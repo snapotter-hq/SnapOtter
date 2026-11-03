@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: Tools pemrosesan file yang mencakup image, video, audio, PDF, dan files. Masing-masing menerima unggahan file multipart dan mengembalikan download URL.
+    description: Endpoint alat yang tidak dikelompokkan dalam bagian tertentu.
+  - name: Image
+    description: Alat image. Masing-masing menerima unggahan file multipart dan mengembalikan download URL.
+  - name: Video
+    description: Alat video. Masing-masing menerima unggahan file multipart dan mengembalikan download URL.
+  - name: Audio
+    description: Alat audio. Masing-masing menerima unggahan file multipart dan mengembalikan download URL.
+  - name: PDF
+    description: Alat PDF dan dokumen. Masing-masing menerima unggahan file multipart dan mengembalikan download URL.
   - name: Batch
     description: Proses beberapa file melalui sebuah tool dalam satu permintaan.
+  - name: Jobs
+    description: Status dan progres job yang berjalan lama.
   - name: Pipelines
     description: Rangkai beberapa tools menjadi alur kerja yang dapat digunakan kembali.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: Ubah Ukuran Gambar
       description: Ubah ukuran image ke dimensi tertentu atau berdasarkan persentase.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: Resize sadar konten
       description: Ubah ukuran image menggunakan seam carving untuk menghapus atau menyisipkan konten secara cerdas sambil mempertahankan fitur penting.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: Potong Gambar
       description: Potong image ke area tertentu.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: Putar & Balik Gambar
       description: Putar image berdasarkan sudut atau balik secara horizontal/vertikal.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: Konversi Gambar
       description: Konversi image ke format lain.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar
       description: Kurangi ukuran file image berdasarkan tingkat kualitas atau ukuran target.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar ke 20 KB
       description: |
         Kompres gambar ke ukuran target 20 KB
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar ke 50 KB
       description: |
         Kompres gambar ke ukuran target 50 KB
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar ke 100 KB
       description: |
         Kompres gambar ke ukuran target 100 KB
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar ke 200 KB
       description: |
         Kompres gambar ke ukuran target 200 KB
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: Kompres Gambar ke 500 KB
       description: |
         Kompres gambar ke ukuran target 500 KB
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: Hapus Metadata Gambar
       description: Hapus metadata EXIF, GPS, ICC, atau XMP dari image.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: Border dan frame
       description: Tambahkan border, sudut membulat, padding, atau bayangan ke image.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: Percantik screenshot
       description: |
         Tambahkan latar belakang gradien, device frame, bayangan, watermark, dan ukuran
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: Penyesuaian warna
       description: |
         Tool penyesuaian warna terkonsolidasi. Menyesuaikan brightness, contrast, exposure, saturation, temperature, tint, hue, sharpness, channel warna, dan efek dalam satu proses.
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: Pertajam Gambar
       description: Pertajam image menggunakan metode adaptive, unsharp mask, atau high-pass dengan pengurangan noise opsional.
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Optimalkan untuk web
       description: Optimalkan image untuk pengiriman web dengan mengonversi ke format modern, menyesuaikan kualitas, dan opsional mengubah ukuran.
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Optimalkan untuk web (preview)
       description: |
         Endpoint preview ringan untuk penyetelan parameter langsung. Mengembalikan
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: Peningkatan image
       description: |
         Peningkatan image otomatis bertenaga AI. Menganalisis image dan menerapkan
@@ -1363,7 +1433,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: Analisis image untuk peningkatan
       description: |
         Analisis image dan kembalikan saran koreksi tanpa menerapkannya.
@@ -1415,7 +1485,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: Penghapusan noise
       description: |
         Penghapusan noise bertenaga AI menggunakan sidecar Python. Mendukung beberapa
@@ -1454,11 +1524,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1494,7 +1575,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: Penghapusan mata merah
       description: |
         Deteksi dan penghapusan mata merah bertenaga AI. Mendeteksi wajah dan mengoreksi
@@ -1531,11 +1612,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1571,7 +1663,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: Restorasi foto
       description: |
         Pipeline restorasi foto bertenaga AI. Memperbaiki goresan, meningkatkan wajah,
@@ -1611,11 +1703,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1651,7 +1754,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Pas foto - analisis
       description: |
         Fase 1 pembuatan pas foto. Mendeteksi landmark wajah dan menghapus
@@ -1787,7 +1890,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Pas foto - generate
       description: |
         Fase 2 pembuatan pas foto. Menggunakan jobId dan landmark dari
@@ -1930,7 +2033,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: Warnai
       description: |
         Pewarnaan foto bertenaga AI. Mengonversi foto hitam-putih atau grayscale
@@ -1965,11 +2068,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2005,7 +2119,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: Peningkatan wajah
       description: |
         Peningkatan wajah bertenaga AI menggunakan GFPGAN atau CodeFormer. Mendeteksi wajah
@@ -2042,11 +2156,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2082,7 +2207,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: Image ke Base64
       description: |
         Konversi satu atau beberapa image menjadi string berformat Base64 dengan data URI.
@@ -2176,7 +2301,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: Watermark teks
       description: Tambahkan watermark teks ke image.
       security:
@@ -2229,7 +2354,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: Overlay teks
       description: Tambahkan overlay teks bergaya dengan kotak latar belakang opsional.
       security:
@@ -2283,7 +2408,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: Ganti warna
       description: Ganti warna tertentu pada image dengan warna lain atau transparansi.
       security:
@@ -2334,7 +2459,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: Simulasi buta warna
       description: Simulasikan tampilan image bagi orang dengan berbagai jenis defisiensi penglihatan warna.
       security:
@@ -2382,7 +2507,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF tools
       description: Ubah ukuran, optimalkan, sesuaikan kecepatan, balik, ekstrak frame dari, atau putar GIF animasi.
       security:
@@ -2446,7 +2571,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: Info GIF
       description: Dapatkan metadata tentang GIF animasi termasuk dimensi, jumlah frame, delay, dan durasi.
       security: []
@@ -2503,7 +2628,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: Smart crop
       description: Smart crop dengan tiga mode - fokus subjek, fokus wajah, atau trim otomatis.
       security:
@@ -2562,7 +2687,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: Image ke SVG
       description: Konversi image raster ke format vektor SVG menggunakan potrace (hitam-putih) atau VTracer (warna).
       security:
@@ -2617,7 +2742,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG ke raster
       description: Konversi file SVG ke format image raster pada skala dan DPI kustom.
       security:
@@ -2670,7 +2795,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG ke raster (batch)
       description: Konversi beberapa file SVG ke image raster. Mengembalikan arsip ZIP.
       security:
@@ -2730,7 +2855,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: Image ke PDF
       description: Konversi satu atau beberapa image menjadi dokumen PDF.
       security:
@@ -2812,7 +2937,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF ke image
       description: Konversi halaman PDF ke image. Mengembalikan unduhan per halaman dan ZIP dari semua halaman.
       security:
@@ -2901,7 +3026,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: Jumlah halaman PDF
       description: Dapatkan jumlah halaman dalam file PDF.
       security: []
@@ -2940,7 +3065,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: Thumbnail halaman PDF
       description: Buat pratinjau thumbnail untuk setiap halaman dalam PDF (maks 200 halaman, JPEG lebar 300px).
       security: []
@@ -2993,7 +3118,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: Bagi Gambar
       description: Bagi image menjadi grid ubin. Mengembalikan file ZIP.
       security:
@@ -3047,7 +3172,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: Ganti nama massal
       description: Ganti nama beberapa image menggunakan template pola. Mendukung token {{index}}, {{padded}}, dan {{original}}. Mengembalikan file ZIP.
       security:
@@ -3099,7 +3224,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Generator favicon
       description: Buat set favicon lengkap (PNG 16px hingga 512px, ICO, dan manifest.json) dari sebuah image. Mengembalikan file ZIP.
       security:
@@ -3143,7 +3268,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: Watermark image
       description: Tambahkan overlay watermark image.
       security:
@@ -3198,7 +3323,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: Komposisi image
       description: Komposisikan image overlay ke image dasar dengan mode blend.
       security:
@@ -3254,7 +3379,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: Generator meme
       description: |
         Buat meme menggunakan template atau image kustom. Mendukung dua mode: (1) Mode template - kirim body JSON dengan `templateId` dan `textBoxes`. (2) Mode image kustom - kirim multipart dengan `file` dan `settings`.
@@ -3493,7 +3618,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: Bandingkan image
       description: Bandingkan dua image dan buat laporan perbedaan visual.
       security:
@@ -3560,7 +3685,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: Penghapus objek
       description: Hapus objek dari image menggunakan mask. Area putih pada mask menunjukkan area yang akan dihapus. Menggunakan inpainting LaMa.
       security:
@@ -3613,11 +3738,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3653,7 +3789,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: Perluasan kanvas AI (eksperimental)
       description: |
         Perluas kanvas image menggunakan outpainting AI. Memperluas image ke segala
@@ -3696,11 +3832,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3736,7 +3883,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: Kolase & Grid
       description: Gabungkan beberapa image menjadi kolase grid.
       security:
@@ -3793,7 +3940,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: Gabungkan Gambar
       description: Gabungkan beberapa image secara horizontal, vertikal, atau dalam tata letak grid.
       security:
@@ -3852,7 +3999,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: Hapus latar belakang dari gambar animasi
       description: Hapus latar belakang dari animasi GIF, WebP, atau APNG bingkai demi bingkai menggunakan AI (rembg). Berjalan secara lokal.
       security:
@@ -3898,11 +4045,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3932,7 +4090,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: Hapus latar belakang
       description: Hapus latar belakang dari image menggunakan AI (rembg). Berjalan secara lokal.
       security:
@@ -3966,11 +4124,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4006,7 +4175,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: Terapkan efek latar belakang
       description: |
         Terapkan penggantian atau efek latar belakang ke hasil remove-background yang telah diproses sebelumnya. Memerlukan jobId dari panggilan POST /api/v1/tools/image/remove-background sebelumnya.
@@ -4073,7 +4242,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: Perbaiki transparansi palsu
       description: |
         Perbaiki PNG "transparan palsu" yang memiliki fringing, halo, atau artefak
@@ -4111,11 +4280,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4151,7 +4331,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: Upscaling image
       description: Perbesar image menggunakan AI (Real-ESRGAN). Berjalan secara lokal.
       security:
@@ -4187,11 +4367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4227,7 +4418,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: Blur Wajah & Info Pribadi
       description: Deteksi dan blur wajah pada image untuk privasi. Menggunakan OpenCV. Berjalan secara lokal.
       security:
@@ -4259,11 +4450,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4299,7 +4501,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / ekstraksi teks
       description: |-
         Ekstrak teks dari gambar secara lokal. Tingkat Fast bawaan menggunakan
@@ -4337,6 +4539,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4345,6 +4552,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4388,7 +4601,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: Info image
       description: Dapatkan metadata terperinci tentang image termasuk dimensi, format, color space, dan data EXIF.
       security:
@@ -4491,7 +4704,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: Palet warna
       description: Ekstrak warna dominan dari sebuah image.
       security:
@@ -4544,7 +4757,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: Pembaca barcode
       description: Baca QR code dan barcode dari sebuah image.
       security:
@@ -4649,7 +4862,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: Temukan duplikat
       description: Temukan image duplikat dalam suatu set menggunakan perceptual hashing.
       security:
@@ -4752,7 +4965,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: Generator QR code
       description: Buat image QR code dari teks. Tool ini menerima body JSON, bukan multipart.
       security:
@@ -4815,7 +5028,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Tangkap halaman web sebagai image
       description: Tangkap halaman web sebagai image screenshot berkualitas tinggi. Menerima body JSON dengan URL dan opsi penangkapan.
       security:
@@ -4901,7 +5114,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: Inspeksi metadata
       description: Lihat semua metadata (EXIF, GPS, ICC, XMP) pada image tanpa menghapusnya.
       security:
@@ -4970,7 +5183,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: Sunting Metadata Gambar
       description: Edit field metadata EXIF, IPTC, GPS, dan lainnya pada image menggunakan ExifTool.
       security:
@@ -5039,7 +5252,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: Inspeksi metadata (ExifTool)
       description: Baca semua metadata dari image menggunakan ExifTool. Mengembalikan semua field EXIF, IPTC, XMP, dan GPS yang tertanam.
       security:
@@ -7054,6 +7267,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: Ambil status job
+      description: |
+        Mengembalikan status job yang tersimpan tanpa menahan koneksi tetap terbuka. Lakukan polling setelah respons 202, atau gunakan sebagai cadangan saat aliran progres terputus.
+
+        `status` adalah salah satu dari `queued`, `processing`, `completed`, `failed`, atau `canceled`. `completed`, `failed`, dan `canceled` bersifat terminal. Job yang dibatalkan tetap bisa membawa `result` sebagian (misalnya ZIP berisi file yang sudah selesai), jadi baca `result` setiap kali ada.
+
+        Aksesnya mengikuti aliran progres: pemilik job, pengguna dengan `files:all`, atau pengguna dengan `features:manage` untuk job instalasi feature bundle. Pemanggil lain mendapat 404.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7372,6 +7632,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Kirim feedback produk
+      description: Mencatat satu event feedback dari pengguna yang sudah masuk. Dibatasi 10 permintaan per menit. `accepted` bernilai false jika server tidak mencatat event tersebut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: Ambil rilis yang lebih baru tersedia
+      description: Mengembalikan rilis terbaru yang sudah dipublikasikan jika lebih baru dari versi yang berjalan, atau null. Memerlukan settings:write.
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: Reset semua feature bundle AI
+      description: |
+        Menghapus virtual environment AI, model, dan cache pip, lalu menandai setiap bundle sebagai belum terpasang. Gunakan saat instalasi tidak bisa pulih dengan sendirinya. Menghapus bundle hanya menghapus bobot model-nya, jadi ini reset penuh.
+
+        Respons menyatakan apakah venv diisi ulang dari base bawaan (venvReseeded). Mengembalikan 409 selama instalasi bundle berjalan. Memerlukan features:manage.
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: Instal setiap feature bundle yang dibutuhkan alat
+      description: Mengantrekan setiap bundle yang dibutuhkan alat dan melaporkan untuk tiap bundle apakah diantrekan atau dilewati. Memerlukan features:manage.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7411,11 +7856,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7925,7 +8381,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Konversi Video
       description: Konversi video antara MP4, MOV, WebM, AVI, dan MKV.
       security:
@@ -7957,11 +8413,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7991,7 +8458,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Kompres Video
       description: Perkecil ukuran file video dengan kontrol kualitas.
       security:
@@ -8023,11 +8490,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8057,7 +8535,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Pangkas Video
       description: Potong sebuah klip dari sebuah video.
       security:
@@ -8107,7 +8585,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Bisukan Video
       description: Hapus track audio dari sebuah video.
       security:
@@ -8150,7 +8628,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: Video ke GIF
       description: Ubah klip video menjadi GIF animasi.
       security:
@@ -8184,11 +8662,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8218,7 +8707,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Ubah Ukuran Video
       description: Skalakan video ke resolusi baru atau ukuran preset.
       security:
@@ -8268,7 +8757,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Crop Video
       description: Potong sebuah area dari sebuah video.
       security:
@@ -8319,7 +8808,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Putar Video
       description: Putar atau balik sebuah video.
       security:
@@ -8367,7 +8856,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: Ubah FPS
       description: Ubah frame rate sebuah video.
       security:
@@ -8415,7 +8904,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Warna Video
       description: Sesuaikan brightness, contrast, saturation, dan gamma.
       security:
@@ -8466,7 +8955,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Kecepatan Video
       description: Percepat atau perlambat sebuah video.
       security:
@@ -8515,7 +9004,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Balik Video
       description: Putar klip video secara terbalik. Dibatasi hingga klip 5 menit.
       security:
@@ -8558,7 +9047,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: Normalisasi Audio Video
       description: Normalisasi volume audio video ke standar siaran (EBU R128).
       security:
@@ -8601,7 +9090,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: Padding Rasio
       description: Tambahkan bilah berwarna solid agar sesuai dengan rasio aspek target.
       security:
@@ -8650,7 +9139,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Padding Blur
       description: Isi bilah dengan salinan blur dari video.
       security:
@@ -8699,7 +9188,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Watermark Video
       description: Bakar watermark teks ke frame video.
       security:
@@ -8751,7 +9240,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Stabilkan Video
       description: Kurangi guncangan kamera dengan stabilisasi dua-lintasan.
       security:
@@ -8782,11 +9271,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8816,7 +9316,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF ke Video
       description: Konversi GIF animasi menjadi video MP4, WebM, atau MOV.
       security:
@@ -8864,7 +9364,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: Video ke WebP
       description: Konversi klip video menjadi image WebP animasi.
       security:
@@ -8915,7 +9415,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: Video ke Frame
       description: Ekstrak frame dari video sebagai ZIP berisi image.
       security:
@@ -8966,7 +9466,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Gabungkan Video
       description: |
         Gabungkan beberapa klip video menjadi satu file MP4. Semua input
@@ -8996,11 +9496,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9030,7 +9541,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Ganti Audio
       description: Tukar track audio sebuah video dengan file lain.
       security:
@@ -9075,7 +9586,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: Bakar Subtitle
       description: Render subtitle secara permanen ke frame video.
       security:
@@ -9108,11 +9619,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9142,7 +9664,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Tanam Subtitle
       description: Mux track subtitle ke dalam container video.
       security:
@@ -9192,7 +9714,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Ekstrak Subtitle
       description: Tarik track subtitle keluar dari video sebagai file SRT.
       security:
@@ -9235,7 +9757,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: Image ke Video
       description: Ubah sekumpulan image menjadi video slideshow.
       security:
@@ -9287,7 +9809,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Bersihkan Metadata Video
       description: Hapus metadata dari video dan laporkan apa yang ditemukan.
       security:
@@ -9330,7 +9852,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Subtitle Otomatis
       description: |
         Pembuatan subtitle bertenaga AI dari track audio video menggunakan
@@ -9365,11 +9887,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9405,7 +9938,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Ekstrak Audio
       description: Tarik track audio keluar dari sebuah video.
       security:
@@ -9453,7 +9986,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Konversi Audio
       description: Konversi audio antara MP3, WAV, OGG, dan lainnya.
       security:
@@ -9502,7 +10035,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Pangkas Audio
       description: Potong sebuah bagian dari file audio.
       security:
@@ -9551,7 +10084,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: Atur Volume
       description: Naikkan atau turunkan volume audio dengan gain tetap.
       security:
@@ -9599,7 +10132,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Normalisasi Audio
       description: Ratakan loudness ke level standar siaran (EBU R128, -16 LUFS).
       security:
@@ -9642,7 +10175,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Fade Audio
       description: Tambahkan efek fade-in dan fade-out ke audio.
       security:
@@ -9691,7 +10224,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Balik Audio
       description: Putar audio secara terbalik.
       security:
@@ -9734,7 +10267,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Kecepatan Audio
       description: Percepat atau perlambat pemutaran audio.
       security:
@@ -9782,7 +10315,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Geser Pitch
       description: Naikkan atau turunkan pitch berdasarkan semitone tanpa mengubah kecepatan.
       security:
@@ -9830,7 +10363,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Channel Audio
       description: Konversi antara mono, stereo, atau tukar channel kiri dan kanan.
       security:
@@ -9878,7 +10411,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Hapus Keheningan
       description: Hapus bagian hening dari audio.
       security:
@@ -9927,7 +10460,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Pengurangan Noise
       description: Kurangi noise latar belakang dengan denoising berbasis FFT.
       security:
@@ -9975,7 +10508,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Gabungkan Audio
       description: Gabungkan beberapa file audio menjadi satu track berurutan.
       security:
@@ -10025,7 +10558,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Bagi Audio
       description: |
         Bagi audio berdasarkan waktu, bagian yang sama, atau deteksi keheningan. Mengembalikan
@@ -10079,7 +10612,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Pembuat Nada Dering
       description: Buat klip nada dering (.m4r) dari file audio apa pun.
       security:
@@ -10128,7 +10661,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Image Bentuk Gelombang
       description: Buat visualisasi bentuk gelombang sebagai image PNG dari file audio.
       security:
@@ -10178,7 +10711,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Metadata Audio
       description: |
         Lihat, edit, atau hapus tag audio (ID3). Respons menyertakan objek
@@ -10232,7 +10765,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Transkripsi Audio
       description: |
         Transkripsi speech-to-text bertenaga AI menggunakan faster-whisper. Menghasilkan
@@ -10267,11 +10800,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10307,7 +10851,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: Gabungkan PDF
       description: Gabungkan beberapa PDF menjadi satu. Memerlukan setidaknya dua file.
       security:
@@ -10352,7 +10896,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: Bagi PDF
       description: |
         Ekstrak halaman atau bagi menjadi beberapa bagian. Pada mode "range" mengembalikan satu PDF
@@ -10405,7 +10949,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF
       description: |
         Perkecil ukuran file PDF dengan downsampling image tertanam. Pada mode "quality"
@@ -10459,7 +11003,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF ke 100 KB
       description: |
         Kompres PDF ke ukuran target 100 KB (100 KB, di mana 1 KB = 1000 byte).
@@ -10494,11 +11038,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10522,7 +11077,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF ke 200 KB
       description: |
         Kompres PDF ke ukuran target 200 KB (200 KB, di mana 1 KB = 1000 byte).
@@ -10557,11 +11112,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10585,7 +11151,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF ke 500 KB
       description: |
         Kompres PDF ke ukuran target 500 KB (500 KB, di mana 1 KB = 1000 byte).
@@ -10620,11 +11186,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10648,7 +11225,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF ke 1 MB
       description: |
         Kompres PDF ke ukuran target 1 MB (1000 KB, di mana 1 KB = 1000 byte).
@@ -10683,11 +11260,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10711,7 +11299,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: Kompres PDF ke 2 MB
       description: |
         Kompres PDF ke ukuran target 2 MB (2000 KB, di mana 1 KB = 1000 byte).
@@ -10746,11 +11334,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10774,7 +11373,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: Putar PDF
       description: Putar halaman dalam PDF sebesar 90, 180, atau 270 derajat.
       security:
@@ -10823,7 +11422,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: Ekstrak halaman
       description: Tarik halaman yang dipilih ke dalam PDF baru.
       security:
@@ -10871,7 +11470,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: Hapus halaman
       description: Hapus halaman tertentu dari PDF. Tidak dapat menghapus setiap halaman.
       security:
@@ -10919,7 +11518,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: Atur PDF
       description: Susun ulang halaman dengan urutan halaman eksplisit.
       security:
@@ -10967,7 +11566,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF Multi-Alat
       description: Susun PDF dari rencana halaman eksplisit - urutkan ulang, duplikat, putar, atau hapus halaman dan tarik halaman dari PDF tambahan, dalam satu pengiriman.
       security:
@@ -11018,7 +11617,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: Lindungi PDF
       description: Tambahkan perlindungan password dengan enkripsi AES-256. Password disunting dari audit log.
       security:
@@ -11067,7 +11666,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: Buka Kunci PDF
       description: Hapus perlindungan password dari PDF. Password yang benar harus diberikan. Password disunting dari audit log.
       security:
@@ -11115,7 +11714,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: Perbaiki PDF
       description: Coba perbaiki PDF yang rusak atau korup. Validasi struktural dilewati pada input agar file yang tidak valid dapat diterima.
       security:
@@ -11158,7 +11757,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: Optimalkan PDF untuk web
       description: Linearisasi PDF untuk tampilan web cepat (progressive download).
       security:
@@ -11201,7 +11800,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF Grayscale
       description: Konversi semua warna dalam PDF menjadi grayscale.
       security:
@@ -11244,7 +11843,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: Konverter PDF/A
       description: Konversi PDF ke format arsip PDF/A-2 untuk penyimpanan jangka panjang.
       security:
@@ -11287,7 +11886,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: Crop PDF
       description: Potong semua halaman dengan margin seragam.
       security:
@@ -11335,7 +11934,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: Halaman Per Lembar (N-up)
       description: Susun beberapa halaman per lembar (mis. 2-up, 4-up).
       security:
@@ -11383,7 +11982,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: Booklet PDF
       description: Susun halaman untuk dilipat menjadi booklet (impose untuk cetak duplex).
       security:
@@ -11431,7 +12030,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: Watermark PDF
       description: Tambahkan watermark teks ke setiap halaman PDF.
       security:
@@ -11483,7 +12082,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: Nomor halaman PDF
       description: Tambahkan nomor halaman ("Page N of M") ke setiap halaman PDF.
       security:
@@ -11532,7 +12131,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: Konversi dokumen
       description: Konversi antara format Word, OpenDocument, RTF, dan teks biasa.
       security:
@@ -11563,11 +12162,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11591,7 +12201,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: Konversi presentasi
       description: Konversi antara format presentasi PowerPoint dan OpenDocument.
       security:
@@ -11622,11 +12232,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11650,7 +12271,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: Konversi spreadsheet
       description: Konversi antara format Excel, OpenDocument, dan CSV. Workbook multi-sheet mengekspor sheet pertama ke CSV.
       security:
@@ -11681,11 +12302,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11709,7 +12341,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel ke PDF
       description: Konversi spreadsheet ke PDF. Sheet yang lebar dapat terpaginasi ke beberapa halaman.
       security:
@@ -11735,11 +12367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11763,7 +12406,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word ke PDF
       description: Konversi dokumen Word ke PDF.
       security:
@@ -11789,11 +12432,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11817,7 +12471,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint ke PDF
       description: Konversi presentasi ke PDF.
       security:
@@ -11843,11 +12497,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11871,7 +12536,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML ke PDF
       description: Konversi file HTML ke PDF. Sumber daya remote dinonaktifkan demi privasi.
       security:
@@ -11897,11 +12562,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11925,7 +12601,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown ke Word
       description: Konversi file Markdown ke dokumen Word (DOCX).
       security:
@@ -11968,7 +12644,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown ke HTML
       description: Konversi file Markdown ke halaman HTML mandiri. Image remote pada sumber dibiarkan apa adanya pada output.
       security:
@@ -12011,7 +12687,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown ke PDF
       description: Konversi file Markdown ke PDF bergaya. Sumber daya remote dinonaktifkan demi privasi.
       security:
@@ -12037,11 +12713,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12065,7 +12752,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: Konversi dari EPUB
       description: Konversi EPUB ke PDF, DOCX, HTML, atau Markdown. Sumber daya remote di dalam buku tidak diambil.
       security:
@@ -12096,11 +12783,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12124,7 +12822,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: Konversi ke EPUB
       description: Konversi file Word, Markdown, HTML, atau teks biasa ke EPUB.
       security:
@@ -12150,11 +12848,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12178,7 +12887,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: Ratakan PDF
       description: Bakar form dan anotasi ke dalam konten halaman.
       security:
@@ -12221,7 +12930,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: Redaksi PDF
       description: Hapus kemunculan teks secara permanen (redaksi sejati yang terverifikasi).
       security:
@@ -12276,7 +12985,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF ke teks
       description: Ekstrak teks biasa dari PDF.
       security:
@@ -12325,7 +13034,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF ke Word
       description: Terbaik untuk PDF berbasis teks; halaman hasil pindaian memerlukan OCR.
       security:
@@ -12351,11 +13060,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12379,7 +13099,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: Metadata PDF
       description: Baca dan tulis metadata dokumen PDF.
       security:
@@ -12436,7 +13156,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: OCR PDF
       description: |-
         Ekstrak teks dari dokumen PDF yang dipindai halaman demi halaman. Fast menggunakan
@@ -12476,6 +13196,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12484,6 +13209,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12533,7 +13264,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Pembuat Chart
       description: Buat diagram batang, garis, atau lingkaran dari data CSV atau JSON. Mengembalikan gambar PNG. Ketika baris ditinggalkan karena sel nilainya berisi teks yang bukan angka, respons menambahkan `chartRows` ({charted, skipped}); baris kosong tidak dihitung.
       security:
@@ -12584,7 +13315,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV ke Excel
       description: Konversi antara CSV dan Excel (XLSX), kedua arah. Unggah file CSV atau TSV untuk mendapatkan XLSX, atau unggah file XLSX untuk mendapatkan CSV.
       security:
@@ -12632,7 +13363,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV ke JSON
       description: Konversi antara CSV dan JSON, kedua arah. Unggah file CSV atau TSV untuk mendapatkan JSON, atau unggah array objek JSON untuk mendapatkan CSV.
       security:
@@ -12680,7 +13411,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON ke XML
       description: Konversi antara JSON dan XML, kedua arah. Unggah file JSON untuk mendapatkan XML, atau unggah file XML untuk mendapatkan JSON.
       security:
@@ -12728,7 +13459,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: Bagi CSV
       description: Bagi file CSV menjadi file yang lebih kecil berdasarkan jumlah baris. Mengembalikan arsip ZIP berisi bagian-bagiannya.
       security:
@@ -12777,7 +13508,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: Gabungkan CSV
       description: Gabungkan beberapa file CSV atau TSV dengan kolom yang cocok menjadi satu file gabungan. Semua file harus memiliki header kolom yang sama.
       security:
@@ -12822,7 +13553,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: Konversi YAML / JSON
       description: Konversi antara YAML dan JSON, kedua arah. Unggah file YAML untuk mendapatkan JSON, atau unggah file JSON untuk mendapatkan YAML.
       security:
@@ -12865,7 +13596,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML ke CSV
       description: Ekstrak elemen berulang dari file XML ke dalam tabel CSV. Secara otomatis menemukan array objek pertama dalam pohon XML.
       security:
@@ -12908,7 +13639,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: Buat ZIP
       description: Bundel beberapa file menjadi satu arsip ZIP. Filename duplikat otomatis dideduplikasi.
       security:
@@ -12953,7 +13684,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: Ekstrak ZIP
       description: Ekstrak file dari arsip ZIP dengan aman disertai perlindungan bomb. Arsip berisi satu file mengembalikan file secara langsung; arsip multi-file mengembalikan ZIP datar.
       security:
@@ -12996,7 +13727,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: Ganti latar belakang
       description: |
         Penggantian latar belakang bertenaga AI. Menghapus latar belakang subjek
@@ -13036,11 +13767,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13076,7 +13818,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: Blur latar belakang
       description: |
         Blur latar belakang bertenaga AI. Menghapus latar belakang, mem-blur
@@ -13112,11 +13854,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13152,7 +13905,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: Generator barcode
       description: Buat image barcode dari teks. Tool ini menerima body JSON, bukan multipart.
       security:
@@ -13215,7 +13968,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: Crop lingkaran
       description: Potong image menjadi lingkaran terpusat dengan sudut transparan, border opsional, dan zoom/offset yang dapat disesuaikan.
       security:
@@ -13269,7 +14022,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: Potong Membulat
       description: Pangkas gambar menjadi persegi bulat atau persegi dengan sudut transparan, batas opsional, dan zoom/offset yang dapat disesuaikan.
       security:
@@ -13325,7 +14078,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: Duotone
       description: Terapkan efek duotone dua-warna dengan warna shadow dan highlight kustom.
       security:
@@ -13375,7 +14128,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: Padding image
       description: Beri padding pada image ke rasio aspek target dengan latar belakang warna solid, transparan, atau blur.
       security:
@@ -13428,7 +14181,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Pikselasi
       description: Terapkan efek pikselasi ke seluruh image atau area persegi panjang tertentu.
       security:
@@ -13481,7 +14234,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vignette
       description: Tambahkan efek vignette dengan kekuatan, warna, radius, kelembutan, kebulatan, dan posisi tengah yang dapat disesuaikan.
       security:
@@ -13535,7 +14288,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: Konverter GIF/WebP
       description: Konversi GIF animasi ke WebP dan sebaliknya, mempertahankan semua frame. Hanya menerima input .gif dan .webp.
       security:
@@ -13585,7 +14338,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Histogram
       description: |
         Buat chart histogram RGB dari sebuah image. Mengembalikan image histogram
@@ -13719,7 +14472,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: Placeholder LQIP
       description: |
         Buat placeholder image kualitas-rendah berukuran kecil. Mengembalikan file image
@@ -13798,7 +14551,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: Sprite sheet
       description: |
         Gabungkan beberapa image menjadi satu grid sprite sheet. Menerima
@@ -13893,7 +14646,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Pas Foto
       description: |
         Endpoint panduan untuk alur pas foto dua-fase. Gunakan
@@ -13926,7 +14679,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: Tanda Tangani PDF
       description: Stempelkan satu atau beberapa image PNG tanda tangan ke PDF menggunakan penempatan halaman ternormalisasi.
       security:
@@ -13970,11 +14723,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -14004,7 +14768,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke PNG
       description: |
         Konversi JPG ke PNG
@@ -14065,7 +14829,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke JPG
       description: |
         Konversi PNG ke JPG
@@ -14126,7 +14890,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke WebP
       description: |
         Konversi JPG ke WebP
@@ -14187,7 +14951,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke WebP
       description: |
         Konversi PNG ke WebP
@@ -14248,7 +15012,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP ke JPG
       description: |
         Konversi WebP ke JPG
@@ -14309,7 +15073,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP ke PNG
       description: |
         Konversi WebP ke PNG
@@ -14370,7 +15134,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke AVIF
       description: |
         Konversi JPG ke AVIF
@@ -14431,7 +15195,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke AVIF
       description: |
         Konversi PNG ke AVIF
@@ -14492,7 +15256,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP ke AVIF
       description: |
         Konversi WebP ke AVIF
@@ -14553,7 +15317,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC ke JPG
       description: |
         Konversi HEIC ke JPG
@@ -14614,7 +15378,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC ke PNG
       description: |
         Konversi HEIC ke PNG
@@ -14675,7 +15439,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC ke AVIF
       description: |
         Konversi HEIC ke AVIF
@@ -14736,7 +15500,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke GIF
       description: |
         Konversi JPG ke GIF
@@ -14797,7 +15561,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke GIF
       description: |
         Konversi PNG ke GIF
@@ -14858,7 +15622,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF ke JPG
       description: |
         Konversi GIF ke JPG
@@ -14919,7 +15683,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF ke PNG
       description: |
         Konversi GIF ke PNG
@@ -14980,7 +15744,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP ke GIF
       description: |
         Konversi WebP ke GIF
@@ -15041,7 +15805,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke TIFF
       description: |
         Konversi JPG ke TIFF
@@ -15102,7 +15866,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke TIFF
       description: |
         Konversi PNG ke TIFF
@@ -15163,7 +15927,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF ke JPG
       description: |
         Konversi TIFF ke JPG
@@ -15224,7 +15988,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF ke PNG
       description: |
         Konversi TIFF ke PNG
@@ -15285,7 +16049,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD ke JPG
       description: |
         Konversi PSD ke JPG
@@ -15346,7 +16110,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD ke PNG
       description: |
         Konversi PSD ke PNG
@@ -15407,7 +16171,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke EPS
       description: |
         Konversi PNG ke EPS
@@ -15468,7 +16232,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke EPS
       description: |
         Konversi JPG ke EPS
@@ -15529,7 +16293,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS ke PNG
       description: |
         Konversi EPS ke PNG
@@ -15590,7 +16354,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS ke JPG
       description: |
         Konversi EPS ke JPG
@@ -15651,7 +16415,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke SVG
       description: |
         Konversi PNG ke SVG
@@ -15712,7 +16476,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke SVG
       description: |
         Konversi JPG ke SVG
@@ -15773,7 +16537,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF ke SVG
       description: |
         Konversi TIFF ke SVG
@@ -15834,7 +16598,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD ke SVG
       description: |
         Konversi PSD ke SVG
@@ -15895,7 +16659,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS ke SVG
       description: |
         Konversi EPS ke SVG
@@ -15956,7 +16720,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG ke PNG
       description: |
         Konversi SVG ke PNG
@@ -16012,7 +16776,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG ke JPG
       description: |
         Konversi SVG ke JPG
@@ -16068,7 +16832,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG ke PDF
       description: |
         Konversi JPG ke PDF
@@ -16126,7 +16890,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG ke PDF
       description: |
         Konversi PNG ke PDF
@@ -16184,7 +16948,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC ke PDF
       description: |
         Konversi HEIC ke PDF
@@ -16242,7 +17006,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF ke PDF
       description: |
         Konversi TIFF ke PDF
@@ -16300,7 +17064,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP ke PDF
       description: |
         Konversi WebP ke PDF
@@ -16358,7 +17122,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF ke PDF
       description: |
         Konversi GIF ke PDF
@@ -16416,7 +17180,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS ke PDF
       description: |
         Konversi EPS ke PDF
@@ -16474,7 +17238,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF ke JPG
       description: |
         Konversi PDF ke JPG
@@ -16530,7 +17294,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF ke PNG
       description: |
         Konversi PDF ke PNG
@@ -16586,7 +17350,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF ke TIFF
       description: |
         Konversi PDF ke TIFF
@@ -16642,7 +17406,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV ke MP4
       description: |
         Konversi MOV ke MP4
@@ -16675,11 +17439,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16709,7 +17484,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM ke MP4
       description: |
         Konversi WEBM ke MP4
@@ -16742,11 +17517,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16776,7 +17562,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV ke MP4
       description: |
         Konversi MKV ke MP4
@@ -16809,11 +17595,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16843,7 +17640,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI ke MP4
       description: |
         Konversi AVI ke MP4
@@ -16876,11 +17673,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16910,7 +17718,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke MOV
       description: |
         Konversi MP4 ke MOV
@@ -16943,11 +17751,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16977,7 +17796,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke WEBM
       description: |
         Konversi MP4 ke WEBM
@@ -17010,11 +17829,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17044,7 +17874,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM ke MOV
       description: |
         Konversi WEBM ke MOV
@@ -17077,11 +17907,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17111,7 +17952,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV ke MOV
       description: |
         Konversi MKV ke MOV
@@ -17144,11 +17985,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17178,7 +18030,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI ke MOV
       description: |
         Konversi AVI ke MOV
@@ -17211,11 +18063,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17245,7 +18108,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke AVI
       description: |
         Konversi MP4 ke AVI
@@ -17278,11 +18141,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17312,7 +18186,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV ke AVI
       description: |
         Konversi MOV ke AVI
@@ -17345,11 +18219,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17379,7 +18264,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV ke AVI
       description: |
         Konversi MKV ke AVI
@@ -17412,11 +18297,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17446,7 +18342,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI ke MKV
       description: |
         Konversi AVI ke MKV
@@ -17479,11 +18375,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17513,7 +18420,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke GIF
       description: |
         Konversi MP4 ke GIF
@@ -17546,11 +18453,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17580,7 +18498,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV ke GIF
       description: |
         Konversi MOV ke GIF
@@ -17613,11 +18531,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17647,7 +18576,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV ke GIF
       description: |
         Konversi MKV ke GIF
@@ -17680,11 +18609,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17714,7 +18654,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI ke GIF
       description: |
         Konversi AVI ke GIF
@@ -17747,11 +18687,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17781,7 +18732,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF ke MP4
       description: |
         Konversi GIF ke MP4
@@ -17842,7 +18793,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF ke WEBM
       description: |
         Konversi GIF ke WEBM
@@ -17903,7 +18854,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF ke MOV
       description: |
         Konversi GIF ke MOV
@@ -17964,7 +18915,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke MP3
       description: |
         Konversi MP4 ke MP3
@@ -18025,7 +18976,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV ke MP3
       description: |
         Konversi MOV ke MP3
@@ -18086,7 +19037,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV ke MP3
       description: |
         Konversi MKV ke MP3
@@ -18147,7 +19098,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM ke MP3
       description: |
         Konversi WEBM ke MP3
@@ -18208,7 +19159,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI ke MP3
       description: |
         Konversi AVI ke MP3
@@ -18269,7 +19220,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke WAV
       description: |
         Konversi MP4 ke WAV
@@ -18330,7 +19281,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV ke WAV
       description: |
         Konversi MOV ke WAV
@@ -18391,7 +19342,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 ke OGG
       description: |
         Konversi MP4 ke OGG
@@ -18452,7 +19403,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A ke MP3
       description: |
         Konversi M4A ke MP3
@@ -18513,7 +19464,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A ke WAV
       description: |
         Konversi M4A ke WAV
@@ -18574,7 +19525,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC ke MP3
       description: |
         Konversi AAC ke MP3
@@ -18635,7 +19586,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC ke WAV
       description: |
         Konversi AAC ke WAV
@@ -18696,7 +19647,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC ke FLAC
       description: |
         Konversi AAC ke FLAC
@@ -18757,7 +19708,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG ke MP3
       description: |
         Konversi OGG ke MP3
@@ -18818,7 +19769,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG ke WAV
       description: |
         Konversi OGG ke WAV
@@ -18879,7 +19830,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV ke MP3
       description: |
         Konversi WAV ke MP3
@@ -18940,7 +19891,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 ke WAV
       description: |
         Konversi MP3 ke WAV
@@ -19001,7 +19952,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC ke MP3
       description: |
         Konversi FLAC ke MP3
@@ -19062,7 +20013,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel ke CSV
       description: |
         Konversi Excel ke CSV
@@ -19095,11 +20046,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19238,6 +20200,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: Selesaikan pendaftaran MFA yang wajib
+      description: Mengonfirmasi pendaftaran wajib yang dimulai saat login dan mengembalikan sesi. Panggilan ini tidak dibatasi sesi; token pendaftaran berumur pendek menggantikan sesi. Hanya kode TOTP yang diterima di sini, bukan kode pemulihan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19404,7 +20418,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: Buat preview unggahan
@@ -19753,6 +20767,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: Perbarui sebagian pengguna SCIM
+      description: PatchOp RFC 7644. Mendukung add, remove, dan replace pada path yang diizinkan server. Path pengguna divalidasi per operasi.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19818,6 +20895,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: Perbarui sebagian grup SCIM
+      description: PatchOp RFC 7644. Mendukung add, remove, dan replace pada path yang diizinkan server. Anggota grup divalidasi per operasi.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20064,7 +21204,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20260,13 +21422,33 @@ x-i18n:
       provenance: machine
       outputHash: 1c8b03f27fe3
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: a8509200adbe
+      outputHash: 1750437452f7
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: c08410506451
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 412e7e772358
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 88a87727f2f0
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 06acd030cc00
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 7d8523813845
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 5fb77cbacdee
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21223,6 +22405,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: bedff9625ec5
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: a5fa46669dbb
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: 4ecb09c17ed6
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21255,6 +22445,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 02aa9f735015
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: a86cbb1d7fbf
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: b02a9297bf77
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: d4a5679d55c1
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 07a67b4e8326
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: a2c71c3fb167
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: ec844d7d6cd3
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: e3cbe66955a3
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 92513d658254
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22935,6 +24157,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: cd20ab03e172
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: 385a36c5e8b1
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: f0f5cd8c7695
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23151,6 +24381,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 025562d15e15
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 3bbfd59735fd
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: 41ea168e6aa0
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23191,6 +24429,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: 8680c0a6ca9d
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: c06265210f7c
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 89d43db4836a
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

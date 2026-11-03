@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: Bestandsverwerkingstools voor image, video, audio, PDF en files. Elk accepteert een multipart bestandsupload en geeft een download-URL terug.
+    description: Toolendpoints die niet onder een sectie zijn gegroepeerd.
+  - name: Image
+    description: Image-tools. Elk accepteert een multipart bestandsupload en geeft een download-URL terug.
+  - name: Video
+    description: Video-tools. Elk accepteert een multipart bestandsupload en geeft een download-URL terug.
+  - name: Audio
+    description: Audio-tools. Elk accepteert een multipart bestandsupload en geeft een download-URL terug.
+  - name: PDF
+    description: PDF- en documenttools. Elk accepteert een multipart bestandsupload en geeft een download-URL terug.
   - name: Batch
     description: Verwerk meerdere bestanden door een tool in één verzoek.
+  - name: Jobs
+    description: Status en voortgang van langlopende jobs.
   - name: Pipelines
     description: Koppel meerdere tools tot herbruikbare workflows.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding herschalen
       description: Wijzig het formaat van een afbeelding naar specifieke afmetingen of via een percentage.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: Contentbewust formaat wijzigen
       description: Wijzig het formaat van een afbeelding met seam carving om content intelligent te verwijderen of toe te voegen terwijl belangrijke onderdelen behouden blijven.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding bijsnijden
       description: Snijd een afbeelding bij tot een specifiek gebied.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding draaien & spiegelen
       description: Draai een afbeelding over een hoek of spiegel horizontaal/verticaal.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: Afbeelding converteren
       description: Converteer een afbeelding naar een ander formaat.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren
       description: Verklein de bestandsgrootte van een afbeelding via kwaliteitsniveau of doelgrootte.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren naar 20 KB
       description: |
         Comprimeer een afbeelding naar een doelgrootte van 20 KB
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren naar 50 KB
       description: |
         Comprimeer een afbeelding naar een doelgrootte van 50 KB
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren naar 100 KB
       description: |
         Comprimeer een afbeelding naar een doelgrootte van 100 KB
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren naar 200 KB
       description: |
         Comprimeer een afbeelding naar een doelgrootte van 200 KB
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: Afbeelding comprimeren naar 500 KB
       description: |
         Comprimeer een afbeelding naar een doelgrootte van 500 KB
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingsmetadata verwijderen
       description: Verwijder EXIF-, GPS-, ICC- of XMP-metadata uit een afbeelding.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: Rand en kader
       description: Voeg een rand, afgeronde hoeken, opvulling of schaduw toe aan een afbeelding.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: Screenshot verfraaien
       description: |
         Voeg gradiëntachtergronden, apparaatframes, schaduwen, watermerken en sociale-media-afmetingen toe aan screenshots. Ondersteunt effen, lineaire-gradiënt-, radiale-gradiënt-, image- en transparante achtergronden. Bevat apparaatframes voor macOS, Windows, browser, iPhone, MacBook en iPad. Sociale-mediapresets voor Twitter, LinkedIn, Instagram, Facebook en Product Hunt.
@@ -1063,7 +1133,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: Kleuraanpassingen
       description: |
         Geïntegreerde tool voor kleuraanpassing. Past helderheid, contrast, belichting, verzadiging, temperatuur, tint, kleurtoon, scherpte, kleurkanalen en effecten aan in één doorloop.
@@ -1123,7 +1193,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding verscherpen
       description: Verscherp een afbeelding met adaptieve, unsharp mask- of high-pass-methoden met optionele ruisonderdrukking.
       security:
@@ -1183,7 +1253,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Optimaliseren voor web
       description: Optimaliseer een afbeelding voor levering via het web door te converteren naar moderne formaten, de kwaliteit aan te passen en optioneel het formaat te wijzigen.
       security:
@@ -1236,7 +1306,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Optimaliseren voor web (preview)
       description: |
         Lichtgewicht preview-endpoint voor live parameterafstemming. Geeft de geoptimaliseerde afbeelding rechtstreeks als binary terug (geen JSON). Grootte-informatie staat in de responseheaders. Maakt geen workspace aan en bewaart geen resultaten.
@@ -1297,7 +1367,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingsverbetering
       description: |
         AI-gestuurde automatische afbeeldingsverbetering. Analyseert de afbeelding en past correcties toe voor belichting, contrast, witbalans, verzadiging, scherpte en ruis op basis van de geselecteerde scenemodus.
@@ -1355,7 +1425,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: Afbeelding analyseren voor verbetering
       description: |
         Analyseer een afbeelding en geef voorgestelde correcties terug zonder ze toe te passen. Handig om te bekijken welke verbeteringen zouden worden gemaakt.
@@ -1406,7 +1476,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: Ruisverwijdering
       description: |
         AI-gestuurde ruisverwijdering via de Python-sidecar. Ondersteunt meerdere kwaliteitsniveaus, van snelle preview tot maximale kwaliteit. Vereist dat de noise-removal-featurebundel is geïnstalleerd.
@@ -1443,11 +1513,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1483,7 +1564,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: Rode-ogenverwijdering
       description: |
         AI-gestuurde detectie en verwijdering van rode ogen. Detecteert gezichten en corrigeert rode-ogenartefacten in foto's. Vereist dat de red-eye-removal-featurebundel is geïnstalleerd.
@@ -1518,11 +1599,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1558,7 +1650,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: Fotorestauratie
       description: |
         AI-gestuurde fotorestauratiepipeline. Herstelt krassen, verbetert gezichten, verwijdert ruis en kleurt optioneel oude of beschadigde foto's in. Vereist dat de photo-restoration-featurebundel is geïnstalleerd.
@@ -1596,11 +1688,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1636,7 +1739,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Pasfoto - analyseren
       description: |
         Fase 1 van het genereren van een pasfoto. Detecteert gezichtsherkenningspunten en verwijdert de achtergrond. Geeft herkenningspuntdata en een base64-gecodeerde preview terug voor de client om in de generatiefase te gebruiken. Vereist dat de passport-photo-featurebundel is geïnstalleerd.
@@ -1769,7 +1872,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Pasfoto - genereren
       description: |
         Fase 2 van het genereren van een pasfoto. Gebruikt de jobId en herkenningspunten uit de analysefase om de foto bij te snijden, het formaat te wijzigen en te tegelen naar de opgegeven land-/documentspecificatie. Snelle response (geen nieuwe AI-run).
@@ -1910,7 +2013,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: Inkleuren
       description: |
         AI-gestuurde foto-inkleuring. Zet zwart-wit- of grijswaardenfoto's om naar volledige kleur met DDColor en OpenCV DNN als fallback. Vereist dat de colorize-featurebundel is geïnstalleerd.
@@ -1943,11 +2046,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1983,7 +2097,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: Gezichtsverbetering
       description: |
         AI-gestuurde gezichtsverbetering met GFPGAN of CodeFormer. Detecteert gezichten in de afbeelding en verbetert gezichtsdetails, huidtextuur en helderheid. Vereist dat de enhance-faces-featurebundel is geïnstalleerd.
@@ -2018,11 +2132,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2058,7 +2183,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: Afbeelding naar Base64
       description: |
         Converteer een of meer afbeeldingen naar Base64-gecodeerde strings met data-URI's. Ondersteunt optionele formaatconversie en formaatwijziging. Geeft voor elk bestand zowel de ruwe Base64-string als een direct bruikbare data-URI terug.
@@ -2150,7 +2275,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: Tekstwatermerk
       description: Voeg een tekstwatermerk toe aan een afbeelding.
       security:
@@ -2203,7 +2328,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: Tekstoverlay
       description: Voeg opgemaakte tekstoverlay toe met een optioneel achtergrondvak.
       security:
@@ -2257,7 +2382,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: Kleur vervangen
       description: Vervang een specifieke kleur in een afbeelding door een andere kleur of transparantie.
       security:
@@ -2308,7 +2433,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: Kleurenblindheidsimulatie
       description: Simuleer hoe een afbeelding overkomt bij mensen met verschillende soorten kleurzienstoornissen.
       security:
@@ -2356,7 +2481,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF-tools
       description: Wijzig het formaat, optimaliseer, pas de snelheid aan, keer om, extraheer frames uit of draai geanimeerde GIF's.
       security:
@@ -2420,7 +2545,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF-info
       description: Vraag metadata op over een geanimeerde GIF, inclusief afmetingen, aantal frames, vertragingen en duur.
       security: []
@@ -2477,7 +2602,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: Slim bijsnijden
       description: 'Slim bijsnijden met drie modi: onderwerpfocus, gezichtsfocus of automatisch bijsnijden.'
       security:
@@ -2536,7 +2661,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding naar SVG
       description: Converteer een rasterafbeelding naar SVG-vectorformaat met potrace (zwart-wit) of VTracer (kleur).
       security:
@@ -2591,7 +2716,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG naar raster
       description: Converteer een SVG-bestand naar een rasterafbeeldingsformaat met aangepaste schaal en DPI.
       security:
@@ -2644,7 +2769,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG naar raster (batch)
       description: Converteer meerdere SVG-bestanden naar rasterafbeeldingen. Geeft een ZIP-archief terug.
       security:
@@ -2704,7 +2829,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: Afbeelding naar PDF
       description: Converteer een of meer afbeeldingen naar een PDF-document.
       security:
@@ -2786,7 +2911,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF naar afbeelding
       description: Converteer PDF-pagina's naar afbeeldingen. Geeft downloads per pagina en een ZIP met alle pagina's terug.
       security:
@@ -2875,7 +3000,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: Aantal PDF-pagina's
       description: Vraag het aantal pagina's in een PDF-bestand op.
       security: []
@@ -2914,7 +3039,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF-paginaminiaturen
       description: Genereer miniatuurvoorbeelden voor elke pagina in een PDF (max. 200 pagina's, JPEG, 300px breed).
       security: []
@@ -2967,7 +3092,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding splitsen
       description: Splits een afbeelding in een raster van tegels. Geeft een ZIP-bestand terug.
       security:
@@ -3021,7 +3146,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: Bulk hernoemen
       description: Hernoem meerdere afbeeldingen met een patroonsjabloon. Ondersteunt de tokens {{index}}, {{padded}} en {{original}}. Geeft een ZIP-bestand terug.
       security:
@@ -3073,7 +3198,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Favicon-generator
       description: Genereer een volledige faviconset (PNG's van 16px tot 512px, ICO en manifest.json) uit een afbeelding. Geeft een ZIP-bestand terug.
       security:
@@ -3117,7 +3242,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingswatermerk
       description: Voeg een afbeeldingswatermerkoverlay toe.
       security:
@@ -3172,7 +3297,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingscompositie
       description: Plaats een overlay-afbeelding op een basisafbeelding met overvloeimodi.
       security:
@@ -3228,7 +3353,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: Meme-generator
       description: |
         Maak memes met sjablonen of aangepaste afbeeldingen. Ondersteunt twee modi: (1) Sjabloonmodus - stuur een JSON-body met `templateId` en `textBoxes`. (2) Modus met aangepaste afbeelding - stuur multipart met `file` en `settings`.
@@ -3467,7 +3592,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingen vergelijken
       description: Vergelijk twee afbeeldingen en genereer een visueel verschilrapport.
       security:
@@ -3534,7 +3659,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: Objectgum
       description: Wis objecten uit een afbeelding met een masker. Witte gebieden in het masker geven de te wissen regio's aan. Gebruikt LaMa-inpainting.
       security:
@@ -3587,11 +3712,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3627,7 +3763,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI-canvas uitbreiden (experimenteel)
       description: |
         Breid het canvas van een afbeelding uit met AI-outpainting. Verlengt de afbeelding in elke richting door nieuwe content te genereren die naadloos aansluit op het origineel. Gebruikt LaMa-gebaseerde outpainting. Vereist dat de ai-canvas-expand-featurebundel is geïnstalleerd.
@@ -3667,11 +3803,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3707,7 +3854,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: Collage & Raster
       description: Combineer meerdere afbeeldingen tot een rastercollage.
       security:
@@ -3764,7 +3911,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingen samenvoegen
       description: Voeg meerdere afbeeldingen horizontaal, verticaal of in een rasterindeling samen.
       security:
@@ -3823,7 +3970,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: Achtergrond verwijderen uit een geanimeerde afbeelding
       description: Verwijder de achtergrond van een geanimeerde GIF, WebP of APNG frame voor frame met behulp van AI (rembg). Wordt lokaal uitgevoerd.
       security:
@@ -3869,11 +4016,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3903,7 +4061,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: Achtergrond verwijderen
       description: Verwijder de achtergrond van een afbeelding met AI (rembg). Draait lokaal.
       security:
@@ -3937,11 +4095,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3977,7 +4146,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: Achtergrondeffecten toepassen
       description: |
         Pas achtergrondvervanging of -effecten toe op een eerder verwerkt remove-background-resultaat. Vereist een jobId van een eerdere POST /api/v1/tools/image/remove-background-aanroep.
@@ -4044,7 +4213,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: Nep-transparantie herstellen
       description: |
         Herstel "nep-transparante" PNG's met randjes, halo's of semi-transparante artefacten van een eerdere achtergrondverwijdering. Gebruikt BiRefNet HR-matting (2048x2048) om een schoon alfakanaal te produceren met configureerbare defringe-verwerking. Valt terug op birefnet-general en daarna u2net bij OOM. Vereist dat de background-removal-featurebundel is geïnstalleerd.
@@ -4078,11 +4247,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4118,7 +4298,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: Afbeelding opschalen
       description: Schaal een afbeelding op met AI (Real-ESRGAN). Draait lokaal.
       security:
@@ -4154,11 +4334,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4194,7 +4385,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: Gezichten & PII vervagen
       description: Detecteer en vervaag gezichten in een afbeelding voor privacy. Gebruikt OpenCV. Draait lokaal.
       security:
@@ -4226,11 +4417,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4266,7 +4468,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / tekstextractie
       description: |-
         Extraheer tekst lokaal uit een afbeelding. De ingebouwde Fast-laag maakt gebruik van
@@ -4304,6 +4506,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4312,6 +4519,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4355,7 +4568,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingsinfo
       description: Vraag gedetailleerde metadata over een afbeelding op, inclusief afmetingen, formaat, kleurruimte en EXIF-data.
       security:
@@ -4458,7 +4671,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: Kleurenpalet
       description: Extraheer de dominante kleuren uit een afbeelding.
       security:
@@ -4511,7 +4724,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: Barcodelezer
       description: Lees QR-codes en barcodes uit een afbeelding.
       security:
@@ -4616,7 +4829,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: Duplicaten zoeken
       description: Zoek dubbele afbeeldingen in een set met perceptuele hashing.
       security:
@@ -4719,7 +4932,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR-codegenerator
       description: Genereer een QR-codeafbeelding uit tekst. Deze tool accepteert een JSON-body, geen multipart.
       security:
@@ -4782,7 +4995,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Webpagina vastleggen als afbeelding
       description: Leg een webpagina vast als een hoogwaardige screenshotafbeelding. Accepteert een JSON-body met een URL en opname-opties.
       security:
@@ -4868,7 +5081,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: Metadata inspecteren
       description: Bekijk alle metadata (EXIF, GPS, ICC, XMP) in een afbeelding zonder ze te verwijderen.
       security:
@@ -4937,7 +5150,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: Afbeeldingsmetadata bewerken
       description: Bewerk EXIF-, IPTC-, GPS- en andere metadatavelden in een afbeelding met ExifTool.
       security:
@@ -5006,7 +5219,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: Metadata inspecteren (ExifTool)
       description: Lees alle metadata uit een afbeelding met ExifTool. Geeft alle ingebedde EXIF-, IPTC-, XMP- en GPS-velden terug.
       security:
@@ -7019,6 +7232,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: Jobstatus ophalen
+      description: |
+        Geeft de opgeslagen status van een job terug zonder een verbinding open te houden. Poll deze na een 202-respons, of gebruik hem als terugvaloptie wanneer de voortgangsstream wegvalt.
+
+        `status` is een van `queued`, `processing`, `completed`, `failed` of `canceled`. `completed`, `failed` en `canceled` zijn eindstatussen. Een geannuleerde job kan nog steeds een gedeeltelijke `result` bevatten (bijvoorbeeld een ZIP van de bestanden die klaar waren), dus lees `result` wanneer die aanwezig is.
+
+        De toegang volgt de voortgangsstream: de eigenaar van de job, een gebruiker met `files:all`, of een gebruiker met `features:manage` voor een job die een feature installeert. Elke andere aanroeper krijgt 404.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7332,6 +7592,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Productfeedback indienen
+      description: Registreert één feedbackgebeurtenis van de ingelogde gebruiker. Beperkt tot 10 verzoeken per minuut. `accepted` is false wanneer de server de gebeurtenis niet heeft geregistreerd.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: Nieuwere beschikbare release ophalen
+      description: Geeft de nieuwste gepubliceerde release terug wanneer die nieuwer is dan de draaiende versie, anders null. Vereist settings:write.
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: Alle AI-featurebundels resetten
+      description: |
+        Wist de AI-virtuele omgeving, de modellen en de pip-cache, en markeert daarna elke bundel als niet geïnstalleerd. Gebruik dit wanneer een installatie zichzelf niet kan herstellen. Een bundel verwijderen haalt alleen de modelgewichten weg, dus dit is de volledige reset.
+
+        De respons geeft aan of de venv opnieuw is opgebouwd vanuit de ingebouwde basis (venvReseeded). Geeft 409 terug zolang een bundelinstallatie loopt. Vereist features:manage.
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: Elke featurebundel installeren die een tool nodig heeft
+      description: Zet elke bundel die de tool vereist in de wachtrij en meldt per bundel of die in de wachtrij is gezet of is overgeslagen. Vereist features:manage.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7371,11 +7816,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7881,7 +8337,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Video converteren
       description: Converteer video's tussen MP4, MOV, WebM, AVI en MKV.
       security:
@@ -7913,11 +8369,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7947,7 +8414,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Video comprimeren
       description: Verklein de bestandsgrootte van video met kwaliteitscontrole.
       security:
@@ -7979,11 +8446,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8013,7 +8491,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Video inkorten
       description: Knip een fragment uit een video.
       security:
@@ -8063,7 +8541,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Video dempen
       description: Verwijder het audiospoor uit een video.
       security:
@@ -8106,7 +8584,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: Video naar GIF
       description: Zet een videofragment om in een geanimeerde GIF.
       security:
@@ -8140,11 +8618,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8174,7 +8663,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Videoformaat wijzigen
       description: Schaal een video naar een nieuwe resolutie of vooraf ingesteld formaat.
       security:
@@ -8224,7 +8713,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Video bijsnijden
       description: Snijd een gebied uit een video.
       security:
@@ -8275,7 +8764,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Video draaien
       description: Draai of spiegel een video.
       security:
@@ -8323,7 +8812,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: FPS wijzigen
       description: Wijzig de framerate van een video.
       security:
@@ -8371,7 +8860,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Videokleur
       description: Pas helderheid, contrast, verzadiging en gamma aan.
       security:
@@ -8422,7 +8911,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Videosnelheid
       description: Versnel of vertraag een video.
       security:
@@ -8471,7 +8960,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Video omkeren
       description: Speel een videofragment achterwaarts af. Beperkt tot fragmenten van maximaal 5 minuten.
       security:
@@ -8514,7 +9003,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: Video-audio normaliseren
       description: Normaliseer het audiovolume van video naar de broadcaststandaard (EBU R128).
       security:
@@ -8557,7 +9046,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: Aspectverhouding opvullen
       description: Voeg effen gekleurde balken toe om in een doel-aspectverhouding te passen.
       security:
@@ -8606,7 +9095,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Vervaagde opvulling
       description: Vul balken met een vervaagde kopie van de video.
       security:
@@ -8655,7 +9144,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Video van watermerk voorzien
       description: Brand een tekstwatermerk in op videoframes.
       security:
@@ -8707,7 +9196,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Video stabiliseren
       description: Verminder cameratrilling met tweepass-stabilisatie.
       security:
@@ -8738,11 +9227,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8772,7 +9272,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF naar video
       description: Converteer een geanimeerde GIF naar een MP4-, WebM- of MOV-video.
       security:
@@ -8820,7 +9320,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: Video naar WebP
       description: Converteer een videofragment naar een geanimeerde WebP-afbeelding.
       security:
@@ -8871,7 +9371,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: Video naar frames
       description: Extraheer frames uit een video als een ZIP met afbeeldingen.
       security:
@@ -8922,7 +9422,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Video's samenvoegen
       description: |
         Voeg meerdere videofragmenten samen tot één MP4-bestand. Alle invoer wordt genormaliseerd naar de resolutie van de eerste video en 30 fps.
@@ -8951,11 +9451,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8985,7 +9496,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Audio vervangen
       description: Vervang het audiospoor van een video door een ander bestand.
       security:
@@ -9030,7 +9541,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: Ondertitels inbranden
       description: Render ondertitels permanent op videoframes.
       security:
@@ -9063,11 +9574,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9097,7 +9619,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Ondertitels insluiten
       description: Mux een ondertitelspoor in de videocontainer.
       security:
@@ -9147,7 +9669,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Ondertitels extraheren
       description: Haal het ondertitelspoor uit een video als een SRT-bestand.
       security:
@@ -9190,7 +9712,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: Afbeeldingen naar video
       description: Zet een set afbeeldingen om in een diavoorstellingsvideo.
       security:
@@ -9242,7 +9764,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Videometadata opschonen
       description: Verwijder metadata uit een video en rapporteer wat er is gevonden.
       security:
@@ -9285,7 +9807,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Automatische ondertitels
       description: |
         AI-gestuurde ondertitelgeneratie op basis van videoaudiosporen met faster-whisper. Ondersteunt automatische detectie en 10 expliciete talen. Vereist dat de transcription-featurebundel is geïnstalleerd.
@@ -9318,11 +9840,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9358,7 +9891,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Audio extraheren
       description: Haal het audiospoor uit een video.
       security:
@@ -9406,7 +9939,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio converteren
       description: Converteer audio tussen MP3, WAV, OGG en meer.
       security:
@@ -9455,7 +9988,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio inkorten
       description: Knip een gedeelte uit een audiobestand.
       security:
@@ -9504,7 +10037,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: Volume aanpassen
       description: Verhoog of verlaag het audiovolume met een vaste versterking.
       security:
@@ -9552,7 +10085,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio normaliseren
       description: Effen de luidheid uit naar broadcaststandaardniveaus (EBU R128, -16 LUFS).
       security:
@@ -9595,7 +10128,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio in-/uitfaden
       description: Voeg fade-in- en fade-out-effecten toe aan audio.
       security:
@@ -9644,7 +10177,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio omkeren
       description: Speel audio achterwaarts af.
       security:
@@ -9687,7 +10220,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Audiosnelheid
       description: Versnel of vertraag het afspelen van audio.
       security:
@@ -9735,7 +10268,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Toonhoogte verschuiven
       description: Verhoog of verlaag de toonhoogte met halve tonen zonder de snelheid te wijzigen.
       security:
@@ -9783,7 +10316,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Audiokanalen
       description: Converteer tussen mono en stereo, of wissel het linker- en rechterkanaal om.
       security:
@@ -9831,7 +10364,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Stilte verwijderen
       description: Verwijder stille gedeelten uit audio.
       security:
@@ -9880,7 +10413,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Ruisonderdrukking
       description: Verminder achtergrondruis met FFT-gebaseerde denoising.
       security:
@@ -9928,7 +10461,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio samenvoegen
       description: Combineer meerdere audiobestanden tot één opeenvolgend spoor.
       security:
@@ -9978,7 +10511,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio splitsen
       description: |
         Splits audio op tijd, in gelijke delen of via stiltedetectie. Geeft een ToolResponse terug met een downloadUrl die naar een ZIP-archief met segmenten verwijst.
@@ -10031,7 +10564,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Beltoonmaker
       description: Maak een beltoonfragment (.m4r) van elk audiobestand.
       security:
@@ -10080,7 +10613,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Golfvormafbeelding
       description: Genereer een golfvormvisualisatie als PNG-afbeelding uit een audiobestand.
       security:
@@ -10130,7 +10663,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Audiometadata
       description: |
         Bekijk, bewerk of verwijder audiotags (ID3). Het antwoord bevat een `metadata`-object met container, durationS, bitrateKbps en tags naast de standaard ToolResponse-velden.
@@ -10182,7 +10715,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Audio transcriberen
       description: |
         AI-gestuurde spraak-naar-tekst-transcriptie met faster-whisper. Levert platte tekst of ondertitelformaten SRT of VTT op. Vereist dat de transcription-featurebundel is geïnstalleerd.
@@ -10215,11 +10748,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10255,7 +10799,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF's samenvoegen
       description: Combineer meerdere PDF's tot één. Vereist minstens twee bestanden.
       security:
@@ -10300,7 +10844,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF splitsen
       description: |
         Extraheer pagina's of splits in delen. In de modus "range" wordt één PDF met de geselecteerde pagina's teruggegeven. In de modus "every" wordt gesplitst in blokken van N pagina's en wordt een ZIP-archief met de delen teruggegeven.
@@ -10351,7 +10895,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren
       description: |
         Verklein de PDF-bestandsgrootte door ingebedde afbeeldingen te downsamplen. In de modus "quality" bepaalt een schuifregelaar van 1-100 de afbeeldings-DPI. In de modus "targetSize" vindt een binaire zoekactie de hoogste DPI die binnen de doelgrootte past. Als compressie het bestand zou vergroten, worden de originele bytes ongewijzigd teruggegeven.
@@ -10402,7 +10946,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren naar 100 KB
       description: |
         Comprimeer een PDF naar een doelgrootte van 100 KB (100 KB, waarbij 1 KB = 1000 bytes).
@@ -10437,11 +10981,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10465,7 +11020,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren naar 200 KB
       description: |
         Comprimeer een PDF naar een doelgrootte van 200 KB (200 KB, waarbij 1 KB = 1000 bytes).
@@ -10500,11 +11055,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10528,7 +11094,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren naar 500 KB
       description: |
         Comprimeer een PDF naar een doelgrootte van 500 KB (500 KB, waarbij 1 KB = 1000 bytes).
@@ -10563,11 +11129,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10591,7 +11168,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren naar 1 MB
       description: |
         Comprimeer een PDF naar een doelgrootte van 1 MB (1000 KB, waarbij 1 KB = 1000 bytes).
@@ -10626,11 +11203,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10654,7 +11242,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF comprimeren naar 2 MB
       description: |
         Comprimeer een PDF naar een doelgrootte van 2 MB (2000 KB, waarbij 1 KB = 1000 bytes).
@@ -10689,11 +11277,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10717,7 +11316,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF draaien
       description: Draai pagina's in een PDF met 90, 180 of 270 graden.
       security:
@@ -10766,7 +11365,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: Pagina's extraheren
       description: Haal geselecteerde pagina's in een nieuwe PDF.
       security:
@@ -10814,7 +11413,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: Pagina's verwijderen
       description: Verwijder specifieke pagina's uit een PDF. Kan niet elke pagina verwijderen.
       security:
@@ -10862,7 +11461,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF ordenen
       description: Herschik pagina's met een expliciete paginavolgorde.
       security:
@@ -10910,7 +11509,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF-multitool
       description: 'Stel een PDF samen vanuit een expliciet pagina-plan: pagina''s opnieuw ordenen, dupliceren, roteren of verwijderen en pagina''s uit extra PDF''s halen, in één indiening.'
       security:
@@ -10961,7 +11560,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF beveiligen
       description: Voeg wachtwoordbeveiliging toe met AES-256-encryptie. Wachtwoorden worden geredigeerd uit auditlogs.
       security:
@@ -11010,7 +11609,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF ontgrendelen
       description: Verwijder wachtwoordbeveiliging van een PDF. Het juiste wachtwoord moet worden opgegeven. Wachtwoorden worden geredigeerd uit auditlogs.
       security:
@@ -11058,7 +11657,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF repareren
       description: Probeer een beschadigde of corrupte PDF te repareren. Structurele validatie wordt bij invoer overgeslagen om misvormde bestanden toe te staan.
       security:
@@ -11101,7 +11700,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF weboptimaliseren
       description: Lineariseer een PDF voor snelle webweergave (progressief downloaden).
       security:
@@ -11144,7 +11743,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF naar grijswaarden
       description: Converteer alle kleuren in een PDF naar grijswaarden.
       security:
@@ -11187,7 +11786,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A-converter
       description: Converteer een PDF naar het archiveringsformaat PDF/A-2 voor langdurig behoud.
       security:
@@ -11230,7 +11829,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF bijsnijden
       description: Snijd alle pagina's bij met een uniforme marge.
       security:
@@ -11278,7 +11877,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: Pagina's per vel (N-up)
       description: Schik meerdere pagina's per vel (bijv. 2-up, 4-up).
       security:
@@ -11326,7 +11925,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: Boekje-PDF
       description: Schik pagina's om tot een boekje te vouwen (opmaken voor dubbelzijdig printen).
       security:
@@ -11374,7 +11973,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF van watermerk voorzien
       description: Voeg een tekstwatermerk toe aan elke pagina van een PDF.
       security:
@@ -11426,7 +12025,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF-paginanummers
       description: Voeg paginanummers ("Pagina N van M") toe aan elke pagina van een PDF.
       security:
@@ -11475,7 +12074,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: Document converteren
       description: Converteer tussen Word-, OpenDocument-, RTF- en platte-tekstformaten.
       security:
@@ -11506,11 +12105,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11534,7 +12144,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: Presentatie converteren
       description: Converteer tussen PowerPoint- en OpenDocument-presentatieformaten.
       security:
@@ -11565,11 +12175,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11593,7 +12214,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: Spreadsheet converteren
       description: Converteer tussen Excel-, OpenDocument- en CSV-formaten. Werkmappen met meerdere bladen exporteren het eerste blad naar CSV.
       security:
@@ -11624,11 +12245,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11652,7 +12284,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel naar PDF
       description: Converteer spreadsheets naar PDF. Brede bladen kunnen over meerdere pagina's worden verdeeld.
       security:
@@ -11678,11 +12310,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11706,7 +12349,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word naar PDF
       description: Converteer Word-documenten naar PDF.
       security:
@@ -11732,11 +12375,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11760,7 +12414,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint naar PDF
       description: Converteer presentaties naar PDF.
       security:
@@ -11786,11 +12440,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11814,7 +12479,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML naar PDF
       description: Converteer een HTML-bestand naar PDF. Externe bronnen zijn uitgeschakeld voor privacy.
       security:
@@ -11840,11 +12505,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11868,7 +12544,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown naar Word
       description: Converteer een Markdown-bestand naar een Word-document (DOCX).
       security:
@@ -11911,7 +12587,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown naar HTML
       description: Converteer een Markdown-bestand naar een op zichzelf staande HTML-pagina. Externe afbeeldingen in de bron blijven ongewijzigd in de uitvoer.
       security:
@@ -11954,7 +12630,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown naar PDF
       description: Converteer een Markdown-bestand naar een opgemaakte PDF. Externe bronnen zijn uitgeschakeld voor privacy.
       security:
@@ -11980,11 +12656,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12008,7 +12695,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: Converteren vanuit EPUB
       description: Converteer een EPUB naar PDF, DOCX, HTML of Markdown. Externe bronnen in het boek worden niet opgehaald.
       security:
@@ -12039,11 +12726,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12067,7 +12765,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: Converteren naar EPUB
       description: Converteer Word-, Markdown-, HTML- of platte-tekstbestanden naar EPUB.
       security:
@@ -12093,11 +12791,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12121,7 +12830,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF afvlakken
       description: Bak formulieren en annotaties in de pagina-inhoud.
       security:
@@ -12164,7 +12873,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF redigeren
       description: Verwijder tekstvoorkomens permanent (geverifieerde echte redactie).
       security:
@@ -12219,7 +12928,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF naar tekst
       description: Extraheer platte tekst uit een PDF.
       security:
@@ -12268,7 +12977,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF naar Word
       description: Het beste voor tekstgebaseerde PDF's; gescande pagina's vereisen OCR.
       security:
@@ -12294,11 +13003,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12322,7 +13042,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF-metadata
       description: Lees en schrijf metadata van een PDF-document.
       security:
@@ -12379,7 +13099,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF-OCR
       description: |-
         Extraheer tekst uit gescande PDF-documenten pagina voor pagina. Fast maakt gebruik van de
@@ -12419,6 +13139,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12427,6 +13152,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12476,7 +13207,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Grafiekmaker
       description: Maak staaf-, lijn- of taartdiagrammen uit CSV- of JSON-gegevens. Geeft een PNG-afbeelding terug. Wanneer rijen zijn weggelaten omdat hun waardecel tekst bevatte die geen getal is, voegt de respons `chartRows` toe ({charted, skipped}); lege rijen worden niet meegeteld.
       security:
@@ -12527,7 +13258,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV naar Excel
       description: Converteer tussen CSV en Excel (XLSX), in beide richtingen. Upload een CSV- of TSV-bestand om XLSX te krijgen, of upload een XLSX-bestand om CSV te krijgen.
       security:
@@ -12575,7 +13306,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV naar JSON
       description: Converteer tussen CSV en JSON, in beide richtingen. Upload een CSV- of TSV-bestand om JSON te krijgen, of upload een JSON-array van objecten om CSV te krijgen.
       security:
@@ -12623,7 +13354,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON naar XML
       description: Converteer tussen JSON en XML, in beide richtingen. Upload een JSON-bestand om XML te krijgen, of upload een XML-bestand om JSON te krijgen.
       security:
@@ -12671,7 +13402,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: CSV splitsen
       description: Splits een CSV-bestand in kleinere bestanden op basis van het aantal rijen. Geeft een ZIP-archief met de delen terug.
       security:
@@ -12720,7 +13451,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: CSV's samenvoegen
       description: Combineer meerdere CSV- of TSV-bestanden met overeenkomende kolommen tot één samengevoegd bestand. Alle bestanden moeten dezelfde kolomkoppen hebben.
       security:
@@ -12765,7 +13496,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: YAML / JSON converteren
       description: Converteer tussen YAML en JSON, in beide richtingen. Upload een YAML-bestand om JSON te krijgen, of upload een JSON-bestand om YAML te krijgen.
       security:
@@ -12808,7 +13539,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML naar CSV
       description: Extraheer terugkerende elementen uit een XML-bestand naar een CSV-tabel. Vindt automatisch de eerste array van objecten in de XML-boom.
       security:
@@ -12851,7 +13582,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: ZIP maken
       description: Bundel meerdere bestanden tot één ZIP-archief. Dubbele bestandsnamen worden automatisch ontdubbeld.
       security:
@@ -12896,7 +13627,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: ZIP uitpakken
       description: Pak bestanden veilig uit een ZIP-archief met bombeveiliging. Archieven met één bestand geven het bestand rechtstreeks terug; archieven met meerdere bestanden geven een platte ZIP terug.
       security:
@@ -12939,7 +13670,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: Achtergrond vervangen
       description: |
         AI-gestuurde achtergrondvervanging. Verwijdert de achtergrond van het onderwerp en plaatst het op een effen kleur of gradiënt. Vereist dat de background-removal-featurebundel is geïnstalleerd.
@@ -12977,11 +13708,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13017,7 +13759,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: Achtergrond vervagen
       description: |
         AI-gestuurde achtergrondvervaging. Verwijdert de achtergrond, vervaagt het origineel en plaatst het scherpe onderwerp erbovenop. Vereist dat de background-removal-featurebundel is geïnstalleerd.
@@ -13051,11 +13793,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13091,7 +13844,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: Barcodegenerator
       description: Genereer een barcodeafbeelding uit tekst. Deze tool accepteert een JSON-body, geen multipart.
       security:
@@ -13154,7 +13907,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: Cirkelvormig bijsnijden
       description: Snijd een afbeelding bij tot een gecentreerde cirkel met transparante hoeken, optionele rand en instelbare zoom/offset.
       security:
@@ -13208,7 +13961,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: Afgerond bijsnijden
       description: Snijd een afbeelding bij tot een afgerond vierkant of cirkel met transparante hoeken, optionele rand en instelbare zoom/offset.
       security:
@@ -13264,7 +14017,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: Duotoon
       description: Pas een tweekleurig duotooneffect toe met aangepaste schaduw- en hooglichtkleuren.
       security:
@@ -13314,7 +14067,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: Afbeelding opvullen
       description: Vul een afbeelding op tot een doel-aspectverhouding met een effen kleur, transparante of vervaagde achtergrond.
       security:
@@ -13367,7 +14120,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Pixelen
       description: Pas een pixeleffect toe op de volledige afbeelding of op een specifiek rechthoekig gebied.
       security:
@@ -13420,7 +14173,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vignet
       description: Voeg een vigneteffect toe met instelbare sterkte, kleur, straal, zachtheid, rondheid en middelpuntpositie.
       security:
@@ -13474,7 +14227,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP-converter
       description: Converteer een geanimeerde GIF naar WebP en omgekeerd, met behoud van alle frames. Accepteert alleen .gif- en .webp-invoer.
       security:
@@ -13524,7 +14277,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Histogram
       description: |
         Genereer een RGB-histogramgrafiek uit een afbeelding. Geeft een PNG-histogramafbeelding terug plus statistieken per kanaal en ruwe histogramdata met 256 bins in de response-JSON.
@@ -13656,7 +14409,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP-placeholder
       description: |
         Genereer een piepkleine low-quality image placeholder. Geeft een klein afbeeldingsbestand terug plus een base64-data-URI, een direct bruikbare HTML-img-tag en een CSS-achtergrondfragment in de response-JSON.
@@ -13733,7 +14486,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: Sprite sheet
       description: |
         Combineer meerdere afbeeldingen tot één sprite-sheet-raster. Accepteert 2 tot 64 afbeeldingen. Elke afbeelding wordt aangepast aan de afmetingen van de eerste afbeelding. Geeft de sprite-sheet-afbeelding terug plus metadata met framecoordinaten.
@@ -13825,7 +14578,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Pasfoto
       description: |
         Gids-endpoint voor de tweefasige pasfotoflow. Gebruik `/api/v1/tools/image/passport-photo/analyze` om een afbeelding te analyseren, en daarna `/api/v1/tools/image/passport-photo/generate` om de uiteindelijke pasfoto te maken. Deze basisroute geeft een 400-gidsfout terug wanneer de vereiste featurebundels zijn geïnstalleerd, of 501 wanneer ze ontbreken.
@@ -13854,7 +14607,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: PDF ondertekenen
       description: Stempel een of meer handtekening-PNG-afbeeldingen op een PDF met genormaliseerde paginaplaatsingen.
       security:
@@ -13898,11 +14651,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13932,7 +14696,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar PNG
       description: |
         Converteer JPG naar PNG
@@ -13993,7 +14757,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar JPG
       description: |
         Converteer PNG naar JPG
@@ -14054,7 +14818,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar WebP
       description: |
         Converteer JPG naar WebP
@@ -14115,7 +14879,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar WebP
       description: |
         Converteer PNG naar WebP
@@ -14176,7 +14940,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP naar JPG
       description: |
         Converteer WebP naar JPG
@@ -14237,7 +15001,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP naar PNG
       description: |
         Converteer WebP naar PNG
@@ -14298,7 +15062,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar AVIF
       description: |
         Converteer JPG naar AVIF
@@ -14359,7 +15123,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar AVIF
       description: |
         Converteer PNG naar AVIF
@@ -14420,7 +15184,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP naar AVIF
       description: |
         Converteer WebP naar AVIF
@@ -14481,7 +15245,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC naar JPG
       description: |
         Converteer HEIC naar JPG
@@ -14542,7 +15306,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC naar PNG
       description: |
         Converteer HEIC naar PNG
@@ -14603,7 +15367,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC naar AVIF
       description: |
         Converteer HEIC naar AVIF
@@ -14664,7 +15428,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar GIF
       description: |
         Converteer JPG naar GIF
@@ -14725,7 +15489,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar GIF
       description: |
         Converteer PNG naar GIF
@@ -14786,7 +15550,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF naar JPG
       description: |
         Converteer GIF naar JPG
@@ -14847,7 +15611,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF naar PNG
       description: |
         Converteer GIF naar PNG
@@ -14908,7 +15672,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP naar GIF
       description: |
         Converteer WebP naar GIF
@@ -14969,7 +15733,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar TIFF
       description: |
         Converteer JPG naar TIFF
@@ -15030,7 +15794,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar TIFF
       description: |
         Converteer PNG naar TIFF
@@ -15091,7 +15855,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF naar JPG
       description: |
         Converteer TIFF naar JPG
@@ -15152,7 +15916,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF naar PNG
       description: |
         Converteer TIFF naar PNG
@@ -15213,7 +15977,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD naar JPG
       description: |
         Converteer PSD naar JPG
@@ -15274,7 +16038,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD naar PNG
       description: |
         Converteer PSD naar PNG
@@ -15335,7 +16099,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar EPS
       description: |
         Converteer PNG naar EPS
@@ -15396,7 +16160,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar EPS
       description: |
         Converteer JPG naar EPS
@@ -15457,7 +16221,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS naar PNG
       description: |
         Converteer EPS naar PNG
@@ -15518,7 +16282,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS naar JPG
       description: |
         Converteer EPS naar JPG
@@ -15579,7 +16343,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar SVG
       description: |
         Converteer PNG naar SVG
@@ -15640,7 +16404,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar SVG
       description: |
         Converteer JPG naar SVG
@@ -15701,7 +16465,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF naar SVG
       description: |
         Converteer TIFF naar SVG
@@ -15762,7 +16526,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD naar SVG
       description: |
         Converteer PSD naar SVG
@@ -15823,7 +16587,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS naar SVG
       description: |
         Converteer EPS naar SVG
@@ -15884,7 +16648,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG naar PNG
       description: |
         Converteer SVG naar PNG
@@ -15940,7 +16704,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG naar JPG
       description: |
         Converteer SVG naar JPG
@@ -15996,7 +16760,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG naar PDF
       description: |
         Converteer JPG naar PDF
@@ -16054,7 +16818,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG naar PDF
       description: |
         Converteer PNG naar PDF
@@ -16112,7 +16876,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC naar PDF
       description: |
         Converteer HEIC naar PDF
@@ -16170,7 +16934,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF naar PDF
       description: |
         Converteer TIFF naar PDF
@@ -16228,7 +16992,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP naar PDF
       description: |
         Converteer WebP naar PDF
@@ -16286,7 +17050,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF naar PDF
       description: |
         Converteer GIF naar PDF
@@ -16344,7 +17108,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS naar PDF
       description: |
         Converteer EPS naar PDF
@@ -16402,7 +17166,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF naar JPG
       description: |
         Converteer PDF naar JPG
@@ -16458,7 +17222,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF naar PNG
       description: |
         Converteer PDF naar PNG
@@ -16514,7 +17278,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF naar TIFF
       description: |
         Converteer PDF naar TIFF
@@ -16570,7 +17334,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV naar MP4
       description: |
         Converteer MOV naar MP4
@@ -16603,11 +17367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16637,7 +17412,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM naar MP4
       description: |
         Converteer WEBM naar MP4
@@ -16670,11 +17445,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16704,7 +17490,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV naar MP4
       description: |
         Converteer MKV naar MP4
@@ -16737,11 +17523,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16771,7 +17568,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI naar MP4
       description: |
         Converteer AVI naar MP4
@@ -16804,11 +17601,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16838,7 +17646,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar MOV
       description: |
         Converteer MP4 naar MOV
@@ -16871,11 +17679,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16905,7 +17724,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar WEBM
       description: |
         Converteer MP4 naar WEBM
@@ -16938,11 +17757,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16972,7 +17802,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM naar MOV
       description: |
         Converteer WEBM naar MOV
@@ -17005,11 +17835,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17039,7 +17880,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV naar MOV
       description: |
         Converteer MKV naar MOV
@@ -17072,11 +17913,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17106,7 +17958,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI naar MOV
       description: |
         Converteer AVI naar MOV
@@ -17139,11 +17991,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17173,7 +18036,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar AVI
       description: |
         Converteer MP4 naar AVI
@@ -17206,11 +18069,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17240,7 +18114,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV naar AVI
       description: |
         Converteer MOV naar AVI
@@ -17273,11 +18147,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17307,7 +18192,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV naar AVI
       description: |
         Converteer MKV naar AVI
@@ -17340,11 +18225,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17374,7 +18270,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI naar MKV
       description: |
         Converteer AVI naar MKV
@@ -17407,11 +18303,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17441,7 +18348,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar GIF
       description: |
         Converteer MP4 naar GIF
@@ -17474,11 +18381,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17508,7 +18426,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV naar GIF
       description: |
         Converteer MOV naar GIF
@@ -17541,11 +18459,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17575,7 +18504,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV naar GIF
       description: |
         Converteer MKV naar GIF
@@ -17608,11 +18537,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17642,7 +18582,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI naar GIF
       description: |
         Converteer AVI naar GIF
@@ -17675,11 +18615,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17709,7 +18660,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF naar MP4
       description: |
         Converteer GIF naar MP4
@@ -17770,7 +18721,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF naar WEBM
       description: |
         Converteer GIF naar WEBM
@@ -17831,7 +18782,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF naar MOV
       description: |
         Converteer GIF naar MOV
@@ -17892,7 +18843,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar MP3
       description: |
         Converteer MP4 naar MP3
@@ -17953,7 +18904,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV naar MP3
       description: |
         Converteer MOV naar MP3
@@ -18014,7 +18965,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV naar MP3
       description: |
         Converteer MKV naar MP3
@@ -18075,7 +19026,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM naar MP3
       description: |
         Converteer WEBM naar MP3
@@ -18136,7 +19087,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI naar MP3
       description: |
         Converteer AVI naar MP3
@@ -18197,7 +19148,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar WAV
       description: |
         Converteer MP4 naar WAV
@@ -18258,7 +19209,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV naar WAV
       description: |
         Converteer MOV naar WAV
@@ -18319,7 +19270,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 naar OGG
       description: |
         Converteer MP4 naar OGG
@@ -18380,7 +19331,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A naar MP3
       description: |
         Converteer M4A naar MP3
@@ -18441,7 +19392,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A naar WAV
       description: |
         Converteer M4A naar WAV
@@ -18502,7 +19453,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC naar MP3
       description: |
         Converteer AAC naar MP3
@@ -18563,7 +19514,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC naar WAV
       description: |
         Converteer AAC naar WAV
@@ -18624,7 +19575,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC naar FLAC
       description: |
         Converteer AAC naar FLAC
@@ -18685,7 +19636,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG naar MP3
       description: |
         Converteer OGG naar MP3
@@ -18746,7 +19697,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG naar WAV
       description: |
         Converteer OGG naar WAV
@@ -18807,7 +19758,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV naar MP3
       description: |
         Converteer WAV naar MP3
@@ -18868,7 +19819,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 naar WAV
       description: |
         Converteer MP3 naar WAV
@@ -18929,7 +19880,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC naar MP3
       description: |
         Converteer FLAC naar MP3
@@ -18990,7 +19941,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel naar CSV
       description: |
         Converteer Excel naar CSV
@@ -19023,11 +19974,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19166,6 +20128,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: Een verplichte MFA-registratie afronden
+      description: Bevestigt een verplichte registratie die bij het inloggen is gestart, en geeft een sessie terug. De aanroep vereist geen sessie; de kortlevende registratietoken neemt de plaats van een sessie in. Hier wordt alleen een TOTP-code geaccepteerd, nooit een herstelcode.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19332,7 +20346,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: Uploadpreview genereren
@@ -19681,6 +20695,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: Een SCIM-gebruiker gedeeltelijk bijwerken
+      description: RFC 7644 PatchOp. Ondersteunt add, remove en replace op de paden die de server toestaat. Gebruikerspaden worden per bewerking gevalideerd.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19746,6 +20823,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: Een SCIM-groep gedeeltelijk bijwerken
+      description: RFC 7644 PatchOp. Ondersteunt add, remove en replace op de paden die de server toestaat. Groepsleden worden per bewerking gevalideerd.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -19992,7 +21132,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20188,13 +21350,33 @@ x-i18n:
       provenance: machine
       outputHash: fd18d8aa1479
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: abf9ee1ba426
+      outputHash: 484a9623d929
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: c37fb5aced7c
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 3ee3eabafec7
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: ef841e474d83
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 6e8da4757d2a
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 8013d4e549a0
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 73765e06e85e
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21151,6 +22333,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: 8bb32487c841
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: eaee34799513
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: bfe35a8ac9be
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21183,6 +22373,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: f425655851cf
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 552156a4054a
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: 0a9fb77369af
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: eab712b3f11d
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 90398aa5815f
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 726d5607f4e8
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: c1c8fc6ea595
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: f9c5bc5c98ab
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 5b33cc41e2bb
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22863,6 +24085,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: 823a6b754ba6
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: d6e801713546
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: '322768443544'
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23079,6 +24309,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 00575a284487
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 9ccda0f3e0d4
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: fc4ad8dabdf9
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23119,6 +24357,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: 05a2624f0617
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 4f70dd0b4df5
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 9164b925e793
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: Görüntü, video, ses, PDF ve dosyalar genelinde dosya işleme araçları. Her biri multipart dosya yüklemesi kabul eder ve bir indirme URL'si döndürür.
+    description: Bir bölüme ayrılmamış araç uç noktaları.
+  - name: Image
+    description: Görüntü araçları. Her biri multipart dosya yüklemesi kabul eder ve bir indirme URL'si döndürür.
+  - name: Video
+    description: Video araçları. Her biri multipart dosya yüklemesi kabul eder ve bir indirme URL'si döndürür.
+  - name: Audio
+    description: Ses araçları. Her biri multipart dosya yüklemesi kabul eder ve bir indirme URL'si döndürür.
+  - name: PDF
+    description: PDF ve belge araçları. Her biri multipart dosya yüklemesi kabul eder ve bir indirme URL'si döndürür.
   - name: Batch
     description: Bir araç üzerinden tek istekte birden fazla dosyayı işleyin.
+  - name: Jobs
+    description: Uzun süren işlerin durumu ve ilerlemesi.
   - name: Pipelines
     description: Birden fazla aracı yeniden kullanılabilir iş akışlarında zincirleyin.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Boyutlandır
       description: Bir görüntüyü belirli boyutlara veya yüzdeye göre yeniden boyutlandırın.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: İçeriğe duyarlı yeniden boyutlandırma
       description: Önemli özellikleri korurken içeriği akıllıca kaldırmak veya eklemek için seam carving kullanarak bir görüntüyü yeniden boyutlandırın.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Kırp
       description: Bir görüntüyü belirli bir bölgeye kırpın.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Döndür ve Çevir
       description: Bir görüntüyü açıya göre döndürün veya yatay/dikey olarak çevirin.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: Görüntü Dönüştür
       description: Bir görüntüyü farklı bir formata dönüştürün.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Sıkıştır
       description: Görüntü dosya boyutunu kalite düzeyine veya hedef boyuta göre küçültün.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: Görüntüyü 20 KB'ye sıkıştır
       description: |
         Bir görüntüyü 20 KB hedef boyutuna sıkıştır
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: Görüntüyü 50 KB'ye sıkıştır
       description: |
         Bir görüntüyü 50 KB hedef boyutuna sıkıştır
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: Görüntüyü 100 KB'ye sıkıştır
       description: |
         Bir görüntüyü 100 KB hedef boyutuna sıkıştır
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: Görüntüyü 200 KB'ye sıkıştır
       description: |
         Bir görüntüyü 200 KB hedef boyutuna sıkıştır
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: Görüntüyü 500 KB'ye sıkıştır
       description: |
         Bir görüntüyü 500 KB hedef boyutuna sıkıştır
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: Görüntü Meta Verisi Kaldır
       description: Bir görüntüden EXIF, GPS, ICC veya XMP meta verilerini kaldırın.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: Kenarlık ve çerçeve
       description: Bir görüntüye kenarlık, yuvarlatılmış köşeler, dolgu veya gölge ekleyin.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: Ekran görüntüsünü güzelleştir
       description: |
         Ekran görüntülerine gradyan arka planlar, cihaz çerçeveleri, gölgeler, filigranlar ve sosyal
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: Renk ayarlamaları
       description: |
         Birleştirilmiş renk ayarlama aracı. Parlaklık, kontrast, pozlama, doygunluk, sıcaklık, ton, renk tonu, keskinlik, renk kanalları ve efektleri tek geçişte ayarlar.
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Keskinleştir
       description: Bir görüntüyü uyarlanabilir, unsharp mask veya high-pass yöntemleriyle, isteğe bağlı gürültü azaltma ile keskinleştirin.
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Web için optimize et
       description: Modern formatlara dönüştürerek, kaliteyi ayarlayarak ve isteğe bağlı olarak yeniden boyutlandırarak bir görüntüyü web dağıtımı için optimize edin.
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Web için optimize et (önizleme)
       description: |
         Canlı parametre ayarı için hafif önizleme uç noktası. Optimize edilmiş
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü iyileştirme
       description: |
         AI destekli otomatik görüntü iyileştirme. Görüntüyü analiz eder ve seçilen
@@ -1363,7 +1433,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: İyileştirme için görüntüyü analiz et
       description: |
         Bir görüntüyü analiz edin ve uygulamadan önerilen düzeltmeleri döndürün.
@@ -1415,7 +1485,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: Gürültü kaldırma
       description: |
         Python sidecar kullanarak AI destekli gürültü kaldırma. Hızlı önizlemeden
@@ -1454,11 +1524,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1494,7 +1575,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: Kırmızı göz kaldırma
       description: |
         AI destekli kırmızı göz algılama ve kaldırma. Yüzleri algılar ve
@@ -1531,11 +1612,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1571,7 +1663,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: Fotoğraf restorasyonu
       description: |
         AI destekli fotoğraf restorasyon hattı. Çizikleri onarır, yüzleri iyileştirir,
@@ -1611,11 +1703,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1651,7 +1754,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Vesikalık fotoğraf - analiz et
       description: |
         Vesikalık fotoğraf oluşturmanın 1. aşaması. Yüz işaret noktalarını algılar ve
@@ -1787,7 +1890,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Vesikalık fotoğraf - oluştur
       description: |
         Vesikalık fotoğraf oluşturmanın 2. aşaması. Fotoğrafı belirtilen
@@ -1930,7 +2033,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: Renklendir
       description: |
         AI destekli fotoğraf renklendirme. Siyah beyaz veya gri tonlamalı
@@ -1965,11 +2068,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2005,7 +2119,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: Yüz iyileştirme
       description: |
         GFPGAN veya CodeFormer kullanarak AI destekli yüz iyileştirme. Görüntüdeki
@@ -2042,11 +2156,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2082,7 +2207,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: Görüntüden Base64'e
       description: |
         Bir veya daha fazla görüntüyü data URI'leriyle Base64 kodlu dizelere dönüştürün.
@@ -2176,7 +2301,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: Metin filigranı
       description: Bir görüntüye metin filigranı ekleyin.
       security:
@@ -2229,7 +2354,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: Metin katmanı
       description: İsteğe bağlı arka plan kutusuyla stilize metin katmanı ekleyin.
       security:
@@ -2283,7 +2408,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: Rengi değiştir
       description: Bir görüntüdeki belirli bir rengi başka bir renkle veya saydamlıkla değiştirin.
       security:
@@ -2334,7 +2459,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: Renk körlüğü simülasyonu
       description: Bir görüntünün çeşitli renk görme eksikliği türlerine sahip kişilere nasıl göründüğünü simüle edin.
       security:
@@ -2382,7 +2507,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF araçları
       description: Animasyonlu GIF'leri yeniden boyutlandırın, optimize edin, hızını ayarlayın, ters çevirin, karelerini çıkarın veya döndürün.
       security:
@@ -2446,7 +2571,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF bilgisi
       description: Boyutlar, kare sayısı, gecikmeler ve süre dahil bir animasyonlu GIF hakkında meta veri alın.
       security: []
@@ -2503,7 +2628,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: Akıllı kırpma
       description: 'Üç modlu akıllı kırpma: özne odağı, yüz odağı veya otomatik kırpma.'
       security:
@@ -2562,7 +2687,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: Görüntüden SVG'ye
       description: Bir raster görüntüyü potrace (siyah beyaz) veya VTracer (renkli) kullanarak SVG vektör formatına dönüştürün.
       security:
@@ -2617,7 +2742,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG'den raster'a
       description: Bir SVG dosyasını özel ölçek ve DPI'de raster görüntü formatına dönüştürün.
       security:
@@ -2670,7 +2795,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG'den raster'a (toplu)
       description: Birden fazla SVG dosyasını raster görüntülere dönüştürün. Bir ZIP arşivi döndürür.
       security:
@@ -2730,7 +2855,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: Görüntüden PDF'e
       description: Bir veya daha fazla görüntüyü bir PDF belgesine dönüştürün.
       security:
@@ -2812,7 +2937,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF'den görüntüye
       description: PDF sayfalarını görüntülere dönüştürün. Tekil sayfa indirmelerini ve tüm sayfaların bir ZIP'ini döndürür.
       security:
@@ -2901,7 +3026,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF sayfa sayısı
       description: Bir PDF dosyasındaki sayfa sayısını alın.
       security: []
@@ -2940,7 +3065,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF sayfa küçük resimleri
       description: Bir PDF'deki her sayfa için küçük resim önizlemeleri oluşturun (en fazla 200 sayfa, JPEG 300px genişlik).
       security: []
@@ -2993,7 +3118,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü Böl
       description: Bir görüntüyü döşeme ızgarasına bölün. Bir ZIP dosyası döndürür.
       security:
@@ -3047,7 +3172,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: Toplu yeniden adlandırma
       description: Bir desen şablonu kullanarak birden fazla görüntüyü yeniden adlandırın. {{index}}, {{padded}} ve {{original}} jetonlarını destekler. Bir ZIP dosyası döndürür.
       security:
@@ -3099,7 +3224,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Favicon oluşturucu
       description: Bir görüntüden eksiksiz bir favicon seti (16px'ten 512px'e PNG'ler, ICO ve manifest.json) oluşturun. Bir ZIP dosyası döndürür.
       security:
@@ -3143,7 +3268,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: Görüntü filigranı
       description: Bir görüntü filigranı katmanı ekleyin.
       security:
@@ -3198,7 +3323,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: Görüntü kompozisyonu
       description: Bir katman görüntüsünü karışım modlarıyla bir taban görüntü üzerine birleştirin.
       security:
@@ -3254,7 +3379,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: Mem oluşturucu
       description: |
         Şablonlar veya özel görüntüler kullanarak mem oluşturun. İki modu destekler: (1) Şablon modu - `templateId` ve `textBoxes` ile JSON gövdesi gönderin. (2) Özel görüntü modu - `file` ve `settings` ile multipart gönderin.
@@ -3493,7 +3618,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: Görüntü karşılaştırma
       description: İki görüntüyü karşılaştırın ve görsel bir fark raporu oluşturun.
       security:
@@ -3560,7 +3685,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: Nesne silici
       description: Bir maske kullanarak bir görüntüden nesneleri silin. Maskedeki beyaz alanlar silinecek bölgeleri belirtir. LaMa inpainting kullanır.
       security:
@@ -3613,11 +3738,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3653,7 +3789,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI tuval genişletme (deneysel)
       description: |
         AI outpainting kullanarak bir görüntü tuvalini genişletin. Orijinalle
@@ -3696,11 +3832,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3736,7 +3883,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: Kolaj ve Izgara
       description: Birden fazla görüntüyü bir ızgara kolajında birleştirin.
       security:
@@ -3793,7 +3940,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: Görüntüleri Birleştir
       description: Birden fazla görüntüyü yatay, dikey veya ızgara düzeninde birleştirin.
       security:
@@ -3852,7 +3999,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: Animasyonlu bir görüntüden arka planı kaldırma
       description: AI (rembg) kullanarak animasyonlu bir GIF, WebP veya APNG'den arka planı kare kare kaldırın. Yerel olarak çalışır.
       security:
@@ -3898,11 +4045,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3932,7 +4090,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: Arka planı kaldır
       description: AI (rembg) kullanarak bir görüntüden arka planı kaldırın. Yerel olarak çalışır.
       security:
@@ -3966,11 +4124,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4006,7 +4175,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: Arka plan efektlerini uygula
       description: |
         Daha önce işlenmiş bir remove-background sonucuna arka plan değişimi veya efektleri uygulayın. Önceki bir POST /api/v1/tools/image/remove-background çağrısından bir jobId gerektirir.
@@ -4073,7 +4242,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: Sahte saydamlığı düzelt
       description: |
         Önceki bir arka plan kaldırmadan kaynaklanan saçaklanma, hale veya yarı saydam
@@ -4111,11 +4280,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4151,7 +4331,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: Görüntü büyütme
       description: AI (Real-ESRGAN) kullanarak bir görüntüyü büyütün. Yerel olarak çalışır.
       security:
@@ -4187,11 +4367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4227,7 +4418,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: Yüzleri ve Kişisel Bilgileri Bulanıklaştır
       description: Gizlilik için bir görüntüdeki yüzleri algılayın ve bulanıklaştırın. OpenCV kullanır. Yerel olarak çalışır.
       security:
@@ -4259,11 +4450,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4299,7 +4501,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / metin çıkarma
       description: |-
         Bir görüntüdeki metni yerel olarak çıkarın. Yerleşik Fast katmanının kullanım alanları
@@ -4337,6 +4539,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4345,6 +4552,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4388,7 +4601,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: Görüntü bilgisi
       description: Boyutlar, format, renk uzayı ve EXIF verileri dahil bir görüntü hakkında ayrıntılı meta veri alın.
       security:
@@ -4491,7 +4704,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: Renk paleti
       description: Bir görüntüden baskın renkleri çıkarın.
       security:
@@ -4544,7 +4757,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: Barkod okuyucu
       description: Bir görüntüden QR kodlarını ve barkodları okuyun.
       security:
@@ -4649,7 +4862,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: Kopyaları bul
       description: Algısal hashleme kullanarak bir kümede kopya görüntüleri bulun.
       security:
@@ -4752,7 +4965,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR kodu oluşturucu
       description: Metinden bir QR kodu görüntüsü oluşturun. Bu araç multipart değil, bir JSON gövdesi kabul eder.
       security:
@@ -4815,7 +5028,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Web sayfasını görüntü olarak yakala
       description: Bir web sayfasını yüksek kaliteli bir ekran görüntüsü olarak yakalayın. Bir URL ve yakalama seçenekleriyle bir JSON gövdesi kabul eder.
       security:
@@ -4901,7 +5114,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: Meta verileri incele
       description: Bir görüntüdeki tüm meta verileri (EXIF, GPS, ICC, XMP) kaldırmadan görüntüleyin.
       security:
@@ -4970,7 +5183,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: Görüntü Meta Verisi Düzenle
       description: ExifTool kullanarak bir görüntüdeki EXIF, IPTC, GPS ve diğer meta veri alanlarını düzenleyin.
       security:
@@ -5039,7 +5252,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: Meta verileri incele (ExifTool)
       description: ExifTool kullanarak bir görüntüden tüm meta verileri okuyun. Gömülü tüm EXIF, IPTC, XMP ve GPS alanlarını döndürür.
       security:
@@ -7054,6 +7267,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: İş durumunu al
+      description: |
+        Bağlantıyı açık tutmadan işin kayıtlı durumunu döndürür. 202 yanıtından sonra yoklayın veya ilerleme akışı koptuğunda yedek olarak kullanın.
+
+        `status` şu değerlerden biri olabilir: `queued`, `processing`, `completed`, `failed` veya `canceled`. `completed`, `failed` ve `canceled` son durumlardır. İptal edilmiş bir iş yine de kısmi bir `result` taşıyabilir (örneğin tamamlanan dosyaların ZIP'i), bu yüzden `result` mevcut olduğunda her zaman okuyun.
+
+        Erişim ilerleme akışını izler: işin sahibi, `files:all` yetkisine sahip bir kullanıcı veya bir AI özellik paketi kurulum işi için `features:manage` yetkisine sahip bir kullanıcı. Diğer çağrılar 404 alır.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7372,6 +7632,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Ürün geri bildirimi gönder
+      description: Oturum açmış kullanıcıdan tek bir geri bildirim olayı kaydeder. Dakikada 10 istekle sınırlıdır. Sunucu olayı kaydetmediğinde `accepted` false olur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: Kullanılabilir daha yeni sürümü al
+      description: Yayımlanan en yeni sürüm, çalışan sürümden daha yeniyse onu, değilse null döndürür. settings:write gerektirir.
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: Tüm AI özellik paketlerini sıfırla
+      description: |
+        AI sanal ortamını, modelleri ve pip önbelleğini siler, ardından her paketi kurulu değil olarak işaretler. Kurulum kendi başına kurtarılamadığında kullanın. Bir paketi kaldırmak yalnızca model ağırlıklarını siler, bu nedenle bu tam sıfırlamadır.
+
+        Yanıt, sanal ortamın imaja gömülü temelden yeniden oluşturulup oluşturulmadığını (venvReseeded) belirtir. Bir paket kurulumu çalışırken 409 döndürür. features:manage gerektirir.
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: Bir aracın ihtiyaç duyduğu tüm özellik paketlerini kur
+      description: Aracın gerektirdiği her paketi kuyruğa alır ve paket başına kuyruğa alındığını ya da atlandığını bildirir. features:manage gerektirir.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7411,11 +7856,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7925,7 +8381,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Video Dönüştür
       description: Videoları MP4, MOV, WebM, AVI ve MKV arasında dönüştürün.
       security:
@@ -7957,11 +8413,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7991,7 +8458,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Video Sıkıştır
       description: Kalite kontrolüyle video dosya boyutunu küçültün.
       security:
@@ -8023,11 +8490,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8057,7 +8535,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Video Kırp
       description: Bir videodan bir klip kesin.
       security:
@@ -8107,7 +8585,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Sustur
       description: Bir videodan ses parçasını kaldırın.
       security:
@@ -8150,7 +8628,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: Videodan GIF'e
       description: Bir video klibini animasyonlu GIF'e dönüştürün.
       security:
@@ -8184,11 +8662,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8218,7 +8707,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Yeniden Boyutlandır
       description: Bir videoyu yeni bir çözünürlüğe veya ön ayar boyutuna ölçekleyin.
       security:
@@ -8268,7 +8757,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Kırp
       description: Bir videodan bir bölge kırpın.
       security:
@@ -8319,7 +8808,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Döndür
       description: Bir videoyu döndürün veya çevirin.
       security:
@@ -8367,7 +8856,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: FPS Değiştir
       description: Bir videonun kare hızını değiştirin.
       security:
@@ -8415,7 +8904,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Video Rengi
       description: Parlaklık, kontrast, doygunluk ve gamayı ayarlayın.
       security:
@@ -8466,7 +8955,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Video Hızı
       description: Bir videoyu hızlandırın veya yavaşlatın.
       security:
@@ -8515,7 +9004,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Ters Çevir
       description: Bir video klibini geriye doğru oynatın. 5 dakikaya kadar kliplerle sınırlıdır.
       security:
@@ -8558,7 +9047,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: Video Sesini Normalleştir
       description: Video ses seviyesini yayın standardına (EBU R128) normalleştirin.
       security:
@@ -8601,7 +9090,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: En Boy Doldurma
       description: Hedef en boy oranına uydurmak için düz renkli çubuklar ekleyin.
       security:
@@ -8650,7 +9139,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Bulanık Doldurma
       description: Çubukları videonun bulanık bir kopyasıyla doldurun.
       security:
@@ -8699,7 +9188,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Videoya Filigran Ekle
       description: Video karelerine bir metin filigranı gömün.
       security:
@@ -8751,7 +9240,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Videoyu Sabitle
       description: İki geçişli sabitlemeyle kamera sarsıntısını azaltın.
       security:
@@ -8782,11 +9271,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8816,7 +9316,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF'ten Videoya
       description: Bir animasyonlu GIF'i MP4, WebM veya MOV videoya dönüştürün.
       security:
@@ -8864,7 +9364,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: Videodan WebP'ye
       description: Bir video klibini animasyonlu WebP görüntüsüne dönüştürün.
       security:
@@ -8915,7 +9415,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: Videodan Karelere
       description: Bir videodan kareleri görüntülerin ZIP'i olarak çıkarın.
       security:
@@ -8966,7 +9466,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Videoları Birleştir
       description: |
         Birden fazla video klibini tek bir MP4 dosyasında birleştirin. Tüm girdiler
@@ -8996,11 +9496,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9030,7 +9541,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Sesi Değiştir
       description: Bir videonun ses parçasını başka bir dosyayla değiştirin.
       security:
@@ -9075,7 +9586,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: Altyazıları Göm
       description: Altyazıları video karelerine kalıcı olarak işleyin.
       security:
@@ -9108,11 +9619,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9142,7 +9664,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Altyazıları Ekle
       description: Bir altyazı parçasını video kapsayıcısına mux'layın.
       security:
@@ -9192,7 +9714,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Altyazıları Çıkar
       description: Bir videodan altyazı parçasını SRT dosyası olarak çekin.
       security:
@@ -9235,7 +9757,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: Görüntülerden Videoya
       description: Bir görüntü setini slayt gösterisi videosuna dönüştürün.
       security:
@@ -9287,7 +9809,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Video Meta Verilerini Temizle
       description: Bir videodan meta verileri temizleyin ve bulunanları raporlayın.
       security:
@@ -9330,7 +9852,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Otomatik Altyazı
       description: |
         faster-whisper kullanarak video ses parçalarından AI destekli altyazı
@@ -9365,11 +9887,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9405,7 +9938,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Sesi Çıkar
       description: Bir videodan ses parçasını çekin.
       security:
@@ -9453,7 +9986,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Ses Dönüştür
       description: Sesi MP3, WAV, OGG ve daha fazlası arasında dönüştürün.
       security:
@@ -9502,7 +10035,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Ses Kırp
       description: Bir ses dosyasından bir bölüm kesin.
       security:
@@ -9551,7 +10084,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: Ses Seviyesini Ayarla
       description: Ses düzeyini sabit bir kazançla artırın veya azaltın.
       security:
@@ -9599,7 +10132,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Sesi Normalleştir
       description: Ses yüksekliğini yayın standardı seviyelerine (EBU R128, -16 LUFS) eşitleyin.
       security:
@@ -9642,7 +10175,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Ses Geçişi
       description: Sese açılış ve kapanış geçiş efektleri ekleyin.
       security:
@@ -9691,7 +10224,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Sesi Ters Çevir
       description: Sesi geriye doğru oynatın.
       security:
@@ -9734,7 +10267,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Ses Hızı
       description: Ses oynatmayı hızlandırın veya yavaşlatın.
       security:
@@ -9782,7 +10315,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Perde Kaydırma
       description: Hızı değiştirmeden perdeyi yarım tonlarla yükseltin veya düşürün.
       security:
@@ -9830,7 +10363,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Ses Kanalları
       description: Mono, stereo arasında dönüştürün veya sol ve sağ kanalları değiştirin.
       security:
@@ -9878,7 +10411,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Sessizlik Kaldırma
       description: Sesteki sessiz bölümleri temizleyin.
       security:
@@ -9927,7 +10460,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Gürültü Azaltma
       description: FFT tabanlı gürültü giderme ile arka plan gürültüsünü azaltın.
       security:
@@ -9975,7 +10508,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Sesi Birleştir
       description: Birden fazla ses dosyasını tek bir ardışık parçada birleştirin.
       security:
@@ -10025,7 +10558,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Sesi Böl
       description: |
         Sesi zamana, eşit parçalara veya sessizlik algılamaya göre bölün. Segmentlerin
@@ -10079,7 +10612,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Zil Sesi Oluşturucu
       description: Herhangi bir ses dosyasından bir zil sesi klibi (.m4r) oluşturun.
       security:
@@ -10128,7 +10661,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Dalga Formu Görüntüsü
       description: Bir ses dosyasından PNG görüntüsü olarak bir dalga formu görselleştirmesi oluşturun.
       security:
@@ -10178,7 +10711,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Ses Meta Verileri
       description: |
         Ses etiketlerini (ID3) görüntüleyin, düzenleyin veya temizleyin. Yanıt, standart
@@ -10232,7 +10765,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Sesi Yazıya Dök
       description: |
         faster-whisper kullanarak AI destekli konuşmadan metne çevirme. Düz metin,
@@ -10267,11 +10800,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10307,7 +10851,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'leri Birleştir
       description: Birden fazla PDF'i birine birleştirin. En az iki dosya gerektirir.
       security:
@@ -10352,7 +10896,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Böl
       description: |
         Sayfaları çıkarın veya parçalara bölün. "range" modunda seçilen sayfalarla tek
@@ -10405,7 +10949,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Sıkıştır
       description: |
         Gömülü görüntüleri örnekleyerek PDF dosya boyutunu küçültün. "quality" modunda
@@ -10459,7 +11003,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'yi 100 KB'ye sıkıştır
       description: |
         Bir PDF'yi 100 KB hedef boyutuna sıkıştır (100 KB, burada 1 KB = 1000 bayt).
@@ -10494,11 +11038,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10522,7 +11077,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'yi 200 KB'ye sıkıştır
       description: |
         Bir PDF'yi 200 KB hedef boyutuna sıkıştır (200 KB, burada 1 KB = 1000 bayt).
@@ -10557,11 +11112,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10585,7 +11151,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'yi 500 KB'ye sıkıştır
       description: |
         Bir PDF'yi 500 KB hedef boyutuna sıkıştır (500 KB, burada 1 KB = 1000 bayt).
@@ -10620,11 +11186,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10648,7 +11225,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'yi 1 MB'ye sıkıştır
       description: |
         Bir PDF'yi 1 MB hedef boyutuna sıkıştır (1000 KB, burada 1 KB = 1000 bayt).
@@ -10683,11 +11260,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10711,7 +11299,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'yi 2 MB'ye sıkıştır
       description: |
         Bir PDF'yi 2 MB hedef boyutuna sıkıştır (2000 KB, burada 1 KB = 1000 bayt).
@@ -10746,11 +11334,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10774,7 +11373,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Döndür
       description: Bir PDF'deki sayfaları 90, 180 veya 270 derece döndürün.
       security:
@@ -10823,7 +11422,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: Sayfaları çıkar
       description: Seçilen sayfaları yeni bir PDF'e çekin.
       security:
@@ -10871,7 +11470,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: Sayfaları kaldır
       description: Bir PDF'den belirli sayfaları silin. Her sayfayı kaldıramaz.
       security:
@@ -10919,7 +11518,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Düzenle
       description: Açık bir sayfa sırasıyla sayfaları yeniden sıralayın.
       security:
@@ -10967,7 +11566,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF Çoklu Araç
       description: Açık bir sayfa planından PDF oluşturun - sayfaları yeniden sıralayın, çoğaltın, döndürün veya silin ve ek PDF'lerden sayfaları tek bir gönderimde alın.
       security:
@@ -11018,7 +11617,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Koru
       description: AES-256 şifrelemesiyle parola koruması ekleyin. Parolalar denetim günlüklerinden gizlenir.
       security:
@@ -11067,7 +11666,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF Kilidini Aç
       description: Bir PDF'den parola korumasını kaldırın. Doğru parola sağlanmalıdır. Parolalar denetim günlüklerinden gizlenir.
       security:
@@ -11115,7 +11714,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Onar
       description: Hasarlı veya bozuk bir PDF'i onarmayı deneyin. Hatalı biçimlendirilmiş dosyalara izin vermek için girdide yapısal doğrulama atlanır.
       security:
@@ -11158,7 +11757,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Web için Optimize Et
       description: Hızlı web görüntüleme (aşamalı indirme) için bir PDF'i doğrusallaştırın.
       security:
@@ -11201,7 +11800,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: Gri Tonlamalı PDF
       description: Bir PDF'deki tüm renkleri gri tonlamaya dönüştürün.
       security:
@@ -11244,7 +11843,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A Dönüştürücü
       description: Uzun süreli koruma için bir PDF'i arşiv PDF/A-2 formatına dönüştürün.
       security:
@@ -11287,7 +11886,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Kırp
       description: Tüm sayfaları eşit bir kenar boşluğuyla kırpın.
       security:
@@ -11335,7 +11934,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: Yaprak Başına Sayfa (N-up)
       description: Sayfa başına birden fazla sayfa yerleştirin (örneğin 2-up, 4-up).
       security:
@@ -11383,7 +11982,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: Kitapçık PDF
       description: Sayfaları bir kitapçığa katlamak için düzenleyin (çift taraflı baskı için tertip).
       security:
@@ -11431,7 +12030,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'e Filigran Ekle
       description: Bir PDF'in her sayfasına metin filigranı ekleyin.
       security:
@@ -11483,7 +12082,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF sayfa numaraları
       description: Bir PDF'in her sayfasına sayfa numaraları ("Sayfa N / M") ekleyin.
       security:
@@ -11532,7 +12131,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: Belge dönüştür
       description: Word, OpenDocument, RTF ve düz metin formatları arasında dönüştürün.
       security:
@@ -11563,11 +12162,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11591,7 +12201,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: Sunum dönüştür
       description: PowerPoint ve OpenDocument sunum formatları arasında dönüştürün.
       security:
@@ -11622,11 +12232,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11650,7 +12271,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: Elektronik tablo dönüştür
       description: Excel, OpenDocument ve CSV formatları arasında dönüştürün. Çok sayfalı çalışma kitapları ilk sayfayı CSV'ye aktarır.
       security:
@@ -11681,11 +12302,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11709,7 +12341,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel'den PDF'e
       description: Elektronik tabloları PDF'e dönüştürün. Geniş sayfalar birden fazla sayfaya bölünebilir.
       security:
@@ -11735,11 +12367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11763,7 +12406,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word'den PDF'e
       description: Word belgelerini PDF'e dönüştürün.
       security:
@@ -11789,11 +12432,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11817,7 +12471,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint'ten PDF'e
       description: Sunumları PDF'e dönüştürün.
       security:
@@ -11843,11 +12497,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11871,7 +12536,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML'den PDF'e
       description: Bir HTML dosyasını PDF'e dönüştürün. Gizlilik için uzak kaynaklar devre dışıdır.
       security:
@@ -11897,11 +12562,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11925,7 +12601,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown'dan Word'e
       description: Bir Markdown dosyasını Word belgesine (DOCX) dönüştürün.
       security:
@@ -11968,7 +12644,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown'dan HTML'e
       description: Bir Markdown dosyasını bağımsız bir HTML sayfasına dönüştürün. Kaynaktaki uzak görüntüler çıktıda olduğu gibi bırakılır.
       security:
@@ -12011,7 +12687,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown'dan PDF'e
       description: Bir Markdown dosyasını stilize bir PDF'e dönüştürün. Gizlilik için uzak kaynaklar devre dışıdır.
       security:
@@ -12037,11 +12713,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12065,7 +12752,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: EPUB'dan Dönüştür
       description: Bir EPUB'ı PDF, DOCX, HTML veya Markdown'a dönüştürün. Kitabın içindeki uzak kaynaklar getirilmez.
       security:
@@ -12096,11 +12783,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12124,7 +12822,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: EPUB'a dönüştür
       description: Word, Markdown, HTML veya düz metin dosyalarını EPUB'a dönüştürün.
       security:
@@ -12150,11 +12848,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12178,7 +12887,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Düzleştir
       description: Formları ve ek açıklamaları sayfa içeriğine işleyin.
       security:
@@ -12221,7 +12930,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF'i Redakte Et
       description: Metin geçişlerini kalıcı olarak kaldırın (doğrulanmış gerçek redaksiyon).
       security:
@@ -12276,7 +12985,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF'ten metne
       description: Bir PDF'den düz metin çıkarın.
       security:
@@ -12325,7 +13034,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF'ten Word'e
       description: Metin tabanlı PDF'ler için en iyisidir; taranmış sayfalar OCR gerektirir.
       security:
@@ -12351,11 +13060,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12379,7 +13099,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF meta verileri
       description: PDF belge meta verilerini okuyun ve yazın.
       security:
@@ -12436,7 +13156,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         Taranan PDF belgelerinden metni sayfa sayfa çıkarın. Fast şunu kullanır:
@@ -12476,6 +13196,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12484,6 +13209,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12533,7 +13264,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Grafik Oluşturucu
       description: CSV veya JSON verilerinden çubuk, çizgi veya pasta grafikleri oluşturun. Bir PNG görüntü döndürür. Değer hücresi sayı olmayan metin içerdiği için satırlar çıkarıldığında, yanıt `chartRows` ({charted, skipped}) ekler; boş satırlar sayılmaz.
       security:
@@ -12584,7 +13315,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV'den Excel'e
       description: CSV ve Excel (XLSX) arasında her iki yönde dönüştürün. XLSX almak için bir CSV veya TSV dosyası, CSV almak için bir XLSX dosyası yükleyin.
       security:
@@ -12632,7 +13363,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV'den JSON'a
       description: CSV ve JSON arasında her iki yönde dönüştürün. JSON almak için bir CSV veya TSV dosyası, CSV almak için bir JSON nesne dizisi yükleyin.
       security:
@@ -12680,7 +13411,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON'dan XML'e
       description: JSON ve XML arasında her iki yönde dönüştürün. XML almak için bir JSON dosyası, JSON almak için bir XML dosyası yükleyin.
       security:
@@ -12728,7 +13459,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: CSV'yi Böl
       description: Bir CSV dosyasını satır sayısına göre daha küçük dosyalara bölün. Parçaları içeren bir ZIP arşivi döndürür.
       security:
@@ -12777,7 +13508,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: CSV'leri Birleştir
       description: Eşleşen sütunları olan birden fazla CSV veya TSV dosyasını tek bir birleştirilmiş dosyada birleştirin. Tüm dosyaların aynı sütun başlıkları olmalıdır.
       security:
@@ -12822,7 +13553,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: YAML / JSON Dönüştür
       description: YAML ve JSON arasında her iki yönde dönüştürün. JSON almak için bir YAML dosyası, YAML almak için bir JSON dosyası yükleyin.
       security:
@@ -12865,7 +13596,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML'den CSV'ye
       description: Bir XML dosyasından tekrarlanan öğeleri bir CSV tablosuna çıkarın. XML ağacındaki ilk nesne dizisini otomatik olarak bulur.
       security:
@@ -12908,7 +13639,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: ZIP Oluştur
       description: Birden fazla dosyayı tek bir ZIP arşivinde paketleyin. Yinelenen dosya adları otomatik olarak tekilleştirilir.
       security:
@@ -12953,7 +13684,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: ZIP Çıkar
       description: Bomba korumasıyla bir ZIP arşivinden dosyaları güvenli bir şekilde çıkarın. Tek dosyalı arşivler dosyayı doğrudan döndürür; çok dosyalı arşivler düz bir ZIP döndürür.
       security:
@@ -12996,7 +13727,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: Arka planı değiştir
       description: |
         AI destekli arka plan değişimi. Öznenin arka planını kaldırır ve
@@ -13036,11 +13767,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13076,7 +13818,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: Arka planı bulanıklaştır
       description: |
         AI destekli arka plan bulanıklaştırma. Arka planı kaldırır, orijinali
@@ -13112,11 +13854,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13152,7 +13905,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: Barkod oluşturucu
       description: Metinden bir barkod görüntüsü oluşturun. Bu araç multipart değil, bir JSON gövdesi kabul eder.
       security:
@@ -13215,7 +13968,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: Daire kırpma
       description: Bir görüntüyü saydam köşeler, isteğe bağlı kenarlık ve ayarlanabilir yakınlaştırma/kaydırmayla ortalanmış bir daireye kırpın.
       security:
@@ -13269,7 +14022,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: Yuvarlatılmış Kırpma
       description: Şeffaf köşeler, isteğe bağlı kenarlık ve ayarlanabilir yakınlaştırma/uzaklaştırma ile görüntüyü yuvarlak kare veya sincap şeklinde kırpın.
       security:
@@ -13325,7 +14078,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: İki ton
       description: Özel gölge ve vurgu renkleriyle iki renkli bir iki ton efekti uygulayın.
       security:
@@ -13375,7 +14128,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: Görüntü doldurma
       description: Bir görüntüyü düz renk, saydam veya bulanık arka planla hedef en boy oranına doldurun.
       security:
@@ -13428,7 +14181,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Pikselleştir
       description: Tüm görüntüye veya belirli bir dikdörtgen bölgeye pikselleştirme efekti uygulayın.
       security:
@@ -13481,7 +14234,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vinyet
       description: Ayarlanabilir güç, renk, yarıçap, yumuşaklık, yuvarlaklık ve merkez konumuyla bir vinyet efekti ekleyin.
       security:
@@ -13535,7 +14288,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP dönüştürücü
       description: Tüm kareleri koruyarak animasyonlu GIF'i WebP'ye ve tam tersine dönüştürün. Yalnızca .gif ve .webp girdilerini kabul eder.
       security:
@@ -13585,7 +14338,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Histogram
       description: |
         Bir görüntüden RGB histogram grafiği oluşturun. Yanıt JSON'unda bir PNG histogram
@@ -13719,7 +14472,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP yer tutucusu
       description: |
         Küçük bir düşük kaliteli görüntü yer tutucusu oluşturun. Yanıt JSON'unda küçük
@@ -13798,7 +14551,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: Sprite sayfası
       description: |
         Birden fazla görüntüyü tek bir sprite sayfası ızgarasında birleştirin. 2 ila
@@ -13893,7 +14646,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Vesikalık Fotoğraf
       description: |
         İki aşamalı vesikalık fotoğraf akışı için yönlendirme uç noktası. Bir görüntüyü
@@ -13925,7 +14678,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: PDF İmzala
       description: Normalleştirilmiş sayfa yerleşimleri kullanarak bir PDF'e bir veya daha fazla imza PNG görüntüsü damgalayın.
       security:
@@ -13969,11 +14722,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -14003,7 +14767,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den PNG'ye
       description: |
         JPG'yi PNG'ye dönüştür
@@ -14064,7 +14828,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den JPG'ye
       description: |
         PNG'yi JPG'ye dönüştür
@@ -14125,7 +14889,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den WebP'ye
       description: |
         JPG'yi WebP'ye dönüştür
@@ -14186,7 +14950,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den WebP'ye
       description: |
         PNG'yi WebP'ye dönüştür
@@ -14247,7 +15011,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP'den JPG'ye
       description: |
         WebP'yi JPG'ye dönüştür
@@ -14308,7 +15072,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP'den PNG'ye
       description: |
         WebP'yi PNG'ye dönüştür
@@ -14369,7 +15133,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den AVIF'e
       description: |
         JPG'yi AVIF'e dönüştür
@@ -14430,7 +15194,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den AVIF'e
       description: |
         PNG'yi AVIF'e dönüştür
@@ -14491,7 +15255,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP'den AVIF'e
       description: |
         WebP'yi AVIF'e dönüştür
@@ -14552,7 +15316,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC'ten JPG'ye
       description: |
         HEIC'i JPG'ye dönüştür
@@ -14613,7 +15377,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC'ten PNG'ye
       description: |
         HEIC'i PNG'ye dönüştür
@@ -14674,7 +15438,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC'ten AVIF'e
       description: |
         HEIC'i AVIF'e dönüştür
@@ -14735,7 +15499,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den GIF'e
       description: |
         JPG'yi GIF'e dönüştür
@@ -14796,7 +15560,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den GIF'e
       description: |
         PNG'yi GIF'e dönüştür
@@ -14857,7 +15621,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF'ten JPG'ye
       description: |
         GIF'i JPG'ye dönüştür
@@ -14918,7 +15682,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF'ten PNG'ye
       description: |
         GIF'i PNG'ye dönüştür
@@ -14979,7 +15743,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP'den GIF'e
       description: |
         WebP'yi GIF'e dönüştür
@@ -15040,7 +15804,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den TIFF'e
       description: |
         JPG'yi TIFF'e dönüştür
@@ -15101,7 +15865,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den TIFF'e
       description: |
         PNG'yi TIFF'e dönüştür
@@ -15162,7 +15926,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF'ten JPG'ye
       description: |
         TIFF'i JPG'ye dönüştür
@@ -15223,7 +15987,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF'ten PNG'ye
       description: |
         TIFF'i PNG'ye dönüştür
@@ -15284,7 +16048,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD'den JPG'ye
       description: |
         PSD'yi JPG'ye dönüştür
@@ -15345,7 +16109,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD'den PNG'ye
       description: |
         PSD'yi PNG'ye dönüştür
@@ -15406,7 +16170,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den EPS'e
       description: |
         PNG'yi EPS'e dönüştür
@@ -15467,7 +16231,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den EPS'e
       description: |
         JPG'yi EPS'e dönüştür
@@ -15528,7 +16292,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS'ten PNG'ye
       description: |
         EPS'i PNG'ye dönüştür
@@ -15589,7 +16353,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS'ten JPG'ye
       description: |
         EPS'i JPG'ye dönüştür
@@ -15650,7 +16414,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den SVG'ye
       description: |
         PNG'yi SVG'ye dönüştür
@@ -15711,7 +16475,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den SVG'ye
       description: |
         JPG'yi SVG'ye dönüştür
@@ -15772,7 +16536,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF'ten SVG'ye
       description: |
         TIFF'i SVG'ye dönüştür
@@ -15833,7 +16597,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD'den SVG'ye
       description: |
         PSD'yi SVG'ye dönüştür
@@ -15894,7 +16658,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS'ten SVG'ye
       description: |
         EPS'i SVG'ye dönüştür
@@ -15955,7 +16719,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG'den PNG'ye
       description: |
         SVG'yi PNG'ye dönüştür
@@ -16011,7 +16775,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG'den JPG'ye
       description: |
         SVG'yi JPG'ye dönüştür
@@ -16067,7 +16831,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG'den PDF'e
       description: |
         JPG'yi PDF'e dönüştür
@@ -16125,7 +16889,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG'den PDF'e
       description: |
         PNG'yi PDF'e dönüştür
@@ -16183,7 +16947,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC'ten PDF'e
       description: |
         HEIC'i PDF'e dönüştür
@@ -16241,7 +17005,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF'ten PDF'e
       description: |
         TIFF'i PDF'e dönüştür
@@ -16299,7 +17063,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP'den PDF'e
       description: |
         WebP'yi PDF'e dönüştür
@@ -16357,7 +17121,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF'ten PDF'e
       description: |
         GIF'i PDF'e dönüştür
@@ -16415,7 +17179,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS'ten PDF'e
       description: |
         EPS'i PDF'e dönüştür
@@ -16473,7 +17237,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'ten JPG'ye
       description: |
         PDF'i JPG'ye dönüştür
@@ -16529,7 +17293,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'ten PNG'ye
       description: |
         PDF'i PNG'ye dönüştür
@@ -16585,7 +17349,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF'ten TIFF'e
       description: |
         PDF'i TIFF'e dönüştür
@@ -16641,7 +17405,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV'dan MP4'e
       description: |
         MOV'u MP4'e dönüştür
@@ -16674,11 +17438,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16708,7 +17483,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM'den MP4'e
       description: |
         WEBM'i MP4'e dönüştür
@@ -16741,11 +17516,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16775,7 +17561,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV'den MP4'e
       description: |
         MKV'yi MP4'e dönüştür
@@ -16808,11 +17594,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16842,7 +17639,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI'den MP4'e
       description: |
         AVI'yi MP4'e dönüştür
@@ -16875,11 +17672,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16909,7 +17717,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten MOV'a
       description: |
         MP4'ü MOV'a dönüştür
@@ -16942,11 +17750,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16976,7 +17795,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten WEBM'e
       description: |
         MP4'ü WEBM'e dönüştür
@@ -17009,11 +17828,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17043,7 +17873,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM'den MOV'a
       description: |
         WEBM'i MOV'a dönüştür
@@ -17076,11 +17906,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17110,7 +17951,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV'den MOV'a
       description: |
         MKV'yi MOV'a dönüştür
@@ -17143,11 +17984,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17177,7 +18029,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI'den MOV'a
       description: |
         AVI'yi MOV'a dönüştür
@@ -17210,11 +18062,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17244,7 +18107,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten AVI'ye
       description: |
         MP4'ü AVI'ye dönüştür
@@ -17277,11 +18140,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17311,7 +18185,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV'dan AVI'ye
       description: |
         MOV'u AVI'ye dönüştür
@@ -17344,11 +18218,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17378,7 +18263,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV'den AVI'ye
       description: |
         MKV'yi AVI'ye dönüştür
@@ -17411,11 +18296,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17445,7 +18341,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI'den MKV'ye
       description: |
         AVI'yi MKV'ye dönüştür
@@ -17478,11 +18374,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17512,7 +18419,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten GIF'e
       description: |
         MP4'ü GIF'e dönüştür
@@ -17545,11 +18452,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17579,7 +18497,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV'dan GIF'e
       description: |
         MOV'u GIF'e dönüştür
@@ -17612,11 +18530,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17646,7 +18575,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV'den GIF'e
       description: |
         MKV'yi GIF'e dönüştür
@@ -17679,11 +18608,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17713,7 +18653,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI'den GIF'e
       description: |
         AVI'yi GIF'e dönüştür
@@ -17746,11 +18686,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17780,7 +18731,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF'ten MP4'e
       description: |
         GIF'i MP4'e dönüştür
@@ -17841,7 +18792,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF'ten WEBM'e
       description: |
         GIF'i WEBM'e dönüştür
@@ -17902,7 +18853,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF'ten MOV'a
       description: |
         GIF'i MOV'a dönüştür
@@ -17963,7 +18914,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten MP3'e
       description: |
         MP4'ü MP3'e dönüştür
@@ -18024,7 +18975,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV'dan MP3'e
       description: |
         MOV'u MP3'e dönüştür
@@ -18085,7 +19036,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV'den MP3'e
       description: |
         MKV'yi MP3'e dönüştür
@@ -18146,7 +19097,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM'den MP3'e
       description: |
         WEBM'i MP3'e dönüştür
@@ -18207,7 +19158,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI'den MP3'e
       description: |
         AVI'yi MP3'e dönüştür
@@ -18268,7 +19219,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten WAV'a
       description: |
         MP4'ü WAV'a dönüştür
@@ -18329,7 +19280,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV'dan WAV'a
       description: |
         MOV'u WAV'a dönüştür
@@ -18390,7 +19341,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4'ten OGG'ye
       description: |
         MP4'ü OGG'ye dönüştür
@@ -18451,7 +19402,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A'dan MP3'e
       description: |
         M4A'yı MP3'e dönüştür
@@ -18512,7 +19463,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A'dan WAV'a
       description: |
         M4A'yı WAV'a dönüştür
@@ -18573,7 +19524,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC'den MP3'e
       description: |
         AAC'yi MP3'e dönüştür
@@ -18634,7 +19585,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC'den WAV'a
       description: |
         AAC'yi WAV'a dönüştür
@@ -18695,7 +19646,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC'den FLAC'e
       description: |
         AAC'yi FLAC'e dönüştür
@@ -18756,7 +19707,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG'den MP3'e
       description: |
         OGG'yi MP3'e dönüştür
@@ -18817,7 +19768,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG'den WAV'a
       description: |
         OGG'yi WAV'a dönüştür
@@ -18878,7 +19829,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV'dan MP3'e
       description: |
         WAV'ı MP3'e dönüştür
@@ -18939,7 +19890,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3'ten WAV'a
       description: |
         MP3'ü WAV'a dönüştür
@@ -19000,7 +19951,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC'ten MP3'e
       description: |
         FLAC'i MP3'e dönüştür
@@ -19061,7 +20012,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel'den CSV'ye
       description: |
         Excel'i CSV'ye dönüştür
@@ -19094,11 +20045,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19237,6 +20199,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: Zorunlu MFA kaydını tamamla
+      description: Girişte başlayan zorunlu kaydı onaylar ve bir oturum döndürür. Çağrı oturum kapısına tabi değildir; kısa ömürlü kayıt belirteci oturumun yerini tutar. Burada yalnızca TOTP kodu kabul edilir, kurtarma kodu asla kabul edilmez.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19403,7 +20417,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: Yükleme önizlemesi oluştur
@@ -19752,6 +20766,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: Bir SCIM kullanıcısını kısmen güncelle
+      description: RFC 7644 PatchOp. Sunucunun izin verdiği yollarda add, remove ve replace işlemlerini destekler. Kullanıcı yolları işlem başına doğrulanır.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19817,6 +20894,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: Bir SCIM grubunu kısmen güncelle
+      description: RFC 7644 PatchOp. Sunucunun izin verdiği yollarda add, remove ve replace işlemlerini destekler. Grup üyeleri işlem başına doğrulanır.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20063,7 +21203,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20259,13 +21421,33 @@ x-i18n:
       provenance: machine
       outputHash: d1a1b84bd78a
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: 6470333f7d9c
+      outputHash: 13ed5a072bb7
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: 7faf93e71297
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 6edbe6a837a8
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 073d258d3a51
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 39a9b7ce119a
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 99f617920b1a
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 7441403f56e9
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21222,6 +22404,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: d51cfb50ae2e
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 3e7045a95d04
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: b5004985072b
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21254,6 +22444,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 3797ce813135
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 28cffbd39fe3
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: cf04f2ac3afc
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 3fb496db0567
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 8456357fac5d
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: cfe7f2e329d1
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 5bb5fd18485e
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: dc1991e35bda
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: f600eeb63383
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22934,6 +24156,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: ece3d150a12c
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: 994c2202ad10
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 1d7c1d59f7c5
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23150,6 +24380,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: e3ec6f704dbd
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 6fd38da00da0
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: 55f9379d4ac9
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23190,6 +24428,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: f108eca39c1e
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 727a7e418f80
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 412e81be128d
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

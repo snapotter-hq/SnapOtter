@@ -903,7 +903,8 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         expect(res.statusCode).toBe(expectedStatus);
         const body = JSON.parse(res.body) as { error: string; code?: string };
         expect(body.error).toBe(expectedError);
-        expect(body.code).toBe(expectedCode);
+        // Every error body carries a code now; a route error without a SafeError code falls back to the status-derived one.
+        expect(body.code).toBe(expectedCode ?? "INTERNAL_ERROR");
         expect(res.body).not.toContain("/data/uploads");
         expect(res.body).not.toContain(".snapotter-staging");
         expect(requestLogError).toHaveBeenCalledOnce();

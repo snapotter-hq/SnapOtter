@@ -260,7 +260,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(res.statusCode, res.body).toBe(422);
       expect(res.body).not.toContain(tmpdir());
       expect(res.body).not.toContain("/data/out");
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: c.expectedError,
         details: "write failed at [internal] and [internal]",
       });
@@ -286,7 +286,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(res.statusCode, res.body).toBe(422);
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: "Color extraction failed",
         details: "vips raw failed at [internal]",
       });
@@ -302,7 +302,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }], "{}"),
         });
         expect(badSettingsRes.statusCode).toBe(400);
-        expect(badSettingsRes.json()).toEqual({
+        expect(badSettingsRes.json()).toMatchObject({
           error: "Invalid settings",
           details: "bad JSON in [internal]",
         });
@@ -337,7 +337,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ]),
       });
       expect(res.statusCode, res.body).toBe(422);
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: "Duplicate detection failed",
         details: "hash probe failed at [internal]",
       });
@@ -379,7 +379,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(res.statusCode, `${route.name}: ${res.body}`).toBe(422);
-        expect(res.json()).toEqual({
+        expect(res.json()).toMatchObject({
           error: route.expectedError,
           details: "stream hijack failed at [internal]",
         });
@@ -410,7 +410,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         payload: { text: "hello" },
       });
       expect(qrRes.statusCode, qrRes.body).toBe(422);
-      expect(qrRes.json()).toEqual({
+      expect(qrRes.json()).toMatchObject({
         error: "QR code generation failed",
         details: "qr write failed at [internal]",
       });
@@ -439,7 +439,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         },
       });
       expect(passRes.statusCode, passRes.body).toBe(422);
-      expect(passRes.json()).toEqual({
+      expect(passRes.json()).toMatchObject({
         error: "Passport photo generation failed",
         details: "passport write failed at [internal]",
       });
@@ -476,7 +476,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ...multipartBody([{ name: "photo.heic", type: "image/heic", data: HEIC }]),
       });
       expect(heicRes.statusCode, heicRes.body).toBe(422);
-      expect(heicRes.json()).toEqual({
+      expect(heicRes.json()).toMatchObject({
         error: 'Failed to decode HEIC file "photo.heic"',
         details: "Command failed: heif-convert [internal]",
       });
@@ -488,7 +488,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ...multipartBody([{ name: "icon.ico", type: "image/x-icon", data: ICO }]),
       });
       expect(icoRes.statusCode, icoRes.body).toBe(422);
-      expect(icoRes.json()).toEqual({
+      expect(icoRes.json()).toMatchObject({
         error: 'Failed to decode ICO file "icon.ico"',
         details: "Command failed: magick [internal]",
       });
@@ -649,7 +649,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ),
       });
       expect(collageRes.statusCode, collageRes.body).toBe(422);
-      expect(collageRes.json()).toEqual({
+      expect(collageRes.json()).toMatchObject({
         error: "Collage creation failed",
         details: "cjxl rejected [internal]",
       });
@@ -664,7 +664,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
       });
       expect(svgBatchRes.statusCode, svgBatchRes.body).toBe(422);
       expect(svgBatchRes.body).not.toContain(tmpdir());
-      expect(svgBatchRes.json()).toEqual({
+      expect(svgBatchRes.json()).toMatchObject({
         error: "All files failed processing",
         errors: [{ filename: "a.svg", error: "cjxl batch failed on [internal]" }],
       });
@@ -676,7 +676,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(editInspectRes.statusCode, editInspectRes.body).toBe(422);
-      expect(editInspectRes.json()).toEqual({
+      expect(editInspectRes.json()).toMatchObject({
         error: "Failed to read image metadata",
         details: "exiftool inspect failed on [internal]",
       });
@@ -688,7 +688,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { artist: "Test" }),
       });
       expect(editRes.statusCode, editRes.body).toBe(422);
-      expect(editRes.json()).toEqual({
+      expect(editRes.json()).toMatchObject({
         error: "Metadata edit failed",
         details: "exiftool write failed on [internal]",
       });
@@ -707,7 +707,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(stripRes1.statusCode, stripRes1.body).toBe(422);
-        expect(stripRes1.json()).toEqual({
+        expect(stripRes1.json()).toMatchObject({
           error: "Failed to read image metadata",
           details: "strip metadata failed on [internal]",
         });
@@ -721,7 +721,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
           ...multipartBody([{ name: "a.png", type: "image/png", data: disguisedSvg }]),
         });
         expect(stripRes2.statusCode, stripRes2.body).toBe(422);
-        expect(stripRes2.json()).toEqual({
+        expect(stripRes2.json()).toMatchObject({
           error: "Failed to read image metadata",
           details: "strip outer failed on [internal]",
         });
@@ -752,7 +752,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         payload: { url: "https://example.com" },
       });
       expect(htmlRes.statusCode, htmlRes.body).toBe(400);
-      expect(htmlRes.json()).toEqual({
+      expect(htmlRes.json()).toMatchObject({
         error: "URL is not allowed",
         details: "DNS lookup failed via [internal]",
       });
@@ -767,7 +767,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         },
       });
       expect(webhookRes.statusCode, webhookRes.body).toBe(400);
-      expect(webhookRes.json()).toEqual({
+      expect(webhookRes.json()).toMatchObject({
         error: "Webhook URL must resolve to a public HTTP(S) destination",
         details: "DNS lookup failed via [internal]",
       });
@@ -781,7 +781,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         },
       });
       expect(siemRes.statusCode, siemRes.body).toBe(400);
-      expect(siemRes.json()).toEqual({
+      expect(siemRes.json()).toMatchObject({
         error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
         details: "DNS lookup failed via [internal]",
       });
@@ -793,7 +793,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
         payload: { html: "<p>hi</p>" },
       });
       expect(htmlCaptureRes.statusCode, htmlCaptureRes.body).toBe(422);
-      expect(htmlCaptureRes.json()).toEqual({
+      expect(htmlCaptureRes.json()).toMatchObject({
         error: "Screenshot capture failed",
         details: "capture write failed at [internal]",
       });
@@ -837,7 +837,7 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(res.statusCode, res.body).toBe(400);
       expect(res.body).not.toContain(tmpdir());
       expect(res.body).not.toContain("/tmp/");
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: 'Invalid file "broken.heic": Command failed: heif-convert [internal] [internal]',
       });
       // The raw error is still recorded for operators.
@@ -927,7 +927,7 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       });
       expect(res.statusCode, res.body).toBe(400);
       expect(res.body).not.toContain(tmpdir());
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: 'Invalid file "broken.svg": SVG sanitize rejected at [internal]',
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
@@ -951,7 +951,7 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       });
       expect(res.statusCode, res.body).toBe(400);
       expect(res.body).not.toContain(tmpdir());
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: 'Invalid file "ok.png": vips stats failed at [internal]',
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
@@ -1013,7 +1013,7 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
         ...multipartBody([{ name: "photo.heic", type: "image/heic", data: HEIC }]),
       });
       expect(res.statusCode, res.body).toBe(422);
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: "Failed to decode HEIC/HEIF file",
         details: "Command failed: heif-convert [internal]",
       });

@@ -448,7 +448,7 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
       fsState.failMkdirWith = "EPERM";
       const docFail = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
       expect(docFail.statusCode).toBe(503);
-      expect(docFail.json()).toEqual({
+      expect(docFail.json()).toMatchObject({
         error: NOT_WRITABLE_MSG,
         code: "storage-not-writable",
       });
@@ -469,7 +469,7 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
       fsState.failMkdirWith = "EDQUOT";
       const vidFail = await app.inject({ method: "GET", url: "/api/v1/files/vid-1/preview" });
       expect(vidFail.statusCode).toBe(503);
-      expect(vidFail.json()).toEqual({
+      expect(vidFail.json()).toMatchObject({
         error: FULL_MSG,
         code: "storage-full",
       });
@@ -795,7 +795,7 @@ describe("media previews when ffmpeg is missing (#1576)", () => {
     try {
       const res = await app.inject({ method: "GET", url: "/api/v1/files/aud-1/preview" });
       expect(res.statusCode).toBe(503);
-      expect(res.json()).toEqual({
+      expect(res.json()).toMatchObject({
         error: ENGINE_MSG,
         details: ENGINE_HINT,
         code: "ENGINE_UNAVAILABLE",

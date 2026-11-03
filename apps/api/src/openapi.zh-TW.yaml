@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: 涵蓋圖片、影片、音訊、PDF 與檔案的檔案處理工具。每個工具接受 multipart 檔案上傳並回傳下載 URL。
+    description: 不屬於任何分組的工具端點。
+  - name: Image
+    description: 圖片工具。每個工具接受 multipart 檔案上傳，並回傳下載 URL。
+  - name: Video
+    description: 影片工具。每個工具接受 multipart 檔案上傳，並回傳下載 URL。
+  - name: Audio
+    description: 音訊工具。每個工具接受 multipart 檔案上傳，並回傳下載 URL。
+  - name: PDF
+    description: PDF 與文件工具。每個工具接受 multipart 檔案上傳，並回傳下載 URL。
   - name: Batch
     description: 在單一請求中透過一個工具處理多個檔案。
+  - name: Jobs
+    description: 長時間執行工作的狀態與進度。
   - name: Pipelines
     description: 將多個工具串接為可重複使用的工作流程。
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: 調整影像大小
       description: 將圖片調整為特定尺寸或依百分比縮放。
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: 內容感知調整尺寸
       description: 使用接縫裁剪（seam carving）調整圖片尺寸，智慧地移除或插入內容並保留重要特徵。
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: 裁切影像
       description: 將圖片裁剪至特定區域。
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: 旋轉與翻轉影像
       description: 依角度旋轉圖片，或做水平／垂直翻轉。
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: 轉換影像
       description: 將圖片轉換為不同格式。
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: 壓縮影像
       description: 依品質等級或目標大小縮減圖片檔案大小。
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: 將圖片壓縮至 20 KB
       description: |
         將圖片壓縮至 20 KB 目標大小
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: 將圖片壓縮至 50 KB
       description: |
         將圖片壓縮至 50 KB 目標大小
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: 將圖片壓縮至 100 KB
       description: |
         將圖片壓縮至 100 KB 目標大小
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: 將圖片壓縮至 200 KB
       description: |
         將圖片壓縮至 200 KB 目標大小
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: 將圖片壓縮至 500 KB
       description: |
         將圖片壓縮至 500 KB 目標大小
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: 移除影像中繼資料
       description: 從圖片移除 EXIF、GPS、ICC 或 XMP 中繼資料。
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: 邊框與外框
       description: 為圖片加上邊框、圓角、留白或陰影。
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: 美化截圖
       description: |
         為截圖加上漸層背景、裝置外框、陰影、浮水印，以及社群媒體尺寸。支援純色、線性漸層、放射狀漸層、圖片與透明背景。內含 macOS、Windows、瀏覽器、iPhone、MacBook 與 iPad 裝置外框。並提供 Twitter、LinkedIn、Instagram、Facebook 與 Product Hunt 的社群媒體預設。
@@ -1063,7 +1133,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: 色彩調整
       description: |
         整合式色彩調整工具。在單次處理中調整亮度、對比、曝光、飽和度、色溫、色調、色相、銳利度、色彩通道與特效。
@@ -1123,7 +1193,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: 銳利化影像
       description: 使用自適應、遮色片銳化（unsharp mask）或高通方法銳化圖片，並可選擇降噪。
       security:
@@ -1183,7 +1253,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: 網頁最佳化
       description: 將圖片轉換為現代格式、調整品質並可選擇調整尺寸，為網頁傳輸最佳化。
       security:
@@ -1236,7 +1306,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: 網頁最佳化（預覽）
       description: |
         供即時參數調整的輕量預覽端點。直接回傳最佳化後的圖片二進位資料（非 JSON）。大小資訊置於回應標頭。不會建立工作區或保存結果。
@@ -1297,7 +1367,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: 圖片增強
       description: |
         AI 驅動的自動圖片增強。分析圖片後，依所選場景模式套用曝光、對比、白平衡、飽和度、銳利度與雜訊的校正。
@@ -1355,7 +1425,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: 分析圖片以進行增強
       description: |
         分析圖片並回傳建議的校正，但不實際套用。可用於預覽將會進行哪些增強。
@@ -1406,7 +1476,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: 雜訊移除
       description: |
         透過 Python sidecar 進行 AI 驅動的雜訊移除。支援從快速預覽到最高品質的多個品質層級。需先安裝 noise-removal 功能套件。
@@ -1443,11 +1513,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1483,7 +1564,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: 紅眼移除
       description: |
         AI 驅動的紅眼偵測與移除。偵測臉部並校正相片中的紅眼瑕疵。需先安裝 red-eye-removal 功能套件。
@@ -1518,11 +1599,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1558,7 +1650,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: 相片修復
       description: |
         AI 驅動的相片修復流程。修補刮痕、增強臉部、降噪，並可選擇為老舊或受損相片上色。需先安裝 photo-restoration 功能套件。
@@ -1596,11 +1688,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1636,7 +1739,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 證件照 - 分析
       description: |
         證件照產生的第 1 階段。偵測臉部特徵點並移除背景。回傳特徵點資料及一組 base64 編碼預覽，供用戶端在產生階段使用。需先安裝 passport-photo 功能套件。
@@ -1769,7 +1872,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 證件照 - 產生
       description: |
         證件照產生的第 2 階段。使用分析階段取得的 jobId 與特徵點，依指定的國家／證件規格裁剪、調整尺寸並排版相片。快速回應（不重跑 AI）。
@@ -1910,7 +2013,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: 上色
       description: |
         AI 驅動的相片上色。使用 DDColor 並以 OpenCV DNN 作為後備，將黑白或灰階相片轉為全彩。需先安裝 colorize 功能套件。
@@ -1943,11 +2046,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1983,7 +2097,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: 臉部增強
       description: |
         使用 GFPGAN 或 CodeFormer 的 AI 驅動臉部增強。偵測圖片中的臉部並增強臉部細節、膚質與清晰度。需先安裝 enhance-faces 功能套件。
@@ -2018,11 +2132,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2058,7 +2183,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: 圖片轉 Base64
       description: |
         將一或多張圖片轉換為附帶 data URI 的 Base64 編碼字串。支援可選的格式轉換與尺寸調整。每個檔案同時回傳原始 Base64 字串與可直接使用的 data URI。
@@ -2150,7 +2275,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: 文字浮水印
       description: 為圖片加上文字浮水印。
       security:
@@ -2203,7 +2328,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: 文字疊加
       description: 加上帶樣式的文字疊加，並可選擇背景框。
       security:
@@ -2257,7 +2382,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: 取代顏色
       description: 將圖片中的特定顏色取代為另一種顏色或透明。
       security:
@@ -2308,7 +2433,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: 色盲模擬
       description: 模擬圖片在各類色覺缺陷者眼中的呈現方式。
       security:
@@ -2356,7 +2481,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF 工具
       description: 對動態 GIF 進行調整尺寸、最佳化、調速、反轉、擷取影格或旋轉。
       security:
@@ -2420,7 +2545,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF 資訊
       description: 取得動態 GIF 的中繼資料，包含尺寸、影格數、延遲與時長。
       security: []
@@ -2477,7 +2602,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: 智慧裁剪
       description: 提供三種模式的智慧裁剪：主體聚焦、臉部聚焦或自動裁邊。
       security:
@@ -2536,7 +2661,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: 圖片轉 SVG
       description: 使用 potrace（黑白）或 VTracer（彩色）將點陣圖轉換為 SVG 向量格式。
       security:
@@ -2591,7 +2716,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG 轉點陣圖
       description: 以自訂縮放比例與 DPI 將 SVG 檔案轉換為點陣圖格式。
       security:
@@ -2644,7 +2769,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG 轉點陣圖（批次）
       description: 將多個 SVG 檔案轉換為點陣圖。回傳 ZIP 壓縮檔。
       security:
@@ -2704,7 +2829,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: 圖片轉 PDF
       description: 將一或多張圖片轉換為 PDF 文件。
       security:
@@ -2786,7 +2911,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉圖片
       description: 將 PDF 頁面轉換為圖片。回傳各頁面的個別下載，以及包含所有頁面的 ZIP。
       security:
@@ -2875,7 +3000,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF 頁數
       description: 取得 PDF 檔案的頁數。
       security: []
@@ -2914,7 +3039,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF 頁面縮圖
       description: 為 PDF 的每一頁產生縮圖預覽（最多 200 頁，JPEG 寬 300px）。
       security: []
@@ -2967,7 +3092,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: 分割影像
       description: 將圖片分割為網格圖磚。回傳 ZIP 檔。
       security:
@@ -3021,7 +3146,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: 批次重新命名
       description: 使用樣板模式為多張圖片重新命名。支援 {{index}}、{{padded}} 與 {{original}} 權杖。回傳 ZIP 檔。
       security:
@@ -3073,7 +3198,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: favicon 產生器
       description: 從圖片產生完整的 favicon 組合（16px 至 512px 的 PNG、ICO 與 manifest.json）。回傳 ZIP 檔。
       security:
@@ -3117,7 +3242,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: 圖片浮水印
       description: 加上圖片浮水印疊加。
       security:
@@ -3172,7 +3297,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: 圖片合成
       description: 以混合模式將疊加圖片合成到底圖上。
       security:
@@ -3228,7 +3353,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: 梗圖產生器
       description: |
         使用範本或自訂圖片建立梗圖。支援兩種模式：(1) 範本模式 - 送出帶有 `templateId` 與 `textBoxes` 的 JSON body。(2) 自訂圖片模式 - 送出帶有 `file` 與 `settings` 的 multipart。
@@ -3467,7 +3592,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: 圖片比對
       description: 比對兩張圖片並產生視覺差異報告。
       security:
@@ -3534,7 +3659,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: 物件橡皮擦
       description: 使用遮罩從圖片中抹除物件。遮罩中的白色區域代表要抹除的範圍。採用 LaMa 修補。
       security:
@@ -3587,11 +3712,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3627,7 +3763,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI 畫布擴展（實驗性）
       description: |
         使用 AI 外繪擴展圖片畫布。向任意方向延伸圖片，產生與原圖無縫融合的新內容。採用基於 LaMa 的外繪。需先安裝 ai-canvas-expand 功能套件。
@@ -3667,11 +3803,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3707,7 +3854,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: 拼貼畫與格線
       description: 將多張圖片組合成網格拼貼。
       security:
@@ -3764,7 +3911,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: 拼接影像
       description: 以水平、垂直或網格排版將多張圖片接合。
       security:
@@ -3823,7 +3970,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: 從動畫圖像中刪除背景
       description: 使用 AI (rembg) 逐幀刪除動畫 GIF、WebP 或 APNG 中的背景。在本地運行。
       security:
@@ -3869,11 +4016,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3903,7 +4061,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: 移除背景
       description: 使用 AI（rembg）移除圖片背景。於本機執行。
       security:
@@ -3937,11 +4095,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3977,7 +4146,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: 套用背景特效
       description: |
         對先前處理過的移除背景結果套用背景取代或特效。需要前一次 POST /api/v1/tools/image/remove-background 呼叫所得的 jobId。
@@ -4044,7 +4213,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: 修復偽透明
       description: |
         修復因先前背景移除而帶有邊緣殘影、光暈或半透明瑕疵的「偽透明」PNG。使用 BiRefNet HR-matting（2048x2048）產生乾淨的 alpha 通道，並提供可設定的去邊緣處理。發生 OOM 時依序回退至 birefnet-general，再至 u2net。需先安裝 background-removal 功能套件。
@@ -4078,11 +4247,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4118,7 +4298,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: 圖片放大
       description: 使用 AI（Real-ESRGAN）放大圖片。於本機執行。
       security:
@@ -4154,11 +4334,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4194,7 +4385,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: 模糊臉部與隱私資訊
       description: 為保護隱私，偵測並模糊圖片中的臉部。使用 OpenCV。於本機執行。
       security:
@@ -4226,11 +4417,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4266,7 +4468,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR／文字擷取
       description: |-
         從本地圖​​像中提取文字。內建的Fast等級用途Tesseract。Balanced和Best使用可選的簽名RapidOCR運行時
@@ -4303,6 +4505,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4311,6 +4518,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4354,7 +4567,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: 圖片資訊
       description: 取得圖片的詳細中繼資料，包含尺寸、格式、色彩空間與 EXIF 資料。
       security:
@@ -4457,7 +4670,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: 色彩調色盤
       description: 從圖片擷取主要色彩。
       security:
@@ -4510,7 +4723,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: 條碼讀取器
       description: 從圖片讀取 QR code 與條碼。
       security:
@@ -4615,7 +4828,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: 尋找重複
       description: 使用感知雜湊在一組圖片中尋找重複項。
       security:
@@ -4718,7 +4931,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR code 產生器
       description: 從文字產生 QR code 圖片。此工具接受 JSON body，非 multipart。
       security:
@@ -4781,7 +4994,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: 擷取網頁為圖片
       description: 將網頁擷取為高品質截圖。接受帶有 URL 與擷取選項的 JSON body。
       security:
@@ -4867,7 +5080,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: 檢視中繼資料
       description: 檢視圖片中的所有中繼資料（EXIF、GPS、ICC、XMP）而不移除。
       security:
@@ -4936,7 +5149,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: 編輯影像中繼資料
       description: 使用 ExifTool 編輯圖片中的 EXIF、IPTC、GPS 與其他中繼資料欄位。
       security:
@@ -5005,7 +5218,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: 檢視中繼資料（ExifTool）
       description: 使用 ExifTool 讀取圖片中的所有中繼資料。回傳所有嵌入的 EXIF、IPTC、XMP 與 GPS 欄位。
       security:
@@ -7018,6 +7231,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: 取得工作狀態
+      description: |
+        回傳工作的已儲存狀態，不會保持連線開啟。收到 202 回應後可輪詢此端點，或在進度串流中斷時作為備援。
+
+        `status` 為 `queued`、`processing`、`completed`、`failed` 或 `canceled` 其中之一。`completed`、`failed` 與 `canceled` 為終止狀態。已取消的工作仍可能帶有部分 `result`（例如已完成檔案的 ZIP），因此只要 `result` 存在，就應讀取它。
+
+        存取權限與進度串流相同：工作擁有者、具有 `files:all` 的使用者，或具有 `features:manage` 的使用者（用於功能套件安裝工作）。其他呼叫者會收到 404。
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7331,6 +7591,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: 提交產品回饋
+      description: 記錄已登入使用者的一則回饋事件。每分鐘限 10 次請求。`accepted` 為 false 時，表示伺服器未記錄此事件。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: 取得可用的較新版本
+      description: 當已發布的最新版本比目前執行的版本更新時回傳該版本，否則回傳 null。需要 settings:write 權限。
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: 重設所有 AI 功能套件
+      description: |
+        清除 AI 虛擬環境、模型與 pip 快取，並將所有套件標示為未安裝。安裝無法自行復原時使用。解除安裝單一套件只會移除其模型權重，因此這是完整重設。
+
+        回應會說明 venv 是否已從內建的基礎環境重新植入（venvReseeded）。若有套件安裝正在執行，會回傳 409。需要 features:manage 權限。
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: 安裝工具所需的所有功能套件
+      description: 為工具所需的每個套件排入佇列，並逐一回報已排入佇列或已略過。需要 features:manage 權限。
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7355,11 +7800,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7865,7 +8321,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: 轉換影片
       description: 在 MP4、MOV、WebM、AVI 與 MKV 之間轉換影片。
       security:
@@ -7897,11 +8353,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7931,7 +8398,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: 壓縮影片
       description: 在可控品質下縮減影片檔案大小。
       security:
@@ -7963,11 +8430,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7997,7 +8475,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: 裁切影片
       description: 從影片中剪出一段片段。
       security:
@@ -8047,7 +8525,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: 靜音影片
       description: 移除影片的音軌。
       security:
@@ -8090,7 +8568,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: 影片轉 GIF
       description: 將影片片段轉為動態 GIF。
       security:
@@ -8124,11 +8602,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8158,7 +8647,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: 調整影片尺寸
       description: 將影片縮放至新解析度或預設尺寸。
       security:
@@ -8208,7 +8697,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: 裁剪影片
       description: 從影片中裁剪出一塊區域。
       security:
@@ -8259,7 +8748,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: 旋轉影片
       description: 旋轉或翻轉影片。
       security:
@@ -8307,7 +8796,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: 變更 FPS
       description: 變更影片的影格率。
       security:
@@ -8355,7 +8844,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: 影片色彩
       description: 調整亮度、對比、飽和度與 gamma。
       security:
@@ -8406,7 +8895,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: 影片速度
       description: 加快或放慢影片速度。
       security:
@@ -8455,7 +8944,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: 反轉影片
       description: 倒放影片片段。限 5 分鐘以內的片段。
       security:
@@ -8498,7 +8987,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: 標準化影片音量
       description: 將影片音訊音量正規化至廣播標準（EBU R128）。
       security:
@@ -8541,7 +9030,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: 長寬比填充
       description: 加上純色邊條以符合目標長寬比。
       security:
@@ -8590,7 +9079,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: 模糊填充
       description: 以影片的模糊副本填滿邊條。
       security:
@@ -8639,7 +9128,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: 影片浮水印
       description: 將文字浮水印燒錄到影片影格上。
       security:
@@ -8691,7 +9180,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: 穩定影片
       description: 以兩階段穩定化減少畫面晃動。
       security:
@@ -8722,11 +9211,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8756,7 +9256,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF 轉影片
       description: 將動態 GIF 轉換為 MP4、WebM 或 MOV 影片。
       security:
@@ -8804,7 +9304,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: 影片轉 WebP
       description: 將影片片段轉換為動態 WebP 圖片。
       security:
@@ -8855,7 +9355,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: 影片轉影格
       description: 從影片擷取影格並以圖片 ZIP 形式輸出。
       security:
@@ -8906,7 +9406,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: 合併影片
       description: |
         將多個影片片段接合為一個 MP4 檔案。所有輸入皆正規化為第一個影片的解析度與 30 fps。
@@ -8935,11 +9435,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8969,7 +9480,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: 取代音訊
       description: 以另一個檔案替換影片的音軌。
       security:
@@ -9014,7 +9525,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: 燒錄字幕
       description: 將字幕永久燒錄到影片影格上。
       security:
@@ -9047,11 +9558,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9081,7 +9603,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: 嵌入字幕
       description: 將字幕軌 mux 進影片容器中。
       security:
@@ -9131,7 +9653,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: 擷取字幕
       description: 將影片中的字幕軌以 SRT 檔案形式取出。
       security:
@@ -9174,7 +9696,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: 圖片轉影片
       description: 將一組圖片製成幻燈片影片。
       security:
@@ -9226,7 +9748,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: 清理影片中繼資料
       description: 從影片移除中繼資料並回報所發現的內容。
       security:
@@ -9269,7 +9791,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: 自動字幕
       description: |
         使用 faster-whisper 從影片音軌進行 AI 驅動的字幕產生。支援自動偵測與 10 種明確指定的語言。需先安裝 transcription 功能套件。
@@ -9302,11 +9824,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9342,7 +9875,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: 擷取音訊
       description: 從影片中取出音軌。
       security:
@@ -9390,7 +9923,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: 轉換音訊
       description: 在 MP3、WAV、OGG 等格式之間轉換音訊。
       security:
@@ -9439,7 +9972,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: 裁切音訊
       description: 從音訊檔案中剪出一段。
       security:
@@ -9488,7 +10021,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: 調整音量
       description: 以固定增益提高或降低音訊音量。
       security:
@@ -9536,7 +10069,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: 正規化音訊
       description: 將響度平整至廣播標準（EBU R128，-16 LUFS）。
       security:
@@ -9579,7 +10112,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音訊淡化
       description: 為音訊加上淡入與淡出效果。
       security:
@@ -9628,7 +10161,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: 反轉音訊
       description: 倒放音訊。
       security:
@@ -9671,7 +10204,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: 音訊速度
       description: 加快或放慢音訊播放速度。
       security:
@@ -9719,7 +10252,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: 音高位移
       description: 以半音為單位提高或降低音高，且不改變速度。
       security:
@@ -9767,7 +10300,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: 音訊聲道
       description: 在單聲道、立體聲之間轉換，或交換左右聲道。
       security:
@@ -9815,7 +10348,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: 靜音移除
       description: 從音訊中移除靜音段落。
       security:
@@ -9864,7 +10397,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: 降噪
       description: 以 FFT 為基礎的降噪減少背景雜訊。
       security:
@@ -9912,7 +10445,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: 合併音訊
       description: 將多個音訊檔案合併為一個依序播放的音軌。
       security:
@@ -9962,7 +10495,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: 分割音訊
       description: |
         依時間、等分或靜音偵測分割音訊。回傳一個 ToolResponse，其 downloadUrl 指向包含各段落的 ZIP 壓縮檔。
@@ -10015,7 +10548,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: 鈴聲製作器
       description: 從任意音訊檔案建立鈴聲片段（.m4r）。
       security:
@@ -10064,7 +10597,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: 波形圖
       description: 從音訊檔案產生 PNG 格式的波形視覺化圖。
       security:
@@ -10114,7 +10647,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: 音訊中繼資料
       description: |
         檢視、編輯或移除音訊標籤（ID3）。回應除標準 ToolResponse 欄位外，還包含一個 `metadata` 物件，內含 container、durationS、bitrateKbps 與 tags。
@@ -10166,7 +10699,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: 音訊轉錄
       description: |
         使用 faster-whisper 進行 AI 驅動的語音轉文字轉錄。輸出純文字、SRT 或 VTT 字幕格式。需先安裝 transcription 功能套件。
@@ -10199,11 +10732,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10239,7 +10783,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: 合併 PDF
       description: 將多個 PDF 合併為一個。至少需要兩個檔案。
       security:
@@ -10284,7 +10828,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: 分割 PDF
       description: |
         擷取頁面或分割為多份。在「range」模式下回傳含所選頁面的單一 PDF。在「every」模式下以每 N 頁為一組分割，並回傳包含各部分的 ZIP 壓縮檔。
@@ -10335,7 +10879,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: 壓縮 PDF
       description: |
         透過對嵌入圖片降取樣以縮減 PDF 檔案大小。在「quality」模式下以 1 至 100 的滑桿控制圖片 DPI。在「targetSize」模式下以二分搜尋找出符合目標的最高 DPI。若壓縮反而使檔案變大，則原封不動地回傳原始位元組。
@@ -10386,7 +10930,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: 將 PDF 壓縮至 100 KB
       description: |
         將 PDF 壓縮至 100 KB 目標大小（100 KB，其中 1 KB = 1000 位元組）。
@@ -10421,11 +10965,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10449,7 +11004,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: 將 PDF 壓縮至 200 KB
       description: |
         將 PDF 壓縮至 200 KB 目標大小（200 KB，其中 1 KB = 1000 位元組）。
@@ -10484,11 +11039,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10512,7 +11078,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: 將 PDF 壓縮至 500 KB
       description: |
         將 PDF 壓縮至 500 KB 目標大小（500 KB，其中 1 KB = 1000 位元組）。
@@ -10547,11 +11113,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10575,7 +11152,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: 將 PDF 壓縮至 1 MB
       description: |
         將 PDF 壓縮至 1 MB 目標大小（1000 KB，其中 1 KB = 1000 位元組）。
@@ -10610,11 +11187,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10638,7 +11226,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: 將 PDF 壓縮至 2 MB
       description: |
         將 PDF 壓縮至 2 MB 目標大小（2000 KB，其中 1 KB = 1000 位元組）。
@@ -10673,11 +11261,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10701,7 +11300,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: 旋轉 PDF
       description: 將 PDF 頁面旋轉 90、180 或 270 度。
       security:
@@ -10750,7 +11349,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: 擷取頁面
       description: 將所選頁面擷取為新的 PDF。
       security:
@@ -10798,7 +11397,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: 移除頁面
       description: 從 PDF 刪除特定頁面。無法移除全部頁面。
       security:
@@ -10846,7 +11445,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: 整理 PDF
       description: 以明確的頁面順序重新排列頁面。
       security:
@@ -10894,7 +11493,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 多功能工具
       description: 依明確的頁面計畫組裝 PDF——重新排序、複製、旋轉或刪除頁面，並在單次提交中從其他 PDF 拉入頁面。
       security:
@@ -10945,7 +11544,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: 保護 PDF
       description: 以 AES-256 加密加上密碼保護。密碼會從稽核記錄中遮蔽。
       security:
@@ -10994,7 +11593,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: 解鎖 PDF
       description: 移除 PDF 的密碼保護。須提供正確的密碼。密碼會從稽核記錄中遮蔽。
       security:
@@ -11042,7 +11641,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: 修復 PDF
       description: 嘗試修復損毀或毀壞的 PDF。輸入時略過結構驗證，以允許格式不良的檔案。
       security:
@@ -11085,7 +11684,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 網頁最佳化
       description: 將 PDF 線性化以利快速網頁檢視（漸進式下載）。
       security:
@@ -11128,7 +11727,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: 灰階 PDF
       description: 將 PDF 中的所有顏色轉換為灰階。
       security:
@@ -11171,7 +11770,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A 轉換器
       description: 將 PDF 轉換為存檔用的 PDF/A-2 格式，以利長期保存。
       security:
@@ -11214,7 +11813,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: 裁剪 PDF
       description: 以一致的邊界裁剪所有頁面。
       security:
@@ -11262,7 +11861,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: 每張紙頁數 (N-up)
       description: 每張紙排入多個頁面（例如 2-up、4-up）。
       security:
@@ -11310,7 +11909,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: 小冊子 PDF
       description: 為摺疊成小冊子排列頁面（用於雙面列印的拼版）。
       security:
@@ -11358,7 +11957,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 浮水印
       description: 為 PDF 的每一頁加上文字浮水印。
       security:
@@ -11410,7 +12009,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF 頁碼
       description: 為 PDF 的每一頁加上頁碼（「Page N of M」）。
       security:
@@ -11459,7 +12058,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: 轉換文件
       description: 在 Word、OpenDocument、RTF 與純文字格式之間轉換。
       security:
@@ -11490,11 +12089,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11518,7 +12128,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: 轉換簡報
       description: 在 PowerPoint 與 OpenDocument 簡報格式之間轉換。
       security:
@@ -11549,11 +12159,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11577,7 +12198,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: 轉換試算表
       description: 在 Excel、OpenDocument 與 CSV 格式之間轉換。多工作表活頁簿會將第一個工作表匯出為 CSV。
       security:
@@ -11608,11 +12229,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11636,7 +12268,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel 轉 PDF
       description: 將試算表轉換為 PDF。過寬的工作表可能會分頁跨越多頁。
       security:
@@ -11662,11 +12294,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11690,7 +12333,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word 轉 PDF
       description: 將 Word 文件轉換為 PDF。
       security:
@@ -11716,11 +12359,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11744,7 +12398,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint 轉 PDF
       description: 將簡報轉換為 PDF。
       security:
@@ -11770,11 +12424,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11798,7 +12463,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML 轉 PDF
       description: 將 HTML 檔案轉換為 PDF。為保護隱私，已停用遠端資源。
       security:
@@ -11824,11 +12489,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11852,7 +12528,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown 轉 Word
       description: 將 Markdown 檔案轉換為 Word 文件（DOCX）。
       security:
@@ -11895,7 +12571,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown 轉 HTML
       description: 將 Markdown 檔案轉換為獨立的 HTML 頁面。原始檔中的遠端圖片會原樣保留於輸出中。
       security:
@@ -11938,7 +12614,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown 轉 PDF
       description: 將 Markdown 檔案轉換為帶樣式的 PDF。為保護隱私，已停用遠端資源。
       security:
@@ -11964,11 +12640,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11992,7 +12679,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: 從 EPUB 轉換
       description: 將 EPUB 轉換為 PDF、DOCX、HTML 或 Markdown。書中的遠端資源不會被擷取。
       security:
@@ -12023,11 +12710,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12051,7 +12749,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: 轉換為 EPUB
       description: 將 Word、Markdown、HTML 或純文字檔案轉換為 EPUB。
       security:
@@ -12077,11 +12775,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12105,7 +12814,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: 扁平化 PDF
       description: 將表單與註解烘焙進頁面內容中。
       security:
@@ -12148,7 +12857,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: 遮蔽 PDF
       description: 永久移除文字出現處（經驗證的真實遮蔽）。
       security:
@@ -12203,7 +12912,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉文字
       description: 從 PDF 擷取純文字。
       security:
@@ -12252,7 +12961,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉 Word
       description: 最適合以文字為主的 PDF；掃描頁面需要 OCR。
       security:
@@ -12278,11 +12987,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12306,7 +13026,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF 中繼資料
       description: 讀取與寫入 PDF 文件的中繼資料。
       security:
@@ -12363,7 +13083,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         從掃描的 PDF 文件中逐頁擷取文字。 Fast 使用
@@ -12403,6 +13123,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12411,6 +13136,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12460,7 +13191,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: 圖表製作器
       description: 從 CSV 或 JSON 資料建立長條圖、折線圖或圓餅圖。回傳 PNG 圖片。當因值儲存格包含非數字文字而略過某些列時，回應會新增 `chartRows`（{charted, skipped}）；空白列不計入。
       security:
@@ -12511,7 +13242,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV 轉 Excel
       description: 在 CSV 與 Excel（XLSX）之間雙向轉換。上傳 CSV 或 TSV 檔以取得 XLSX，或上傳 XLSX 檔以取得 CSV。
       security:
@@ -12559,7 +13290,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV 轉 JSON
       description: 在 CSV 與 JSON 之間雙向轉換。上傳 CSV 或 TSV 檔以取得 JSON，或上傳一個物件陣列的 JSON 以取得 CSV。
       security:
@@ -12607,7 +13338,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON 轉 XML
       description: 在 JSON 與 XML 之間雙向轉換。上傳 JSON 檔以取得 XML，或上傳 XML 檔以取得 JSON。
       security:
@@ -12655,7 +13386,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: 分割 CSV
       description: 依列數將 CSV 檔案分割為較小的檔案。回傳包含各部分的 ZIP 壓縮檔。
       security:
@@ -12704,7 +13435,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: 合併 CSV
       description: 將多個欄位相符的 CSV 或 TSV 檔案合併為一個檔案。所有檔案的欄位標頭必須相同。
       security:
@@ -12749,7 +13480,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: 轉換 YAML / JSON
       description: 在 YAML 與 JSON 之間雙向轉換。上傳 YAML 檔以取得 JSON，或上傳 JSON 檔以取得 YAML。
       security:
@@ -12792,7 +13523,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML 轉 CSV
       description: 從 XML 檔案擷取重複元素成 CSV 表格。自動尋找 XML 樹狀結構中第一個物件陣列。
       security:
@@ -12835,7 +13566,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: 建立 ZIP
       description: 將多個檔案打包為單一 ZIP 壓縮檔。重複的檔名會自動去重。
       security:
@@ -12880,7 +13611,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: 解壓 ZIP
       description: 以壓縮炸彈防護安全地從 ZIP 壓縮檔解出檔案。單一檔案的壓縮檔直接回傳該檔案；多檔案的壓縮檔回傳扁平化的 ZIP。
       security:
@@ -12923,7 +13654,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: 取代背景
       description: |
         AI 驅動的背景取代。移除主體的背景並將其合成到純色或漸層之上。需先安裝 background-removal 功能套件。
@@ -12961,11 +13692,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13001,7 +13743,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: 模糊背景
       description: |
         AI 驅動的背景模糊。移除背景、模糊原圖，再將清晰的主體合成於上方。需先安裝 background-removal 功能套件。
@@ -13035,11 +13777,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13075,7 +13828,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: 條碼產生器
       description: 從文字產生條碼圖片。此工具接受 JSON body，非 multipart。
       security:
@@ -13138,7 +13891,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: 圓形裁剪
       description: 將圖片裁剪為置中的圓形，四角透明，並提供可選邊框與可調整的縮放／位移。
       security:
@@ -13192,7 +13945,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: 圓角裁切
       description: 將影像裁切為具有透明角、可選邊框和可調節縮放/偏移的圓角正方形或方形圓形。
       security:
@@ -13248,7 +14001,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: 雙色調
       description: 以自訂的陰影與高光顏色套用雙色調效果。
       security:
@@ -13298,7 +14051,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: 圖片填充
       description: 以純色、透明或模糊背景將圖片填充至目標長寬比。
       security:
@@ -13351,7 +14104,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: 像素化
       description: 對整張圖片或特定矩形區域套用像素化效果。
       security:
@@ -13404,7 +14157,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: 暈影
       description: 加上暈影效果，可調整強度、顏色、半徑、柔和度、圓潤度與中心位置。
       security:
@@ -13458,7 +14211,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP 轉換器
       description: 在動態 GIF 與 WebP 之間互相轉換並保留所有影格。僅接受 .gif 與 .webp 輸入。
       security:
@@ -13508,7 +14261,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: 直方圖
       description: |
         從圖片產生 RGB 直方圖。回應 JSON 中回傳一張 PNG 直方圖，加上各通道統計及原始的 256 分組直方圖資料。
@@ -13640,7 +14393,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP 佔位圖
       description: |
         產生極小的低品質圖片佔位圖。回應 JSON 中回傳一個小圖片檔，加上 base64 data URI、可直接使用的 HTML img 標籤，以及 CSS 背景片段。
@@ -13717,7 +14470,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: 精靈圖表
       description: |
         將多張圖片組合成單一精靈圖表網格。接受 2 至 64 張圖片。每張圖片會調整尺寸以符合第一張圖片的尺寸。回傳精靈圖表圖片以及影格座標中繼資料。
@@ -13809,7 +14562,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: 證件照
       description: |
         兩階段證件照流程的導引端點。使用 `/api/v1/tools/image/passport-photo/analyze` 分析圖片，接著使用 `/api/v1/tools/image/passport-photo/generate` 建立最終的證件照。此基底路由在所需功能套件已安裝時回傳 400 導引錯誤，缺少時則回傳 501。
@@ -13838,7 +14591,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: 簽署 PDF
       description: 使用正規化的頁面位置，將一或多張簽名 PNG 圖片蓋印到 PDF 上。
       security:
@@ -13882,11 +14635,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13916,7 +14680,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 PNG
       description: |
         將 JPG 轉換為 PNG
@@ -13977,7 +14741,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 JPG
       description: |
         將 PNG 轉換為 JPG
@@ -14038,7 +14802,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 WebP
       description: |
         將 JPG 轉換為 WebP
@@ -14099,7 +14863,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 WebP
       description: |
         將 PNG 轉換為 WebP
@@ -14160,7 +14924,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP 轉 JPG
       description: |
         將 WebP 轉換為 JPG
@@ -14221,7 +14985,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP 轉 PNG
       description: |
         將 WebP 轉換為 PNG
@@ -14282,7 +15046,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 AVIF
       description: |
         將 JPG 轉換為 AVIF
@@ -14343,7 +15107,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 AVIF
       description: |
         將 PNG 轉換為 AVIF
@@ -14404,7 +15168,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP 轉 AVIF
       description: |
         將 WebP 轉換為 AVIF
@@ -14465,7 +15229,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 轉 JPG
       description: |
         將 HEIC 轉換為 JPG
@@ -14526,7 +15290,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 轉 PNG
       description: |
         將 HEIC 轉換為 PNG
@@ -14587,7 +15351,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 轉 AVIF
       description: |
         將 HEIC 轉換為 AVIF
@@ -14648,7 +15412,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 GIF
       description: |
         將 JPG 轉換為 GIF
@@ -14709,7 +15473,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 GIF
       description: |
         將 PNG 轉換為 GIF
@@ -14770,7 +15534,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF 轉 JPG
       description: |
         將 GIF 轉換為 JPG
@@ -14831,7 +15595,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF 轉 PNG
       description: |
         將 GIF 轉換為 PNG
@@ -14892,7 +15656,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP 轉 GIF
       description: |
         將 WebP 轉換為 GIF
@@ -14953,7 +15717,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 TIFF
       description: |
         將 JPG 轉換為 TIFF
@@ -15014,7 +15778,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 TIFF
       description: |
         將 PNG 轉換為 TIFF
@@ -15075,7 +15839,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 轉 JPG
       description: |
         將 TIFF 轉換為 JPG
@@ -15136,7 +15900,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 轉 PNG
       description: |
         將 TIFF 轉換為 PNG
@@ -15197,7 +15961,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD 轉 JPG
       description: |
         將 PSD 轉換為 JPG
@@ -15258,7 +16022,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD 轉 PNG
       description: |
         將 PSD 轉換為 PNG
@@ -15319,7 +16083,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 EPS
       description: |
         將 PNG 轉換為 EPS
@@ -15380,7 +16144,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 EPS
       description: |
         將 JPG 轉換為 EPS
@@ -15441,7 +16205,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS 轉 PNG
       description: |
         將 EPS 轉換為 PNG
@@ -15502,7 +16266,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS 轉 JPG
       description: |
         將 EPS 轉換為 JPG
@@ -15563,7 +16327,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 SVG
       description: |
         將 PNG 轉換為 SVG
@@ -15624,7 +16388,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 SVG
       description: |
         將 JPG 轉換為 SVG
@@ -15685,7 +16449,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 轉 SVG
       description: |
         將 TIFF 轉換為 SVG
@@ -15746,7 +16510,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD 轉 SVG
       description: |
         將 PSD 轉換為 SVG
@@ -15807,7 +16571,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS 轉 SVG
       description: |
         將 EPS 轉換為 SVG
@@ -15868,7 +16632,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG 轉 PNG
       description: |
         將 SVG 轉換為 PNG
@@ -15924,7 +16688,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG 轉 JPG
       description: |
         將 SVG 轉換為 JPG
@@ -15980,7 +16744,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG 轉 PDF
       description: |
         將 JPG 轉換為 PDF
@@ -16038,7 +16802,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG 轉 PDF
       description: |
         將 PNG 轉換為 PDF
@@ -16096,7 +16860,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC 轉 PDF
       description: |
         將 HEIC 轉換為 PDF
@@ -16154,7 +16918,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF 轉 PDF
       description: |
         將 TIFF 轉換為 PDF
@@ -16212,7 +16976,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP 轉 PDF
       description: |
         將 WebP 轉換為 PDF
@@ -16270,7 +17034,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF 轉 PDF
       description: |
         將 GIF 轉換為 PDF
@@ -16328,7 +17092,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS 轉 PDF
       description: |
         將 EPS 轉換為 PDF
@@ -16386,7 +17150,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉 JPG
       description: |
         將 PDF 轉換為 JPG
@@ -16442,7 +17206,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉 PNG
       description: |
         將 PDF 轉換為 PNG
@@ -16498,7 +17262,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 轉 TIFF
       description: |
         將 PDF 轉換為 TIFF
@@ -16554,7 +17318,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV 轉 MP4
       description: |
         將 MOV 轉換為 MP4
@@ -16587,11 +17351,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16621,7 +17396,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM 轉 MP4
       description: |
         將 WEBM 轉換為 MP4
@@ -16654,11 +17429,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16688,7 +17474,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV 轉 MP4
       description: |
         將 MKV 轉換為 MP4
@@ -16721,11 +17507,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16755,7 +17552,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI 轉 MP4
       description: |
         將 AVI 轉換為 MP4
@@ -16788,11 +17585,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16822,7 +17630,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 MOV
       description: |
         將 MP4 轉換為 MOV
@@ -16855,11 +17663,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16889,7 +17708,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 WEBM
       description: |
         將 MP4 轉換為 WEBM
@@ -16922,11 +17741,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16956,7 +17786,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM 轉 MOV
       description: |
         將 WEBM 轉換為 MOV
@@ -16989,11 +17819,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17023,7 +17864,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV 轉 MOV
       description: |
         將 MKV 轉換為 MOV
@@ -17056,11 +17897,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17090,7 +17942,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI 轉 MOV
       description: |
         將 AVI 轉換為 MOV
@@ -17123,11 +17975,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17157,7 +18020,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 AVI
       description: |
         將 MP4 轉換為 AVI
@@ -17190,11 +18053,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17224,7 +18098,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV 轉 AVI
       description: |
         將 MOV 轉換為 AVI
@@ -17257,11 +18131,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17291,7 +18176,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV 轉 AVI
       description: |
         將 MKV 轉換為 AVI
@@ -17324,11 +18209,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17358,7 +18254,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI 轉 MKV
       description: |
         將 AVI 轉換為 MKV
@@ -17391,11 +18287,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17425,7 +18332,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 GIF
       description: |
         將 MP4 轉換為 GIF
@@ -17458,11 +18365,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17492,7 +18410,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV 轉 GIF
       description: |
         將 MOV 轉換為 GIF
@@ -17525,11 +18443,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17559,7 +18488,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV 轉 GIF
       description: |
         將 MKV 轉換為 GIF
@@ -17592,11 +18521,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17626,7 +18566,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI 轉 GIF
       description: |
         將 AVI 轉換為 GIF
@@ -17659,11 +18599,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17693,7 +18644,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF 轉 MP4
       description: |
         將 GIF 轉換為 MP4
@@ -17754,7 +18705,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF 轉 WEBM
       description: |
         將 GIF 轉換為 WEBM
@@ -17815,7 +18766,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF 轉 MOV
       description: |
         將 GIF 轉換為 MOV
@@ -17876,7 +18827,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 MP3
       description: |
         將 MP4 轉換為 MP3
@@ -17937,7 +18888,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV 轉 MP3
       description: |
         將 MOV 轉換為 MP3
@@ -17998,7 +18949,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV 轉 MP3
       description: |
         將 MKV 轉換為 MP3
@@ -18059,7 +19010,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM 轉 MP3
       description: |
         將 WEBM 轉換為 MP3
@@ -18120,7 +19071,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI 轉 MP3
       description: |
         將 AVI 轉換為 MP3
@@ -18181,7 +19132,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 WAV
       description: |
         將 MP4 轉換為 WAV
@@ -18242,7 +19193,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV 轉 WAV
       description: |
         將 MOV 轉換為 WAV
@@ -18303,7 +19254,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 轉 OGG
       description: |
         將 MP4 轉換為 OGG
@@ -18364,7 +19315,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A 轉 MP3
       description: |
         將 M4A 轉換為 MP3
@@ -18425,7 +19376,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A 轉 WAV
       description: |
         將 M4A 轉換為 WAV
@@ -18486,7 +19437,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC 轉 MP3
       description: |
         將 AAC 轉換為 MP3
@@ -18547,7 +19498,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC 轉 WAV
       description: |
         將 AAC 轉換為 WAV
@@ -18608,7 +19559,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC 轉 FLAC
       description: |
         將 AAC 轉換為 FLAC
@@ -18669,7 +19620,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG 轉 MP3
       description: |
         將 OGG 轉換為 MP3
@@ -18730,7 +19681,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG 轉 WAV
       description: |
         將 OGG 轉換為 WAV
@@ -18791,7 +19742,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV 轉 MP3
       description: |
         將 WAV 轉換為 MP3
@@ -18852,7 +19803,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 轉 WAV
       description: |
         將 MP3 轉換為 WAV
@@ -18913,7 +19864,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC 轉 MP3
       description: |
         將 FLAC 轉換為 MP3
@@ -18974,7 +19925,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel 轉 CSV
       description: |
         將 Excel 轉換為 CSV
@@ -19007,11 +19958,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19150,6 +20112,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: 完成強制 MFA 註冊
+      description: 確認登入時開始的強制註冊，並回傳工作階段。此呼叫不需要工作階段驗證，短期有效的註冊權杖可代替工作階段。此處只接受 TOTP 代碼，不接受復原碼。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19316,7 +20330,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: 產生上傳預覽
@@ -19664,6 +20678,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: 部分更新 SCIM 使用者
+      description: RFC 7644 PatchOp。支援伺服器允許的路徑上的 add、remove 與 replace。使用者路徑會逐項驗證。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19729,6 +20806,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: 部分更新 SCIM 群組
+      description: RFC 7644 PatchOp。支援伺服器允許的路徑上的 add、remove 與 replace。群組成員會逐項驗證。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -19974,7 +21114,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20170,13 +21332,33 @@ x-i18n:
       provenance: machine
       outputHash: 97f9bece25ca
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: a131f51daa99
+      outputHash: a4e4ed6b7ec0
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: bbd36a9299f0
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 84d14f62dc02
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 5c47de811537
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 4ffa86d7055c
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 595b2499c428
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: '523382322540'
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21133,6 +22315,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: 5164d49cc74b
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 963ea598813b
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: bf1a179d7842
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21165,6 +22355,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: bdefb0bdbfd9
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: b622433bf13c
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: 9cbf605b5ef9
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 5a64131d0930
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: ab061127c257
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 8ee483ec6bb9
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 40cacb028659
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: b5d49170b225
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 7539e335bec9
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22845,6 +24067,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: 4c73d9112aae
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: 9a72101c07eb
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: a420a686aec8
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23061,6 +24291,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 22e3c6c53721
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: fc38a57cc79b
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: 3030ffa62a55
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23101,6 +24339,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: dd41d6ce76e5
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 9cacf05a007e
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: bc25f7dded62
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

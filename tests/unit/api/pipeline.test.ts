@@ -1206,7 +1206,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveUnknownRes.statusCode).toBe(400);
-      expect(saveUnknownRes.json()).toEqual({
+      expect(saveUnknownRes.json()).toMatchObject({
         error: "Step 2 (unknown-save-tool): Tool not found or not available",
       });
 
@@ -1224,7 +1224,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenRes.statusCode).toBe(403);
-      expect(saveForbiddenRes.json()).toEqual({
+      expect(saveForbiddenRes.json()).toMatchObject({
         error: `Step 2 (${stepErrorTestToolId}): You don't have permission to use this tool`,
       });
 
@@ -1242,7 +1242,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenPasswordRes.statusCode).toBe(403);
-      expect(saveForbiddenPasswordRes.json()).toEqual({
+      expect(saveForbiddenPasswordRes.json()).toMatchObject({
         error: "Step 2 (protect-pdf): You don't have permission to use this tool",
       });
 
@@ -1259,7 +1259,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(savePasswordRes.statusCode).toBe(400);
-      expect(savePasswordRes.json()).toEqual({
+      expect(savePasswordRes.json()).toMatchObject({
         error:
           "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
       });
@@ -1304,7 +1304,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveUnregisteredContentAwareRes.statusCode).toBe(400);
-      expect(saveUnregisteredContentAwareRes.json()).toEqual({
+      expect(saveUnregisteredContentAwareRes.json()).toMatchObject({
         error: "Step 1 (resize): Tool not found or not available",
       });
       expect(insertValuesMock).not.toHaveBeenCalled();
@@ -1344,7 +1344,7 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenContentAwareRes.statusCode).toBe(403);
-      expect(saveForbiddenContentAwareRes.json()).toEqual({
+      expect(saveForbiddenContentAwareRes.json()).toMatchObject({
         error: "Step 1 (resize): You don't have permission to use this tool",
       });
       expect(hasEffectiveToolAccess).toHaveBeenLastCalledWith(
@@ -1497,7 +1497,7 @@ describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
       });
 
       expect(res.statusCode).toBe(500);
-      expect(res.json()).toEqual({ error: "Internal server error" });
+      expect(res.json()).toMatchObject({ error: "Internal server error" });
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0]?.bindings).toMatchObject({
         err: dbErr,

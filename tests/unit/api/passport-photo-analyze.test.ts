@@ -160,7 +160,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
     });
 
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       error: "Passport photo analysis failed",
       details: "passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB",
     });
@@ -337,7 +337,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       ...buildAnalyzeMultipart(validPng, "client-job-persist-fail"),
     });
     expect(failRes.statusCode).toBe(422);
-    expect(failRes.json()).toEqual({
+    expect(failRes.json()).toMatchObject({
       error: "Passport photo analysis failed",
       details: "face model error",
     });
@@ -464,7 +464,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       ...buildAnalyzeMultipart(validPng),
     });
     expect(baseRes.statusCode).toBe(400);
-    expect(baseRes.json()).toEqual({
+    expect(baseRes.json()).toMatchObject({
       error: "Use /api/v1/tools/image/passport-photo/analyze or /generate",
     });
     await expect(

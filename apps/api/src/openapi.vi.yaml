@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: Các công cụ xử lý tệp cho image, video, audio, PDF và files. Mỗi công cụ nhận một tệp tải lên multipart và trả về một URL tải xuống.
+    description: Các endpoint công cụ không thuộc nhóm nào.
+  - name: Image
+    description: Công cụ ảnh. Mỗi công cụ nhận một tệp tải lên multipart và trả về một URL tải xuống.
+  - name: Video
+    description: Công cụ video. Mỗi công cụ nhận một tệp tải lên multipart và trả về một URL tải xuống.
+  - name: Audio
+    description: Công cụ âm thanh. Mỗi công cụ nhận một tệp tải lên multipart và trả về một URL tải xuống.
+  - name: PDF
+    description: Công cụ PDF và tài liệu. Mỗi công cụ nhận một tệp tải lên multipart và trả về một URL tải xuống.
   - name: Batch
     description: Xử lý nhiều tệp qua một công cụ trong một yêu cầu.
+  - name: Jobs
+    description: Tình trạng và tiến trình của các công việc chạy lâu.
   - name: Pipelines
     description: Kết nối nhiều công cụ thành các quy trình có thể tái sử dụng.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: Thay đổi kích thước ảnh
       description: Thay đổi kích thước ảnh theo kích thước cụ thể hoặc theo phần trăm.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: Thay đổi kích thước theo nội dung
       description: Thay đổi kích thước ảnh bằng seam carving để loại bỏ hoặc chèn nội dung một cách thông minh trong khi vẫn giữ các đặc điểm quan trọng.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: Cắt ảnh
       description: Cắt xén ảnh theo một vùng cụ thể.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: Xoay & Lật ảnh
       description: Xoay ảnh theo góc hoặc lật ngang/dọc.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: Chuyển đổi ảnh
       description: Chuyển đổi ảnh sang một định dạng khác.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh
       description: Giảm kích thước tệp ảnh theo mức chất lượng hoặc kích thước mục tiêu.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh xuống 20 KB
       description: |
         Nén ảnh xuống kích thước mục tiêu 20 KB
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh xuống 50 KB
       description: |
         Nén ảnh xuống kích thước mục tiêu 50 KB
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh xuống 100 KB
       description: |
         Nén ảnh xuống kích thước mục tiêu 100 KB
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh xuống 200 KB
       description: |
         Nén ảnh xuống kích thước mục tiêu 200 KB
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: Nén ảnh xuống 500 KB
       description: |
         Nén ảnh xuống kích thước mục tiêu 500 KB
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: Xóa siêu dữ liệu ảnh
       description: Loại bỏ metadata EXIF, GPS, ICC hoặc XMP khỏi ảnh.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: Viền và khung
       description: Thêm viền, bo góc, đệm hoặc đổ bóng cho ảnh.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: Làm đẹp ảnh chụp màn hình
       description: |
         Thêm nền gradient, khung thiết bị, đổ bóng, hình mờ và kích thước mạng xã
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: Điều chỉnh màu sắc
       description: |
         Công cụ điều chỉnh màu hợp nhất. Điều chỉnh độ sáng, tương phản, phơi sáng, độ bão hòa, nhiệt độ, tông màu, sắc độ, độ nét, kênh màu và hiệu ứng trong một lần xử lý.
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: Làm nét ảnh
       description: Làm nét ảnh bằng các phương pháp adaptive, unsharp mask hoặc high-pass với tùy chọn giảm nhiễu.
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: Tối ưu cho web
       description: Tối ưu ảnh để phân phối trên web bằng cách chuyển sang các định dạng hiện đại, điều chỉnh chất lượng và tùy chọn thay đổi kích thước.
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: Tối ưu cho web (xem trước)
       description: |
         Endpoint xem trước nhẹ để tinh chỉnh tham số trực tiếp. Trả về
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: Cải thiện ảnh
       description: |
         Tự động cải thiện ảnh bằng AI. Phân tích ảnh và áp dụng
@@ -1363,7 +1433,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: Phân tích ảnh để cải thiện
       description: |
         Phân tích ảnh và trả về các chỉnh sửa được đề xuất mà không áp dụng chúng.
@@ -1415,7 +1485,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: Khử nhiễu
       description: |
         Khử nhiễu bằng AI sử dụng sidecar Python. Hỗ trợ nhiều
@@ -1454,11 +1524,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1494,7 +1575,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: Khử mắt đỏ
       description: |
         Phát hiện và khử mắt đỏ bằng AI. Phát hiện khuôn mặt và sửa
@@ -1531,11 +1612,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1571,7 +1663,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: Phục hồi ảnh
       description: |
         Quy trình phục hồi ảnh bằng AI. Sửa vết trầy xước, cải thiện khuôn mặt,
@@ -1611,11 +1703,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1651,7 +1754,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Ảnh hộ chiếu - phân tích
       description: |
         Giai đoạn 1 của việc tạo ảnh hộ chiếu. Phát hiện các điểm mốc trên khuôn mặt và xóa
@@ -1787,7 +1890,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: Ảnh hộ chiếu - tạo
       description: |
         Giai đoạn 2 của việc tạo ảnh hộ chiếu. Dùng jobId và các điểm mốc từ
@@ -1930,7 +2033,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: Tô màu
       description: |
         Tô màu ảnh bằng AI. Chuyển đổi ảnh chụp đen trắng hoặc thang xám
@@ -1965,11 +2068,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2005,7 +2119,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: Cải thiện khuôn mặt
       description: |
         Cải thiện khuôn mặt bằng AI dùng GFPGAN hoặc CodeFormer. Phát hiện khuôn mặt
@@ -2042,11 +2156,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2082,7 +2207,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: Ảnh sang Base64
       description: |
         Chuyển đổi một hoặc nhiều ảnh sang chuỗi mã hóa Base64 với data URI.
@@ -2176,7 +2301,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: Hình mờ văn bản
       description: Thêm hình mờ văn bản vào ảnh.
       security:
@@ -2229,7 +2354,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: Lớp phủ văn bản
       description: Thêm lớp phủ văn bản có định dạng với tùy chọn hộp nền.
       security:
@@ -2283,7 +2408,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: Thay thế màu
       description: Thay thế một màu cụ thể trong ảnh bằng màu khác hoặc bằng độ trong suốt.
       security:
@@ -2334,7 +2459,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: Mô phỏng mù màu
       description: Mô phỏng cách ảnh hiển thị với những người mắc các dạng khiếm khuyết thị giác màu khác nhau.
       security:
@@ -2382,7 +2507,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: Công cụ GIF
       description: Thay đổi kích thước, tối ưu, chỉnh tốc độ, đảo ngược, trích xuất khung hình hoặc xoay GIF động.
       security:
@@ -2446,7 +2571,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: Thông tin GIF
       description: Lấy metadata về GIF động bao gồm kích thước, số khung hình, độ trễ và thời lượng.
       security: []
@@ -2503,7 +2628,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: Cắt xén thông minh
       description: Cắt xén thông minh với ba chế độ - lấy nét chủ thể, lấy nét khuôn mặt hoặc tự động cắt bỏ viền.
       security:
@@ -2562,7 +2687,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: Ảnh sang SVG
       description: Chuyển đổi ảnh raster sang định dạng vector SVG bằng potrace (đen trắng) hoặc VTracer (màu).
       security:
@@ -2617,7 +2742,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG sang raster
       description: Chuyển đổi tệp SVG sang định dạng ảnh raster với tỷ lệ và DPI tùy chỉnh.
       security:
@@ -2670,7 +2795,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG sang raster (hàng loạt)
       description: Chuyển đổi nhiều tệp SVG sang ảnh raster. Trả về một tệp lưu trữ ZIP.
       security:
@@ -2730,7 +2855,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: Ảnh sang PDF
       description: Chuyển đổi một hoặc nhiều ảnh thành một tài liệu PDF.
       security:
@@ -2812,7 +2937,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF sang ảnh
       description: Chuyển đổi các trang PDF sang ảnh. Trả về các bản tải xuống từng trang và một tệp ZIP chứa tất cả các trang.
       security:
@@ -2901,7 +3026,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: Số trang PDF
       description: Lấy số trang trong một tệp PDF.
       security: []
@@ -2940,7 +3065,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: Ảnh thu nhỏ trang PDF
       description: Tạo ảnh thu nhỏ xem trước cho mỗi trang trong PDF (tối đa 200 trang, JPEG rộng 300px).
       security: []
@@ -2993,7 +3118,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: Tách ảnh
       description: Chia tách ảnh thành lưới các ô. Trả về một tệp ZIP.
       security:
@@ -3047,7 +3172,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: Đổi tên hàng loạt
       description: Đổi tên nhiều ảnh bằng mẫu khuôn mẫu. Hỗ trợ các token {{index}}, {{padded}} và {{original}}. Trả về một tệp ZIP.
       security:
@@ -3099,7 +3224,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: Trình tạo favicon
       description: Tạo bộ favicon đầy đủ (PNG từ 16px đến 512px, ICO và manifest.json) từ một ảnh. Trả về một tệp ZIP.
       security:
@@ -3143,7 +3268,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: Hình mờ ảnh
       description: Thêm lớp phủ hình mờ dạng ảnh.
       security:
@@ -3198,7 +3323,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: Ghép ảnh
       description: Ghép một ảnh lớp phủ lên ảnh nền với các chế độ hòa trộn.
       security:
@@ -3254,7 +3379,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: Trình tạo meme
       description: |
         Tạo meme bằng khuôn mẫu hoặc ảnh tùy chỉnh. Hỗ trợ hai chế độ: (1) Chế độ khuôn mẫu - gửi phần thân JSON với `templateId` và `textBoxes`. (2) Chế độ ảnh tùy chỉnh - gửi multipart với `file` và `settings`.
@@ -3493,7 +3618,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: So sánh ảnh
       description: So sánh hai ảnh và tạo báo cáo khác biệt trực quan.
       security:
@@ -3560,7 +3685,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: Xóa vật thể
       description: Xóa vật thể khỏi ảnh bằng một mặt nạ. Các vùng trắng trong mặt nạ chỉ định các vùng cần xóa. Dùng inpainting LaMa.
       security:
@@ -3613,11 +3738,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3653,7 +3789,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: Mở rộng khung ảnh bằng AI (thử nghiệm)
       description: |
         Mở rộng khung ảnh bằng outpainting AI. Kéo dài ảnh theo bất kỳ
@@ -3696,11 +3832,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3736,7 +3883,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: Ảnh ghép và Lưới
       description: Kết hợp nhiều ảnh thành một ảnh ghép dạng lưới.
       security:
@@ -3793,7 +3940,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: Ghép nối ảnh
       description: Nối nhiều ảnh theo chiều ngang, chiều dọc hoặc theo bố cục lưới.
       security:
@@ -3852,7 +3999,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: Xóa nền khỏi hình ảnh động
       description: Xóa nền khỏi GIF, WebP hoặc APNG hoạt hình theo từng khung hình bằng cách sử dụng AI (rembg). Chạy cục bộ.
       security:
@@ -3898,11 +4045,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3932,7 +4090,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: Xóa nền
       description: Xóa nền khỏi ảnh bằng AI (rembg). Chạy cục bộ.
       security:
@@ -3966,11 +4124,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4006,7 +4175,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: Áp dụng hiệu ứng nền
       description: |
         Áp dụng thay thế nền hoặc hiệu ứng cho một kết quả remove-background đã xử lý trước đó. Yêu cầu một jobId từ lệnh gọi POST /api/v1/tools/image/remove-background trước đó.
@@ -4073,7 +4242,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: Sửa độ trong suốt giả
       description: |
         Sửa các PNG "trong suốt giả" có viền lem, quầng sáng hoặc lỗi bán
@@ -4111,11 +4280,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4151,7 +4331,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: Nâng độ phân giải ảnh
       description: Nâng độ phân giải ảnh bằng AI (Real-ESRGAN). Chạy cục bộ.
       security:
@@ -4187,11 +4367,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4227,7 +4418,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: Làm mờ khuôn mặt và thông tin nhạy cảm
       description: Phát hiện và làm mờ khuôn mặt trong ảnh để bảo vệ quyền riêng tư. Dùng OpenCV. Chạy cục bộ.
       security:
@@ -4259,11 +4450,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4299,7 +4501,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / trích xuất văn bản
       description: |-
         Trích xuất văn bản từ một hình ảnh cục bộ. Tích hợp sẵnFastsử dụng cấp độTesseract.BalancedVàBestsử dụng chữ ký tùy chọnRapidOCRthời gian chạy
@@ -4336,6 +4538,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4344,6 +4551,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4387,7 +4600,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: Thông tin ảnh
       description: Lấy metadata chi tiết về ảnh bao gồm kích thước, định dạng, không gian màu và dữ liệu EXIF.
       security:
@@ -4490,7 +4703,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: Bảng màu
       description: Trích xuất các màu chủ đạo từ ảnh.
       security:
@@ -4543,7 +4756,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: Trình đọc mã vạch
       description: Đọc mã QR và mã vạch từ ảnh.
       security:
@@ -4648,7 +4861,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: Tìm ảnh trùng lặp
       description: Tìm các ảnh trùng lặp trong một tập hợp bằng băm tri giác.
       security:
@@ -4751,7 +4964,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: Trình tạo mã QR
       description: Tạo ảnh mã QR từ văn bản. Công cụ này nhận phần thân JSON, không phải multipart.
       security:
@@ -4814,7 +5027,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: Chụp trang web thành ảnh
       description: Chụp trang web thành ảnh chụp màn hình chất lượng cao. Nhận phần thân JSON với một URL và các tùy chọn chụp.
       security:
@@ -4900,7 +5113,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: Kiểm tra metadata
       description: Xem toàn bộ metadata (EXIF, GPS, ICC, XMP) trong ảnh mà không xóa nó.
       security:
@@ -4969,7 +5182,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: Chỉnh sửa siêu dữ liệu ảnh
       description: Chỉnh sửa các trường metadata EXIF, IPTC, GPS và các trường khác trong ảnh bằng ExifTool.
       security:
@@ -5038,7 +5251,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: Kiểm tra metadata (ExifTool)
       description: Đọc toàn bộ metadata từ ảnh bằng ExifTool. Trả về tất cả các trường EXIF, IPTC, XMP và GPS được nhúng.
       security:
@@ -7053,6 +7266,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: Lấy trạng thái công việc
+      description: |
+        Trả về trạng thái đã lưu của một công việc mà không giữ kết nối mở. Hãy gọi lại endpoint này sau phản hồi 202, hoặc dùng nó làm phương án dự phòng khi luồng tiến trình bị ngắt.
+
+        `status` là một trong `queued`, `processing`, `completed`, `failed` hoặc `canceled`. `completed`, `failed` và `canceled` là trạng thái kết thúc. Một công việc đã hủy vẫn có thể mang một `result` một phần (ví dụ một ZIP của các tệp đã xong), nên hãy đọc `result` bất cứ khi nào nó có mặt.
+
+        Quyền truy cập theo luồng tiến trình: chủ công việc, người dùng có `files:all`, hoặc người dùng có `features:manage` đối với công việc cài gói tính năng. Mọi người gọi khác nhận 404.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7371,6 +7631,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: Gửi phản hồi sản phẩm
+      description: Ghi nhận một sự kiện phản hồi từ người dùng đã đăng nhập. Giới hạn 10 yêu cầu mỗi phút. `accepted` là false khi máy chủ không ghi nhận sự kiện.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: Lấy bản phát hành mới hơn đang có sẵn
+      description: Trả về bản phát hành mới nhất đã công bố khi nó mới hơn phiên bản đang chạy, hoặc null. Yêu cầu settings:write.
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: Đặt lại toàn bộ gói tính năng AI
+      description: |
+        Xóa môi trường ảo AI, các mô hình và bộ nhớ đệm pip, rồi đánh dấu mọi gói là chưa cài đặt. Dùng khi một lần cài không tự phục hồi được. Gỡ cài đặt một gói chỉ xóa trọng số mô hình của nó, nên đây là cách đặt lại hoàn toàn.
+
+        Phản hồi cho biết venv có được khởi tạo lại từ bản cơ sở đi kèm hay không (venvReseeded). Trả về 409 khi một lần cài gói đang chạy. Yêu cầu features:manage.
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: Cài mọi gói tính năng mà một công cụ cần
+      description: Xếp hàng từng gói mà công cụ cần và báo cho từng gói là đã xếp hàng hay bị bỏ qua. Yêu cầu features:manage.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7410,11 +7855,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7924,7 +8380,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: Chuyển đổi video
       description: Chuyển đổi video giữa MP4, MOV, WebM, AVI và MKV.
       security:
@@ -7956,11 +8412,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7990,7 +8457,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: Nén video
       description: Thu nhỏ kích thước tệp video với kiểm soát chất lượng.
       security:
@@ -8022,11 +8489,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8056,7 +8534,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: Cắt video
       description: Cắt một đoạn ra khỏi video.
       security:
@@ -8106,7 +8584,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: Tắt tiếng video
       description: Loại bỏ rãnh âm thanh khỏi video.
       security:
@@ -8149,7 +8627,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: Video sang GIF
       description: Biến một đoạn video thành GIF động.
       security:
@@ -8183,11 +8661,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8217,7 +8706,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: Thay đổi kích thước video
       description: Chỉnh video sang độ phân giải mới hoặc kích thước cài đặt sẵn.
       security:
@@ -8267,7 +8756,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: Cắt xén video
       description: Cắt xén một vùng ra khỏi video.
       security:
@@ -8318,7 +8807,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: Xoay video
       description: Xoay hoặc lật một video.
       security:
@@ -8366,7 +8855,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: Đổi FPS
       description: Đổi tốc độ khung hình của video.
       security:
@@ -8414,7 +8903,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: Màu video
       description: Điều chỉnh độ sáng, tương phản, độ bão hòa và gamma.
       security:
@@ -8465,7 +8954,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: Tốc độ video
       description: Tăng tốc hoặc làm chậm video.
       security:
@@ -8514,7 +9003,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: Đảo ngược video
       description: Phát một đoạn video ngược lại. Giới hạn cho các đoạn tối đa 5 phút.
       security:
@@ -8557,7 +9046,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: Chuẩn hóa âm thanh video
       description: Chuẩn hóa âm lượng âm thanh video theo chuẩn phát sóng (EBU R128).
       security:
@@ -8600,7 +9089,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: Đệm tỷ lệ khung hình
       description: Thêm các thanh màu đơn để vừa với tỷ lệ khung hình mục tiêu.
       security:
@@ -8649,7 +9138,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: Đệm làm mờ
       description: Lấp đầy các thanh bằng bản sao làm mờ của video.
       security:
@@ -8698,7 +9187,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: Hình mờ video
       description: In một hình mờ văn bản lên các khung hình video.
       security:
@@ -8750,7 +9239,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: Ổn định video
       description: Giảm rung máy quay bằng ổn định hai lượt.
       security:
@@ -8781,11 +9270,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8815,7 +9315,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF sang video
       description: Chuyển đổi một GIF động thành video MP4, WebM hoặc MOV.
       security:
@@ -8863,7 +9363,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: Video sang WebP
       description: Chuyển đổi một đoạn video thành ảnh WebP động.
       security:
@@ -8914,7 +9414,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: Video sang khung hình
       description: Trích xuất các khung hình từ video dưới dạng một tệp ZIP ảnh.
       security:
@@ -8965,7 +9465,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: Ghép video
       description: |
         Nối nhiều đoạn video thành một tệp MP4. Tất cả đầu vào được
@@ -8995,11 +9495,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9029,7 +9540,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: Thay thế âm thanh
       description: Thay rãnh âm thanh của video bằng một tệp khác.
       security:
@@ -9074,7 +9585,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: In phụ đề
       description: In vĩnh viễn phụ đề lên các khung hình video.
       security:
@@ -9107,11 +9618,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9141,7 +9663,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: Nhúng phụ đề
       description: Ghép một rãnh phụ đề vào container video.
       security:
@@ -9191,7 +9713,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: Trích xuất phụ đề
       description: Lấy rãnh phụ đề ra khỏi video dưới dạng một tệp SRT.
       security:
@@ -9234,7 +9756,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: Ảnh sang video
       description: Biến một tập hợp ảnh thành video trình chiếu.
       security:
@@ -9286,7 +9808,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: Dọn dẹp metadata video
       description: Xóa metadata khỏi video và báo cáo những gì được tìm thấy.
       security:
@@ -9329,7 +9851,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: Phụ đề tự động
       description: |
         Tạo phụ đề bằng AI từ rãnh âm thanh video dùng
@@ -9364,11 +9886,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9404,7 +9937,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: Trích xuất âm thanh
       description: Lấy rãnh âm thanh ra khỏi video.
       security:
@@ -9452,7 +9985,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: Chuyển đổi âm thanh
       description: Chuyển đổi âm thanh giữa MP3, WAV, OGG và nhiều hơn nữa.
       security:
@@ -9501,7 +10034,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: Cắt âm thanh
       description: Cắt một đoạn ra khỏi tệp âm thanh.
       security:
@@ -9550,7 +10083,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: Điều chỉnh âm lượng
       description: Tăng hoặc giảm âm lượng âm thanh theo một mức khuếch đại cố định.
       security:
@@ -9598,7 +10131,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: Chuẩn hóa âm thanh
       description: Cân bằng độ lớn về mức chuẩn phát sóng (EBU R128, -16 LUFS).
       security:
@@ -9641,7 +10174,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: Làm mờ dần âm thanh
       description: Thêm hiệu ứng mờ dần vào và mờ dần ra cho âm thanh.
       security:
@@ -9690,7 +10223,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: Đảo ngược âm thanh
       description: Phát âm thanh ngược lại.
       security:
@@ -9733,7 +10266,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: Tốc độ âm thanh
       description: Tăng tốc hoặc làm chậm phát lại âm thanh.
       security:
@@ -9781,7 +10314,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: Dịch cao độ
       description: Nâng hoặc hạ cao độ theo bán cung mà không đổi tốc độ.
       security:
@@ -9829,7 +10362,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: Kênh âm thanh
       description: Chuyển đổi giữa mono, stereo hoặc hoán đổi kênh trái và phải.
       security:
@@ -9877,7 +10410,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: Loại bỏ khoảng lặng
       description: Loại bỏ các đoạn im lặng khỏi âm thanh.
       security:
@@ -9926,7 +10459,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: Giảm nhiễu
       description: Giảm tiếng ồn nền bằng khử nhiễu dựa trên FFT.
       security:
@@ -9974,7 +10507,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: Ghép âm thanh
       description: Kết hợp nhiều tệp âm thanh thành một rãnh tuần tự.
       security:
@@ -10024,7 +10557,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: Chia tách âm thanh
       description: |
         Chia tách âm thanh theo thời gian, các phần bằng nhau hoặc phát hiện khoảng lặng. Trả về một
@@ -10078,7 +10611,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: Trình tạo nhạc chuông
       description: Tạo một đoạn nhạc chuông (.m4r) từ bất kỳ tệp âm thanh nào.
       security:
@@ -10127,7 +10660,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: Ảnh dạng sóng
       description: Tạo hình ảnh trực quan dạng sóng dưới dạng ảnh PNG từ một tệp âm thanh.
       security:
@@ -10177,7 +10710,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: Metadata âm thanh
       description: |
         Xem, chỉnh sửa hoặc xóa thẻ âm thanh (ID3). Phản hồi bao gồm một
@@ -10231,7 +10764,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: Chép lời âm thanh
       description: |
         Chép lời chuyển giọng nói thành văn bản bằng AI dùng faster-whisper. Xuất
@@ -10266,11 +10799,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10306,7 +10850,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: Ghép PDF
       description: Kết hợp nhiều PDF thành một. Yêu cầu ít nhất hai tệp.
       security:
@@ -10351,7 +10895,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: Chia tách PDF
       description: |
         Trích xuất các trang hoặc chia thành các phần. Ở chế độ "range" trả về một PDF duy nhất
@@ -10404,7 +10948,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF
       description: |
         Thu nhỏ kích thước tệp PDF bằng cách giảm mẫu các ảnh nhúng. Ở chế độ "quality"
@@ -10458,7 +11002,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF xuống 100 KB
       description: |
         Nén PDF xuống kích thước mục tiêu 100 KB (100 KB, trong đó 1 KB = 1000 byte).
@@ -10493,11 +11037,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10521,7 +11076,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF xuống 200 KB
       description: |
         Nén PDF xuống kích thước mục tiêu 200 KB (200 KB, trong đó 1 KB = 1000 byte).
@@ -10556,11 +11111,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10584,7 +11150,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF xuống 500 KB
       description: |
         Nén PDF xuống kích thước mục tiêu 500 KB (500 KB, trong đó 1 KB = 1000 byte).
@@ -10619,11 +11185,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10647,7 +11224,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF xuống 1 MB
       description: |
         Nén PDF xuống kích thước mục tiêu 1 MB (1000 KB, trong đó 1 KB = 1000 byte).
@@ -10682,11 +11259,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10710,7 +11298,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: Nén PDF xuống 2 MB
       description: |
         Nén PDF xuống kích thước mục tiêu 2 MB (2000 KB, trong đó 1 KB = 1000 byte).
@@ -10745,11 +11333,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10773,7 +11372,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: Xoay PDF
       description: Xoay các trang trong PDF theo 90, 180 hoặc 270 độ.
       security:
@@ -10822,7 +11421,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: Trích xuất trang
       description: Lấy các trang đã chọn vào một PDF mới.
       security:
@@ -10870,7 +11469,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: Xóa trang
       description: Xóa các trang cụ thể khỏi một PDF. Không thể xóa hết mọi trang.
       security:
@@ -10918,7 +11517,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: Sắp xếp PDF
       description: Sắp xếp lại các trang với thứ tự trang rõ ràng.
       security:
@@ -10966,7 +11565,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: Công cụ PDF đa năng
       description: Tạo PDF từ kế hoạch trang rõ ràng - sắp xếp lại, nhân đôi, xoay hoặc xóa trang và kéo trang từ các PDF khác, trong một lần gửi.
       security:
@@ -11017,7 +11616,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: Bảo vệ PDF
       description: Thêm bảo vệ bằng mật khẩu với mã hóa AES-256. Mật khẩu được ẩn khỏi nhật ký kiểm toán.
       security:
@@ -11066,7 +11665,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: Mở khóa PDF
       description: Loại bỏ bảo vệ bằng mật khẩu khỏi một PDF. Phải cung cấp đúng mật khẩu. Mật khẩu được ẩn khỏi nhật ký kiểm toán.
       security:
@@ -11114,7 +11713,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: Sửa chữa PDF
       description: Cố gắng sửa chữa một PDF bị hư hỏng hoặc lỗi. Xác thực cấu trúc được bỏ qua ở đầu vào để cho phép các tệp không đúng định dạng.
       security:
@@ -11157,7 +11756,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: Tối ưu PDF cho web
       description: Tuyến tính hóa một PDF để xem web nhanh (tải xuống tiến trình).
       security:
@@ -11200,7 +11799,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF thang xám
       description: Chuyển đổi tất cả màu trong một PDF sang thang xám.
       security:
@@ -11243,7 +11842,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: Bộ chuyển đổi PDF/A
       description: Chuyển đổi một PDF sang định dạng lưu trữ PDF/A-2 để bảo tồn lâu dài.
       security:
@@ -11286,7 +11885,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: Cắt xén PDF
       description: Cắt xén tất cả các trang với một lề đồng đều.
       security:
@@ -11334,7 +11933,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: Số trang mỗi tờ (N-up)
       description: Sắp xếp nhiều trang trên mỗi tờ (ví dụ 2-up, 4-up).
       security:
@@ -11382,7 +11981,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF dạng sách nhỏ
       description: Sắp xếp các trang để gấp thành một cuốn sách nhỏ (dàn trang để in hai mặt).
       security:
@@ -11430,7 +12029,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: Hình mờ PDF
       description: Thêm một hình mờ văn bản vào mọi trang của một PDF.
       security:
@@ -11482,7 +12081,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: Số trang PDF
       description: Thêm số trang ("Trang N trên M") vào mọi trang của một PDF.
       security:
@@ -11531,7 +12130,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi tài liệu
       description: Chuyển đổi giữa các định dạng Word, OpenDocument, RTF và văn bản thuần.
       security:
@@ -11562,11 +12161,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11590,7 +12200,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi bài thuyết trình
       description: Chuyển đổi giữa các định dạng bài thuyết trình PowerPoint và OpenDocument.
       security:
@@ -11621,11 +12231,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11649,7 +12270,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi bảng tính
       description: Chuyển đổi giữa các định dạng Excel, OpenDocument và CSV. Sổ làm việc nhiều trang tính xuất trang tính đầu tiên sang CSV.
       security:
@@ -11680,11 +12301,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11708,7 +12340,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel sang PDF
       description: Chuyển đổi bảng tính sang PDF. Các trang tính rộng có thể phân trang trên nhiều trang.
       security:
@@ -11734,11 +12366,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11762,7 +12405,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word sang PDF
       description: Chuyển đổi tài liệu Word sang PDF.
       security:
@@ -11788,11 +12431,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11816,7 +12470,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint sang PDF
       description: Chuyển đổi bài thuyết trình sang PDF.
       security:
@@ -11842,11 +12496,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11870,7 +12535,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML sang PDF
       description: Chuyển đổi một tệp HTML sang PDF. Tài nguyên từ xa bị vô hiệu hóa để bảo vệ quyền riêng tư.
       security:
@@ -11896,11 +12561,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11924,7 +12600,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown sang Word
       description: Chuyển đổi một tệp Markdown sang tài liệu Word (DOCX).
       security:
@@ -11967,7 +12643,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown sang HTML
       description: Chuyển đổi một tệp Markdown sang một trang HTML độc lập. Ảnh từ xa trong nguồn được giữ nguyên trong đầu ra.
       security:
@@ -12010,7 +12686,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown sang PDF
       description: Chuyển đổi một tệp Markdown sang một PDF có định dạng. Tài nguyên từ xa bị vô hiệu hóa để bảo vệ quyền riêng tư.
       security:
@@ -12036,11 +12712,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12064,7 +12751,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi từ EPUB
       description: Chuyển đổi một EPUB sang PDF, DOCX, HTML hoặc Markdown. Tài nguyên từ xa bên trong cuốn sách không được lấy về.
       security:
@@ -12095,11 +12782,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12123,7 +12821,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi sang EPUB
       description: Chuyển đổi tệp Word, Markdown, HTML hoặc văn bản thuần sang EPUB.
       security:
@@ -12149,11 +12847,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12177,7 +12886,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: Làm phẳng PDF
       description: Hợp nhất biểu mẫu và chú thích vào nội dung trang.
       security:
@@ -12220,7 +12929,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: Che thông tin PDF
       description: Loại bỏ vĩnh viễn các lần xuất hiện văn bản (che thông tin thật đã được xác minh).
       security:
@@ -12275,7 +12984,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF sang văn bản
       description: Trích xuất văn bản thuần từ một PDF.
       security:
@@ -12324,7 +13033,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF sang Word
       description: Tốt nhất cho PDF dựa trên văn bản; các trang quét cần OCR.
       security:
@@ -12350,11 +13059,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12378,7 +13098,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: Metadata PDF
       description: Đọc và ghi metadata của tài liệu PDF.
       security:
@@ -12435,7 +13155,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: OCR PDF
       description: |-
         Trích xuất văn bản từ từng trang tài liệu PDF được quét. Fast sử dụng
@@ -12475,6 +13195,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12483,6 +13208,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12532,7 +13263,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: Trình tạo biểu đồ
       description: Tạo biểu đồ cột, đường hoặc tròn từ dữ liệu CSV hoặc JSON. Trả về ảnh PNG. Khi các hàng bị bỏ qua vì ô giá trị chứa văn bản không phải số, phản hồi thêm `chartRows` ({charted, skipped}); các hàng trống không được tính.
       security:
@@ -12583,7 +13314,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV sang Excel
       description: Chuyển đổi giữa CSV và Excel (XLSX), cả hai chiều. Tải lên một tệp CSV hoặc TSV để nhận XLSX, hoặc tải lên một tệp XLSX để nhận CSV.
       security:
@@ -12631,7 +13362,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV sang JSON
       description: Chuyển đổi giữa CSV và JSON, cả hai chiều. Tải lên một tệp CSV hoặc TSV để nhận JSON, hoặc tải lên một mảng JSON gồm các đối tượng để nhận CSV.
       security:
@@ -12679,7 +13410,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON sang XML
       description: Chuyển đổi giữa JSON và XML, cả hai chiều. Tải lên một tệp JSON để nhận XML, hoặc tải lên một tệp XML để nhận JSON.
       security:
@@ -12727,7 +13458,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: Chia tách CSV
       description: Chia tách một tệp CSV thành các tệp nhỏ hơn theo số hàng. Trả về một tệp lưu trữ ZIP chứa các phần.
       security:
@@ -12776,7 +13507,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: Ghép CSV
       description: Kết hợp nhiều tệp CSV hoặc TSV có cột khớp nhau thành một tệp đã ghép. Tất cả các tệp phải có cùng tiêu đề cột.
       security:
@@ -12821,7 +13552,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: Chuyển đổi YAML / JSON
       description: Chuyển đổi giữa YAML và JSON, cả hai chiều. Tải lên một tệp YAML để nhận JSON, hoặc tải lên một tệp JSON để nhận YAML.
       security:
@@ -12864,7 +13595,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML sang CSV
       description: Trích xuất các phần tử lặp lại từ một tệp XML thành một bảng CSV. Tự động tìm mảng đối tượng đầu tiên trong cây XML.
       security:
@@ -12907,7 +13638,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: Tạo ZIP
       description: Đóng gói nhiều tệp thành một tệp lưu trữ ZIP duy nhất. Các tên tệp trùng lặp được tự động khử trùng lặp.
       security:
@@ -12952,7 +13683,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: Giải nén ZIP
       description: Giải nén tệp từ một tệp lưu trữ ZIP một cách an toàn với bảo vệ chống bom nén. Tệp lưu trữ một tệp trả về tệp trực tiếp; tệp lưu trữ nhiều tệp trả về một ZIP phẳng.
       security:
@@ -12995,7 +13726,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: Thay thế nền
       description: |
         Thay thế nền bằng AI. Xóa nền của chủ thể
@@ -13035,11 +13766,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13075,7 +13817,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: Làm mờ nền
       description: |
         Làm mờ nền bằng AI. Xóa nền, làm mờ
@@ -13111,11 +13853,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13151,7 +13904,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: Trình tạo mã vạch
       description: Tạo ảnh mã vạch từ văn bản. Công cụ này nhận phần thân JSON, không phải multipart.
       security:
@@ -13214,7 +13967,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: Cắt tròn
       description: Cắt xén ảnh thành một hình tròn ở giữa với các góc trong suốt, tùy chọn viền và điều chỉnh thu phóng/độ lệch.
       security:
@@ -13268,7 +14021,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: Cắt bo tròn
       description: Cắt hình ảnh thành hình vuông hoặc hình tròn tròn với các góc trong suốt, đường viền tùy chọn và khả năng thu phóng/bù trừ có thể điều chỉnh.
       security:
@@ -13324,7 +14077,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: Duotone
       description: Áp dụng hiệu ứng duotone hai màu với màu bóng tối và màu sáng tùy chỉnh.
       security:
@@ -13374,7 +14127,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: Đệm ảnh
       description: Đệm một ảnh về tỷ lệ khung hình mục tiêu với nền màu đơn, trong suốt hoặc làm mờ.
       security:
@@ -13427,7 +14180,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: Làm mờ ô vuông
       description: Áp dụng hiệu ứng làm mờ ô vuông cho toàn bộ ảnh hoặc một vùng hình chữ nhật cụ thể.
       security:
@@ -13480,7 +14233,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: Vignette
       description: Thêm hiệu ứng vignette với cường độ, màu sắc, bán kính, độ mềm, độ tròn và vị trí trung tâm có thể điều chỉnh.
       security:
@@ -13534,7 +14287,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: Trình chuyển đổi GIF/WebP
       description: Chuyển đổi GIF động sang WebP và ngược lại, giữ tất cả các khung hình. Chỉ nhận đầu vào .gif và .webp.
       security:
@@ -13584,7 +14337,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: Biểu đồ tần suất
       description: |
         Tạo biểu đồ tần suất RGB từ một ảnh. Trả về một ảnh biểu đồ
@@ -13718,7 +14471,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: Ảnh giữ chỗ LQIP
       description: |
         Tạo một ảnh giữ chỗ chất lượng thấp cỡ nhỏ. Trả về một tệp ảnh
@@ -13797,7 +14550,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: Sprite sheet
       description: |
         Kết hợp nhiều ảnh thành một lưới sprite sheet duy nhất. Nhận
@@ -13892,7 +14645,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: Ảnh hộ chiếu
       description: |
         Endpoint hướng dẫn cho luồng ảnh hộ chiếu hai giai đoạn. Dùng
@@ -13925,7 +14678,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: Ký PDF
       description: Đóng dấu một hoặc nhiều ảnh chữ ký PNG lên một PDF bằng cách dùng vị trí trang chuẩn hóa.
       security:
@@ -13969,11 +14722,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -14003,7 +14767,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang PNG
       description: |
         Chuyển đổi JPG sang PNG
@@ -14064,7 +14828,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang JPG
       description: |
         Chuyển đổi PNG sang JPG
@@ -14125,7 +14889,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang WebP
       description: |
         Chuyển đổi JPG sang WebP
@@ -14186,7 +14950,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang WebP
       description: |
         Chuyển đổi PNG sang WebP
@@ -14247,7 +15011,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP sang JPG
       description: |
         Chuyển đổi WebP sang JPG
@@ -14308,7 +15072,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP sang PNG
       description: |
         Chuyển đổi WebP sang PNG
@@ -14369,7 +15133,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang AVIF
       description: |
         Chuyển đổi JPG sang AVIF
@@ -14430,7 +15194,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang AVIF
       description: |
         Chuyển đổi PNG sang AVIF
@@ -14491,7 +15255,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP sang AVIF
       description: |
         Chuyển đổi WebP sang AVIF
@@ -14552,7 +15316,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC sang JPG
       description: |
         Chuyển đổi HEIC sang JPG
@@ -14613,7 +15377,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC sang PNG
       description: |
         Chuyển đổi HEIC sang PNG
@@ -14674,7 +15438,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC sang AVIF
       description: |
         Chuyển đổi HEIC sang AVIF
@@ -14735,7 +15499,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang GIF
       description: |
         Chuyển đổi JPG sang GIF
@@ -14796,7 +15560,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang GIF
       description: |
         Chuyển đổi PNG sang GIF
@@ -14857,7 +15621,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF sang JPG
       description: |
         Chuyển đổi GIF sang JPG
@@ -14918,7 +15682,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF sang PNG
       description: |
         Chuyển đổi GIF sang PNG
@@ -14979,7 +15743,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP sang GIF
       description: |
         Chuyển đổi WebP sang GIF
@@ -15040,7 +15804,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang TIFF
       description: |
         Chuyển đổi JPG sang TIFF
@@ -15101,7 +15865,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang TIFF
       description: |
         Chuyển đổi PNG sang TIFF
@@ -15162,7 +15926,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF sang JPG
       description: |
         Chuyển đổi TIFF sang JPG
@@ -15223,7 +15987,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF sang PNG
       description: |
         Chuyển đổi TIFF sang PNG
@@ -15284,7 +16048,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD sang JPG
       description: |
         Chuyển đổi PSD sang JPG
@@ -15345,7 +16109,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD sang PNG
       description: |
         Chuyển đổi PSD sang PNG
@@ -15406,7 +16170,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang EPS
       description: |
         Chuyển đổi PNG sang EPS
@@ -15467,7 +16231,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang EPS
       description: |
         Chuyển đổi JPG sang EPS
@@ -15528,7 +16292,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS sang PNG
       description: |
         Chuyển đổi EPS sang PNG
@@ -15589,7 +16353,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS sang JPG
       description: |
         Chuyển đổi EPS sang JPG
@@ -15650,7 +16414,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang SVG
       description: |
         Chuyển đổi PNG sang SVG
@@ -15711,7 +16475,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang SVG
       description: |
         Chuyển đổi JPG sang SVG
@@ -15772,7 +16536,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF sang SVG
       description: |
         Chuyển đổi TIFF sang SVG
@@ -15833,7 +16597,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD sang SVG
       description: |
         Chuyển đổi PSD sang SVG
@@ -15894,7 +16658,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS sang SVG
       description: |
         Chuyển đổi EPS sang SVG
@@ -15955,7 +16719,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG sang PNG
       description: |
         Chuyển đổi SVG sang PNG
@@ -16011,7 +16775,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG sang JPG
       description: |
         Chuyển đổi SVG sang JPG
@@ -16067,7 +16831,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG sang PDF
       description: |
         Chuyển đổi JPG sang PDF
@@ -16125,7 +16889,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG sang PDF
       description: |
         Chuyển đổi PNG sang PDF
@@ -16183,7 +16947,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC sang PDF
       description: |
         Chuyển đổi HEIC sang PDF
@@ -16241,7 +17005,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF sang PDF
       description: |
         Chuyển đổi TIFF sang PDF
@@ -16299,7 +17063,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP sang PDF
       description: |
         Chuyển đổi WebP sang PDF
@@ -16357,7 +17121,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF sang PDF
       description: |
         Chuyển đổi GIF sang PDF
@@ -16415,7 +17179,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS sang PDF
       description: |
         Chuyển đổi EPS sang PDF
@@ -16473,7 +17237,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF sang JPG
       description: |
         Chuyển đổi PDF sang JPG
@@ -16529,7 +17293,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF sang PNG
       description: |
         Chuyển đổi PDF sang PNG
@@ -16585,7 +17349,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF sang TIFF
       description: |
         Chuyển đổi PDF sang TIFF
@@ -16641,7 +17405,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV sang MP4
       description: |
         Chuyển đổi MOV sang MP4
@@ -16674,11 +17438,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16708,7 +17483,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM sang MP4
       description: |
         Chuyển đổi WEBM sang MP4
@@ -16741,11 +17516,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16775,7 +17561,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV sang MP4
       description: |
         Chuyển đổi MKV sang MP4
@@ -16808,11 +17594,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16842,7 +17639,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI sang MP4
       description: |
         Chuyển đổi AVI sang MP4
@@ -16875,11 +17672,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16909,7 +17717,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang MOV
       description: |
         Chuyển đổi MP4 sang MOV
@@ -16942,11 +17750,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16976,7 +17795,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang WEBM
       description: |
         Chuyển đổi MP4 sang WEBM
@@ -17009,11 +17828,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17043,7 +17873,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM sang MOV
       description: |
         Chuyển đổi WEBM sang MOV
@@ -17076,11 +17906,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17110,7 +17951,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV sang MOV
       description: |
         Chuyển đổi MKV sang MOV
@@ -17143,11 +17984,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17177,7 +18029,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI sang MOV
       description: |
         Chuyển đổi AVI sang MOV
@@ -17210,11 +18062,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17244,7 +18107,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang AVI
       description: |
         Chuyển đổi MP4 sang AVI
@@ -17277,11 +18140,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17311,7 +18185,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV sang AVI
       description: |
         Chuyển đổi MOV sang AVI
@@ -17344,11 +18218,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17378,7 +18263,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV sang AVI
       description: |
         Chuyển đổi MKV sang AVI
@@ -17411,11 +18296,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17445,7 +18341,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI sang MKV
       description: |
         Chuyển đổi AVI sang MKV
@@ -17478,11 +18374,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17512,7 +18419,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang GIF
       description: |
         Chuyển đổi MP4 sang GIF
@@ -17545,11 +18452,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17579,7 +18497,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV sang GIF
       description: |
         Chuyển đổi MOV sang GIF
@@ -17612,11 +18530,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17646,7 +18575,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV sang GIF
       description: |
         Chuyển đổi MKV sang GIF
@@ -17679,11 +18608,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17713,7 +18653,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI sang GIF
       description: |
         Chuyển đổi AVI sang GIF
@@ -17746,11 +18686,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17780,7 +18731,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF sang MP4
       description: |
         Chuyển đổi GIF sang MP4
@@ -17841,7 +18792,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF sang WEBM
       description: |
         Chuyển đổi GIF sang WEBM
@@ -17902,7 +18853,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF sang MOV
       description: |
         Chuyển đổi GIF sang MOV
@@ -17963,7 +18914,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang MP3
       description: |
         Chuyển đổi MP4 sang MP3
@@ -18024,7 +18975,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV sang MP3
       description: |
         Chuyển đổi MOV sang MP3
@@ -18085,7 +19036,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV sang MP3
       description: |
         Chuyển đổi MKV sang MP3
@@ -18146,7 +19097,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM sang MP3
       description: |
         Chuyển đổi WEBM sang MP3
@@ -18207,7 +19158,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI sang MP3
       description: |
         Chuyển đổi AVI sang MP3
@@ -18268,7 +19219,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang WAV
       description: |
         Chuyển đổi MP4 sang WAV
@@ -18329,7 +19280,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV sang WAV
       description: |
         Chuyển đổi MOV sang WAV
@@ -18390,7 +19341,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4 sang OGG
       description: |
         Chuyển đổi MP4 sang OGG
@@ -18451,7 +19402,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A sang MP3
       description: |
         Chuyển đổi M4A sang MP3
@@ -18512,7 +19463,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A sang WAV
       description: |
         Chuyển đổi M4A sang WAV
@@ -18573,7 +19524,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC sang MP3
       description: |
         Chuyển đổi AAC sang MP3
@@ -18634,7 +19585,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC sang WAV
       description: |
         Chuyển đổi AAC sang WAV
@@ -18695,7 +19646,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC sang FLAC
       description: |
         Chuyển đổi AAC sang FLAC
@@ -18756,7 +19707,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG sang MP3
       description: |
         Chuyển đổi OGG sang MP3
@@ -18817,7 +19768,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG sang WAV
       description: |
         Chuyển đổi OGG sang WAV
@@ -18878,7 +19829,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV sang MP3
       description: |
         Chuyển đổi WAV sang MP3
@@ -18939,7 +19890,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3 sang WAV
       description: |
         Chuyển đổi MP3 sang WAV
@@ -19000,7 +19951,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC sang MP3
       description: |
         Chuyển đổi FLAC sang MP3
@@ -19061,7 +20012,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel sang CSV
       description: |
         Chuyển đổi Excel sang CSV
@@ -19094,11 +20045,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19237,6 +20199,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: Hoàn tất đăng ký MFA bắt buộc
+      description: Xác nhận một lần đăng ký bắt buộc bắt đầu từ lúc đăng nhập và trả về một phiên. Lệnh gọi này không yêu cầu phiên; mã đăng ký có thời hạn ngắn thay thế cho phiên. Chỉ chấp nhận mã TOTP ở đây, không bao giờ chấp nhận mã khôi phục.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19403,7 +20417,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: Tạo bản xem trước tải lên
@@ -19751,6 +20765,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: Cập nhật một phần người dùng SCIM
+      description: RFC 7644 PatchOp. Hỗ trợ add, remove và replace trên các đường dẫn mà máy chủ cho phép. Đường dẫn Users được xác thực theo từng thao tác.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19816,6 +20893,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: Cập nhật một phần nhóm SCIM
+      description: RFC 7644 PatchOp. Hỗ trợ add, remove và replace trên các đường dẫn mà máy chủ cho phép. Thành viên nhóm được xác thực theo từng thao tác.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20062,7 +21202,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20258,13 +21420,33 @@ x-i18n:
       provenance: machine
       outputHash: 255dfe5157a4
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: 8e7bca7cf496
+      outputHash: 58bb3b0e90fe
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: ce248945b7cc
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 889bab95e00a
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: 83b633240432
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: 4651c61e4be2
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: 3efb99f96106
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: 3d9cad81d586
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21221,6 +22403,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: e8c307822255
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 56212d8d61cb
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: 7ec53e66ebcc
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21253,6 +22443,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: b2a497980f6f
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 18397cf094fc
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: e010d193f167
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: b7ef53caca52
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: 8d986fb1e868
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 516f8f05744d
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: ec817ce399d3
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: 05f1b4485854
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: 882f3d715773
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22933,6 +24155,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: 84cde193d18f
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: f45a4ba9abfe
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 2e4cc742ed20
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23149,6 +24379,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: 5975ebb5e31b
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: c2f2a2bcd36f
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: de7149e6a1b2
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23189,6 +24427,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: dd9c72fd48d0
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: 509da3bbe4d7
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 74afeb005568
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine

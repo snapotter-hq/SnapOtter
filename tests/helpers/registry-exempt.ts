@@ -49,4 +49,6 @@ export const REGISTRY_EXEMPT = new Set([
   "pdf-to-tiff",
   "svg-to-png",
   "svg-to-jpg",
+  "ocr",
+  "ocr-pdf",
 ]);

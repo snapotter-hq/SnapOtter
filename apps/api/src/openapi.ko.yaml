@@ -22,9 +22,19 @@ servers:
     description: Current instance
 tags:
   - name: Tools
-    description: 이미지, 비디오, 오디오, PDF, 파일에 걸친 파일 처리 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
+    description: 길게 묶이지 않은 도구 엔드포인트입니다.
+  - name: Image
+    description: 이미지 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
+  - name: Video
+    description: 비디오 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
+  - name: Audio
+    description: 오디오 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
+  - name: PDF
+    description: PDF 및 문서 도구입니다. 각 도구는 multipart 파일 업로드를 받아 다운로드 URL을 반환합니다.
   - name: Batch
     description: 한 요청으로 여러 파일을 한 도구를 통해 처리합니다.
+  - name: Jobs
+    description: 장시간 실행 작업의 상태와 진행 상황입니다.
   - name: Pipelines
     description: 여러 도구를 재사용 가능한 워크플로로 연결합니다.
   - name: Files
@@ -94,6 +104,8 @@ components:
       type: object
       required:
         - error
+        - code
+        - requestId
       properties:
         error:
           type: string
@@ -101,6 +113,64 @@ components:
         details:
           type: string
           description: Additional error details (e.g. Zod validation errors)
+        code:
+          type: string
+          description: Stable machine-readable code. Listed in the error catalog.
+          example: UNPROCESSABLE_ENTITY
+        requestId:
+          type: string
+          description: Request ID for support and log correlation.
+          example: req-42
+    JobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+        - progress
+        - progressUrl
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - canceled
+          description: Stored job status. completed, failed, and canceled are terminal.
+        createdAt:
+          type: string
+          format: date-time
+        progress:
+          type: object
+          required:
+            - percent
+          properties:
+            percent:
+              type: number
+              minimum: 0
+              maximum: 100
+            stage:
+              type: string
+        result:
+          type: object
+          additionalProperties: true
+          description: Present when the job has a result. The shape depends on the tool, for example downloadUrl. A canceled job can carry a partial result.
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+        progressUrl:
+          type: string
+          description: SSE stream for this job.
+          example: /api/v1/jobs/3f9c2a1e/progress
     ToolResponse:
       type: object
       properties:
@@ -267,7 +337,7 @@ paths:
     post:
       operationId: resizeImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 크기 조정
       description: 이미지를 특정 크기 또는 백분율로 조정합니다.
       security:
@@ -319,7 +389,7 @@ paths:
     post:
       operationId: contentAwareResize
       tags:
-        - Tools
+        - Image
       summary: 콘텐츠 인식 크기 조정
       description: seam carving을 사용해 중요한 특징을 보존하면서 콘텐츠를 지능적으로 제거하거나 삽입하여 이미지 크기를 조정합니다.
       security:
@@ -381,7 +451,7 @@ paths:
     post:
       operationId: cropImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 크롭
       description: 이미지를 특정 영역으로 자릅니다.
       security:
@@ -433,7 +503,7 @@ paths:
     post:
       operationId: rotateImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 회전 및 뒤집기
       description: 이미지를 각도로 회전하거나 가로/세로로 뒤집습니다.
       security:
@@ -483,7 +553,7 @@ paths:
     post:
       operationId: convertFormat
       tags:
-        - Tools
+        - Image
       summary: 이미지 변환
       description: 이미지를 다른 형식으로 변환합니다.
       security:
@@ -532,7 +602,7 @@ paths:
     post:
       operationId: compressImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 압축
       description: 품질 수준 또는 목표 크기로 이미지 파일 크기를 줄입니다.
       security:
@@ -582,7 +652,7 @@ paths:
     post:
       operationId: compressImageTo20KbTool
       tags:
-        - Tools
+        - Image
       summary: 이미지를 20 KB로 압축
       description: |
         이미지를 20 KB 목표 크기로 압축합니다
@@ -642,7 +712,7 @@ paths:
     post:
       operationId: compressImageTo50KbTool
       tags:
-        - Tools
+        - Image
       summary: 이미지를 50 KB로 압축
       description: |
         이미지를 50 KB 목표 크기로 압축합니다
@@ -702,7 +772,7 @@ paths:
     post:
       operationId: compressImageTo100KbTool
       tags:
-        - Tools
+        - Image
       summary: 이미지를 100 KB로 압축
       description: |
         이미지를 100 KB 목표 크기로 압축합니다
@@ -762,7 +832,7 @@ paths:
     post:
       operationId: compressImageTo200KbTool
       tags:
-        - Tools
+        - Image
       summary: 이미지를 200 KB로 압축
       description: |
         이미지를 200 KB 목표 크기로 압축합니다
@@ -822,7 +892,7 @@ paths:
     post:
       operationId: compressImageTo500KbTool
       tags:
-        - Tools
+        - Image
       summary: 이미지를 500 KB로 압축
       description: |
         이미지를 500 KB 목표 크기로 압축합니다
@@ -882,7 +952,7 @@ paths:
     post:
       operationId: stripMetadata
       tags:
-        - Tools
+        - Image
       summary: 이미지 메타데이터 제거
       description: 이미지에서 EXIF, GPS, ICC, XMP 메타데이터를 제거합니다.
       security:
@@ -934,7 +1004,7 @@ paths:
     post:
       operationId: addBorder
       tags:
-        - Tools
+        - Image
       summary: 테두리 및 프레임
       description: 이미지에 테두리, 둥근 모서리, 여백, 그림자를 추가합니다.
       security:
@@ -992,7 +1062,7 @@ paths:
     post:
       operationId: beautifyScreenshot
       tags:
-        - Tools
+        - Image
       summary: 스크린샷 꾸미기
       description: |
         스크린샷에 그라데이션 배경, 기기 프레임, 그림자, 워터마크, 소셜 미디어
@@ -1067,7 +1137,7 @@ paths:
     post:
       operationId: adjustColors
       tags:
-        - Tools
+        - Image
       summary: 색상 조정
       description: |
         통합 색상 조정 도구입니다. 밝기, 대비, 노출, 채도, 색온도, 틴트, 색조, 선명도, 색상 채널, 효과를 한 번에 조정합니다.
@@ -1127,7 +1197,7 @@ paths:
     post:
       operationId: sharpenImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 선명하게
       description: adaptive, unsharp mask, high-pass 방식으로 이미지를 선명하게 하며, 선택적으로 노이즈를 감소시킵니다.
       security:
@@ -1187,7 +1257,7 @@ paths:
     post:
       operationId: optimizeForWeb
       tags:
-        - Tools
+        - Image
       summary: 웹 최적화
       description: 최신 형식으로 변환하고 품질을 조정하며 선택적으로 크기를 조정하여 이미지를 웹 전송에 최적화합니다.
       security:
@@ -1240,7 +1310,7 @@ paths:
     post:
       operationId: optimizeForWebPreview
       tags:
-        - Tools
+        - Image
       summary: 웹 최적화(미리보기)
       description: |
         실시간 파라미터 튜닝을 위한 경량 미리보기 엔드포인트입니다. 최적화된
@@ -1303,7 +1373,7 @@ paths:
     post:
       operationId: enhanceImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 향상
       description: |
         AI 기반 자동 이미지 향상입니다. 이미지를 분석하여 선택한 장면 모드에
@@ -1362,7 +1432,7 @@ paths:
     post:
       operationId: analyzeImageEnhancement
       tags:
-        - Tools
+        - Image
       summary: 향상을 위한 이미지 분석
       description: |
         이미지를 분석하여 적용하지 않고 제안된 보정을 반환합니다.
@@ -1414,7 +1484,7 @@ paths:
     post:
       operationId: removeNoise
       tags:
-        - Tools
+        - Image
       summary: 노이즈 제거
       description: |
         Python 사이드카를 사용하는 AI 기반 노이즈 제거입니다. 빠른 미리보기부터
@@ -1453,11 +1523,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1493,7 +1574,7 @@ paths:
     post:
       operationId: removeRedEye
       tags:
-        - Tools
+        - Image
       summary: 적목 현상 제거
       description: |
         AI 기반 적목 현상 감지 및 제거입니다. 얼굴을 감지하여 사진의 적목
@@ -1530,11 +1611,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1570,7 +1662,7 @@ paths:
     post:
       operationId: restorePhoto
       tags:
-        - Tools
+        - Image
       summary: 사진 복원
       description: |
         AI 기반 사진 복원 파이프라인입니다. 오래되었거나 손상된 사진의 스크래치를
@@ -1610,11 +1702,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -1650,7 +1753,7 @@ paths:
     post:
       operationId: analyzePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 여권 사진 - 분석
       description: |
         여권 사진 생성의 1단계입니다. 얼굴 랜드마크를 감지하고 배경을
@@ -1786,7 +1889,7 @@ paths:
     post:
       operationId: generatePassportPhoto
       tags:
-        - Tools
+        - Image
       summary: 여권 사진 - 생성
       description: |
         여권 사진 생성의 2단계입니다. 분석 단계의 jobId와 랜드마크를 사용해
@@ -1929,7 +2032,7 @@ paths:
     post:
       operationId: colorizeImage
       tags:
-        - Tools
+        - Image
       summary: 색 입히기
       description: |
         AI 기반 사진 색 입히기입니다. OpenCV DNN 폴백과 함께 DDColor를 사용해
@@ -1964,11 +2067,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2004,7 +2118,7 @@ paths:
     post:
       operationId: enhanceFaces
       tags:
-        - Tools
+        - Image
       summary: 얼굴 향상
       description: |
         GFPGAN 또는 CodeFormer를 사용하는 AI 기반 얼굴 향상입니다. 이미지에서
@@ -2041,11 +2155,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -2081,7 +2206,7 @@ paths:
     post:
       operationId: imageToBase64
       tags:
-        - Tools
+        - Image
       summary: 이미지를 Base64로
       description: |
         하나 이상의 이미지를 데이터 URI가 포함된 Base64 인코딩 문자열로
@@ -2175,7 +2300,7 @@ paths:
     post:
       operationId: addTextWatermark
       tags:
-        - Tools
+        - Image
       summary: 텍스트 워터마크
       description: 이미지에 텍스트 워터마크를 추가합니다.
       security:
@@ -2228,7 +2353,7 @@ paths:
     post:
       operationId: addTextOverlay
       tags:
-        - Tools
+        - Image
       summary: 텍스트 오버레이
       description: 선택적 배경 박스와 함께 스타일이 적용된 텍스트 오버레이를 추가합니다.
       security:
@@ -2282,7 +2407,7 @@ paths:
     post:
       operationId: replaceColor
       tags:
-        - Tools
+        - Image
       summary: 색상 교체
       description: 이미지의 특정 색상을 다른 색상 또는 투명으로 교체합니다.
       security:
@@ -2333,7 +2458,7 @@ paths:
     post:
       operationId: simulateColorBlindness
       tags:
-        - Tools
+        - Image
       summary: 색맹 시뮬레이션
       description: 다양한 유형의 색각 이상이 있는 사람에게 이미지가 어떻게 보이는지 시뮬레이션합니다.
       security:
@@ -2381,7 +2506,7 @@ paths:
     post:
       operationId: processGif
       tags:
-        - Tools
+        - Image
       summary: GIF 도구
       description: 애니메이션 GIF의 크기 조정, 최적화, 속도 조절, 역재생, 프레임 추출, 회전을 수행합니다.
       security:
@@ -2445,7 +2570,7 @@ paths:
     post:
       operationId: getGifInfo
       tags:
-        - Tools
+        - Image
       summary: GIF 정보
       description: 크기, 프레임 수, 지연 시간, 재생 시간을 포함한 애니메이션 GIF 메타데이터를 가져옵니다.
       security: []
@@ -2502,7 +2627,7 @@ paths:
     post:
       operationId: smartCrop
       tags:
-        - Tools
+        - Image
       summary: 스마트 자르기
       description: 피사체 초점, 얼굴 초점, 자동 트리밍의 세 가지 모드로 스마트 자르기를 수행합니다.
       security:
@@ -2561,7 +2686,7 @@ paths:
     post:
       operationId: vectorizeImage
       tags:
-        - Tools
+        - Image
       summary: 이미지를 SVG로
       description: potrace(흑백) 또는 VTracer(컬러)를 사용해 래스터 이미지를 SVG 벡터 형식으로 변환합니다.
       security:
@@ -2616,7 +2741,7 @@ paths:
     post:
       operationId: svgToRaster
       tags:
-        - Tools
+        - Image
       summary: SVG를 래스터로
       description: SVG 파일을 사용자 지정 스케일과 DPI로 래스터 이미지 형식으로 변환합니다.
       security:
@@ -2669,7 +2794,7 @@ paths:
     post:
       operationId: svgToRasterBatch
       tags:
-        - Tools
+        - Image
       summary: SVG를 래스터로(배치)
       description: 여러 SVG 파일을 래스터 이미지로 변환합니다. ZIP 아카이브를 반환합니다.
       security:
@@ -2729,7 +2854,7 @@ paths:
     post:
       operationId: imageToPdf
       tags:
-        - Tools
+        - Image
       summary: 이미지를 PDF로
       description: 하나 이상의 이미지를 PDF 문서로 변환합니다.
       security:
@@ -2811,7 +2936,7 @@ paths:
     post:
       operationId: pdfToImage
       tags:
-        - Tools
+        - PDF
       summary: PDF를 이미지로
       description: PDF 페이지를 이미지로 변환합니다. 개별 페이지 다운로드와 모든 페이지의 ZIP을 반환합니다.
       security:
@@ -2900,7 +3025,7 @@ paths:
     post:
       operationId: getPdfInfo
       tags:
-        - Tools
+        - PDF
       summary: PDF 페이지 수
       description: PDF 파일의 페이지 수를 가져옵니다.
       security: []
@@ -2939,7 +3064,7 @@ paths:
     post:
       operationId: previewPdfPages
       tags:
-        - Tools
+        - PDF
       summary: PDF 페이지 썸네일
       description: PDF의 각 페이지에 대한 썸네일 미리보기를 생성합니다(최대 200페이지, JPEG, 너비 300px).
       security: []
@@ -2992,7 +3117,7 @@ paths:
     post:
       operationId: splitImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 분할
       description: 이미지를 타일 격자로 분할합니다. ZIP 파일을 반환합니다.
       security:
@@ -3046,7 +3171,7 @@ paths:
     post:
       operationId: bulkRename
       tags:
-        - Tools
+        - Image
       summary: 일괄 이름 변경
       description: 패턴 템플릿을 사용해 여러 이미지의 이름을 변경합니다. {{index}}, {{padded}}, {{original}} 토큰을 지원합니다. ZIP 파일을 반환합니다.
       security:
@@ -3098,7 +3223,7 @@ paths:
     post:
       operationId: generateFavicon
       tags:
-        - Tools
+        - Image
       summary: 파비콘 생성기
       description: 이미지에서 전체 파비콘 세트(16px부터 512px PNG, ICO, manifest.json)를 생성합니다. ZIP 파일을 반환합니다.
       security:
@@ -3142,7 +3267,7 @@ paths:
     post:
       operationId: addImageWatermark
       tags:
-        - Tools
+        - Image
       summary: 이미지 워터마크
       description: 이미지 워터마크 오버레이를 추가합니다.
       security:
@@ -3197,7 +3322,7 @@ paths:
     post:
       operationId: composeImages
       tags:
-        - Tools
+        - Image
       summary: 이미지 합성
       description: 블렌드 모드로 오버레이 이미지를 기본 이미지에 합성합니다.
       security:
@@ -3253,7 +3378,7 @@ paths:
     post:
       operationId: generateMeme
       tags:
-        - Tools
+        - Image
       summary: 밈 생성기
       description: |
         템플릿 또는 사용자 지정 이미지를 사용해 밈을 만듭니다. 두 가지 모드를 지원합니다. (1) 템플릿 모드 - `templateId` 및 `textBoxes`이(가) 포함된 JSON 본문을 보냅니다. (2) 사용자 지정 이미지 모드 - `file` 및 `settings`이(가) 포함된 multipart를 보냅니다.
@@ -3492,7 +3617,7 @@ paths:
     post:
       operationId: compareImages
       tags:
-        - Tools
+        - Image
       summary: 이미지 비교
       description: 두 이미지를 비교하여 시각적 차이 리포트를 생성합니다.
       security:
@@ -3559,7 +3684,7 @@ paths:
     post:
       operationId: eraseObject
       tags:
-        - Tools
+        - Image
       summary: 객체 지우개
       description: 마스크를 사용해 이미지에서 객체를 지웁니다. 마스크의 흰색 영역이 지울 영역을 나타냅니다. LaMa inpainting을 사용합니다.
       security:
@@ -3612,11 +3737,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3652,7 +3788,7 @@ paths:
     post:
       operationId: aiCanvasExpand
       tags:
-        - Tools
+        - Image
       summary: AI 캔버스 확장(실험적)
       description: |
         AI outpainting을 사용해 이미지 캔버스를 확장합니다. 원본과 매끄럽게
@@ -3695,11 +3831,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3735,7 +3882,7 @@ paths:
     post:
       operationId: createCollage
       tags:
-        - Tools
+        - Image
       summary: 콜라주 및 그리드
       description: 여러 이미지를 격자 콜라주로 결합합니다.
       security:
@@ -3792,7 +3939,7 @@ paths:
     post:
       operationId: stitchImages
       tags:
-        - Tools
+        - Image
       summary: 이미지 결합
       description: 여러 이미지를 가로, 세로 또는 격자 레이아웃으로 이어붙입니다.
       security:
@@ -3851,7 +3998,7 @@ paths:
     post:
       operationId: removeGifBackground
       tags:
-        - Tools
+        - Image
       summary: 애니메이션 이미지에서 배경 제거
       description: AI(rembg)를 사용하여 애니메이션 GIF, WebP 또는 APNG 프레임에서 배경을 제거합니다. 로컬로 실행됩니다.
       security:
@@ -3897,11 +4044,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -3931,7 +4089,7 @@ paths:
     post:
       operationId: removeBackground
       tags:
-        - Tools
+        - Image
       summary: 배경 제거
       description: AI(rembg)를 사용해 이미지에서 배경을 제거합니다. 로컬에서 실행됩니다.
       security:
@@ -3965,11 +4123,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4005,7 +4174,7 @@ paths:
     post:
       operationId: applyBackgroundEffects
       tags:
-        - Tools
+        - Image
       summary: 배경 효과 적용
       description: |
         이전에 처리된 remove-background 결과에 배경 교체 또는 효과를 적용합니다. 이전 POST /api/v1/tools/image/remove-background 호출의 jobId가 필요합니다.
@@ -4072,7 +4241,7 @@ paths:
     post:
       operationId: fixTransparency
       tags:
-        - Tools
+        - Image
       summary: 가짜 투명도 수정
       description: |
         이전 배경 제거로 인한 프린징, 헤일로, 반투명 아티팩트가 있는 "가짜
@@ -4110,11 +4279,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4150,7 +4330,7 @@ paths:
     post:
       operationId: upscaleImage
       tags:
-        - Tools
+        - Image
       summary: 이미지 업스케일링
       description: AI(Real-ESRGAN)를 사용해 이미지를 업스케일합니다. 로컬에서 실행됩니다.
       security:
@@ -4186,11 +4366,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4226,7 +4417,7 @@ paths:
     post:
       operationId: blurFaces
       tags:
-        - Tools
+        - Image
       summary: 얼굴 및 개인정보 블러
       description: 개인정보 보호를 위해 이미지에서 얼굴을 감지하고 흐리게 처리합니다. OpenCV를 사용합니다. 로컬에서 실행됩니다.
       security:
@@ -4258,11 +4449,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -4298,7 +4500,7 @@ paths:
     post:
       operationId: extractText
       tags:
-        - Tools
+        - Image
       summary: OCR / 텍스트 추출
       description: |-
         이미지에서 로컬로 텍스트를 추출합니다. 내장된 Fast 계층은 다음을 사용합니다.
@@ -4336,6 +4538,11 @@ paths:
       responses:
         '202':
           description: Accepted after validation and enqueueing. Track progress via SSE at /api/v1/jobs/{jobId}/progress; processing failures arrive in the terminal failed event.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -4344,6 +4551,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -4387,7 +4600,7 @@ paths:
     post:
       operationId: getImageInfo
       tags:
-        - Tools
+        - Image
       summary: 이미지 정보
       description: 크기, 형식, 색 공간, EXIF 데이터를 포함한 이미지의 상세 메타데이터를 가져옵니다.
       security:
@@ -4490,7 +4703,7 @@ paths:
     post:
       operationId: extractColorPalette
       tags:
-        - Tools
+        - Image
       summary: 색상 팔레트
       description: 이미지에서 주요 색상을 추출합니다.
       security:
@@ -4543,7 +4756,7 @@ paths:
     post:
       operationId: readBarcode
       tags:
-        - Tools
+        - Image
       summary: 바코드 리더
       description: 이미지에서 QR 코드와 바코드를 읽습니다.
       security:
@@ -4648,7 +4861,7 @@ paths:
     post:
       operationId: findDuplicates
       tags:
-        - Tools
+        - Image
       summary: 중복 찾기
       description: perceptual hashing을 사용해 세트에서 중복 이미지를 찾습니다.
       security:
@@ -4751,7 +4964,7 @@ paths:
     post:
       operationId: generateQrCode
       tags:
-        - Tools
+        - Image
       summary: QR 코드 생성기
       description: 텍스트에서 QR 코드 이미지를 생성합니다. 이 도구는 multipart가 아닌 JSON 본문을 받습니다.
       security:
@@ -4814,7 +5027,7 @@ paths:
     post:
       operationId: captureWebpage
       tags:
-        - Tools
+        - Image
       summary: 웹페이지를 이미지로 캡처
       description: 웹페이지를 고품질 스크린샷 이미지로 캡처합니다. URL과 캡처 옵션이 포함된 JSON 본문을 받습니다.
       security:
@@ -4900,7 +5113,7 @@ paths:
     post:
       operationId: inspectMetadata
       tags:
-        - Tools
+        - Image
       summary: 메타데이터 검사
       description: 제거하지 않고 이미지의 모든 메타데이터(EXIF, GPS, ICC, XMP)를 봅니다.
       security:
@@ -4969,7 +5182,7 @@ paths:
     post:
       operationId: editMetadata
       tags:
-        - Tools
+        - Image
       summary: 이미지 메타데이터 편집
       description: ExifTool을 사용해 이미지의 EXIF, IPTC, GPS 및 기타 메타데이터 필드를 편집합니다.
       security:
@@ -5038,7 +5251,7 @@ paths:
     post:
       operationId: inspectMetadataExifTool
       tags:
-        - Tools
+        - Image
       summary: 메타데이터 검사(ExifTool)
       description: ExifTool을 사용해 이미지의 모든 메타데이터를 읽습니다. 포함된 모든 EXIF, IPTC, XMP, GPS 필드를 반환합니다.
       security:
@@ -7053,6 +7266,53 @@ paths:
                 properties:
                   authEnabled:
                     type: boolean
+  /api/v1/jobs/{jobId}:
+    get:
+      operationId: getJobStatus
+      tags:
+        - Jobs
+      summary: 작업 상태 조회
+      description: |
+        연결을 열어 두지 않고 작업의 저장된 상태를 반환합니다. 202 응답 후에 폴링하거나, 진행 스트림이 끊기면 대체 수단으로 사용하세요.
+
+        `status`은 `queued`, `processing`, `completed`, `failed`, `canceled` 중 하나입니다. `completed`, `failed`, `canceled`은 종료 상태입니다. 취소된 작업에도 부분 `result`(예: 완료된 파일의 ZIP)이 남아 있을 수 있으므로, `result`이 있으면 항상 확인하세요.
+
+        접근 권한은 진행 스트림과 같습니다. 작업 소유자, `files:all` 권한이 있는 사용자, 또는 기능 설치 작업의 경우 `features:manage` 권한이 있는 사용자가 조회할 수 있습니다. 그 외 호출자에게는 404가 반환됩니다.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: The jobId from a 202 response.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+              example:
+                jobId: 3f9c2a1e
+                status: completed
+                createdAt: '2026-11-03T10:00:00.000Z'
+                progress:
+                  percent: 100
+                result:
+                  downloadUrl: /api/v1/download/3f9c2a1e/photo.png
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Job not found, or not visible to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
@@ -7370,6 +7630,191 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags:
+        - System
+      summary: 제품 피드백 제출
+      description: 로그인한 사용자의 피드백 이벤트를 하나 기록합니다. 분당 10회 요청으로 제한됩니다. `accepted`은 서버가 이벤트를 기록하지 않았을 때 false입니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: string
+                  description: Where the feedback was given. Accepted values are defined in the shared feedback constants.
+                surveyId:
+                  type: string
+                promptVariant:
+                  type: string
+                  maxLength: 80
+                  pattern: ^[a-z0-9_-]+$
+                sentiment:
+                  type: string
+                feedbackType:
+                  type: string
+                message:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Feedback handled
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - accepted
+                properties:
+                  ok:
+                    type: boolean
+                  accepted:
+                    type: boolean
+        '400':
+          description: Invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/latest-release:
+    get:
+      operationId: getLatestRelease
+      tags:
+        - Admin
+      summary: 사용 가능한 새 릴리스 조회
+      description: 게시된 최신 릴리스가 실행 중인 버전보다 새로울 때 해당 릴리스를, 그렇지 않으면 null을 반환합니다. settings:write 권한이 필요합니다.
+      responses:
+        '200':
+          description: Latest release, or null when this instance is current
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - latest
+                properties:
+                  latest:
+                    type: string
+                    nullable: true
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing settings:write permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/features/reset:
+    post:
+      operationId: resetFeatures
+      tags:
+        - Features
+      summary: 모든 AI 기능 번들 초기화
+      description: |
+        AI 가상 환경, 모델, pip 캐시를 삭제하고 모든 번들을 설치되지 않음으로 표시합니다. 설치가 스스로 복구되지 않을 때 사용하세요. 번들을 제거하면 모델 가중치만 삭제되므로, 이 작업이 전체 초기화입니다.
+
+        응답의 venvReseeded 필드는 가상 환경이 기본 베이스에서 다시 시드되었는지 나타냅니다. 번들 설치가 진행 중이면 409를 반환합니다. features:manage 권한이 필요합니다.
+      responses:
+        '200':
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venvReseeded:
+                    type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A bundle install is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/tools/{toolId}/features/install:
+    post:
+      operationId: installToolFeatures
+      tags:
+        - Features
+      summary: 도구에 필요한 기능 번들 모두 설치
+      description: 도구에 필요한 각 번들을 큐에 넣고, 번들마다 큐에 추가되었는지 건너뛰었는지 보고합니다. features:manage 권한이 필요합니다.
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-bundle status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundleId:
+                          type: string
+                        queued:
+                          type: boolean
+                        skipped:
+                          type: boolean
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Missing features:manage permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unknown tool, or the tool needs no bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -7409,11 +7854,22 @@ paths:
       responses:
         '202':
           description: Installation started or queued
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                     description: Job ID for tracking installation progress via SSE
@@ -7923,7 +8379,7 @@ paths:
     post:
       operationId: convertVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 변환
       description: MP4, MOV, WebM, AVI, MKV 간에 비디오를 변환합니다.
       security:
@@ -7955,11 +8411,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -7989,7 +8456,7 @@ paths:
     post:
       operationId: compressVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 압축
       description: 품질 제어로 비디오 파일 크기를 줄입니다.
       security:
@@ -8021,11 +8488,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8055,7 +8533,7 @@ paths:
     post:
       operationId: trimVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 트리밍
       description: 비디오에서 클립을 잘라냅니다.
       security:
@@ -8105,7 +8583,7 @@ paths:
     post:
       operationId: muteVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 음소거
       description: 비디오에서 오디오 트랙을 제거합니다.
       security:
@@ -8148,7 +8626,7 @@ paths:
     post:
       operationId: videoToGif
       tags:
-        - Tools
+        - Video
       summary: 비디오를 GIF로
       description: 비디오 클립을 애니메이션 GIF로 변환합니다.
       security:
@@ -8182,11 +8660,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8216,7 +8705,7 @@ paths:
     post:
       operationId: resizeVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 크기 조정
       description: 비디오를 새 해상도 또는 프리셋 크기로 조정합니다.
       security:
@@ -8266,7 +8755,7 @@ paths:
     post:
       operationId: cropVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 자르기
       description: 비디오에서 영역을 잘라냅니다.
       security:
@@ -8317,7 +8806,7 @@ paths:
     post:
       operationId: rotateVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 회전
       description: 비디오를 회전하거나 뒤집습니다.
       security:
@@ -8365,7 +8854,7 @@ paths:
     post:
       operationId: changeFps
       tags:
-        - Tools
+        - Video
       summary: FPS 변경
       description: 비디오의 프레임 속도를 변경합니다.
       security:
@@ -8413,7 +8902,7 @@ paths:
     post:
       operationId: videoColor
       tags:
-        - Tools
+        - Video
       summary: 비디오 색상
       description: 밝기, 대비, 채도, 감마를 조정합니다.
       security:
@@ -8464,7 +8953,7 @@ paths:
     post:
       operationId: videoSpeed
       tags:
-        - Tools
+        - Video
       summary: 비디오 속도
       description: 비디오를 빠르게 하거나 느리게 합니다.
       security:
@@ -8513,7 +9002,7 @@ paths:
     post:
       operationId: reverseVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 역재생
       description: 비디오 클립을 거꾸로 재생합니다. 최대 5분 클립으로 제한됩니다.
       security:
@@ -8556,7 +9045,7 @@ paths:
     post:
       operationId: videoLoudnorm
       tags:
-        - Tools
+        - Video
       summary: 동영상 오디오 정규화
       description: 비디오 오디오 볼륨을 방송 표준(EBU R128)으로 정규화합니다.
       security:
@@ -8599,7 +9088,7 @@ paths:
     post:
       operationId: aspectPad
       tags:
-        - Tools
+        - Video
       summary: 종횡비 패딩
       description: 목표 종횡비에 맞게 단색 바를 추가합니다.
       security:
@@ -8648,7 +9137,7 @@ paths:
     post:
       operationId: blurPad
       tags:
-        - Tools
+        - Video
       summary: 블러 패딩
       description: 비디오의 흐릿한 복사본으로 바를 채웁니다.
       security:
@@ -8697,7 +9186,7 @@ paths:
     post:
       operationId: watermarkVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 워터마크
       description: 비디오 프레임에 텍스트 워터마크를 새깁니다.
       security:
@@ -8749,7 +9238,7 @@ paths:
     post:
       operationId: stabilizeVideo
       tags:
-        - Tools
+        - Video
       summary: 비디오 안정화
       description: 2패스 안정화로 카메라 흔들림을 줄입니다.
       security:
@@ -8780,11 +9269,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -8814,7 +9314,7 @@ paths:
     post:
       operationId: gifToVideo
       tags:
-        - Tools
+        - Video
       summary: GIF를 비디오로
       description: 애니메이션 GIF를 MP4, WebM 또는 MOV 비디오로 변환합니다.
       security:
@@ -8862,7 +9362,7 @@ paths:
     post:
       operationId: videoToWebp
       tags:
-        - Tools
+        - Video
       summary: 비디오를 WebP로
       description: 비디오 클립을 애니메이션 WebP 이미지로 변환합니다.
       security:
@@ -8913,7 +9413,7 @@ paths:
     post:
       operationId: videoToFrames
       tags:
-        - Tools
+        - Video
       summary: 비디오를 프레임으로
       description: 비디오에서 프레임을 이미지 ZIP으로 추출합니다.
       security:
@@ -8964,7 +9464,7 @@ paths:
     post:
       operationId: mergeVideos
       tags:
-        - Tools
+        - Video
       summary: 비디오 병합
       description: |
         여러 비디오 클립을 하나의 MP4 파일로 이어붙입니다. 모든 입력은
@@ -8994,11 +9494,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9028,7 +9539,7 @@ paths:
     post:
       operationId: replaceAudio
       tags:
-        - Tools
+        - Video
       summary: 오디오 교체
       description: 비디오의 오디오 트랙을 다른 파일로 교체합니다.
       security:
@@ -9073,7 +9584,7 @@ paths:
     post:
       operationId: burnSubtitles
       tags:
-        - Tools
+        - Video
       summary: 자막 굽기
       description: 비디오 프레임에 자막을 영구적으로 렌더링합니다.
       security:
@@ -9106,11 +9617,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9140,7 +9662,7 @@ paths:
     post:
       operationId: embedSubtitles
       tags:
-        - Tools
+        - Video
       summary: 자막 삽입
       description: 자막 트랙을 비디오 컨테이너에 mux합니다.
       security:
@@ -9190,7 +9712,7 @@ paths:
     post:
       operationId: extractSubtitles
       tags:
-        - Tools
+        - Video
       summary: 자막 추출
       description: 비디오에서 자막 트랙을 SRT 파일로 추출합니다.
       security:
@@ -9233,7 +9755,7 @@ paths:
     post:
       operationId: imagesToVideo
       tags:
-        - Tools
+        - Video
       summary: 이미지를 비디오로
       description: 이미지 세트를 슬라이드쇼 비디오로 변환합니다.
       security:
@@ -9285,7 +9807,7 @@ paths:
     post:
       operationId: videoMetadata
       tags:
-        - Tools
+        - Video
       summary: 비디오 메타데이터 정리
       description: 비디오에서 메타데이터를 제거하고 발견된 내용을 보고합니다.
       security:
@@ -9328,7 +9850,7 @@ paths:
     post:
       operationId: autoSubtitles
       tags:
-        - Tools
+        - Video
       summary: 자동 자막
       description: |
         faster-whisper를 사용해 비디오 오디오 트랙에서 AI 기반 자막을
@@ -9363,11 +9885,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -9403,7 +9936,7 @@ paths:
     post:
       operationId: extractAudio
       tags:
-        - Tools
+        - Video
       summary: 오디오 추출
       description: 비디오에서 오디오 트랙을 추출합니다.
       security:
@@ -9451,7 +9984,7 @@ paths:
     post:
       operationId: convertAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 변환
       description: MP3, WAV, OGG 등의 형식 간에 오디오를 변환합니다.
       security:
@@ -9500,7 +10033,7 @@ paths:
     post:
       operationId: trimAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 트리밍
       description: 오디오 파일에서 구간을 잘라냅니다.
       security:
@@ -9549,7 +10082,7 @@ paths:
     post:
       operationId: volumeAdjust
       tags:
-        - Tools
+        - Audio
       summary: 볼륨 조정
       description: 고정 게인으로 오디오 볼륨을 높이거나 낮춥니다.
       security:
@@ -9597,7 +10130,7 @@ paths:
     post:
       operationId: normalizeAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 정규화
       description: 라우드니스를 방송 표준 수준(EBU R128, -16 LUFS)으로 고르게 맞춥니다.
       security:
@@ -9640,7 +10173,7 @@ paths:
     post:
       operationId: fadeAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 페이드
       description: 오디오에 페이드인 및 페이드아웃 효과를 추가합니다.
       security:
@@ -9689,7 +10222,7 @@ paths:
     post:
       operationId: reverseAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 역재생
       description: 오디오를 거꾸로 재생합니다.
       security:
@@ -9732,7 +10265,7 @@ paths:
     post:
       operationId: audioSpeed
       tags:
-        - Tools
+        - Audio
       summary: 오디오 속도
       description: 오디오 재생을 빠르게 하거나 느리게 합니다.
       security:
@@ -9780,7 +10313,7 @@ paths:
     post:
       operationId: pitchShift
       tags:
-        - Tools
+        - Audio
       summary: 피치 시프트
       description: 속도를 바꾸지 않고 반음 단위로 피치를 높이거나 낮춥니다.
       security:
@@ -9828,7 +10361,7 @@ paths:
     post:
       operationId: audioChannels
       tags:
-        - Tools
+        - Audio
       summary: 오디오 채널
       description: 모노, 스테레오 간 변환 또는 좌우 채널 교체를 수행합니다.
       security:
@@ -9876,7 +10409,7 @@ paths:
     post:
       operationId: removeSilence
       tags:
-        - Tools
+        - Audio
       summary: 무음 제거
       description: 오디오에서 무음 구간을 제거합니다.
       security:
@@ -9925,7 +10458,7 @@ paths:
     post:
       operationId: reduceNoise
       tags:
-        - Tools
+        - Audio
       summary: 노이즈 감소
       description: FFT 기반 노이즈 제거로 배경 소음을 줄입니다.
       security:
@@ -9973,7 +10506,7 @@ paths:
     post:
       operationId: mergeAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 병합
       description: 여러 오디오 파일을 하나의 순차 트랙으로 결합합니다.
       security:
@@ -10023,7 +10556,7 @@ paths:
     post:
       operationId: splitAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 분할
       description: |
         시간, 균등 분할 또는 무음 감지로 오디오를 분할합니다. 세그먼트의 ZIP
@@ -10077,7 +10610,7 @@ paths:
     post:
       operationId: ringtoneMaker
       tags:
-        - Tools
+        - Audio
       summary: 벨소리 제작기
       description: 모든 오디오 파일에서 벨소리 클립(.m4r)을 만듭니다.
       security:
@@ -10126,7 +10659,7 @@ paths:
     post:
       operationId: waveformImage
       tags:
-        - Tools
+        - Audio
       summary: 파형 이미지
       description: 오디오 파일에서 파형 시각화를 PNG 이미지로 생성합니다.
       security:
@@ -10176,7 +10709,7 @@ paths:
     post:
       operationId: audioMetadata
       tags:
-        - Tools
+        - Audio
       summary: 오디오 메타데이터
       description: |
         오디오 태그(ID3)를 보거나 편집하거나 제거합니다. 응답에는 표준
@@ -10230,7 +10763,7 @@ paths:
     post:
       operationId: transcribeAudio
       tags:
-        - Tools
+        - Audio
       summary: 오디오 전사
       description: |
         faster-whisper를 사용하는 AI 기반 음성-텍스트 전사입니다. 일반 텍스트,
@@ -10265,11 +10798,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10305,7 +10849,7 @@ paths:
     post:
       operationId: mergePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 병합
       description: 여러 PDF를 하나로 결합합니다. 최소 두 개의 파일이 필요합니다.
       security:
@@ -10350,7 +10894,7 @@ paths:
     post:
       operationId: splitPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 분할
       description: |
         페이지를 추출하거나 여러 부분으로 분할합니다. "range" 모드에서는 선택한
@@ -10403,7 +10947,7 @@ paths:
     post:
       operationId: compressPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 압축
       description: |
         포함된 이미지를 다운샘플링하여 PDF 파일 크기를 줄입니다. "quality"
@@ -10457,7 +11001,7 @@ paths:
     post:
       operationId: compressPdfTo100KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 100 KB로 압축
       description: |
         PDF를 100 KB 목표 크기로 압축합니다 (100 KB, 1 KB = 1000 바이트).
@@ -10492,11 +11036,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10520,7 +11075,7 @@ paths:
     post:
       operationId: compressPdfTo200KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 200 KB로 압축
       description: |
         PDF를 200 KB 목표 크기로 압축합니다 (200 KB, 1 KB = 1000 바이트).
@@ -10555,11 +11110,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10583,7 +11149,7 @@ paths:
     post:
       operationId: compressPdfTo500KbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 500 KB로 압축
       description: |
         PDF를 500 KB 목표 크기로 압축합니다 (500 KB, 1 KB = 1000 바이트).
@@ -10618,11 +11184,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10646,7 +11223,7 @@ paths:
     post:
       operationId: compressPdfTo1MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 1 MB로 압축
       description: |
         PDF를 1 MB 목표 크기로 압축합니다 (1000 KB, 1 KB = 1000 바이트).
@@ -10681,11 +11258,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10709,7 +11297,7 @@ paths:
     post:
       operationId: compressPdfTo2MbTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 2 MB로 압축
       description: |
         PDF를 2 MB 목표 크기로 압축합니다 (2000 KB, 1 KB = 1000 바이트).
@@ -10744,11 +11332,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -10772,7 +11371,7 @@ paths:
     post:
       operationId: rotatePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 회전
       description: PDF의 페이지를 90, 180 또는 270도 회전합니다.
       security:
@@ -10821,7 +11420,7 @@ paths:
     post:
       operationId: extractPages
       tags:
-        - Tools
+        - PDF
       summary: 페이지 추출
       description: 선택한 페이지를 새 PDF로 추출합니다.
       security:
@@ -10869,7 +11468,7 @@ paths:
     post:
       operationId: removePages
       tags:
-        - Tools
+        - PDF
       summary: 페이지 제거
       description: PDF에서 특정 페이지를 삭제합니다. 모든 페이지를 제거할 수는 없습니다.
       security:
@@ -10917,7 +11516,7 @@ paths:
     post:
       operationId: organizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 정리
       description: 명시적 페이지 순서로 페이지를 재정렬합니다.
       security:
@@ -10965,7 +11564,7 @@ paths:
     post:
       operationId: multiToolPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 멀티 도구
       description: 명시적인 페이지 계획으로 PDF를 조립합니다 - 페이지 재정렬, 복제, 회전 또는 삭제와 추가 PDF에서 페이지 가져오기를 한 번의 제출로 수행합니다.
       security:
@@ -11016,7 +11615,7 @@ paths:
     post:
       operationId: protectPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 보호
       description: AES-256 암호화로 비밀번호 보호를 추가합니다. 비밀번호는 감사 로그에서 삭제됩니다.
       security:
@@ -11065,7 +11664,7 @@ paths:
     post:
       operationId: unlockPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 잠금 해제
       description: PDF의 비밀번호 보호를 제거합니다. 올바른 비밀번호를 제공해야 합니다. 비밀번호는 감사 로그에서 삭제됩니다.
       security:
@@ -11113,7 +11712,7 @@ paths:
     post:
       operationId: repairPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 복구
       description: 손상되었거나 깨진 PDF의 복구를 시도합니다. 형식이 잘못된 파일을 허용하기 위해 입력 시 구조 검증을 건너뜁니다.
       security:
@@ -11156,7 +11755,7 @@ paths:
     post:
       operationId: linearizePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 웹 최적화
       description: 빠른 웹 보기(progressive download)를 위해 PDF를 linearize합니다.
       security:
@@ -11199,7 +11798,7 @@ paths:
     post:
       operationId: grayscalePdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 그레이스케일
       description: PDF의 모든 색상을 그레이스케일로 변환합니다.
       security:
@@ -11242,7 +11841,7 @@ paths:
     post:
       operationId: pdfaConvert
       tags:
-        - Tools
+        - PDF
       summary: PDF/A 변환기
       description: 장기 보존을 위해 PDF를 보관용 PDF/A-2 형식으로 변환합니다.
       security:
@@ -11285,7 +11884,7 @@ paths:
     post:
       operationId: cropPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 자르기
       description: 모든 페이지를 균일한 여백으로 자릅니다.
       security:
@@ -11333,7 +11932,7 @@ paths:
     post:
       operationId: nupPdf
       tags:
-        - Tools
+        - PDF
       summary: 한 장에 여러 페이지 (N-up)
       description: '한 장에 여러 페이지를 배치합니다(예: 2-up, 4-up).'
       security:
@@ -11381,7 +11980,7 @@ paths:
     post:
       operationId: bookletPdf
       tags:
-        - Tools
+        - PDF
       summary: 소책자 PDF
       description: 소책자로 접을 수 있도록 페이지를 배치합니다(양면 인쇄용 imposition).
       security:
@@ -11429,7 +12028,7 @@ paths:
     post:
       operationId: watermarkPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 워터마크
       description: PDF의 모든 페이지에 텍스트 워터마크를 추가합니다.
       security:
@@ -11481,7 +12080,7 @@ paths:
     post:
       operationId: pdfPageNumbers
       tags:
-        - Tools
+        - PDF
       summary: PDF 페이지 번호
       description: PDF의 모든 페이지에 페이지 번호("Page N of M")를 추가합니다.
       security:
@@ -11530,7 +12129,7 @@ paths:
     post:
       operationId: convertDocument
       tags:
-        - Tools
+        - Files
       summary: 문서 변환
       description: Word, OpenDocument, RTF, 일반 텍스트 형식 간에 변환합니다.
       security:
@@ -11561,11 +12160,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11589,7 +12199,7 @@ paths:
     post:
       operationId: convertPresentation
       tags:
-        - Tools
+        - Files
       summary: 프레젠테이션 변환
       description: PowerPoint와 OpenDocument 프레젠테이션 형식 간에 변환합니다.
       security:
@@ -11620,11 +12230,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11648,7 +12269,7 @@ paths:
     post:
       operationId: convertSpreadsheet
       tags:
-        - Tools
+        - Files
       summary: 스프레드시트 변환
       description: Excel, OpenDocument, CSV 형식 간에 변환합니다. 다중 시트 워크북은 첫 번째 시트를 CSV로 내보냅니다.
       security:
@@ -11679,11 +12300,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11707,7 +12339,7 @@ paths:
     post:
       operationId: excelToPdf
       tags:
-        - Tools
+        - Files
       summary: Excel을 PDF로
       description: 스프레드시트를 PDF로 변환합니다. 넓은 시트는 여러 페이지에 걸쳐 나뉠 수 있습니다.
       security:
@@ -11733,11 +12365,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11761,7 +12404,7 @@ paths:
     post:
       operationId: wordToPdf
       tags:
-        - Tools
+        - Files
       summary: Word를 PDF로
       description: Word 문서를 PDF로 변환합니다.
       security:
@@ -11787,11 +12430,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11815,7 +12469,7 @@ paths:
     post:
       operationId: powerpointToPdf
       tags:
-        - Tools
+        - Files
       summary: PowerPoint를 PDF로
       description: 프레젠테이션을 PDF로 변환합니다.
       security:
@@ -11841,11 +12495,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11869,7 +12534,7 @@ paths:
     post:
       operationId: htmlToPdf
       tags:
-        - Tools
+        - Files
       summary: HTML을 PDF로
       description: HTML 파일을 PDF로 변환합니다. 개인정보 보호를 위해 원격 리소스는 비활성화됩니다.
       security:
@@ -11895,11 +12560,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -11923,7 +12599,7 @@ paths:
     post:
       operationId: markdownToDocx
       tags:
-        - Tools
+        - Files
       summary: Markdown을 Word로
       description: Markdown 파일을 Word 문서(DOCX)로 변환합니다.
       security:
@@ -11966,7 +12642,7 @@ paths:
     post:
       operationId: markdownToHtml
       tags:
-        - Tools
+        - Files
       summary: Markdown을 HTML로
       description: Markdown 파일을 독립 실행형 HTML 페이지로 변환합니다. 원본의 원격 이미지는 출력에서 그대로 유지됩니다.
       security:
@@ -12009,7 +12685,7 @@ paths:
     post:
       operationId: markdownToPdf
       tags:
-        - Tools
+        - Files
       summary: Markdown을 PDF로
       description: Markdown 파일을 스타일이 적용된 PDF로 변환합니다. 개인정보 보호를 위해 원격 리소스는 비활성화됩니다.
       security:
@@ -12035,11 +12711,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12063,7 +12750,7 @@ paths:
     post:
       operationId: epubConvert
       tags:
-        - Tools
+        - Files
       summary: EPUB에서 변환
       description: EPUB를 PDF, DOCX, HTML 또는 Markdown으로 변환합니다. 책 내부의 원격 리소스는 가져오지 않습니다.
       security:
@@ -12094,11 +12781,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12122,7 +12820,7 @@ paths:
     post:
       operationId: toEpub
       tags:
-        - Tools
+        - Files
       summary: EPUB로 변환
       description: Word, Markdown, HTML 또는 일반 텍스트 파일을 EPUB로 변환합니다.
       security:
@@ -12148,11 +12846,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12176,7 +12885,7 @@ paths:
     post:
       operationId: flattenPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 플래튼
       description: 양식과 주석을 페이지 콘텐츠에 병합합니다.
       security:
@@ -12219,7 +12928,7 @@ paths:
     post:
       operationId: redactPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF 편집 삭제
       description: 텍스트 항목을 영구적으로 제거합니다(검증된 실제 편집 삭제).
       security:
@@ -12274,7 +12983,7 @@ paths:
     post:
       operationId: pdfToText
       tags:
-        - Tools
+        - PDF
       summary: PDF를 텍스트로
       description: PDF에서 일반 텍스트를 추출합니다.
       security:
@@ -12323,7 +13032,7 @@ paths:
     post:
       operationId: pdfToWord
       tags:
-        - Tools
+        - PDF
       summary: PDF를 Word로
       description: 텍스트 기반 PDF에 가장 적합합니다. 스캔된 페이지는 OCR이 필요합니다.
       security:
@@ -12349,11 +13058,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -12377,7 +13097,7 @@ paths:
     post:
       operationId: pdfMetadata
       tags:
-        - Tools
+        - PDF
       summary: PDF 메타데이터
       description: PDF 문서 메타데이터를 읽고 씁니다.
       security:
@@ -12434,7 +13154,7 @@ paths:
     post:
       operationId: ocrPdf
       tags:
-        - Tools
+        - PDF
       summary: PDF OCR
       description: |-
         스캔한 PDF 문서에서 페이지별로 텍스트를 추출합니다. Fast는
@@ -12474,6 +13194,11 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -12482,6 +13207,12 @@ paths:
                   - jobId
                   - async
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   progressJobId:
@@ -12531,7 +13262,7 @@ paths:
     post:
       operationId: chartMaker
       tags:
-        - Tools
+        - Files
       summary: 차트 제작기
       description: CSV 또는 JSON 데이터로부터 막대, 선 또는 원형 차트를 생성합니다. PNG 이미지를 반환합니다. 값 셀에 숫자가 아닌 텍스트가 들어 있어 제외된 행이 있는 경우, 응답에 `chartRows` ({charted, skipped})이 추가됩니다. 빈 행은 계산되지 않습니다.
       security:
@@ -12582,7 +13313,7 @@ paths:
     post:
       operationId: csvExcel
       tags:
-        - Tools
+        - Files
       summary: CSV를 Excel로
       description: CSV와 Excel(XLSX) 간에 양방향으로 변환합니다. CSV 또는 TSV 파일을 업로드하면 XLSX가, XLSX 파일을 업로드하면 CSV가 생성됩니다.
       security:
@@ -12630,7 +13361,7 @@ paths:
     post:
       operationId: csvJson
       tags:
-        - Tools
+        - Files
       summary: CSV를 JSON으로
       description: CSV와 JSON 간에 양방향으로 변환합니다. CSV 또는 TSV 파일을 업로드하면 JSON이, 객체의 JSON 배열을 업로드하면 CSV가 생성됩니다.
       security:
@@ -12678,7 +13409,7 @@ paths:
     post:
       operationId: jsonXml
       tags:
-        - Tools
+        - Files
       summary: JSON을 XML로
       description: JSON과 XML 간에 양방향으로 변환합니다. JSON 파일을 업로드하면 XML이, XML 파일을 업로드하면 JSON이 생성됩니다.
       security:
@@ -12726,7 +13457,7 @@ paths:
     post:
       operationId: splitCsv
       tags:
-        - Tools
+        - Files
       summary: CSV 분할
       description: CSV 파일을 행 수에 따라 더 작은 파일로 분할합니다. 부분들이 담긴 ZIP 아카이브를 반환합니다.
       security:
@@ -12775,7 +13506,7 @@ paths:
     post:
       operationId: mergeCsvs
       tags:
-        - Tools
+        - Files
       summary: CSV 병합
       description: 열이 일치하는 여러 CSV 또는 TSV 파일을 하나의 병합된 파일로 결합합니다. 모든 파일의 열 헤더가 동일해야 합니다.
       security:
@@ -12820,7 +13551,7 @@ paths:
     post:
       operationId: yamlJson
       tags:
-        - Tools
+        - Files
       summary: YAML / JSON 변환
       description: YAML과 JSON 간에 양방향으로 변환합니다. YAML 파일을 업로드하면 JSON이, JSON 파일을 업로드하면 YAML이 생성됩니다.
       security:
@@ -12863,7 +13594,7 @@ paths:
     post:
       operationId: xmlToCsv
       tags:
-        - Tools
+        - Files
       summary: XML을 CSV로
       description: XML 파일에서 반복되는 요소를 CSV 테이블로 추출합니다. XML 트리에서 객체의 첫 번째 배열을 자동으로 찾습니다.
       security:
@@ -12906,7 +13637,7 @@ paths:
     post:
       operationId: createZip
       tags:
-        - Tools
+        - Files
       summary: ZIP 생성
       description: 여러 파일을 단일 ZIP 아카이브로 묶습니다. 중복된 파일 이름은 자동으로 중복 제거됩니다.
       security:
@@ -12951,7 +13682,7 @@ paths:
     post:
       operationId: extractZip
       tags:
-        - Tools
+        - Files
       summary: ZIP 추출
       description: bomb 보호와 함께 ZIP 아카이브에서 파일을 안전하게 추출합니다. 단일 파일 아카이브는 파일을 직접 반환하고, 다중 파일 아카이브는 플랫 ZIP을 반환합니다.
       security:
@@ -12994,7 +13725,7 @@ paths:
     post:
       operationId: backgroundReplace
       tags:
-        - Tools
+        - Image
       summary: 배경 교체
       description: |
         AI 기반 배경 교체입니다. 피사체의 배경을 제거하고 단색 또는
@@ -13034,11 +13765,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13074,7 +13816,7 @@ paths:
     post:
       operationId: blurBackground
       tags:
-        - Tools
+        - Image
       summary: 배경 흐리기
       description: |
         AI 기반 배경 흐리기입니다. 배경을 제거하고 원본을 흐리게 한 다음
@@ -13110,11 +13852,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -13150,7 +13903,7 @@ paths:
     post:
       operationId: generateBarcode
       tags:
-        - Tools
+        - Image
       summary: 바코드 생성기
       description: 텍스트에서 바코드 이미지를 생성합니다. 이 도구는 multipart가 아닌 JSON 본문을 받습니다.
       security:
@@ -13213,7 +13966,7 @@ paths:
     post:
       operationId: circleCrop
       tags:
-        - Tools
+        - Image
       summary: 원형 자르기
       description: 투명한 모서리, 선택적 테두리, 조정 가능한 확대/오프셋과 함께 이미지를 중앙 정렬 원형으로 자릅니다.
       security:
@@ -13267,7 +14020,7 @@ paths:
     post:
       operationId: roundedCrop
       tags:
-        - Tools
+        - Image
       summary: 둥근 모서리 크롭
       description: 투명한 모서리, 선택적 테두리, 조정 가능한 확대/축소/오프셋을 사용하여 이미지를 둥근 정사각형이나 곡선 모양으로 자릅니다.
       security:
@@ -13323,7 +14076,7 @@ paths:
     post:
       operationId: duotone
       tags:
-        - Tools
+        - Image
       summary: 듀오톤
       description: 사용자 지정 그림자 및 하이라이트 색상으로 2색 듀오톤 효과를 적용합니다.
       security:
@@ -13373,7 +14126,7 @@ paths:
     post:
       operationId: imagePad
       tags:
-        - Tools
+        - Image
       summary: 이미지 패딩
       description: 단색, 투명 또는 흐린 배경으로 이미지를 목표 종횡비에 맞게 패딩합니다.
       security:
@@ -13426,7 +14179,7 @@ paths:
     post:
       operationId: pixelate
       tags:
-        - Tools
+        - Image
       summary: 픽셀화
       description: 전체 이미지 또는 특정 직사각형 영역에 픽셀화 효과를 적용합니다.
       security:
@@ -13479,7 +14232,7 @@ paths:
     post:
       operationId: vignette
       tags:
-        - Tools
+        - Image
       summary: 비네트
       description: 조정 가능한 강도, 색상, 반경, 부드러움, 둥글기, 중심 위치로 비네트 효과를 추가합니다.
       security:
@@ -13533,7 +14286,7 @@ paths:
     post:
       operationId: gifWebp
       tags:
-        - Tools
+        - Image
       summary: GIF/WebP 변환기
       description: 모든 프레임을 보존하면서 애니메이션 GIF를 WebP로, 그 반대로 변환합니다. .gif 및 .webp 입력만 받습니다.
       security:
@@ -13583,7 +14336,7 @@ paths:
     post:
       operationId: histogram
       tags:
-        - Tools
+        - Image
       summary: 히스토그램
       description: |
         이미지에서 RGB 히스토그램 차트를 생성합니다. PNG 히스토그램 이미지와
@@ -13717,7 +14470,7 @@ paths:
     post:
       operationId: lqipPlaceholder
       tags:
-        - Tools
+        - Image
       summary: LQIP 플레이스홀더
       description: |
         작은 저품질 이미지 플레이스홀더를 생성합니다. 작은 이미지 파일과
@@ -13796,7 +14549,7 @@ paths:
     post:
       operationId: spriteSheet
       tags:
-        - Tools
+        - Image
       summary: 스프라이트 시트
       description: |
         여러 이미지를 단일 스프라이트 시트 격자로 결합합니다. 2개에서
@@ -13891,7 +14644,7 @@ paths:
     post:
       operationId: passportPhotoTool
       tags:
-        - Tools
+        - Image
       summary: 여권 사진
       description: |
         2단계 여권 사진 흐름을 위한 안내 엔드포인트입니다. 이미지를
@@ -13924,7 +14677,7 @@ paths:
     post:
       operationId: signPdfTool
       tags:
-        - Tools
+        - PDF
       summary: PDF 서명
       description: 정규화된 페이지 배치를 사용해 하나 이상의 서명 PNG 이미지를 PDF에 스탬프합니다.
       security:
@@ -13968,11 +14721,22 @@ paths:
                 $ref: '#/components/schemas/ToolResponse'
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -14002,7 +14766,7 @@ paths:
     post:
       operationId: jpgToPngTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 PNG로
       description: |
         JPG를 PNG로 변환
@@ -14063,7 +14827,7 @@ paths:
     post:
       operationId: pngToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 JPG로
       description: |
         PNG를 JPG로 변환
@@ -14124,7 +14888,7 @@ paths:
     post:
       operationId: jpgToWebpTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 WebP로
       description: |
         JPG를 WebP로 변환
@@ -14185,7 +14949,7 @@ paths:
     post:
       operationId: pngToWebpTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 WebP로
       description: |
         PNG를 WebP로 변환
@@ -14246,7 +15010,7 @@ paths:
     post:
       operationId: webpToJpgTool
       tags:
-        - Tools
+        - Image
       summary: WebP를 JPG로
       description: |
         WebP를 JPG로 변환
@@ -14307,7 +15071,7 @@ paths:
     post:
       operationId: webpToPngTool
       tags:
-        - Tools
+        - Image
       summary: WebP를 PNG로
       description: |
         WebP를 PNG로 변환
@@ -14368,7 +15132,7 @@ paths:
     post:
       operationId: jpgToAvifTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 AVIF로
       description: |
         JPG를 AVIF로 변환
@@ -14429,7 +15193,7 @@ paths:
     post:
       operationId: pngToAvifTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 AVIF로
       description: |
         PNG를 AVIF로 변환
@@ -14490,7 +15254,7 @@ paths:
     post:
       operationId: webpToAvifTool
       tags:
-        - Tools
+        - Image
       summary: WebP를 AVIF로
       description: |
         WebP를 AVIF로 변환
@@ -14551,7 +15315,7 @@ paths:
     post:
       operationId: heicToJpgTool
       tags:
-        - Tools
+        - Image
       summary: HEIC를 JPG로
       description: |
         HEIC를 JPG로 변환
@@ -14612,7 +15376,7 @@ paths:
     post:
       operationId: heicToPngTool
       tags:
-        - Tools
+        - Image
       summary: HEIC를 PNG로
       description: |
         HEIC를 PNG로 변환
@@ -14673,7 +15437,7 @@ paths:
     post:
       operationId: heicToAvifTool
       tags:
-        - Tools
+        - Image
       summary: HEIC를 AVIF로
       description: |
         HEIC를 AVIF로 변환
@@ -14734,7 +15498,7 @@ paths:
     post:
       operationId: jpgToGifTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 GIF로
       description: |
         JPG를 GIF로 변환
@@ -14795,7 +15559,7 @@ paths:
     post:
       operationId: pngToGifTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 GIF로
       description: |
         PNG를 GIF로 변환
@@ -14856,7 +15620,7 @@ paths:
     post:
       operationId: gifToJpgTool
       tags:
-        - Tools
+        - Image
       summary: GIF를 JPG로
       description: |
         GIF를 JPG로 변환
@@ -14917,7 +15681,7 @@ paths:
     post:
       operationId: gifToPngTool
       tags:
-        - Tools
+        - Image
       summary: GIF를 PNG로
       description: |
         GIF를 PNG로 변환
@@ -14978,7 +15742,7 @@ paths:
     post:
       operationId: webpToGifTool
       tags:
-        - Tools
+        - Image
       summary: WebP를 GIF로
       description: |
         WebP를 GIF로 변환
@@ -15039,7 +15803,7 @@ paths:
     post:
       operationId: jpgToTiffTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 TIFF로
       description: |
         JPG를 TIFF로 변환
@@ -15100,7 +15864,7 @@ paths:
     post:
       operationId: pngToTiffTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 TIFF로
       description: |
         PNG를 TIFF로 변환
@@ -15161,7 +15925,7 @@ paths:
     post:
       operationId: tiffToJpgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF를 JPG로
       description: |
         TIFF를 JPG로 변환
@@ -15222,7 +15986,7 @@ paths:
     post:
       operationId: tiffToPngTool
       tags:
-        - Tools
+        - Image
       summary: TIFF를 PNG로
       description: |
         TIFF를 PNG로 변환
@@ -15283,7 +16047,7 @@ paths:
     post:
       operationId: psdToJpgTool
       tags:
-        - Tools
+        - Image
       summary: PSD를 JPG로
       description: |
         PSD를 JPG로 변환
@@ -15344,7 +16108,7 @@ paths:
     post:
       operationId: psdToPngTool
       tags:
-        - Tools
+        - Image
       summary: PSD를 PNG로
       description: |
         PSD를 PNG로 변환
@@ -15405,7 +16169,7 @@ paths:
     post:
       operationId: pngToEpsTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 EPS로
       description: |
         PNG를 EPS로 변환
@@ -15466,7 +16230,7 @@ paths:
     post:
       operationId: jpgToEpsTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 EPS로
       description: |
         JPG를 EPS로 변환
@@ -15527,7 +16291,7 @@ paths:
     post:
       operationId: epsToPngTool
       tags:
-        - Tools
+        - Image
       summary: EPS를 PNG로
       description: |
         EPS를 PNG로 변환
@@ -15588,7 +16352,7 @@ paths:
     post:
       operationId: epsToJpgTool
       tags:
-        - Tools
+        - Image
       summary: EPS를 JPG로
       description: |
         EPS를 JPG로 변환
@@ -15649,7 +16413,7 @@ paths:
     post:
       operationId: pngToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 SVG로
       description: |
         PNG를 SVG로 변환
@@ -15710,7 +16474,7 @@ paths:
     post:
       operationId: jpgToSvgTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 SVG로
       description: |
         JPG를 SVG로 변환
@@ -15771,7 +16535,7 @@ paths:
     post:
       operationId: tiffToSvgTool
       tags:
-        - Tools
+        - Image
       summary: TIFF를 SVG로
       description: |
         TIFF를 SVG로 변환
@@ -15832,7 +16596,7 @@ paths:
     post:
       operationId: psdToSvgTool
       tags:
-        - Tools
+        - Image
       summary: PSD를 SVG로
       description: |
         PSD를 SVG로 변환
@@ -15893,7 +16657,7 @@ paths:
     post:
       operationId: epsToSvgTool
       tags:
-        - Tools
+        - Image
       summary: EPS를 SVG로
       description: |
         EPS를 SVG로 변환
@@ -15954,7 +16718,7 @@ paths:
     post:
       operationId: svgToPngTool
       tags:
-        - Tools
+        - Image
       summary: SVG를 PNG로
       description: |
         SVG를 PNG로 변환
@@ -16010,7 +16774,7 @@ paths:
     post:
       operationId: svgToJpgTool
       tags:
-        - Tools
+        - Image
       summary: SVG를 JPG로
       description: |
         SVG를 JPG로 변환
@@ -16066,7 +16830,7 @@ paths:
     post:
       operationId: jpgToPdfTool
       tags:
-        - Tools
+        - Image
       summary: JPG를 PDF로
       description: |
         JPG를 PDF로 변환
@@ -16124,7 +16888,7 @@ paths:
     post:
       operationId: pngToPdfTool
       tags:
-        - Tools
+        - Image
       summary: PNG를 PDF로
       description: |
         PNG를 PDF로 변환
@@ -16182,7 +16946,7 @@ paths:
     post:
       operationId: heicToPdfTool
       tags:
-        - Tools
+        - Image
       summary: HEIC를 PDF로
       description: |
         HEIC를 PDF로 변환
@@ -16240,7 +17004,7 @@ paths:
     post:
       operationId: tiffToPdfTool
       tags:
-        - Tools
+        - Image
       summary: TIFF를 PDF로
       description: |
         TIFF를 PDF로 변환
@@ -16298,7 +17062,7 @@ paths:
     post:
       operationId: webpToPdfTool
       tags:
-        - Tools
+        - Image
       summary: WebP를 PDF로
       description: |
         WebP를 PDF로 변환
@@ -16356,7 +17120,7 @@ paths:
     post:
       operationId: gifToPdfTool
       tags:
-        - Tools
+        - Image
       summary: GIF를 PDF로
       description: |
         GIF를 PDF로 변환
@@ -16414,7 +17178,7 @@ paths:
     post:
       operationId: epsToPdfTool
       tags:
-        - Tools
+        - Image
       summary: EPS를 PDF로
       description: |
         EPS를 PDF로 변환
@@ -16472,7 +17236,7 @@ paths:
     post:
       operationId: pdfToJpgTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 JPG로
       description: |
         PDF를 JPG로 변환
@@ -16528,7 +17292,7 @@ paths:
     post:
       operationId: pdfToPngTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 PNG로
       description: |
         PDF를 PNG로 변환
@@ -16584,7 +17348,7 @@ paths:
     post:
       operationId: pdfToTiffTool
       tags:
-        - Tools
+        - PDF
       summary: PDF를 TIFF로
       description: |
         PDF를 TIFF로 변환
@@ -16640,7 +17404,7 @@ paths:
     post:
       operationId: movToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MOV를 MP4로
       description: |
         MOV를 MP4로 변환
@@ -16673,11 +17437,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16707,7 +17482,7 @@ paths:
     post:
       operationId: webmToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM을 MP4로
       description: |
         WEBM을 MP4로 변환
@@ -16740,11 +17515,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16774,7 +17560,7 @@ paths:
     post:
       operationId: mkvToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: MKV를 MP4로
       description: |
         MKV를 MP4로 변환
@@ -16807,11 +17593,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16841,7 +17638,7 @@ paths:
     post:
       operationId: aviToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: AVI를 MP4로
       description: |
         AVI를 MP4로 변환
@@ -16874,11 +17671,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16908,7 +17716,7 @@ paths:
     post:
       operationId: mp4ToMovTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 MOV로
       description: |
         MP4를 MOV로 변환
@@ -16941,11 +17749,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -16975,7 +17794,7 @@ paths:
     post:
       operationId: mp4ToWebmTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 WEBM으로
       description: |
         MP4를 WEBM으로 변환
@@ -17008,11 +17827,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17042,7 +17872,7 @@ paths:
     post:
       operationId: webmToMovTool
       tags:
-        - Tools
+        - Video
       summary: WEBM을 MOV로
       description: |
         WEBM을 MOV로 변환
@@ -17075,11 +17905,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17109,7 +17950,7 @@ paths:
     post:
       operationId: mkvToMovTool
       tags:
-        - Tools
+        - Video
       summary: MKV를 MOV로
       description: |
         MKV를 MOV로 변환
@@ -17142,11 +17983,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17176,7 +18028,7 @@ paths:
     post:
       operationId: aviToMovTool
       tags:
-        - Tools
+        - Video
       summary: AVI를 MOV로
       description: |
         AVI를 MOV로 변환
@@ -17209,11 +18061,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17243,7 +18106,7 @@ paths:
     post:
       operationId: mp4ToAviTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 AVI로
       description: |
         MP4를 AVI로 변환
@@ -17276,11 +18139,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17310,7 +18184,7 @@ paths:
     post:
       operationId: movToAviTool
       tags:
-        - Tools
+        - Video
       summary: MOV를 AVI로
       description: |
         MOV를 AVI로 변환
@@ -17343,11 +18217,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17377,7 +18262,7 @@ paths:
     post:
       operationId: mkvToAviTool
       tags:
-        - Tools
+        - Video
       summary: MKV를 AVI로
       description: |
         MKV를 AVI로 변환
@@ -17410,11 +18295,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17444,7 +18340,7 @@ paths:
     post:
       operationId: aviToMkvTool
       tags:
-        - Tools
+        - Video
       summary: AVI를 MKV로
       description: |
         AVI를 MKV로 변환
@@ -17477,11 +18373,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17511,7 +18418,7 @@ paths:
     post:
       operationId: mp4ToGifTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 GIF로
       description: |
         MP4를 GIF로 변환
@@ -17544,11 +18451,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17578,7 +18496,7 @@ paths:
     post:
       operationId: movToGifTool
       tags:
-        - Tools
+        - Video
       summary: MOV를 GIF로
       description: |
         MOV를 GIF로 변환
@@ -17611,11 +18529,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17645,7 +18574,7 @@ paths:
     post:
       operationId: mkvToGifTool
       tags:
-        - Tools
+        - Video
       summary: MKV를 GIF로
       description: |
         MKV를 GIF로 변환
@@ -17678,11 +18607,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17712,7 +18652,7 @@ paths:
     post:
       operationId: aviToGifTool
       tags:
-        - Tools
+        - Video
       summary: AVI를 GIF로
       description: |
         AVI를 GIF로 변환
@@ -17745,11 +18685,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -17779,7 +18730,7 @@ paths:
     post:
       operationId: gifToMp4Tool
       tags:
-        - Tools
+        - Video
       summary: GIF를 MP4로
       description: |
         GIF를 MP4로 변환
@@ -17840,7 +18791,7 @@ paths:
     post:
       operationId: gifToWebmTool
       tags:
-        - Tools
+        - Video
       summary: GIF를 WEBM으로
       description: |
         GIF를 WEBM으로 변환
@@ -17901,7 +18852,7 @@ paths:
     post:
       operationId: gifToMovTool
       tags:
-        - Tools
+        - Video
       summary: GIF를 MOV로
       description: |
         GIF를 MOV로 변환
@@ -17962,7 +18913,7 @@ paths:
     post:
       operationId: mp4ToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MP4를 MP3로
       description: |
         MP4를 MP3로 변환
@@ -18023,7 +18974,7 @@ paths:
     post:
       operationId: movToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MOV를 MP3로
       description: |
         MOV를 MP3로 변환
@@ -18084,7 +19035,7 @@ paths:
     post:
       operationId: mkvToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: MKV를 MP3로
       description: |
         MKV를 MP3로 변환
@@ -18145,7 +19096,7 @@ paths:
     post:
       operationId: webmToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: WEBM을 MP3로
       description: |
         WEBM을 MP3로 변환
@@ -18206,7 +19157,7 @@ paths:
     post:
       operationId: aviToMp3Tool
       tags:
-        - Tools
+        - Video
       summary: AVI를 MP3로
       description: |
         AVI를 MP3로 변환
@@ -18267,7 +19218,7 @@ paths:
     post:
       operationId: mp4ToWavTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 WAV로
       description: |
         MP4를 WAV로 변환
@@ -18328,7 +19279,7 @@ paths:
     post:
       operationId: movToWavTool
       tags:
-        - Tools
+        - Video
       summary: MOV를 WAV로
       description: |
         MOV를 WAV로 변환
@@ -18389,7 +19340,7 @@ paths:
     post:
       operationId: mp4ToOggTool
       tags:
-        - Tools
+        - Video
       summary: MP4를 OGG로
       description: |
         MP4를 OGG로 변환
@@ -18450,7 +19401,7 @@ paths:
     post:
       operationId: m4aToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: M4A를 MP3로
       description: |
         M4A를 MP3로 변환
@@ -18511,7 +19462,7 @@ paths:
     post:
       operationId: m4aToWavTool
       tags:
-        - Tools
+        - Audio
       summary: M4A를 WAV로
       description: |
         M4A를 WAV로 변환
@@ -18572,7 +19523,7 @@ paths:
     post:
       operationId: aacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: AAC를 MP3로
       description: |
         AAC를 MP3로 변환
@@ -18633,7 +19584,7 @@ paths:
     post:
       operationId: aacToWavTool
       tags:
-        - Tools
+        - Audio
       summary: AAC를 WAV로
       description: |
         AAC를 WAV로 변환
@@ -18694,7 +19645,7 @@ paths:
     post:
       operationId: aacToFlacTool
       tags:
-        - Tools
+        - Audio
       summary: AAC를 FLAC로
       description: |
         AAC를 FLAC로 변환
@@ -18755,7 +19706,7 @@ paths:
     post:
       operationId: oggToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: OGG를 MP3로
       description: |
         OGG를 MP3로 변환
@@ -18816,7 +19767,7 @@ paths:
     post:
       operationId: oggToWavTool
       tags:
-        - Tools
+        - Audio
       summary: OGG를 WAV로
       description: |
         OGG를 WAV로 변환
@@ -18877,7 +19828,7 @@ paths:
     post:
       operationId: wavToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: WAV를 MP3로
       description: |
         WAV를 MP3로 변환
@@ -18938,7 +19889,7 @@ paths:
     post:
       operationId: mp3ToWavTool
       tags:
-        - Tools
+        - Audio
       summary: MP3를 WAV로
       description: |
         MP3를 WAV로 변환
@@ -18999,7 +19950,7 @@ paths:
     post:
       operationId: flacToMp3Tool
       tags:
-        - Tools
+        - Audio
       summary: FLAC를 MP3로
       description: |
         FLAC를 MP3로 변환
@@ -19060,7 +20011,7 @@ paths:
     post:
       operationId: excelToCsvTool
       tags:
-        - Tools
+        - Files
       summary: Excel을 CSV로
       description: |
         Excel을 CSV로 변환
@@ -19093,11 +20044,22 @@ paths:
       responses:
         '202':
           description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
                   jobId:
                     type: string
                   async:
@@ -19236,6 +20198,58 @@ paths:
           description: No pending enrollment or invalid body
         '401':
           description: Invalid TOTP code
+  /api/auth/mfa/enroll-complete:
+    post:
+      operationId: completeMfaEnrollment
+      tags:
+        - Auth
+      security: []
+      summary: 강제 MFA 등록 완료
+      description: 로그인 중 시작된 강제 등록을 확인하고 세션을 반환합니다. 이 호출은 세션 게이트를 거치지 않으며, 수명이 짧은 등록 토큰이 세션을 대신합니다. 여기서는 TOTP 코드만 허용되고 복구 코드는 허용되지 않습니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollmentToken
+                - code
+              properties:
+                enrollmentToken:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: Enrollment confirmed and session created. The session token is returned as it is at login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          description: Missing enrollment token or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired enrollment token, or wrong code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/auth/mfa/complete:
     post:
       operationId: completeMfaLogin
@@ -19402,7 +20416,7 @@ paths:
           description: Could not generate preview
   /api/v1/preview/generate:
     post:
-      operationId: generatePreview
+      operationId: generateUploadPreview
       tags:
         - Files
       summary: 업로드 미리보기 생성
@@ -19751,6 +20765,69 @@ paths:
       responses:
         '200':
           description: SCIM user deactivated
+    patch:
+      operationId: patchScimUser
+      tags:
+        - Enterprise
+      summary: SCIM 사용자 부분 업데이트
+      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 사용자 경로는 작업마다 검증됩니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
@@ -19816,6 +20893,69 @@ paths:
       responses:
         '204':
           description: SCIM group deleted
+    patch:
+      operationId: patchScimGroup
+      tags:
+        - Enterprise
+      summary: SCIM 그룹 부분 업데이트
+      description: RFC 7644 PatchOp입니다. 서버가 허용하는 경로에 대해 add, remove, replace를 지원합니다. 그룹 멤버는 작업마다 검증됩니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Operations
+              properties:
+                Operations:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - op
+                    properties:
+                      op:
+                        type: string
+                        enum:
+                          - add
+                          - remove
+                          - replace
+                      path:
+                        type: string
+                      value: {}
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Invalid PatchOp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/enterprise/audit/export:
     get:
       operationId: exportAuditLog
@@ -20062,7 +21202,29 @@ paths:
             type: string
       responses:
         '202':
-          description: Export job started
+          description: Export started. Poll statusUrl for the result. The same URL is in the Location header.
+          headers:
+            Location:
+              description: Status URL for the export (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - jobId
+                  - message
+                  - statusUrl
+                properties:
+                  jobId:
+                    type: string
+                  message:
+                    type: string
+                    example: Export started
+                  statusUrl:
+                    type: string
+                    example: /api/v1/enterprise/users/0b7e/export/9d1c
         '403':
           description: Feature not licensed or insufficient permissions
         '404':
@@ -20258,13 +21420,33 @@ x-i18n:
       provenance: machine
       outputHash: 80d901e1b23f
     tags.Tools.description:
-      sourceHash: 9c71553d06df
+      sourceHash: 0f3ee28f3b19
       provenance: machine
-      outputHash: f3e1cf81071e
+      outputHash: 363b2b62698b
+    tags.Image.description:
+      sourceHash: 74856faf62a4
+      provenance: machine
+      outputHash: b8145c3ce410
+    tags.Video.description:
+      sourceHash: 5919c4258c7e
+      provenance: machine
+      outputHash: 764c9d09f62e
+    tags.Audio.description:
+      sourceHash: fba96a6d1c60
+      provenance: machine
+      outputHash: e9004816554e
+    tags.PDF.description:
+      sourceHash: b297dd6fa69b
+      provenance: machine
+      outputHash: a19027bb160c
     tags.Batch.description:
       sourceHash: f9c99eda7653
       provenance: machine
       outputHash: c7d5f3d2525e
+    tags.Jobs.description:
+      sourceHash: 7cf05fe0bec2
+      provenance: machine
+      outputHash: bdaeadaaa43e
     tags.Pipelines.description:
       sourceHash: 18d60931b26d
       provenance: machine
@@ -21221,6 +22403,14 @@ x-i18n:
       sourceHash: 404909083a24
       provenance: machine
       outputHash: ecd3d3a763f7
+    paths./api/v1/jobs/{jobId}.get.summary:
+      sourceHash: ea2c3f05a19a
+      provenance: machine
+      outputHash: 4dd1558f304f
+    paths./api/v1/jobs/{jobId}.get.description:
+      sourceHash: 3b539e2cd6b0
+      provenance: machine
+      outputHash: 7eabb7df9e54
     paths./api/v1/jobs/{jobId}/progress.get.summary:
       sourceHash: bcf19846aa43
       provenance: machine
@@ -21253,6 +22443,38 @@ x-i18n:
       sourceHash: aa0b433ca9a9
       provenance: machine
       outputHash: 206494d3a36f
+    paths./api/v1/feedback.post.summary:
+      sourceHash: 4addd61cdf76
+      provenance: machine
+      outputHash: 01863edccd61
+    paths./api/v1/feedback.post.description:
+      sourceHash: 294a6d11b67b
+      provenance: machine
+      outputHash: bc6224aeb2ab
+    paths./api/v1/admin/latest-release.get.summary:
+      sourceHash: 5c462d541cf1
+      provenance: machine
+      outputHash: 3620b8335c54
+    paths./api/v1/admin/latest-release.get.description:
+      sourceHash: 5cc6f77b3629
+      provenance: machine
+      outputHash: c26de18bf34d
+    paths./api/v1/admin/features/reset.post.summary:
+      sourceHash: 8e9f6cf8186d
+      provenance: machine
+      outputHash: 763f1a9891d2
+    paths./api/v1/admin/features/reset.post.description:
+      sourceHash: be188cb61d14
+      provenance: machine
+      outputHash: 2a7843dc0784
+    paths./api/v1/admin/tools/{toolId}/features/install.post.summary:
+      sourceHash: b51abe2a96a1
+      provenance: machine
+      outputHash: c89afed76b02
+    paths./api/v1/admin/tools/{toolId}/features/install.post.description:
+      sourceHash: 5769016e70ea
+      provenance: machine
+      outputHash: a855d0d04c02
     paths./api/v1/admin/features/{bundleId}/install.post.summary:
       sourceHash: bebc6f7ea7c3
       provenance: machine
@@ -22933,6 +24155,14 @@ x-i18n:
       sourceHash: ae628486beb5
       provenance: machine
       outputHash: db1749fb6ce4
+    paths./api/auth/mfa/enroll-complete.post.summary:
+      sourceHash: 7eb2d5497507
+      provenance: machine
+      outputHash: d846762b7831
+    paths./api/auth/mfa/enroll-complete.post.description:
+      sourceHash: 50eff9184881
+      provenance: machine
+      outputHash: 89cf557564ef
     paths./api/auth/mfa/complete.post.summary:
       sourceHash: 16f65adb8582
       provenance: machine
@@ -23149,6 +24379,14 @@ x-i18n:
       sourceHash: 7051119f905f
       provenance: machine
       outputHash: a3c1a4bb8aed
+    paths./api/v1/scim/v2/Users/{id}.patch.summary:
+      sourceHash: fe90c6cfc2b7
+      provenance: machine
+      outputHash: 6cafcc980876
+    paths./api/v1/scim/v2/Users/{id}.patch.description:
+      sourceHash: 4d560dd051f1
+      provenance: machine
+      outputHash: e8174d338c5b
     paths./api/v1/scim/v2/Users/{id}.delete.summary:
       sourceHash: 11c8da919810
       provenance: machine
@@ -23189,6 +24427,14 @@ x-i18n:
       sourceHash: 0b41d735866c
       provenance: machine
       outputHash: cbe6ef10fb49
+    paths./api/v1/scim/v2/Groups/{id}.patch.summary:
+      sourceHash: 560e84b4df62
+      provenance: machine
+      outputHash: df630ecc582c
+    paths./api/v1/scim/v2/Groups/{id}.patch.description:
+      sourceHash: 758265bf4193
+      provenance: machine
+      outputHash: 18e12588cc00
     paths./api/v1/scim/v2/Groups/{id}.delete.summary:
       sourceHash: 37212ab76d6b
       provenance: machine
