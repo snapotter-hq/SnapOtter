@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { userErrorMessage } from "@/lib/api";
 import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { useFileStore } from "@/stores/file-store";
 
@@ -66,7 +67,7 @@ export function DocumentView({ inputOnly = false }: { inputOnly?: boolean } = {}
         await renderTask.promise;
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(userErrorMessage(t, err, String(err)));
         }
       }
     })();
@@ -76,7 +77,7 @@ export function DocumentView({ inputOnly = false }: { inputOnly?: boolean } = {}
       renderTask?.cancel();
       doc?.loadingTask.destroy();
     };
-  }, [src, page, entry?.file, showInputFallback, hasProcessedUrl]);
+  }, [src, page, entry?.file, showInputFallback, hasProcessedUrl, t]);
 
   if (!entry) return null;
 

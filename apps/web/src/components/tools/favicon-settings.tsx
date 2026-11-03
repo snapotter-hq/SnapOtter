@@ -6,7 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { reportRunEndFailure } from "@/lib/run-end-report";
@@ -332,7 +332,7 @@ export function FaviconSettings() {
       const teardownError = runEndWrites([
         () => {
           if (!storeReset) {
-            setError(err instanceof Error ? err.message : t.toolSettings.favicon.networkError);
+            setError(userErrorMessage(t, err, t.toolSettings.favicon.networkError));
           }
         },
         cleanup,

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -165,7 +165,7 @@ export function BulkRenameSettings() {
         return;
       }
       unsubscribe();
-      setError(err instanceof Error ? err.message : t.toolSettings["bulk-rename"].renameFailed);
+      setError(userErrorMessage(t, err, t.toolSettings["bulk-rename"].renameFailed));
     } finally {
       unsubscribe();
       if (abortRef.current === controller) abortRef.current = null;

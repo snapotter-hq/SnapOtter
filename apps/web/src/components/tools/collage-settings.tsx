@@ -4,7 +4,7 @@ import { useCallback, useEffect } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
@@ -291,7 +291,7 @@ export function CollageSettings() {
       clearWatchdog();
       run.end();
       if (!run.isCurrent()) return;
-      store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
+      store.setError(userErrorMessage(t, err, t.toolSettings.collage.collageFailed));
       return;
     }
 
