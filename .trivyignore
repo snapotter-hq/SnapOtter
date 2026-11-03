@@ -1,6 +1,6 @@
 # Trivy suppressions for the release and bundle scans.
 #
-# This file is empty on purpose. Every entry it used to hold (21 IDs covering
+# It holds one entry, at the bottom. Every entry it used to hold (21 IDs covering
 # pnpm 9.x and its bundled glob/minimatch/picomatch/tar, plus npm's vendored
 # sigstore) suppressed something that is not in any shipped artifact: the
 # production image purges pnpm and npm before the final layer, so raw and
@@ -19,3 +19,14 @@
 # findings that ARE present and have no upstream fix, do not suppress them. Add
 # the ID to .trivy-unfixed-allow instead, so the release scan keeps reporting
 # it and a new one still fails the build.
+
+# CVE-2026-115924, rembg 2.0.69 (packages/ai/python/requirements.txt, scanned in
+# the release archive and installed by the background-removal bundle). The
+# vulnerable code is the `rembg s` HTTP server's SAM model loading. SnapOtter
+# imports rembg as a library, never runs `rembg s`, and passes new_session()
+# only allowlisted model names (remove_bg.py ALLOWED_MODELS). ci.yml's pip-audit
+# step ignores the same ID for the same reason.
+# Owner: maintainers. Unblocks when the AI stack moves to numpy 2.x: rembg
+# 2.0.82 needs it, and realesrgan 0.3.0 and codeformer-pip 0.0.4 break on it.
+# Re-check: 2027-02-01.
+CVE-2026-115924

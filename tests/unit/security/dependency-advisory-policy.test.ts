@@ -49,14 +49,17 @@ describe("production dependency advisory policy", () => {
   it("pins the vulnerable brace-expansion release to its patched successor", () => {
     const rootPackage = packageJson("package.json");
 
-    expect(rootPackage.pnpm?.overrides?.["brace-expansion@5.0.7"]).toBe("5.0.8");
+    // 5.0.8 fixed the first DoS; CVE-2026-69152, CVE-2026-102276 and
+    // CVE-2026-102278 need 5.0.11, so every 5.x below 5.0.12 is lifted to it.
+    expect(rootPackage.pnpm?.overrides?.["brace-expansion@>=5.0.0 <5.0.12"]).toBe("5.0.12");
   });
 
   it("resolves only the patched versions in the frozen lockfile", () => {
     const lockfile = readFileSync(resolve(root, "pnpm-lock.yaml"), "utf8");
 
     expect(lockfile).toContain("'@fastify/static@10.1.8'");
-    expect(lockfile).toContain("brace-expansion@5.0.8");
+    expect(lockfile).toContain("brace-expansion@5.0.12");
+    expect(lockfile).not.toContain("brace-expansion@5.0.8:");
     expect(lockfile).toContain("react-router@8.5.1");
     expect(lockfile).toContain("tar@7.5.22");
     expect(lockfile).not.toContain("'@fastify/static@9.3.0'");

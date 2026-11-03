@@ -382,7 +382,12 @@ sys.modules["pdf2docx_layout"] = pdf2docx_layout
 weasyprint = types.ModuleType("weasyprint")
 weasyprint.HTML = _raise_mem
 weasyprint_urls = types.ModuleType("weasyprint.urls")
-weasyprint_urls.default_url_fetcher = lambda *a, **k: None
+class _URLFetcher:
+    def __init__(self, **kwargs):
+        pass
+
+
+weasyprint_urls.URLFetcher = _URLFetcher
 weasyprint.urls = weasyprint_urls
 sys.modules["weasyprint"] = weasyprint
 sys.modules["weasyprint.urls"] = weasyprint_urls

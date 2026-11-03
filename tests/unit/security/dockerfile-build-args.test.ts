@@ -57,29 +57,32 @@ describe("Dockerfile build args", () => {
 
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
-      "golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61";
+      "golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9";
     expect(dockerfile.split(goBuilder)).toHaveLength(3);
 
     // Transitive modules pinned above what the application itself requires, so
     // a vulnerable version can be patched without unpinning the application.
     // x/image and x/text are linked into both binaries (x/text 0.38.0 carried
-    // CVE-2026-56852, fixed in 0.39.0). x/sys is only in caire's graph; pdfcpu
+    // CVE-2026-56852, fixed in 0.39.0, and 0.39.0 carried CVE-2026-56851, fixed
+    // in 0.41.0; x/image 0.43.0 carried CVE-2026-46603, fixed in 0.45.0). x/sys is only in caire's graph; pdfcpu
     // has no dependency on it. caire resolved x/sys 0.22.0, which carries
     // CVE-2026-39824 (fixed in 0.44.0): Windows-only code, but Trivy flags the
     // module version compiled into the shipped binary.
-    const sharedPins = ["golang.org/x/image v0.43.0", "golang.org/x/text v0.39.0"];
+    const sharedPins = ["golang.org/x/image v0.45.0", "golang.org/x/text v0.41.0"];
     for (const contract of [
       {
         stage: "caire-builder",
         directory: "caire",
         application: "github.com/esimov/caire v1.5.0",
-        pins: [...sharedPins, "golang.org/x/sys v0.44.0"],
+        pins: [...sharedPins, "golang.org/x/sys v0.47.0"],
       },
       {
         stage: "pdfcpu-builder",
         directory: "pdfcpu",
         application: "github.com/pdfcpu/pdfcpu v0.13.0",
-        pins: sharedPins,
+        // pdfcpu resolved x/crypto 0.52.0, which carries CVE-2026-56854 (fixed
+        // in 0.55.0).
+        pins: [...sharedPins, "golang.org/x/crypto v0.55.0"],
       },
     ]) {
       const modulePath = resolve(root, `docker/go-tools/${contract.directory}/go.mod`);
