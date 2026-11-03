@@ -3749,7 +3749,12 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     ]);
 
     expect(claimedReply.statusCode).toBe(202);
-    expect(claimedReply.payload).toEqual({ jobId: "reused-pipeline-alias", async: true });
+    expect(claimedReply.payload).toEqual({
+      jobId: "reused-pipeline-alias",
+      async: true,
+      statusUrl: "/api/v1/jobs/reused-pipeline-alias",
+      progressUrl: "/api/v1/jobs/reused-pipeline-alias/progress",
+    });
     expect(clearBatchCanceledMock).toHaveBeenCalledTimes(1);
     expect(clearBatchCanceledMock).toHaveBeenCalledWith("reused-pipeline-alias");
     expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(1);
@@ -3800,6 +3805,8 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(faultTolerantReply.payload).toEqual({
       jobId: "reused-pipeline-alias-fault",
       async: true,
+      statusUrl: "/api/v1/jobs/reused-pipeline-alias-fault",
+      progressUrl: "/api/v1/jobs/reused-pipeline-alias-fault/progress",
     });
     expect(faultLog.warn).toHaveBeenCalledWith(
       {

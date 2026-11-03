@@ -717,6 +717,18 @@ interface ToolBundleInstallResult {
   skipped?: boolean;
 }
 
+function withJobUrls(bundle: ToolBundleInstallResult): ToolBundleInstallResult & {
+  statusUrl?: string;
+  progressUrl?: string;
+} {
+  if (!bundle.jobId) return bundle;
+  return {
+    ...bundle,
+    statusUrl: `/api/v1/jobs/${bundle.jobId}`,
+    progressUrl: `/api/v1/jobs/${bundle.jobId}/progress`,
+  };
+}
+
 export interface ManifestModel {
   id: string;
   path?: string;
@@ -1063,7 +1075,12 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
 
-      return reply.status(202).send({ jobId: result.jobId, queued: result.queued });
+      return reply.status(202).send({
+        jobId: result.jobId,
+        queued: result.queued,
+        statusUrl: `/api/v1/jobs/${result.jobId}`,
+        progressUrl: `/api/v1/jobs/${result.jobId}/progress`,
+      });
     },
   );
 
@@ -1100,7 +1117,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         bundles.push(result ?? { bundleId, queued: false, skipped: true });
       }
 
-      return reply.status(202).send({ bundles });
+      return reply.status(202).send({ bundles: bundles.map(withJobUrls) });
     },
   );
 

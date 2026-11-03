@@ -7777,8 +7777,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: Per-bundle status
+        '202':
+          description: Per-bundle status. Each queued bundle carries its own statusUrl and progressUrl. Skipped bundles have neither.
           content:
             application/json:
               schema:
@@ -7795,6 +7795,12 @@ paths:
                           type: boolean
                         skipped:
                           type: boolean
+                        jobId:
+                          type: string
+                        statusUrl:
+                          type: string
+                        progressUrl:
+                          type: string
         '401':
           description: Missing or invalid credentials
           content:

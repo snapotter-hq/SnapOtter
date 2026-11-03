@@ -477,7 +477,12 @@ describe("ClientJobId passthrough", () => {
 
     const second = await post(adminToken);
     expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
-    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+    expect(second.json()).toEqual({
+      jobId: clientJobId,
+      async: true,
+      statusUrl: `/api/v1/jobs/${clientJobId}`,
+      progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+    });
 
     const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
     expect(after).toEqual(before);
@@ -1180,7 +1185,12 @@ describe("Sync-wait expiry", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
       // The flow does not care about the response: the finalize still
       // persists the ZIP and publishes the terminal frame the client

@@ -46,11 +46,18 @@ describe("openapi.yaml contract", () => {
     expect(accepted.length).toBeGreaterThan(0);
     for (const { path, method, op } of accepted) {
       const r = op.responses?.["202"];
-      expect(r?.headers?.Location, `${method} ${path} Location`).toBeDefined();
-      expect(
-        r?.content?.["application/json"]?.schema?.properties?.statusUrl,
-        `${method} ${path} statusUrl`,
-      ).toBeDefined();
+      const props = r?.content?.["application/json"]?.schema?.properties as
+        | Record<string, { items?: { properties?: Record<string, unknown> } }>
+        | undefined;
+      // The tools install returns one entry per bundle, so each entry carries the URL and no Location header.
+      if (props?.statusUrl) {
+        expect(r?.headers?.Location, `${method} ${path} Location`).toBeDefined();
+      } else {
+        expect(
+          props?.bundles?.items?.properties?.statusUrl,
+          `${method} ${path} statusUrl`,
+        ).toBeDefined();
+      }
     }
   });
 
