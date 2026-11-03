@@ -1,8 +1,9 @@
 import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { currentTranslations } from "@/lib/current-translations";
 
 interface CaptureResponse {
   downloadUrl: string;
@@ -148,7 +149,11 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
-        error: err instanceof Error ? err.message : "Network error",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.networkFailed,
+        ),
         capturing: false,
       });
     } finally {

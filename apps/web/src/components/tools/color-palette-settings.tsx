@@ -6,7 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -147,7 +147,7 @@ export function ColorPaletteSettings() {
         return;
       }
       unsubscribe();
-      setError(err instanceof Error ? err.message : ts.extracting);
+      setError(userErrorMessage(t, err, ts.extracting));
     } finally {
       unsubscribe();
       if (abortRef.current === controller) abortRef.current = null;

@@ -194,6 +194,7 @@ export function apiErrorMessage(
 ): string {
   if (err instanceof ApiError) {
     const byAnyCode: Partial<Record<string, string>> = {
+      ...t.errors.codes,
       AUTH_REQUIRED: t.errors.sessionEnded,
       FORBIDDEN: t.errors.forbidden,
       IP_NOT_ALLOWED: t.auth.ipNotAllowed,
@@ -208,6 +209,16 @@ export function apiErrorMessage(
   // reason where someone debugging can find it.
   console.warn("Request failed:", err);
   return fallback;
+}
+
+/**
+ * Message to show for a caught error. A server answer goes through
+ * apiErrorMessage, so the server's English text never reaches the screen.
+ * Any other error keeps its own message, as it did before.
+ */
+export function userErrorMessage(t: TranslationKeys, err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return apiErrorMessage(t, err, {}, fallback);
+  return err instanceof Error ? err.message : fallback;
 }
 
 export async function throwWithMessage(res: Response): Promise<never> {

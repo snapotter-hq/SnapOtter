@@ -740,7 +740,7 @@ export function EditMetadataSettings() {
               type="number"
               value={form.gpsAltitude}
               onChange={(v) => setField("gpsAltitude", v)}
-              placeholder="Optional (e.g. 25)"
+              placeholder={t.toolSettings["edit-metadata"].altitudePlaceholder}
               disabled={form.clearGps}
             />
 
