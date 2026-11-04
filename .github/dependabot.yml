@@ -1,5 +1,8 @@
 version: 2
 
+# Explicit labels replace Dependabot's per-language defaults (javascript,
+# python, docker, github_actions) with the repo's own area scheme.
+
 updates:
   # npm/pnpm dependencies (root lockfile covers entire monorepo)
   - package-ecosystem: "npm"
@@ -10,6 +13,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 10
+    labels: ["dependencies"]
     groups:
       production-deps:
         dependency-type: "production"
@@ -34,6 +38,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    labels: ["dependencies", "area: ai"]
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -47,6 +52,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    labels: ["dependencies", "area: infrastructure"]
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -68,6 +74,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    labels: ["dependencies", "area: infrastructure"]
     groups:
       actions:
         patterns:
