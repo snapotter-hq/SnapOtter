@@ -2717,6 +2717,12 @@
     "outputHash": "ed83fda7f02f",
     "stale": false
   },
+  "nav.star": {
+    "sourceHash": "e357d396871d",
+    "provenance": "machine",
+    "outputHash": "0a0804d45959",
+    "stale": false
+  },
   "nav.talkToHuman": {
     "sourceHash": "955efd290845",
     "provenance": "machine",

@@ -217,7 +217,7 @@ test.describe("Landing Homepage", () => {
 
   test("open-source section renders with GitHub link", async ({ page }) => {
     await expect(page.getByText("Open source. Fully auditable.")).toBeVisible();
-    const ghLink = page.getByRole("link", { name: "Star on GitHub" }).first();
+    const ghLink = page.locator("#open-source").getByRole("link", { name: "Star on GitHub" });
     await expect(ghLink).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
   });
 
@@ -231,5 +231,31 @@ test.describe("Landing Homepage", () => {
   test("footer renders copyright with current year", async ({ page }) => {
     const year = new Date().getFullYear();
     await expect(page.getByText(new RegExp(`${year}.*Chocolate Wafers`))).toBeVisible();
+  });
+});
+
+test.describe("Navbar Star button", () => {
+  test("shows the Star label and count on a wide English nav", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const star = page.locator("[data-star-button]");
+    await expect(star).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
+    await expect(star).not.toHaveAttribute("data-compact");
+    await expect(star.getByText("Star", { exact: true })).toBeVisible();
+    await expect(star).toHaveAccessibleName(/^Star on GitHub \(.+\)$/);
+  });
+
+  // The Ukrainian nav has no room for the label at this width, so it must drop
+  // to octocat + count instead of pushing the CTAs past the container.
+  test("drops the label when a localized nav would overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/uk/");
+    const star = page.locator("[data-star-button]");
+    await expect(star).toHaveAttribute("data-compact", "");
+    await expect(star.getByText("Зірка", { exact: true })).toBeHidden();
+    const overflow = await page
+      .locator("[data-nav-row]")
+      .evaluate((row) => row.scrollWidth - row.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });
