@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: Nén ảnh
-      description: Giảm kích thước tệp ảnh theo mức chất lượng hoặc kích thước mục tiêu.
+      description: |
+        Giảm dung lượng tệp ảnh theo mức chất lượng hoặc dung lượng mục tiêu.
+        Chế độ dung lượng mục tiêu thay thế cho các thao tác compress-image-to-{20,50,100,200,500}kb đã bị deprecated.
       security:
         - bearerAuth: []
       requestBody:
@@ -656,8 +658,9 @@ paths:
         - Image
       summary: Nén ảnh xuống 20 KB
       description: |
-        Nén ảnh xuống kích thước mục tiêu 20 KB
-        Đây là điểm cuối cài đặt sẵn nén chuyên dụng được hỗ trợ bởi `compress` ở chế độ targetSize.
+        Nén một ảnh về dung lượng mục tiêu 20 KB
+        Đây là endpoint preset nén chuyên dụng, dựa trên `compress` ở chế độ targetSize.
+        Đã được thay thế bởi POST /api/v1/tools/image/compress với `mode` đặt là `targetSize` và `targetSizeKb` đặt là 20. Được giữ lại ít nhất một bản phát hành phụ.
       security:
         - bearerAuth: []
       requestBody:
@@ -717,8 +720,9 @@ paths:
         - Image
       summary: Nén ảnh xuống 50 KB
       description: |
-        Nén ảnh xuống kích thước mục tiêu 50 KB
-        Đây là điểm cuối cài đặt sẵn nén chuyên dụng được hỗ trợ bởi `compress` ở chế độ targetSize.
+        Nén một ảnh về dung lượng mục tiêu 50 KB
+        Đây là endpoint preset nén chuyên dụng, dựa trên `compress` ở chế độ targetSize.
+        Đã được thay thế bởi POST /api/v1/tools/image/compress với `mode` đặt là `targetSize` và `targetSizeKb` đặt là 50. Được giữ lại ít nhất một bản phát hành phụ.
       security:
         - bearerAuth: []
       requestBody:
@@ -778,8 +782,9 @@ paths:
         - Image
       summary: Nén ảnh xuống 100 KB
       description: |
-        Nén ảnh xuống kích thước mục tiêu 100 KB
-        Đây là điểm cuối cài đặt sẵn nén chuyên dụng được hỗ trợ bởi `compress` ở chế độ targetSize.
+        Nén một ảnh về dung lượng mục tiêu 100 KB
+        Đây là endpoint preset nén chuyên dụng, dựa trên `compress` ở chế độ targetSize.
+        Đã được thay thế bởi POST /api/v1/tools/image/compress với `mode` đặt là `targetSize` và `targetSizeKb` đặt là 100. Được giữ lại ít nhất một bản phát hành phụ.
       security:
         - bearerAuth: []
       requestBody:
@@ -839,8 +844,9 @@ paths:
         - Image
       summary: Nén ảnh xuống 200 KB
       description: |
-        Nén ảnh xuống kích thước mục tiêu 200 KB
-        Đây là điểm cuối cài đặt sẵn nén chuyên dụng được hỗ trợ bởi `compress` ở chế độ targetSize.
+        Nén một ảnh về dung lượng mục tiêu 200 KB
+        Đây là endpoint preset nén chuyên dụng, dựa trên `compress` ở chế độ targetSize.
+        Đã được thay thế bởi POST /api/v1/tools/image/compress với `mode` đặt là `targetSize` và `targetSizeKb` đặt là 200. Được giữ lại ít nhất một bản phát hành phụ.
       security:
         - bearerAuth: []
       requestBody:
@@ -900,8 +906,9 @@ paths:
         - Image
       summary: Nén ảnh xuống 500 KB
       description: |
-        Nén ảnh xuống kích thước mục tiêu 500 KB
-        Đây là điểm cuối cài đặt sẵn nén chuyên dụng được hỗ trợ bởi `compress` ở chế độ targetSize.
+        Nén một ảnh về dung lượng mục tiêu 500 KB
+        Đây là endpoint preset nén chuyên dụng, dựa trên `compress` ở chế độ targetSize.
+        Đã được thay thế bởi POST /api/v1/tools/image/compress với `mode` đặt là `targetSize` và `targetSizeKb` đặt là 500. Được giữ lại ít nhất một bản phát hành phụ.
       security:
         - bearerAuth: []
       requestBody:
@@ -21594,49 +21601,49 @@ x-i18n:
       provenance: machine
       outputHash: 886d04862ece
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 812f40ee0e88
+      outputHash: f975c5ac6f25
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: d23258b0b437
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 1f3535041c37
+      outputHash: d8f768a4c914
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 8a6901818c0a
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 7d56f8b4d809
+      outputHash: dbe4f03ac157
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: d15ccf8833e3
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 3a443738a9d7
+      outputHash: fdbd16a7c414
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: e7e8dfe7d769
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 1b2883bffe99
+      outputHash: fb82f24355d2
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 36fd398a432e
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 1107f8617247
+      outputHash: 4fe9bb0a2381
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

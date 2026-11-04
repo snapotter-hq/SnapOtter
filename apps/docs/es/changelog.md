@@ -1,12 +1,18 @@
 ---
 description: "Notas de versión e historial de versiones de SnapOtter. Vea qué hay de nuevo, qué se ha mejorado y qué se ha corregido en cada versión."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 674f81cc1a04
+i18n_output_hash: 589654e8b9ea
 i18n_hash_version: 2
 ---
 
 # Registro de cambios {#changelog}
+
+## Sin publicar {#unreleased}
+
+### Obsoleto {#unreleased-deprecated}
+
+- **Las cinco operaciones de compresión de imagen a un tamaño determinado quedan obsoletas.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` y `-500kb` están marcadas como obsoletas en la especificación OpenAPI y se mantendrán al menos una versión menor más. Envíe `POST /api/v1/tools/image/compress` con `settings` definido como `{"mode":"targetSize","targetSizeKb":20}` (o 50, 100, 200, 500). El resultado es el mismo. Las rutas de los ajustes preestablecidos de PDF no cambian.
 
 ## v2.3.0 {#v2-3-0}
 
@@ -320,7 +326,7 @@ SnapOtter 2.0 convierte el conjunto de herramientas de imagen en una suite compl
 
 ### Cambios incompatibles {#breaking-changes}
 
-2.0 reemplaza la base de datos SQLite integrada por Postgres 17 y añade Redis 8 para la cola de trabajos. Sus datos de 1.x se migran automáticamente en el primer arranque, pero la pila de contenedores cambió, así que respalde primero todo su volumen `/data` (1.x ejecuta SQLite en modo WAL, por lo que los datos confirmados suelen residir en `snapotter.db-wal`). Luego elija la imagen de un solo contenedor (Postgres y Redis integrados, solo root) o la pila Compose (aplicación más Postgres 17 y Redis 8). Consulte la [guía de migración](https://github.com/snapotter-hq/SnapOtter/blob/main/MIGRATING.md) y la [guía de actualización](/es/guide/upgrading).
+2.0 reemplaza la base de datos SQLite integrada por Postgres 17 y añade Redis 8 para la cola de trabajos. Sus datos de 1.x se migran automáticamente en el primer arranque, pero la pila de contenedores cambió, así que haga primero una copia de seguridad de todo el volumen `/data` (1.x ejecuta SQLite en modo WAL, por lo que los datos confirmados suelen estar en `snapotter.db-wal`). Después elija la imagen de un solo contenedor (Postgres y Redis integrados, solo root) o la pila Compose (la aplicación más Postgres 17 y Redis 8). Consulte la [guía de migración](https://github.com/snapotter-hq/SnapOtter/blob/main/MIGRATING.md) y la [guía de actualización](/es/guide/upgrading).
 
 ### Actualización {#upgrade}
 

@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: 이미지 압축
-      description: 품질 수준 또는 목표 크기로 이미지 파일 크기를 줄입니다.
+      description: |
+        품질 수준 또는 목표 용량을 기준으로 이미지 파일 크기를 줄입니다.
+        목표 용량 모드는 지원 중단된 compress-image-to-{20,50,100,200,500}kb 작업을 대체합니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -656,8 +658,9 @@ paths:
         - Image
       summary: 이미지를 20 KB로 압축
       description: |
-        이미지를 20 KB 목표 크기로 압축합니다
-        이것은 targetSize 모드의 `compress`에 의해 지원되는 전용 압축 프리셋 엔드포인트입니다.
+        이미지를 20 KB 목표 용량으로 압축
+        이 엔드포인트는 targetSize 모드의 `compress`를 기반으로 하는 전용 압축 프리셋입니다.
+        POST /api/v1/tools/image/compress에서 settings의 `mode`는 `targetSize`로, `targetSizeKb`는 20으로 설정하는 방식으로 대체되었습니다. 최소 한 번의 마이너 릴리스 동안 유지됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -717,8 +720,9 @@ paths:
         - Image
       summary: 이미지를 50 KB로 압축
       description: |
-        이미지를 50 KB 목표 크기로 압축합니다
-        이것은 targetSize 모드의 `compress`에 의해 지원되는 전용 압축 프리셋 엔드포인트입니다.
+        이미지를 50 KB 목표 용량으로 압축
+        이 엔드포인트는 targetSize 모드의 `compress`를 기반으로 하는 전용 압축 프리셋입니다.
+        POST /api/v1/tools/image/compress에서 settings의 `mode`는 `targetSize`로, `targetSizeKb`는 50으로 설정하는 방식으로 대체되었습니다. 최소 한 번의 마이너 릴리스 동안 유지됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -778,8 +782,9 @@ paths:
         - Image
       summary: 이미지를 100 KB로 압축
       description: |
-        이미지를 100 KB 목표 크기로 압축합니다
-        이것은 targetSize 모드의 `compress`에 의해 지원되는 전용 압축 프리셋 엔드포인트입니다.
+        이미지를 100 KB 목표 용량으로 압축
+        이 엔드포인트는 targetSize 모드의 `compress`를 기반으로 하는 전용 압축 프리셋입니다.
+        POST /api/v1/tools/image/compress에서 settings의 `mode`는 `targetSize`로, `targetSizeKb`는 100으로 설정하는 방식으로 대체되었습니다. 최소 한 번의 마이너 릴리스 동안 유지됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -839,8 +844,9 @@ paths:
         - Image
       summary: 이미지를 200 KB로 압축
       description: |
-        이미지를 200 KB 목표 크기로 압축합니다
-        이것은 targetSize 모드의 `compress`에 의해 지원되는 전용 압축 프리셋 엔드포인트입니다.
+        이미지를 200 KB 목표 용량으로 압축
+        이 엔드포인트는 targetSize 모드의 `compress`를 기반으로 하는 전용 압축 프리셋입니다.
+        POST /api/v1/tools/image/compress에서 settings의 `mode`는 `targetSize`로, `targetSizeKb`는 200으로 설정하는 방식으로 대체되었습니다. 최소 한 번의 마이너 릴리스 동안 유지됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -900,8 +906,9 @@ paths:
         - Image
       summary: 이미지를 500 KB로 압축
       description: |
-        이미지를 500 KB 목표 크기로 압축합니다
-        이것은 targetSize 모드의 `compress`에 의해 지원되는 전용 압축 프리셋 엔드포인트입니다.
+        이미지를 500 KB 목표 용량으로 압축
+        이 엔드포인트는 targetSize 모드의 `compress`를 기반으로 하는 전용 압축 프리셋입니다.
+        POST /api/v1/tools/image/compress에서 settings의 `mode`는 `targetSize`로, `targetSizeKb`는 500으로 설정하는 방식으로 대체되었습니다. 최소 한 번의 마이너 릴리스 동안 유지됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -21590,49 +21597,49 @@ x-i18n:
       provenance: machine
       outputHash: c39dc05c871f
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: e0cd78c9d157
+      outputHash: 89957de2abb2
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 1088b030c2e2
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 13984a934871
+      outputHash: e7bb4ebfef90
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: ee9f85eb30ab
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 1fb24984913a
+      outputHash: 771b1da8dd95
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: bfabf3e72859
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: c4989621aa38
+      outputHash: 932fb3d543ae
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 88798967aeef
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: fe6c7d0b9615
+      outputHash: b06580ed43f2
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 4217d27c9da8
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 9ba99e248ea2
+      outputHash: fc4486d7e332
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

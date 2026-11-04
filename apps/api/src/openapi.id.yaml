@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: Kompres Gambar
-      description: Kurangi ukuran file image berdasarkan tingkat kualitas atau ukuran target.
+      description: |
+        Kurangi ukuran file gambar berdasarkan tingkat kualitas atau ukuran target.
+        Mode ukuran target adalah pengganti operasi compress-image-to-{20,50,100,200,500}kb yang sudah deprecated.
       security:
         - bearerAuth: []
       requestBody:
@@ -658,6 +660,7 @@ paths:
       description: |
         Kompres gambar ke ukuran target 20 KB
         Ini adalah endpoint preset kompresi khusus yang didukung oleh `compress` dalam mode targetSize.
+        Digantikan oleh POST /api/v1/tools/image/compress dengan pengaturan `mode` diatur ke `targetSize` dan `targetSizeKb` diatur ke 20. Dipertahankan setidaknya selama satu rilis minor.
       security:
         - bearerAuth: []
       requestBody:
@@ -719,6 +722,7 @@ paths:
       description: |
         Kompres gambar ke ukuran target 50 KB
         Ini adalah endpoint preset kompresi khusus yang didukung oleh `compress` dalam mode targetSize.
+        Digantikan oleh POST /api/v1/tools/image/compress dengan pengaturan `mode` diatur ke `targetSize` dan `targetSizeKb` diatur ke 50. Dipertahankan setidaknya selama satu rilis minor.
       security:
         - bearerAuth: []
       requestBody:
@@ -780,6 +784,7 @@ paths:
       description: |
         Kompres gambar ke ukuran target 100 KB
         Ini adalah endpoint preset kompresi khusus yang didukung oleh `compress` dalam mode targetSize.
+        Digantikan oleh POST /api/v1/tools/image/compress dengan pengaturan `mode` diatur ke `targetSize` dan `targetSizeKb` diatur ke 100. Dipertahankan setidaknya selama satu rilis minor.
       security:
         - bearerAuth: []
       requestBody:
@@ -841,6 +846,7 @@ paths:
       description: |
         Kompres gambar ke ukuran target 200 KB
         Ini adalah endpoint preset kompresi khusus yang didukung oleh `compress` dalam mode targetSize.
+        Digantikan oleh POST /api/v1/tools/image/compress dengan pengaturan `mode` diatur ke `targetSize` dan `targetSizeKb` diatur ke 200. Dipertahankan setidaknya selama satu rilis minor.
       security:
         - bearerAuth: []
       requestBody:
@@ -902,6 +908,7 @@ paths:
       description: |
         Kompres gambar ke ukuran target 500 KB
         Ini adalah endpoint preset kompresi khusus yang didukung oleh `compress` dalam mode targetSize.
+        Digantikan oleh POST /api/v1/tools/image/compress dengan pengaturan `mode` diatur ke `targetSize` dan `targetSizeKb` diatur ke 500. Dipertahankan setidaknya selama satu rilis minor.
       security:
         - bearerAuth: []
       requestBody:
@@ -21596,49 +21603,49 @@ x-i18n:
       provenance: machine
       outputHash: 00ddda3014b6
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 555dd4dc5242
+      outputHash: c466e1e670a9
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: dd21e9c85f6b
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: e20b91a9d1e4
+      outputHash: 38be42034dca
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 601a5a60e50c
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 7843b026293b
+      outputHash: 0b49b70a0326
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: f975eca049dd
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 87261958ecb8
+      outputHash: 3a62ff19df03
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: c722dddbda85
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 285137a4cc82
+      outputHash: ac0b43716823
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: bb701be39f22
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 8f1988e5ce25
+      outputHash: fd185837a043
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

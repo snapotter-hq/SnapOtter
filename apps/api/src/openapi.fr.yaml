@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: Compresser une image
-      description: Réduit la taille de fichier d'une image par niveau de qualité ou taille cible.
+      description: |-
+        Réduit la taille d'un fichier image par niveau de qualité ou par taille cible.
+        Le mode taille cible remplace les opérations obsolètes compress-image-to-{20,50,100,200,500}kb.
       security:
         - bearerAuth: []
       requestBody:
@@ -655,9 +657,10 @@ paths:
       tags:
         - Image
       summary: Compresser une image à 20 KB
-      description: |
-        Compresser une image à une taille cible de 20 KB
-        Ceci est un endpoint de preset de compression dédié pris en charge par `compress` en mode targetSize.
+      description: |-
+        Compresser une image à une taille cible de 20 Ko
+        Il s'agit d'un endpoint de préréglage de compression dédié, adossé à `compress` en mode targetSize.
+        Remplacé par POST /api/v1/tools/image/compress avec le paramètre `mode` réglé sur `targetSize` et `targetSizeKb` réglé sur 20. Conservé pendant au moins une version mineure.
       security:
         - bearerAuth: []
       requestBody:
@@ -716,9 +719,10 @@ paths:
       tags:
         - Image
       summary: Compresser une image à 50 KB
-      description: |
-        Compresser une image à une taille cible de 50 KB
-        Ceci est un endpoint de preset de compression dédié pris en charge par `compress` en mode targetSize.
+      description: |-
+        Compresser une image à une taille cible de 50 Ko
+        Il s'agit d'un endpoint de préréglage de compression dédié, adossé à `compress` en mode targetSize.
+        Remplacé par POST /api/v1/tools/image/compress avec le paramètre `mode` réglé sur `targetSize` et `targetSizeKb` réglé sur 50. Conservé pendant au moins une version mineure.
       security:
         - bearerAuth: []
       requestBody:
@@ -777,9 +781,10 @@ paths:
       tags:
         - Image
       summary: Compresser une image à 100 KB
-      description: |
-        Compresser une image à une taille cible de 100 KB
-        Ceci est un endpoint de preset de compression dédié pris en charge par `compress` en mode targetSize.
+      description: |-
+        Compresser une image à une taille cible de 100 Ko
+        Il s'agit d'un endpoint de préréglage de compression dédié, adossé à `compress` en mode targetSize.
+        Remplacé par POST /api/v1/tools/image/compress avec le paramètre `mode` réglé sur `targetSize` et `targetSizeKb` réglé sur 100. Conservé pendant au moins une version mineure.
       security:
         - bearerAuth: []
       requestBody:
@@ -838,9 +843,10 @@ paths:
       tags:
         - Image
       summary: Compresser une image à 200 KB
-      description: |
-        Compresser une image à une taille cible de 200 KB
-        Ceci est un endpoint de preset de compression dédié pris en charge par `compress` en mode targetSize.
+      description: |-
+        Compresser une image à une taille cible de 200 Ko
+        Il s'agit d'un endpoint de préréglage de compression dédié, adossé à `compress` en mode targetSize.
+        Remplacé par POST /api/v1/tools/image/compress avec le paramètre `mode` réglé sur `targetSize` et `targetSizeKb` réglé sur 200. Conservé pendant au moins une version mineure.
       security:
         - bearerAuth: []
       requestBody:
@@ -899,9 +905,10 @@ paths:
       tags:
         - Image
       summary: Compresser une image à 500 KB
-      description: |
-        Compresser une image à une taille cible de 500 KB
-        Ceci est un endpoint de preset de compression dédié pris en charge par `compress` en mode targetSize.
+      description: |-
+        Compresser une image à une taille cible de 500 Ko
+        Il s'agit d'un endpoint de préréglage de compression dédié, adossé à `compress` en mode targetSize.
+        Remplacé par POST /api/v1/tools/image/compress avec le paramètre `mode` réglé sur `targetSize` et `targetSizeKb` réglé sur 500. Conservé pendant au moins une version mineure.
       security:
         - bearerAuth: []
       requestBody:
@@ -21570,49 +21577,49 @@ x-i18n:
       provenance: machine
       outputHash: 7a47f7374b53
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 3cf08570d1ba
+      outputHash: 0c94da7315e3
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: a08dad869169
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 5d4cd0467ed9
+      outputHash: 257d7d969fc1
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 530ccbaca2d2
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: f4ba17c6226a
+      outputHash: 34818ee0afab
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 5e1d55931931
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 8e7ea35a1f4f
+      outputHash: 01bc18ab94a9
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 5c04bd4b8f0c
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 8d85aeb3d7a1
+      outputHash: 1d834fac103e
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: f427b196e6bc
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: c39a669db6a0
+      outputHash: 20a3fe4d56fd
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

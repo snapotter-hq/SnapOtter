@@ -1,545 +1,551 @@
 ---
-description: "Notas de versión e historial de versiones de SnapOtter. Vea qué hay de nuevo, qué se ha mejorado y qué se ha corregido en cada versión."
-i18n_source_hash: 952098c65251
+description: "Catatan rilis dan riwayat versi SnapOtter. Lihat apa yang baru, ditingkatkan, dan diperbaiki di setiap rilis."
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: d840d365a8ab
+i18n_output_hash: ff20b7ce9afd
 i18n_hash_version: 2
 ---
 
-# Registro de cambios {#changelog}
+# Changelog {#changelog}
+
+## Belum dirilis {#unreleased}
+
+### Tidak digunakan lagi {#unreleased-deprecated}
+
+- **Kelima operasi kompres-ke-ukuran untuk gambar sudah tidak digunakan lagi (deprecated).** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, dan `-500kb` ditandai deprecated di spesifikasi OpenAPI dan akan tetap ada setidaknya selama satu rilis minor. Kirim `POST /api/v1/tools/image/compress` dengan `settings` diatur ke `{"mode":"targetSize","targetSizeKb":20}` (atau 50, 100, 200, 500). Hasilnya sama. Jalur preset PDF tidak berubah.
 
 ## v2.3.0 {#v2-3-0}
 
-SnapOtter acaba de superar el millón de descargas de imágenes entre Docker Hub y GHCR, y las 3,000 estrellas en GitHub. Son muchos servidores autoalojados, así que esta versión es nuestro agradecimiento a todos quienes los ejecutan.
+SnapOtter baru saja melewati satu juta pull image di Docker Hub dan GHCR, serta 3.000 bintang di GitHub. Itu berarti banyak server self-hosted, jadi rilis ini adalah ucapan terima kasih kami kepada semua yang menjalankannya.
 
-Actualice pronto. 2.3.0 cierra seis avisos de seguridad, uno de ellos de gravedad alta. Los detalles están en la sección Seguridad más abajo.
+Segera perbarui. Versi 2.3.0 menutup enam advisori keamanan, satu di antaranya bertingkat keparahan tinggi. Detailnya ada di bagian Keamanan di bawah.
 
-Además de las correcciones, hay herramientas nuevas: un editor de páginas PDF Multi-Tool, ajustes preestablecidos de compresión a un tamaño objetivo con un clic para imágenes y PDF, y ordenación de páginas arrastrando y soltando en Organize PDF. OCR ahora lee árabe, y pdf-to-text ofrece OCR cuando encuentra un PDF escaneado. SnapOtter puede ejecutarse bajo una subruta como `/snapotter` detrás de un proxy inverso. La aplicación ya no necesita un superusuario de Postgres para funcionar. Los administradores que queden bloqueados pueden recuperar el acceso desde la línea de comandos. El resto son unas 1,400 correcciones, la mayoría de problemas que ustedes reportaron.
+Selain perbaikan, ada alat baru: editor halaman PDF Multi-Tool, preset kompres-ke-ukuran satu klik untuk gambar dan PDF, serta pengurutan halaman dengan seret dan lepas di Organize PDF. OCR kini membaca bahasa Arab, dan pdf-to-text menawarkan OCR ketika menemui PDF hasil pindai. SnapOtter dapat berjalan di bawah subpath seperti `/snapotter` di belakang reverse proxy. Aplikasi tidak lagi memerlukan superuser Postgres untuk berjalan. Admin yang terkunci dapat melakukan pemulihan dari command line. Sisanya sekitar 1.400 perbaikan, sebagian besar untuk masalah yang Anda laporkan.
 
 > [!IMPORTANT]
-> Los seis avisos siguientes afectan a 2.2.0, y algunos se remontan a 2.0.0. Si comparte una instancia con otros usuarios o la expone fuera de su propia red, actualice.
+> Keenam advisori di bawah ini memengaruhi 2.2.0, dan beberapa berlaku sejak 2.0.0. Jika Anda berbagi instance dengan pengguna lain atau membukanya di luar jaringan Anda sendiri, perbarui.
 
-### Seguridad {#v2-3-0-security}
+### Keamanan {#v2-3-0-security}
 
-- **Las cargas de SVG podían omitir el saneamiento (GHSA-9c7h-xjrp-8gh3, alta).** Un SVG que el decodificador de imágenes rechazaba se almacenaba y se servía tal cual en lugar de sanearse. Afectadas: 2.2.0 y anteriores. Reportado por @xaferima. (#1211)
-- **El flujo de progreso de los trabajos no comprobaba quién preguntaba (GHSA-ff22-w6x2-fm98, media).** Ahora exige haber iniciado sesión y ser el propietario del trabajo. Afectadas: de 2.0.0 a 2.2.0. (#1750)
-- **Los enlaces de descarga de resultados también servían la carga original (GHSA-jgv3-2jc6-f628, media).** Afectadas: 2.2.0 y anteriores. Reportado por @emirhancatkin. (#3623)
-- **Las funciones de foto de pasaporte y de efectos de fondo confiaban en un ID de trabajo proporcionado por el cliente (GHSA-3c8g-8v4x-qq9j, media).** Afectadas: 2.2.0 y anteriores. Reportado por @shaoyuuuuu. (#3623)
-- **La importación por URL, la carga y la vista previa omitían las comprobaciones de permisos de rol y de clave de API (GHSA-8xxr-g2w8-7f9r, media).** Afectadas: 2.2.0 y anteriores. Reportado por @nguyenvantiennani. (#3780, #707)
-- **La exigencia de SSO revelaba el nombre de usuario de emergencia (GHSA-q6fg-vvw9-cr8r, baja).** Un inicio de sesión local rechazado ahora recibe el mismo 401 que cualquier otro inicio de sesión fallido. Afectadas: de 2.0.0 a 2.2.0. (#2148)
-- **Postgres ya no se ejecuta como superusuario.** La aplicación ahora se conecta con un rol que solo puede leer y escribir datos. Las migraciones usan una conexión independiente y opcional. Consulte las Notas de actualización. (#918)
-- **Dependencias parcheadas**: los mínimos de override de dompurify y handlebars se elevaron a las versiones corregidas. (#4247)
+- **Unggahan SVG dapat melewati sanitasi (GHSA-9c7h-xjrp-8gh3, tinggi).** SVG yang ditolak oleh dekoder gambar disimpan dan disajikan apa adanya tanpa disanitasi. Terdampak: 2.2.0 dan sebelumnya. Dilaporkan oleh @xaferima. (#1211)
+- **Aliran progres job tidak memeriksa siapa yang meminta (GHSA-ff22-w6x2-fm98, sedang).** Kini aliran ini mewajibkan login dan kepemilikan job. Terdampak: 2.0.0 hingga 2.2.0. (#1750)
+- **Tautan unduhan hasil juga menyajikan unggahan asli (GHSA-jgv3-2jc6-f628, sedang).** Terdampak: 2.2.0 dan sebelumnya. Dilaporkan oleh @emirhancatkin. (#3623)
+- **Foto paspor dan efek latar belakang memercayai ID job yang diberikan klien (GHSA-3c8g-8v4x-qq9j, sedang).** Terdampak: 2.2.0 dan sebelumnya. Dilaporkan oleh @shaoyuuuuu. (#3623)
+- **Impor URL, unggahan, dan pratinjau melewati pemeriksaan izin peran dan kunci API (GHSA-8xxr-g2w8-7f9r, sedang).** Terdampak: 2.2.0 dan sebelumnya. Dilaporkan oleh @nguyenvantiennani. (#3780, #707)
+- **Penegakan SSO mengungkap nama pengguna break-glass (GHSA-q6fg-vvw9-cr8r, rendah).** Login lokal yang ditolak kini mendapat 401 yang sama seperti login gagal lainnya. Terdampak: 2.0.0 hingga 2.2.0. (#2148)
+- **Postgres tidak lagi berjalan sebagai superuser.** Aplikasi kini terhubung dengan role yang hanya dapat membaca dan menulis data. Migrasi menggunakan koneksi terpisah yang opsional. Lihat Catatan Upgrade. (#918)
+- **Dependensi yang ditambal**: batas bawah override dompurify dan handlebars dinaikkan ke versi yang sudah diperbaiki. (#4247)
 
-### Funciones nuevas {#v2-3-0-new-features}
+### Fitur Baru {#v2-3-0-new-features}
 
-- **PDF Multi-Tool**: un editor de páginas que reordena, duplica, gira y elimina páginas, e incorpora páginas de otros PDF. El servidor ensambla el archivo final. (#1338)
-- **Comprimir a un tamaño objetivo con un clic**: cinco ajustes preestablecidos de imagen (20, 50, 100, 200, 500 KB) y cinco de PDF (100, 200, 500 KB, 1 MB, 2 MB). (#1250, #1377)
-- **Ejecute SnapOtter bajo una subruta**: defina `BASE_PATH=/snapotter` y la misma imagen se sirve desde allí. Los enlaces de resultados, las cookies, las redirecciones de SSO y la documentación de la API la siguen. (#1252, #1324)
-- **OCR en árabe**: elija árabe explícitamente, o deje que el modo automático lo detecte. Funciona con OCR de imágenes y de PDF. (#4130, #4183)
-- **pdf-to-text ofrece OCR** cuando un PDF, o un lote completo, no tiene capa de texto, en lugar de devolver un archivo vacío. (#4142, #4198)
-- **Ordenación de páginas arrastrando y soltando en Organize PDF**, con ratón y con pantalla táctil. (#1249, #2601)
-- **Reordene archivos antes de una ejecución con varios archivos**: merge, stitch, collage y las demás herramientas de varios archivos respetan el orden que usted defina. (#756, #757)
-- **Cancele ejecuciones por lotes y de pipelines**, y el trabajo realmente se detiene en el servidor. (#807)
-- **Comandos de recuperación de `snapotter-admin`**: `reset-password`, `create-admin`, `unlock-user` y restablecimiento de MFA, para administradores bloqueados fuera de la interfaz web. (#4016)
-- **Inscripción en MFA al iniciar sesión**: cuando se exige MFA, los usuarios que no la tienen la configuran en el momento en lugar de quedar bloqueados.
-- **Captura con la cámara y una aplicación instalable**: tome una foto directamente hacia una herramienta en el móvil e instale SnapOtter como PWA. (#773)
-- **Relleno transparente en el cuadro de diálogo Tamaño del lienzo del editor.** (#4111)
-- **Avisos de actualización para administradores**: cuando hay una versión más reciente de SnapOtter, los administradores ven un aviso descartable con un enlace a las notas de la versión. La comprobación se realiza a través de la conexión de analítica existente, así que está desactivada cuando la analítica lo está.
+- **PDF Multi-Tool**: editor halaman yang mengurutkan ulang, menggandakan, memutar, dan menghapus halaman, serta menarik halaman dari PDF lain. Server menyusun file akhir. (#1338)
+- **Kompres ke ukuran target dalam satu klik**: lima preset gambar (20, 50, 100, 200, 500 KB) dan lima preset PDF (100, 200, 500 KB, 1 MB, 2 MB). (#1250, #1377)
+- **Jalankan SnapOtter di bawah subpath**: atur `BASE_PATH=/snapotter` dan image yang sama akan disajikan dari sana. Tautan hasil, cookie, pengalihan SSO, dan dokumentasi API semuanya mengikutinya. (#1252, #1324)
+- **OCR Arab**: pilih bahasa Arab secara eksplisit, atau biarkan mode otomatis mendeteksinya. Berfungsi untuk OCR gambar dan PDF. (#4130, #4183)
+- **pdf-to-text menawarkan OCR** ketika sebuah PDF, atau seluruh batch, tidak memiliki lapisan teks, alih-alih mengembalikan file kosong. (#4142, #4198)
+- **Pengurutan halaman dengan seret dan lepas di Organize PDF**, dengan mouse maupun sentuhan. (#1249, #2601)
+- **Urutkan ulang file sebelum proses multi-file**: merge, stitch, collage, dan alat multi-file lainnya mempertahankan urutan yang Anda atur. (#756, #757)
+- **Batalkan proses batch dan pipeline**, dan pekerjaan di server benar-benar berhenti. (#807)
+- **Perintah pemulihan `snapotter-admin`**: `reset-password`, `create-admin`, `unlock-user`, dan reset MFA, untuk admin yang terkunci dari UI web. (#4016)
+- **Pendaftaran MFA saat login**: ketika MFA diwajibkan, pengguna yang belum memilikinya menyiapkannya saat itu juga alih-alih diblokir.
+- **Tangkap kamera dan aplikasi yang dapat diinstal**: ambil foto langsung ke sebuah alat di ponsel, dan instal SnapOtter sebagai PWA. (#773)
+- **Padding transparan di dialog Ukuran Kanvas editor.** (#4111)
+- **Pemberitahuan pembaruan untuk admin**: ketika SnapOtter versi lebih baru tersedia, admin melihat pemberitahuan yang dapat ditutup beserta tautan ke catatan rilis. Pemeriksaan berjalan melalui koneksi analitik yang sudah ada, sehingga mati ketika analitik dimatikan.
 
-### Mejoras {#v2-3-0-improvements}
+### Peningkatan {#v2-3-0-improvements}
 
-- **La eliminación de fondo es más rápida en ejecuciones repetidas**: el modelo permanece cargado entre solicitudes en lugar de recargarse cada vez. (#4144)
-- **Las cargas por lotes usan mucha menos memoria**: cada archivo se envía al disco temporal y se procesa de uno en uno en lugar de permanecer en la RAM. (#2687)
-- **Las instalaciones de paquetes de IA fallan limpiamente y se revierten** en lugar de dejar un venv instalado a medias. Las instalaciones de eliminación de fondo en Proxmox LXC vuelven a funcionar, y los hosts con poca memoria reciben límites de CPU razonables antes de iniciar un trabajo. (#2628, #2597, #2526, #2546)
-- **La detección de GPU es más fiable**: CUDA se detecta a través del controlador, las tarjetas de la serie RTX 50 recurren a la CPU en lugar de fallar, y los codificadores de vídeo por hardware se prueban antes de usarse. (#4225, #4075, #3980, #3983)
-- **`MAX_WORKER_THREADS` ahora funciona**. Se analizaba pero nunca se aplicaba. (#3249)
-- **Las herramientas largas reciben el tiempo de espera largo**: pdf-to-word, compress-pdf, convert-document y el cambio de tamaño según el contenido ya no agotan el tiempo antes de lo debido con archivos grandes. (#3276)
-- **Compress PDF mantiene legibles los escaneos**, e indica cuando no se puede alcanzar un tamaño objetivo en lugar de producir un archivo ilegible. (#4112)
-- **Los inicios de sesión fallidos se limitan por nombre de usuario**: más de diez en quince minutos reciben un 429 con `Retry-After`. (#827)
-- **Los errores indican qué salió mal**: los binarios ausentes, los fallos de almacenamiento, las terminaciones por falta de memoria y los límites de carga ahora reciben mensajes específicos en lugar de un 500 o un 422 sin detalle.
-- **El registro de auditoría cubre las ejecuciones de herramientas, lotes y pipelines**, y los eventos de usuarios, roles, equipos y RGPD registran quién hizo qué a quién. (#3991, #3984)
-- **El contenedor todo en uno se detiene ante un primer arranque fallido** en lugar de reiniciarse indefinidamente, y el Postgres y el Redis integrados tienen plazos de arranque. (#3008, #1130)
-- **Las fechas y los plurales siguen su idioma**, y las últimas cadenas de inglés fijadas en el código están traducidas.
-- **Mejoras para móvil y para el editor**: diseños del control deslizante, de Sign PDF y del recorte en teléfonos, arrastre táctil, pinceles de píxeles más rápidos, y Niveles y Curvas en deshacer y autoguardado.
+- **Penghapusan latar belakang lebih cepat pada proses berulang**: model tetap dimuat di antara permintaan alih-alih dimuat ulang setiap kali. (#4144)
+- **Unggahan batch menggunakan memori jauh lebih sedikit**: setiap file masuk ke disk sementara dan diproses satu per satu alih-alih berada di RAM. (#2687)
+- **Instalasi bundel AI gagal dengan bersih dan di-rollback** alih-alih meninggalkan venv yang setengah terpasang. Instalasi penghapusan latar belakang di Proxmox LXC berfungsi kembali, dan host dengan memori rendah mendapat batas CPU yang wajar sebelum job dimulai. (#2628, #2597, #2526, #2546)
+- **Deteksi GPU lebih andal**: CUDA dideteksi melalui driver, kartu seri RTX 50 beralih ke CPU alih-alih gagal, dan encoder video perangkat keras diuji coba sebelum digunakan. (#4225, #4075, #3980, #3983)
+- **`MAX_WORKER_THREADS` kini berfungsi**. Sebelumnya diurai tetapi tidak pernah diterapkan. (#3249)
+- **Alat yang lama mendapat batas waktu yang panjang**: pdf-to-word, compress-pdf, convert-document, dan content-aware resize tidak lagi kehabisan waktu terlalu cepat pada file besar. (#3276)
+- **Compress PDF menjaga hasil pindai tetap terbaca**, dan memberi tahu ketika ukuran target tidak dapat dicapai alih-alih menghasilkan file yang tidak terbaca. (#4112)
+- **Login gagal dibatasi per nama pengguna**: lebih dari sepuluh kali dalam lima belas menit mendapat 429 dengan `Retry-After`. (#827)
+- **Error menyebutkan apa yang salah**: binary yang hilang, kesalahan penyimpanan, proses yang dihentikan karena kehabisan memori, dan batas unggahan kini mendapat pesan yang spesifik alih-alih 500 atau 422 polos.
+- **Log audit mencakup proses alat, batch, dan pipeline**, dan event pengguna, peran, tim, dan GDPR mencatat siapa melakukan apa kepada siapa. (#3991, #3984)
+- **Container all-in-one berhenti saat boot pertama yang buruk** alih-alih restart tanpa henti, dan Postgres serta Redis bawaan memiliki batas waktu startup. (#3008, #1130)
+- **Tanggal dan bentuk jamak mengikuti bahasa Anda**, dan string bahasa Inggris hardcode yang terakhir sudah diterjemahkan.
+- **Penyempurnaan seluler dan editor**: tata letak slider, Sign PDF, dan crop di ponsel, seret sentuh, kuas piksel yang lebih cepat, serta Levels dan Curves dalam undo dan autosave.
 
-### Correcciones de errores {#v2-3-0-bug-fixes}
+### Perbaikan Bug {#v2-3-0-bug-fixes}
 
-- **Adjust Colors combinaba mal los ajustes**: temperatura, saturación, tono, contraste y sepia se anulaban entre sí en lugar de acumularse. (#3153, #3120, #3469)
-- **Pixelate no pixelaba**, y la salida PNG se reducía silenciosamente de paleta en varias herramientas de imagen. (#709, #716)
-- **Los GIF y WebP animados perdían fotogramas** en varias herramientas, y las paletas y la transparencia de los GIF salían mal. (#1184, #1225, #3407, #2573)
-- **Las cargas giradas perdían calidad**: la orientación automática descartaba la codificación sin pérdida, la transparencia y la profundidad de 16 bits. El WebP animado ahora gira todos los fotogramas. (#2384, #2529)
-- **Los TIFF con transparencia, los archivos HEIF con AV1 y varios formatos RAW** fallaban o perdían el canal alfa. (#2609, #2572, #1120)
-- **Cambiar el tamaño del lienzo del editor escalaba la imagen** en lugar de añadir espacio a su alrededor. (#2081)
-- **Los nombres de archivo de salida se alteraban**: `.jpeg` y `.tif` se convertían en otra cosa, y los archivos que empiezan por punto o los nombres que repiten su extensión fallaban. (#3495, #3382)
-- **El autoguardado en la biblioteca ignoraba la cuota de almacenamiento**, y los contadores de almacenamiento podían volverse negativos. (#2389, #2585)
-- **Los trabajos atascados tras un reinicio** ahora se resuelven al iniciar en lugar de mostrar "procesando" para siempre. (#3219, #3193)
-- **El inicio de sesión con OIDC nombraba "admin" a todo usuario nuevo**, y los inicios de sesión en Safari de iOS terminaban en una página de error tras completarse con éxito. (#862, #4021)
-- **Las reglas de contraseña desactivadas se seguían aplicando** al crear usuarios. (#1028)
-- **Los PDF dañados se colgaban 30 segundos** antes de fallar. (#920)
-- **La comprobación de disco del paquete de IA pedía unos 18 GB** para instalar un solo paquete. (#1248)
-- **Compress Video fallaba con grabaciones de pantalla de velocidad de fotogramas variable.** (#2427)
-- **La eliminación de fondo por lotes perdía resultados terminados** cuando el navegador reintentaba la solicitud. (#2015)
-- **Los campos numéricos de Ajustes no se podían vaciar** mientras se escribía. (#1449)
-- **Desactivar la analítica dejaba eventos en cola para enviarse** unos 30 segundos después. Ahora se descartan cuando usted opta por no participar. (#4270)
+- **Adjust Colors menggabungkan pengaturan secara keliru**: suhu, saturasi, hue, kontras, dan sepia saling menimpa alih-alih bertumpuk. (#3153, #3120, #3469)
+- **Pixelate tidak memberi efek piksel**, dan keluaran PNG diam-diam dikurangi palet warnanya di berbagai alat gambar. (#709, #716)
+- **GIF dan WebP animasi kehilangan frame** di beberapa alat, dan palet serta transparansi GIF keluar salah. (#1184, #1225, #3407, #2573)
+- **Unggahan yang diputar kehilangan kualitas**: auto-orient menghilangkan pengodean lossless, transparansi, dan kedalaman 16-bit. WebP animasi kini memutar setiap frame. (#2384, #2529)
+- **TIFF dengan transparansi, file HEIF AV1, dan beberapa format RAW** gagal atau kehilangan alpha. (#2609, #2572, #1120)
+- **Mengubah ukuran kanvas editor menskalakan gambar** alih-alih menambah ruang di sekelilingnya. (#2081)
+- **Nama file keluaran rusak**: `.jpeg` dan `.tif` berubah menjadi hal lain, dan dotfile atau nama yang mengulang ekstensinya bermasalah. (#3495, #3382)
+- **Simpan otomatis Pustaka mengabaikan kuota penyimpanan**, dan penghitung penyimpanan bisa menjadi negatif. (#2389, #2585)
+- **Job yang macet setelah restart** kini diselesaikan saat startup alih-alih menampilkan "processing" selamanya. (#3219, #3193)
+- **Login OIDC menamai setiap pengguna baru "admin"**, dan login iOS Safari berakhir di halaman error setelah berhasil. (#862, #4021)
+- **Aturan kata sandi yang dinonaktifkan tetap diberlakukan** saat membuat pengguna. (#1028)
+- **PDF yang rusak menggantung selama 30 detik** sebelum gagal. (#920)
+- **Pemeriksaan disk bundel AI meminta sekitar 18 GB** untuk memasang satu bundel. (#1248)
+- **Compress Video gagal pada rekaman layar dengan frame rate variabel.** (#2427)
+- **Penghapusan latar belakang batch kehilangan hasil yang sudah selesai** ketika browser mencoba ulang permintaan. (#2015)
+- **Kolom angka di Pengaturan tidak dapat dikosongkan** saat mengetik. (#1449)
+- **Mematikan analitik meninggalkan event dalam antrean untuk dikirim** sekitar 30 detik kemudian. Kini event tersebut dibuang saat Anda memilih keluar. (#4270)
 
-### Notas de actualización {#v2-3-0-upgrade-notes}
+### Catatan Upgrade {#v2-3-0-upgrade-notes}
 
-Las migraciones se ejecutan solas al iniciar. No necesita ejecutar ningún SQL.
+Migrasi berjalan sendiri saat startup. Anda tidak perlu menjalankan SQL apa pun.
 
-- **Roles de base de datos.** El archivo Compose canónico ahora da a la aplicación un rol que solo puede leer y escribir datos (`DATABASE_URL`) y una conexión privilegiada independiente (`DATABASE_MIGRATION_URL`) que se usa solo durante el arranque para migraciones y permisos. Un archivo Compose existente sigue funcionando como antes: deje `DATABASE_MIGRATION_URL` sin definir y SnapOtter funciona con un solo rol. Para un despliegue no local, defina `POSTGRES_APP_PASSWORD` junto con `POSTGRES_PASSWORD`.
-- **Comprobaciones de inicio más estrictas.** Antes fallaban más tarde, o en silencio. Ahora detienen el contenedor con un mensaje que nombra la variable: un `DEFAULT_LOCALE` no admitido (use un código admitido como `de`, no `de_DE`), un `SAML_IDP_SSO_URL`, `SAML_CALLBACK_URL` o `OIDC_ISSUER_URL` mal formado cuando SSO está activado, una lista `TRUST_PROXY` no válida, un `BASE_PATH` incorrecto y un `LOG_DIR` no escribible.
-- **`TRUST_PROXY` ya no acepta un número de saltos.** Un número como `TRUST_PROXY=2` ahora detiene el contenedor al iniciar en lugar de no confiar silenciosamente en ningún proxy. Defínalo con las direcciones del proxy o con rangos con nombre (el valor predeterminado es `loopback,linklocal,uniquelocal`), `false` cuando nada hace de proxy de SnapOtter, o `true` solo cuando un proxy bajo su control esté delante, en una dirección pública. (#998)
-- **`MAX_WORKER_THREADS` ahora surte efecto.** Si lo definió y no vio ningún cambio antes, ahora lo verá.
-- **Códigos de estado de la API.** Los fallos de motor y de almacenamiento devuelven 503 `ENGINE_UNAVAILABLE` (los endpoints por lotes devolvían 422). Las cargas que superan el límite devuelven 413 (antes 400). Un `clientJobId` mal formado devuelve 400 y uno reutilizado 409 (antes 500). Reproducir su propio lote de pipeline devuelve 202. `mode=targetSize` sin `targetSizeKb` devuelve 400. Un inicio de sesión local rechazado bajo la exigencia de SSO devuelve 401 en lugar de 403 `SSO_ENFORCED`. Los inicios de sesión limitados devuelven 429 `LOGIN_THROTTLED`. El resultado de remove-background ya no incluye `originalUrl`.
-- **Nuevas variables opcionales**: `BASE_PATH`, `DATABASE_MIGRATION_URL`, `GDPR_EXPORT_TIMEOUT_MS` (15 minutos por defecto, `0` lo desactiva), `EMBEDDED_REDIS_TIMEOUT_S` (180) y `EMBEDDED_POSTGRES_TIMEOUT_S` (600).
-- **Los archivos Compose se distribuyen con la versión.** `docker-compose.yml` y `docker-compose-gpu.yml` se adjuntan a esta versión, de modo que puede descargarlos directamente desde la página de la versión.
+- **Role database.** File Compose kanonis kini memberi aplikasi role yang hanya dapat membaca dan menulis data (`DATABASE_URL`) dan koneksi berhak istimewa terpisah (`DATABASE_MIGRATION_URL`) yang hanya digunakan saat boot untuk migrasi dan grant. File Compose yang sudah ada tetap berfungsi seperti sebelumnya: biarkan `DATABASE_MIGRATION_URL` tidak diatur dan SnapOtter berjalan dengan satu role. Untuk deployment non-lokal, atur `POSTGRES_APP_PASSWORD` bersama `POSTGRES_PASSWORD`.
+- **Pemeriksaan startup yang lebih ketat.** Sebelumnya ini gagal belakangan, atau diam-diam. Kini semuanya menghentikan container dengan pesan yang menyebutkan variabelnya: `DEFAULT_LOCALE` yang tidak didukung (gunakan kode yang didukung seperti `de`, bukan `de_DE`), `SAML_IDP_SSO_URL`, `SAML_CALLBACK_URL`, atau `OIDC_ISSUER_URL` yang salah format saat SSO aktif, daftar `TRUST_PROXY` yang tidak valid, `BASE_PATH` yang salah, dan `LOG_DIR` yang tidak dapat ditulis.
+- **`TRUST_PROXY` tidak lagi menerima jumlah hop.** Angka seperti `TRUST_PROXY=2` kini menghentikan container saat startup alih-alih diam-diam tidak memercayai proxy mana pun. Atur ke alamat proxy atau rentang bernama (defaultnya `loopback,linklocal,uniquelocal`), `false` ketika tidak ada proxy di depan SnapOtter, atau `true` hanya ketika proxy yang Anda kendalikan berada di depan pada alamat publik. (#998)
+- **`MAX_WORKER_THREADS` kini berlaku.** Jika Anda mengaturnya dan sebelumnya tidak melihat perubahan, sekarang Anda akan melihatnya.
+- **Kode status API.** Kesalahan engine dan penyimpanan mengembalikan 503 `ENGINE_UNAVAILABLE` (endpoint batch sebelumnya mengembalikan 422). Unggahan yang melebihi batas mengembalikan 413 (sebelumnya 400). `clientJobId` yang salah format mengembalikan 400 dan yang dipakai ulang 409 (sebelumnya 500). Memutar ulang batch pipeline Anda sendiri mengembalikan 202. `mode=targetSize` tanpa `targetSizeKb` mengembalikan 400. Login lokal yang ditolak di bawah penegakan SSO mengembalikan 401 alih-alih 403 `SSO_ENFORCED`. Login yang dibatasi mengembalikan 429 `LOGIN_THROTTLED`. Hasil remove-background tidak lagi menyertakan `originalUrl`.
+- **Variabel opsional baru**: `BASE_PATH`, `DATABASE_MIGRATION_URL`, `GDPR_EXPORT_TIMEOUT_MS` (15 menit secara default, `0` menonaktifkan), `EMBEDDED_REDIS_TIMEOUT_S` (180), dan `EMBEDDED_POSTGRES_TIMEOUT_S` (600).
+- **File Compose disertakan bersama rilis.** `docker-compose.yml` dan `docker-compose-gpu.yml` dilampirkan pada rilis ini, sehingga Anda dapat mengunduhnya langsung dari halaman rilis.
 
-### Agradecimientos {#v2-3-0-acknowledgements}
+### Ucapan Terima Kasih {#v2-3-0-acknowledgements}
 
-Un millón de descargas significa mucha gente reportando errores, enviando correcciones y diciéndonos lo que faltaba. Esta versión es en su mayor parte obra suya.
+Satu juta pull berarti banyak orang yang melaporkan bug, mengirim perbaikan, dan memberi tahu kami apa yang kurang. Rilis ini sebagian besar adalah hasil kerja mereka.
 
-Código y contribuciones:
+Kode dan kontribusi:
 
-- **@zakka258** ❤️: Construyó el editor de páginas PDF Multi-Tool y el despliegue bajo subruta, dos de las funciones más grandes de esta versión, incluidas las pruebas de autenticación y SSO bajo una subruta. (#1338, #1252, #1324, #1295)
-- **@akshat-lakhera** ❤️: Construyó los ajustes preestablecidos de compresión de imágenes a un tamaño objetivo con un clic, corrigió la concurrencia y la limpieza de las vistas previas, e impidió que el almacenamiento bloqueado del navegador dejara colgado el indicador de carga del inicio de sesión. (#1250, #1368, #2359)
-- **@ChrisCreatesNet** ❤️: Añadió el reordenamiento de páginas arrastrando y soltando a Organize PDF, algo que había pedido antes en Discussions. (#1249, #965)
-- **@drakeo338** ❤️: Diez correcciones en todo el conjunto, incluidas la orientación automática que conserva el formato y la calidad, los grupos SCIM creados en una sola transacción, las instalaciones de IA bajo cgroup v2, y los errores 5xx que ya no se enmascaran como 422. (#1229, #2014, #1638, #1667)
-- **@SuranaSanyam** ❤️: Añadió el relleno transparente del lienzo al editor, corrigió los veredictos obsoletos del tamaño objetivo de Compress PDF y permitió actualizaciones parciales de equipos. (#4111, #4112, #1906, #2366, #2367)
-- **@thejdubb02** ❤️: Impidió que las instancias autoalojadas enviaran datos de mapas de calor, validó `TRUST_PROXY` al iniciar en lugar de fallar, y corrigió el manejo de nombres de grupo de SCIM y de los tiempos de espera de qpdf. (#1051, #1052, #1053, #993, #994)
-- **@88subarno88** ❤️: Convirtió varios 500 en respuestas 400 y 409 adecuadas para ID de trabajo mal formados e importaciones multipart, y corrigió el vaciado de los campos numéricos en Ajustes. (#1486, #1556, #1603, #1449)
-- **@harshoutoftokens** ❤️: Hizo que la lectura de códigos de barras funcione sin conexión al incluir su decodificador, corrigió las vistas previas de medios que mostraban la entrada y mejoró la búsqueda de formatos. (#1401, #1512, #1388)
-- **@darklabs9** ❤️: Reportó y corrigió el fallo de Compress Video con grabaciones de pantalla de velocidad de fotogramas variable. (#2426, #2427)
-- **@dvd233** ❤️: Expuso todos los formatos RAW de cámara que admite el decodificador, y logró que las herramientas de favicon aparezcan al buscar ICO. (#1120, #1121)
-- **@bercedev** ❤️: Corrigió los nombres de archivo cuyo nombre base repite la extensión, e hizo que la IA informe del dispositivo en el que realmente se ejecuta. (#3382, #3613)
-- **@pamod-madubashana** ❤️: Tradujo el último encabezado de MFA que solo estaba en inglés y conectó las cadenas de progreso sin usar. (#1228, #1227)
-- **@mvanhorn** ❤️: Corrigió la asignación duplicada de nombres de usuario en el inicio de sesión con SAML. (#2640)
-- **@peremunoz** ❤️: Impidió que la generación de códigos de barras ocultara los fallos de almacenamiento y de memoria como "Texto no válido". (#4057)
-- **@mayuriphad** ❤️: Corrigió un fallo con una cabecera de autenticación de alerta almacenada mal formada. (#3080)
-- **@DevShoaib78** ❤️: Corrigió el cierre del lazo poligonal en el editor. (#1207)
-- **@dltsum** ❤️: Trasladó las indicaciones de progreso al catálogo de mensajes compartido. (#1262)
-- **@albanobattistella** ❤️: Correcciones de traducción. (#1024)
-- **@shoaibyazdani** ❤️: Regeneró las referencias visuales de macOS. (#2475)
+- **@zakka258** ❤️: Membangun editor halaman PDF Multi-Tool dan deployment subpath, dua fitur terbesar di rilis ini, termasuk pengujian untuk auth dan SSO di bawah subpath. (#1338, #1252, #1324, #1295)
+- **@akshat-lakhera** ❤️: Membangun preset gambar kompres-ke-ukuran satu klik, memperbaiki konkurensi dan pembersihan pratinjau, serta menghentikan penyimpanan browser yang diblokir menggantungkan spinner login. (#1250, #1368, #2359)
+- **@ChrisCreatesNet** ❤️: Menambahkan pengurutan ulang halaman dengan seret dan lepas ke Organize PDF, yang pertama kali mereka minta di Discussions. (#1249, #965)
+- **@drakeo338** ❤️: Sepuluh perbaikan di seluruh stack, termasuk auto-orient yang mempertahankan format dan kualitas, grup SCIM yang dibuat dalam satu transaksi, instalasi AI di bawah cgroup v2, dan error 5xx yang tidak lagi disamarkan sebagai 422. (#1229, #2014, #1638, #1667)
+- **@SuranaSanyam** ❤️: Menambahkan padding kanvas transparan ke editor, memperbaiki vonis ukuran target Compress PDF yang basi, dan mengizinkan pembaruan tim sebagian. (#4111, #4112, #1906, #2366, #2367)
+- **@thejdubb02** ❤️: Menghentikan instance self-hosted mengirim data heatmap, memvalidasi `TRUST_PROXY` saat startup alih-alih crash, dan memperbaiki penanganan nama grup SCIM dan timeout qpdf. (#1051, #1052, #1053, #993, #994)
+- **@88subarno88** ❤️: Mengubah beberapa 500 menjadi jawaban 400 dan 409 yang tepat untuk ID job yang salah format dan impor multipart, serta memperbaiki pengosongan kolom angka di Pengaturan. (#1486, #1556, #1603, #1449)
+- **@harshoutoftokens** ❤️: Membuat pembacaan barcode berfungsi offline dengan menyertakan dekodernya, memperbaiki pratinjau media yang menampilkan input, dan menyempurnakan pencarian format. (#1401, #1512, #1388)
+- **@darklabs9** ❤️: Melaporkan dan memperbaiki Compress Video yang gagal pada rekaman layar dengan frame rate variabel. (#2426, #2427)
+- **@dvd233** ❤️: Mengekspos setiap format RAW kamera yang didukung dekoder, dan membuat alat favicon muncul untuk pencarian ICO. (#1120, #1121)
+- **@bercedev** ❤️: Memperbaiki nama file yang batang namanya mengulang ekstensi, dan membuat AI melaporkan perangkat yang benar-benar digunakannya. (#3382, #3613)
+- **@pamod-madubashana** ❤️: Menerjemahkan judul MFA terakhir yang masih berbahasa Inggris saja dan menghubungkan string progres yang tidak terpakai. (#1228, #1227)
+- **@mvanhorn** ❤️: Memperbaiki alokasi nama pengguna ganda pada login SAML. (#2640)
+- **@peremunoz** ❤️: Menghentikan pembuatan barcode menyembunyikan kesalahan penyimpanan dan memori sebagai "Invalid text". (#4057)
+- **@mayuriphad** ❤️: Memperbaiki crash pada header autentikasi alert tersimpan yang salah format. (#3080)
+- **@DevShoaib78** ❤️: Memperbaiki penutupan lasso poligonal di editor. (#1207)
+- **@dltsum** ❤️: Memindahkan tampilan progres ke katalog pesan bersama. (#1262)
+- **@albanobattistella** ❤️: Perbaikan terjemahan. (#1024)
+- **@shoaibyazdani** ❤️: Membuat ulang baseline visual macOS. (#2475)
 
-Divulgaciones de seguridad:
+Pengungkapan keamanan:
 
-- **@xaferima** ❤️: Descubrió que los SVG rechazados por el decodificador omitían el saneamiento, y analizó el impacto junto con nosotros. (GHSA-9c7h-xjrp-8gh3, #1211)
-- **@emirhancatkin** ❤️: Descubrió que los enlaces de resultados también servían la carga original. (GHSA-jgv3-2jc6-f628, #3623)
-- **@shaoyuuuuu** ❤️: Descubrió que las funciones de foto de pasaporte y de efectos de fondo confiaban en un ID de trabajo proporcionado por el cliente. (GHSA-3c8g-8v4x-qq9j, #3623)
-- **@nguyenvantiennani** ❤️: Descubrió que la importación por URL omitía las comprobaciones de permisos. (GHSA-8xxr-g2w8-7f9r, #3780)
-- **tonghuaroot** ❤️: Reportó elusiones mediante IPv6 de las comprobaciones de direcciones SSRF, con pruebas de concepto funcionales. Las correcciones se incluyeron en 2.0.0, y este agradecimiento se debía desde hace tiempo. (#287)
+- **@xaferima** ❤️: Menemukan bahwa SVG yang ditolak dekoder melewati sanitasi, dan menelaah dampaknya bersama kami. (GHSA-9c7h-xjrp-8gh3, #1211)
+- **@emirhancatkin** ❤️: Menemukan bahwa tautan hasil juga menyajikan unggahan asli. (GHSA-jgv3-2jc6-f628, #3623)
+- **@shaoyuuuuu** ❤️: Menemukan bahwa foto paspor dan efek latar belakang memercayai ID job yang diberikan klien. (GHSA-3c8g-8v4x-qq9j, #3623)
+- **@nguyenvantiennani** ❤️: Menemukan bahwa impor URL melewati pemeriksaan izin. (GHSA-8xxr-g2w8-7f9r, #3780)
+- **tonghuaroot** ❤️: Melaporkan bypass IPv6 pada pemeriksaan alamat SSRF, lengkap dengan proof of concept yang berfungsi. Perbaikannya dirilis di 2.0.0, dan ucapan terima kasih ini sudah terlambat. (#287)
 
-Reportes de errores:
+Laporan bug:
 
-- **@kabo** ❤️: El ejemplo de `docker-compose.yml` no funcionaba. (#1027)
-- **@xromen** ❤️: PDF dañados que se colgaban hasta un tiempo de espera de qpdf de 30 segundos. (#920)
-- **@snmabaur** ❤️: El inicio de sesión con OIDC que establecía todos los nombres de perfil como "admin". (#862)
-- **@CodecNomad** ❤️: La herramienta Blur que duplicaba la imagen. (#829)
-- **@ohora0923** ❤️ y **@Alexis-VS-CSharp** ❤️: Pixelate que no funcionaba. (#678, #775)
-- **@mptpro** ❤️: La descarga de IA de eliminación de fondo que fallaba. (#714)
-- **@dominic427** ❤️: Cambiar el tamaño del lienzo del editor escalaba la imagen en lugar de extenderla. (#2016)
-- **@CodeByToast** ❤️: Campos numéricos de Ajustes que no se podían vaciar. (#1186)
-- **@gioxx** ❤️: La comprobación de disco del paquete de IA que exigía unos 18 GB para un solo paquete. (#1248)
-- **@rekcodocker** ❤️ y **@madmike970** ❤️: Instalaciones de paquetes de IA que fallaban en Proxmox LXC, con los detalles del contenedor que ayudaron a acotarlo. (#1030, #352)
-- **@wxf26054** ❤️: Reglas de contraseña desactivadas que se seguían aplicando al crear usuarios. (#1028)
-- **@ersil** ❤️: Safari de iOS que solicitaba dos veces el callback de OIDC y terminaba en una página de error tras un inicio de sesión exitoso. (#4021)
-- **@casi-3** ❤️: La eliminación de fondo por lotes que perdía resultados terminados cuando el navegador reproducía la solicitud, con un diagnóstico preciso. (#2015)
-- **@killervette42** ❤️: El fallo de la GPU Blackwell en unRaid, que dio lugar a la alternativa a CPU para la serie RTX 50. (#120, #4075)
+- **@kabo** ❤️: Contoh `docker-compose.yml` tidak berfungsi. (#1027)
+- **@xromen** ❤️: PDF rusak menggantung hingga timeout qpdf 30 detik. (#920)
+- **@snmabaur** ❤️: Login OIDC mengatur setiap nama profil menjadi "admin". (#862)
+- **@CodecNomad** ❤️: Alat Blur menggandakan gambar. (#829)
+- **@ohora0923** ❤️ dan **@Alexis-VS-CSharp** ❤️: Pixelate tidak berfungsi. (#678, #775)
+- **@mptpro** ❤️: Unduhan AI penghapusan latar belakang gagal. (#714)
+- **@dominic427** ❤️: Mengubah ukuran kanvas editor menskalakan gambar alih-alih memperluasnya. (#2016)
+- **@CodeByToast** ❤️: Kolom angka di Pengaturan yang tidak dapat dikosongkan. (#1186)
+- **@gioxx** ❤️: Pemeriksaan disk bundel AI meminta sekitar 18 GB untuk satu bundel. (#1248)
+- **@rekcodocker** ❤️ dan **@madmike970** ❤️: Instalasi bundel AI gagal di Proxmox LXC, beserta detail container yang membantu mempersempit penyebabnya. (#1030, #352)
+- **@wxf26054** ❤️: Aturan kata sandi yang dinonaktifkan tetap diberlakukan saat membuat pengguna. (#1028)
+- **@ersil** ❤️: iOS Safari meminta callback OIDC dua kali dan mendarat di halaman error setelah login berhasil. (#4021)
+- **@casi-3** ❤️: Penghapusan latar belakang batch kehilangan hasil yang sudah selesai ketika browser memutar ulang permintaan, disertai diagnosis yang tepat. (#2015)
+- **@killervette42** ❤️: Kegagalan GPU Blackwell di unRaid, yang menjadi bahan bagi fallback CPU untuk seri RTX 50. (#120, #4075)
 
-Solicitudes de funciones y comentarios:
+Permintaan fitur dan masukan:
 
-- **@photoevents** ❤️: Midió que la eliminación de fondo tardaba unos 11 segundos en cargar el modelo y 1 segundo en la inferencia, propuso almacenar sesiones en caché y compartió lo que había aprendido al ejecutar su propia caché. Eso se convirtió en la caché de sesiones de esta versión. (#768, #776, #4144)
-- **@benbou8231** ❤️: Señaló que los archivos importados llegan en orden inverso a las herramientas de varios archivos, lo que condujo a poder reordenar antes de una ejecución. (#729, #756)
-- **@cf3901646** ❤️: Rastreó un error ruidoso de producción hasta la clase de error 58 de Postgres y propuso la corrección. No pudimos fusionar su PR sin un CLA firmado, así que escribimos nosotros la misma corrección. (#4210, #4253)
-- **@chiliec** ❤️: Detectó que una orientación automática fallida se ignoraba en silencio y que el progreso de la instalación ignoraba el catálogo de traducciones. Ambas propuestas se incorporaron mediante PR de los mantenedores. (#1266, #1416, #1258, #1262)
-- **@wahajahmed010** ❤️: Propuso unificar en un solo vuelo la importación del módulo enterprise, la corrección para que las solicitudes SCIM concurrentes dejaran de discrepar sobre la licencia. (#1267, #1283)
-- **@chenzeyan54-commits** ❤️: Señaló que la guía de configuración nunca mencionaba las sobrescrituras de binarios de motores ni `SNAPOTTER_HW_ACCEL`, que ahora están documentados. (#1312, #1696)
-- **@aron-intframe** ❤️: Reprodujo una laguna en el manejo de errores de exiftool en un clon nuevo y descubrió que la condición de carrera de la ruta temporal era peor de lo que describía la incidencia. (#3458)
+- **@photoevents** ❤️: Mengukur bahwa penghapusan latar belakang menghabiskan sekitar 11 detik memuat model dan 1 detik untuk inferensi, mengusulkan caching sesi, dan membagikan apa yang mereka pelajari dari menjalankan cache sendiri. Itu menjadi session cache di rilis ini. (#768, #776, #4144)
+- **@benbou8231** ❤️: Menunjukkan bahwa file yang diimpor masuk dalam urutan terbalik di alat multi-file, yang mengarah ke pengurutan ulang sebelum proses. (#729, #756)
+- **@cf3901646** ❤️: Melacak error produksi yang berisik hingga ke kelas error Postgres 58 dan mengusulkan perbaikannya. Kami tidak dapat menggabungkan PR mereka tanpa CLA yang ditandatangani, jadi kami menulis perbaikan yang sama sendiri. (#4210, #4253)
+- **@chiliec** ❤️: Menyadari bahwa auto-orient yang gagal ditelan secara diam-diam dan bahwa progres instalasi mengabaikan katalog terjemahan. Kedua usulan dirilis melalui PR maintainer. (#1266, #1416, #1258, #1262)
+- **@wahajahmed010** ❤️: Mengusulkan single-flight untuk impor modul enterprise, perbaikan bagi permintaan SCIM bersamaan yang tidak sepakat soal lisensi. (#1267, #1283)
+- **@chenzeyan54-commits** ❤️: Menunjukkan bahwa panduan konfigurasi tidak pernah menyebutkan override binary engine atau `SNAPOTTER_HW_ACCEL`, yang kini sudah didokumentasikan. (#1312, #1696)
+- **@aron-intframe** ❤️: Mereproduksi celah penanganan error exiftool pada clone baru dan menemukan bahwa race pada path sementara lebih buruk daripada yang dijelaskan di issue. (#3458)
 
-Gracias también a los miembros de la comunidad que reportaron estos casos por Discord y por correo electrónico, y cuyos nombres no registramos.
+Terima kasih juga kepada anggota komunitas yang melaporkan hal-hal ini lewat Discord dan email, yang namanya tidak kami catat.
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.2.0...v2.3.0)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.2.0...v2.3.0)
 
 ---
 
 ## v2.2.0 {#v2-2-0}
 
-La mayor parte de 2.2 es endurecimiento. Un usuario no administrador con un rol `users:manage` delegado podía tomar el control de una instancia, y resultó que a todos los endpoints de herramientas les faltaba su comprobación de permisos. Actualice si tiene más de un usuario.
+Sebagian besar 2.2 adalah penguatan keamanan. Non-admin yang memegang role `users:manage` yang didelegasikan dapat mengambil alih sebuah instance, dan ternyata setiap endpoint alat tidak memiliki pemeriksaan izin. Perbarui jika Anda menjalankan lebih dari satu pengguna.
 
-El resto es la larga cola del autoalojamiento: descargas que empezaban y nunca terminaban, ajustes preestablecidos que se rompían en cuanto añadía un segundo archivo, contenedores que se reiniciaban en bucle mientras Postgres aún arrancaba. También llegaron dos herramientas nuevas. La documentación y el sitio web ahora están traducidos a 21 idiomas, y la interfaz por fin cumple el contraste WCAG AA.
+Sisanya adalah ekor panjang dari self-hosting: unduhan yang dimulai tetapi tidak pernah selesai, preset yang rusak begitu Anda menambahkan file kedua, container yang crash-loop saat Postgres masih naik. Dua alat baru juga hadir. Dokumentasi dan situs web kini diterjemahkan ke 21 bahasa, dan antarmuka akhirnya memenuhi kontras WCAG AA.
 
 > [!IMPORTANT]
-> Si concedió `users:manage` a un usuario no administrador mediante un rol personalizado, ese rol podía tomar el control de cuentas de administrador en 2.0.0 hasta 2.1.0. Los detalles están en Seguridad.
+> Jika Anda memberikan `users:manage` kepada non-admin melalui role kustom, role tersebut dapat mengambil alih akun administrator pada 2.0.0 hingga 2.1.0. Detail ada di Keamanan.
 
-### Seguridad {#v2-2-0-security}
+### Keamanan {#v2-2-0-security}
 
-- **Escalada de privilegios mediante un rol `users:manage` delegado (GHSA-9xgh-95qh-2x7h).** Un usuario no administrador con `users:manage` a través de un rol personalizado podía restablecer la contraseña de una cuenta de mayor privilegio, o eliminarla, incluido un administrador integrado, y tomar el control de la instancia. El restablecimiento de contraseña y la eliminación de cuentas ahora verifican la autoridad de quien llama sobre el objetivo, de modo que un rol delegado no puede alcanzar niveles por encima del suyo. Afectadas: de 2.0.0 a 2.1.0. Reportado por 李春来 (Chunlai Li). (#616)
-- **Todos los endpoints de herramientas ahora están protegidos.** El acceso a las herramientas se aplicaba ruta por ruta, así que las 45 rutas escritas a mano debían recordar la misma llamada y ninguna lo hacía. Un rol sin `tools:use` aún podía ejecutar image-to-pdf, erase-object, upscale, sign-pdf y el resto. La comprobación ahora reside en un único preHandler basado en la ruta coincidente, por lo que cubre las subrutas y cualquier ruta que se añada en el futuro. (#646)
-- **La limitación de tasa se podía eludir en las instalaciones con Docker.** La imagen se distribuía con `TRUST_PROXY=true`, así que la IP del cliente provenía de una cabecera de la solicitud y un `X-Forwarded-For` falsificado superaba el limitador de inicio de sesión. El valor predeterminado ahora es una lista de confianza de redes privadas. (#649)
-- **Las escrituras de ajustes se comprueban por ajuste**, no una sola vez en la entrada, y la importación de configuración ahora es transaccional, de modo que una clave rechazada no pueda dejar una configuración aplicada a medias. (#618)
-- **Los nombres de archivo de la biblioteca no pueden escapar de su raíz de almacenamiento.** Un nombre almacenado manipulado, que una importación SQLite 1.x maliciosa copia tal cual, podía leer o eliminar archivos fuera del directorio de archivos. Solo es alcanzable después de que un operador importe una base de datos SQLite 1.x proporcionada por un atacante, que es la única vía que permite elegir un nombre almacenado. Reportado por @Alpastx. (GHSA-55w2-8cqf-w969, #600)
-- **La cancelación de trabajos exige la propiedad**, de modo que un usuario autenticado ya no puede cancelar el trabajo de otro usuario mediante su ID. Reportado por @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
-- **Una nueva auditoría de todo el árbol 2.0 detectó lo que seguía abierto**: se podía reproducir una aserción SAML capturada, un desafío de MFA sobrevivía a cualquier número de códigos erróneos, la búsqueda de clave de API por solicitud era un escaneo completo de la tabla, `MAX_WORKSPACE_SIZE_GB` era configuración muerta, y el sanitizador de SVG dejaba pasar href sin comillas de `javascript:`. (#620)
-- **Nueve CVE divulgados parcheados**: fast-uri, svgo, sharp y tar de forma transitiva (#619), además de Pillow 12.3.0 (#517). La decodificación RAW en arm64 ahora compila LibRaw 0.22.2 desde el código fuente en lugar de enlazar una copia del sistema sin parchear. (#649)
+- **Eskalasi hak istimewa melalui role `users:manage` yang didelegasikan (GHSA-9xgh-95qh-2x7h).** Non-admin yang memegang `users:manage` melalui role kustom dapat mereset kata sandi, atau menghapus, akun dengan hak istimewa lebih tinggi, termasuk administrator bawaan, dan mengambil alih instance. Reset kata sandi dan penghapusan akun kini memverifikasi wewenang pemanggil atas target, sehingga role yang didelegasikan tidak dapat menjangkau di atas levelnya sendiri. Terdampak: 2.0.0 hingga 2.1.0. Dilaporkan oleh 李春来 (Chunlai Li). (#616)
+- **Setiap endpoint alat kini dijaga.** Akses alat sebelumnya ditegakkan rute demi rute, sehingga ke-45 rute yang ditulis tangan harus mengingat pemanggilan yang sama dan tidak satu pun melakukannya. Role tanpa `tools:use` masih dapat menjalankan image-to-pdf, erase-object, upscale, sign-pdf, dan lainnya. Pemeriksaan kini berada di satu preHandler yang dikunci pada rute yang cocok, sehingga mencakup sub-path dan rute apa pun yang ditambahkan nanti. (#646)
+- **Pembatasan laju dapat dilewati pada instalasi Docker.** Image dikirim dengan `TRUST_PROXY=true`, sehingga IP klien berasal dari header permintaan dan `X-Forwarded-For` yang dipalsukan lolos dari pembatas login. Defaultnya kini daftar kepercayaan jaringan privat. (#649)
+- **Penulisan pengaturan diperiksa per pengaturan**, bukan sekali di pintu masuk, dan impor konfigurasi kini transaksional sehingga kunci yang ditolak tidak dapat meninggalkan konfigurasi yang diterapkan setengah-setengah. (#618)
+- **Nama file Pustaka tidak dapat keluar dari root penyimpanannya.** Nama tersimpan yang direkayasa, yang disalin apa adanya oleh impor SQLite 1.x berbahaya, dapat membaca atau menghapus file di luar direktori file. Hanya dapat dijangkau setelah operator mengimpor database SQLite 1.x yang diberikan penyerang, yang merupakan satu-satunya jalur yang memungkinkan nama tersimpan dipilih. Dilaporkan oleh @Alpastx. (GHSA-55w2-8cqf-w969, #600)
+- **Pembatalan job menegakkan kepemilikan**, sehingga pengguna terautentikasi tidak lagi dapat membatalkan job pengguna lain dengan ID-nya. Dilaporkan oleh @Alpastx. (GHSA-wqxf-gj2p-689x, #599)
+- **Audit ulang seluruh pohon 2.0 menangkap apa yang masih terbuka**: assertion SAML yang tertangkap dapat diputar ulang, challenge MFA bertahan setelah berapa pun kode salah, pencarian kunci API per permintaan berupa pemindaian tabel penuh, `MAX_WORKSPACE_SIZE_GB` adalah konfigurasi mati, dan sanitizer SVG meloloskan href `javascript:` tanpa tanda kutip. (#620)
+- **Sembilan CVE yang diungkapkan ditambal**: fast-uri, svgo, sharp, dan tar secara transitif (#619), ditambah Pillow 12.3.0 (#517). Dekode RAW di arm64 kini membangun LibRaw 0.22.2 dari sumber alih-alih menautkan salinan sistem yang belum ditambal. (#649)
 
-### Funciones nuevas {#v2-2-0-new-features}
+### Fitur Baru {#v2-2-0-new-features}
 
-- **Rounded Crop**: máscaras de cuadrado redondeado y de squircle al estilo iOS, con un control del radio de las esquinas. Pensado para favicons e iconos de aplicaciones. (#602)
-- **Remove GIF Background**: elimine el fondo de un GIF animado, WebP o APNG fotograma a fotograma y obtenga una animación transparente. (#502)
-- **Lazo y modo de Alta Calidad en Object Eraser**: arrastre un lazo libre en lugar de pintar cada píxel y, opcionalmente, instale un paquete de relleno por difusión para rellenos más limpios de áreas grandes. (#503, #566)
-- **Guardar como nuevo, o sobrescribir.** Editar un archivo de la biblioteca solía reemplazar silenciosamente el original. Ahora usted elige en cada edición, y el valor predeterminado lo conserva. (#564, #577)
-- **Ajustes preestablecidos de relación de aspecto en Resize.** Elija 1:1, 4:3 o 16:9 y las dos dimensiones permanecen bloqueadas, sin ampliar. (#530)
-- **OCR de dos niveles**: un nivel rápido incluido en la imagen que se ejecuta sin conexión y sin descargas, y un entorno de ejecución más preciso que se instala bajo demanda. (#519)
-- **Escriba en cualquier lugar para buscar.** Empiece a escribir en el panel o en la página de inicio y el texto llega al cuadro de búsqueda. (#644)
-- **Documentación y sitio web en 21 idiomas**: el sitio de documentación, las páginas de inicio y la referencia de la API ahora están traducidos, sumándose a la interfaz de la aplicación. Una nueva guía de despliegue con pocos recursos cubre Raspberry Pi y equipos de 2 GB. (#548)
-- **Nombres de herramientas más claros**: 18 nombres ambiguos ahora se autocualifican, así que "Compress" pasó a ser "Compress Image". Los ID y las rutas de las herramientas no cambian, así que nada de lo que tenga guardado en marcadores se rompe. (#520)
+- **Rounded Crop**: mask persegi bulat dan squircle gaya iOS, dengan kontrol radius sudut. Dibuat untuk favicon dan ikon aplikasi. (#602)
+- **Remove GIF Background**: hapus latar belakang dari GIF, WebP, atau APNG animasi frame demi frame dan dapatkan animasi transparan. (#502)
+- **Lasso dan mode High Quality pada Object Eraser**: seret loop bebas alih-alih mengecat setiap piksel, dan secara opsional pasang bundel inpainting difusi untuk isian area luas yang lebih bersih. (#503, #566)
+- **Simpan sebagai baru, atau timpa.** Mengedit file Pustaka sebelumnya diam-diam menggantikan aslinya. Kini Anda memilih per pengeditan, dan defaultnya mempertahankan aslinya. (#564, #577)
+- **Preset rasio aspek di Resize.** Pilih 1:1, 4:3, atau 16:9 dan kedua dimensi tetap terkunci, tanpa upscaling. (#530)
+- **OCR dua tingkat**: tingkat cepat sudah disertakan di dalam image dan berjalan offline tanpa unduhan, dan runtime yang lebih akurat dipasang sesuai permintaan. (#519)
+- **Ketik di mana saja untuk mencari.** Mulai mengetik di dasbor atau beranda dan teks masuk ke kotak pencarian. (#644)
+- **Dokumentasi dan situs web dalam 21 bahasa**: situs dokumentasi, halaman landing, dan referensi API semuanya sudah diterjemahkan, menyusul antarmuka aplikasi. Panduan deployment sumber daya rendah yang baru mencakup Raspberry Pi dan mesin 2 GB. (#548)
+- **Nama alat yang lebih jelas**: 18 nama yang ambigu kini menyertakan kualifikasi sendiri, sehingga "Compress" menjadi "Compress Image". ID alat dan rute tidak berubah, jadi tidak ada bookmark yang rusak. (#520)
 
-### Mejoras {#v2-2-0-improvements}
+### Peningkatan {#v2-2-0-improvements}
 
-- **Contraste WCAG AA en toda la interfaz**: la paleta se reajustó para que el naranja vivo quede en los rellenos mientras el texto y las etiquetas usan tokens de tinta accesibles, y los 57 indicadores de foco superan ahora el umbral de 3:1 para elementos no textuales. (#567, #574)
-- **Upscale y la eliminación de fondo dejan de parecer congelados**: la barra de progreso avanza durante la inferencia en lugar de quedarse en 30%, y ambas herramientas ahora advierten de que un host solo con CPU es mucho más lento. (#605, #608)
-- **Los mensajes de tiempo de espera nombran la causa real** y tienen en cuenta los hosts solo con CPU en lugar de culpar a la carga. (#596)
-- **SnapOtter espera a Postgres y a Redis al iniciar** en lugar de reiniciarse en bucle, tanto en Compose como en la imagen todo en uno. Una instalación en Proxmox LXC se reiniciaba 76 veces antes de esto. (#537, #595)
-- **Las descargas sobreviven a un proxy inverso**: SnapOtter pide a nginx y a los proxies compatibles que no almacenen en búfer las respuestas de archivos, que es el motivo habitual de que una descarga autoalojada empiece y nunca termine. (#604, #607)
-- **Compress PDF se acerca al tamaño objetivo**, e indica con honestidad cuando un objetivo está fuera de alcance. (#522)
-- **Los controles de las herramientas en móvil siguen siendo accesibles** ahora que las estructuras de la aplicación se ajustan a la ventana gráfica dinámica. (#559)
-- **Convert Audio expone un ajuste de frecuencia de muestreo.** (#561)
-- **Los administradores pueden relajar la longitud mínima de la contraseña**, hasta 1 en una instancia de LAN de confianza. (#543)
-- **MFA es de autoservicio**, se cerró el bloqueo por política, y los inicios de sesión con OIDC o SAML reciben un desafío de MFA real en lugar de un bloqueo total. (#531, #536)
-- **Un `Error: Error` a secas ahora nombra su causa.** Los fallos de codificación de Sharp, las salidas del sidecar de IA, la salida del sidecar de documentos que no era JSON y los fallos de eliminación de fondo solían llegar con el motivo borrado. (#532, #534, #535, #538, #612)
-- **El cuadro de diálogo de ayuda está traducido.** Las etiquetas de sus atajos y el texto de primeros pasos estaban fijados en inglés mientras había traducciones terminadas sin usar en los 21 archivos de idioma. (#647)
+- **Kontras WCAG AA di seluruh antarmuka**: palet disetel ulang sehingga oranye cerah tetap untuk isian sementara teks dan label memakai token tinta yang aksesibel, dan ke-57 indikator fokus kini memenuhi batas 3:1 untuk non-teks. (#567, #574)
+- **Upscale dan penghapusan latar belakang tidak lagi tampak beku**: bilah progres bergerak selama inferensi alih-alih berhenti di 30%, dan kedua alat kini memperingatkan bahwa host hanya-CPU jauh lebih lambat. (#605, #608)
+- **Pesan timeout menyebutkan penyebab sebenarnya** dan memperhitungkan host hanya-CPU alih-alih menyalahkan unggahan. (#596)
+- **SnapOtter menunggu Postgres dan Redis saat startup** alih-alih crash-loop, baik di Compose maupun image all-in-one. Instalasi Proxmox LXC sempat restart 76 kali sebelum ini. (#537, #595)
+- **Unduhan bertahan melewati reverse proxy**: SnapOtter meminta nginx dan proxy yang kompatibel untuk tidak mem-buffer respons file, yang biasanya menjadi alasan unduhan self-hosted dimulai tetapi tidak pernah selesai. (#604, #607)
+- **Compress PDF mendarat mendekati ukuran target**, dan menyatakannya dengan jujur ketika target tidak terjangkau. (#522)
+- **Kontrol alat di seluler tetap terjangkau** karena shell aplikasi kini mengikuti ukuran viewport dinamis. (#559)
+- **Convert Audio menyediakan pengaturan sample rate.** (#561)
+- **Admin dapat melonggarkan panjang kata sandi minimum**, hingga 1 untuk instance LAN tepercaya. (#543)
+- **MFA bersifat swalayan**, penguncian kebijakan sudah ditutup, dan login OIDC atau SAML mendapat challenge MFA yang sebenarnya alih-alih blokir keras. (#531, #536)
+- **`Error: Error` polos kini menyebutkan penyebabnya.** Kegagalan encode Sharp, keluarnya sidecar AI, keluaran sidecar dokumen non-JSON, dan kegagalan penghapusan latar belakang sebelumnya semuanya tiba dengan alasan yang dihapus. (#532, #534, #535, #538, #612)
+- **Dialog bantuan sudah diterjemahkan.** Label pintasan dan teks memulai-nya sebelumnya hardcode bahasa Inggris sementara terjemahan yang sudah jadi tidak terpakai di ke-21 file locale. (#647)
 
-### Correcciones de errores {#v2-2-0-bug-fixes}
+### Perbaikan Bug {#v2-2-0-bug-fixes}
 
-- **Los archivos HEIC del iPhone se rechazaban** como ilegibles antes de llegar al decodificador que los maneja. (#631)
-- **Los ajustes preestablecidos de conversión fallaban con un segundo archivo**: jpg-to-pdf y sus equivalentes de image-to-pdf, además de pdf-to-png, pdf-to-jpg y pdf-to-tiff, devolvían todos `Tool not found` cuando cargaba dos archivos. (#633, #643)
-- **Los ajustes preestablecidos de conversión de PDF perdieron su botón de descarga.** (#629)
-- **No se respetaba un tiempo de espera de procesamiento ilimitado**, y los flujos de progreso detenidos ahora se recuperan en lugar de dejar a la interfaz esperando. (#638)
-- **Las descargas se colgaban en lugar de fallar** cuando un archivo almacenado resultaba ser más corto que su longitud registrada. (#617)
-- **Las herramientas de páginas PDF fallaban con archivos cortos y cifrados**: Remove Pages usaba por defecto un intervalo de páginas que ningún documento de menos de seis páginas tiene, y los PDF protegidos con contraseña fallaban de forma críptica dentro del worker. (#594)
-- **PDF to Text devolvía en silencio un archivo vacío** con los PDF escaneados. Ahora le indica OCR y sirve el texto en UTF-8. (#603)
-- **PDF to Word descartaba los bloques de texto de color** y los dividía a lo largo de la página. (#500)
-- **Object Eraser dejaba restos fantasma** y difuminaba los objetos pequeños en imágenes de alta resolución. (#501)
-- **Stabilize Video escribía una salida no reproducible** sin faststart. (#593)
-- **Reparaciones del editor de imágenes**: girar, voltear, cambiar tamaño, niveles, curvas, filtros y bloqueo de capas. (#597)
-- **Sign PDF mostraba un lienzo en blanco** en lugar de informar de por qué un PDF no se cargaba. (#545)
-- **La biblioteca de archivos registraba dimensiones 0x0** y omitía las vistas previas de las cargas HEIC, RAW y PSD. (#636, #637)
-- **Instalar más de un paquete de IA** dejaba el entorno virtual compartido con varias versiones y rompía en silencio tres herramientas. (#649)
-- **Convertir a JXL con calidad de 1 a 4 devolvía un 500**, y un ffmpeg ausente se le informaba como una carga corrupta. (#649)
-- **Una interrupción transitoria de Postgres dejaba varados los trabajos terminados**, con la salida en disco y ninguna fila que apuntara a ella. Ahora un reconciliador adopta ese trabajo en lugar de descartarlo. (#649)
-- **Un endpoint de Redis que cambiaba de dirección bloqueaba a todos los consumidores** mientras las comprobaciones de estado seguían respondiendo 200. (#649)
-- **Correcciones del sitio web y de la documentación**: los enlaces localizados ya no pierden los fragmentos `#` ni ponen en minúsculas `zh-CN`, la navegación de la documentación permanece dentro de la ventana gráfica en tabletas, y ninguno de los dos sitios llama ya a la API de GitHub desde su navegador. (#516, #562, #570, #560)
+- **File HEIC iPhone ditolak** sebagai tidak terbaca sebelum mencapai dekoder yang menanganinya. (#631)
+- **Preset konversi gagal pada file kedua**: jpg-to-pdf dan saudara image-to-pdf-nya, ditambah pdf-to-png, pdf-to-jpg, dan pdf-to-tiff, semuanya mengembalikan `Tool not found` begitu Anda mengunggah dua file. (#633, #643)
+- **Preset konversi PDF kehilangan tombol unduhnya.** (#629)
+- **Timeout pemrosesan tanpa batas tidak dihormati**, dan aliran progres yang macet kini pulih alih-alih membiarkan antarmuka menunggu. (#638)
+- **Unduhan menggantung alih-alih gagal** ketika file tersimpan ternyata lebih pendek daripada panjang yang tercatat. (#617)
+- **Alat halaman PDF gagal pada file pendek dan terenkripsi**: Remove Pages secara default memakai rentang halaman yang tidak dimiliki dokumen di bawah enam halaman mana pun, dan PDF yang dilindungi kata sandi gagal secara samar di dalam worker. (#594)
+- **PDF to Text diam-diam mengembalikan file kosong** untuk PDF hasil pindai. Kini ia mengarahkan Anda ke OCR dan menyajikan teks sebagai UTF-8. (#603)
+- **PDF to Word menghilangkan blok teks berwarna** dan memecahnya di seluruh halaman. (#500)
+- **Object Eraser meninggalkan sisa hantu** dan mengaburkan objek kecil pada gambar beresolusi tinggi. (#501)
+- **Stabilize Video menulis keluaran yang tidak dapat diputar** tanpa faststart. (#593)
+- **Perbaikan editor gambar**: rotate, flip, resize, levels, curves, filter, dan kunci layer. (#597)
+- **Sign PDF menampilkan kanvas kosong** alih-alih melaporkan mengapa PDF gagal dimuat. (#545)
+- **Pustaka file mencatat dimensi 0x0** dan melewati pratinjau untuk unggahan HEIC, RAW, dan PSD. (#636, #637)
+- **Memasang lebih dari satu bundel AI** membuat virtualenv bersama bermulti-versi dan diam-diam merusak tiga alat. (#649)
+- **Konversi ke JXL pada kualitas 1 hingga 4 mengembalikan 500**, dan ffmpeg yang hilang dilaporkan kepada Anda sebagai unggahan yang rusak. (#649)
+- **Gangguan Postgres sementara menelantarkan job yang selesai**, meninggalkan keluaran di disk tanpa baris yang menunjuk ke sana. Reconciler kini mengadopsi pekerjaan itu alih-alih membuangnya. (#649)
+- **Endpoint Redis yang berubah alamat membuat setiap consumer macet** sementara health check tetap menjawab 200. (#649)
+- **Perbaikan situs web dan dokumentasi**: tautan terlokalisasi tidak lagi menghilangkan fragmen `#` atau mengubah `zh-CN` menjadi huruf kecil, navigasi dokumentasi tetap di dalam viewport pada tablet, dan kedua situs tidak lagi memanggil API GitHub dari browser Anda. (#516, #562, #570, #560)
 
-### Notas de actualización {#v2-2-0-upgrade-notes}
+### Catatan Upgrade {#v2-2-0-upgrade-notes}
 
-No hay nada que migrar, pero cambiaron dos valores predeterminados incluidos:
+Tidak ada yang perlu dimigrasikan, tetapi dua default bawaan berubah:
 
-- **`TRUST_PROXY` ahora tiene por defecto `loopback,linklocal,uniquelocal`** en lugar de confiar en todos los pares. Las redes puente de Docker y de Compose están dentro de ese rango, así que la mayoría de las configuraciones no necesitan cambios. Si su proxy inverso llega a SnapOtter desde una dirección pública, defina `TRUST_PROXY` explícitamente, o la limitación de tasa y los registros de auditoría atribuirán cada solicitud al proxy.
-- **`MAX_AI_JOBS_PER_USER` tiene por defecto 5** trabajos de IA de un solo archivo en curso por usuario. Las ejecuciones de IA por lotes y de pipelines siguen sin límite.
+- **`TRUST_PROXY` kini default ke `loopback,linklocal,uniquelocal`** alih-alih memercayai setiap peer. Jaringan bridge Docker dan Compose berada di dalam rentang itu, jadi sebagian besar setup tidak perlu perubahan. Jika reverse proxy Anda menjangkau SnapOtter dari alamat publik, atur `TRUST_PROXY` secara eksplisit, atau pembatasan laju dan log audit akan mengaitkan setiap permintaan ke proxy.
+- **`MAX_AI_JOBS_PER_USER` default ke 5** job AI satu-file yang sedang berjalan per pengguna. Proses AI batch dan pipeline tetap tanpa batas.
 
-Nuevos parámetros opcionales: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (desactivado por defecto) y `GIF_BG_MAX_FRAMES`.
+Opsi opsional baru: `DB_STARTUP_TIMEOUT_MS`, `SUBPROCESS_MEMORY_LIMIT_MB` (nonaktif secara default), dan `GIF_BG_MAX_FRAMES`.
 
-### Agradecimientos {#v2-2-0-acknowledgements}
+### Ucapan Terima Kasih {#v2-2-0-acknowledgements}
 
-Buena parte de esta versión empezó como el reporte de errores de otra persona.
+Sebagian besar rilis ini bermula dari laporan bug orang lain.
 
-Código y contribuciones:
+Kode dan kontribusi:
 
-- **@mvanhorn** ❤️: Reescribió el fallo por tiempo de espera de remove-background como un mensaje que indica qué hacer al respecto, en lugar de un simple tiempo de espera agotado. (#518, #494)
-- **@EuanTop** ❤️: Restauró la acción de descarga en las páginas de ajustes preestablecidos de conversión de PDF haciendo que la ruta síncrona devolviera el contrato estándar de resultado de herramienta. (#629, #623)
-- **@harshjainnn** ❤️: Diagnosticó la descarga que empieza y nunca termina, y propuso la dirección de reinicio del socket sobre la que se construyó la corrección. (#617, #590)
+- **@mvanhorn** ❤️: Menulis ulang kegagalan timeout remove-background menjadi pesan yang menyebutkan apa yang harus dilakukan, alih-alih timeout polos. (#518, #494)
+- **@EuanTop** ❤️: Memulihkan aksi unduh pada halaman preset konversi PDF dengan membuat rute sinkron mengembalikan kontrak hasil alat standar. (#629, #623)
+- **@harshjainnn** ❤️: Mendiagnosis unduhan yang dimulai tetapi tidak pernah selesai, dan mengusulkan arah socket-reset yang menjadi dasar perbaikannya. (#617, #590)
 
-Divulgaciones de seguridad:
+Pengungkapan keamanan:
 
-- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)): Divulgó de forma privada la escalada de privilegios mediante un rol `users:manage` delegado, con un análisis completo desde el origen hasta el destino y una cadena de explotación funcional. (GHSA-9xgh-95qh-2x7h, #616)
-- **@Alpastx** ❤️ (Alpesh Bhagwatkar): Divulgó un IDOR autenticado en la cancelación de trabajos, y un path traversal en los nombres de archivo almacenados de la biblioteca, alcanzable tras una importación SQLite 1.x maliciosa, con una prueba de concepto funcional para cada uno. (#599, #600)
+- **李春来 (Chunlai Li)** ❤️ ([@laijunyue](https://github.com/laijunyue)): Mengungkapkan secara privat eskalasi hak istimewa melalui role `users:manage` yang didelegasikan, dengan analisis lengkap dari sumber ke sink dan rantai eksploit yang berfungsi. (GHSA-9xgh-95qh-2x7h, #616)
+- **@Alpastx** ❤️ (Alpesh Bhagwatkar): Mengungkapkan IDOR terautentikasi pada pembatalan job, dan path traversal pada nama file tersimpan Pustaka yang dapat dijangkau setelah impor SQLite 1.x berbahaya, dengan proof of concept yang berfungsi untuk masing-masing. (#599, #600)
 
-Reportes de errores:
+Laporan bug:
 
-- **@riz467** ❤️: Archivos HEIC reales de iPhone rechazados en la validación, con la causa raíz determinada en el reporte. (#622)
-- **@coupej** ❤️: Las páginas de ajustes preestablecidos de PDF que se colgaban para siempre, y jpg-to-pdf que fallaba en cuanto se añadía un segundo archivo. Dos errores distintos, correctamente separados. (#623, #627)
-- **@linuxuser1** ❤️: `PROCESSING_TIMEOUT_S=0` documentado como ilimitado pero limitado a cinco minutos. (#630)
-- **@bezibaerchen** ❤️: Convert Audio ocultaba el ajuste de frecuencia de muestreo que su propia descripción prometía. (#558)
-- **@hell-toupee** ❤️: El paquete de OCR preciso que no se instalaba, con un error `libpaddle`. (#505)
-- **@Michael1260** ❤️ y **@And-CSH** ❤️: Confirmaron de forma independiente ese fallo de instalación de OCR y establecieron que la extracción manual funciona mientras que el instalador de la aplicación no, lo que acotó el error al instalador. (#505)
-- **@TomErnst1972** ❤️: Activar la política de MFA obligatoria bloqueaba a un administrador fuera de su propia instancia. (#515)
-- **@thokich** ❤️: El borrado de objetos producía rellenos borrosos e inservibles, lo que impulsó tanto la reescritura de inpainting en HD como el paquete opcional de alta calidad. (#141)
-- **@Hennie-git** ❤️: Una instalación en Proxmox LXC que se reiniciaba 76 veces contra un Postgres que aún no aceptaba conexiones. (community-scripts/ProxmoxVE#15796)
-- **MickLesk** ❤️ (Proxmox VE community-scripts): Clasificó ese reporte en tiempo real y produjo el diagnóstico sobre el que se construyó la corrección del arranque. (#537)
+- **@riz467** ❤️: File HEIC iPhone asli ditolak saat validasi, dengan akar masalah yang sudah ditelusuri dalam laporan. (#622)
+- **@coupej** ❤️: Halaman preset PDF menggantung selamanya, dan jpg-to-pdf gagal begitu file kedua ditambahkan. Dua bug yang berbeda, dipisahkan dengan benar. (#623, #627)
+- **@linuxuser1** ❤️: `PROCESSING_TIMEOUT_S=0` didokumentasikan sebagai tanpa batas tetapi dibatasi lima menit. (#630)
+- **@bezibaerchen** ❤️: Convert Audio menyembunyikan pengaturan sample rate yang dijanjikan deskripsinya sendiri. (#558)
+- **@hell-toupee** ❤️: Bundel OCR akurat gagal dipasang dengan error `libpaddle`. (#505)
+- **@Michael1260** ❤️ dan **@And-CSH** ❤️: Mengonfirmasi kegagalan instalasi OCR itu secara independen dan menetapkan bahwa ekstraksi manual berfungsi sementara installer dalam aplikasi tidak, yang mempersempit bug ke installer. (#505)
+- **@TomErnst1972** ❤️: Mengaktifkan kebijakan wajib-MFA mengunci admin dari instance miliknya sendiri. (#515)
+- **@thokich** ❤️: Penghapusan objek menghasilkan isian yang buram dan tidak dapat dipakai, yang mendorong penulisan ulang inpainting HD dan bundel kualitas tinggi opsional. (#141)
+- **@Hennie-git** ❤️: Instalasi Proxmox LXC restart 76 kali terhadap Postgres yang belum menerima koneksi. (community-scripts/ProxmoxVE#15796)
+- **MickLesk** ❤️ (Proxmox VE community-scripts): Memilah laporan itu secara real time dan menghasilkan diagnosis yang menjadi dasar perbaikan startup. (#537)
 
-Solicitudes de funciones y comentarios:
+Permintaan fitur dan masukan:
 
-- **@LECOQQ** ❤️: Pidió relajar la complejidad de las contraseñas en una instalación de servidor doméstico. (#136)
-- **@killervette42** ❤️: Pidió una aplicación de comunidad de Unraid, ahora publicada en la tienda Unraid CA. (#96)
-- **@alienatedsec** ❤️: Señaló que la corrección de que la GPU recurre a la CPU estaba enterrada en una incidencia cerrada y no se podía encontrar, que es por lo que ahora está en la documentación de despliegue. (#490, #587)
-- **@neilp316** ❤️: Confirmó el fallo de la GPU Blackwell en una RTX 5060 y trazó una ruta de actualización funcional a CUDA 12.8. (#120)
-- **@Roiki11** ❤️: Defendió el almacenamiento compartido con referencias de ruta en lugar de la transferencia de archivos por HTTP para el cómputo de IA fuera del equipo. (#189)
+- **@LECOQQ** ❤️: Meminta pelonggaran kompleksitas kata sandi pada instalasi home-server. (#136)
+- **@killervette42** ❤️: Meminta Unraid Community App, kini diterbitkan ke toko Unraid CA. (#96)
+- **@alienatedsec** ❤️: Menunjukkan bahwa perbaikan fallback GPU ke CPU terkubur dalam issue yang sudah ditutup dan tidak dapat ditemukan, itulah sebabnya kini ada di dokumentasi deployment. (#490, #587)
+- **@neilp316** ❤️: Mengonfirmasi kegagalan GPU Blackwell pada RTX 5060 dan memetakan jalur upgrade CUDA 12.8 yang berfungsi. (#120)
+- **@Roiki11** ❤️: Mengusulkan penyimpanan bersama dengan referensi path dibandingkan transfer file lewat HTTP untuk komputasi AI di luar kotak. (#189)
 
-Gracias también a los miembros de la comunidad que reportaron estos casos por Discord y por correo electrónico, y cuyos nombres no registramos: la solicitud del recorte squircle (#602), la descarga de image-to-PDF que empezaba y nunca terminaba (#604, #607), la herramienta Delete Pages que se atascaba (#594), el texto en árabe que faltaba en pdf-to-text (#603) y el diagnóstico detrás de la alternativa de GPU a CPU de ONNX (#490).
+Terima kasih juga kepada anggota komunitas yang melaporkan hal-hal ini lewat Discord dan email, yang namanya tidak kami catat: permintaan crop squircle (#602), unduhan image-to-PDF yang dimulai tetapi tidak pernah selesai (#604, #607), alat Delete Pages yang macet (#594), teks Arab yang hilang dari pdf-to-text (#603), dan diagnosis di balik fallback GPU ONNX (#490).
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v2.1.0...v2.2.0)
 
 ---
 
 ## v2.0.0 {#v2-0-0}
 
-SnapOtter 2.0 convierte el conjunto de herramientas de imagen en una suite completa de manipulación de archivos: más de 200 herramientas en cinco modalidades (Imagen, Vídeo, Audio, PDF y Archivos), reconstruida sobre Postgres 17 y una cola de trabajos respaldada por Redis, con un `docker run` de un solo comando. Es una versión mayor; lea los Cambios incompatibles antes de actualizar desde 1.x.
+SnapOtter 2.0 mengubah toolkit gambar menjadi suite manipulasi file yang lengkap: 200+ alat di lima modalitas (Gambar, Video, Audio, PDF, dan File), dibangun ulang di atas Postgres 17 dan antrean job berbasis Redis, dengan `docker run` satu perintah. Ini adalah rilis mayor; baca Perubahan yang merusak sebelum meningkatkan dari 1.x.
 
-### Funciones nuevas {#new-features}
+### Fitur baru {#new-features}
 
-- **Cuatro nuevas modalidades de herramientas**: Vídeo, Audio, PDF y Archivos se suman a Imagen, llevando el catálogo a más de 200 herramientas.
-- **Trabajos en segundo plano duraderos**: Una cola respaldada por Redis (BullMQ) ejecuta cada herramienta como un trabajo con seguimiento y progreso en vivo por SSE.
-- **Modo todo en uno de un solo contenedor**: Un único `docker run` arranca una instancia completa con Postgres y Redis integrados.
-- **Paquetes de IA bajo demanda**: La eliminación de fondo, el OCR, la transcripción, el aumento de escala, la detección y mejora de rostros, el borrado de objetos, la colorización y la restauración de fotos se instalan desde la interfaz. La aceleración por GPU se detecta por framework.
-- **Sign PDF**: Dibuje, escriba o cargue una firma y colóquela en un PDF en el navegador.
-- **Automate**: Un constructor visual de pipelines que encadena herramientas, con nueve plantillas predefinidas.
-- **83 ajustes preestablecidos de conversión con un clic**: Conversores dedicados como JPG a PNG, MP4 a GIF y similares, con búsqueda aproximada.
-- **Editor de imágenes por capas**: Un editor basado en Konva en `/editor` con pinceles, formas, ajustes, filtros y curvas.
-- **Biblioteca de Archivos**: Guarde cualquier resultado y reutilícelo como entrada de otra herramienta.
-- Herramientas fijadas, zoom y desplazamiento en el lienzo, 21 idiomas y capacidades enterprise (OIDC/SSO, SAML, SCIM, almacenamiento S3, permisos por herramienta, exportación de auditoría, trazado distribuido).
+- **Empat modalitas alat baru**: Video, Audio, PDF, dan File bergabung dengan Gambar, membawa katalog ke 200+ alat.
+- **Job latar belakang yang tahan lama**: Antrean berbasis Redis (BullMQ) menjalankan setiap alat sebagai job yang terlacak dengan progres SSE langsung.
+- **Mode satu container all-in-one**: Satu `docker run` menjalankan instance lengkap dengan Postgres dan Redis bawaan.
+- **Bundel AI sesuai permintaan**: Penghapusan latar belakang, OCR, transkripsi, upscaling, deteksi dan peningkatan wajah, object eraser, colorize, dan pemulihan foto dipasang dari UI. Akselerasi GPU dideteksi per framework.
+- **Sign PDF**: Gambar, ketik, atau unggah tanda tangan dan letakkan pada PDF di browser.
+- **Automate**: Pembuat pipeline visual yang merangkai alat, dengan sembilan templat siap pakai.
+- **83 preset konversi satu klik**: Konverter khusus seperti JPG-ke-PNG, MP4-ke-GIF, dan sejenisnya dengan pencarian fuzzy.
+- **Editor gambar berbasis layer**: Editor berbasis Konva di `/editor` dengan kuas, bentuk, penyesuaian, filter, dan kurva.
+- **Pustaka file**: Simpan hasil apa pun dan gunakan kembali sebagai input untuk alat lain.
+- Alat yang disematkan, zoom dan pan di dalam kanvas, 21 bahasa, dan kemampuan enterprise (OIDC/SSO, SAML, SCIM, penyimpanan S3, izin per alat, ekspor audit, distributed tracing).
 
-### Mejoras {#improvements}
+### Peningkatan {#improvements}
 
-- Cancele un proceso en ejecución. (#137)
-- Decodificación RAW a resolución completa mediante LibRaw, incluido DNG. (#289)
-- Despliegues sin root y con UID ajenos (TrueNAS, Unraid, OpenShift, PUID/PGID). (#230, #127)
-- Detección precisa de la instalación de IA y un flujo de instalación reforzado. (#214, #352)
-- Endurecimiento de la privacidad: sin salida automática hacia terceros, además de un modo estricto sin conexión opcional.
-- Botón de comentarios siempre activo, incluso con la analítica desactivada.
+- Batalkan proses yang sedang berjalan. (#137)
+- Dekode RAW resolusi penuh melalui LibRaw, termasuk DNG. (#289)
+- Deployment non-root dan UID asing (TrueNAS, Unraid, OpenShift, PUID/PGID). (#230, #127)
+- Deteksi instalasi AI yang akurat dan alur instalasi yang diperkuat. (#214, #352)
+- Penguatan privasi: tidak ada egress pihak ketiga otomatis, ditambah mode strict-offline opsional.
+- Tombol masukan yang selalu aktif, bahkan saat analitik dimatikan.
 
-### Correcciones de errores {#bug-fixes}
+### Perbaikan bug {#bug-fixes}
 
-- `RATE_LIMIT_PER_MIN=0` vuelve a desactivar la limitación de tasa para las rutas de herramientas. (#271)
-- Se repararon las rutas del entorno virtual de IA dentro de la imagen de Docker. (#390)
-- Compatibilidad con sharp 0.35.2+. (#362)
-- Correcciones del diseño del editor de imágenes: reglas, comportamiento de relleno, barra lateral y tamaño del lienzo. (#258, #259)
-- Se completó la traducción al italiano. (#231, #206, #425)
-- Audio normalize y loudnorm conservan la frecuencia de muestreo de origen.
-- Endurecimiento contra SSRF: coincidencia numérica de CIDR de IPv6 y un análisis previo de URL ampliado. (#287)
-- Los PDF generados se sellan con SnapOtter como Producer.
-- mediapipe se instala en Python 3.13 y Debian 13.
+- `RATE_LIMIT_PER_MIN=0` kembali menonaktifkan pembatasan laju untuk rute alat. (#271)
+- Memperbaiki path virtualenv AI di dalam image Docker. (#390)
+- Kompatibilitas sharp 0.35.2+. (#362)
+- Perbaikan tata letak editor gambar: penggaris, perilaku isian, sidebar, dan ukuran kanvas. (#258, #259)
+- Menyelesaikan terjemahan bahasa Italia. (#231, #206, #425)
+- Audio normalize dan loudnorm mempertahankan sample rate sumber.
+- Penguatan SSRF: pencocokan CIDR IPv6 numerik dan pra-pindai URL yang diperluas. (#287)
+- PDF yang dihasilkan diberi cap SnapOtter sebagai Producer.
+- mediapipe terpasang di Python 3.13 dan Debian 13.
 
-### Cambios incompatibles {#breaking-changes}
+### Perubahan yang merusak {#breaking-changes}
 
-2.0 reemplaza la base de datos SQLite integrada por Postgres 17 y añade Redis 8 para la cola de trabajos. Sus datos de 1.x se migran automáticamente en el primer arranque, pero la pila de contenedores cambió, así que respalde primero todo su volumen `/data` (1.x ejecuta SQLite en modo WAL, por lo que los datos confirmados suelen residir en `snapotter.db-wal`). Luego elija la imagen de un solo contenedor (Postgres y Redis integrados, solo root) o la pila Compose (aplicación más Postgres 17 y Redis 8). Consulte la [guía de migración](https://github.com/snapotter-hq/SnapOtter/blob/main/MIGRATING.md) y la [guía de actualización](/id/guide/upgrading).
+2.0 mengganti database SQLite bawaan dengan Postgres 17 dan menambahkan Redis 8 untuk antrean job. Data 1.x Anda dimigrasikan secara otomatis pada boot pertama, tetapi stack container berubah, jadi cadangkan seluruh volume `/data` Anda terlebih dahulu (1.x menjalankan SQLite dalam mode WAL, sehingga data yang ter-commit biasanya berada di `snapotter.db-wal`). Lalu pilih image satu container (Postgres dan Redis bawaan, hanya root) atau stack Compose (aplikasi plus Postgres 17 dan Redis 8). Lihat [panduan migrasi](https://github.com/snapotter-hq/SnapOtter/blob/main/MIGRATING.md) dan [panduan upgrade](/id/guide/upgrading).
 
-### Actualización {#upgrade}
+### Upgrade {#upgrade}
 
 ```bash
 docker pull snapotter/snapotter:2.0.0
 ```
 
-O con Docker Compose:
+Atau dengan Docker Compose:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.2...v2.0.0)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.2...v2.0.0)
 
 ---
 
 ## v1.17.2 {#v1-17-2}
 
-Nueva herramienta HTML to Image, accesibilidad WCAG 2.2 AA, endurecimiento de seguridad a partir de pruebas de penetración y 5 correcciones críticas de Docker.
+Alat HTML to Image baru, aksesibilitas WCAG 2.2 AA, penguatan keamanan dari penetration testing, dan 5 perbaikan Docker yang kritis.
 
-### Funciones nuevas {#new-features-1}
+### Fitur baru {#new-features-1}
 
-- **HTML to Image**: Capture capturas de pantalla de URL o de HTML en bruto como PNG/JPEG/WebP. Capturas de página completa, ventanas gráficas personalizadas, modo oscuro.
-- **Convención _FILE de secretos en Docker**: Monte las variables de entorno sensibles como archivos en lugar de texto sin cifrar. (#205)
-- **Licencias enterprise y almacenamiento S3**: Clave de licencia comercial opcional y almacenamiento de objetos compatible con S3.
-- **Mejoras del editor de formas**: Transparencia de relleno/trazo, selector de color RGBA, estilos de línea discontinua.
-- **Archivos de versión precompilados**: Descargue tarballs desde GitHub Releases para instalaciones sin Docker (Proxmox, bare metal, LXC). (#202)
+- **HTML to Image**: Tangkap tangkapan layar URL atau HTML mentah sebagai PNG/JPEG/WebP. Tangkapan halaman penuh, viewport kustom, mode gelap.
+- **Konvensi secret Docker _FILE**: Pasang variabel env sensitif sebagai file alih-alih teks biasa. (#205)
+- **Lisensi enterprise dan penyimpanan S3**: Kunci lisensi komersial opsional dan penyimpanan objek yang kompatibel dengan S3.
+- **Peningkatan editor bentuk**: Transparansi isian/garis, pemilih warna RGBA, gaya garis putus-putus.
+- **Arsip rilis siap pakai**: Unduh tarball dari GitHub Releases untuk instalasi non-Docker (Proxmox, bare metal, LXC). (#202)
 
-### Mejoras {#improvements-1}
+### Peningkatan {#improvements-1}
 
-- **Accesibilidad WCAG 2.2 AA**: Salto de navegación, atrapado del foco, regiones aria-live, compatibilidad con movimiento reducido, relaciones de contraste correctas. (#209)
-- **Adaptación a móviles**: Ajustes adaptables, reconexión automática de SSE al cambiar de pestaña en el móvil. (#203, #204)
-- **Calidad de la eliminación de fondo**: Suavizado de bordes, descontaminación de color, selección del formato de salida.
-- **Traducción al italiano**: ~145 cadenas nuevas por @albanobattistella. (#206)
-- **Documentación de la API por herramienta**: 53 páginas de documentación con parámetros, ejemplos y formatos de respuesta.
-- **Descargas de modelos de IA**: Lógica de reintentos con retroceso exponencial para HuggingFace. (#201)
+- **Aksesibilitas WCAG 2.2 AA**: Lewati navigasi, focus trapping, region aria-live, dukungan reduced motion, rasio kontras yang benar. (#209)
+- **Responsivitas seluler**: Pengaturan responsif, SSE menyambung ulang otomatis saat berpindah tab di seluler. (#203, #204)
+- **Kualitas penghapusan latar belakang**: Penghalusan tepi, dekontaminasi warna, pemilihan format keluaran.
+- **Terjemahan Italia**: ~145 string baru oleh @albanobattistella. (#206)
+- **Dokumentasi API per alat**: 53 halaman dokumentasi dengan parameter, contoh, dan format respons.
+- **Unduhan model AI**: Logika coba ulang dengan exponential backoff untuk HuggingFace. (#201)
 
-### Correcciones de errores {#bug-fixes-1}
+### Perbaikan bug {#bug-fixes-1}
 
-- Los contenedores de Docker nuevos eran completamente inutilizables (la limitación de tasa bloqueaba todas las solicitudes).
-- Las herramientas de IA de detección de rostros (blur-faces, red-eye-removal, enhance-faces, passport-photo) fallaban en todas las plataformas.
-- Los archivos HEIC fallaban en ARM (discrepancia de símbolos de libheif).
-- Los paquetes de IA de upscale y restore-photo no se instalaban en ARM.
-- OCR usaba la versión de CUDA equivocada en contenedores con GPU.
-- Elusión de la protección SSRF mediante direcciones IPv6 mapeadas desde IPv4 en hexadecimal. (Crédito: @tonghuaroot)
-- Decodificación de HEIC de iPhone con imágenes auxiliares. (#183, #199)
-- CUDA OOM de Real-ESRGAN en GPU de 8 GB. (#200)
-- 6 errores de Sentry en producción y 7 errores de QA. (#208)
+- Container Docker baru sama sekali tidak dapat digunakan (pembatasan laju memblokir semua permintaan).
+- Alat AI deteksi wajah (blur-faces, red-eye-removal, enhance-faces, passport-photo) gagal di semua platform.
+- File HEIC rusak di ARM (ketidakcocokan simbol libheif).
+- Bundel AI upscale dan restore-photo gagal dipasang di ARM.
+- OCR memakai versi CUDA yang salah pada container GPU.
+- Bypass penjaga SSRF melalui alamat IPv6 yang dipetakan IPv4 heksadesimal. (Kredit: @tonghuaroot)
+- Dekode HEIC iPhone dengan gambar pendamping. (#183, #199)
+- Real-ESRGAN CUDA OOM pada GPU 8GB. (#200)
+- 6 error Sentry produksi dan 7 bug QA. (#208)
 
-### Seguridad {#security}
+### Keamanan {#security}
 
-- Se abordaron 10 hallazgos de pruebas de penetración (elusión de XFF, fallos por JSON mal formado, pipelines sin límite, XSS en el registro de auditoría, método TRACE y más). (#207)
-- Se bloqueó la elusión SSRF mediante IPv6 en hexadecimal. (Crédito: @tonghuaroot)
-- Las imágenes base del Dockerfile se fijaron por digest.
+- 10 temuan penetration test ditangani (bypass XFF, crash JSON yang salah format, pipeline tanpa batas, XSS log audit, metode TRACE, dan lainnya). (#207)
+- Bypass IPv6 heksadesimal SSRF diblokir. (Kredit: @tonghuaroot)
+- Image dasar Dockerfile dipin berdasarkan digest.
 
-### Actualización {#upgrade-1}
+### Upgrade {#upgrade-1}
 
 ```bash
 docker pull snapotter/snapotter:1.17.2
 ```
 
-O con Docker Compose:
+Atau dengan Docker Compose:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.1...v1.17.2)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.1...v1.17.2)
 
 ---
 
 ## v1.17.1 {#v1-17-1}
 
-Demo en vivo, páginas de destino por herramienta y un lote de correcciones de pulido.
+Demo langsung, halaman landing per alat, dan sejumlah perbaikan penyempurnaan.
 
-### Funciones nuevas {#new-features-2}
+### Fitur baru {#new-features-2}
 
-- **Demo en vivo** - [demo.snapotter.com](https://demo.snapotter.com) permite a las personas probar SnapOtter sin instalar nada.
-- **Página de índice de herramientas** - Explore las más de 50 herramientas en `/tools` con búsqueda y filtros por categoría.
-- **Más de 50 páginas de destino para SEO** - Cada herramienta ahora tiene una página de destino propia con preguntas frecuentes, casos de uso y tablas comparativas.
-- **Vista previa del fondo** - El control deslizante de antes y después muestra un fondo de cuadros detrás de las imágenes transparentes.
-- **Generador de contraseñas seguras** - Botón de un clic en el formulario Agregar miembros.
+- **Demo langsung** - [demo.snapotter.com](https://demo.snapotter.com) memungkinkan orang mencoba SnapOtter tanpa menginstal apa pun.
+- **Halaman indeks alat** - Jelajahi semua 50+ alat di `/tools` dengan pencarian dan filter kategori.
+- **50+ halaman landing SEO** - Setiap alat kini memiliki halaman landing khusus dengan FAQ, kasus penggunaan, dan tabel perbandingan.
+- **Pratinjau latar belakang** - Slider sebelum-sesudah menampilkan latar belakang kotak-kotak di belakang gambar transparan.
+- **Pembuat kata sandi kuat** - Tombol satu klik di formulir Tambah Anggota.
 
-### Correcciones de errores {#bug-fixes-2}
+### Perbaikan bug {#bug-fixes-2}
 
-- La herramienta de información de HEIC/HEIF ya no falla (se añadió una predecodificación).
-- La instalación de paquetes de modelos de IA muestra mejores mensajes de error y respeta los límites de recursos.
-- Las miniaturas de la biblioteca se cargan correctamente (faltaban las cabeceras de autenticación).
-- Los menús desplegables ya no se recortan en las tablas de ajustes de Personas y Equipos.
-- El porcentaje de comparación de tamaño se oculta en las herramientas que no comprimen.
-- Se eliminó el enlace duplicado a la política de privacidad.
-- Se añadió la traducción al italiano de los ajustes de funciones de IA.
-- Se actualizaron los iconos de Lucide renombrados (Wand2, Columns).
+- Alat info HEIC/HEIF tidak lagi gagal (pra-dekode ditambahkan).
+- Instalasi bundel model AI menampilkan pesan error yang lebih baik dan menghormati batas sumber daya.
+- Thumbnail Pustaka dimuat dengan benar (header autentikasi sebelumnya hilang).
+- Menu dropdown tidak lagi terpotong di tabel pengaturan Orang dan Tim.
+- Persentase perbandingan ukuran disembunyikan pada alat non-kompresi.
+- Tautan kebijakan privasi ganda dihapus.
+- Terjemahan Italia ditambahkan untuk pengaturan fitur AI.
+- Ikon Lucide yang diganti namanya diperbarui (Wand2, Columns).
 
-### Infraestructura {#infrastructure}
+### Infrastruktur {#infrastructure}
 
-- OpenSSF Scorecard reforzado de 4.3 a ~7.0.
-- Las pruebas de CI se paralelizaron en 4 fragmentos con datos de prueba reducidos.
-- 41 actualizaciones de dependencias.
+- OpenSSF Scorecard diperkuat dari 4,3 menjadi ~7,0.
+- Tes CI diparalelkan menjadi 4 shard dengan fixture yang diperkecil.
+- 41 pembaruan dependensi.
 
-### Actualización {#upgrade-2}
+### Upgrade {#upgrade-2}
 
 ```bash
 docker pull snapotter/snapotter:1.17.1
 ```
 
-O con Docker Compose:
+Atau dengan Docker Compose:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.0...v1.17.1)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.17.0...v1.17.1)
 
 ---
 
 ## v1.17.0 {#v1-17-0}
 
-Cinco herramientas nuevas, un editor de imágenes completo, inicio de sesión con SSO, 20 idiomas. Probablemente debieron ser tres versiones distintas, pero aquí estamos.
+Lima alat baru, editor gambar lengkap, login SSO, 20 bahasa. Mungkin seharusnya dipecah menjadi tiga rilis terpisah, tetapi begitulah adanya.
 
-### Funciones nuevas {#new-features-3}
+### Fitur baru {#new-features-3}
 
-- **Editor de imágenes** - Capas, pinceles, formas, ajustes, filtros, curvas, atajos de teclado. Se ejecuta en su navegador, procesa en su hardware.
-- **Autenticación OIDC / SSO** - Inicie sesión con Google, GitHub, Okta o cualquier proveedor de OpenID Connect. Defina unas pocas variables de entorno y su equipo usa sus cuentas existentes.
-- **Generador de memes** - 100 plantillas integradas con renderizado de texto mediante opentype.js. O cargue su propia imagen.
-- **Beautify** - Suelte una captura de pantalla y obtenga una imagen pulida. Marcos de dispositivo (macOS, Windows, navegador), sombras, degradados, ajustes preestablecidos para redes sociales.
-- **Simulación de daltonismo** - Previsualice cómo se ven las imágenes con protanopía, deuteranopía, tritanopía y otras deficiencias de la visión del color.
-- **Corrector de transparencia de PNG** - Detecta los PNG con falsa transparencia y los corrige con BiRefNet HR-matting. Eliminación opcional de marcas de agua mediante inpainting con LaMa.
-- **Expansión de lienzo con IA** - Extienda los límites de la imagen con relleno de IA. Tres niveles de calidad (rápido, equilibrado, calidad) según cuánto tiempo de GPU quiera intercambiar.
-- **20 idiomas** - Árabe, chino (simplificado/tradicional), checo, neerlandés, francés, alemán, hindi, indonesio, italiano, japonés, coreano, polaco, portugués, ruso, español, tailandés, turco, ucraniano, vietnamita. RTL funciona para el árabe.
-- **Importación por URL** - Pegue URL en la zona de carga o impórtelas en bloque desde una lista. Obtención desde el servidor con protección contra SSRF.
-- **Borrador de varios archivos** - Dibuje máscaras de borrado en varias imágenes y procéselas todas con un clic. Los trazos persisten por imagen.
-- **Importación/exportación de pipelines** - Guarde cadenas de herramientas como JSON y compártalas con otros.
-- **17 nuevos formatos RAW de cámara** mediante exiftool, además de entrada QOI, JP2, EPS, DDS, CUR, DPX, FITS, PPM/PGM/PBM, SVGZ y APNG. Nuevos códecs de salida para BMP, ICO, JP2, QOI. La exportación a AVIF, TIFF, GIF, JXL y PSD se recuperó de una rama perdida anteriormente.
+- **Editor gambar** - Layer, kuas, bentuk, penyesuaian, filter, kurva, pintasan keyboard. Berjalan di browser Anda, memproses di perangkat keras Anda.
+- **Autentikasi OIDC / SSO** - Login dengan Google, GitHub, Okta, atau penyedia OpenID Connect apa pun. Atur beberapa variabel env dan tim Anda memakai akun yang sudah ada.
+- **Pembuat meme** - 100 templat bawaan dengan perenderan teks melalui opentype.js. Atau unggah gambar Anda sendiri.
+- **Beautify** - Masukkan tangkapan layar, dapatkan gambar yang dipoles. Bingkai perangkat (macOS, Windows, browser), bayangan, gradien, preset media sosial.
+- **Simulasi buta warna** - Pratinjau tampilan gambar dengan protanopia, deuteranopia, tritanopia, dan gangguan penglihatan warna lainnya.
+- **Perbaikan transparansi PNG** - Mendeteksi PNG yang transparan palsu dan memperbaikinya dengan BiRefNet HR-matting. Penghapusan watermark opsional melalui inpainting LaMa.
+- **Perluasan kanvas AI** - Perluas batas gambar dengan isian AI. Tiga tingkat kualitas (cepat, seimbang, kualitas) tergantung berapa banyak waktu GPU yang ingin Anda korbankan.
+- **20 bahasa** - Arab, Tionghoa (Sederhana/Tradisional), Ceko, Belanda, Prancis, Jerman, Hindi, Indonesia, Italia, Jepang, Korea, Polandia, Portugis, Rusia, Spanyol, Thai, Turki, Ukraina, Vietnam. RTL berfungsi untuk bahasa Arab.
+- **Impor URL** - Tempel URL ke dropzone atau impor massal dari daftar. Pengambilan di sisi server dengan perlindungan SSRF.
+- **Penghapus multi-file** - Gambar mask penghapusan di beberapa gambar, proses semuanya dengan satu klik. Goresan tersimpan per gambar.
+- **Impor/ekspor pipeline** - Simpan rangkaian alat sebagai JSON, bagikan kepada orang lain.
+- **17 format RAW kamera baru** melalui exiftool, ditambah input QOI, JP2, EPS, DDS, CUR, DPX, FITS, PPM/PGM/PBM, SVGZ, dan APNG. Codec keluaran baru untuk BMP, ICO, JP2, QOI. Ekspor AVIF, TIFF, GIF, JXL, dan PSD dipulihkan dari branch yang sebelumnya hilang.
 
-### Mejoras {#improvements-2}
+### Peningkatan {#improvements-2}
 
-- **Mejora de imagen** - Se reemplazó el pipeline anterior por CLAHE + normalización + gamma. Un nuevo interruptor Deep Enhance usa el modelo de IA para obtener resultados más agresivos.
-- **Restore photo** - Detección de arañazos reescrita con filtrado Otsu de 8 ángulos. El inpainting con LaMa ahora se ejecuta a resolución nativa.
-- **Formatos exóticos en todas partes** - OCR, image-to-PDF, el generador de favicons, composition, stitch y vectorize ahora decodifican HEIC, RAW y PSD.
-- **Compress** - La tolerancia del tamaño objetivo se redujo del 5% al 1%. El tamaño objetivo es el modo predeterminado. Se añadieron botones de incremento y un selector de unidades KB/MB.
-- **Limpieza de Sentry** - Se filtraron 644 eventos sin acción posible. Los errores reales ahora se gestionan correctamente.
-- **Detección de GPU** - Mejor diagnóstico para contenedores donde CUDA está presente pero nvidia-smi no.
-- **Modo con autenticación desactivada** - El usuario anónimo se siembra en la base de datos con el rol de administrador. Las claves de API, los pipelines y los archivos de usuario ya no fallan por restricciones de clave externa.
-- **Más de 2,705 pruebas nuevas** entre unitarias, de integración y E2E.
+- **Peningkatan gambar** - Mengganti pipeline lama dengan CLAHE + normalise + gamma. Toggle Deep Enhance yang baru memakai model AI untuk hasil yang lebih agresif.
+- **Restore photo** - Deteksi goresan ditulis ulang dengan pemfilteran Otsu 8 sudut. Inpainting LaMa kini berjalan pada resolusi asli.
+- **Format eksotis di mana-mana** - OCR, image-to-PDF, generator favicon, composition, stitch, dan vectorize kini semuanya mendekode HEIC, RAW, PSD.
+- **Compress** - Toleransi ukuran target diperketat dari 5% menjadi 1%. Ukuran target adalah mode default. Menambahkan tombol stepper dan pemilih satuan KB/MB.
+- **Pembersihan Sentry** - 644 event yang tidak dapat ditindaklanjuti difilter. Error yang sebenarnya kini ditangani dengan benar.
+- **Deteksi GPU** - Diagnostik yang lebih baik untuk container yang memiliki CUDA tetapi tidak memiliki nvidia-smi.
+- **Mode autentikasi nonaktif** - Pengguna anonim di-seed di DB dengan role admin. Kunci API, pipeline, dan file pengguna tidak lagi rusak karena constraint FK.
+- **2.705+ tes baru** di unit, integrasi, dan E2E.
 
-### Correcciones de errores {#bug-fixes-3}
+### Perbaikan bug {#bug-fixes-3}
 
-- Upscale en CPU ya no agota el tiempo en equipos NAS y hardware de bajo consumo.
-- El logotipo del código QR ya no hace desaparecer la vista previa de forma permanente.
-- Se corrigió el desbordamiento del recorte en imágenes verticales altas.
-- Los archivos TIFF con alfa ahora fuerzan correctamente la salida PNG en lugar de producir corrupción.
-- La decodificación de HDR/EXR convierte a 8 bits antes de CLAHE, lo que corrige los fallos de decodificación.
-- Los búferes de entrada de puntos de referencia faciales se convierten a PNG antes del sidecar de Python, lo que corrige los fallos.
-- Find duplicates gestiona lotes de formatos mixtos y errores de red.
-- La vista previa de Beautify se actualiza en tiempo real.
-- Barras de progreso para stitch y vectorize.
-- SVGZ gestionado por SVG-to-raster.
-- Se corrigieron los nombres de archivo no ASCII mediante la cabecera X-File-Results codificada en porcentaje.
+- Upscale di CPU tidak lagi timeout pada kotak NAS dan perangkat keras berdaya rendah.
+- Logo kode QR tidak lagi membuat pratinjau hilang secara permanen.
+- Overflow crop diperbaiki untuk gambar potret yang tinggi.
+- File TIFF beralpha dengan benar memaksa keluaran PNG alih-alih menghasilkan korupsi.
+- Dekode HDR/EXR dikonversi ke 8-bit sebelum CLAHE, memperbaiki kegagalan dekode.
+- Buffer input face landmarks dikonversi ke PNG sebelum sidecar Python, memperbaiki crash.
+- Find duplicates menangani batch dengan format campuran dan error jaringan.
+- Pratinjau Beautify diperbarui secara real time.
+- Bilah progres untuk stitch dan vectorize.
+- SVGZ ditangani oleh SVG-to-raster.
+- Nama file non-ASCII diperbaiki melalui header X-File-Results yang dikodekan persen.
 
-### Actualización {#upgrade-3}
+### Upgrade {#upgrade-3}
 
 ```bash
 docker pull snapotter/snapotter:1.17.0
 ```
 
-O con Docker Compose:
+Atau dengan Docker Compose:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-[Diferencias completas en GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.16.0...v1.17.0)
+[Selisih lengkap di GitHub](https://github.com/snapotter-hq/SnapOtter/compare/v1.16.0...v1.17.0)
 
 ---
 
 ## v1.14.0 {#v1-14-0}
 
-Imagen de Docker unificada con detección automática de GPU. Una sola imagen gestiona tanto cargas de trabajo de CPU como de GPU. Compose simplificado en un solo archivo con rotación de registros. Las descargas previas de modelos ahora incluyen verificación y una prueba de humo.
+Image Docker terpadu dengan deteksi otomatis GPU. Satu image menangani beban kerja CPU maupun GPU. Compose disederhanakan menjadi satu file dengan rotasi log. Pra-unduhan model kini menyertakan verifikasi dan smoke test.
 
 ---
 
 ## v1.13.0 {#v1-13-0}
 
-Control de acceso basado en roles (RBAC). 14 permisos granulares, tres roles integrados (admin, editor, user), compatibilidad con roles personalizados. Comprobaciones de permisos en todas las rutas de la API. Las pestañas del frontend se filtran según los permisos del usuario.
+Kontrol akses berbasis peran (RBAC). 14 izin granular, tiga role bawaan (admin, editor, user), dukungan role kustom. Pemeriksaan izin pada semua rute API. Tab frontend difilter berdasarkan izin pengguna.
 
 ---
 
 ## v1.12.0 {#v1-12-0}
 
-Herramienta PDF to Image. Convierta páginas de PDF a PNG, JPEG, WebP o TIFF con DPI personalizado. Imagen de Docker unificada con detección automática de GPU.
+Alat PDF to Image. Konversi halaman PDF ke PNG, JPEG, WebP, atau TIFF pada DPI kustom. Image Docker terpadu dengan deteksi otomatis GPU.
 
 ---
 
 ## v1.11.0 {#v1-11-0}
 
-llms.txt generado automáticamente mediante vitepress-plugin-llms para una documentación apta para IA.
+llms.txt yang dibuat otomatis melalui vitepress-plugin-llms untuk dokumentasi yang ramah AI.
 
 ---
 
 ## v1.10.0 {#v1-10-0}
 
-Cambio de tamaño según el contenido (seam carving) con protección de rostros. Cambie el tamaño de las imágenes conservando el contenido importante.
+Content-aware resize (seam carving) dengan perlindungan wajah. Ubah ukuran gambar sambil mempertahankan konten penting.
 
 ---
 
 ## v1.9.0 {#v1-9-0}
 
-Herramienta Stitch / Combine. Una imágenes lado a lado, apiladas verticalmente o en una cuadrícula personalizada.
+Alat Stitch / Combine. Gabungkan gambar berdampingan, ditumpuk secara vertikal, atau dalam grid kustom.
 
 ---
 
 ## v1.8.0 {#v1-8-0}
 
-Herramienta Edit Metadata. Vea y edite metadatos EXIF, IPTC y XMP con una interfaz granular de quitar/conservar.
+Alat Edit Metadata. Lihat dan edit metadata EXIF, IPTC, dan XMP dengan antarmuka strip/keep yang granular.
 
 ---
 
-## Versiones anteriores {#older-releases}
+## Rilis lama {#older-releases}
 
-Para el registro de cambios completo a nivel de commits, incluidas las versiones de parche, consulte [GitHub Releases](https://github.com/snapotter-hq/snapotter/releases).
+Untuk changelog tingkat commit lengkap termasuk rilis patch, lihat [GitHub Releases](https://github.com/snapotter-hq/snapotter/releases).

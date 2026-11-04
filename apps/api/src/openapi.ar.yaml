@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: ضغط الصورة
-      description: تقليل حجم ملف الصورة حسب مستوى الجودة أو الحجم المستهدف.
+      description: |
+        قلّل حجم ملف الصورة بحسب مستوى الجودة أو الحجم المستهدف.
+        وضع الحجم المستهدف هو البديل لعمليات compress-image-to-{20,50,100,200,500}kb المهجورة.
       security:
         - bearerAuth: []
       requestBody:
@@ -656,8 +658,9 @@ paths:
         - Image
       summary: ضغط صورة إلى 20 KB
       description: |
-        ضغط صورة إلى حجم مستهدف 20 KB
-        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+        اضغط صورة إلى حجم مستهدف قدره 20 KB
+        هذه نقطة نهاية مخصصة لإعداد ضغط مسبق، ويدعمها `compress` في وضع targetSize.
+        حلّت محلها POST /api/v1/tools/image/compress مع ضبط `mode` على `targetSize` وضبط `targetSizeKb` على 20. تبقى لإصدار فرعي واحد على الأقل.
       security:
         - bearerAuth: []
       requestBody:
@@ -717,8 +720,9 @@ paths:
         - Image
       summary: ضغط صورة إلى 50 KB
       description: |
-        ضغط صورة إلى حجم مستهدف 50 KB
-        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+        اضغط صورة إلى حجم مستهدف قدره 50 KB
+        هذه نقطة نهاية مخصصة لإعداد ضغط مسبق، ويدعمها `compress` في وضع targetSize.
+        حلّت محلها POST /api/v1/tools/image/compress مع ضبط `mode` على `targetSize` وضبط `targetSizeKb` على 50. تبقى لإصدار فرعي واحد على الأقل.
       security:
         - bearerAuth: []
       requestBody:
@@ -778,8 +782,9 @@ paths:
         - Image
       summary: ضغط صورة إلى 100 KB
       description: |
-        ضغط صورة إلى حجم مستهدف 100 KB
-        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+        اضغط صورة إلى حجم مستهدف قدره 100 KB
+        هذه نقطة نهاية مخصصة لإعداد ضغط مسبق، ويدعمها `compress` في وضع targetSize.
+        حلّت محلها POST /api/v1/tools/image/compress مع ضبط `mode` على `targetSize` وضبط `targetSizeKb` على 100. تبقى لإصدار فرعي واحد على الأقل.
       security:
         - bearerAuth: []
       requestBody:
@@ -839,8 +844,9 @@ paths:
         - Image
       summary: ضغط صورة إلى 200 KB
       description: |
-        ضغط صورة إلى حجم مستهدف 200 KB
-        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+        اضغط صورة إلى حجم مستهدف قدره 200 KB
+        هذه نقطة نهاية مخصصة لإعداد ضغط مسبق، ويدعمها `compress` في وضع targetSize.
+        حلّت محلها POST /api/v1/tools/image/compress مع ضبط `mode` على `targetSize` وضبط `targetSizeKb` على 200. تبقى لإصدار فرعي واحد على الأقل.
       security:
         - bearerAuth: []
       requestBody:
@@ -900,8 +906,9 @@ paths:
         - Image
       summary: ضغط صورة إلى 500 KB
       description: |
-        ضغط صورة إلى حجم مستهدف 500 KB
-        هذا نقطة نهاية مخصصة لضغط مسبق مدعومة من `compress` في وضع targetSize.
+        اضغط صورة إلى حجم مستهدف قدره 500 KB
+        هذه نقطة نهاية مخصصة لإعداد ضغط مسبق، ويدعمها `compress` في وضع targetSize.
+        حلّت محلها POST /api/v1/tools/image/compress مع ضبط `mode` على `targetSize` وضبط `targetSizeKb` على 500. تبقى لإصدار فرعي واحد على الأقل.
       security:
         - bearerAuth: []
       requestBody:
@@ -21598,49 +21605,49 @@ x-i18n:
       provenance: machine
       outputHash: 712bed84f197
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: c6cafb954ea1
+      outputHash: b3fff8ac0691
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 0a6b2aa3d889
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 79ac7542c73c
+      outputHash: d669fe49d4f8
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 70b2c9d830d8
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 7b4c29883227
+      outputHash: 3a79e95108f2
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 8e6d8929ba4b
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: c74c98432b55
+      outputHash: e0ace9320010
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 046e03da1f67
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: ad8632043532
+      outputHash: 202b4bf293be
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 82d3f2e5489d
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 5d9288c50673
+      outputHash: b63f42255a09
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

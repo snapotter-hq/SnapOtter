@@ -1,12 +1,18 @@
 ---
 description: "Release notes en versiegeschiedenis van SnapOtter. Bekijk wat er nieuw, verbeterd en opgelost is in elke release."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 6ba81a86cbaa
+i18n_output_hash: aac564f6ab39
 i18n_hash_version: 2
 ---
 
 # Changelog {#changelog}
+
+## Niet uitgebracht {#unreleased}
+
+### Verouderd {#unreleased-deprecated}
+
+- **De vijf compress-to-size-bewerkingen voor afbeeldingen zijn verouderd.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` en `-500kb` zijn in de OpenAPI-specificatie als verouderd gemarkeerd en blijven minstens één minor release bestaan. Stuur `POST /api/v1/tools/image/compress` met `settings` ingesteld op `{"mode":"targetSize","targetSizeKb":20}` (of 50, 100, 200, 500). De uitvoer is hetzelfde. De PDF-presetpaden zijn ongewijzigd.
 
 ## v2.3.0 {#v2-3-0}
 

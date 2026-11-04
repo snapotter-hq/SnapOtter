@@ -1,12 +1,18 @@
 ---
 description: "Примітки до випусків та історія версій SnapOtter. Дізнайтеся, що нового, покращеного та виправленого в кожному випуску."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: a9b3c1e40bf5
+i18n_output_hash: 24c51fbd4e14
 i18n_hash_version: 2
 ---
 
 # Журнал змін {#changelog}
+
+## Не випущено {#unreleased}
+
+### Застаріле {#unreleased-deprecated}
+
+- **П'ять операцій стиснення зображень до заданого розміру застаріли.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` і `-500kb` позначено застарілими в специфікації OpenAPI, і вони залишатимуться щонайменше один мінорний випуск. Надсилайте `POST /api/v1/tools/image/compress`, задавши в `settings` значення `{"mode":"targetSize","targetSizeKb":20}` (або 50, 100, 200, 500). Результат той самий. Шляхи пресетів PDF не змінилися.
 
 ## v2.3.0 {#v2-3-0}
 

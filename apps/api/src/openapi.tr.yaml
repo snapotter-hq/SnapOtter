@@ -604,7 +604,9 @@ paths:
       tags:
         - Image
       summary: Görüntü Sıkıştır
-      description: Görüntü dosya boyutunu kalite düzeyine veya hedef boyuta göre küçültün.
+      description: |
+        Görsel dosya boyutunu kalite düzeyine veya hedef boyuta göre küçültür.
+        Hedef boyut modu, kullanımdan kaldırılan compress-image-to-{20,50,100,200,500}kb işlemlerinin yerini alır.
       security:
         - bearerAuth: []
       requestBody:
@@ -656,8 +658,9 @@ paths:
         - Image
       summary: Görüntüyü 20 KB'ye sıkıştır
       description: |
-        Bir görüntüyü 20 KB hedef boyutuna sıkıştır
-        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayar uç noktasıdır.
+        Bir görseli 20 KB hedef boyuta sıkıştırır
+        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayarı uç noktasıdır.
+        Yerine, `mode` değeri `targetSize` ve `targetSizeKb` değeri 20 olan ayarlarla POST /api/v1/tools/image/compress kullanılır. En az bir minör sürüm boyunca korunur.
       security:
         - bearerAuth: []
       requestBody:
@@ -717,8 +720,9 @@ paths:
         - Image
       summary: Görüntüyü 50 KB'ye sıkıştır
       description: |
-        Bir görüntüyü 50 KB hedef boyutuna sıkıştır
-        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayar uç noktasıdır.
+        Bir görseli 50 KB hedef boyuta sıkıştırır
+        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayarı uç noktasıdır.
+        Yerine, `mode` değeri `targetSize` ve `targetSizeKb` değeri 50 olan ayarlarla POST /api/v1/tools/image/compress kullanılır. En az bir minör sürüm boyunca korunur.
       security:
         - bearerAuth: []
       requestBody:
@@ -778,8 +782,9 @@ paths:
         - Image
       summary: Görüntüyü 100 KB'ye sıkıştır
       description: |
-        Bir görüntüyü 100 KB hedef boyutuna sıkıştır
-        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayar uç noktasıdır.
+        Bir görseli 100 KB hedef boyuta sıkıştırır
+        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayarı uç noktasıdır.
+        Yerine, `mode` değeri `targetSize` ve `targetSizeKb` değeri 100 olan ayarlarla POST /api/v1/tools/image/compress kullanılır. En az bir minör sürüm boyunca korunur.
       security:
         - bearerAuth: []
       requestBody:
@@ -839,8 +844,9 @@ paths:
         - Image
       summary: Görüntüyü 200 KB'ye sıkıştır
       description: |
-        Bir görüntüyü 200 KB hedef boyutuna sıkıştır
-        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayar uç noktasıdır.
+        Bir görseli 200 KB hedef boyuta sıkıştırır
+        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayarı uç noktasıdır.
+        Yerine, `mode` değeri `targetSize` ve `targetSizeKb` değeri 200 olan ayarlarla POST /api/v1/tools/image/compress kullanılır. En az bir minör sürüm boyunca korunur.
       security:
         - bearerAuth: []
       requestBody:
@@ -900,8 +906,9 @@ paths:
         - Image
       summary: Görüntüyü 500 KB'ye sıkıştır
       description: |
-        Bir görüntüyü 500 KB hedef boyutuna sıkıştır
-        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayar uç noktasıdır.
+        Bir görseli 500 KB hedef boyuta sıkıştırır
+        Bu, targetSize modunda `compress` tarafından desteklenen özel bir sıkıştırma ön ayarı uç noktasıdır.
+        Yerine, `mode` değeri `targetSize` ve `targetSizeKb` değeri 500 olan ayarlarla POST /api/v1/tools/image/compress kullanılır. En az bir minör sürüm boyunca korunur.
       security:
         - bearerAuth: []
       requestBody:
@@ -21595,49 +21602,49 @@ x-i18n:
       provenance: machine
       outputHash: cc38fb5d2ff1
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: f8544c6782c1
+      outputHash: 3c5ce7e8bf16
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 4ae0184e6afb
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: b350f60c676f
+      outputHash: a23178eb1407
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: a1daa298bcf9
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: ed6b6d118b85
+      outputHash: e2cbaa1f5be4
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 9a027da762e2
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: c1840547d44c
+      outputHash: bbcb19bf5c6f
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: ec2b6f1421bb
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 6b7623124ae2
+      outputHash: 46ec8fe06194
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 288bd5f501f4
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 1409910e1f13
+      outputHash: 867271de427c
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

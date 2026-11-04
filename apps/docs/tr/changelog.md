@@ -1,12 +1,18 @@
 ---
 description: "SnapOtter için sürüm notları ve sürüm geçmişi. Her sürümde nelerin yeni olduğunu, geliştirildiğini ve düzeltildiğini görün."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: e6ef84034a08
+i18n_output_hash: 6b881f5da005
 i18n_hash_version: 2
 ---
 
 # Değişiklik günlüğü {#changelog}
+
+## Yayınlanmamış {#unreleased}
+
+### Kullanımdan kaldırılanlar {#unreleased-deprecated}
+
+- **Görsel için boyuta göre sıkıştırma işlemlerinin beşi kullanımdan kaldırıldı.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` ve `-500kb`, OpenAPI belirtiminde kullanımdan kaldırıldı olarak işaretlendi ve en az bir minör sürüm boyunca korunacak. `POST /api/v1/tools/image/compress` isteğini, `settings` içinde `{"mode":"targetSize","targetSizeKb":20}` değeriyle gönderin (veya 50, 100, 200, 500). Çıktı aynıdır. PDF ön ayar yolları değişmedi.
 
 ## v2.3.0 {#v2-3-0}
 
