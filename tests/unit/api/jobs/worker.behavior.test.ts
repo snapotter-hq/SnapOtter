@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { POOLS, queueName } from "../../../../apps/api/src/jobs/types.js";
 import { isBinarySpawnFailure } from "../../../../apps/api/src/lib/binary-overrides.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -7159,8 +7160,8 @@ describe("Worker error log throttle (#4360)", () => {
     return { listeners, loggerError: logger.error as unknown as ReturnType<typeof vi.fn> };
   }
 
-  function workerErrorLogs(loggerError: ReturnType<typeof vi.fn>) {
-    return loggerError.mock.calls.filter((c) => c[1] === "Worker error");
+  function logsWith(loggerError: ReturnType<typeof vi.fn>, msg: string) {
+    return loggerError.mock.calls.filter((c) => c[1] === msg);
   }
 
   function misconf(): Error {
@@ -7173,30 +7174,31 @@ describe("Worker error log throttle (#4360)", () => {
   it("logs one line per pool for a burst of Redis errors instead of one per event", async () => {
     vi.useFakeTimers();
     const { listeners, loggerError } = await errorListeners();
-    expect(listeners.size).toBe(5);
+    expect(listeners.size).toBe(POOLS.length);
 
     for (const listener of listeners.values()) {
       for (let i = 0; i < 1_000; i++) listener(misconf());
     }
 
-    const logs = workerErrorLogs(loggerError);
-    expect(logs).toHaveLength(5);
-    expect(new Set(logs.map((c) => (c[0] as { pool: string }).pool)).size).toBe(5);
+    const logs = logsWith(loggerError, "Worker error");
+    expect(logs.map((c) => (c[0] as { pool: string }).pool).sort()).toEqual([...POOLS].sort());
   });
 
-  it("reports how many errors it held back once the window has passed", async () => {
+  it("reports how many errors it held back once the window closes", async () => {
     vi.useFakeTimers();
     const { listeners, loggerError } = await errorListeners();
-    const system = [...listeners.entries()].find(([queue]) => queue.endsWith("system"))?.[1];
+    const system = listeners.get(queueName("system"));
     if (!system) throw new Error("no error listener for the system pool");
 
     for (let i = 0; i < 250; i++) system(misconf());
     vi.advanceTimersByTime(30_000);
-    system(misconf());
 
-    const logs = workerErrorLogs(loggerError);
-    expect(logs).toHaveLength(2);
-    expect(logs[0][0]).not.toHaveProperty("suppressed");
-    expect(logs[1][0]).toMatchObject({ pool: "system", suppressed: 249 });
+    expect(logsWith(loggerError, "Worker error")).toHaveLength(1);
+    expect(logsWith(loggerError, "Worker errors suppressed")).toEqual([
+      [expect.objectContaining({ pool: "system", suppressed: 249 }), "Worker errors suppressed"],
+    ]);
+
+    system(misconf());
+    expect(logsWith(loggerError, "Worker error")).toHaveLength(2);
   });
 });
