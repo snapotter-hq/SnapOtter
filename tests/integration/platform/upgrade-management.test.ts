@@ -165,17 +165,23 @@ describe("upgrade management - with enterprise license", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("GET /api/v1/admin/migrations/pending returns 500 when journal is not at expected path", async () => {
+  it("GET /api/v1/admin/migrations/pending reports every migration applied on a migrated database (#4299)", async () => {
     const res = await entApp.app.inject({
       method: "GET",
       url: "/api/v1/admin/migrations/pending",
       headers: { authorization: `Bearer ${entAdminToken}` },
     });
-    // readJournal() looks for drizzle/meta/_journal.json relative to cwd,
-    // but in tests cwd is the repo root (journal is in apps/api/drizzle/)
-    expect(res.statusCode).toBe(500);
-    const body = JSON.parse(res.body);
-    expect(body.error).toContain("journal");
+    // The journal is found from the API source tree, not process.cwd(), so this
+    // also runs from the repo root, where the tests start.
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      migrations: { tag: string; applied: boolean }[];
+      appliedCount: number;
+      totalCount: number;
+    };
+    expect(body.totalCount).toBeGreaterThan(0);
+    expect(body.migrations.filter((m) => !m.applied).map((m) => m.tag)).toEqual([]);
+    expect(body.appliedCount).toBe(body.totalCount);
   });
 
   it("GET /api/v1/admin/migrations/pending returns 403 for non-admin users", async () => {

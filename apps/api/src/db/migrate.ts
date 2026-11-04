@@ -50,8 +50,48 @@ function errorCode(err: unknown): string | undefined {
   return undefined;
 }
 
+export const MIGRATIONS_FOLDER = join(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
+
+/** drizzle-orm's defaults; migrate() is called without overriding either. */
+const LAST_APPLIED_MIGRATION_SQL =
+  "SELECT max(created_at) AS last FROM drizzle.__drizzle_migrations";
+const UNDEFINED_TABLE = "42P01";
+const INVALID_SCHEMA_NAME = "3F000";
+
+/**
+ * created_at of the newest row drizzle has recorded, or null when it has
+ * recorded none. drizzle's migrator runs a journal entry only when its `when`
+ * is newer than this value and stores `when` as created_at, so an entry is
+ * applied exactly when `entry.when <= last`. The table holds a hash of the SQL,
+ * not the tag, so matching on tags never works.
+ *
+ * In split mode the runtime role has no grant on the drizzle schema by design,
+ * so the read goes over the migration role instead.
+ */
+export async function readLastAppliedMigrationAt(): Promise<number | null> {
+  const split = resolveRoleSplit(env.DATABASE_URL, env.DATABASE_MIGRATION_URL);
+  const client = split.active ? new pg.Client({ connectionString: split.migrationUrl }) : null;
+  try {
+    let rows: { last: string | number | null }[];
+    if (client) {
+      await client.connect();
+      rows = (await client.query(LAST_APPLIED_MIGRATION_SQL)).rows;
+    } else {
+      rows = (await pool.query(LAST_APPLIED_MIGRATION_SQL)).rows;
+    }
+    const last = rows[0]?.last;
+    return last === null || last === undefined ? null : Number(last);
+  } catch (err) {
+    const code = errorCode(err);
+    if (code === UNDEFINED_TABLE || code === INVALID_SCHEMA_NAME) return null;
+    throw err;
+  } finally {
+    await client?.end();
+  }
+}
+
 export async function runMigrations(): Promise<void> {
-  const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
+  const migrationsFolder = MIGRATIONS_FOLDER;
   const split = resolveRoleSplit(env.DATABASE_URL, env.DATABASE_MIGRATION_URL);
 
   if (!split.active) {
