@@ -2812,6 +2812,7 @@ export const th: TranslationKeys = {
       stretchMode: "ยืด",
       cropMode: "ครอป",
       alignment: "การจัดตำแหน่ง",
+      allCaps: "ตัวพิมพ์ใหญ่ทั้งหมด",
       start: "เริ่มต้น",
       center: "กลาง",
       end: "ท้าย",

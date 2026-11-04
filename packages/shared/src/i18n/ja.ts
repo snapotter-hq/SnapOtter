@@ -2814,6 +2814,7 @@ export const ja: TranslationKeys = {
       stretchMode: "ストレッチ",
       cropMode: "クロップ",
       alignment: "配置",
+      allCaps: "すべて大文字",
       start: "先頭",
       center: "中央",
       end: "末尾",

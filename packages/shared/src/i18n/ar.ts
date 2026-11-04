@@ -2834,6 +2834,7 @@ export const ar: TranslationKeys = {
       stretchMode: "تمديد",
       cropMode: "قص",
       alignment: "المحاذاة",
+      allCaps: "أحرف كبيرة",
       start: "البداية",
       center: "الوسط",
       end: "النهاية",

@@ -2866,6 +2866,7 @@ export const pl: TranslationKeys = {
       stretchMode: "Rozciągnij",
       cropMode: "Kadruj",
       alignment: "Wyrównanie",
+      allCaps: "Wszystkie wielkie litery",
       start: "Początek",
       center: "Środek",
       end: "Koniec",
