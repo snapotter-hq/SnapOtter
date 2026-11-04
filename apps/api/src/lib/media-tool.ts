@@ -259,3 +259,33 @@ export async function runMediaTool(
   );
   return { outPath, durationS: info.durationS };
 }
+
+export const TARGETS = {
+  "16:9": [16, 9],
+  "9:16": [9, 16],
+  "1:1": [1, 1],
+  "4:3": [4, 3],
+  "3:4": [3, 4],
+} as const;
+export type TargetKey = keyof typeof TARGETS;
+
+/** Output canvas for a source WxH fitted into ratio rw:rh (even dims). */
+export function canvasFor(
+  w: number,
+  h: number,
+  rw: number,
+  rh: number,
+): { cw: number; ch: number } {
+  let cw: number;
+  let ch: number;
+  if (w * rh >= h * rw) {
+    cw = w;
+    ch = Math.round((w * rh) / rw);
+  } else {
+    ch = h;
+    cw = Math.round((h * rw) / rh);
+  }
+  cw += cw % 2;
+  ch += ch % 2;
+  return { cw, ch };
+}
