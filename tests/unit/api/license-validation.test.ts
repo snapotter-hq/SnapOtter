@@ -189,12 +189,12 @@ describe("PLAN_FEATURES", () => {
     const expected = [
       "saml_sso",
       "s3_storage",
-      "multi_tenancy",
       "audit_export",
       "siem_forwarding",
       "sso_enforcement",
       "upgrade_management",
       "admin_alerts",
+      "webhooks",
     ];
     for (const feature of expected) {
       expect(PLAN_FEATURES.team).toContain(feature);
@@ -203,7 +203,6 @@ describe("PLAN_FEATURES", () => {
 
   it("team plan does not include compliance-only features", () => {
     expect(PLAN_FEATURES.team).not.toContain("scim");
-    expect(PLAN_FEATURES.team).not.toContain("webhooks");
     expect(PLAN_FEATURES.team).not.toContain("mfa");
     expect(PLAN_FEATURES.team).not.toContain("per_tool_permissions");
     expect(PLAN_FEATURES.team).not.toContain("tamper_resistant_audit");
@@ -214,8 +213,8 @@ describe("PLAN_FEATURES", () => {
     expect(PLAN_FEATURES.team).not.toContain("config_export_import");
   });
 
-  it("enterprise plan has all 19 features", () => {
-    expect(PLAN_FEATURES.enterprise).toHaveLength(19);
+  it("enterprise plan has all 18 features", () => {
+    expect(PLAN_FEATURES.enterprise).toHaveLength(18);
   });
 
   it("enterprise plan is a superset of team plan", () => {
@@ -230,8 +229,8 @@ describe("PLAN_FEATURES", () => {
 });
 
 describe("ENTERPRISE_FEATURES", () => {
-  it("contains exactly 19 features", () => {
-    expect(ENTERPRISE_FEATURES).toHaveLength(19);
+  it("contains exactly 18 features", () => {
+    expect(ENTERPRISE_FEATURES).toHaveLength(18);
   });
 
   it("has no duplicate entries", () => {
@@ -244,7 +243,6 @@ describe("ENTERPRISE_FEATURES", () => {
       "saml_sso",
       "s3_storage",
       "scim",
-      "multi_tenancy",
       "webhooks",
       "audit_export",
       "mfa",
