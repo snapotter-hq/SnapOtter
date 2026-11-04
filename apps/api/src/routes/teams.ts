@@ -1,10 +1,10 @@
 /**
  * Team management routes (CRUD).
  *
- * GET    /api/v1/teams      — List all teams with member count
- * POST   /api/v1/teams      — Create team (admin only)
- * PUT    /api/v1/teams/:id  — Update team (admin only)
- * DELETE /api/v1/teams/:id  — Delete team (admin only)
+ * GET    /api/v1/teams: List all teams with member count
+ * POST   /api/v1/teams: Create team (admin only)
+ * PUT    /api/v1/teams/:id: Update team (admin only)
+ * DELETE /api/v1/teams/:id: Delete team (admin only)
  */
 
 import { randomUUID } from "node:crypto";
@@ -54,7 +54,7 @@ export const updateTeamSchema = z
   );
 
 export async function teamsRoutes(app: FastifyInstance): Promise<void> {
-  // GET /api/v1/teams — List all teams with member count (admin only)
+  // GET /api/v1/teams: List all teams with member count (admin only)
   app.get("/api/v1/teams", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("teams:manage")(request, reply);
     if (!user) return;
@@ -78,7 +78,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // POST /api/v1/teams — Create team (admin only)
+  // POST /api/v1/teams: Create team (admin only)
   app.post("/api/v1/teams", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("teams:manage")(request, reply);
     if (!admin) return;
@@ -131,7 +131,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // PUT /api/v1/teams/:id — Update team (admin only)
+  // PUT /api/v1/teams/:id: Update team (admin only)
   app.put(
     "/api/v1/teams/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -200,7 +200,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // DELETE /api/v1/teams/:id — Delete team (admin only)
+  // DELETE /api/v1/teams/:id: Delete team (admin only)
   app.delete(
     "/api/v1/teams/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {

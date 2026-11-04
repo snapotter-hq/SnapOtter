@@ -193,7 +193,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
         lines.push("**Parameters:**");
         for (const p of op.parameters) {
           lines.push(
-            `- \`${p.name}\` (${p.in}${p.required ? ", required" : ""}) — ${p.schema?.type || "string"}`,
+            `- \`${p.name}\` (${p.in}${p.required ? ", required" : ""}): ${p.schema?.type || "string"}`,
           );
         }
         lines.push("");
@@ -206,7 +206,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
         if (schema?.properties) {
           for (const [name, prop] of Object.entries(schema.properties)) {
             const required = schema.required?.includes(name) ? " (required)" : "";
-            const desc = prop.description ? ` — ${prop.description.split("\n")[0]}` : "";
+            const desc = prop.description ? `: ${prop.description.split("\n")[0]}` : "";
             lines.push(`- \`${name}\`${required}: ${prop.type || "string"}${desc}`);
           }
         }
@@ -219,7 +219,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
           // A shared response is a $ref; its text lives under components.responses.
           const shared = res.$ref?.match(/^#\/components\/responses\/(.+)$/)?.[1];
           const resolved = shared ? spec.components?.responses?.[shared] : res;
-          lines.push(`- \`${code}\` — ${resolved?.description || ""}`);
+          lines.push(`- \`${code}\`: ${resolved?.description || ""}`);
         }
         lines.push("");
       }

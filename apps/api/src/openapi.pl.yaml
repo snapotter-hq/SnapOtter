@@ -11586,7 +11586,7 @@ paths:
       tags:
         - PDF
       summary: Wielofunkcyjny PDF
-      description: Złóż plik PDF z jawnego planu stron — zmień kolejność, duplikuj, obracaj lub usuń strony i pobieraj strony z dodatkowych plików PDF w jednym przesłaniu.
+      description: Złóż plik PDF z jawnego planu stron, zmień kolejność, duplikuj, obracaj lub usuń strony i pobieraj strony z dodatkowych plików PDF w jednym przesłaniu.
       security:
         - bearerAuth: []
       requestBody:

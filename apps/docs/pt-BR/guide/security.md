@@ -1,6 +1,6 @@
 ---
 description: "Guia de hardening de segurança do SnapOtter. Segurança de contêineres, isolamento de rede, Docker secrets, implantação em Kubernetes e artefatos de conformidade."
-i18n_source_hash: 5cf773ddb4c0
+i18n_source_hash: 630381c08cde
 i18n_provenance: machine
 i18n_output_hash: f0bfc66d34be
 i18n_hash_version: 2

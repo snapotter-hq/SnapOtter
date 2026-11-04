@@ -2,13 +2,13 @@
 description: "Zmień kolejność, obróć, usuń i pobierz strony z innych plików PDF w jednym edytorze lub przez API."
 i18n_source_hash: 4eca29216d15
 i18n_provenance: machine
-i18n_output_hash: a1e37b036842
+i18n_output_hash: 4378fe75595c
 i18n_hash_version: 2
 ---
 
 # PDF Multi-Tool {#multi-tool-pdf}
 
-Złóż plik PDF z jawnego planu stron: zmień kolejność, duplikuj, obróć lub usuń strony oraz pobierz strony z dodatkowych plików PDF — wszystko w jednym żądaniu.
+Złóż plik PDF z jawnego planu stron: zmień kolejność, duplikuj, obróć lub usuń strony oraz pobierz strony z dodatkowych plików PDF, wszystko w jednym żądaniu.
 
 ## Punkt końcowy API {#api-endpoint}
 

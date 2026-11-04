@@ -133,7 +133,7 @@ describe("Rapid sequential requests", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Interleaved uploads", () => {
   it("processes two resize requests started nearly simultaneously", async () => {
-    // Start both at the same time — both should complete independently
+    // Start both at the same time, both should complete independently
     const [first, second] = await Promise.all([
       app.inject(buildToolRequest("resize", PNG_200x150, "interleave-a.png", { width: 120 })),
       app.inject(buildToolRequest("resize", JPG_100x100, "interleave-b.jpg", { width: 60 })),
@@ -207,7 +207,7 @@ describe("10 simultaneous uploads to the same tool", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MIXED TOOL REQUESTS IN PARALLEL — VERIFY NO RESPONSE CORRUPTION
+// MIXED TOOL REQUESTS IN PARALLEL: VERIFY NO RESPONSE CORRUPTION
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Mixed tool requests in parallel with result verification", () => {
   it("resize + crop + rotate + compress simultaneously produce correct results", async () => {
@@ -277,7 +277,7 @@ describe("Concurrent requests with different image formats", () => {
 // 10 CONCURRENT COMPRESS REQUESTS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("10 concurrent compress requests", () => {
-  it("fires 10 simultaneous compress requests — all succeed with unique job IDs", async () => {
+  it("fires 10 simultaneous compress requests: all succeed with unique job IDs", async () => {
     const results = await Promise.all(
       Array.from({ length: 10 }, (_, i) =>
         app.inject(
@@ -303,7 +303,7 @@ describe("10 concurrent compress requests", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // SIMULTANEOUS BATCH + SINGLE REQUESTS
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Simultaneous batch + single requests — no corruption", () => {
+describe("Simultaneous batch + single requests: no corruption", () => {
   it("runs a batch resize and a single resize at the same time", async () => {
     // Build batch request
     const batchPayload = createMultipartPayload([
@@ -337,7 +337,7 @@ describe("Simultaneous batch + single requests — no corruption", () => {
     expect(batchRes.headers["content-type"]).toBe("application/zip");
   }, 60_000);
 
-  it("runs a batch compress and a single rotate at the same time — no cross-contamination", async () => {
+  it("runs a batch compress and a single rotate at the same time: no cross-contamination", async () => {
     const batchPayload = createMultipartPayload([
       { name: "file", filename: "b1.png", content: PNG_200x150, contentType: "image/png" },
       { name: "file", filename: "b2.jpg", content: JPG_100x100, contentType: "image/jpeg" },
@@ -370,7 +370,7 @@ describe("Simultaneous batch + single requests — no corruption", () => {
 // CONCURRENT PIPELINE EXECUTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Concurrent pipeline executions", () => {
-  it("fires 5 simultaneous pipeline requests — all succeed", async () => {
+  it("fires 5 simultaneous pipeline requests: all succeed", async () => {
     const pipelineDef = {
       steps: [
         { toolId: "resize", settings: { width: 80 } },

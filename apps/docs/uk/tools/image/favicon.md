@@ -2,7 +2,8 @@
 description: "Генерує всі стандартні розміри favicon та іконок застосунку з вихідного зображення."
 i18n_source_hash: 3a6451a94b7a
 i18n_provenance: human
-i18n_output_hash: 72dc322c51fa
+i18n_output_hash: 68de6896ced6
+i18n_hash_version: 2
 ---
 
 # Генератор favicon {#favicon-generator}
@@ -63,7 +64,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/favicon \
 
 ## Приклад відповіді {#example-response}
 
-Відповідь — це ZIP-файл, який передається напряму. Заголовки відповіді такі:
+Відповідь, це ZIP-файл, який передається напряму. Заголовки відповіді такі:
 
 ```
 Content-Type: application/zip

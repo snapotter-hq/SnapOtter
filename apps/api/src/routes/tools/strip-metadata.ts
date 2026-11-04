@@ -107,7 +107,7 @@ function parseIccProfile(iccBuffer: Buffer): Record<string, string> {
 }
 
 export function registerStripMetadata(app: FastifyInstance) {
-  // Inspect endpoint — returns parsed metadata as JSON
+  // Inspect endpoint: returns parsed metadata as JSON
   app.post(
     "/api/v1/tools/image/strip-metadata/inspect",
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -259,7 +259,7 @@ export function registerStripMetadata(app: FastifyInstance) {
     },
   );
 
-  // Strip endpoint — processes and returns cleaned image
+  // Strip endpoint: processes and returns cleaned image
   createToolRoute(app, {
     toolId: "strip-metadata",
     settingsSchema,

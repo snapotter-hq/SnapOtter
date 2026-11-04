@@ -11530,7 +11530,7 @@ paths:
       tags:
         - PDF
       summary: PDF マルチツール
-      description: 明示的なページ計画から PDF を組み立てます — ページの並べ替え、複製、回転、削除、および 1 回の送信で他の PDF からページを取り込みます。
+      description: 明示的なページ計画から PDF を組み立てます。ページの並べ替え、複製、回転、削除、および 1 回の送信で他の PDF からページを取り込みます。
       security:
         - bearerAuth: []
       requestBody:

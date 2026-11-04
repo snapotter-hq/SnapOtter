@@ -81,18 +81,18 @@ test.describe("Erase Object tool", () => {
     const qualitySlider = page.locator("#eraser-quality");
     const formatSelect = page.locator("#eraser-format");
 
-    // Default is PNG — quality hidden
+    // Default is PNG: quality hidden
     await expect(qualitySlider).not.toBeVisible();
 
-    // Select JPG — quality visible
+    // Select JPG: quality visible
     await formatSelect.selectOption("jpg");
     await expect(qualitySlider).toBeVisible();
 
-    // Select WEBP — quality visible
+    // Select WEBP: quality visible
     await formatSelect.selectOption("webp");
     await expect(qualitySlider).toBeVisible();
 
-    // Back to PNG — quality hidden
+    // Back to PNG: quality hidden
     await formatSelect.selectOption("png");
     await expect(qualitySlider).not.toBeVisible();
   });

@@ -365,7 +365,7 @@ def main():
             os.dup2(2, 1)
         except OSError:
             # os.dup may fail on Windows when launched via child_process.spawn
-            # with piped stdio — fall back to just suppressing sys.stdout
+            # with piped stdio: fall back to just suppressing sys.stdout
             stdout_fd = None
         sys.stdout = sys.stderr  # Python-level redirect regardless of OS
 

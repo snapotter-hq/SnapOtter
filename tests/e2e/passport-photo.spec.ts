@@ -103,7 +103,7 @@ test.describe("Passport Photo tool", () => {
     await skipIfFeatureNotInstalled(page);
     await uploadFile(page, fixturePath("test-portrait.jpg"));
 
-    // Wait for analysis to complete — either generate button or an error
+    // Wait for analysis to complete, either generate button or an error
     await expect(
       page.getByTestId("passport-photo-generate").or(page.getByText("Face analysis failed")),
     ).toBeVisible({ timeout: 300_000 });
@@ -113,7 +113,7 @@ test.describe("Passport Photo tool", () => {
     await skipIfFeatureNotInstalled(page);
     await uploadFile(page, fixturePath("test-portrait.heic"));
 
-    // Wait for analysis to complete — either generate button or an error
+    // Wait for analysis to complete, either generate button or an error
     await expect(
       page.getByTestId("passport-photo-generate").or(page.getByText("Face analysis failed")),
     ).toBeVisible({ timeout: 300_000 });

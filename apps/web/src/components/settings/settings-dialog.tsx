@@ -2260,7 +2260,7 @@ export function PeopleSection() {
               {availableRoles.length > 0 ? (
                 availableRoles.map((r) => (
                   <option key={r.name} value={r.name}>
-                    {r.name.charAt(0).toUpperCase() + r.name.slice(1)} —{" "}
+                    {r.name.charAt(0).toUpperCase() + r.name.slice(1)}:{" "}
                     {r.description || t.settings.people.noDescription}
                   </option>
                 ))
@@ -2361,7 +2361,7 @@ export function PeopleSection() {
               {availableRoles.length > 0 ? (
                 availableRoles.map((r) => (
                   <option key={r.name} value={r.name}>
-                    {r.name.charAt(0).toUpperCase() + r.name.slice(1)} —{" "}
+                    {r.name.charAt(0).toUpperCase() + r.name.slice(1)}:{" "}
                     {r.description || t.settings.people.noDescription}
                   </option>
                 ))

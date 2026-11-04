@@ -13,7 +13,7 @@ setup("authenticate", async ({ page }) => {
   await page.getByLabel("Password").fill("admin");
   await page.getByRole("button", { name: /login/i }).click();
 
-  // Wait for login to complete — page leaves "/login"
+  // Wait for login to complete, page leaves "/login"
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
     timeout: 30_000,
   });

@@ -29,7 +29,7 @@ precision, and F1 floors; aggregate performance cannot hide a failed image.
 Visible business names, logos, and public-agency marks remain the property of their respective
 owners. Apache-2.0 does not grant trademark rights or imply endorsement.
 
-## Wikimedia Commons — Hagye station sign
+## Wikimedia Commons: Hagye station sign
 
 `commons-hagye-station-715` is the original `Hagye01.jpg` photograph by Wikimedia Commons user
 Marcopolis, file page ID 7592246, timestamped `2009-08-18T13:00:50Z`. The file page is pinned at

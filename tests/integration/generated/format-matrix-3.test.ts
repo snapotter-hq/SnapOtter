@@ -125,7 +125,7 @@ describe("Exotic format error resilience", () => {
           body: payload,
         });
 
-        // Must not crash (500) — either succeed or return a clean error
+        // Must not crash (500), either succeed or return a clean error
         if (await settleAsyncFallback(res)) return;
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);

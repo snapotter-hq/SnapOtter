@@ -114,7 +114,7 @@ const BROWSER_PREVIEWABLE_EXTS = new Set([
 ]);
 
 function canBrowserPreview(url: string, filename?: string | null): boolean {
-  // Blob URLs are always renderable in <img> tags — no extension to check
+  // Blob URLs are always renderable in <img> tags; no extension to check
   if (url.startsWith("blob:")) return true;
   // For batch results, check the stored filename (has extension) rather than the blob URL
   const source = filename ?? url;
@@ -1607,7 +1607,7 @@ function ToolPageContent({
           </button>
         )}
 
-        {/* Batch download — shown right after settings for easy access */}
+        {/* Batch download: shown right after settings for easy access */}
         {entries.length > 1 && hasProcessed && batchZipBlob && !docCanvas && (
           <button
             type="button"

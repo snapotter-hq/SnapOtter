@@ -157,7 +157,7 @@ describe("Pipeline with invalid tool reference", () => {
       steps: [{ toolId: "resize", settings: { width: 100 } }, { toolId: "nonexistent-tool" }],
     });
 
-    // Validation happens before execution — should reject immediately
+    // Validation happens before execution, should reject immediately
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
     expect(json.error).toMatch(/step 2/i);
@@ -415,7 +415,7 @@ describe("Save pipeline edge cases", () => {
     expect(found).toBeDefined();
     expect(found.steps).toHaveLength(2);
 
-    // Clean up — delete the pipeline
+    // Clean up: delete the pipeline
     const deleteRes = await app.inject({
       method: "DELETE",
       url: `/api/v1/pipeline/${saved.id}`,

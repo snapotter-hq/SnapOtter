@@ -1525,7 +1525,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // PUT /api/auth/users/:id (admin only — update role/team)
+  // PUT /api/auth/users/:id (admin only; updates role/team)
   app.put(
     "/api/auth/users/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -2071,9 +2071,9 @@ export const PUBLIC_PATHS = [
 ];
 
 export function isPublicRoute(url: string): boolean {
-  // Non-API routes are public (SPA static files — auth is handled client-side)
+  // Non-API routes are public (SPA static files; auth is handled client-side)
   if (!url.startsWith("/api/")) return true;
-  // Download URLs use unguessable UUIDs as capability tokens — no auth needed
+  // Download URLs use unguessable UUIDs as capability tokens; no auth needed
   return PUBLIC_PATHS.some((path) => url.startsWith(path));
 }
 

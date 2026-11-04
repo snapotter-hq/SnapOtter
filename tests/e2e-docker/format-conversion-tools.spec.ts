@@ -46,9 +46,9 @@ const WEBP_50x50 = fixture("test-50x50.webp");
 const ANIMATED_GIF = fixture("animated.gif");
 const PDF_3PAGE = documentFixture("test-3page.pdf");
 
-// ─── SVG to Raster — Extended Formats ──────────────────────────────
+// ─── SVG to Raster: Extended Formats ──────────────────────────────
 
-test.describe("SVG to Raster — extended", () => {
+test.describe("SVG to Raster: extended", () => {
   test("convert SVG to AVIF", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
@@ -105,9 +105,9 @@ test.describe("SVG to Raster — extended", () => {
   });
 });
 
-// ─── Vectorize — Extended Formats ──────────────────────────────────
+// ─── Vectorize: Extended Formats ──────────────────────────────────
 
-test.describe("Vectorize — extended", () => {
+test.describe("Vectorize: extended", () => {
   test("vectorize WebP to SVG", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
@@ -164,9 +164,9 @@ test.describe("Vectorize — extended", () => {
   });
 });
 
-// ─── GIF Tools — Extended ──────────────────────────────────────────
+// ─── GIF Tools: Extended ──────────────────────────────────────────
 
-test.describe("GIF Tools — extended", () => {
+test.describe("GIF Tools: extended", () => {
   test("GIF tool with resize settings", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/gif-tools", {
       headers: { Authorization: `Bearer ${token}` },
@@ -252,9 +252,9 @@ test.describe("GIF Tools — extended", () => {
   });
 });
 
-// ─── PDF to Image — Extended ───────────────────────────────────────
+// ─── PDF to Image: Extended ───────────────────────────────────────
 
-test.describe("PDF to Image — extended", () => {
+test.describe("PDF to Image: extended", () => {
   test("convert PDF to AVIF format", async ({ request }) => {
     const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
@@ -424,9 +424,9 @@ test.describe("Convert from exotic formats", () => {
   });
 });
 
-// ─── Image to Base64 — Extended Formats ────────────────────────────
+// ─── Image to Base64: Extended Formats ────────────────────────────
 
-test.describe("Image to Base64 — extended", () => {
+test.describe("Image to Base64: extended", () => {
   test("encode WebP to base64", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/image-to-base64", {
       headers: { Authorization: `Bearer ${token}` },
@@ -485,7 +485,7 @@ test.describe("Multipage TIFF handling", () => {
         settings: JSON.stringify({ format: "png" }),
       },
     });
-    // May return first page or all pages — verify no crash
+    // May return first page or all pages, verify no crash
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl || body.pages).toBeTruthy();
@@ -519,7 +519,7 @@ test.describe("JXL format handling", () => {
         settings: JSON.stringify({ format: "png" }),
       },
     });
-    // JXL decode may require fallback — accept success or unsupported format
+    // JXL decode may require fallback, accept success or unsupported format
     if (res.ok()) {
       const body = await res.json();
       expect(body.downloadUrl).toContain(".png");
@@ -587,9 +587,9 @@ test.describe("ICO format handling", () => {
   });
 });
 
-// ─── SVG to Raster — All Output Formats ──────────────────────────
+// ─── SVG to Raster: All Output Formats ──────────────────────────
 
-test.describe("SVG to Raster — all output formats", () => {
+test.describe("SVG to Raster: all output formats", () => {
   test("convert SVG to GIF", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
@@ -637,9 +637,9 @@ test.describe("SVG to Raster — all output formats", () => {
   });
 });
 
-// ─── Vectorize — Round-trip Verification ──────────────────────────
+// ─── Vectorize: Round-trip Verification ──────────────────────────
 
-test.describe("Vectorize — round-trip", () => {
+test.describe("Vectorize: round-trip", () => {
   test("vectorize PNG then convert SVG back to raster", async ({ request }) => {
     // Step 1: Vectorize PNG to SVG
     const vecRes = await request.post("/api/v1/tools/image/vectorize", {
@@ -675,9 +675,9 @@ test.describe("Vectorize — round-trip", () => {
   });
 });
 
-// ─── PDF to Image — WebP and TIFF Output ──────────────────────────
+// ─── PDF to Image: WebP and TIFF Output ──────────────────────────
 
-test.describe("PDF to Image — additional formats", () => {
+test.describe("PDF to Image: additional formats", () => {
   test("convert PDF to TIFF format", async ({ request }) => {
     const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },
@@ -723,9 +723,9 @@ test.describe("PDF to Image — additional formats", () => {
   });
 });
 
-// ─── SVG to Raster — Output Verification ────────────────────────
+// ─── SVG to Raster: Output Verification ────────────────────────
 
-test.describe("SVG to Raster — output verification", () => {
+test.describe("SVG to Raster: output verification", () => {
   test("SVG-to-raster output can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/svg-to-raster", {
       headers: { Authorization: `Bearer ${token}` },
@@ -748,9 +748,9 @@ test.describe("SVG to Raster — output verification", () => {
   });
 });
 
-// ─── GIF Tools — Output Verification ────────────────────────────
+// ─── GIF Tools: Output Verification ────────────────────────────
 
-test.describe("GIF Tools — output verification", () => {
+test.describe("GIF Tools: output verification", () => {
   test("GIF tool with optimize action", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/gif-tools", {
       headers: { Authorization: `Bearer ${token}` },
@@ -792,9 +792,9 @@ test.describe("GIF Tools — output verification", () => {
   });
 });
 
-// ─── Vectorize — Output Verification ────────────────────────────
+// ─── Vectorize: Output Verification ────────────────────────────
 
-test.describe("Vectorize — output verification", () => {
+test.describe("Vectorize: output verification", () => {
   test("vectorized SVG output can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/vectorize", {
       headers: { Authorization: `Bearer ${token}` },
@@ -818,9 +818,9 @@ test.describe("Vectorize — output verification", () => {
   });
 });
 
-// ─── PDF to Image — Output Verification ─────────────────────────
+// ─── PDF to Image: Output Verification ─────────────────────────
 
-test.describe("PDF to Image — output verification", () => {
+test.describe("PDF to Image: output verification", () => {
   test("PDF conversion output can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/pdf/pdf-to-image", {
       headers: { Authorization: `Bearer ${token}` },

@@ -358,7 +358,7 @@ describe("Corrupted headers and wrong magic bytes", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // UNICODE FILENAMES (EXTENDED)
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Unicode filenames — extended adversarial", () => {
+describe("Unicode filenames: extended adversarial", () => {
   it("handles filename with emoji: photo_\u{1F389}.png", async () => {
     const res = await postTool("resize", [
       {
@@ -445,7 +445,7 @@ describe("Unicode filenames — extended adversarial", () => {
       { name: "settings", content: JSON.stringify({ width: 100 }) },
     ]);
 
-    // Should succeed — null bytes are stripped by filename sanitization
+    // Should succeed: null bytes are stripped by filename sanitization
     expect([200, 400]).toContain(res.statusCode);
   });
 
@@ -560,7 +560,7 @@ describe("1x1 pixel image through additional tools", () => {
       },
     ]);
 
-    // The watermark will be much larger than the 1x1 image — may succeed
+    // The watermark will be much larger than the 1x1 image, may succeed
     // or fail depending on how Sharp handles the composite. Must not crash.
     expect([200, 400, 422]).toContain(res.statusCode);
   });
@@ -600,7 +600,7 @@ describe("1x1 pixel image through additional tools", () => {
       },
     ]);
 
-    // Text overlay on 1x1 image — the SVG overlay will dwarf the image
+    // Text overlay on 1x1 image, the SVG overlay will dwarf the image
     expect([200, 422]).toContain(res.statusCode);
   });
 
@@ -622,7 +622,7 @@ describe("1x1 pixel image through additional tools", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // BATCH EDGE CASES (EXTENDED)
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Batch edge cases — extended", () => {
+describe("Batch edge cases: extended", () => {
   it("rejects batch with 0 images uploaded to resize", async () => {
     const res = await postBatch("resize", [
       { name: "settings", content: JSON.stringify({ width: 100 }) },
@@ -716,7 +716,7 @@ describe("Batch edge cases — extended", () => {
       { name: "settings", content: JSON.stringify({ width: 50 }) },
     ]);
 
-    // All files failed — should return 422
+    // All files failed: should return 422
     expect(res.statusCode).toBe(422);
     const json = JSON.parse(res.body);
     expect(json.error).toMatch(/all files failed/i);
@@ -751,7 +751,7 @@ describe("Batch edge cases — extended", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // PIPELINE EDGE CASES (EXTENDED)
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Pipeline edge cases — extended", () => {
+describe("Pipeline edge cases: extended", () => {
   it("rejects pipeline with 0 steps", async () => {
     const res = await executePipeline(PNG_200x150, "test.png", {
       steps: [],
@@ -763,7 +763,7 @@ describe("Pipeline edge cases — extended", () => {
   });
 
   it("handles pipeline with conflicting resize then crop larger than result", async () => {
-    // Resize to 50x50, then crop region 200x200 — should fail at crop step
+    // Resize to 50x50, then crop region 200x200, should fail at crop step
     const res = await executePipeline(PNG_200x150, "test.png", {
       steps: [
         { toolId: "resize", settings: { width: 50, height: 50 } },
@@ -774,7 +774,7 @@ describe("Pipeline edge cases — extended", () => {
       ],
     });
 
-    // Crop exceeds resized dimensions — should fail gracefully (422)
+    // Crop exceeds resized dimensions, should fail gracefully (422)
     // or succeed if sharp auto-clips. Must not crash.
     expect([200, 422]).toContain(res.statusCode);
   });
@@ -819,7 +819,7 @@ describe("Pipeline edge cases — extended", () => {
   });
 
   it("handles pipeline that outputs to a different format mid-chain", async () => {
-    // Convert to webp, then resize — should work since Sharp handles webp
+    // Convert to webp, then resize, should work since Sharp handles webp
     const res = await executePipeline(PNG_200x150, "test.png", {
       steps: [
         { toolId: "convert", settings: { format: "webp" } },
@@ -834,10 +834,10 @@ describe("Pipeline edge cases — extended", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONCURRENT STRESS — EXTENDED
+// CONCURRENT STRESS: EXTENDED
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Concurrent stress — 10 simultaneous resize requests", () => {
-  it("fires 10 simultaneous resize requests with the same image — all return 200", async () => {
+describe("Concurrent stress: 10 simultaneous resize requests", () => {
+  it("fires 10 simultaneous resize requests with the same image: all return 200", async () => {
     const results = await Promise.all(
       Array.from({ length: 10 }, (_, i) =>
         app.inject(
@@ -861,8 +861,8 @@ describe("Concurrent stress — 10 simultaneous resize requests", () => {
   }, 120_000);
 });
 
-describe("Concurrent stress — 5 different tools simultaneously", () => {
-  it("fires resize, crop, rotate, compress, and border simultaneously — all return 200", async () => {
+describe("Concurrent stress: 5 different tools simultaneously", () => {
+  it("fires resize, crop, rotate, compress, and border simultaneously: all return 200", async () => {
     const [resizeRes, cropRes, rotateRes, compressRes, borderRes] = await Promise.all([
       app.inject(
         buildToolRequest("resize", PNG_200x150, "conc-resize.png", {
@@ -932,7 +932,7 @@ describe("Concurrent adversarial and valid requests", () => {
       ),
       // Garbage data
       app.inject(buildToolRequest("resize", garbage, "garbage.png", { width: 50 })),
-      // Zero-byte file — manually construct since buildToolRequest uses non-empty image
+      // Zero-byte file: manually construct since buildToolRequest uses non-empty image
       (() => {
         const { body, contentType } = createMultipartPayload([
           {
@@ -1022,7 +1022,7 @@ describe("Injection attacks in settings fields", () => {
       },
     ]);
 
-    // Zod strips unknown keys — the extra fields should be ignored
+    // Zod strips unknown keys, the extra fields should be ignored
     expect(res.statusCode).toBe(200);
   });
 
@@ -1362,10 +1362,10 @@ describe("Non-existent tool and route handling", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MEMORY PRESSURE — LARGE FILE SEQUENTIAL UPLOADS
+// MEMORY PRESSURE: LARGE FILE SEQUENTIAL UPLOADS
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Memory pressure — large file (6.7MB) sequential uploads", () => {
-  it("processes 5 sequential resize requests with stress-large.jpg — all succeed", async () => {
+describe("Memory pressure: large file (6.7MB) sequential uploads", () => {
+  it("processes 5 sequential resize requests with stress-large.jpg: all succeed", async () => {
     for (let i = 0; i < 5; i++) {
       const res = await postTool("resize", [
         {
@@ -1449,7 +1449,7 @@ describe("Memory pressure — large file (6.7MB) sequential uploads", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PIPELINE LIMIT — MANY STEPS
+// PIPELINE LIMIT: MANY STEPS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline with many repeated steps", () => {
   it("handles pipeline with 10 resize steps (repeated operation)", async () => {
@@ -1507,7 +1507,7 @@ describe("Pipeline with many repeated steps", () => {
     expect(json.error).toMatch(/not found/i);
   });
 
-  it("handles pipeline where middle step fails — returns partial step info", async () => {
+  it("handles pipeline where middle step fails: returns partial step info", async () => {
     // Resize to 10x10, then crop 200x200 (exceeds image), then border
     const res = await executePipeline(PNG_200x150, "mid-fail.png", {
       steps: [
@@ -1528,9 +1528,9 @@ describe("Pipeline with many repeated steps", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BATCH LIMITS — BOUNDARY TESTS
+// BATCH LIMITS: BOUNDARY TESTS
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Batch limits — boundary tests", () => {
+describe("Batch limits: boundary tests", () => {
   it("handles batch with exactly 1 image (minimum valid batch)", async () => {
     const res = await postBatch("resize", [
       {
@@ -1596,9 +1596,9 @@ describe("Batch limits — boundary tests", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// UNICODE FILENAMES — ADDITIONAL EDGE CASES
+// UNICODE FILENAMES: ADDITIONAL EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Unicode filenames — specific requested patterns", () => {
+describe("Unicode filenames: specific requested patterns", () => {
   it("handles filename with picture frame emoji: \u{1F5BC}️.jpg", async () => {
     const res = await postTool("resize", [
       {
@@ -1678,9 +1678,9 @@ describe("Unicode filenames — specific requested patterns", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EXTREME DIMENSIONS — 1x1 IMAGE CROP LARGER THAN IMAGE
+// EXTREME DIMENSIONS: 1x1 IMAGE CROP LARGER THAN IMAGE
 // ═══════════════════════════════════════════════════════════════════════════
-describe("1x1 pixel image — crop larger than image", () => {
+describe("1x1 pixel image: crop larger than image", () => {
   it("rejects crop of 100x100 on a 1x1 image", async () => {
     const res = await postTool("crop", [
       {
@@ -1695,7 +1695,7 @@ describe("1x1 pixel image — crop larger than image", () => {
       },
     ]);
 
-    // Crop region extends beyond image — should fail
+    // Crop region extends beyond image, should fail
     expect([400, 422]).toContain(res.statusCode);
   });
 

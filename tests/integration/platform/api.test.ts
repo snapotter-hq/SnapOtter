@@ -47,7 +47,7 @@ afterAll(async () => {
   await testApp.cleanup();
 });
 
-// adminToken is created once in beforeAll — reuse it throughout.
+// adminToken is created once in beforeAll, reuse it throughout.
 // Individual tests that need a fresh token should create their own.
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,7 +124,7 @@ describe("Auth endpoints", () => {
         headers: { "content-type": "application/json" },
         payload: "null",
       });
-      // The route checks body?.username — null body should trigger 400
+      // The route checks body?.username, null body should trigger 400
       expect(res.statusCode).toBe(400);
     });
 
@@ -134,7 +134,7 @@ describe("Auth endpoints", () => {
         url: "/api/auth/login",
         payload: { username: "' OR 1=1 --", password: "anything" },
       });
-      // Should NOT succeed — parameterized queries prevent injection
+      // Should NOT succeed: parameterized queries prevent injection
       expect(res.statusCode).toBe(401);
     });
 
@@ -243,7 +243,7 @@ describe("Auth endpoints", () => {
         method: "POST",
         url: "/api/auth/logout",
       });
-      // Logout is on a public path prefix (/api/auth/) — should succeed
+      // Logout is on a public path prefix (/api/auth/), should succeed
       expect(res.statusCode).toBe(200);
     });
   });
@@ -408,7 +408,7 @@ describe("Auth endpoints", () => {
       });
       const userToken = JSON.parse(loginRes.body).token;
 
-      // Try to register — should fail with 403
+      // Try to register: should fail with 403
       const res = await app.inject({
         method: "POST",
         url: "/api/auth/register",
@@ -1046,7 +1046,7 @@ describe("Tool processing", () => {
         },
         payload,
       });
-      // Sharp should throw when crop extends beyond image — rejected as bad input (400)
+      // Sharp should throw when crop extends beyond image, rejected as bad input (400)
       expect(res.statusCode).toBe(400);
     });
   });
@@ -3091,7 +3091,7 @@ describe("Batch processing", () => {
         },
         payload,
       });
-      // Batch streams a ZIP directly — raw status comes from writeHead
+      // Batch streams a ZIP directly, raw status comes from writeHead
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toBe("application/zip");
       expect(res.headers["x-job-id"]).toBeDefined();
@@ -3461,7 +3461,7 @@ describe("Batch processing", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Smart crop format preservation", () => {
   // Helper: smart-crop requires the face-detection AI bundle.
-  // When it's not installed, the API returns 501 — skip assertions on the body.
+  // When it's not installed, the API returns 501, skip assertions on the body.
   const smartCropRequest = async (
     file: { name: string; filename: string; contentType: string; content: Buffer },
     settings: Record<string, unknown>,

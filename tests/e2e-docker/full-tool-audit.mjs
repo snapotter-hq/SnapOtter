@@ -1,5 +1,5 @@
 /**
- * FULL TOOL AUDIT — Tests every tool in SnapOtter on Windows/amd64.
+ * FULL TOOL AUDIT: Tests every tool in SnapOtter on Windows/amd64.
  * Verifies: (1) tool works, (2) GPU-capable tools do not unexpectedly fall
  * back, and (3) execution provenance matches the declared contract. OCR is
  * deliberately CPU-only on every host, including NVIDIA systems.
@@ -103,7 +103,7 @@ async function test(name, path, settings, checks = {}) {
 
 async function main() {
   console.log("=============================================================");
-  console.log("  SNAPOTTER FULL TOOL AUDIT — Windows amd64 + RTX 4070");
+  console.log("  SNAPOTTER FULL TOOL AUDIT, Windows amd64 + RTX 4070");
   console.log("=============================================================\n");
 
   // Login
@@ -137,11 +137,11 @@ async function main() {
   }
 
   // ════════════════════════════════════════════════════════════════
-  // SECTION 1: GPU/AI TOOLS — verify correct model and declared provider
+  // SECTION 1: GPU/AI TOOLS, verify correct model and declared provider
   // ════════════════════════════════════════════════════════════════
   console.log("--- GPU/AI TOOLS (GPU where supported; OCR is CPU-only) ---\n");
 
-  // Background removal — all models
+  // Background removal: all models
   await test(
     "Remove BG (birefnet-general-lite)",
     "remove-background",
@@ -220,7 +220,7 @@ async function main() {
   );
   await test("Colorize (auto)", "colorize", { model: "auto" });
 
-  // Noise removal — all tiers
+  // Noise removal: all tiers
   await test("Noise Removal (quick)", "noise-removal", { tier: "quick" });
   await test("Noise Removal (balanced)", "noise-removal", { tier: "balanced" });
   await test("Noise Removal (quality/SCUNet)", "noise-removal", { tier: "quality" });
@@ -274,7 +274,7 @@ async function main() {
   // Content-aware resize (caire binary)
   await test("Content-Aware Resize", "content-aware-resize", { width: 800, height: 800 });
 
-  // Erase object (LaMa inpainting — needs mask, likely fails without one)
+  // Erase object (LaMa inpainting, needs mask, likely fails without one)
   // Skipping as it needs a mask input
 
   // Smart crop
@@ -312,7 +312,7 @@ async function main() {
   await test("Strip Metadata", "strip-metadata", {});
   await test("Image to Base64", "image-to-base64", {});
   await test("Optimize for Web", "optimize-for-web", { maxWidth: 1920, quality: 80 });
-  // Favicon returns binary ICO, not JSON — test via status code only
+  // Favicon returns binary ICO, not JSON, test via status code only
   try {
     const imageBuffer = readFileSync(IMG);
     const imageBlob = new Blob([imageBuffer], { type: "image/webp" });

@@ -93,7 +93,7 @@ describe("file details format row (#1783)", () => {
   });
 
   it("shows a dash when neither the name nor the type names a format", async () => {
-    expect(await formatShownFor(entry("mystery", ""))).toBe("—");
+    expect(await formatShownFor(entry("mystery", ""))).toBe("-");
   });
 });
 

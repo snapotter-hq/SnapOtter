@@ -47,7 +47,7 @@ beforeAll(() => {
     path.join(scratch, "body-session.md"),
     "Claude-Session: https://claude.ai/code/session_1\n",
   );
-  fs.writeFileSync(path.join(scratch, "body-dash.md"), "Fixes a bug — see below.\n");
+  fs.writeFileSync(path.join(scratch, "body-dash.md"), "Fixes a bug \u2014 see below.\n");
   fs.writeFileSync(path.join(scratch, "body-secret.md"), `Uses ${FAKE_GH_TOKEN} for auth.\n`);
 
   repo = path.join(scratch, "repo");
@@ -225,7 +225,7 @@ describe("publish text guard", () => {
   });
 
   it("asks on em dashes in an inline commit message and in a body file", () => {
-    expect(publishTextVerdict(`git commit -m "fix: a — b"`, scratch)?.level).toBe("ask");
+    expect(publishTextVerdict(`git commit -m "fix: a \u2014 b"`, scratch)?.level).toBe("ask");
     expect(
       publishTextVerdict("gh pr create --title t --body-file body-dash.md", scratch)?.level,
     ).toBe("ask");
@@ -252,7 +252,7 @@ describe("publish text guard", () => {
   });
 
   it("checks the text when the repo flag precedes the subcommand", () => {
-    const command = `gh -R owner/repo pr create --body "a — b"`;
+    const command = `gh -R owner/repo pr create --body "a \u2014 b"`;
     expect(publishTextVerdict(command, scratch)?.level).toBe("ask");
   });
 

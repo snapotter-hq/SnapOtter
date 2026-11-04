@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 
 // ─── Watermark & Overlay Tools ─────────────────────────────────────
 // Extended tests for: watermark-text, watermark-image, text-overlay,
-// compose — covering positioning, opacity, batch, and edge cases.
+// compose: covering positioning, opacity, batch, and edge cases.
 // Complements creative-tools.spec.ts with deeper coverage.
 
 const FIXTURES = join(process.cwd(), "tests", "fixtures", "image", "valid");
@@ -71,9 +71,9 @@ const WEBP_50x50 = fixture("test-50x50.webp");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const JPG_SAMPLE = formatFixture("sample.jpg");
 
-// ─── Watermark Text — Extended Positioning ─────────────────────────
+// ─── Watermark Text: Extended Positioning ─────────────────────────
 
-test.describe("Watermark Text — extended", () => {
+test.describe("Watermark Text: extended", () => {
   test("watermark with large font on high-res image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/watermark-text", {
       headers: { Authorization: `Bearer ${token}` },
@@ -192,9 +192,9 @@ test.describe("Watermark Text — extended", () => {
   });
 });
 
-// ─── Watermark Image — Extended ────────────────────────────────────
+// ─── Watermark Image: Extended ────────────────────────────────────
 
-test.describe("Watermark Image — extended", () => {
+test.describe("Watermark Image: extended", () => {
   test("image watermark at top-left position", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -328,9 +328,9 @@ test.describe("Watermark Image — extended", () => {
   });
 });
 
-// ─── Text Overlay — Extended ───────────────────────────────────────
+// ─── Text Overlay: Extended ───────────────────────────────────────
 
-test.describe("Text Overlay — extended", () => {
+test.describe("Text Overlay: extended", () => {
   test("text overlay on HEIC image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },
@@ -446,9 +446,9 @@ test.describe("Text Overlay — extended", () => {
   });
 });
 
-// ─── Compose — Extended ────────────────────────────────────────────
+// ─── Compose: Extended ────────────────────────────────────────────
 
-test.describe("Compose — extended", () => {
+test.describe("Compose: extended", () => {
   test("compose with full opacity overlay", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -539,9 +539,9 @@ test.describe("Compose — extended", () => {
   });
 });
 
-// ─── Watermark Text — All Positions ──────────────────────────────
+// ─── Watermark Text: All Positions ──────────────────────────────
 
-test.describe("Watermark Text — all positions", () => {
+test.describe("Watermark Text: all positions", () => {
   const positions = [
     "top-left",
     "top-right",
@@ -573,9 +573,9 @@ test.describe("Watermark Text — all positions", () => {
   }
 });
 
-// ─── Watermark Image — Tiled ────────────────────────────────────
+// ─── Watermark Image: Tiled ────────────────────────────────────
 
-test.describe("Watermark Image — tiled", () => {
+test.describe("Watermark Image: tiled", () => {
   test("tiled image watermark", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -604,9 +604,9 @@ test.describe("Watermark Image — tiled", () => {
   });
 });
 
-// ─── Compose — Different Format Combos ──────────────────────────
+// ─── Compose: Different Format Combos ──────────────────────────
 
-test.describe("Compose — format combinations", () => {
+test.describe("Compose: format combinations", () => {
   test("compose HEIC base with PNG overlay", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -652,9 +652,9 @@ test.describe("Compose — format combinations", () => {
   });
 });
 
-// ─── Text Overlay — Validation ──────────────────────────────────
+// ─── Text Overlay: Validation ──────────────────────────────────
 
-test.describe("Text Overlay — validation", () => {
+test.describe("Text Overlay: validation", () => {
   test("text overlay with multiline text", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/text-overlay", {
       headers: { Authorization: `Bearer ${token}` },

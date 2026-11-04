@@ -127,7 +127,7 @@ async function _waitForProcessingDone(page: Page, timeoutMs = 120_000): Promise<
       await spinner.waitFor({ state: "hidden", timeout: timeoutMs });
     }
   } catch {
-    // No spinner — processing may have been instant
+    // No spinner: processing may have been instant
   }
   await page.waitForTimeout(500);
 }

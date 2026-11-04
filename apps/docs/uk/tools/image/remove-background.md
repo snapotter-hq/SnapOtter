@@ -2,7 +2,8 @@
 description: "Видалення фону на основі ШІ з опціональними ефектами (розмиття, тінь, градієнт, власний фон)."
 i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 7f67064ec4a9
+i18n_output_hash: 304b9ae8aa5b
+i18n_hash_version: 2
 ---
 
 # Видалення фону {#remove-background}
@@ -83,7 +84,7 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | Параметр | Тип | Обов'язковий | За замовчуванням | Опис |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Так | - | JSON із налаштуваннями ефектів (див. нижче) |
-| backgroundImage | file | Так, коли `backgroundType` — `image` | - | Власне зображення фону |
+| backgroundImage | file | Так, коли `backgroundType`, `image` | - | Власне зображення фону |
 
 #### Поля JSON налаштувань {#settings-json-fields}
 
@@ -92,9 +93,9 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
 | jobId | string | Так | - | ID завдання з Фази 1 |
 | filename | string | Так | - | Оригінальне ім'я файлу з Фази 1 |
 | backgroundType | string | Ні | `"transparent"` | Один з: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Так, коли `backgroundType` — `color` | - | Hex-колір: `#RRGGBB` або `#RGB` (символ `#` необов'язковий) |
-| gradientColor1 | string | Так, коли `backgroundType` — `gradient` | - | Перший колір градієнта, hex як у `backgroundColor` |
-| gradientColor2 | string | Так, коли `backgroundType` — `gradient` | - | Другий колір градієнта, hex як у `backgroundColor` |
+| backgroundColor | string | Так, коли `backgroundType`, `color` | - | Hex-колір: `#RRGGBB` або `#RGB` (символ `#` необов'язковий) |
+| gradientColor1 | string | Так, коли `backgroundType`, `gradient` | - | Перший колір градієнта, hex як у `backgroundColor` |
+| gradientColor2 | string | Так, коли `backgroundType`, `gradient` | - | Другий колір градієнта, hex як у `backgroundColor` |
 | gradientAngle | number | Ні | - | Кут градієнта в градусах |
 | blurEnabled | boolean | Ні | - | Розмити оригінальний фон за об'єктом (`backgroundType: "blur"` має на увазі це) |
 | blurIntensity | number | Ні | - | Інтенсивність розмиття (0-100) |
