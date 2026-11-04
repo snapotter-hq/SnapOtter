@@ -620,7 +620,7 @@ export const en = {
     },
     "color-blindness": {
       name: "Color Blindness Simulation",
-      description: "Simulate how images appear with different types of color vision deficiency",
+      description: "Simulate how images appear with color vision deficiency",
     },
     "remove-background": {
       name: "Remove Background",
@@ -630,7 +630,7 @@ export const en = {
     "erase-object": { name: "Object Eraser", description: "Remove unwanted objects with AI" },
     ocr: {
       name: "Extract Text from Image (OCR)",
-      description: "Extract text from images with AI-powered accuracy",
+      description: "Extract text from images",
     },
     "ocr-pdf": {
       name: "PDF OCR",
@@ -650,8 +650,7 @@ export const en = {
     },
     "image-enhancement": {
       name: "Image Enhancement",
-      description:
-        "One-click auto-improve with smart exposure, contrast, color, and sharpness correction",
+      description: "One-click auto-improve with smart analysis",
     },
     "noise-removal": {
       name: "Noise Removal",
@@ -675,12 +674,11 @@ export const en = {
     },
     colorize: {
       name: "AI Colorization",
-      description: "Convert black & white photos to full color using AI deep learning models",
+      description: "Convert B&W photos to full color with AI",
     },
     "passport-photo": {
       name: "Passport Photo",
-      description:
-        "Create government-compliant passport, visa, and ID photos with auto face detection",
+      description: "AI-powered passport and ID photo generator",
     },
     "transcribe-audio": {
       name: "Transcribe Audio",
@@ -708,8 +706,7 @@ export const en = {
     compose: { name: "Image Composition", description: "Layer images with position and opacity" },
     "meme-generator": {
       name: "Meme Generator",
-      description:
-        "Create memes with popular templates or your own images. Classic Impact-style text with customizable fonts, colors, and positioning.",
+      description: "Create memes with templates and custom text",
     },
     info: { name: "Image Info", description: "View all metadata and image properties" },
     compare: { name: "Image Compare", description: "Side-by-side comparison of two images" },
@@ -747,12 +744,11 @@ export const en = {
     },
     border: {
       name: "Border & Frame",
-      description: "Add borders, padding, rounded corners, and shadows with one-click presets",
+      description: "Add borders, rounded corners, and shadows",
     },
     beautify: {
       name: "Beautify Screenshot",
-      description:
-        "Add gradient backgrounds, device frames, shadows, and social media sizing to screenshots",
+      description: "Add gradient backgrounds, device frames, shadows, and social media sizing",
     },
     "circle-crop": {
       name: "Circle Crop",

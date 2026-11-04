@@ -636,7 +636,7 @@ export const tr: TranslationKeys = {
     },
     "color-blindness": {
       name: "Renk Körlüğü Simülasyonu",
-      description: "Farklı renk görme bozukluklarında görüntülerin nasıl göründüğünü simüle edin",
+      description: "Görüntülerin renk görme eksikliğiyle nasıl göründüğünü simüle edin",
     },
     "remove-background": {
       name: "Arka Plan Kaldır",
@@ -652,7 +652,7 @@ export const tr: TranslationKeys = {
     },
     ocr: {
       name: "Görüntüden Metin Çıkarma (OCR)",
-      description: "AI destekli doğrulukla görüntülerden metin çıkarın",
+      description: "Görüntülerden metin çıkarın",
     },
     "ocr-pdf": {
       name: "PDF'den Metin Çıkarma (OCR)",
@@ -672,8 +672,7 @@ export const tr: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Görüntü İyileştirme",
-      description:
-        "Akıllı pozlama, kontrast, renk ve keskinlik düzeltmesiyle tek tıkla otomatik iyileştirme",
+      description: "Akıllı analizle tek tıkla otomatik iyileştirme",
     },
     "noise-removal": {
       name: "Gürültü Giderme",
@@ -697,13 +696,11 @@ export const tr: TranslationKeys = {
     },
     colorize: {
       name: "AI Renklendirme",
-      description:
-        "AI derin öğrenme modelleri kullanarak siyah-beyaz fotoğrafları renkli hale getirin",
+      description: "Siyah beyaz fotoğrafları yapay zekayla tam renkliye dönüştürün",
     },
     "passport-photo": {
       name: "Vesikalık Fotoğraf",
-      description:
-        "Otomatik yüz algılama ile devlet standartlarına uygun pasaport, vize ve kimlik fotoğrafları oluşturun",
+      description: "Yapay zeka destekli pasaport ve kimlik fotoğrafı oluşturucu",
     },
     "transcribe-audio": {
       name: "Ses Transkripsiyonu",
@@ -743,8 +740,7 @@ export const tr: TranslationKeys = {
     },
     "meme-generator": {
       name: "Meme Oluşturucu",
-      description:
-        "Popüler şablonlar veya kendi görüntülerinizle Meme oluşturun. Özelleştirilebilir yazı tipleri, renkler ve konumlandırma ile klasik Impact tarzı metin.",
+      description: "Şablonlar ve özel metinle meme oluşturun",
     },
     info: {
       name: "Görüntü Bilgisi",
@@ -789,12 +785,12 @@ export const tr: TranslationKeys = {
     },
     border: {
       name: "Kenarlık ve Çerçeve",
-      description: "Tek tıkla şablonlarla kenarlık, dolgu, yuvarlatılmış köşeler ve gölge ekleyin",
+      description: "Kenarlık, yuvarlatılmış köşe ve gölge ekleyin",
     },
     beautify: {
       name: "Ekran Görüntüsü Güzelleştir",
       description:
-        "Ekran görüntülerine gradyan arka planlar, cihaz çerçeveleri, gölgeler ve sosyal medya boyutları ekleyin",
+        "Gradyan arka planlar, cihaz çerçeveleri, gölgeler ve sosyal medya boyutları ekleyin",
     },
     "circle-crop": {
       name: "Daire Kırpma",

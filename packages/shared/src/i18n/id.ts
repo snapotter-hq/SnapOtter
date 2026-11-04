@@ -636,7 +636,7 @@ export const id: TranslationKeys = {
     },
     "color-blindness": {
       name: "Simulasi Buta Warna",
-      description: "Simulasikan tampilan gambar dengan berbagai jenis defisiensi penglihatan warna",
+      description: "Simulasikan tampilan gambar pada penderita defisiensi penglihatan warna",
     },
     "remove-background": {
       name: "Hapus Latar Belakang",
@@ -652,7 +652,7 @@ export const id: TranslationKeys = {
     },
     ocr: {
       name: "Ekstrak Teks dari Gambar (OCR)",
-      description: "Ekstrak teks dari gambar dengan akurasi AI",
+      description: "Ekstrak teks dari gambar",
     },
     "ocr-pdf": {
       name: "OCR PDF",
@@ -672,8 +672,7 @@ export const id: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Peningkatan Gambar",
-      description:
-        "Perbaikan otomatis sekali klik dengan koreksi eksposur, kontras, warna, dan ketajaman cerdas",
+      description: "Perbaikan otomatis sekali klik dengan analisis cerdas",
     },
     "noise-removal": {
       name: "Penghapusan Noise",
@@ -697,12 +696,11 @@ export const id: TranslationKeys = {
     },
     colorize: {
       name: "Pewarnaan AI",
-      description: "Ubah foto hitam putih menjadi warna penuh menggunakan model deep learning AI",
+      description: "Ubah foto hitam putih menjadi berwarna penuh dengan AI",
     },
     "passport-photo": {
       name: "Foto Paspor",
-      description:
-        "Buat foto paspor, visa, dan KTP sesuai standar pemerintah dengan deteksi wajah otomatis",
+      description: "Pembuat foto paspor dan KTP berbasis AI",
     },
     "transcribe-audio": {
       name: "Transkripsi Audio",
@@ -742,8 +740,7 @@ export const id: TranslationKeys = {
     },
     "meme-generator": {
       name: "Generator Meme",
-      description:
-        "Buat meme dengan template populer atau gambar Anda sendiri. Teks bergaya Impact klasik dengan font, warna, dan posisi yang dapat disesuaikan.",
+      description: "Buat meme dengan templat dan teks kustom",
     },
     info: {
       name: "Info Gambar",
@@ -788,13 +785,11 @@ export const id: TranslationKeys = {
     },
     border: {
       name: "Border & Bingkai",
-      description:
-        "Tambahkan border, padding, sudut membulat, dan bayangan dengan preset sekali klik",
+      description: "Tambahkan bingkai, sudut membulat, dan bayangan",
     },
     beautify: {
       name: "Percantik Screenshot",
-      description:
-        "Tambahkan latar gradien, bingkai perangkat, bayangan, dan ukuran media sosial ke screenshot",
+      description: "Tambahkan latar gradien, bingkai perangkat, bayangan, dan ukuran media sosial",
     },
     "circle-crop": {
       name: "Potong Lingkaran",

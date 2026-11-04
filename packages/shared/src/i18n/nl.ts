@@ -638,8 +638,7 @@ export const nl: TranslationKeys = {
     },
     "color-blindness": {
       name: "Kleurenblindheid-simulatie",
-      description:
-        "Simuleer hoe afbeeldingen eruitzien bij verschillende vormen van kleurenblindheid",
+      description: "Simuleer hoe afbeeldingen eruitzien bij kleurenblindheid",
     },
     "remove-background": {
       name: "Achtergrond verwijderen",
@@ -655,7 +654,7 @@ export const nl: TranslationKeys = {
     },
     ocr: {
       name: "Tekst uit afbeelding halen (OCR)",
-      description: "Tekst uit afbeeldingen halen met AI-nauwkeurigheid",
+      description: "Tekst uit afbeeldingen halen",
     },
     "ocr-pdf": {
       name: "PDF OCR",
@@ -675,8 +674,7 @@ export const nl: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Beeldverbetering",
-      description:
-        "Eenkliksverbetering met slimme belichting, contrast, kleur en scherpte-correctie",
+      description: "Automatisch verbeteren met één klik dankzij slimme analyse",
     },
     "noise-removal": {
       name: "Ruisverwijdering",
@@ -700,12 +698,11 @@ export const nl: TranslationKeys = {
     },
     colorize: {
       name: "AI-inkleuren",
-      description: "Zwart-witfoto's omzetten naar kleur met AI-deep-learning-modellen",
+      description: "Zwart-witfoto's met AI omzetten naar volledige kleur",
     },
     "passport-photo": {
       name: "Pasfoto",
-      description:
-        "Officieel geldige pas-, visum- en ID-foto's maken met automatische gezichtsdetectie",
+      description: "AI-generator voor pasfoto's en identiteitsfoto's",
     },
     "transcribe-audio": {
       name: "Audio transcriberen",
@@ -745,8 +742,7 @@ export const nl: TranslationKeys = {
     },
     "meme-generator": {
       name: "Meme-generator",
-      description:
-        "Maak memes met populaire templates of je eigen afbeeldingen. Klassieke Impact-stijl tekst met aanpasbare lettertypen, kleuren en positionering.",
+      description: "Maak memes met sjablonen en eigen tekst",
     },
     info: {
       name: "Beeldinformatie",
@@ -790,12 +786,12 @@ export const nl: TranslationKeys = {
     },
     border: {
       name: "Rand & Kader",
-      description: "Randen, opvulling, afgeronde hoeken en schaduwen toevoegen met eenklik-presets",
+      description: "Randen, afgeronde hoeken en schaduwen toevoegen",
     },
     beautify: {
       name: "Screenshot verfraaien",
       description:
-        "Achtergrondverlopen, apparaatframes, schaduwen en social media-formaten voor screenshots",
+        "Verloopachtergronden, apparaatkaders, schaduwen en socialemediaformaten toevoegen",
     },
     "circle-crop": {
       name: "Cirkel bijsnijden",

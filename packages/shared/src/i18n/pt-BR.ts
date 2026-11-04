@@ -634,8 +634,7 @@ export const ptBR: TranslationKeys = {
     },
     "color-blindness": {
       name: "Simulação de daltonismo",
-      description:
-        "Simule como as imagens aparecem com diferentes tipos de deficiência na visão de cores",
+      description: "Simule como as imagens aparecem com deficiência de visão de cores",
     },
     "remove-background": {
       name: "Remover fundo",
@@ -651,7 +650,7 @@ export const ptBR: TranslationKeys = {
     },
     ocr: {
       name: "Extrair texto de imagem (OCR)",
-      description: "Extraia texto de imagens com precisão alimentada por AI",
+      description: "Extraia texto de imagens",
     },
     "ocr-pdf": {
       name: "OCR de PDF",
@@ -671,8 +670,7 @@ export const ptBR: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Melhoria de imagem",
-      description:
-        "Melhoria automática com um clique: exposição, contraste, cor e nitidez inteligentes",
+      description: "Melhoria automática com um clique usando análise inteligente",
     },
     "noise-removal": {
       name: "Remoção de ruído",
@@ -696,13 +694,11 @@ export const ptBR: TranslationKeys = {
     },
     colorize: {
       name: "Colorização com AI",
-      description:
-        "Converta fotos em preto e branco para coloridas usando modelos de aprendizado profundo com AI",
+      description: "Converta fotos em preto e branco para colorido com IA",
     },
     "passport-photo": {
       name: "Foto para documento",
-      description:
-        "Crie fotos para passaporte, visto e identidade em conformidade com os requisitos oficiais, com detecção automática de rosto",
+      description: "Gerador de fotos de passaporte e documentos com IA",
     },
     "transcribe-audio": {
       name: "Transcrever áudio",
@@ -742,8 +738,7 @@ export const ptBR: TranslationKeys = {
     },
     "meme-generator": {
       name: "Gerador de Meme",
-      description:
-        "Crie memes com modelos populares ou suas próprias imagens. Texto clássico estilo Impact com fontes, cores e posicionamento personalizáveis.",
+      description: "Crie memes com modelos e texto personalizado",
     },
     info: {
       name: "Info da imagem",
@@ -787,13 +782,12 @@ export const ptBR: TranslationKeys = {
     },
     border: {
       name: "Borda e moldura",
-      description:
-        "Adicione bordas, preenchimento, cantos arredondados e sombras com presets de um clique",
+      description: "Adicione bordas, cantos arredondados e sombras",
     },
     beautify: {
       name: "Embelezar captura de tela",
       description:
-        "Adicione fundos degradados, molduras de dispositivo, sombras e tamanhos para redes sociais às capturas de tela",
+        "Adicione fundos em degradê, molduras de dispositivos, sombras e tamanhos para redes sociais",
     },
     "circle-crop": {
       name: "Recorte Circular",
