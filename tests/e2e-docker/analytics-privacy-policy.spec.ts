@@ -49,7 +49,7 @@ test.describe("Privacy policy page", () => {
   test("does NOT contain old 'No Tracking or Analytics' text", async ({ page }) => {
     await page.goto("/privacy");
 
-    // The old privacy policy had this text — it should be gone now
+    // The old privacy policy had this text, it should be gone now
     const oldText = page.getByText("No Tracking or Analytics");
     await expect(oldText).not.toBeVisible({ timeout: 5_000 });
   });

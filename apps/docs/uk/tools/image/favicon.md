@@ -63,7 +63,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/favicon \
 
 ## Приклад відповіді {#example-response}
 
-Відповідь — це ZIP-файл, який передається напряму. Заголовки відповіді такі:
+Відповідь, це ZIP-файл, який передається напряму. Заголовки відповіді такі:
 
 ```
 Content-Type: application/zip

@@ -749,7 +749,7 @@ test.describe("Batch Favicon", () => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    // Favicon batch may not be registered — accept 200 or 404
+    // Favicon batch may not be registered, accept 200 or 404
     if (res.status() === 404) {
       const json = await res.json();
       expect(json.error).toBeDefined();
@@ -788,7 +788,7 @@ test.describe("Batch Edit Metadata", () => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    // edit-metadata batch may not be registered — accept 200 or 404
+    // edit-metadata batch may not be registered, accept 200 or 404
     if (res.status() === 404) {
       const json = await res.json();
       expect(json.error).toBeDefined();
@@ -808,7 +808,7 @@ test.describe("Batch Edit Metadata", () => {
 
 // ─── Batch Convert to Multiple Formats ────────────────────────────
 
-test.describe("Batch Convert — format variety", () => {
+test.describe("Batch Convert: format variety", () => {
   test("batch convert to PNG", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
@@ -852,7 +852,7 @@ test.describe("Batch Convert — format variety", () => {
 
 // ─── Batch Rotate with Various Angles ─────────────────────────────
 
-test.describe("Batch Rotate — angles", () => {
+test.describe("Batch Rotate: angles", () => {
   test("batch rotate 180 degrees", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
@@ -1324,7 +1324,7 @@ test.describe("Batch validation", () => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    // Either accepts the single file or returns an error — both valid
+    // Either accepts the single file or returns an error, both valid
     const resContentType = res.headers()["content-type"] ?? "";
     if (res.ok()) {
       if (resContentType.includes("application/json")) {

@@ -203,9 +203,9 @@ describe("docs route logic", () => {
     it("includes responses section and resolves $ref under components.responses", () => {
       const result = generateLlmsFullTxt(fullSpec);
       expect(result).toContain("**Responses:**");
-      expect(result).toContain("`200` — Successful resize");
-      expect(result).toContain("`400` — Invalid input");
-      expect(result).toContain("`413` — Upload exceeds configured size limit");
+      expect(result).toContain("`200`: Successful resize");
+      expect(result).toContain("`400`: Invalid input");
+      expect(result).toContain("`413`: Upload exceeds configured size limit");
     });
 
     it("handles spec with no description", () => {

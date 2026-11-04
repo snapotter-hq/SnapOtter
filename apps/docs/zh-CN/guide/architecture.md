@@ -60,8 +60,8 @@ Python 脚本位于 `packages/ai/python/` 中。大型可选模型包根据需�
 - 流水线编排（顺序串联多个工具）
 - 通过 BullMQ 作业队列进行带并发控制的批处理（池：image、media、ai、docs、system）
 - 用户认证、RBAC（带完整权限集的 admin/user 角色）、API 密钥管理和限流
-- 团队管理——仅限管理员的 CRUD；用户通过其个人资料上的 `team` 字段被分配到某个团队
-- 运行时设置——`settings` 表中的键值存储，无需重新部署即可控制 `disabledTools`、`enableExperimentalTools`、`loginAttemptLimit` 及其他运维开关
+- 团队管理，仅限管理员的 CRUD；用户通过其个人资料上的 `team` 字段被分配到某个团队
+- 运行时设置，`settings` 表中的键值存储，无需重新部署即可控制 `disabledTools`、`enableExperimentalTools`、`loginAttemptLimit` 及其他运维开关
 - 通过数据库支持的设置实现自定义品牌化和运行时偏好
 - 位于 `/api/docs` 的 Scalar/OpenAPI 文档
 - 在生产环境中将构建后的前端作为 SPA 提供服务
@@ -110,7 +110,7 @@ Node.js/Fastify 进程、PostgreSQL 和 Redis 均在运行。三个容器（Node
 |-----------|-------------|---------------------|
 | Fastify 服务器 + Postgres + Redis | 容器启动 | 合计约 200-300 MB |
 | BullMQ workers | 容器启动（进程内） | 每个池一个 worker（image、media、ai、docs、system） |
-| Python dispatcher | 首个 AI 工具请求 | Python 解释器 + 预导入的库（PIL、NumPy、MediaPipe、rembg）——无模型权重 |
+| Python dispatcher | 首个 AI 工具请求 | Python 解释器 + 预导入的库（PIL、NumPy、MediaPipe、rembg），无模型权重 |
 | AI 模型权重 | 特定工具的请求期间 | 从磁盘加载，请求结束时释放 |
 
 ### 模型加载 {#model-loading}

@@ -552,7 +552,7 @@ function CollageCell({
         </div>
       )}
 
-      {/* Top bar — drag handle + fit/fill toggle */}
+      {/* Top bar: drag handle + fit/fill toggle */}
       {isSelected && image && !isLoading && (
         <div
           role="toolbar"
@@ -608,7 +608,7 @@ function CollageCell({
         </div>
       )}
 
-      {/* Zoom controls overlay — bottom of selected cells */}
+      {/* Zoom controls overlay: bottom of selected cells */}
       {isSelected && image && !isLoading && (
         <div
           role="toolbar"

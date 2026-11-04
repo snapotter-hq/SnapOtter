@@ -49,7 +49,7 @@ async function createCustomRole(
     body: JSON.stringify({ name, permissions, description }),
   });
   if (res.status === 409) {
-    // Role already exists — look it up
+    // Role already exists: look it up
     const listRes = await fetch(`${API}/api/v1/roles`, {
       headers: authOnly(adminToken),
     });
@@ -129,9 +129,9 @@ async function deleteRoleByName(adminToken: string, name: string): Promise<void>
   }
 }
 
-// ── 1. People Management UI — role dropdown ─────────────────────────
+// ── 1. People Management UI: role dropdown ─────────────────────────
 
-base.describe("RBAC Full — People Management UI", () => {
+base.describe("RBAC Full: People Management UI", () => {
   base.use({
     storageState: authFile,
   });
@@ -164,7 +164,7 @@ base.describe("RBAC Full — People Management UI", () => {
 
 // ── 2–3. Roles Management UI ────────────────────────────────────────
 
-base.describe("RBAC Full — Roles Management UI", () => {
+base.describe("RBAC Full: Roles Management UI", () => {
   base.use({
     storageState: authFile,
   });
@@ -197,7 +197,7 @@ base.describe("RBAC Full — Roles Management UI", () => {
 
 // ── 4–5. Audit Log UI ──────────────────────────────────────────────
 
-base.describe("RBAC Full — Audit Log UI", () => {
+base.describe("RBAC Full: Audit Log UI", () => {
   base.use({
     storageState: authFile,
   });
@@ -222,7 +222,7 @@ base.describe("RBAC Full — Audit Log UI", () => {
     const filterSelect = page.locator("select").first();
     await filterSelect.selectOption("LOGIN_SUCCESS");
 
-    // Wait for table to update — check for at least one row with "LOGIN SUCCESS" text
+    // Wait for table to update, check for at least one row with "LOGIN SUCCESS" text
     // The action column displays the action with underscores replaced by spaces
     await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 10_000 });
 
@@ -234,7 +234,7 @@ base.describe("RBAC Full — Audit Log UI", () => {
 
 // ── 6. API Key Scoping UI ──────────────────────────────────────────
 
-base.describe("RBAC Full — API Key Scoping UI", () => {
+base.describe("RBAC Full: API Key Scoping UI", () => {
   base.use({
     storageState: authFile,
   });
@@ -262,7 +262,7 @@ base.describe("RBAC Full — API Key Scoping UI", () => {
 
 // ── 7–8. Custom Role User ──────────────────────────────────────────
 
-base.describe("RBAC Full — Custom Role User", () => {
+base.describe("RBAC Full: Custom Role User", () => {
   const CUSTOM_ROLE = `testrole-${UID}`;
   const CUSTOM_USER = `customuser-${UID}`;
   const CUSTOM_PASSWORD = "CustomPass1";
@@ -326,13 +326,13 @@ base.describe("RBAC Full — Custom Role User", () => {
       expect(token).toBeTruthy();
       const bearerToken = token as string;
 
-      // GET /api/v1/settings — requires settings:read (which CUSTOM_ROLE holds), should succeed
+      // GET /api/v1/settings: requires settings:read (which CUSTOM_ROLE holds), should succeed
       const readRes = await fetch(`${API}/api/v1/settings`, {
         headers: authOnly(bearerToken),
       });
       expect(readRes.status).toBe(200);
 
-      // PUT /api/v1/settings — requires settings:write, should be 403
+      // PUT /api/v1/settings: requires settings:write, should be 403
       const writeRes = await fetch(`${API}/api/v1/settings`, {
         method: "PUT",
         headers: authJson(bearerToken),
@@ -340,7 +340,7 @@ base.describe("RBAC Full — Custom Role User", () => {
       });
       expect(writeRes.status).toBe(403);
 
-      // GET /api/auth/users — requires users:manage, should be 403
+      // GET /api/auth/users: requires users:manage, should be 403
       const usersRes = await fetch(`${API}/api/auth/users`, {
         headers: authOnly(bearerToken),
       });

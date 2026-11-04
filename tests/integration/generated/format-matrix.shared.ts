@@ -297,7 +297,7 @@ export function formatSamplesForPart(part: number): FormatSample[] {
 }
 
 // ---------------------------------------------------------------------------
-// Tool definitions — settings each tool requires
+// Tool definitions: settings each tool requires
 // ---------------------------------------------------------------------------
 export interface ToolDef {
   /** Tool route name (maps to /api/v1/tools/<id>) */

@@ -171,7 +171,7 @@ export interface ValidationError {
 /** Camera RAW extensions that share TIFF magic bytes. */
 const RAW_EXTENSIONS = new Set(CAMERA_RAW_INPUTS.map((ext) => ext.slice(1)));
 
-/** Formats that Sharp cannot decode natively — skip dimension check. */
+/** Formats that Sharp cannot decode natively; skip dimension check. */
 const CLI_DECODED_FORMATS = new Set([
   "raw",
   "ico",
@@ -257,7 +257,7 @@ export async function validateImageBuffer(
     return { valid: false, reason: "File is empty" };
   }
 
-  // Reject buffers that are entirely null bytes — they are not valid images
+  // Reject buffers that are entirely null bytes; they are not valid images
   // and would pass the length check but crash Sharp.
   if (isNullByteBuffer(buffer)) {
     return { valid: false, reason: "File contains no image data" };
@@ -270,7 +270,7 @@ export async function validateImageBuffer(
   let detectedFormat =
     detectMagicBytes(buffer) || (isSvgBuffer(buffer) ? "svg" : null) || detectHdrText(buffer);
 
-  // RAW formats share TIFF magic bytes — differentiate by extension
+  // RAW formats share TIFF magic bytes; differentiate by extension
   if (detectedFormat === "tiff" && ext && isRawExtension(ext)) {
     detectedFormat = "raw";
   }

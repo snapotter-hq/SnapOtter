@@ -21,7 +21,7 @@ const OUTWARD_KINDS = new Set([
 ]);
 const BODY_FLAGS = new Set(["-F", "--file", "--body-file"]);
 const SESSION_LINK = /Claude-Session:|claude\.ai\/code\/session/i;
-const EM_DASH = /—/;
+const EM_DASH = /\u2014/;
 // A space-delimited `--` is the ASCII stand-in for a dash. Only message text is
 // checked (inline values and body files), never the command line itself, where
 // ` -- ` ends options and flags like --body-file start with it.
