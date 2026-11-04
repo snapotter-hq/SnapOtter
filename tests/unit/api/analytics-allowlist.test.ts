@@ -72,3 +72,18 @@ describe("sanitizeEventProperties", () => {
     expect(out).not.toHaveProperty("hostname");
   });
 });
+
+describe("app_version (#4215)", () => {
+  it.each([
+    "tool_used",
+    "pipeline_executed",
+    "ai_bundle_action",
+    "instance_started",
+    "auth_login",
+    "auth_login_failed",
+  ])("survives the allowlist on %s", (event) => {
+    expect(sanitizeEventProperties(event, { app_version: "2.3.0" })).toEqual({
+      app_version: "2.3.0",
+    });
+  });
+});

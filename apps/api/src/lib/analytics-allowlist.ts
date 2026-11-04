@@ -16,6 +16,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "execution_hint",
     "error_code",
     "error_kind",
+    "app_version",
   ]),
   pipeline_executed: new Set([
     "step_count",
@@ -24,11 +25,12 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "file_count",
     "duration_ms",
     "status",
+    "app_version",
   ]),
-  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms"]),
+  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "app_version"]),
   instance_started: new Set(["arch", "os_platform", "deploy_mode", "gpu_present", "app_version"]),
-  auth_login: new Set(["method"]),
-  auth_login_failed: new Set(["method"]),
+  auth_login: new Set(["method", "app_version"]),
+  auth_login_failed: new Set(["method", "app_version"]),
 };
 
 function isAllowedValue(value: unknown): boolean {

@@ -139,7 +139,9 @@ export async function trackEvent(
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),
       event,
-      properties: sanitizeEventProperties(event, properties),
+      // After the gates above, so opted-out instances send nothing. Spread last
+      // so a call site can't claim another release (#4215).
+      properties: sanitizeEventProperties(event, { ...properties, app_version: APP_VERSION }),
     });
   } catch {
     // analytics must never throw
