@@ -2865,6 +2865,7 @@ export const id: TranslationKeys = {
       stretchMode: "Regangkan",
       cropMode: "Potong",
       alignment: "Perataan",
+      allCaps: "Huruf kapital semua",
       start: "Awal",
       center: "Tengah",
       end: "Akhir",

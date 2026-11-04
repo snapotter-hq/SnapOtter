@@ -2872,6 +2872,7 @@ export const ru: TranslationKeys = {
       stretchMode: "Растянуть",
       cropMode: "Обрезать",
       alignment: "Выравнивание",
+      allCaps: "Все заглавные",
       start: "Начало",
       center: "Центр",
       end: "Конец",

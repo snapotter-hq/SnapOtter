@@ -2862,6 +2862,7 @@ export const sv: TranslationKeys = {
       stretchMode: "Sträcka",
       cropMode: "Beskära",
       alignment: "Justering",
+      allCaps: "Alla versaler",
       start: "Början",
       center: "Mitten",
       end: "Slut",

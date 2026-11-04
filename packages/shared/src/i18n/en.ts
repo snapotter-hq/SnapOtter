@@ -2806,6 +2806,7 @@ export const en = {
       stretchMode: "Stretch",
       cropMode: "Crop",
       alignment: "Alignment",
+      allCaps: "All caps",
       start: "Start",
       center: "Center",
       end: "End",

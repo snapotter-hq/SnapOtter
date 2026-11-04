@@ -2669,6 +2669,7 @@ export const hi: TranslationKeys = {
       stretchMode: "स्ट्रेच",
       cropMode: "क्रॉप",
       alignment: "अलाइनमेंट",
+      allCaps: "सभी अक्षर बड़े",
       start: "शुरू",
       center: "केंद्र",
       end: "अंत",

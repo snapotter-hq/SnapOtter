@@ -2883,6 +2883,7 @@ export const fr: TranslationKeys = {
       stretchMode: "Étirer",
       cropMode: "Recadrer",
       alignment: "Alignement",
+      allCaps: "Tout en majuscules",
       start: "Début",
       center: "Centre",
       end: "Fin",

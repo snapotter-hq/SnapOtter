@@ -10,9 +10,10 @@
  * custom route from forgetting the stamp entirely.
  *
  * Routes that read clientJobId without calling enqueueToolJob are out of
- * scope: they either use it as the job id itself (pdf-to-image,
- * svg-to-raster) or only for progress frames (passport-photo), so there is
- * no alias row to stamp.
+ * scope: they use it as the job id itself (svg-to-raster), point a batch
+ * alias row at a server id (pdf-to-image, see jobs/batch-alias.ts), or use it
+ * only for progress frames (passport-photo), so there is no tool alias row to
+ * stamp.
  *
  * Detection boundary: a route that enqueues around enqueueToolJob (raw
  * getQueue().add() or FlowProducer) evades this scan. No tool route does

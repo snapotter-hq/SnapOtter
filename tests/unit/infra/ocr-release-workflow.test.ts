@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import { expandAiBundlesScripts } from "../../helpers/ai-bundles-workflow.js";
 
 const root = process.cwd();
 
@@ -35,6 +36,11 @@ const ocrRequirementsPaths = [
 function readRequired(file: string): string {
   expect(existsSync(file), `${path.relative(root, file)} is missing`).toBe(true);
   return readFileSync(file, "utf8");
+}
+
+/** ai-bundles.yml with its moved step scripts expanded back inline. */
+function readBundlesWorkflow(): string {
+  return expandAiBundlesScripts(readRequired(bundlesWorkflowPath), root);
 }
 
 interface WorkflowDocument {
@@ -113,7 +119,7 @@ describe("OCR v3 bundle release workflow", () => {
     }
 
     const ci = readRequired(ciWorkflowPath);
-    const bundles = readRequired(bundlesWorkflowPath);
+    const bundles = readBundlesWorkflow();
     for (const workflow of [ci, bundles]) {
       expect(workflow).toContain('"pip-audit==2.10.0"');
       expect(workflow).toContain("docker/ocr-runtime-requirements-amd64.txt");
@@ -189,7 +195,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("builds and verifies both portable targets on native runners", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
 
     expect(workflow).not.toContain("default: false");
     expect(job(workflow, "validate-inputs", "build-ocr")).toContain(
@@ -224,7 +230,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("keeps bundle publication reachable only from the release workflow", () => {
-    const workflow = load(readRequired(bundlesWorkflowPath)) as WorkflowDocument;
+    const workflow = load(readBundlesWorkflow()) as WorkflowDocument;
 
     // The manual and scheduled triggers exist so the standalone
     // installed-AI verification lane can run outside a release. They must not
@@ -235,13 +241,13 @@ describe("OCR v3 bundle release workflow", () => {
 
     // Negative control: strip the release-commit gate and the same walk must
     // report the publish job as reachable from a manual dispatch.
-    const ungated = load(readRequired(bundlesWorkflowPath)) as WorkflowDocument;
+    const ungated = load(readBundlesWorkflow()) as WorkflowDocument;
     delete ungated.jobs["validate-inputs"].if;
     expect(publishGate(ungated)).toBeNull();
   });
 
   it("blocks release on the amd64 CPU pack running with a real NVIDIA GPU exposed", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const gpuJob = job(workflow, "verify-ocr-nvidia", "sign-ocr-index");
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
 
@@ -258,7 +264,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("installs each exact archive offline before a functional CPU-only smoke", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const verifier = readRequired(verifierPath);
 
     const verifyJob = job(workflow, "verify-ocr", "verify-ocr-nvidia");
@@ -377,7 +383,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("runs native verification as the production user and covers arbitrary UID with GID 0", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const verifier = readRequired(verifierPath);
     const verifyJob = job(workflow, "verify-ocr", "verify-ocr-nvidia");
     const gpuJob = job(workflow, "verify-ocr-nvidia", "sign-ocr-index");
@@ -428,7 +434,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("gates the exact Fast OCR language payload while keeping its layer size approximate", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const verifyJob = job(workflow, "verify-ocr", "verify-ocr-nvidia");
 
     expect(verifyJob).toContain("Verify exact Fast OCR payload");
@@ -505,7 +511,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("blocks native release on every licensed real fixture across Fast, Balanced, and Best", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const verifyJob = job(workflow, "verify-ocr", "verify-ocr-nvidia");
     const verifier = readRequired(verifierPath);
 
@@ -634,7 +640,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("inventories and vulnerability-gates each verified OCR runtime artifact", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const verifyJob = job(workflow, "verify-ocr", "verify-ocr-nvidia");
     const publishJob = job(workflow, "publish");
 
@@ -691,7 +697,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("hash-locks tooling before exposing the HuggingFace write token", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const publishJob = job(workflow, "publish");
     const requirements = readRequired(hfReleaseRequirementsPath);
 
@@ -735,7 +741,7 @@ describe("OCR v3 bundle release workflow", () => {
     // green.
     type Step = Record<string, unknown> & { with?: Record<string, unknown> };
     type Job = Record<string, unknown> & { steps: Step[] };
-    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+    const parsed = load(readBundlesWorkflow()) as {
       env?: unknown;
       defaults?: unknown;
       jobs: Record<string, Job>;
@@ -822,7 +828,7 @@ describe("OCR v3 bundle release workflow", () => {
     // `needs` edge or a dropped --strict can't turn the guard into a no-op.
     type Step = Record<string, unknown> & { with?: Record<string, unknown> };
     type Job = Record<string, unknown> & { steps: Step[] };
-    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+    const parsed = load(readBundlesWorkflow()) as {
       env?: unknown;
       defaults?: unknown;
       jobs: Record<string, Job>;
@@ -887,7 +893,7 @@ describe("OCR v3 bundle release workflow", () => {
     // holds the signing key or the HuggingFace token (and with merge-multiple,
     // let it overwrite a real report), so each download names one artifact.
     type Step = Record<string, unknown> & { with?: Record<string, unknown> };
-    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+    const parsed = load(readBundlesWorkflow()) as {
       jobs: Record<string, { steps: Step[] }>;
     };
     const downloadsOf = (jobName: string) =>
@@ -937,7 +943,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("signs one canonical two-target index and verifies it before upload", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
     const verifySignedJob = job(workflow, "verify-signed-ocr-index", "publish");
     const publishJob = job(workflow, "publish");
@@ -1019,7 +1025,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("refuses to sign an index carrying a float or an unsafe integer (#1415)", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
     const beginMarker = "# OCR_CANONICAL_NUMBER_CONTRACT_BEGIN";
     const endMarker = "# OCR_CANONICAL_NUMBER_CONTRACT_END";
@@ -1061,7 +1067,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("rejects signed artifacts whose measured sizes drift beyond the release tolerance", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
     const contract = measuredEstimateContract(signJob);
     const python = `${contract}\n\nimport json\nimport sys\npayload = json.loads(sys.argv[1])\nvalidate_measured_estimate(\n    "linux-amd64-cpu-py312", payload["manifestTarget"], payload["archive"]\n)\n`;
@@ -1158,7 +1164,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("rejects non-canonical public-key base64 at the earliest release boundaries", () => {
-    const bundles = readRequired(bundlesWorkflowPath);
+    const bundles = readBundlesWorkflow();
     const release = readRequired(releaseWorkflowPath);
     const bundleValidation = job(bundles, "validate-inputs", "build-ocr");
     const releaseValidation = job(release, "release", "prebuilt");
@@ -1192,7 +1198,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("makes every run-scoped artifact upload safe to replace on a rerun", () => {
-    const workflows = [readRequired(bundlesWorkflowPath), readRequired(releaseWorkflowPath)];
+    const workflows = [readBundlesWorkflow(), readRequired(releaseWorkflowPath)];
     const expectedUploadCounts = [5, 2];
 
     workflows.forEach((workflow, workflowIndex) => {
@@ -1209,7 +1215,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("always removes only release-scoped state from the persistent NVIDIA runner", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const gpuJob = job(workflow, "verify-ocr-nvidia", "sign-ocr-index");
     const cleanupStart = gpuJob.indexOf("Remove release-scoped state from persistent runner");
 
@@ -1226,7 +1232,7 @@ describe("OCR v3 bundle release workflow", () => {
 
   it("binds every downstream checkout to one peeled release commit", () => {
     const release = readRequired(releaseWorkflowPath);
-    const bundles = readRequired(bundlesWorkflowPath);
+    const bundles = readBundlesWorkflow();
     const releaseJob = job(release, "release", "prebuilt");
 
     expect(releaseJob).toContain("release_commit: ${{ steps.check.outputs.release_commit }}");
@@ -1249,7 +1255,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("records the release source and reusable-workflow revision independently", () => {
-    const workflow = readRequired(bundlesWorkflowPath);
+    const workflow = readBundlesWorkflow();
     const buildJob = job(workflow, "build-ocr", "verify-ocr");
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
 
@@ -1267,7 +1273,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("snapshots Hugging Face reads and publishes with a compare-and-swap parent", () => {
-    const publishJob = job(readRequired(bundlesWorkflowPath), "publish");
+    const publishJob = job(readBundlesWorkflow(), "publish");
 
     // A shared group plus cancel-in-progress: false is the whole serialization
     // contract. GitHub queues the second run behind the first, which is what
@@ -1290,7 +1296,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("refetches the immutable release tag at the Hugging Face mutation boundary", () => {
-    const publishJob = job(readRequired(bundlesWorkflowPath), "publish");
+    const publishJob = job(readBundlesWorkflow(), "publish");
     const uploadStart = publishJob.indexOf(
       "Upload only after every verification and signing gate passed",
     );
@@ -1307,7 +1313,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("installs the exact Syft 1.42.3 Linux binary from verified release bytes", () => {
-    for (const workflow of [readRequired(bundlesWorkflowPath), readRequired(releaseWorkflowPath)]) {
+    for (const workflow of [readBundlesWorkflow(), readRequired(releaseWorkflowPath)]) {
       expect(workflow).not.toContain("anchore/sbom-action/download-syft@");
       expect(workflow).not.toContain("install.sh");
       expect(workflow).toContain(

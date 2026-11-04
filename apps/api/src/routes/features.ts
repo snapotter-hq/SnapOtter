@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import {
   acquireVenvLock,
+  buildInstallerEnv,
   drainOcrDispatcher,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
@@ -390,11 +391,10 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
       stdio: ["ignore", "pipe", "pipe", installLockFd],
-      env: {
-        ...process.env,
+      env: buildInstallerEnv({
         BUNDLE_ID: bundleId,
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
-      },
+      }),
     });
 
     const stallMs = env.INSTALL_STALL_MS;

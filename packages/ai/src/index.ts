@@ -15,6 +15,7 @@ export {
 } from "./background-removal-animated.js";
 export type { DispatcherRecycleReason, DispatcherStatus } from "./bridge.js";
 export {
+  buildInstallerEnv,
   getDispatcherStatus,
   getDocsDispatcher,
   initDispatcher,

@@ -590,7 +590,9 @@ paths:
       operationId: compressImage
       tags: [Image]
       summary: Compress Image
-      description: Reduce image file size by quality level or target size.
+      description: |
+        Reduce image file size by quality level or target size.
+        Target-size mode is the replacement for the deprecated compress-image-to-{20,50,100,200,500}kb operations.
       security:
         - bearerAuth: []
       requestBody:
@@ -637,11 +639,13 @@ paths:
   /api/v1/tools/image/compress-image-to-20kb:
     post:
       operationId: compressImageTo20KbTool
+      deprecated: true
       tags: [Image]
       summary: "Compress Image to 20 KB"
       description: |
         Compress an image to a 20 KB target size
         This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        Replaced by POST /api/v1/tools/image/compress with settings `mode` set to `targetSize` and `targetSizeKb` set to 20. Kept for at least one minor release.
       security:
         - bearerAuth: []
       requestBody:
@@ -696,11 +700,13 @@ paths:
   /api/v1/tools/image/compress-image-to-50kb:
     post:
       operationId: compressImageTo50KbTool
+      deprecated: true
       tags: [Image]
       summary: "Compress Image to 50 KB"
       description: |
         Compress an image to a 50 KB target size
         This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        Replaced by POST /api/v1/tools/image/compress with settings `mode` set to `targetSize` and `targetSizeKb` set to 50. Kept for at least one minor release.
       security:
         - bearerAuth: []
       requestBody:
@@ -755,11 +761,13 @@ paths:
   /api/v1/tools/image/compress-image-to-100kb:
     post:
       operationId: compressImageTo100KbTool
+      deprecated: true
       tags: [Image]
       summary: "Compress Image to 100 KB"
       description: |
         Compress an image to a 100 KB target size
         This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        Replaced by POST /api/v1/tools/image/compress with settings `mode` set to `targetSize` and `targetSizeKb` set to 100. Kept for at least one minor release.
       security:
         - bearerAuth: []
       requestBody:
@@ -814,11 +822,13 @@ paths:
   /api/v1/tools/image/compress-image-to-200kb:
     post:
       operationId: compressImageTo200KbTool
+      deprecated: true
       tags: [Image]
       summary: "Compress Image to 200 KB"
       description: |
         Compress an image to a 200 KB target size
         This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        Replaced by POST /api/v1/tools/image/compress with settings `mode` set to `targetSize` and `targetSizeKb` set to 200. Kept for at least one minor release.
       security:
         - bearerAuth: []
       requestBody:
@@ -873,11 +883,13 @@ paths:
   /api/v1/tools/image/compress-image-to-500kb:
     post:
       operationId: compressImageTo500KbTool
+      deprecated: true
       tags: [Image]
       summary: "Compress Image to 500 KB"
       description: |
         Compress an image to a 500 KB target size
         This is a dedicated compression preset endpoint backed by `compress` in targetSize mode.
+        Replaced by POST /api/v1/tools/image/compress with settings `mode` set to `targetSize` and `targetSizeKb` set to 500. Kept for at least one minor release.
       security:
         - bearerAuth: []
       requestBody:

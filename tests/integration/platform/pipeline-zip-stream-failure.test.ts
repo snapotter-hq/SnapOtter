@@ -23,6 +23,7 @@ import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { batchJobIdFor } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -50,11 +51,16 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
   const { SafeError } = await import("@snapotter/shared");
+  // Parents are named by their clientJobId; batch keys carry the server id.
+  const clientKey = async (key: string) => {
+    const { toClientKey } = await import("../batch-alias.js");
+    return toClientKey(key);
+  };
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
       const faultParent = mocks.unmasked500IngressForParentId;
-      if (faultParent && key.startsWith(`uploads/${faultParent}-f`)) {
+      if (faultParent && (await clientKey(key)).startsWith(`uploads/${faultParent}-f`)) {
         throw Object.assign(
           new TypeError("Cannot read properties of undefined (reading 'byteLength')"),
           { statusCode: 500 },
@@ -64,7 +70,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     },
     putObjectStream: async (key: string, stream: Parameters<typeof actual.putObjectStream>[1]) => {
       const capParent = mocks.capZipStoreForParentId;
-      if (capParent && key.startsWith(`outputs/${capParent}/`)) {
+      if (capParent && (await clientKey(key)).startsWith(`outputs/${capParent}/`)) {
         throw new SafeError("Injected cap at packaging", {
           kind: "operational",
           code: "workspace-cap",
@@ -74,12 +80,13 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
       return actual.putObjectStream(key, stream);
     },
     getObjectStream: async (key: string, range?: { start: number; end?: number }) => {
+      const matchKey = await clientKey(key);
       const entryParent = mocks.failEntryStreamsForParentId;
-      if (entryParent && new RegExp(`^outputs/${entryParent}-f\\d+/`).test(key)) {
+      if (entryParent && new RegExp(`^outputs/${entryParent}-f\\d+/`).test(matchKey)) {
         throw new Error("simulated object storage outage");
       }
       const zipParent = mocks.failZipObjectForParentId;
-      if (zipParent && key.startsWith(`outputs/${zipParent}/`)) {
+      if (zipParent && matchKey.startsWith(`outputs/${zipParent}/`)) {
         throw new Error("simulated object storage outage");
       }
       return actual.getObjectStream(key, range);
@@ -262,17 +269,18 @@ describe("Pipeline batch ZIP delivery", () => {
 
     expect(res.statusCode).toBe(500);
 
-    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    const batchJobId = await batchJobIdFor(parentId);
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, batchJobId));
     expect(row?.status).toBe("failed");
     expect(row?.error).toEqual({
       message: "Internal server error",
       details: [{ filename: "", error: "Internal server error" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${parentId}`);
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${batchJobId}`);
     expect(cached).not.toBeNull();
     expect(JSON.parse(cached as string)).toMatchObject({
-      jobId: parentId,
+      jobId: batchJobId,
       type: "batch",
       status: "failed",
       totalFiles: 1,

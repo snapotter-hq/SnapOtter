@@ -2599,6 +2599,7 @@ export const zhCN: TranslationKeys = {
       stretchMode: "拉伸",
       cropMode: "裁剪",
       alignment: "对齐",
+      allCaps: "全部大写",
       start: "起始",
       center: "居中",
       end: "末尾",

@@ -4,6 +4,12 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 # Changelog {#changelog}
 
+## Unreleased {#unreleased}
+
+### Deprecated {#unreleased-deprecated}
+
+- **The five image compress-to-size operations are deprecated.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, and `-500kb` are marked deprecated in the OpenAPI spec and will stay for at least one minor release. Send `POST /api/v1/tools/image/compress` with `settings` set to `{"mode":"targetSize","targetSizeKb":20}` (or 50, 100, 200, 500). The output is the same. The PDF preset paths are unchanged.
+
 ## v2.3.0 {#v2-3-0}
 
 SnapOtter just passed one million image pulls across Docker Hub and GHCR, and 3,000 stars on GitHub. That's a lot of self-hosted servers, so this release is our thank-you to everyone running them.

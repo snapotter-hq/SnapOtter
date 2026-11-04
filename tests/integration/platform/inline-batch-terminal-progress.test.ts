@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { resolveBatchJobId } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -108,9 +109,16 @@ function postBatch(
   });
 }
 
-async function readRow(id: string) {
+// pdf-to-image runs under a server id with the client id as an alias row;
+// svg-to-raster still runs under the client id. Both resolve here.
+async function readRow(clientJobId: string) {
+  const id = await resolveBatchJobId(clientJobId);
   const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
   return row;
+}
+
+async function terminalPersisted(clientJobId: string) {
+  return terminal.persisted.has(await resolveBatchJobId(clientJobId));
 }
 
 describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) => {
@@ -122,7 +130,7 @@ describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) =>
     const res = await postBatch(route, clientJobId);
 
     expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
-    expect(terminal.persisted.has(clientJobId), "answered before the terminal write").toBe(true);
+    expect(await terminalPersisted(clientJobId), "answered before the terminal write").toBe(true);
     expect((await readRow(clientJobId))?.status).toBe("completed");
   });
 
@@ -151,7 +159,7 @@ describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) =>
     const res = await postBatch(route, clientJobId, route.bad);
 
     expect(res.statusCode, res.body.slice(0, 300)).toBe(422);
-    expect(terminal.persisted.has(clientJobId), "answered before the terminal write").toBe(true);
+    expect(await terminalPersisted(clientJobId), "answered before the terminal write").toBe(true);
     expect((await readRow(clientJobId))?.status).toBe("failed");
   });
 

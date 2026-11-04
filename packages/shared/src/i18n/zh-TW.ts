@@ -2599,6 +2599,7 @@ export const zhTW: TranslationKeys = {
       stretchMode: "延展",
       cropMode: "裁切",
       alignment: "對齊",
+      allCaps: "全部大寫",
       start: "起始",
       center: "置中",
       end: "末尾",

@@ -2861,6 +2861,7 @@ export const vi: TranslationKeys = {
       stretchMode: "Kéo giãn",
       cropMode: "Cắt",
       alignment: "Căn chỉnh",
+      allCaps: "Viết hoa tất cả",
       start: "Đầu",
       center: "Giữa",
       end: "Cuối",
