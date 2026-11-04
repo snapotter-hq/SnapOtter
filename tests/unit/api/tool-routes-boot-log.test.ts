@@ -190,6 +190,9 @@ describe("tool routes boot log", () => {
     );
 
     it("drops registry presets and compress presets when their base is disabled", async () => {
+      // The tool registry is module-level and never cleared, so populate it first:
+      // otherwise a missing-base fallback would make this pass without the fix.
+      await (await bootWithDisabled([])).close();
       const app = await bootWithDisabled(["convert", "compress"]);
       expect(hasRoute(app, "heic-to-jpg")).toBe(false);
       expect(hasRoute(app, "compress-image-to-100kb")).toBe(false);
@@ -210,7 +213,11 @@ describe("tool routes boot log", () => {
         .map((c) => String(c[0]))
         .find((l) => l.startsWith("Tool routes:"));
       const skipped = Number(line?.match(/(\d+) skipped/)?.[1]);
+      const active = Number(line?.match(/Tool routes: (\d+) active/)?.[1]);
+      const total = Number(line?.match(/\((\d+) total\)/)?.[1]);
       expect(skipped).toBe(TOOLS.filter((t) => t.experimental).length + 1);
+      expect(active + skipped).toBe(total);
+      expect(total).toBe(TOOLS.length);
     });
   });
 });
