@@ -139,7 +139,7 @@ describe("AudioChannelsControls", async () => {
   it("emits valid defaults on mount", () => {
     const onChange = vi.fn();
     render(<AudioChannelsControls onChange={onChange} />);
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ mode: "stereo-to-mono" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ mode: "mono-to-stereo" }));
   });
 });
 
