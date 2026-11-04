@@ -106,6 +106,10 @@ const envSchema = z
     SNAPOTTER_LICENSE_KEY: z.string().default(""),
     FILE_MAX_AGE_HOURS: z.coerce.number().default(72),
     CLEANUP_INTERVAL_MINUTES: z.coerce.number().default(60),
+    // These two defaults apply only to source and dev runs. docker/Dockerfile and
+    // the published Compose files set both to 0 (unlimited), which is what the
+    // image ships. apps/docs/guide/configuration.md states both values, so change
+    // the docs too if either side moves.
     MAX_UPLOAD_SIZE_MB: z.coerce.number().default(100),
     MAX_BATCH_SIZE: z.coerce.number().default(100),
     CONCURRENT_JOBS: z.coerce.number().default(0),
