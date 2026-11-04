@@ -55,6 +55,24 @@ describe("Dockerfile build args", () => {
     }
   });
 
+  it("builds every Node stage on the patched 22.23.4 release (CVE-2026-111497)", () => {
+    for (const [name, source] of [
+      ["Dockerfile", dockerfile],
+      ["Dockerfile.test", dockerfileTest],
+    ] as const) {
+      const nodeBases = source
+        .split(/\r?\n/)
+        .filter((line) => /^FROM\s+(?:--platform=\S+\s+)?node:/.test(line));
+
+      expect(nodeBases.length, `${name} should contain Node stages`).toBeGreaterThan(0);
+      for (const base of nodeBases) {
+        expect(base, `${name} Node base is not 22.23.4: ${base}`).toMatch(
+          /^FROM\s+(?:--platform=\S+\s+)?node:22\.23\.4-bookworm@sha256:18a6d90fd60542269850c80ca03b29b1d9b14d6b221ac7ee8e35b0d33ef904bd/,
+        );
+      }
+    }
+  });
+
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
       "golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9";
