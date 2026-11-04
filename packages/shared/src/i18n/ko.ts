@@ -2789,6 +2789,7 @@ export const ko: TranslationKeys = {
       stretchMode: "늘리기",
       cropMode: "크롭",
       alignment: "정렬",
+      allCaps: "모두 대문자",
       start: "시작",
       center: "중앙",
       end: "끝",

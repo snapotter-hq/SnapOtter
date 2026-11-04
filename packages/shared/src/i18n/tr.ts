@@ -2862,6 +2862,7 @@ export const tr: TranslationKeys = {
       stretchMode: "Esnet",
       cropMode: "Kırp",
       alignment: "Hizalama",
+      allCaps: "Tümü büyük harf",
       start: "Başlangıç",
       center: "Orta",
       end: "Son",

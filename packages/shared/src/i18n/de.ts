@@ -2880,6 +2880,7 @@ export const de: TranslationKeys = {
       stretchMode: "Strecken",
       cropMode: "Zuschneiden",
       alignment: "Ausrichtung",
+      allCaps: "Großbuchstaben",
       start: "Anfang",
       center: "Mitte",
       end: "Ende",

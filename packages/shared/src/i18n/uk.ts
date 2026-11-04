@@ -2866,6 +2866,7 @@ export const uk: TranslationKeys = {
       stretchMode: "Розтягнути",
       cropMode: "Обрізати",
       alignment: "Вирівнювання",
+      allCaps: "Усі великі літери",
       start: "Початок",
       center: "Центр",
       end: "Кінець",
