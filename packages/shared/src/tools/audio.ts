@@ -32,7 +32,7 @@ export const AUDIO_TOOLS: Tool[] = [
     id: "extract-audio",
     name: "Extract Audio",
     description: "Pull the audio track out of a video",
-    category: "audio-edit",
+    category: "video-convert",
     icon: "FileAudio",
     route: "/extract-audio",
     modality: "video",
