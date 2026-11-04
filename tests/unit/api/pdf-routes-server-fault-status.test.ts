@@ -219,7 +219,11 @@ describe("pdf-to-image single-file route", () => {
         getObjectBuffer.mockRejectedValueOnce(defect);
         const res = await send(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toMatchObject({ error: "Internal server error" });
+        expect(res.json()).toEqual({
+          error: "Internal server error",
+          code: "INTERNAL_ERROR",
+          requestId: expect.any(String),
+        });
         expect(deletePrefix).toHaveBeenCalledTimes(1);
       }
 
@@ -231,7 +235,11 @@ describe("pdf-to-image single-file route", () => {
       );
       const localRes = await send(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
+      expect(localRes.json()).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
       expect(deletePrefix).toHaveBeenCalledTimes(1);
     } finally {
       (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
@@ -431,14 +439,18 @@ describe("pdf-to-image single-file route", () => {
       // 5. Non-OOM RangeError, password-protected, and corrupt PDFs still return 400 without reporting engine unavailable
       const nonOomRangeRes = await sendPreview("pdf-to-image");
       expect(nonOomRangeRes.statusCode).toBe(400);
-      expect(nonOomRangeRes.json()).toMatchObject({
+      expect(nonOomRangeRes.json()).toEqual({
         error: "Invalid or corrupt PDF file",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       const encryptedRes = await sendPreview("pdf-to-image", encryptedPdf);
       expect(encryptedRes.statusCode).toBe(400);
-      expect(encryptedRes.json()).toMatchObject({
+      expect(encryptedRes.json()).toEqual({
         error: "Password-protected PDFs are not supported",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       const corruptRes = await sendPreview(
@@ -446,8 +458,10 @@ describe("pdf-to-image single-file route", () => {
         Buffer.from("%PDF-1.4\nnot really a document"),
       );
       expect(corruptRes.statusCode).toBe(400);
-      expect(corruptRes.json()).toMatchObject({
+      expect(corruptRes.json()).toEqual({
         error: "Invalid or corrupt PDF file",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       expect(reportSpy).toHaveBeenCalledTimes(4);
@@ -598,7 +612,11 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
         getObjectBuffer.mockRejectedValueOnce(defect);
         const res = await send(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toMatchObject({ error: "Internal server error" });
+        expect(res.json()).toEqual({
+          error: "Internal server error",
+          code: "INTERNAL_ERROR",
+          requestId: expect.any(String),
+        });
       }
 
       // Local-mode EIO (STORAGE_MODE !== "s3") bypasses S3 read fault normalization and answers 500
@@ -608,7 +626,11 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
       );
       const localRes = await send(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
+      expect(localRes.json()).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
     } finally {
       (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
       await app.close();
@@ -898,7 +920,11 @@ describe("pdf-to-image batch route (#1552)", () => {
         });
         const res = await sendBatch(app);
         expect(res.statusCode).toBe(500);
-        expect(res.json()).toMatchObject({ error: "Internal server error" });
+        expect(res.json()).toEqual({
+          error: "Internal server error",
+          code: "INTERNAL_ERROR",
+          requestId: expect.any(String),
+        });
         expect(failBatchJob).toHaveBeenCalledWith({
           jobId: expect.any(String),
           totalFiles: 2,
@@ -922,7 +948,11 @@ describe("pdf-to-image batch route (#1552)", () => {
       });
       const localRes = await sendBatch(app);
       expect(localRes.statusCode).toBe(500);
-      expect(localRes.json()).toMatchObject({ error: "Internal server error" });
+      expect(localRes.json()).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
       expect(failBatchJob).toHaveBeenCalledWith({
         jobId: expect.any(String),
         totalFiles: 2,
@@ -1094,7 +1124,11 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(500);
-    expect(res.json()).toMatchObject({ error: "Internal server error" });
+    expect(res.json()).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,
@@ -1121,7 +1155,11 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(500);
-    expect(res.json()).toMatchObject({ error: "Internal server error" });
+    expect(res.json()).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,
@@ -1145,7 +1183,11 @@ describe("pdf-to-image batch route (#1552)", () => {
     const res = await sendBatch(app);
 
     expect(res.statusCode).toBe(502);
-    expect(res.json()).toMatchObject({ error: "Internal server error" });
+    expect(res.json()).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     expect(failBatchJob).toHaveBeenCalledWith({
       jobId: expect.any(String),
       totalFiles: 2,

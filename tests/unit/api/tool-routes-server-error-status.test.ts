@@ -409,9 +409,10 @@ describe("compare", () => {
 
       const compareOomRes = await sendCompare();
       expect(compareOomRes.statusCode).toBe(503);
-      expect(compareOomRes.json()).toMatchObject({
+      expect(compareOomRes.json()).toEqual({
         error: "The image decoder ran out of memory.",
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[0]?.[1]).toMatchObject({
         statusCode: 503,
@@ -421,9 +422,10 @@ describe("compare", () => {
 
       const compareUnavailRes = await sendCompare();
       expect(compareUnavailRes.statusCode).toBe(503);
-      expect(compareUnavailRes.json()).toMatchObject({
+      expect(compareUnavailRes.json()).toEqual({
         error: "No HEIF decoder found.",
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[1]?.[1]).toMatchObject({
         statusCode: 503,
@@ -433,9 +435,10 @@ describe("compare", () => {
 
       const wmOomRes = await sendWatermark();
       expect(wmOomRes.statusCode).toBe(503);
-      expect(wmOomRes.json()).toMatchObject({
+      expect(wmOomRes.json()).toEqual({
         error: "The image decoder ran out of memory.",
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[2]?.[1]).toMatchObject({
         statusCode: 503,
@@ -445,9 +448,10 @@ describe("compare", () => {
 
       const wmUnavailRes = await sendWatermark();
       expect(wmUnavailRes.statusCode).toBe(503);
-      expect(wmUnavailRes.json()).toMatchObject({
+      expect(wmUnavailRes.json()).toEqual({
         error: "No HEIF decoder found.",
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[3]?.[1]).toMatchObject({
         statusCode: 503,
@@ -468,8 +472,10 @@ describe("compare", () => {
 
       const compare400Res = await sendCompare();
       expect(compare400Res.statusCode).toBe(400);
-      expect(compare400Res.json()).toMatchObject({
+      expect(compare400Res.json()).toEqual({
         error: "Invalid first image: corrupt header",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[4]?.[1]).toMatchObject({
         statusCode: 400,
@@ -479,9 +485,11 @@ describe("compare", () => {
 
       const compare422Res = await sendCompare();
       expect(compare422Res.statusCode).toBe(422);
-      expect(compare422Res.json()).toMatchObject({
+      expect(compare422Res.json()).toEqual({
         error: "Failed to decode AVIF file (second image)",
         details: "bad bitstream",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[5]?.[1]).toMatchObject({
         statusCode: 422,
@@ -492,8 +500,10 @@ describe("compare", () => {
 
       const wm400Res = await sendWatermark();
       expect(wm400Res.statusCode).toBe(400);
-      expect(wm400Res.json()).toMatchObject({
+      expect(wm400Res.json()).toEqual({
         error: "Invalid watermark image: corrupt watermark",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[6]?.[1]).toMatchObject({
         statusCode: 400,
@@ -503,9 +513,11 @@ describe("compare", () => {
 
       const wm422Res = await sendWatermark();
       expect(wm422Res.statusCode).toBe(422);
-      expect(wm422Res.json()).toMatchObject({
+      expect(wm422Res.json()).toEqual({
         error: "Failed to decode AVIF file (watermark)",
         details: "bad watermark bitstream",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(sendSpy.mock.calls[7]?.[1]).toMatchObject({
         statusCode: 422,
@@ -581,9 +593,11 @@ describe("edit-metadata (#3646)", () => {
         }),
       });
       expect(badRes.statusCode).toBe(422);
-      expect(badRes.json()).toMatchObject({
+      expect(badRes.json()).toEqual({
         error: "Metadata edit failed",
         details: "exiftool rejected tag",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
     } finally {
       inspectSpy.mockRestore();
@@ -772,9 +786,10 @@ describe("json-bodied routes", () => {
       payload: passportBody,
     });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
+      requestId: expect.any(String),
     });
     expect(putObject).not.toHaveBeenCalled();
 
@@ -788,7 +803,11 @@ describe("json-bodied routes", () => {
       payload: passportBody,
     });
     expect(bugRes.statusCode).toBe(500);
-    expect(bugRes.json()).toMatchObject({ error: "Internal server error" });
+    expect(bugRes.json()).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
   });
 
   it("passport-photo generate answers 400 for a jobId or filename the store would refuse", async () => {
@@ -928,23 +947,27 @@ describe("json-bodied routes", () => {
 
     const oomRes = await send();
     expect(oomRes.statusCode).toBe(503);
-    expect(oomRes.json()).toMatchObject({
+    expect(oomRes.json()).toEqual({
       error:
         "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
       code: "ENGINE_UNAVAILABLE",
+      requestId: expect.any(String),
     });
 
     const unavailRes = await send();
     expect(unavailRes.statusCode).toBe(503);
-    expect(unavailRes.json()).toMatchObject({
+    expect(unavailRes.json()).toEqual({
       error: "No barcode engine found.",
       code: "ENGINE_UNAVAILABLE",
+      requestId: expect.any(String),
     });
 
     const clientRes = await send();
     expect(clientRes.statusCode).toBe(400);
-    expect(clientRes.json()).toMatchObject({
+    expect(clientRes.json()).toEqual({
       error: "Invalid text for this barcode type: bwip-js failed on [internal]",
+      code: "BAD_REQUEST",
+      requestId: expect.any(String),
     });
   });
 });
@@ -989,30 +1012,35 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
 
       const firstOom = await sendInfo();
       expect(firstOom.statusCode).toBe(503);
-      expect(firstOom.json()).toMatchObject({
+      expect(firstOom.json()).toEqual({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
 
       const secondOom = await sendInfo();
       expect(secondOom.statusCode).toBe(503);
-      expect(secondOom.json()).toMatchObject({
+      expect(secondOom.json()).toEqual({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
 
       const enospcRes = await sendInfo();
       expect(enospcRes.statusCode).toBe(503);
-      expect(enospcRes.json()).toMatchObject({
+      expect(enospcRes.json()).toEqual({
         error: "The server's storage is full.",
         code: "storage-full",
+        requestId: expect.any(String),
       });
 
       for (let i = 0; i < 2; i++) {
         const badRes = await sendInfo();
         expect(badRes.statusCode).toBe(422);
-        expect(badRes.json()).toMatchObject({
+        expect(badRes.json()).toEqual({
           error: "Could not read image metadata",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
       }
 
@@ -1095,16 +1123,18 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       animatedFault = new RangeError("Array buffer allocation failed");
       const firstOom = await sendTool();
       expect(firstOom.statusCode).toBe(503);
-      expect(firstOom.json()).toMatchObject({
+      expect(firstOom.json()).toEqual({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
 
       const secondOom = await sendTool();
       expect(secondOom.statusCode).toBe(503);
-      expect(secondOom.json()).toMatchObject({
+      expect(secondOom.json()).toEqual({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
 
       animatedFault = Object.assign(new Error("ENOSPC: no space left on device, write"), {
@@ -1112,9 +1142,10 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const enospcRes = await sendTool();
       expect(enospcRes.statusCode).toBe(503);
-      expect(enospcRes.json()).toMatchObject({
+      expect(enospcRes.json()).toEqual({
         error: "The server's storage is full.",
         code: "storage-full",
+        requestId: expect.any(String),
       });
 
       animatedFault = Object.assign(new Error("EPERM: operation not permitted, write"), {
@@ -1123,10 +1154,11 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const epermRes = await sendTool();
       expect(epermRes.statusCode).toBe(503);
-      expect(epermRes.json()).toMatchObject({
+      expect(epermRes.json()).toEqual({
         error:
           "The server can't write to its storage: it's read-only or not allowed to write there.",
         code: "storage-not-writable",
+        requestId: expect.any(String),
       });
 
       animatedFault = Object.assign(new Error("EMFILE: too many open files"), {
@@ -1134,10 +1166,11 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       });
       const emfileRes = await sendTool();
       expect(emfileRes.statusCode).toBe(503);
-      expect(emfileRes.json()).toMatchObject({
+      expect(emfileRes.json()).toEqual({
         error:
           "The server has too many files open to process this image right now. Try again shortly.",
         code: "EMFILE",
+        requestId: expect.any(String),
       });
 
       animatedFault = new Error(
@@ -1145,16 +1178,20 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       );
       const corruptHeaderRes = await sendTool();
       expect(corruptHeaderRes.statusCode).toBe(400);
-      expect(corruptHeaderRes.json()).toMatchObject({
+      expect(corruptHeaderRes.json()).toEqual({
         error:
           "This image can't be decoded. The file may be corrupt or use an unsupported encoding.",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       animatedFault = new Error("Input image exceeds pixel limit");
       const pixelLimitRes = await sendTool();
       expect(pixelLimitRes.statusCode).toBe(400);
-      expect(pixelLimitRes.json()).toMatchObject({
+      expect(pixelLimitRes.json()).toEqual({
         error: "This image is too large to process. Reduce its dimensions and try again.",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       expect(reportSpy).toHaveBeenCalledTimes(5);
@@ -1216,16 +1253,18 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const thumbOomRes = await sendPair();
         expect(thumbOomRes.statusCode).toBe(503);
-        expect(thumbOomRes.json()).toMatchObject({
+        expect(thumbOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const thumbEnospcRes = await sendPair();
         expect(thumbEnospcRes.statusCode).toBe(503);
-        expect(thumbEnospcRes.json()).toMatchObject({
+        expect(thumbEnospcRes.json()).toEqual({
           error: "The server's storage is full.",
           code: "storage-full",
+          requestId: expect.any(String),
         });
       } finally {
         jpegOomSpy.mockRestore();
@@ -1271,16 +1310,18 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const hashOomRes = await sendPair();
         expect(hashOomRes.statusCode).toBe(503);
-        expect(hashOomRes.json()).toMatchObject({
+        expect(hashOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const hashEnospcRes = await sendPair();
         expect(hashEnospcRes.statusCode).toBe(503);
-        expect(hashEnospcRes.json()).toMatchObject({
+        expect(hashEnospcRes.json()).toEqual({
           error: "The server's storage is full.",
           code: "storage-full",
+          requestId: expect.any(String),
         });
       } finally {
         rawOomSpy.mockRestore();
@@ -1311,16 +1352,19 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       try {
         const outerOomRes = await sendPair();
         expect(outerOomRes.statusCode).toBe(503);
-        expect(outerOomRes.json()).toMatchObject({
+        expect(outerOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const outer422Res = await sendPair();
         expect(outer422Res.statusCode).toBe(422);
-        expect(outer422Res.json()).toMatchObject({
+        expect(outer422Res.json()).toEqual({
           error: "Duplicate detection failed",
           details: "Invalid count",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
       } finally {
         rawThrowSpy.mockRestore();
@@ -1378,9 +1422,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(res.statusCode, res.body).toBe(503);
-        expect(res.json()).toMatchObject({
+        expect(res.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       }
 
@@ -1390,9 +1435,11 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toMatchObject({
+      expect(badRes.json()).toEqual({
         error: "Color extraction failed",
         details: "Invalid raw parameter",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
     } finally {
       rawSpy.mockRestore();
@@ -1433,9 +1480,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(res.statusCode, res.body).toBe(503);
-        expect(res.json()).toMatchObject({
+        expect(res.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       }
 
@@ -1447,9 +1495,11 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toMatchObject({
+      expect(badRes.json()).toEqual({
         error: "Split failed",
         details: "Invalid metadata parameter",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
     } finally {
       metaSpy.mockRestore();
@@ -1520,9 +1570,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody(files, { format: "jxl" }),
         });
         expect(oomRes.statusCode, oomRes.body).toBe(503);
-        expect(oomRes.json()).toMatchObject({
+        expect(oomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       }
 
@@ -1548,9 +1599,11 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         ...multipartBody(files, { format: "jxl" }),
       });
       expect(badRes.statusCode, badRes.body).toBe(422);
-      expect(badRes.json()).toMatchObject({
+      expect(badRes.json()).toEqual({
         error: "Stitch creation failed",
         details: "Invalid cjxl parameter",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
     } finally {
       jxlSpy.mockRestore();
@@ -1600,9 +1653,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
             ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
           });
           expect(oomRes.statusCode, `${toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
-          expect(oomRes.json()).toMatchObject({
+          expect(oomRes.json()).toEqual({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
+            requestId: expect.any(String),
           });
         }
 
@@ -1628,9 +1682,11 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(badRes.statusCode, `${toolId} non-OOM: ${badRes.body}`).toBe(422);
-        expect(badRes.json()).toMatchObject({
+        expect(badRes.json()).toEqual({
           error: "Processing failed",
           details: "Invalid output parameter",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
       }
 
@@ -1662,9 +1718,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           }),
         });
         expect(beautifyHttpOom.statusCode, beautifyHttpOom.body).toBe(503);
-        expect(beautifyHttpOom.json()).toMatchObject({
+        expect(beautifyHttpOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const beautifyCfg = getToolConfig("beautify");
@@ -1705,9 +1762,10 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(memeHttpOom.statusCode, memeHttpOom.body).toBe(503);
-        expect(memeHttpOom.json()).toMatchObject({
+        expect(memeHttpOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         memeMetaCall = 0;
@@ -1845,9 +1903,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
             ...multipartBody([...route.files], route.settings),
           });
           expect(oomRes.statusCode, `${route.toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
-          expect(oomRes.json()).toMatchObject({
+          expect(oomRes.json()).toEqual({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
+            requestId: expect.any(String),
           });
         }
 
@@ -1875,9 +1934,11 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([...route.files], route.settings),
         });
         expect(badRes.statusCode, `${route.toolId} non-OOM: ${badRes.body}`).toBe(422);
-        expect(badRes.json()).toMatchObject({
+        expect(badRes.json()).toEqual({
           error: route.expected422Error,
           details: "Invalid output parameter",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
       }
 
@@ -1902,9 +1963,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(compareStepOom.statusCode, compareStepOom.body).toBe(503);
-        expect(compareStepOom.json()).toMatchObject({
+        expect(compareStepOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       } finally {
         pngSpy.mockRestore();
@@ -1947,9 +2009,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(wmStepOom.statusCode, wmStepOom.body).toBe(503);
-        expect(wmStepOom.json()).toMatchObject({
+        expect(wmStepOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const composeStepOom = await app.inject({
@@ -1961,9 +2024,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ]),
         });
         expect(composeStepOom.statusCode, composeStepOom.body).toBe(503);
-        expect(composeStepOom.json()).toMatchObject({
+        expect(composeStepOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       } finally {
         compositeSpy.mockRestore();
@@ -1997,9 +2061,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
         });
         expect(vectorizeStepOom.statusCode, vectorizeStepOom.body).toBe(503);
-        expect(vectorizeStepOom.json()).toMatchObject({
+        expect(vectorizeStepOom.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const vectorizeCfg = getToolConfig("vectorize");
@@ -2036,9 +2101,10 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
         });
         expect(carveOomRes.statusCode, carveOomRes.body).toBe(503);
-        expect(carveOomRes.json()).toMatchObject({
+        expect(carveOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       }
 

@@ -222,9 +222,10 @@ describe("remove-background effects: reading the stored mask and original", () =
     app = await buildApp();
     const res = await app.inject(effectsRequest(settings));
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
+      requestId: expect.any(String),
     });
     expect(requestLogError).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -255,9 +256,10 @@ describe("remove-background effects: reading the stored mask and original", () =
     });
     const mixedRes = await app.inject(effectsRequest(settings));
     expect(mixedRes.statusCode).toBe(503);
-    expect(mixedRes.json()).toMatchObject({
+    expect(mixedRes.json()).toEqual({
       error: "The server's storage service is unavailable.",
       code: "storage-unavailable",
+      requestId: expect.any(String),
     });
     expect(requestLogError).not.toHaveBeenCalledWith(
       expect.anything(),
@@ -271,7 +273,11 @@ describe("remove-background effects: reading the stored mask and original", () =
     });
     const bugRes = await app.inject(effectsRequest(settings));
     expect(bugRes.statusCode).toBe(500);
-    expect(bugRes.json()).toMatchObject({ error: "Internal server error" });
+    expect(bugRes.json()).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
   });
 
   it("answers 400 for a jobId or filename the store would refuse, without reading", async () => {
@@ -382,9 +388,11 @@ describe("remove-background effects: reading the stored mask and original", () =
       ),
     );
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: "Effects processing failed",
       details: UNDECODABLE_IMAGE_MESSAGE,
+      code: "UNPROCESSABLE_ENTITY",
+      requestId: expect.any(String),
     });
     expect(putObject).not.toHaveBeenCalled();
   });

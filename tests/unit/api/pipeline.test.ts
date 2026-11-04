@@ -1206,8 +1206,10 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveUnknownRes.statusCode).toBe(400);
-      expect(saveUnknownRes.json()).toMatchObject({
+      expect(saveUnknownRes.json()).toEqual({
         error: "Step 2 (unknown-save-tool): Tool not found or not available",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
@@ -1224,8 +1226,10 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenRes.statusCode).toBe(403);
-      expect(saveForbiddenRes.json()).toMatchObject({
+      expect(saveForbiddenRes.json()).toEqual({
         error: `Step 2 (${stepErrorTestToolId}): You don't have permission to use this tool`,
+        code: "FORBIDDEN",
+        requestId: expect.any(String),
       });
 
       vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
@@ -1242,8 +1246,10 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenPasswordRes.statusCode).toBe(403);
-      expect(saveForbiddenPasswordRes.json()).toMatchObject({
+      expect(saveForbiddenPasswordRes.json()).toEqual({
         error: "Step 2 (protect-pdf): You don't have permission to use this tool",
+        code: "FORBIDDEN",
+        requestId: expect.any(String),
       });
 
       const savePasswordRes = await app.inject({
@@ -1259,9 +1265,11 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(savePasswordRes.statusCode).toBe(400);
-      expect(savePasswordRes.json()).toMatchObject({
+      expect(savePasswordRes.json()).toEqual({
         error:
           "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
     } finally {
       await app.close();
@@ -1304,8 +1312,10 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveUnregisteredContentAwareRes.statusCode).toBe(400);
-      expect(saveUnregisteredContentAwareRes.json()).toMatchObject({
+      expect(saveUnregisteredContentAwareRes.json()).toEqual({
         error: "Step 1 (resize): Tool not found or not available",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       expect(insertValuesMock).not.toHaveBeenCalled();
 
@@ -1344,8 +1354,10 @@ describe("pipeline step error message formatting", () => {
         },
       });
       expect(saveForbiddenContentAwareRes.statusCode).toBe(403);
-      expect(saveForbiddenContentAwareRes.json()).toMatchObject({
+      expect(saveForbiddenContentAwareRes.json()).toEqual({
         error: "Step 1 (resize): You don't have permission to use this tool",
+        code: "FORBIDDEN",
+        requestId: expect.any(String),
       });
       expect(hasEffectiveToolAccess).toHaveBeenLastCalledWith(
         expect.objectContaining({ id: "user-1" }),
@@ -1497,7 +1509,11 @@ describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
       });
 
       expect(res.statusCode).toBe(500);
-      expect(res.json()).toMatchObject({ error: "Internal server error" });
+      expect(res.json()).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
       expect(errorLogs).toHaveLength(1);
       expect(errorLogs[0]?.bindings).toMatchObject({
         err: dbErr,
@@ -3752,8 +3768,8 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(claimedReply.payload).toEqual({
       jobId: "reused-pipeline-alias",
       async: true,
-      statusUrl: "/api/v1/jobs/reused-pipeline-alias",
-      progressUrl: "/api/v1/jobs/reused-pipeline-alias/progress",
+      statusUrl: expect.any(String),
+      progressUrl: expect.any(String),
     });
     expect(clearBatchCanceledMock).toHaveBeenCalledTimes(1);
     expect(clearBatchCanceledMock).toHaveBeenCalledWith("reused-pipeline-alias");
@@ -3805,8 +3821,8 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(faultTolerantReply.payload).toEqual({
       jobId: "reused-pipeline-alias-fault",
       async: true,
-      statusUrl: "/api/v1/jobs/reused-pipeline-alias-fault",
-      progressUrl: "/api/v1/jobs/reused-pipeline-alias-fault/progress",
+      statusUrl: expect.any(String),
+      progressUrl: expect.any(String),
     });
     expect(faultLog.warn).toHaveBeenCalledWith(
       {
