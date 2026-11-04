@@ -50,7 +50,8 @@ export function runQpdf(
     return Promise.reject(new Error("Canceled"));
   }
   const bin = resolveQpdf();
-  if (!bin) throw new Error("qpdf binary not found (set QPDF_PATH or install qpdf)");
+  if (!bin)
+    return Promise.reject(new Error("qpdf binary not found (set QPDF_PATH or install qpdf)"));
   const timeoutMs = resolvedOpts.timeoutMs ?? 30_000;
   const abortSignal = resolvedOpts.signal;
   return new Promise<string>((resolvePromise, reject) => {
