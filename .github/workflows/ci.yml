@@ -11,6 +11,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue tests each queued PR on top of main before merging it.
+  # Every required check must also report here, or a queued PR waits forever.
+  merge_group:
 
 # PR branches cancel superseded runs. Main never does: a later merge would
 # otherwise cancel the run on the commit before it, and no commit on main
@@ -52,10 +55,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
             base="$PR_BASE_SHA"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            base="$QUEUE_BASE_SHA"
           else
             base="$PUSH_BEFORE_SHA"
           fi
