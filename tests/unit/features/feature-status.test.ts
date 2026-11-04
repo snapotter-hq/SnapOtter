@@ -235,6 +235,10 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 vi.mock("@snapotter/ai", () => ({
+  buildInstallerEnv: (extra: Record<string, string> = {}) => ({
+    PATH: process.env.PATH ?? "",
+    ...extra,
+  }),
   getOcrRuntimeEffectiveMemoryBytes: ocrRuntime.getEffectiveMemory,
   getOcrRuntimeCapability: ocrRuntime.getCapability,
   selectOcrRuntimeTarget: ocrRuntime.selectTarget,

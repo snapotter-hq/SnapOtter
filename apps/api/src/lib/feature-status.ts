@@ -29,6 +29,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
+  buildInstallerEnv,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
   selectOcrRuntimeTarget,
@@ -382,6 +383,7 @@ function acquireKernelInstallLock(fd: number): boolean {
         {
           stdio,
           timeout: 5_000,
+          env: buildInstallerEnv(),
         },
       )
     : spawnSync(
@@ -394,7 +396,7 @@ try:
 except BlockingIOError:
     sys.exit(${LOCK_BUSY_EXIT_CODE})`,
         ],
-        { stdio, timeout: 5_000 },
+        { stdio, timeout: 5_000, env: buildInstallerEnv() },
       );
 
   if (result.error) throw result.error;
@@ -1927,6 +1929,7 @@ export async function importBundleArchive(
               stdio: ["ignore", "pipe", "pipe", installLockFd],
               timeout: 30_000,
               encoding: "utf-8",
+              env: buildInstallerEnv(),
             },
           );
           if (uninst.error || uninst.status !== 0) {
@@ -2042,7 +2045,12 @@ function resolveVenvSitePackages(venvPath: string): string {
   const result = spawnSync(
     join(venvPath, "bin", "python3"),
     ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
-    { stdio: ["ignore", "pipe", "pipe"], timeout: 10_000, encoding: "utf-8" },
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10_000,
+      encoding: "utf-8",
+      env: buildInstallerEnv(),
+    },
   );
   if (result.error || result.status !== 0 || !result.stdout?.trim()) {
     const detail =
@@ -2145,6 +2153,7 @@ function installFixupWheel(
       stdio: ["ignore", "pipe", "pipe", installLockFd],
       timeout: 30_000,
       encoding: "utf-8",
+      env: buildInstallerEnv({ PIP_NO_INDEX: "1" }),
     },
   );
   if (result.error || result.status !== 0) {
@@ -2181,13 +2190,14 @@ function verifyBundleSmokeImports(
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 60_000,
       encoding: "utf-8",
-      env: {
-        ...process.env,
+      // The imported archive is user-supplied and its code runs here (and via
+      // any .pth it ships, in every later venv child), so never hand it process.env.
+      env: buildInstallerEnv({
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONNOUSERSITE: "1",
         HF_HUB_OFFLINE: "1",
         TRANSFORMERS_OFFLINE: "1",
-      },
+      }),
     });
     if (result.error || result.status !== 0) {
       const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";

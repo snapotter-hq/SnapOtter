@@ -20,7 +20,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // tar lives in apps/api/node_modules; resolve via createRequire (same
 // pattern as tests/global-setup.ts for pg/drizzle).
@@ -619,6 +619,111 @@ describe("site-packages import", () => {
     } finally {
       delete process.env.SNAPOTTER_SKIP_INSTALL_SMOKE;
     }
+  }, 30_000);
+
+  it("runs every venv child of an offline import with an allowlisted env, not the API's secrets (#4472)", async () => {
+    // Imported archives are user-supplied, and a .pth file or module they place
+    // in site-packages runs inside every later interpreter start in the venv.
+    // Record what each child actually sees: a .pth dumps at startup, a fake pip
+    // records install/uninstall, and the bundle's module records the smoke import.
+    const venvPath = join(aiDir, `venv-env-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    const purelib = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    const dumpPath = join(testRoot, `child-env-${randomUUID()}.jsonl`);
+    const dump = (tag: string) =>
+      `open(${JSON.stringify(dumpPath)}, "a").write(json.dumps({"tag": ${JSON.stringify(tag)}, "argv": sys.argv[1:], "env": dict(os.environ)}) + "\\n")`;
+    writeFileSync(join(purelib, "zz_envdump.pth"), `import json, os, sys; ${dump("startup")}\n`);
+    mkdirSync(join(purelib, "pip"), { recursive: true });
+    writeFileSync(join(purelib, "pip", "__init__.py"), "");
+    writeFileSync(
+      join(purelib, "pip", "__main__.py"),
+      [
+        "import json, os, sys, shutil, sysconfig",
+        dump("pip"),
+        'dist = os.path.join(sysconfig.get_paths()["purelib"], "fakefix-1.0.dist-info")',
+        'if sys.argv[1:2] == ["install"]:',
+        "    os.makedirs(dist, exist_ok=True)",
+        "else:",
+        "    shutil.rmtree(dist, ignore_errors=True)",
+        "",
+      ].join("\n"),
+    );
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarDir = join(testRoot, `tar-src-${randomUUID()}`);
+    mkdirSync(join(tarDir, "models", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "site-packages", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "fixups"), { recursive: true });
+    writeFileSync(
+      join(tarDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: testBundleId,
+        version: testVersion,
+        models: ["mediapipe/face.tflite"],
+      }),
+    );
+    writeFileSync(join(tarDir, "models", "mediapipe", "face.tflite"), "model-data");
+    // Fail the smoke import after recording it, so the rollback's pip uninstall runs too.
+    writeFileSync(
+      join(tarDir, "site-packages", "mediapipe", "__init__.py"),
+      `import json, os, sys\n${dump("smoke")}\nraise ImportError("env probe")\n`,
+    );
+    writeFileSync(join(tarDir, "fixups", "fakefix-1.0-py3-none-any.whl"), "placeholder");
+    const tarPath = join(testRoot, `bundle-${randomUUID()}.tar.gz`);
+    await tar.create({ gzip: true, file: tarPath, cwd: tarDir }, ["."]);
+
+    const secrets: Record<string, string> = {
+      SESSION_SECRET: "session-secret-hunter2",
+      S3_SECRET_ACCESS_KEY: "s3-secret-hunter2",
+      SNAPOTTER_API_TOKEN: "api-token-hunter2",
+      HF_TOKEN: "hf-token-hunter2",
+      SENTRY_AUTH_TOKEN: "sentry-token-hunter2",
+    };
+    for (const [key, value] of Object.entries(secrets)) vi.stubEnv(key, value);
+    try {
+      await expectRejectedImport(tarPath, /mediapipe.*env probe/s);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const records = readFileSync(dumpPath, "utf-8")
+      .trim()
+      .split("\n")
+      .map(
+        (line) => JSON.parse(line) as { tag: string; argv: string[]; env: Record<string, string> },
+      );
+    const pipInstall = records.find((r) => r.tag === "pip" && r.argv[0] === "install");
+    const pipUninstall = records.find((r) => r.tag === "pip" && r.argv[0] === "uninstall");
+    const smoke = records.find((r) => r.tag === "smoke");
+    // site-packages query, fixup install, smoke import, rollback uninstall
+    expect(records.filter((r) => r.tag === "startup").length).toBeGreaterThanOrEqual(4);
+    expect(pipInstall).toBeDefined();
+    expect(pipUninstall).toBeDefined();
+    expect(smoke).toBeDefined();
+
+    const forbiddenValues = [
+      ...Object.values(secrets),
+      ...[process.env.DATABASE_URL, process.env.REDIS_URL].filter((v): v is string => Boolean(v)),
+    ];
+    for (const record of records) {
+      for (const key of [...Object.keys(secrets), "DATABASE_URL", "REDIS_URL"]) {
+        expect(record.env, `${record.tag} ${record.argv.join(" ")}`).not.toHaveProperty(key);
+      }
+      const values = Object.values(record.env).join("\n");
+      for (const value of forbiddenValues) expect(values).not.toContain(value);
+      expect(record.env.PATH).toBe(process.env.PATH);
+    }
+    expect(pipInstall?.env.PIP_NO_INDEX).toBe("1");
+    expect(smoke?.env.HF_HUB_OFFLINE).toBe("1");
+    expect(smoke?.env.TRANSFORMERS_OFFLINE).toBe("1");
+    expect(smoke?.env.PYTHONNOUSERSITE).toBe("1");
+    expect(existsSync(join(purelib, "fakefix-1.0.dist-info"))).toBe(false);
   }, 30_000);
 });
 
