@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs this repo's guard hooks for sessions started inside a linked worktree.
-// Worktrees get neither .claude/settings.json nor scripts/agent-hooks (both
-// gitignored), so without this a worktree session runs no guards at all. Wired
+// Worktrees get no .claude/settings.json (gitignored), although scripts/agent-hooks
+// is tracked and present, so without this a worktree session runs no guards at all. Wired
 // from the user-level ~/.claude/settings.json; a no-op everywhere else,
 // including the main checkout, whose own project settings already run them.
 //
