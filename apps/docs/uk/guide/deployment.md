@@ -1,6 +1,6 @@
 ---
 description: "Розгортання SnapOtter у продакшені з Docker. Вимоги до апаратного забезпечення, налаштування GPU та конфігурації зворотного проксі для Nginx, Traefik і Cloudflare."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: 3405a3f31dd9
 i18n_hash_version: 2

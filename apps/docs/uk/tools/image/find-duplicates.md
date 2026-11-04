@@ -2,7 +2,8 @@
 description: "Виявляє дублікати та майже однакові зображення за допомогою перцептивного хешування."
 i18n_source_hash: 4e1f4413f90f
 i18n_provenance: human
-i18n_output_hash: 81c996d6af9c
+i18n_output_hash: cb3f8318113f
+i18n_hash_version: 2
 ---
 
 # Пошук дублікатів {#find-duplicates}

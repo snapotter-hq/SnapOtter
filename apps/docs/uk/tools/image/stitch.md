@@ -2,7 +2,8 @@
 description: "Об’єднання зображень поруч, з накладанням або в сітці з керуванням вирівнюванням, проміжками, межами та режимом зміни розміру."
 i18n_source_hash: 670c5cc944b1
 i18n_provenance: human
-i18n_output_hash: c4ebc858c103
+i18n_output_hash: 55fc607e629b
+i18n_hash_version: 2
 ---
 
 # Склейка зображень {#stitch-combine}

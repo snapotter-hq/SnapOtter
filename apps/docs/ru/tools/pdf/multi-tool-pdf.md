@@ -2,7 +2,7 @@
 description: "Переупорядочивайте, поворачивайте, удаляйте и извлекайте страницы из других PDF в одном редакторе или через API."
 i18n_source_hash: 4eca29216d15
 i18n_provenance: machine
-i18n_output_hash: d87b5eaf4d79
+i18n_output_hash: 16ec94ecb5a8
 i18n_hash_version: 2
 ---
 

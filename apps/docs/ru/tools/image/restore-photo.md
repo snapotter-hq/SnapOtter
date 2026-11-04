@@ -2,7 +2,8 @@
 description: "Устранение царапин, разрывов и повреждений на старых фотографиях с помощью ИИ-конвейера для реставрации, улучшения лиц и цвета."
 i18n_source_hash: 3de13284216c
 i18n_provenance: human
-i18n_output_hash: 47db38aa13e9
+i18n_output_hash: 0156700569d5
+i18n_hash_version: 2
 ---
 
 # Реставрация фото {#photo-restoration}

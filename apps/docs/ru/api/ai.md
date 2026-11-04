@@ -1,6 +1,7 @@
 ---
 description: "Справочник по AI-движку со всеми локальными ML-инструментами. Удаление фона, апскейлинг, OCR, распознавание лиц, реставрация фотографий и другое."
-i18n_output_hash: 49e904411c9c
+i18n_output_hash: 8025c23ba773
+i18n_hash_version: 2
 i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---

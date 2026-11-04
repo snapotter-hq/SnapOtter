@@ -2,7 +2,8 @@
 description: "21 поддерживаемый язык и способы создания или улучшения переводов для SnapOtter с помощью системы i18n, контролируемой TypeScript."
 i18n_source_hash: 55837d9fdaef
 i18n_provenance: human
-i18n_output_hash: f94f8a0a6f70
+i18n_output_hash: 4af6a58da00e
+i18n_hash_version: 2
 ---
 
 # Руководство по переводам {#translation-guide}

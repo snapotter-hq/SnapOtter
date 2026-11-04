@@ -1,6 +1,7 @@
 ---
 description: "Wyodrębnij lokalnie tekst ze zeskanowanych plików PDF za pomocą wbudowanego Tesseract lub opcjonalnego, bardzo dokładnego środowiska wykonawczego RapidOCR."
-i18n_output_hash: d4e2a591634d
+i18n_output_hash: 32941326d6e8
+i18n_hash_version: 2
 i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---

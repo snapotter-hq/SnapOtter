@@ -2,7 +2,8 @@
 description: "Змінюйте розмір, оптимізуйте, змінюйте швидкість, реверсуйте, обертайте та витягуйте кадри з анімованих GIF в одному інструменті."
 i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 195e473f9eac
+i18n_output_hash: 6d21975413e7
+i18n_hash_version: 2
 ---
 
 # GIF Tools {#gif-tools}

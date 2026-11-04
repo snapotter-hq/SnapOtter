@@ -1,6 +1,7 @@
 ---
 description: "Довідник рушія ШІ з усіма локальними інструментами ML. Видалення фону, збільшення роздільної здатності, OCR, розпізнавання облич, реставрація фото та інше."
-i18n_output_hash: 59fed0311462
+i18n_output_hash: cea011db7d36
+i18n_hash_version: 2
 i18n_source_hash: 89992068cacc
 i18n_provenance: human
 ---

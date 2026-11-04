@@ -2,7 +2,8 @@
 description: "Изменение размера изображений по пикселям, процентам или с режимами вписывания."
 i18n_source_hash: 53866e8266b8
 i18n_provenance: human
-i18n_output_hash: dac4c31fbce7
+i18n_output_hash: 2dbe72b9dd8b
+i18n_hash_version: 2
 ---
 
 # Изменение размера изображения {#resize}
