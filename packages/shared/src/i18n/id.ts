@@ -768,7 +768,7 @@ export const id: TranslationKeys = {
     },
     collage: {
       name: "Kolase & Grid",
-      description: "Gabungkan gambar menjadi kolase grid yang indah dengan 25+ template",
+      description: "Gabungkan gambar menjadi kolase grid yang indah dengan banyak template",
     },
     stitch: {
       name: "Gabungkan Gambar",

@@ -607,7 +607,7 @@ export const IMAGE_TOOLS: Tool[] = [
   {
     id: "collage",
     name: "Collage & Grid",
-    description: "Combine images into beautiful grid collages with 25+ templates",
+    description: "Combine images into beautiful grid collages with many templates",
     category: "layout",
     icon: "LayoutGrid",
     route: "/collage",

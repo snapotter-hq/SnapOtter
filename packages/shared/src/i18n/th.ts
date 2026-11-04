@@ -763,7 +763,7 @@ export const th: TranslationKeys = {
     },
     collage: {
       name: "คอลลาจและกริด",
-      description: "รวมภาพเป็นคอลลาจกริดสวยงามด้วยเทมเพลตกว่า 25 แบบ",
+      description: "รวมภาพเป็นคอลลาจกริดสวยงามด้วยเทมเพลตหลากหลายแบบ",
     },
     stitch: {
       name: "ต่อและรวมภาพ",

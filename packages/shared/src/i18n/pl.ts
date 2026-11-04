@@ -768,7 +768,7 @@ export const pl: TranslationKeys = {
     },
     collage: {
       name: "Kolaż i siatka",
-      description: "Łączenie obrazów w piękne kolaże siatkowe z ponad 25 szablonami",
+      description: "Łączenie obrazów w piękne kolaże siatkowe z wieloma szablonami",
     },
     stitch: {
       name: "Połącz obrazy",

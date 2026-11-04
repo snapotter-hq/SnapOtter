@@ -771,7 +771,7 @@ export const fr: TranslationKeys = {
     },
     collage: {
       name: "Collage et grille",
-      description: "Combinez des images en de magnifiques collages avec plus de 25 modèles",
+      description: "Combinez des images en de magnifiques collages avec de nombreux modèles",
     },
     stitch: {
       name: "Assembler des images",

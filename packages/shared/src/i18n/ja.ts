@@ -737,7 +737,7 @@ export const ja: TranslationKeys = {
     },
     collage: {
       name: "コラージュとグリッド",
-      description: "25以上のテンプレートで画像を美しいグリッドコラージュに合成",
+      description: "多数のテンプレートで画像を美しいグリッドコラージュに合成",
     },
     stitch: {
       name: "画像を結合",

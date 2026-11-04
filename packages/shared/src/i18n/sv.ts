@@ -769,7 +769,7 @@ export const sv: TranslationKeys = {
     },
     collage: {
       name: "Collage & Rutnät",
-      description: "Kombinera bilder i rutnätscollage med 25+ mallar",
+      description: "Kombinera bilder i rutnätscollage med många mallar",
     },
     stitch: {
       name: "Sammanfoga bilder",

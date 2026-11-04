@@ -764,7 +764,7 @@ export const ar: TranslationKeys = {
     },
     collage: {
       name: "صورة مجمّعة وشبكة",
-      description: "دمج الصور في شبكات مجمّعة جميلة مع أكثر من 25 قالبًا",
+      description: "دمج الصور في شبكات مجمّعة جميلة مع العديد من القوالب",
     },
     stitch: {
       name: "دمج الصور وتجميعها",

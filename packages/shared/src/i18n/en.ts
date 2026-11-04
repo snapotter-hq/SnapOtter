@@ -728,7 +728,7 @@ export const en = {
     },
     collage: {
       name: "Collage & Grid",
-      description: "Combine images into beautiful grid collages with 25+ templates",
+      description: "Combine images into beautiful grid collages with many templates",
     },
     stitch: {
       name: "Stitch Images",

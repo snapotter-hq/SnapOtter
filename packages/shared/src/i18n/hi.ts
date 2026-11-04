@@ -598,7 +598,7 @@ export const hi: TranslationKeys = {
     },
     collage: {
       name: "कोलाज और ग्रिड",
-      description: "25+ टेम्प्लेट के साथ इमेज को सुंदर ग्रिड कोलाज में मिलाएं",
+      description: "अनेक टेम्प्लेट के साथ इमेज को सुंदर ग्रिड कोलाज में मिलाएं",
     },
     stitch: {
       name: "इमेज जोड़ें",

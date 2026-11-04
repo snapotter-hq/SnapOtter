@@ -723,7 +723,7 @@ export const ko: TranslationKeys = {
     },
     collage: {
       name: "콜라주 및 그리드",
-      description: "25가지 이상의 템플릿으로 이미지를 아름다운 그리드 콜라주로 합성",
+      description: "다양한 템플릿으로 이미지를 아름다운 그리드 콜라주로 합성",
     },
     stitch: {
       name: "이미지 결합",

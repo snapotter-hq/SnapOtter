@@ -771,7 +771,7 @@ export const vi: TranslationKeys = {
     },
     collage: {
       name: "Ảnh ghép và Lưới",
-      description: "Kết hợp hình ảnh thành ảnh ghép dạng lưới đẹp mắt với hơn 25 mẫu",
+      description: "Kết hợp hình ảnh thành ảnh ghép dạng lưới đẹp mắt với nhiều mẫu",
     },
     stitch: {
       name: "Ghép nối ảnh",

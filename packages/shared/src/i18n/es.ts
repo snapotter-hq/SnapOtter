@@ -755,7 +755,7 @@ export const es: TranslationKeys = {
     },
     collage: {
       name: "Collage y cuadrícula",
-      description: "Combina imágenes en hermosos collages con más de 25 plantillas",
+      description: "Combina imágenes en hermosos collages con muchas plantillas",
     },
     stitch: {
       name: "Unir imágenes",

@@ -554,7 +554,7 @@ export const zhCN: TranslationKeys = {
     },
     collage: {
       name: "拼贴和网格",
-      description: "使用 25+ 模板将图片拼成精美网格拼贴",
+      description: "使用众多模板将图片拼成精美网格拼贴",
     },
     stitch: {
       name: "拼接合并图片",
