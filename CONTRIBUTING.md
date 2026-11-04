@@ -94,7 +94,7 @@ pnpm vitest run tests/integration/my-test.test.ts
 
 A tool lives in three places sharing a `toolId` string:
 
-1. **Shared metadata** - `packages/shared/src/constants.ts` (TOOLS array)
+1. **Shared metadata** - `packages/shared/src/tools/<section>.ts` (assembled into the `TOOLS` array in `packages/shared/src/constants.ts`)
 2. **API route** - `apps/api/src/routes/tools/<toolId>.ts` (uses `createToolRoute` factory)
 3. **Frontend settings** - `apps/web/src/components/tools/<toolId>-settings.tsx`
 
