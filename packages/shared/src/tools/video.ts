@@ -8,7 +8,7 @@ export const VIDEO_TOOLS: Tool[] = [
   {
     id: "convert-video",
     name: "Convert Video",
-    description: "Convert videos between MP4, MOV, and WebM",
+    description: "Convert videos between MP4, MOV, WebM, AVI, and MKV",
     category: "video-convert",
     icon: "Video",
     route: "/convert-video",

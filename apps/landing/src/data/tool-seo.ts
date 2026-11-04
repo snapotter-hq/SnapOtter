@@ -5053,7 +5053,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "convert-video": {
     searchTitle: "Convert Video Between MP4 MOV WebM",
     longDescription:
-      "Convert videos between MP4, MOV, and WebM formats with control over codec, quality, and compatibility settings. Handles format differences transparently while preserving audio, subtitles, and metadata. All transcoding runs locally on your self-hosted server.",
+      "Convert videos between MP4, MOV, WebM, AVI, and MKV formats with control over codec, quality, and compatibility settings. Handles format differences transparently while preserving audio, subtitles, and metadata. All transcoding runs locally on your self-hosted server.",
     useCases: [
       "Converting MOV files from iPhone recordings to MP4 for universal web playback",
       "Producing WebM versions of marketing videos for better browser-native performance",
@@ -5061,7 +5061,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Converting client-delivered footage into the format required by an editing workflow",
     ],
     features: [
-      "Supports MP4, MOV, and WebM containers with modern codec options",
+      "Supports MP4, MOV, WebM, AVI, and MKV containers with modern codec options",
       "Preserves audio tracks, subtitle streams, and file metadata during conversion",
       "Configurable quality and bitrate settings for size-quality tradeoff control",
       "Hardware acceleration support for faster transcoding on capable servers",

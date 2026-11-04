@@ -861,7 +861,7 @@ export const ru: TranslationKeys = {
     },
     "convert-video": {
       name: "Конвертация видео",
-      description: "Конвертация видео между форматами MP4, MOV и WebM",
+      description: "Конвертация видео между форматами MP4, MOV, WebM, AVI и MKV",
     },
     "compress-video": {
       name: "Сжатие видео",

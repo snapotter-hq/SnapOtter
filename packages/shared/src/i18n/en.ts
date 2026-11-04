@@ -815,7 +815,7 @@ export const en = {
     },
     "convert-video": {
       name: "Convert Video",
-      description: "Convert videos between MP4, MOV, and WebM",
+      description: "Convert videos between MP4, MOV, WebM, AVI, and MKV",
     },
     "compress-video": {
       name: "Compress Video",

@@ -638,7 +638,7 @@ export const zhTW: TranslationKeys = {
     },
     "convert-video": {
       name: "轉換影片",
-      description: "在 MP4、MOV 與 WebM 之間轉換影片",
+      description: "在 MP4、MOV、WebM、AVI 與 MKV 之間轉換影片",
     },
     "compress-video": {
       name: "壓縮影片",

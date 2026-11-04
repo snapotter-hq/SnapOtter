@@ -850,7 +850,7 @@ export const ar: TranslationKeys = {
     },
     "convert-video": {
       name: "تحويل الفيديو",
-      description: "تحويل الفيديو بين MP4 وMOV وWebM",
+      description: "تحويل الفيديو بين MP4 وMOV وWebM وAVI وMKV",
     },
     "compress-video": {
       name: "ضغط الفيديو",

@@ -857,7 +857,7 @@ export const sv: TranslationKeys = {
     },
     "convert-video": {
       name: "Konvertera video",
-      description: "Konvertera videor mellan MP4, MOV och WebM",
+      description: "Konvertera videor mellan MP4, MOV, WebM, AVI och MKV",
     },
     "compress-video": {
       name: "Komprimera video",

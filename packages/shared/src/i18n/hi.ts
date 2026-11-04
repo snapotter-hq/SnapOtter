@@ -682,7 +682,7 @@ export const hi: TranslationKeys = {
     },
     "convert-video": {
       name: "वीडियो कन्वर्ट",
-      description: "वीडियो को MP4, MOV, और WebM के बीच कन्वर्ट करें",
+      description: "वीडियो को MP4, MOV, WebM, AVI, और MKV के बीच कन्वर्ट करें",
     },
     "compress-video": {
       name: "वीडियो कंप्रेस",
