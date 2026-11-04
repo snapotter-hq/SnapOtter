@@ -1,7 +1,8 @@
 // Keeps outward text written from the shell inside AGENTS.md rules: no agent
 // session links or trailers, no em dashes, and no credentials. Squash merges
 // must pin the reviewed head and carry an explicit subject. The text check reads
-// --body-file and -F inputs too. Session links, em dashes, and merge gaps ask;
+// --body-file and -F inputs too. Session links, em dashes (and a spaced double hyphen used as
+// one), and merge gaps ask;
 // a credential denies.
 
 const fs = require("node:fs");
@@ -21,6 +22,11 @@ const OUTWARD_KINDS = new Set([
 const BODY_FLAGS = new Set(["-F", "--file", "--body-file"]);
 const SESSION_LINK = /Claude-Session:|claude\.ai\/code\/session/i;
 const EM_DASH = /—/;
+// A space-delimited `--` is the ASCII stand-in for a dash. Only message text is
+// checked (inline values and body files), never the command line itself, where
+// ` -- ` ends options and flags like --body-file start with it.
+const DOUBLE_HYPHEN_DASH = /(^|\s)--(\s|$)/m;
+const MESSAGE_FLAGS = new Set(["-m", "--message", "-b", "--body", "-t", "--title", "--subject"]);
 
 function kindOf(tokens) {
   if (gitSubcommand(tokens) === "commit") return "git commit";
@@ -34,6 +40,22 @@ function kindOf(tokens) {
 function mergeArgsOk(tokens) {
   const has = (flag) => tokens.some((t) => t === flag || t.startsWith(`${flag}=`));
   return has("--match-head-commit") && (has("--subject") || has("-t"));
+}
+
+// Values passed inline as the message, title, or body.
+function inlineMessages(tokens) {
+  const values = [];
+  tokens.forEach((token, i) => {
+    if (MESSAGE_FLAGS.has(token) && tokens[i + 1] !== undefined) values.push(tokens[i + 1]);
+    const eq = token.match(/^(--message|--body|--title|--subject)=(.*)$/s);
+    if (eq) values.push(eq[2]);
+  });
+  return values;
+}
+
+// Code spans and fenced blocks may quote a literal `--` (a flag list, a diff).
+function withoutCode(text) {
+  return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 }
 
 // Text of the files a command reads its message from. Returns the unreadable
@@ -59,6 +81,7 @@ function publishTextVerdict(command, cwd) {
   let dir = cwd || process.cwd();
   let outward = false;
   let bodies = "";
+  let prose = "";
   for (const segment of splitSegments(command)) {
     const tokens = tokenize(segment.trim());
     if (tokens[0] === "cd" && tokens[1]) {
@@ -82,6 +105,7 @@ function publishTextVerdict(command, cwd) {
     }
     outward = true;
     bodies += `\n${body.text}`;
+    prose += `\n${body.text}\n${inlineMessages(tokens).join("\n")}`;
   }
   if (!outward) return null;
 
@@ -103,6 +127,12 @@ function publishTextVerdict(command, cwd) {
     return verdict(
       "ask",
       "em dashes are banned in commits, PRs, and issues (AGENTS.md). Use commas, colons, parentheses, or separate sentences, or approve this text as written.",
+    );
+  }
+  if (DOUBLE_HYPHEN_DASH.test(withoutCode(prose))) {
+    return verdict(
+      "ask",
+      "a spaced double hyphen reads as a dash, which AGENTS.md bans in commits, PRs, and issues. Use commas, colons, parentheses, or separate sentences, or approve this text as written.",
     );
   }
   return null;
