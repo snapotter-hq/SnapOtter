@@ -4133,6 +4133,8 @@ export const ru: TranslationKeys = {
     previewFailed: "Не удалось сгенерировать предпросмотр",
     previewEncoderMissing:
       "В ffmpeg на этом сервере нет кодировщика {encoder}, поэтому не удаётся создать предпросмотр. Обратитесь к администратору.",
+    previewEngineUnavailable:
+      "На этом сервере не установлен ffmpeg, поэтому не удаётся создать предпросмотр. Попросите администратора установить ffmpeg или задать FFMPEG_PATH.",
     previewProgressMessages: [
       "Выдра разминается...",
       "Перемалываем пиксели...",

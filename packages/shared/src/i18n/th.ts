@@ -4069,6 +4069,8 @@ export const th: TranslationKeys = {
     previewFailed: "สร้างตัวอย่างไม่สำเร็จ",
     previewEncoderMissing:
       "ffmpeg บนเซิร์ฟเวอร์นี้ไม่มีตัวเข้ารหัส {encoder} จึงสร้างตัวอย่างไม่ได้ กรุณาติดต่อผู้ดูแลระบบ",
+    previewEngineUnavailable:
+      "เซิร์ฟเวอร์นี้ไม่ได้ติดตั้ง ffmpeg จึงสร้างตัวอย่างไม่ได้ กรุณาขอให้ผู้ดูแลระบบติดตั้ง ffmpeg หรือตั้งค่า FFMPEG_PATH",
     previewProgressMessages: [
       "นากกำลังวอร์มอัป...",
       "กำลังบดพิกเซล...",

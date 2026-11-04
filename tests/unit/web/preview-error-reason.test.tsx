@@ -178,3 +178,65 @@ describe("toolPage.previewEncoderMissing translations (#1290)", () => {
     },
   );
 });
+
+/**
+ * #4149: when the server can't run ffmpeg at all, the preview routes answer 503
+ * with code ENGINE_UNAVAILABLE. Both surfaces showed the generic failure; they
+ * now say ffmpeg is missing and how the operator fixes it.
+ */
+const ENGINE_UNAVAILABLE = {
+  error: "Media processing is unavailable on this server because ffmpeg is not installed.",
+  details: "Install ffmpeg in the container or set FFMPEG_PATH.",
+  code: "ENGINE_UNAVAILABLE",
+};
+
+describe("preview error reason when ffmpeg is missing (#4149)", () => {
+  it("NonNativePreview says ffmpeg is missing and names FFMPEG_PATH", async () => {
+    stubFetch(503, ENGINE_UNAVAILABLE);
+    render(
+      <NonNativePreview
+        file={new File(["x"], "clip.wma")}
+        filename="clip.wma"
+        fileSize={1}
+        modality="audio"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /generate preview/i }));
+    expect(await screen.findByText(/FFMPEG_PATH/)).toHaveTextContent(/ffmpeg/);
+    expect(screen.queryByText("Preview generation failed")).not.toBeInTheDocument();
+  });
+
+  it("FilePreview says ffmpeg is missing and names FFMPEG_PATH", async () => {
+    stubFetch(503, ENGINE_UNAVAILABLE);
+    render(<FilePreview fileId="f1" mimeType="audio/x-ms-wma" name="clip.wma" />);
+    fireEvent.click(screen.getByRole("button", { name: /generate preview/i }));
+    expect(await screen.findByText(/FFMPEG_PATH/)).toHaveTextContent(/ffmpeg/);
+    expect(screen.queryByText("Preview generation failed. Try again.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the generic message for a 503 with another code", async () => {
+    stubFetch(503, { error: "Storage is full", code: "STORAGE_FULL" });
+    render(
+      <NonNativePreview
+        file={new File(["x"], "clip.wma")}
+        filename="clip.wma"
+        fileSize={1}
+        modality="audio"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /generate preview/i }));
+    expect(await screen.findByText("Preview generation failed")).toBeInTheDocument();
+  });
+
+  it.each(SUPPORTED_LOCALES.map((l) => l.code))(
+    "%s translates the message and keeps the ffmpeg and FFMPEG_PATH names",
+    async (code) => {
+      const t = await loadTranslations(code);
+      if (code !== "en") expect(t).not.toBe(en);
+      const message = t.toolPage.previewEngineUnavailable;
+      expect(message, code).toContain("ffmpeg");
+      expect(message, code).toContain("FFMPEG_PATH");
+      if (code !== "en") expect(message, code).not.toBe(en.toolPage.previewEngineUnavailable);
+    },
+  );
+});

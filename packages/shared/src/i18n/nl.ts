@@ -4142,6 +4142,8 @@ export const nl: TranslationKeys = {
     previewFailed: "Voorbeeld genereren mislukt",
     previewEncoderMissing:
       "De ffmpeg van deze server mist de encoder {encoder}, dus het voorbeeld kan niet worden gemaakt. Neem contact op met je beheerder.",
+    previewEngineUnavailable:
+      "ffmpeg is niet geïnstalleerd op deze server, dus het voorbeeld kan niet worden gemaakt. Vraag je beheerder om ffmpeg te installeren of FFMPEG_PATH in te stellen.",
     previewProgressMessages: [
       "De otter warmt op...",
       "Pixels worden vermalen...",
