@@ -19,7 +19,7 @@ import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
 import { withAnalytics } from "@/lib/lazy-analytics";
 import { parseStringArray } from "@/lib/settings-payload.js";
-import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
+import { getCategoryName, getSectionName, getToolName } from "@/lib/tool-i18n.js";
 import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
 import { cn } from "@/lib/utils.js";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -106,7 +106,7 @@ export function HomePage() {
       { key: "all", label: t.homePage.all },
       ...SECTIONS.map((s) => ({
         key: s.id,
-        label: s.id === "pdf" ? t.homePage.pdf : s.id === "files" ? t.homePage.files : s.name,
+        label: getSectionName(t, s.id, s.name),
       })),
     ],
     [t],
@@ -567,7 +567,9 @@ function AllTabContent({
                     <SectionIcon className="h-4 w-4" />
                   </span>
                 )}
-                <span className="text-sm font-semibold text-foreground">{sec.name}</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {getSectionName(t, sec.id, sec.name)}
+                </span>
                 <span className="text-xs text-muted-foreground">{totalCount}</span>
                 <span className="flex-1" />
                 <ChevronDown

@@ -10,7 +10,7 @@ import { useMemo } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { ICON_MAP } from "@/lib/icon-map";
-import { getToolDescription, getToolName } from "@/lib/tool-i18n";
+import { getSectionName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { usePinnedToolsStore } from "@/stores/pinned-tools-store";
@@ -108,7 +108,7 @@ export function ToolCard({
         color: SECTION_INK_MAP[section] ?? "#3D3832",
       }}
     >
-      {SECTIONS.find((s) => s.id === section)?.name ?? section}
+      {getSectionName(t, section, section)}
     </span>
   ) : null;
 

@@ -23,3 +23,7 @@ export function getModalityName(t: TranslationKeys, modalityId: string, fallback
   const key = modalityId === "document" ? "documentsAndFiles" : modalityId;
   return (t.modalities as Record<string, string>)[key] ?? fallback;
 }
+
+export function getSectionName(t: TranslationKeys, sectionId: string, fallback: string): string {
+  return (t.sections as Record<string, string>)[sectionId] ?? fallback;
+}
