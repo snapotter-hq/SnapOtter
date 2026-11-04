@@ -1444,6 +1444,7 @@ export const hi: TranslationKeys = {
       separatePdfMode: "अलग-अलग PDF, प्रत्येक इमेज के लिए एक",
       combineAllImages: "सभी इमेज को एक PDF में मिलाएं",
       pageSize: "पेज साइज़",
+      pageSizeLetter: "US Letter",
       orientation: "ओरिएंटेशन",
       portrait: "पोर्ट्रेट",
       landscape: "लैंडस्केप",
@@ -3859,6 +3860,8 @@ export const hi: TranslationKeys = {
     cancelButton: "रद्द करें",
     readyCount: "{count} तैयार",
     failedStatus: "विफल",
+    fetchFailed: "यह URL प्राप्त नहीं की जा सकी (त्रुटि {status})।",
+    downloadFailed: "यह फ़ाइल डाउनलोड नहीं हो सकी (त्रुटि {status})।",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[मेरी फ़ाइल](https://example.com/recording.mp3)",
   },

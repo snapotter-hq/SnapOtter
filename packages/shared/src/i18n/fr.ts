@@ -1640,6 +1640,7 @@ export const fr: TranslationKeys = {
       separatePdfMode: "des PDFs séparés, un par image",
       combineAllImages: "Combiner toutes les images en un PDF",
       pageSize: "Taille de page",
+      pageSizeLetter: "Letter (US)",
       orientation: "Orientation",
       portrait: "Portrait",
       landscape: "Paysage",
@@ -4081,6 +4082,8 @@ export const fr: TranslationKeys = {
     cancelButton: "Annuler",
     readyCount: "{count} prêts",
     failedStatus: "Échec",
+    fetchFailed: "Impossible de récupérer cette URL (erreur {status}).",
+    downloadFailed: "Impossible de télécharger ce fichier (erreur {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Mon fichier](https://example.com/recording.mp3)",
   },

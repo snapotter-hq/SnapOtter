@@ -115,7 +115,7 @@ export function ConversionPresetSettings() {
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             >
               <option value="A4">A4</option>
-              <option value="Letter">Letter</option>
+              <option value="Letter">{t.toolSettings["image-to-pdf"].pageSizeLetter}</option>
               <option value="A3">A3</option>
               <option value="A5">A5</option>
             </select>

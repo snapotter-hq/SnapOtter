@@ -1631,6 +1631,7 @@ export const uk: TranslationKeys = {
       separatePdfMode: "окремі PDF, по одному на зображення",
       combineAllImages: "Об'єднати всі зображення в один PDF",
       pageSize: "Розмір сторінки",
+      pageSizeLetter: "US Letter",
       orientation: "Орієнтація",
       portrait: "Книжкова",
       landscape: "Альбомна",
@@ -4069,6 +4070,8 @@ export const uk: TranslationKeys = {
     cancelButton: "Скасувати",
     readyCount: "{count} готово",
     failedStatus: "Помилка",
+    fetchFailed: "Не вдалося отримати цю URL-адресу (помилка {status}).",
+    downloadFailed: "Не вдалося завантажити цей файл (помилка {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Мій файл](https://example.com/recording.mp3)",
   },

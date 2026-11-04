@@ -1392,6 +1392,7 @@ export const zhCN: TranslationKeys = {
       separatePdfMode: "独立 PDF，每张图片一个",
       combineAllImages: "将所有图片合并为一个 PDF",
       pageSize: "页面大小",
+      pageSizeLetter: "美国信纸 (Letter)",
       orientation: "方向",
       portrait: "纵向",
       landscape: "横向",
@@ -3787,6 +3788,8 @@ export const zhCN: TranslationKeys = {
     cancelButton: "取消",
     readyCount: "{count} 个就绪",
     failedStatus: "失败",
+    fetchFailed: "无法获取此网址(错误 {status})。",
+    downloadFailed: "无法下载此文件(错误 {status})。",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[我的文件](https://example.com/recording.mp3)",
   },

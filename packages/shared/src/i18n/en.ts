@@ -1577,6 +1577,7 @@ export const en = {
       separatePdfMode: "separate PDFs, one per image",
       combineAllImages: "Combine all images into one PDF",
       pageSize: "Page Size",
+      pageSizeLetter: "US Letter",
       orientation: "Orientation",
       portrait: "Portrait",
       landscape: "Landscape",
@@ -3998,6 +3999,8 @@ export const en = {
     cancelButton: "Cancel",
     readyCount: "{count} ready",
     failedStatus: "Failed",
+    fetchFailed: "Couldn't fetch this URL (error {status}).",
+    downloadFailed: "Couldn't download this file (error {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[My file](https://example.com/recording.mp3)",
   },

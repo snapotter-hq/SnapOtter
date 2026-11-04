@@ -1619,6 +1619,7 @@ export const es: TranslationKeys = {
       separatePdfMode: "PDFs separados, uno por imagen",
       combineAllImages: "Combinar todas las imágenes en un PDF",
       pageSize: "Tamaño de página",
+      pageSizeLetter: "Carta (EE. UU.)",
       orientation: "Orientación",
       portrait: "Vertical",
       landscape: "Horizontal",
@@ -4057,6 +4058,8 @@ export const es: TranslationKeys = {
     cancelButton: "Cancelar",
     readyCount: "{count} listos",
     failedStatus: "Error",
+    fetchFailed: "No se pudo obtener esta URL (error {status}).",
+    downloadFailed: "No se pudo descargar este archivo (error {status}).",
     textareaPlaceholder:
       "https://ejemplo.com/foto.jpg\nhttps://ejemplo.com/informe.pdf\n- https://ejemplo.com/clip.mp4\n[Mi archivo](https://ejemplo.com/grabacion.mp3)",
   },

@@ -854,7 +854,9 @@ describe("ToolPage partial batch URL import (#3751)", () => {
       expect(screen.getByRole("dialog")).toBe(dialog);
       expect(within(dialog).queryByText("a.png")).toBeNull();
       expect(within(dialog).getByText("b.png")).toBeTruthy();
-      expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+      expect(
+        within(dialog).getByText(en.urlImport.downloadFailed.replace("{status}", "404")),
+      ).toBeTruthy();
       expect(within(dialog).getByText("notes.txt")).toBeTruthy();
       expect(
         within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
@@ -953,7 +955,9 @@ describe("ToolPage partial batch URL import (#3751)", () => {
 
     expect(screen.getByRole("dialog")).toBe(dialog);
     expect(within(dialog).getByText("b.txt")).toBeTruthy();
-    expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+    expect(
+      within(dialog).getByText(en.urlImport.downloadFailed.replace("{status}", "404")),
+    ).toBeTruthy();
 
     fireEvent.click(within(dialog).getByTitle(en.urlImport.retryButton));
     const secondAddBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });

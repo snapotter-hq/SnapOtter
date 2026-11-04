@@ -1628,6 +1628,7 @@ export const id: TranslationKeys = {
       separatePdfMode: "PDF terpisah, satu per gambar",
       combineAllImages: "Gabungkan semua gambar ke satu PDF",
       pageSize: "Ukuran Halaman",
+      pageSizeLetter: "US Letter",
       orientation: "Orientasi",
       portrait: "Potret",
       landscape: "Lanskap",
@@ -4062,6 +4063,8 @@ export const id: TranslationKeys = {
     cancelButton: "Batal",
     readyCount: "{count} siap",
     failedStatus: "Gagal",
+    fetchFailed: "Tidak dapat mengambil URL ini (galat {status}).",
+    downloadFailed: "Tidak dapat mengunduh file ini (galat {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[File saya](https://example.com/recording.mp3)",
   },

@@ -1628,6 +1628,7 @@ export const vi: TranslationKeys = {
       separatePdfMode: "các tệp PDF riêng lẻ, mỗi ảnh một tệp",
       combineAllImages: "Kết hợp tất cả ảnh vào một PDF",
       pageSize: "Khổ giấy",
+      pageSizeLetter: "US Letter",
       orientation: "Hướng",
       portrait: "Dọc",
       landscape: "Ngang",
@@ -4055,6 +4056,8 @@ export const vi: TranslationKeys = {
     cancelButton: "Hủy",
     readyCount: "{count} sẵn sàng",
     failedStatus: "Thất bại",
+    fetchFailed: "Không thể tải URL này (lỗi {status}).",
+    downloadFailed: "Không thể tải xuống tệp này (lỗi {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Tệp của tôi](https://example.com/recording.mp3)",
   },

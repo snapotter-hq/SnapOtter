@@ -1632,6 +1632,7 @@ export const tr: TranslationKeys = {
       separatePdfMode: "ayrı PDF dosyaları, her görüntü için bir tane",
       combineAllImages: "Tüm görüntüleri tek PDF'de birleştir",
       pageSize: "Sayfa Boyutu",
+      pageSizeLetter: "US Letter",
       orientation: "Yönlendirme",
       portrait: "Dikey",
       landscape: "Yatay",
@@ -4064,6 +4065,8 @@ export const tr: TranslationKeys = {
     cancelButton: "İptal",
     readyCount: "{count} hazır",
     failedStatus: "Başarısız",
+    fetchFailed: "Bu URL alınamadı (hata {status}).",
+    downloadFailed: "Bu dosya indirilemedi (hata {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Dosyam](https://example.com/recording.mp3)",
   },

@@ -1636,6 +1636,7 @@ export const nl: TranslationKeys = {
       separatePdfMode: "aparte PDFs, een per afbeelding",
       combineAllImages: "Alle afbeeldingen samenvoegen in een PDF",
       pageSize: "Paginaformaat",
+      pageSizeLetter: "US Letter",
       orientation: "Orientatie",
       portrait: "Staand",
       landscape: "Liggend",
@@ -4078,6 +4079,8 @@ export const nl: TranslationKeys = {
     cancelButton: "Annuleren",
     readyCount: "{count} gereed",
     failedStatus: "Mislukt",
+    fetchFailed: "Deze URL kon niet worden opgehaald (fout {status}).",
+    downloadFailed: "Dit bestand kon niet worden gedownload (fout {status}).",
     textareaPlaceholder:
       "https://example.com/foto.jpg\nhttps://example.com/rapport.pdf\n- https://example.com/clip.mp4\n[Mijn bestand](https://example.com/opname.mp3)",
   },
