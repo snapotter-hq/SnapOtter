@@ -30,7 +30,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
-import { reportError } from "../lib/error-report.js";
+import { reportError, STORAGE_FULL_CODES } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
@@ -224,6 +224,17 @@ function abortOnDisconnect(request: FastifyRequest, reply: FastifyReply) {
  */
 function isServerFault(err: unknown): boolean {
   return typeof (err as { syscall?: unknown } | null)?.syscall === "string";
+}
+
+/**
+ * The encode or conversion ran out of disk: runFfmpeg and convertDocument tag
+ * a full disk ENOSPC or EDQUOT from their output. That is the server's storage
+ * fault, answered with the same 503 storage-full as a failed cache write and
+ * reported by the error handler, not a 422 that reads as a bad upload (#4148).
+ */
+function isStorageFull(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && STORAGE_FULL_CODES.has(code);
 }
 
 /** Log and report a preview failure that is the server's, not the file's. */
@@ -458,6 +469,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch (err) {
           await cleanupTempDir();
+          if (isStorageFull(err)) throw normalizeOperationalWriteError(err);
           if (isServerFault(err)) {
             reportPreviewFault(err, request, { fileId: id }, "Document preview could not run");
             return reply.status(500).send({ error: "Could not generate document preview" });
@@ -578,6 +590,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
         if (isMissingFfmpeg(err)) return ffmpegUnavailable(request, reply);
+        if (isStorageFull(err)) throw normalizeOperationalWriteError(err);
         if (isServerFault(err)) {
           reportPreviewFault(err, request, { fileId: id }, "Preview encode could not run");
           return reply.status(500).send({ error: "Could not generate preview" });
@@ -750,6 +763,8 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           request.log.info({ filename }, "On-demand preview stopped: client disconnected");
         } else if (isMissingFfmpeg(err)) {
           return ffmpegUnavailable(request, reply);
+        } else if (isStorageFull(err)) {
+          throw normalizeOperationalWriteError(err);
         } else if (isServerFault(err)) {
           // A temp write that failed, a spawn that couldn't start: the server's
           // fault, not the uploaded file's (#1439).
