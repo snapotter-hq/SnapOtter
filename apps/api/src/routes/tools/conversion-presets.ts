@@ -32,7 +32,7 @@ function presetSchema(base: string) {
  *
  * A preset is skipped when `skipTools` holds its own id or its base id, so
  * disabling a tool closes every route that runs it. The ZIP registrars and
- * the compress presets would otherwise stay live after the base is disabled.
+ * any preset disabled by its own id would otherwise stay live.
  * `skippedByPolicy` counts those; presets lost to a missing base are not in it.
  */
 export function registerConversionPresets(
