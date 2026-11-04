@@ -32,7 +32,8 @@ function runGs(args: string[], opts: GsOptions = {}): Promise<void> {
     return Promise.reject(new Error("Canceled"));
   }
   const bin = resolveGs();
-  if (!bin) throw new Error("gs binary not found (set GS_PATH or install ghostscript)");
+  if (!bin)
+    return Promise.reject(new Error("gs binary not found (set GS_PATH or install ghostscript)"));
   const timeoutMs = opts.timeoutMs ?? 120_000;
   return new Promise<void>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
