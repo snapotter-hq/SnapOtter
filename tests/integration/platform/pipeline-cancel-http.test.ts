@@ -68,6 +68,7 @@ const { runSystemJob, SYSTEM_JOBS } = await import("../../../apps/api/src/jobs/s
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { completeBatchJob } = await import("../../../apps/api/src/routes/progress.js");
 const { fixtures, readFixture } = await import("../../fixtures/index.js");
+const { batchJobIdFor } = await import("../batch-alias.js");
 const { buildTestApp, createMultipartPayload, createUserAndLogin, loginAsAdmin } = await import(
   "../test-server.js"
 );
@@ -171,8 +172,8 @@ describe("route-stamped cancel metadata (#771)", () => {
   });
 
   it("does not clobber a same-owner batch parent row that collides with the alias id (#887, #895)", async () => {
-    // Batch parent ids ARE the client-supplied id, so this collision is
-    // reachable by an API caller reusing an id across the two endpoints.
+    // Batch parents created before parent ids were server-generated carry
+    // the client-supplied id, so this collision is still reachable.
     // The alias upsert refuses to re-point the row (#887), and the run must
     // fall back to its own flow id so it never publishes or persists onto
     // the batch parent's channel (#895).
@@ -302,9 +303,10 @@ describe("route-stamped cancel metadata (#771)", () => {
       body,
     });
     expect([200, 202]).toContain(res.statusCode);
-    await waitForTerminalFrame(clientJobId);
+    const parentId = await batchJobIdFor(clientJobId);
+    await waitForTerminalFrame(parentId);
 
-    const parent = await jobRow(clientJobId);
+    const parent = await jobRow(parentId);
     expect(parent?.type).toBe("batch");
     const settings = (parent?.settings ?? {}) as { flowChildCount?: number; stepCount?: number };
     expect(settings.flowChildCount).toBe(2);

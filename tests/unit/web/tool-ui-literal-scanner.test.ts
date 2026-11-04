@@ -427,4 +427,33 @@ describe("scanToolUiLiterals", () => {
     });
     expect(texts(dir)).toEqual(["Rendered copy"]);
   });
+
+  it("reports shouting ALL-CAPS copy but skips single acronyms (#977)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = () => (
+        <div>
+          <span>NOT FOUND</span>
+          <span>PLEASE WAIT</span>
+          <span>SAVE CHANGES:</span>
+          <span>PDF</span>
+          <span>JPG/PNG</span>
+          <span>OCR</span>
+        </div>
+      );`,
+    });
+    expect(texts(dir).sort()).toEqual(["NOT FOUND", "PLEASE WAIT", "SAVE CHANGES:"]);
+  });
+
+  it("skips only a bare ellipsis, not a sentence that starts with one (#977)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = () => (
+        <div>
+          <span>...</span>
+          <span>…</span>
+          <span>...loading more results</span>
+        </div>
+      );`,
+    });
+    expect(texts(dir)).toEqual(["...loading more results"]);
+  });
 });

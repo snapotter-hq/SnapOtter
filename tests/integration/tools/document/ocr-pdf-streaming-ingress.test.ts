@@ -21,6 +21,7 @@ import {
 } from "../../../../apps/api/src/lib/object-storage.js";
 import { DocumentInputHandler } from "../../../../apps/api/src/modality/document-input.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { batchJobIdFor } from "../../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -353,7 +354,7 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
     ]);
 
     expect(response.statusCode).toBe(500);
-    await expectObjectDeleted(`uploads/${parentId}-f0/scan.pdf`);
+    await expectObjectDeleted(`uploads/${await batchJobIdFor(parentId)}-f0/scan.pdf`);
   });
 
   it("rolls back execute-pipeline OCR objects when BullMQ rejects the flow handoff", async () => {
@@ -372,14 +373,15 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
 
   it("rolls back batch-pipeline OCR objects when BullMQ rejects the flow handoff", async () => {
     mocks.flowAdd.mockRejectedValueOnce(new Error("Redis unavailable"));
-    const parentId = "ocr-pdf-pipeline-batch-rollback";
+    const clientJobId = "ocr-pdf-pipeline-batch-rollback";
     const response = await postMultipart("/api/v1/pipeline/batch", [
       validPdfPart(),
       { name: "pipeline", content: OCR_PIPELINE },
-      { name: "clientJobId", content: parentId },
+      { name: "clientJobId", content: clientJobId },
     ]);
 
     expect(response.statusCode).toBe(500);
+    const parentId = await batchJobIdFor(clientJobId);
     await expectObjectDeleted(`uploads/${parentId}-f0-s0/scan.pdf`);
     for (const childId of [`${parentId}-f0-s0`, `${parentId}-f0`]) {
       const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
@@ -389,9 +391,13 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
     expect(parentRow?.status).toBe("failed");
   });
 
-  it("answers 409 without overwriting existing OCR PDF uploads when a child id collides", async () => {
-    const toolParentId = "ocr-pdf-tool-batch-1724";
-    const toolChildId = `${toolParentId}-f0`;
+  // Child ids used to be ${clientJobId}-f${n}, so a client could aim an OCR
+  // batch at another job's rows and uploads (#1724). Children now hang off
+  // the server parent id: rows named like children of the client id are
+  // never touched. The flow handoff is refused so nothing runs.
+  it("leaves OCR PDF rows and uploads named like children of the clientJobId untouched", async () => {
+    const toolClientJobId = "ocr-pdf-tool-batch-1724";
+    const toolChildId = `${toolClientJobId}-f0`;
     const toolUploadKey = `uploads/${toolChildId}/scan.pdf`;
     await putObject(toolUploadKey, Buffer.from("existing-ocr-pdf"));
     await db.insert(schema.jobs).values({
@@ -408,31 +414,22 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
       .from(schema.jobs)
       .where(eq(schema.jobs.id, toolChildId));
 
+    mocks.flowAdd.mockRejectedValueOnce(new Error("Redis unavailable"));
     const toolBatch = await postMultipart("/api/v1/tools/pdf/ocr-pdf/batch", [
       validPdfPart(),
       { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
-      { name: "clientJobId", content: toolParentId },
+      { name: "clientJobId", content: toolClientJobId },
     ]);
-    expect(toolBatch.statusCode).toBe(409);
-    expect(toolBatch.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect(toolBatch.statusCode).toBe(500);
     expect((await getObjectBuffer(toolUploadKey)).toString()).toBe("existing-ocr-pdf");
     const [toolChildAfter] = await db
       .select()
       .from(schema.jobs)
       .where(eq(schema.jobs.id, toolChildId));
     expect(toolChildAfter).toEqual(toolChildBefore);
-    const [toolParentRow] = await db
-      .select()
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, toolParentId));
-    expect(toolParentRow?.status).toBe("failed");
-    expect(toolParentRow?.error).toMatchObject({
-      message: "Job ID already in use",
-      code: "CONFLICT",
-    });
 
-    const pipeParentId = "ocr-pdf-pipeline-batch-1724";
-    const pipeStepId = `${pipeParentId}-f0-s0`;
+    const pipeClientJobId = "ocr-pdf-pipeline-batch-1724";
+    const pipeStepId = `${pipeClientJobId}-f0-s0`;
     const pipeUploadKey = `uploads/${pipeStepId}/scan.pdf`;
     await putObject(pipeUploadKey, Buffer.from("existing-pipeline-ocr-pdf"));
     await db.insert(schema.jobs).values({
@@ -449,28 +446,18 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
       .from(schema.jobs)
       .where(eq(schema.jobs.id, pipeStepId));
 
+    mocks.flowAdd.mockRejectedValueOnce(new Error("Redis unavailable"));
     const pipeBatch = await postMultipart("/api/v1/pipeline/batch", [
       validPdfPart(),
       { name: "pipeline", content: OCR_PIPELINE },
-      { name: "clientJobId", content: pipeParentId },
+      { name: "clientJobId", content: pipeClientJobId },
     ]);
-    expect(pipeBatch.statusCode).toBe(409);
-    expect(pipeBatch.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect(pipeBatch.statusCode).toBe(500);
     expect((await getObjectBuffer(pipeUploadKey)).toString()).toBe("existing-pipeline-ocr-pdf");
     const [pipeStepAfter] = await db
       .select()
       .from(schema.jobs)
       .where(eq(schema.jobs.id, pipeStepId));
     expect(pipeStepAfter).toEqual(pipeStepBefore);
-    const [pipeParentRow] = await db
-      .select()
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, pipeParentId));
-    expect(pipeParentRow?.status).toBe("failed");
-    expect(pipeParentRow?.error).toMatchObject({
-      message: "Job ID already in use",
-      code: "CONFLICT",
-    });
-    expect(mocks.flowAdd).not.toHaveBeenCalled();
   });
 });

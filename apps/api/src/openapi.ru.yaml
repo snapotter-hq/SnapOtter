@@ -651,6 +651,7 @@ paths:
   /api/v1/tools/image/compress-image-to-20kb:
     post:
       operationId: compressImageTo20KbTool
+      deprecated: true
       tags:
         - Image
       summary: Сжать изображение до 20 КБ
@@ -711,6 +712,7 @@ paths:
   /api/v1/tools/image/compress-image-to-50kb:
     post:
       operationId: compressImageTo50KbTool
+      deprecated: true
       tags:
         - Image
       summary: Сжать изображение до 50 КБ
@@ -771,6 +773,7 @@ paths:
   /api/v1/tools/image/compress-image-to-100kb:
     post:
       operationId: compressImageTo100KbTool
+      deprecated: true
       tags:
         - Image
       summary: Сжать изображение до 100 КБ
@@ -831,6 +834,7 @@ paths:
   /api/v1/tools/image/compress-image-to-200kb:
     post:
       operationId: compressImageTo200KbTool
+      deprecated: true
       tags:
         - Image
       summary: Сжать изображение до 200 КБ
@@ -891,6 +895,7 @@ paths:
   /api/v1/tools/image/compress-image-to-500kb:
     post:
       operationId: compressImageTo500KbTool
+      deprecated: true
       tags:
         - Image
       summary: Сжать изображение до 500 КБ

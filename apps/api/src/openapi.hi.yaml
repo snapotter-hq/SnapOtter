@@ -651,6 +651,7 @@ paths:
   /api/v1/tools/image/compress-image-to-20kb:
     post:
       operationId: compressImageTo20KbTool
+      deprecated: true
       tags:
         - Image
       summary: छवि को 20 KB तक संपीड़ित करें
@@ -711,6 +712,7 @@ paths:
   /api/v1/tools/image/compress-image-to-50kb:
     post:
       operationId: compressImageTo50KbTool
+      deprecated: true
       tags:
         - Image
       summary: छवि को 50 KB तक संपीड़ित करें
@@ -771,6 +773,7 @@ paths:
   /api/v1/tools/image/compress-image-to-100kb:
     post:
       operationId: compressImageTo100KbTool
+      deprecated: true
       tags:
         - Image
       summary: छवि को 100 KB तक संपीड़ित करें
@@ -831,6 +834,7 @@ paths:
   /api/v1/tools/image/compress-image-to-200kb:
     post:
       operationId: compressImageTo200KbTool
+      deprecated: true
       tags:
         - Image
       summary: छवि को 200 KB तक संपीड़ित करें
@@ -891,6 +895,7 @@ paths:
   /api/v1/tools/image/compress-image-to-500kb:
     post:
       operationId: compressImageTo500KbTool
+      deprecated: true
       tags:
         - Image
       summary: छवि को 500 KB तक संपीड़ित करें

@@ -37,7 +37,7 @@ const hoisted = vi.hoisted(() => {
 
   interface FakeChild {
     bundleId: string;
-    spawnOptions: { stdio?: unknown[] };
+    spawnOptions: { stdio?: unknown[]; env?: Record<string, string | undefined> };
     stdout: ReturnType<typeof makeEmitter>;
     stderr: ReturnType<typeof makeEmitter>;
     kill: ReturnType<typeof vi.fn>;
@@ -46,16 +46,22 @@ const hoisted = vi.hoisted(() => {
   }
 
   const spawnCalls: FakeChild[] = [];
-  const spawnMock = vi.fn((_cmd: string, args: string[], options: { stdio?: unknown[] }) => {
-    const base = makeEmitter() as unknown as FakeChild;
-    base.bundleId = args[1];
-    base.spawnOptions = options;
-    base.stdout = makeEmitter();
-    base.stderr = makeEmitter();
-    base.kill = vi.fn();
-    spawnCalls.push(base);
-    return base;
-  });
+  const spawnMock = vi.fn(
+    (
+      _cmd: string,
+      args: string[],
+      options: { stdio?: unknown[]; env?: Record<string, string | undefined> },
+    ) => {
+      const base = makeEmitter() as unknown as FakeChild;
+      base.bundleId = args[1];
+      base.spawnOptions = options;
+      base.stdout = makeEmitter();
+      base.stderr = makeEmitter();
+      base.kill = vi.fn();
+      spawnCalls.push(base);
+      return base;
+    },
+  );
 
   const acquireVenvLockMock = vi.fn(async () => () => {});
   const shutdownDispatcherMock = vi.fn();
@@ -408,6 +414,34 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       "pipe",
       expect.any(Number),
     ]);
+  });
+
+  it("spawns the installer with an allowlisted env, not the API's secrets (#4311)", async () => {
+    const secrets: Record<string, string> = {
+      DATABASE_URL: "postgres://user:hunter2@db/snapotter",
+      REDIS_URL: "redis://:hunter2@cache:6379",
+      SESSION_SECRET: "session-secret-value",
+      S3_SECRET_ACCESS_KEY: "s3-secret-value",
+      SNAPOTTER_API_TOKEN: "api-token-value",
+      HF_TOKEN: "hf-token-value",
+      SENTRY_AUTH_TOKEN: "sentry-token-value",
+    };
+    for (const [key, value] of Object.entries(secrets)) vi.stubEnv(key, value);
+    vi.stubEnv("HTTPS_PROXY", "http://proxy.internal:3128");
+    try {
+      const res = await postInstall("transcription");
+      expect(res.statusCode).toBe(202);
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const childEnv = hoisted.spawnCalls[0].spawnOptions.env ?? {};
+      for (const key of Object.keys(secrets)) expect(childEnv).not.toHaveProperty(key);
+      expect(Object.values(childEnv).join("\n")).not.toContain("hunter2");
+      expect(childEnv.BUNDLE_ID).toBe("transcription");
+      expect(childEnv.PIP_CACHE_DIR).toEqual(expect.stringContaining("pip-cache"));
+      expect(childEnv.PATH).toBe(process.env.PATH);
+      expect(childEnv.HTTPS_PROXY).toBe("http://proxy.internal:3128");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("routes OCR through the isolated v3 installer without taking the shared venv lock", async () => {

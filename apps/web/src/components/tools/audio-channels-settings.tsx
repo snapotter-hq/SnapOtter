@@ -7,6 +7,9 @@ import { useFileStore } from "@/stores/file-store";
 
 type ChannelMode = "stereo-to-mono" | "mono-to-stereo" | "swap";
 
+// mono-to-stereo is the only mode that accepts mono input; the others return 422 for it.
+const DEFAULT_CHANNEL_MODE: ChannelMode = "mono-to-stereo";
+
 export function AudioChannelsSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["audio-channels"];
@@ -14,7 +17,7 @@ export function AudioChannelsSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("audio-channels");
 
-  const [mode, setMode] = useState<ChannelMode>("mono-to-stereo");
+  const [mode, setMode] = useState<ChannelMode>(DEFAULT_CHANNEL_MODE);
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -80,7 +83,7 @@ export interface AudioChannelsControlsProps {
 export function AudioChannelsControls({ settings: initial, onChange }: AudioChannelsControlsProps) {
   const { t } = useTranslation();
   const s = t.toolSettings["audio-channels"];
-  const [mode, setMode] = useState<ChannelMode>("stereo-to-mono");
+  const [mode, setMode] = useState<ChannelMode>(DEFAULT_CHANNEL_MODE);
 
   const initializedRef = useRef(false);
   useEffect(() => {

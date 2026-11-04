@@ -254,7 +254,7 @@ function EditorSettings() {
           onChange={(e) => setAllCaps(e.target.checked)}
           className="rounded border-border"
         />
-        ALL CAPS
+        {ts.allCaps}
       </label>
 
       {/* Error */}

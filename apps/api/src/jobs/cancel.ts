@@ -25,6 +25,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
 import { cancelSingleJobGuarded } from "../routes/progress.js";
+import { batchAliasTarget } from "./batch-alias.js";
 import { markBatchCanceled } from "./batch-progress.js";
 import { createRedisSubscriberConnection, sharedRedis } from "./connection.js";
 import { getQueue } from "./queues.js";
@@ -199,6 +200,10 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     })
     .from(schema.jobs)
     .where(eq(schema.jobs.id, jobId));
+  // A batch started with a clientJobId runs under a server id; the client
+  // cancels by its own id, which lands on the alias row.
+  const aliasTarget = row ? batchAliasTarget(row) : null;
+  if (aliasTarget) return aliasTarget === jobId ? false : requestCancel(aliasTarget);
   if (row?.type === "batch") {
     // Custom batch sub-routes (pdf-to-image, svg-to-raster) process inline
     // and only publish progress frames; their rows are implicit inserts with

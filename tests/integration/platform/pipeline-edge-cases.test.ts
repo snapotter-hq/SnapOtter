@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { batchJobIdFor } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -764,7 +765,7 @@ describe("Pipeline batch execution", () => {
     expect(res.headers["x-job-id"]).toBe(clientJobId);
   });
 
-  // A taken id fails the parent insert on the primary key. The owner resending
+  // A taken id fails the alias insert on the primary key. The owner resending
   // the same batch (a browser retrying a POST whose response it gave up on)
   // attaches to the run already going: 202 sends the client to the SSE and its
   // durable result, and the existing row is left alone (#4139, which replaced
@@ -809,32 +810,31 @@ describe("Pipeline batch execution", () => {
     expect(after).toEqual(before);
   });
 
-  // Same child-id collision on /api/v1/pipeline/batch: the parent insert
-  // succeeds, file 0 stages its rows and upload, and file 1 hits 23505 on
-  // ${parentId}-f1 after inserting ${parentId}-f1-s0. Settle the parent,
-  // clean up the staged rows and upload, leave the existing row and its
-  // upload untouched, and answer 409 (#1724).
-  it("answers 409 when a free clientJobId collides on a child id", async () => {
+  // Child ids used to be ${clientJobId}-f${n}, so a client could aim a batch
+  // at another job's rows and uploads (#1724). Children now hang off the
+  // server parent id, so a row that looks like a child of the client id is
+  // never touched and the batch runs normally.
+  it("leaves a row named like a child of the clientJobId untouched", async () => {
     const clientJobId = `pipeline-batch-1724-${randomUUID()}`;
-    const collidingChildId = `${clientJobId}-f1`;
-    const collidingUploadKey = `uploads/${collidingChildId}-s0/b.png`;
-    const { getObjectBuffer, objectExists, putObject } = await import(
+    const lookalikeChildId = `${clientJobId}-f1`;
+    const lookalikeUploadKey = `uploads/${lookalikeChildId}-s0/b.png`;
+    const { getObjectBuffer, putObject } = await import(
       "../../../apps/api/src/lib/object-storage.js"
     );
-    await putObject(collidingUploadKey, Buffer.from("existing-step-upload"));
+    await putObject(lookalikeUploadKey, Buffer.from("existing-step-upload"));
     await db.insert(schema.jobs).values({
-      id: collidingChildId,
+      id: lookalikeChildId,
       toolId: "rotate",
       pool: "image",
       type: "tool",
       status: "completed",
-      inputRefs: [collidingUploadKey],
+      inputRefs: [lookalikeUploadKey],
       settings: { kept: true },
     });
     const [childBefore] = await db
       .select()
       .from(schema.jobs)
-      .where(eq(schema.jobs.id, collidingChildId));
+      .where(eq(schema.jobs.id, lookalikeChildId));
 
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
@@ -852,81 +852,69 @@ describe("Pipeline batch execution", () => {
       body,
     });
 
-    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
-    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
 
     const [childAfter] = await db
       .select()
       .from(schema.jobs)
-      .where(eq(schema.jobs.id, collidingChildId));
+      .where(eq(schema.jobs.id, lookalikeChildId));
     expect(childAfter).toEqual(childBefore);
-    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-step-upload");
+    expect((await getObjectBuffer(lookalikeUploadKey)).toString()).toBe("existing-step-upload");
 
-    for (const stagedId of [
-      `${clientJobId}-f0`,
-      `${clientJobId}-f0-s0`,
-      `${collidingChildId}-s0`,
-    ]) {
-      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stagedId));
-      expect(rows, stagedId).toHaveLength(0);
-    }
-    expect(await objectExists(`uploads/${clientJobId}-f0-s0/a.png`)).toBe(false);
-
-    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
-    expect(parentRow?.status).toBe("failed");
-    expect(parentRow?.error).toMatchObject({
-      message: "Job ID already in use",
-      code: "CONFLICT",
-    });
+    const parentId = await batchJobIdFor(clientJobId);
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(parentRow?.status).toBe("completed");
   });
 
   it("preserves earlier preFailures on the settled parent row when a later file faults on /api/v1/pipeline/batch (#3289)", async () => {
     const clientJobId = `pipeline-batch-3289-${randomUUID()}`;
-    const collidingChildId = `${clientJobId}-f0`;
-    await db.insert(schema.jobs).values({
-      id: collidingChildId,
-      toolId: "rotate",
-      pool: "image",
-      type: "tool",
-      status: "completed",
-      inputRefs: [],
-      settings: {},
-    });
+    const { SafeError } = await import("@snapotter/shared");
+    const putSpy = vi.spyOn(objectStorage, "putObject").mockRejectedValueOnce(
+      new SafeError("Injected cap after empty file", {
+        kind: "operational",
+        code: "workspace-cap",
+        statusCode: 503,
+      }),
+    );
 
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "empty.png",
-        contentType: "image/png",
-        content: Buffer.alloc(0),
-      },
-      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
-      {
-        name: "pipeline",
-        content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
-      },
-      { name: "clientJobId", content: clientJobId },
-    ]);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/pipeline/batch",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
+    try {
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "empty.png",
+          contentType: "image/png",
+          content: Buffer.alloc(0),
+        },
+        { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+        },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
 
-    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
-    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+      expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
 
-    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
-    expect(parentRow?.status).toBe("failed");
-    expect(parentRow?.error).toEqual({
-      message: "Job ID already in use",
-      code: "CONFLICT",
-      details: [
-        { filename: "empty.png", error: "File is empty" },
-        { filename: "", error: "Job ID already in use" },
-      ],
-    });
+      const parentId = await batchJobIdFor(clientJobId);
+      const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+      expect(parentRow?.status).toBe("failed");
+      expect(parentRow?.error).toEqual({
+        message: "Injected cap after empty file",
+        code: "workspace-cap",
+        details: [
+          { filename: "empty.png", error: "File is empty" },
+          { filename: "", error: "Injected cap after empty file" },
+        ],
+      });
+    } finally {
+      putSpy.mockRestore();
+    }
   });
 
   it("pipeline batch with multi-step chain processes correctly", async () => {

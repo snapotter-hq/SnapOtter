@@ -2873,6 +2873,7 @@ export const nl: TranslationKeys = {
       stretchMode: "Uitrekken",
       cropMode: "Bijsnijden",
       alignment: "Uitlijning",
+      allCaps: "Alles in hoofdletters",
       start: "Begin",
       center: "Midden",
       end: "Einde",

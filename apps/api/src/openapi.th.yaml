@@ -651,6 +651,7 @@ paths:
   /api/v1/tools/image/compress-image-to-20kb:
     post:
       operationId: compressImageTo20KbTool
+      deprecated: true
       tags:
         - Image
       summary: บีบอัดรูปภาพเป็น 20 KB
@@ -711,6 +712,7 @@ paths:
   /api/v1/tools/image/compress-image-to-50kb:
     post:
       operationId: compressImageTo50KbTool
+      deprecated: true
       tags:
         - Image
       summary: บีบอัดรูปภาพเป็น 50 KB
@@ -771,6 +773,7 @@ paths:
   /api/v1/tools/image/compress-image-to-100kb:
     post:
       operationId: compressImageTo100KbTool
+      deprecated: true
       tags:
         - Image
       summary: บีบอัดรูปภาพเป็น 100 KB
@@ -831,6 +834,7 @@ paths:
   /api/v1/tools/image/compress-image-to-200kb:
     post:
       operationId: compressImageTo200KbTool
+      deprecated: true
       tags:
         - Image
       summary: บีบอัดรูปภาพเป็น 200 KB
@@ -891,6 +895,7 @@ paths:
   /api/v1/tools/image/compress-image-to-500kb:
     post:
       operationId: compressImageTo500KbTool
+      deprecated: true
       tags:
         - Image
       summary: บีบอัดรูปภาพเป็น 500 KB

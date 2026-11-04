@@ -91,6 +91,63 @@ export function buildMinimalEnv(): Record<string, string> {
   return env;
 }
 
+/**
+ * Extra variables the bundle installer needs beyond the sidecar allowlist:
+ * outbound proxy and CA settings (pip, urllib and huggingface_hub honor them),
+ * the Hugging Face endpoint and cache locations, temp dirs, and the install
+ * knobs install_feature.py reads. Credentials stay out on purpose, including
+ * HF_TOKEN: the feature-bundles repo is public, and the installer runs
+ * third-party wheel code that could read anything it is handed.
+ */
+const INSTALLER_PASSTHROUGH = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "PIP_INDEX_URL",
+  "PIP_EXTRA_INDEX_URL",
+  "PIP_CERT",
+  "PIP_TRUSTED_HOST",
+  "PIP_CONFIG_FILE",
+  "HF_ENDPOINT",
+  "HF_HOME",
+  "HF_HUB_CACHE",
+  "HF_HUB_DOWNLOAD_TIMEOUT",
+  "HF_HUB_ETAG_TIMEOUT",
+  "HF_HUB_DISABLE_XET",
+  "XDG_CACHE_HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "SNAPOTTER_BUNDLE_LOCAL_PATH",
+  "SNAPOTTER_SKIP_INSTALL_SMOKE",
+];
+
+/**
+ * Environment for the feature-bundle installer child. Starts from the sidecar
+ * allowlist so the API's database URLs, auth secrets, and storage keys never
+ * reach a process that downloads and runs third-party packages.
+ */
+export function buildInstallerEnv(extra: Record<string, string> = {}): Record<string, string> {
+  const env = buildMinimalEnv();
+  // OTLP headers usually carry bearer tokens, and the installer exports no telemetry.
+  delete env.OTEL_EXPORTER_OTLP_HEADERS;
+  for (const key of INSTALLER_PASSTHROUGH) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key] as string;
+    }
+  }
+  return { ...env, ...extra };
+}
+
 /** Venv the AI sidecar runs from. Bundle installs write into it. */
 function aiVenvPath(): string {
   return process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");

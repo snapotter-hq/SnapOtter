@@ -25,6 +25,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { claimBatchAlias } from "../jobs/batch-alias.js";
 import { clearBatchCanceled, recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import {
@@ -794,9 +795,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               .onConflictDoUpdate({
                 target: schema.jobs.id,
                 // Only alias rows are re-pointable (#887): a colliding
-                // batch parent or tool artifact the same user owns must
-                // keep its own cancel metadata (batch parent ids ARE
-                // client-supplied, so that collision is reachable).
+                // batch alias, older batch parent or tool artifact the same
+                // user owns must keep its own cancel metadata (a batch's
+                // clientJobId names its alias row, so that collision is
+                // reachable).
                 // Reset terminal columns when the flow pointer changes (#2650,
                 // mirroring upsertToolJobAlias in #886) so a reused channel
                 // accepts nonterminal progress, cancel, and finalize writes.
@@ -1427,54 +1429,47 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
 
           // ── Prepare files and build flow ─────────────────────────────────
-          const parentId = clientJobId || randomUUID();
+          // Server-generated for the same reason as the tool batch route: the
+          // parent id names the ZIP and per-file outputs the public download
+          // route serves by id alone. A clientJobId only gets an alias row.
+          const parentId = randomUUID();
+          const progressJobId = clientJobId ?? parentId;
           const userId = authUser.id;
 
           // Insert batch-finalize row BEFORE updateJobProgress to avoid
-          // a duplicate-key race with the progress persist layer. A
-          // clientJobId that is already taken fails on the primary key: the
-          // client's mistake, answered before anything is staged (#1689).
-          try {
-            await db.insert(schema.jobs).values({
-              id: parentId,
+          // a duplicate-key race with the progress persist layer.
+          await db.insert(schema.jobs).values({
+            id: parentId,
+            userId,
+            toolId: "pipeline-batch",
+            pool: "system",
+            type: "batch",
+            status: "queued",
+            inputRefs: [],
+            // stepCount from the first write (#771): a cancel landing while
+            // files are still validating resolves through this row.
+            settings: { flowChildCount: 0, stepCount: parsedSteps.length },
+          });
+          if (clientJobId) {
+            // The owner resending the same batch (a browser retrying a POST
+            // whose response it gave up on) attaches to the run already
+            // going: a 409 would fail a batch that finishes fine, while 202
+            // sends the client to the SSE and its durable result (#4139,
+            // as the tool batch route does for #2015). Another user's id
+            // stays a conflict (#1689).
+            const claim = await claimBatchAlias({
+              clientJobId,
+              batchJobId: parentId,
               userId,
               toolId: "pipeline-batch",
-              pool: "system",
-              type: "batch",
-              status: "queued",
-              inputRefs: [],
-              // stepCount from the first write (#771): a cancel landing while
-              // files are still validating resolves through this row.
-              settings: { flowChildCount: 0, stepCount: parsedSteps.length },
             });
-          } catch (err) {
-            if (isUniqueViolation(err)) {
-              // The owner resending the same batch (a browser retrying a POST
-              // whose response it gave up on) attaches to the run already
-              // going: a 409 would fail a batch that finishes fine, while 202
-              // sends the client to the SSE and its durable result (#4139,
-              // as the tool batch route does for #2015). Another user's id
-              // stays a conflict.
-              const [existing] = await db
-                .select({
-                  userId: schema.jobs.userId,
-                  toolId: schema.jobs.toolId,
-                  type: schema.jobs.type,
-                })
-                .from(schema.jobs)
-                .where(eq(schema.jobs.id, parentId))
-                .limit(1);
-              if (
-                existing &&
-                existing.type === "batch" &&
-                existing.toolId === "pipeline-batch" &&
-                existing.userId === userId
-              ) {
-                return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
+            if (claim !== "claimed") {
+              await db.delete(schema.jobs).where(eq(schema.jobs.id, parentId));
+              if (claim === "attach") {
+                return reply.status(202).send(buildAsyncAcceptedPayload(clientJobId));
               }
               return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
             }
-            throw err;
           }
           const preFailures: Array<{
             originalIndex: number;
@@ -2011,7 +2006,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // The flow keeps running; the finalize persists the ZIP and
             // publishes the terminal frame carrying its download URL, and
             // the pipeline hook speaks the async contract since #766.
-            return reply.status(202).send(buildAsyncAcceptedPayload(parentId));
+            return reply.status(202).send(buildAsyncAcceptedPayload(progressJobId));
           }
 
           const payload = batchResult.resultPayload as
@@ -2082,7 +2077,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             "Content-Type": "application/zip",
             "Content-Disposition": `attachment; filename="${zip.filename}"`,
             "Content-Length": String(zip.size),
-            "X-Job-Id": parentId,
+            "X-Job-Id": progressJobId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
             ...getSecurityHeaders(),
           });

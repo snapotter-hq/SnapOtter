@@ -2865,6 +2865,7 @@ export const ptBR: TranslationKeys = {
       stretchMode: "Esticar",
       cropMode: "Cortar",
       alignment: "Alinhamento",
+      allCaps: "Tudo em maiúsculas",
       start: "Início",
       center: "Centro",
       end: "Fim",
