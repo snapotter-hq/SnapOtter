@@ -1,5 +1,18 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ENTERPRISE_FEATURES, PLAN_FEATURES } from "@snapotter/enterprise";
 import { describe, expect, it } from "vitest";
+
+const apiSrc = resolve(dirname(fileURLToPath(import.meta.url)), "../../../apps/api/src");
+
+function listTsFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) return listTsFiles(full);
+    return entry.name.endsWith(".ts") ? [full] : [];
+  });
+}
 
 describe("enterprise feature flags", () => {
   it("includes all Phase 1 flags", () => {
@@ -32,8 +45,21 @@ describe("enterprise feature flags", () => {
     }
   });
 
-  it("has exactly 19 features total", () => {
-    expect(ENTERPRISE_FEATURES).toHaveLength(19);
+  it("has exactly 18 features total", () => {
+    expect(ENTERPRISE_FEATURES).toHaveLength(18);
+  });
+
+  it("every feature has at least one gate call site in apps/api/src (#4324)", () => {
+    const source = listTsFiles(apiSrc)
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
+    const ungated = ENTERPRISE_FEATURES.filter(
+      (feature) =>
+        !new RegExp(
+          `(?:isEnterpriseFeatureEnabled|isFeatureEnabled)\\(\\s*["']${feature}["']`,
+        ).test(source),
+    );
+    expect(ungated).toEqual([]);
   });
 
   it("includes distributed_tracing in enterprise plan only", () => {
