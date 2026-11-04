@@ -1,4 +1,4 @@
-import { TOOLS } from "@snapotter/shared";
+import { apiToolPath, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -138,5 +138,79 @@ describe("tool routes boot log", () => {
       .map((call) => String(call[0]))
       .find((line) => line.startsWith("Tool routes:"));
     expect(Number(validBootLine?.match(/(\d+) skipped/)?.[1])).toBe(experimentalCount + 1);
+  });
+
+  describe("disabledTools covers conversion presets (#4288)", () => {
+    async function bootWithDisabled(ids: string[]) {
+      const value = JSON.stringify(ids);
+      await db
+        .insert(schema.settings)
+        .values({ key: "disabledTools", value })
+        .onConflictDoUpdate({
+          target: schema.settings.key,
+          set: { value, updatedAt: new Date() },
+        });
+      const app = Fastify({ logger: true });
+      await registerToolRoutes(app);
+      await app.ready();
+      return app;
+    }
+
+    const hasRoute = (app: ReturnType<typeof Fastify>, id: string) =>
+      app.hasRoute({ method: "POST", url: apiToolPath(id) });
+
+    it("registers every preset route when nothing is disabled", async () => {
+      const app = await bootWithDisabled([]);
+      expect(hasRoute(app, "heic-to-jpg")).toBe(true);
+      for (const base of ["image-to-pdf", "pdf-to-image", "svg-to-raster"]) {
+        const preset = CONVERSION_PRESETS.find((p) => p.base === base);
+        expect(hasRoute(app, preset?.id ?? ""), base).toBe(true);
+      }
+      await app.close();
+    });
+
+    it("drops a preset whose own id is disabled and keeps its siblings", async () => {
+      const app = await bootWithDisabled(["heic-to-jpg"]);
+      expect(hasRoute(app, "heic-to-jpg")).toBe(false);
+      expect(hasRoute(app, "heic-to-png")).toBe(true);
+      await app.close();
+    });
+
+    it.each(["image-to-pdf", "pdf-to-image", "svg-to-raster"])(
+      "drops every preset of the %s base when the base is disabled",
+      async (base) => {
+        const app = await bootWithDisabled([base]);
+        const presets = CONVERSION_PRESETS.filter((p) => p.base === base);
+        expect(presets.length).toBeGreaterThan(0);
+        for (const preset of presets) {
+          expect(hasRoute(app, preset.id), preset.id).toBe(false);
+        }
+        await app.close();
+      },
+    );
+
+    it("drops registry presets and compress presets when their base is disabled", async () => {
+      const app = await bootWithDisabled(["convert", "compress"]);
+      expect(hasRoute(app, "heic-to-jpg")).toBe(false);
+      expect(hasRoute(app, "compress-image-to-100kb")).toBe(false);
+      await app.close();
+    });
+
+    it("counts policy-skipped presets in the boot line so active + skipped stays the total", async () => {
+      const value = JSON.stringify(["heic-to-jpg"]);
+      await db
+        .insert(schema.settings)
+        .values({ key: "disabledTools", value })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
+      const app = Fastify({ logger: true });
+      const infoSpy = vi.spyOn(app.log, "info");
+      await registerToolRoutes(app);
+      await app.close();
+      const line = infoSpy.mock.calls
+        .map((c) => String(c[0]))
+        .find((l) => l.startsWith("Tool routes:"));
+      const skipped = Number(line?.match(/(\d+) skipped/)?.[1]);
+      expect(skipped).toBe(TOOLS.filter((t) => t.experimental).length + 1);
+    });
   });
 });
