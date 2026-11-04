@@ -186,7 +186,7 @@ const STORES: StoreRow[] = [
   },
   {
     site: "url import",
-    fallback: `Fetch failed: ${STATUS}`,
+    fallback: en.urlImport.fetchFailed.replace("{status}", String(STATUS)),
     run: async () => {
       const { result } = renderHook(() => useUrlImport());
       await act(() => result.current.importUrls(["https://example.com/a.png"]));
@@ -195,7 +195,7 @@ const STORES: StoreRow[] = [
   },
   {
     site: "url import download",
-    fallback: `Download failed: ${STATUS}`,
+    fallback: en.urlImport.downloadFailed.replace("{status}", String(STATUS)),
     run: async () => {
       vi.stubGlobal(
         "fetch",

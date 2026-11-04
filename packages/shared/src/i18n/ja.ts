@@ -1588,6 +1588,7 @@ export const ja: TranslationKeys = {
       separatePdfMode: "個別のPDF（1画像につき1つ）",
       combineAllImages: "すべての画像を1つのPDFにまとめる",
       pageSize: "ページサイズ",
+      pageSizeLetter: "USレター",
       orientation: "向き",
       portrait: "縦向き",
       landscape: "横向き",
@@ -4013,6 +4014,8 @@ export const ja: TranslationKeys = {
     cancelButton: "キャンセル",
     readyCount: "{count}件準備完了",
     failedStatus: "失敗",
+    fetchFailed: "このURLを取得できませんでした(エラー {status})。",
+    downloadFailed: "このファイルをダウンロードできませんでした(エラー {status})。",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[ファイル名](https://example.com/recording.mp3)",
   },

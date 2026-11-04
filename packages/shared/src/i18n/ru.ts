@@ -1633,6 +1633,7 @@ export const ru: TranslationKeys = {
       separatePdfMode: "отдельные PDF, по одному на изображение",
       combineAllImages: "Объединить все изображения в один PDF",
       pageSize: "Размер страницы",
+      pageSizeLetter: "US Letter",
       orientation: "Ориентация",
       portrait: "Книжная",
       landscape: "Альбомная",
@@ -4069,6 +4070,8 @@ export const ru: TranslationKeys = {
     cancelButton: "Отмена",
     readyCount: "{count} готово",
     failedStatus: "Ошибка",
+    fetchFailed: "Не удалось получить этот URL (ошибка {status}).",
+    downloadFailed: "Не удалось скачать этот файл (ошибка {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Мой файл](https://example.com/recording.mp3)",
   },

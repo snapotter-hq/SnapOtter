@@ -1568,6 +1568,7 @@ export const ko: TranslationKeys = {
       separatePdfMode: "개별 PDF, 이미지당 1개",
       combineAllImages: "모든 이미지를 하나의 PDF로 합치기",
       pageSize: "페이지 크기",
+      pageSizeLetter: "US 레터",
       orientation: "방향",
       portrait: "세로",
       landscape: "가로",
@@ -3989,6 +3990,8 @@ export const ko: TranslationKeys = {
     cancelButton: "취소",
     readyCount: "{count}개 준비 완료",
     failedStatus: "실패",
+    fetchFailed: "이 URL을 가져오지 못했습니다(오류 {status}).",
+    downloadFailed: "이 파일을 다운로드하지 못했습니다(오류 {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[내 파일](https://example.com/recording.mp3)",
   },
