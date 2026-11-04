@@ -4122,6 +4122,8 @@ export const es: TranslationKeys = {
     previewFailed: "Error al generar la vista previa",
     previewEncoderMissing:
       "Al ffmpeg de este servidor le falta el codificador {encoder}, así que no se puede generar la vista previa. Contacta a tu administrador.",
+    previewEngineUnavailable:
+      "ffmpeg no está instalado en este servidor, así que no se puede generar la vista previa. Pide a tu administrador que instale ffmpeg o configure FFMPEG_PATH.",
     previewProgressMessages: [
       "La nutria está entrando en calor...",
       "Triturando píxeles...",

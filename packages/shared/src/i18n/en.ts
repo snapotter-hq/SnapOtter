@@ -4062,6 +4062,8 @@ export const en = {
     previewFailed: "Preview generation failed",
     previewEncoderMissing:
       "This server's ffmpeg is missing the {encoder} encoder, so the preview can't be generated. Contact your administrator.",
+    previewEngineUnavailable:
+      "ffmpeg isn't installed on this server, so the preview can't be generated. Ask your administrator to install ffmpeg or set FFMPEG_PATH.",
     previewProgressMessages: [
       "Warming up the otter...",
       "Crunching pixels...",

@@ -3848,6 +3848,8 @@ export const zhCN: TranslationKeys = {
     generatePreview: "生成预览",
     previewFailed: "预览生成失败",
     previewEncoderMissing: "此服务器的 ffmpeg 缺少 {encoder} 编码器，无法生成预览。请联系管理员。",
+    previewEngineUnavailable:
+      "此服务器未安装 ffmpeg，无法生成预览。请让管理员安装 ffmpeg 或设置 FFMPEG_PATH。",
     previewProgressMessages: [
       "水獭正在热身...",
       "正在嚼碎像素...",
