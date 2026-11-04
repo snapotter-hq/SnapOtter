@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { expandAiBundlesScripts } from "../../helpers/ai-bundles-workflow.js";
 
 const root = process.cwd();
 const verifierPath = path.resolve(root, "docker/verify-bundle.sh");
@@ -13,6 +14,11 @@ function readRequired(file: string): string {
   return readFileSync(file, "utf8");
 }
 
+/** ai-bundles.yml with its moved step scripts expanded back inline. */
+function readWorkflow(): string {
+  return expandAiBundlesScripts(readRequired(workflowPath), root);
+}
+
 function job(workflow: string, name: string): string {
   const start = workflow.indexOf(`  ${name}:\n`);
   expect(start, `job ${name} is missing`).toBeGreaterThanOrEqual(0);
@@ -21,7 +27,7 @@ function job(workflow: string, name: string): string {
 
 describe("legacy bundle release workflow", () => {
   it("keeps immutable v2 legacy bundles out of each OCR release", () => {
-    const workflow = readRequired(workflowPath);
+    const workflow = readWorkflow();
     const manifest = JSON.parse(readRequired(manifestPath));
 
     expect(workflow).not.toContain("  build-legacy:\n");
@@ -93,7 +99,7 @@ describe("legacy bundle release workflow", () => {
   });
 
   it("rejects a manifestless version prefix that already contains remote objects", () => {
-    const publish = job(readRequired(workflowPath), "publish");
+    const publish = job(readWorkflow(), "publish");
     const manifestMissing = publish.indexOf("if not api.file_exists");
     const prefixListing = publish.indexOf("api.list_repo_files", manifestMissing);
     const prefixGuard = publish.indexOf("if existing_version_files:", prefixListing);
