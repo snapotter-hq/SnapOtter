@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter के लिए सुरक्षा hardening गाइड। Container सुरक्षा, network isolation, Docker secrets, Kubernetes deployment, और compliance artifacts।"
-i18n_source_hash: 5cf773ddb4c0
+i18n_source_hash: 630381c08cde
 i18n_provenance: machine
 i18n_output_hash: 558ff20c2ae9
 i18n_hash_version: 2

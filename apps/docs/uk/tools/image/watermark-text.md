@@ -2,7 +2,8 @@
 description: "Додавання текстових водяних знаків із налаштовуваним положенням, непрозорістю, обертанням та мозаїчним повторенням."
 i18n_source_hash: b80f12f410e4
 i18n_provenance: human
-i18n_output_hash: 6b9fc76a1a3d
+i18n_output_hash: 49e9ab01120c
+i18n_hash_version: 2
 ---
 
 # Текстовий водяний знак {#text-watermark}

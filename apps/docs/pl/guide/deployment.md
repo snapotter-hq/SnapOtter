@@ -1,6 +1,6 @@
 ---
 description: "Wdrażanie SnapOtter w środowisku produkcyjnym z użyciem Docker. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: 0b24437c054d
 i18n_hash_version: 2

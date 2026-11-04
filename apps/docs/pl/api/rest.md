@@ -1,6 +1,7 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: a086ba746be3
+i18n_output_hash: 53e8d429a362
+i18n_hash_version: 2
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---

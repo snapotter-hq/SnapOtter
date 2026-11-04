@@ -1,6 +1,6 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: 9ee358838831
 i18n_hash_version: 2

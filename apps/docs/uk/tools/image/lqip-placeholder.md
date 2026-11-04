@@ -2,7 +2,8 @@
 description: "Генеруйте крихітний низькоякісний плейсхолдер зображення з data URI у форматі base64."
 i18n_source_hash: f8a27c8021f5
 i18n_provenance: human
-i18n_output_hash: 4293d988254d
+i18n_output_hash: fc4de4cf328b
+i18n_hash_version: 2
 ---
 
 # Плейсхолдер LQIP {#lqip-placeholder}

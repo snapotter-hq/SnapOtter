@@ -1,6 +1,7 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 9a477e3679e9
+i18n_output_hash: a1d02cd96a03
+i18n_hash_version: 2
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---

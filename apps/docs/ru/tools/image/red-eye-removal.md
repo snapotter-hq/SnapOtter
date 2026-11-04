@@ -2,7 +2,8 @@
 description: "Обнаружение и коррекция эффекта красных глаз, вызванного вспышкой камеры, на основе ИИ."
 i18n_source_hash: 647c6ff1ef7c
 i18n_provenance: human
-i18n_output_hash: 74f64d016e5b
+i18n_output_hash: 223598bd613f
+i18n_hash_version: 2
 ---
 
 # Удаление красных глаз {#red-eye-removal}

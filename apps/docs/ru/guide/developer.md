@@ -2,7 +2,7 @@
 description: "Настройка локальной среды разработки, команды, соглашения по коду и как добавить новый инструмент в SnapOtter."
 i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 8091800358a0
+i18n_output_hash: 2d3fd32e0579
 i18n_hash_version: 2
 ---
 

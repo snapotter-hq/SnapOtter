@@ -2,7 +2,8 @@
 description: "Захоплюйте вебсторінки або фрагменти HTML як високоякісні зображення з емуляцією пристроїв."
 i18n_source_hash: 1e49d070ea2e
 i18n_provenance: human
-i18n_output_hash: 88275af0ea98
+i18n_output_hash: 247fa53d7f52
+i18n_hash_version: 2
 ---
 
 # HTML в зображення {#html-to-image}

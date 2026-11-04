@@ -1,6 +1,7 @@
 ---
 description: "Витягуйте текст із зображень локально за допомогою вбудованого Tesseract або додаткового високоточного середовища виконання RapidOCR."
-i18n_output_hash: e4c4f8150634
+i18n_output_hash: dbcdad83c2c1
+i18n_hash_version: 2
 i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---

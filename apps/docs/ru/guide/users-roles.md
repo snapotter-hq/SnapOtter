@@ -2,7 +2,7 @@
 description: "Управление пользователями, встроенными и пользовательскими ролями, разрешениями, ключами API, командами, сессиями и журналом аудита в SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 7e3c6824072e
+i18n_output_hash: 95d663cf7445
 i18n_hash_version: 2
 ---
 

@@ -2,7 +2,8 @@
 description: "Генерує діаграму RGB-гістограми з поканальною статистикою із зображення."
 i18n_source_hash: 57aa610206a5
 i18n_provenance: human
-i18n_output_hash: 988081420f18
+i18n_output_hash: 69746668fe40
+i18n_hash_version: 2
 ---
 
 # Гістограма {#histogram}

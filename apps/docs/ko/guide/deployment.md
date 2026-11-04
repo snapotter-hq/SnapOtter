@@ -1,6 +1,6 @@
 ---
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: 7d5cd09b73d9
 i18n_hash_version: 2

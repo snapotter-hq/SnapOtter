@@ -1,6 +1,6 @@
 ---
 description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 與 Cloudflare 的反向代理設定。"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: 2551fd2fd653
 i18n_hash_version: 2

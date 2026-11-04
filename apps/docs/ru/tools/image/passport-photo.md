@@ -2,7 +2,8 @@
 description: "Генератор фото на паспорт и удостоверение на основе ИИ с распознаванием лица, удалением фона и раскладкой для печатного листа."
 i18n_source_hash: 8258315ba894
 i18n_provenance: human
-i18n_output_hash: 927ae8e74c25
+i18n_output_hash: fa9ef886e007
+i18n_hash_version: 2
 ---
 
 # Фото на паспорт {#passport-photo}

@@ -2,7 +2,7 @@
 description: "Локальне налаштування розробки, команди, конвенції коду та як додати новий інструмент до SnapOtter."
 i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 77f58b989cd8
+i18n_output_hash: 628aa9beb1eb
 i18n_hash_version: 2
 ---
 

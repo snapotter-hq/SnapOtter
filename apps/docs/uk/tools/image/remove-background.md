@@ -2,7 +2,8 @@
 description: "Видалення фону на основі ШІ з опціональними ефектами (розмиття, тінь, градієнт, власний фон)."
 i18n_source_hash: 0814cd471fc1
 i18n_provenance: human
-i18n_output_hash: 7f67064ec4a9
+i18n_output_hash: 304b9ae8aa5b
+i18n_hash_version: 2
 ---
 
 # Видалення фону {#remove-background}

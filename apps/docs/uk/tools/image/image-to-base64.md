@@ -2,7 +2,8 @@
 description: "Конвертуйте зображення в data URI у форматі base64 для вбудовування в HTML, CSS тощо."
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
-i18n_output_hash: dd739347bafc
+i18n_output_hash: 38515004e193
+i18n_hash_version: 2
 ---
 
 # Зображення в Base64 {#image-to-base64}

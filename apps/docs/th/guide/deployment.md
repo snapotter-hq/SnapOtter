@@ -1,6 +1,6 @@
 ---
 description: "ติดตั้ง SnapOtter ในระบบจริงด้วย Docker ครอบคลุมความต้องการด้านฮาร์ดแวร์ การตั้งค่า GPU และการกำหนดค่า reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
 i18n_output_hash: f5293d0da6bb
 i18n_hash_version: 2

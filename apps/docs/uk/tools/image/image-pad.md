@@ -2,7 +2,8 @@
 description: "Доповнює зображення до цільового співвідношення сторін суцільним кольором, прозорим або розмитим фоном."
 i18n_source_hash: 796122da3dae
 i18n_provenance: human
-i18n_output_hash: eec892888277
+i18n_output_hash: a766cb86625f
+i18n_hash_version: 2
 ---
 
 # Доповнення зображення {#image-pad}

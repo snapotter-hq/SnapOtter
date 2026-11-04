@@ -2,7 +2,8 @@
 description: "Генерация QR-кодов с пользовательскими цветами и уровнями коррекции ошибок."
 i18n_source_hash: 096ef4d90da5
 i18n_provenance: human
-i18n_output_hash: 7bc1811d0874
+i18n_output_hash: e9af1229fed8
+i18n_hash_version: 2
 ---
 
 # Генератор QR-кодов {#qr-code-generator}

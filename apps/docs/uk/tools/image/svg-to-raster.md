@@ -2,7 +2,8 @@
 description: "Конвертація файлів SVG у PNG, JPEG, WebP, AVIF, TIFF, GIF, HEIF або JXL з довільною роздільною здатністю та DPI, з підтримкою пакетної обробки."
 i18n_source_hash: cf36830f8797
 i18n_provenance: human
-i18n_output_hash: babd1aef9097
+i18n_output_hash: 61e265ee80b7
+i18n_hash_version: 2
 ---
 
 # SVG у растр {#svg-to-raster}
