@@ -116,11 +116,13 @@ const INSTALLER_PASSTHROUGH = [
   "PIP_EXTRA_INDEX_URL",
   "PIP_CERT",
   "PIP_TRUSTED_HOST",
+  "PIP_CONFIG_FILE",
   "HF_ENDPOINT",
   "HF_HOME",
   "HF_HUB_CACHE",
   "HF_HUB_DOWNLOAD_TIMEOUT",
   "HF_HUB_ETAG_TIMEOUT",
+  "HF_HUB_DISABLE_XET",
   "XDG_CACHE_HOME",
   "TMPDIR",
   "TMP",
@@ -136,6 +138,8 @@ const INSTALLER_PASSTHROUGH = [
  */
 export function buildInstallerEnv(extra: Record<string, string> = {}): Record<string, string> {
   const env = buildMinimalEnv();
+  // OTLP headers usually carry bearer tokens, and the installer exports no telemetry.
+  delete env.OTEL_EXPORTER_OTLP_HEADERS;
   for (const key of INSTALLER_PASSTHROUGH) {
     if (process.env[key] !== undefined) {
       env[key] = process.env[key] as string;

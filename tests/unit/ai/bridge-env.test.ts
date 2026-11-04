@@ -60,7 +60,11 @@ describe("bundle installer environment", () => {
       ADMIN_PASSWORD: "pw",
       HF_TOKEN: "hf",
       SENTRY_DSN: "https://k@sentry.example/1",
+      OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer abc",
     };
+    // Allowlisted mirrors may carry a _URL suffix; unset them so the suffix scan is host-independent.
+    vi.stubEnv("PIP_INDEX_URL", undefined);
+    vi.stubEnv("PIP_EXTRA_INDEX_URL", undefined);
     for (const [key, value] of Object.entries(secrets)) vi.stubEnv(key, value);
 
     const env = buildInstallerEnv();
