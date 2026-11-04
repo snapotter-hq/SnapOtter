@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Bypass zustand persist middleware — it captures window.localStorage at import
+// Bypass zustand persist middleware, it captures window.localStorage at import
 // time before jsdom's storage is reliably available in the vitest fork pool.
 vi.mock("zustand/middleware", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -1531,7 +1531,7 @@ describe("usePdfToImageStore", () => {
 // ==========================================================================
 
 // Mock the collage-templates module so we don't depend on real template data.
-// The store uses getDefaultTemplate() and COLLAGE_TEMPLATES — provide
+// The store uses getDefaultTemplate() and COLLAGE_TEMPLATES, provide
 // minimal stubs that return predictable values.
 vi.mock("@/lib/collage-templates", () => ({
   COLLAGE_TEMPLATES: [

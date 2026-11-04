@@ -253,7 +253,7 @@ Running at the small end of these tiers (a Pi, an old laptop, a 2 GB VPS)? [Low-
 | Recommended | All five modalities incl. video, PDF, and standard AI bundles on CPU; batches; a few users | 4 cores | 4 GB (8 GB for HQ inpainting) | None | ~25 GB |
 | Full | Everything at speed incl. GPU AI; large batches; many users | 6-8 cores | 8 GB | NVIDIA 8 GB+ VRAM (12 GB comfortable) | ~35 GB |
 
-**Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`) — no image is built for it — nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
+**Architecture: 64-bit only** (`linux/amd64` or `linux/arm64`). SnapOtter runs natively on Intel/AMD servers, Apple Silicon Macs, and 64-bit ARM boards including the **Raspberry Pi 4 and 5** (4-8 GB). It does **not** run on 32-bit ARM (`armv7`/`armhf`; no image is built for it), nor on 512 MB-class boards such as the Pi Zero, which are below the memory floor (see below).
 
 ### Minimum (image, files, and light PDF tools; no AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
@@ -276,7 +276,7 @@ deploy:
       memory: 2G
 ```
 
-**The one CPU-heavy exception is video re-encoding.** Stream-copy operations (trim, mute, container remux) are instant, but transcoding to a different codec is CPU-bound. A 1080p / 45-second clip re-encoded to VP9 (WebM) takes roughly **~40 s** on a fast modern CPU, ~45 s on Apple Silicon, ~80 s on an older mobile 4-core, and **~130 s** on an older 4-core server. If your workload is video-heavy, prioritize CPU cores and clock speed, or raise the container's `cpus:` limit — the shipped compose caps the app at 4 cores by default (8 on the GPU compose).
+**The one CPU-heavy exception is video re-encoding.** Stream-copy operations (trim, mute, container remux) are instant, but transcoding to a different codec is CPU-bound. A 1080p / 45-second clip re-encoded to VP9 (WebM) takes roughly **~40 s** on a fast modern CPU, ~45 s on Apple Silicon, ~80 s on an older mobile 4-core, and **~130 s** on an older 4-core server. If your workload is video-heavy, prioritize CPU cores and clock speed, or raise the container's `cpus:` limit. The shipped compose caps the app at 4 cores by default (8 on the GPU compose).
 
 ### Recommended (AI tools on CPU) {#recommended-ai-tools-on-cpu}
 
@@ -297,8 +297,8 @@ Most AI tools are perfectly usable on CPU; a couple really want a GPU. Measured 
 | OCR, transcription, subtitles | 1-3 s | Yes |
 | Colorize, face enhancement | ~10 s | Yes |
 | Background removal / replace / blur | ~29 s | Yes (you'll wait) |
-| AI upscale (RealESRGAN) | ~33 s small; minutes on large images | Marginal — GPU strongly recommended |
-| Photo restoration (full pipeline) | several minutes | No — needs a GPU or a fast many-core CPU |
+| AI upscale (RealESRGAN) | ~33 s small; minutes on large images | Marginal, GPU strongly recommended |
+| Photo restoration (full pipeline) | several minutes | No, needs a GPU or a fast many-core CPU |
 
 SnapOtter intentionally does not bake these model downloads into the Docker image. AI bundles are pulled only when an admin enables the related tool, stored in the persistent `/data/ai` volume, and shared by every tool that depends on the same model stack. This keeps the final container image small while still letting a full AI installation reach the larger storage numbers below.
 
@@ -345,12 +345,12 @@ An NVIDIA GPU (CUDA) dramatically speeds up the heavy AI models. Measured on an 
 
 | AI Tool | Speedup with GPU | Notes |
 |---|---|---|
-| AI upscale (RealESRGAN 2×) | **~47×** | The biggest win — under a second vs ~33 s (minutes on large images) |
+| AI upscale (RealESRGAN 2×) | **~47×** | The biggest win: under a second vs ~33 s (minutes on large images) |
 | Face enhancement (CodeFormer) | **~12×** | ~0.9 s vs ~11 s |
 | Transcription (Whisper) | ~4.5× | |
 | Background removal / replace / blur | ~4× | ~7 s on GPU vs ~29 s on CPU |
 | Colorize | ~1.8× | |
-| OCR, face detection, red-eye, noise-removal | ~1× | Already fast on CPU — a GPU doesn't help |
+| OCR, face detection, red-eye, noise-removal | ~1× | Already fast on CPU, a GPU doesn't help |
 | Photo restoration | none | CPU-bound even on a GPU (0% GPU utilisation); a fast CPU matters more than a GPU here |
 
 The tools worth a GPU are **upscale, face enhancement, transcription, and background removal**. Face detection, OCR, and red-eye are CPU-bound and already fast, so a GPU adds nothing.
@@ -408,13 +408,13 @@ See the [complete format list](/guide/supported-formats) for details on every su
 
 ### Bind mounts vs. named volumes {#bind-mounts-vs-named-volumes}
 
-**Named volumes** (recommended) — Docker manages permissions automatically:
+**Named volumes** (recommended): Docker manages permissions automatically:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts** — You manage permissions. Set `PUID`/`PGID` to match your host user:
+**Bind mounts**: you manage permissions. Set `PUID`/`PGID` to match your host user:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -425,13 +425,13 @@ environment:
 
 ### Storage permissions {#storage-permissions}
 
-SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error. The log directory (`LOG_DIR`, `/data/logs` in the image) is checked the same way, in every storage mode, since logs stay local even when files live in S3.
+SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it, instead of booting "healthy" and then failing on the first upload with a cryptic error. The log directory (`LOG_DIR`, `/data/logs` in the image) is checked the same way, in every storage mode, since logs stay local even when files live in S3.
 
 How permissions are handled depends on how the container is launched:
 
-**Default (starts as root, drops to `snapotter`)** — the entrypoint starts as root, fixes ownership of the mounted volumes, then drops to the unprivileged `snapotter` user via `gosu`. Named volumes work with no configuration. For bind mounts, set `PUID`/`PGID` to your host user (above) so the files it writes are owned by you.
+**Default (starts as root, drops to `snapotter`)**: the entrypoint starts as root, fixes ownership of the mounted volumes, then drops to the unprivileged `snapotter` user via `gosu`. Named volumes work with no configuration. For bind mounts, set `PUID`/`PGID` to your host user (above) so the files it writes are owned by you.
 
-**Kubernetes / OpenShift (non-root via `runAsUser`)** — launched directly as a non-root user, the container cannot chown the volumes itself, so the orchestrator must make them writable. Set `fsGroup`:
+**Kubernetes / OpenShift (non-root via `runAsUser`)**: launched directly as a non-root user, the container cannot chown the volumes itself, so the orchestrator must make them writable. Set `fsGroup`:
 
 ```yaml
 securityContext:
@@ -442,10 +442,10 @@ securityContext:
 
 The image's writable directories are group-owned by GID 0 and group-writable, so a pod running with an **arbitrary UID** plus the root supplementary group (the OpenShift default) can write with no `chown`.
 
-**TrueNAS Scale (and other "foreign UID" setups)** — TrueNAS runs apps as a non-root user (often `568:568`) and mounts host datasets owned by a different user, so neither the entrypoint nor `fsGroup` makes them writable on its own. Choose one:
+**TrueNAS Scale (and other "foreign UID" setups)**: TrueNAS runs apps as a non-root user (often `568:568`) and mounts host datasets owned by a different user, so neither the entrypoint nor `fsGroup` makes them writable on its own. Choose one:
 
-- **Run the app as root** (recommended) — leave the app's user unset or set it to `0`, and let the default entrypoint fix permissions and drop to `snapotter`.
-- **Run as UID `999`** — set the app's user/group to `999:999` (SnapOtter's built-in `snapotter` user) so it matches the image's ownership.
+- **Run the app as root** (recommended): leave the app's user unset or set it to `0`, and let the default entrypoint fix permissions and drop to `snapotter`.
+- **Run as UID `999`**: set the app's user/group to `999:999` (SnapOtter's built-in `snapotter` user) so it matches the image's ownership.
 - **`chown` the host dataset** to the UID the container runs as, from the TrueNAS shell:
 
   ```bash

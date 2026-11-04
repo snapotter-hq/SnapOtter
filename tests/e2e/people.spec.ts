@@ -13,12 +13,12 @@ async function getAuthToken(): Promise<string> {
   return data.token;
 }
 
-/** Auth header only — for GET and DELETE (no body). */
+/** Auth header only: for GET and DELETE (no body). */
 function authOnly(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }
 
-/** Auth + JSON content-type — for POST/PUT with body. */
+/** Auth + JSON content-type: for POST/PUT with body. */
 function authJson(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
@@ -46,13 +46,13 @@ async function ensureTeam(token: string, name: string) {
     headers: authJson(token),
     body: JSON.stringify({ name }),
   });
-  // 201 = created, 409 = already exists — both are fine
+  // 201 = created, 409 = already exists, both are fine
   if (res.status !== 201 && res.status !== 409) {
     throw new Error(`Failed to ensure team "${name}": ${res.status}`);
   }
 }
 
-base.describe("People Management — API", () => {
+base.describe("People Management: API", () => {
   let token: string;
 
   base.beforeAll(async () => {
@@ -316,12 +316,12 @@ base.describe("People Management — API", () => {
     const res = await fetch(`${API}/api/auth/users`, {
       headers: authOnly(userToken),
     });
-    // 403 — MUST_CHANGE_PASSWORD blocks non-auth API calls
+    // 403: MUST_CHANGE_PASSWORD blocks non-auth API calls
     expect(res.status).toBe(403);
   });
 });
 
-uiTest.describe("People Management — UI", () => {
+uiTest.describe("People Management: UI", () => {
   uiTest("People section displays user count and table", async ({ loggedInPage: page }) => {
     await openSettings(page);
     await page.getByRole("button", { name: /people/i }).click();

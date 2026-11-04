@@ -11521,7 +11521,7 @@ paths:
       tags:
         - PDF
       summary: PDF 多功能工具
-      description: 根据明确的页面计划组装 PDF——重新排序、复制、旋转或删除页面，并在一个提交中从额外的 PDF 中提取页面。
+      description: 根据明确的页面计划组装 PDF，重新排序、复制、旋转或删除页面，并在一个提交中从额外的 PDF 中提取页面。
       security:
         - bearerAuth: []
       requestBody:

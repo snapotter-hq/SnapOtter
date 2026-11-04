@@ -74,7 +74,7 @@ describe("Corrupted and truncated images", () => {
       { name: "settings", content: JSON.stringify({ width: 100 }) },
     ]);
 
-    // Should fail gracefully — 400 (validation) or 422 (processing)
+    // Should fail gracefully: 400 (validation) or 422 (processing)
     expect([400, 422]).toContain(res.statusCode);
     const json = JSON.parse(res.body);
     expect(json.error).toBeDefined();
@@ -176,7 +176,7 @@ describe("Invalid dimensions in settings", () => {
       { name: "settings", content: JSON.stringify({ width: 1.5 }) },
     ]);
 
-    // Zod allows floats through z.number().positive() — Sharp will round
+    // Zod allows floats through z.number().positive(), Sharp will round
     // Should succeed or get rejected by Zod, but not crash
     expect([200, 400, 422]).toContain(res.statusCode);
   });
@@ -207,7 +207,7 @@ describe("Injection attacks in text fields", () => {
       },
     ]);
 
-    // Text overlay should process normally — SQL injection is in SVG text
+    // Text overlay should process normally, SQL injection is in SVG text
     expect(res.statusCode).toBe(200);
 
     // Verify the database is still intact by making an auth request
@@ -357,7 +357,7 @@ describe("Zero-byte and empty file uploads (adversarial)", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // WRONG MAGIC BYTES (PNG DATA WITH .jpg EXTENSION AND image/jpeg CONTENT TYPE)
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Wrong magic bytes — format mismatch", () => {
+describe("Wrong magic bytes: format mismatch", () => {
   it("handles PNG data uploaded as JPEG content type gracefully", async () => {
     const res = await postTool("resize", [
       {
@@ -369,7 +369,7 @@ describe("Wrong magic bytes — format mismatch", () => {
       { name: "settings", content: JSON.stringify({ width: 100 }) },
     ]);
 
-    // Sharp detects via magic bytes, not content-type — should succeed
+    // Sharp detects via magic bytes, not content-type, should succeed
     expect(res.statusCode).toBe(200);
   });
 
@@ -388,7 +388,7 @@ describe("Wrong magic bytes — format mismatch", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TRUNCATED FILES — PARTIAL IMAGE DATA
+// TRUNCATED FILES: PARTIAL IMAGE DATA
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Truncated files", () => {
   it("handles first 50 bytes of a valid JPEG gracefully", async () => {
@@ -429,7 +429,7 @@ describe("Truncated files", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BINARY GARBAGE DATA — VARIOUS SIZES
+// BINARY GARBAGE DATA: VARIOUS SIZES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Binary garbage data at various sizes", () => {
   it("rejects 1 byte of garbage", async () => {
@@ -499,7 +499,7 @@ describe("Extreme dimension requests", () => {
       { name: "settings", content: JSON.stringify({ left: 0, top: 0, width: 9999, height: 9999 }) },
     ]);
 
-    // Crop extends beyond image — Sharp will fail, should return 422
+    // Crop extends beyond image, Sharp will fail, should return 422
     expect([400, 422]).toContain(res.statusCode);
   });
 
@@ -517,7 +517,7 @@ describe("Extreme dimension requests", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AUTH — UNAUTHENTICATED ACCESS
+// AUTH: UNAUTHENTICATED ACCESS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Unauthenticated tool access", () => {
   it("rejects tool requests without auth token", async () => {

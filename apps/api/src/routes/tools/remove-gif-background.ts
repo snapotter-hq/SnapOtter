@@ -120,7 +120,7 @@ const pipelineSettingsSchema = settingsShape
   .superRefine(requireBackgroundColors);
 
 // The worker also receives the staged background-image storage key (never
-// persisted to the audit row — passed via dbSettings redaction on enqueue).
+// persisted to the audit row, passed via dbSettings redaction on enqueue).
 const jobSettingsSchema = settingsShape
   .extend({ bgImageKey: z.string().optional() })
   .superRefine(requireBackgroundColors);

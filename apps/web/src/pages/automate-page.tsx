@@ -1136,7 +1136,7 @@ function AutomatePageContent({
   return (
     <AppLayout>
       <div className="flex h-full w-full overflow-hidden">
-        {/* LEFT PANE — Tool Palette */}
+        {/* LEFT PANE: Tool Palette */}
         <div className="w-72 border-r border-border flex flex-col shrink-0">
           {/* Palette header */}
           <div className="flex items-center gap-3 p-4 border-b border-border shrink-0">
@@ -1285,7 +1285,7 @@ function AutomatePageContent({
           </div>
         </div>
 
-        {/* RIGHT PANE — Pipeline Canvas + Preview */}
+        {/* RIGHT PANE: Pipeline Canvas + Preview */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Canvas header */}
           <div className="flex items-center gap-3 px-5 py-3 border-b border-border shrink-0">

@@ -92,6 +92,6 @@ Błędy przetwarzania są przekazywane w polu `error` końcowego zdarzenia `fail
 - Pomyślne końcowe `result` zawiera zarówno wyodrębniony tekst w `text`, jak i artefakt `.txt` do pobrania w `downloadUrl`.
 - SnapOtter honoruje wyraźnie żądany poziom. Jeśli `balanced` lub `best` jest niedostępne, API zwraca `501` z `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE`; nigdy po cichu nie obniża poziomu żądania do innego poziomu.
 - Pomyślny pusty wynik pozostaje pustym wynikiem. Błędy w czasie wykonywania zwracają błąd zamiast ponawiania próby z aparatem o niższej jakości.
-— Pomyślne końcowe `result` podaje zarówno `requestedQuality`, jak i `actualQuality`, a także wersję silnika, urządzenia, dostawcy, środowiska wykonawczego i modelu oraz wszelkie ostrzeżenia.
+Pomyślne końcowe `result` podaje zarówno `requestedQuality`, jak i `actualQuality`, a także wersję silnika, urządzenia, dostawcy, środowiska wykonawczego i modelu oraz wszelkie ostrzeżenia.
 - Obsługuje formaty wejściowe HEIC/HEIF, RAW, TGA, PSD, EXR i HDR poprzez automatyczne dekodowanie.
 - Ponadwymiarowe zakodowane wejścia zwracają `413`. Obrazy o rozdzielczości powyżej 40 megapikseli i odpowiedzi OCR przekraczające ograniczone limity wyjściowe są odrzucane zamiast częściowo przetwarzane.

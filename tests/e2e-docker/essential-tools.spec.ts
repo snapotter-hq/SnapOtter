@@ -704,9 +704,9 @@ test.describe("Sharpening", () => {
   });
 });
 
-// ─── Resize — Additional Scenarios ──────────────────────────────────
+// ─── Resize: Additional Scenarios ──────────────────────────────────
 
-test.describe("Resize — additional", () => {
+test.describe("Resize: additional", () => {
   test("resize with fit=inside constrains within bounds", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/resize", {
       headers: { Authorization: `Bearer ${token}` },
@@ -762,9 +762,9 @@ test.describe("Resize — additional", () => {
   });
 });
 
-// ─── Crop — Additional Scenarios ────────────────────────────────────
+// ─── Crop: Additional Scenarios ────────────────────────────────────
 
-test.describe("Crop — additional", () => {
+test.describe("Crop: additional", () => {
   test("crop HEIC image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
@@ -808,9 +808,9 @@ test.describe("Crop — additional", () => {
   });
 });
 
-// ─── Rotate — Additional Scenarios ──────────────────────────────────
+// ─── Rotate: Additional Scenarios ──────────────────────────────────
 
-test.describe("Rotate — additional", () => {
+test.describe("Rotate: additional", () => {
   test("rotate HEIC image 90 degrees", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/rotate", {
       headers: { Authorization: `Bearer ${token}` },
@@ -839,9 +839,9 @@ test.describe("Rotate — additional", () => {
   });
 });
 
-// ─── Compress — Additional Scenarios ────────────────────────────────
+// ─── Compress: Additional Scenarios ────────────────────────────────
 
-test.describe("Compress — additional", () => {
+test.describe("Compress: additional", () => {
   test("compress HEIC image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/compress", {
       headers: { Authorization: `Bearer ${token}` },
@@ -884,9 +884,9 @@ test.describe("Compress — additional", () => {
   });
 });
 
-// ─── Convert — Output Verification ─────────────────────────────────
+// ─── Convert: Output Verification ─────────────────────────────────
 
-test.describe("Convert — output verification", () => {
+test.describe("Convert: output verification", () => {
   test("converted file can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/convert", {
       headers: { Authorization: `Bearer ${token}` },
@@ -923,9 +923,9 @@ test.describe("Convert — output verification", () => {
   });
 });
 
-// ─── Metadata — Additional Scenarios ────────────────────────────────
+// ─── Metadata: Additional Scenarios ────────────────────────────────
 
-test.describe("Metadata — additional", () => {
+test.describe("Metadata: additional", () => {
   test("returns metadata for SVG image", async ({ request }) => {
     const svg = readFileSync(join(FIXTURES, "test-100x100.svg"));
     const res = await request.post("/api/v1/tools/image/info", {

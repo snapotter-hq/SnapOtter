@@ -246,7 +246,7 @@ test.describe("Upscale", () => {
       test.skip();
       return;
     }
-    // 4x upscale on a tiny image may fail with processing error — accept both
+    // 4x upscale on a tiny image may fail with processing error, accept both
     if (result.ok) {
       expect(result.body.downloadUrl).toBeTruthy();
     } else {
@@ -276,7 +276,7 @@ test.describe("Upscale", () => {
       test.skip();
       return;
     }
-    // RealESRGAN may fail on very small images — accept both success and error
+    // RealESRGAN may fail on very small images, accept both success and error
     if (result.ok) {
       expect(result.body.downloadUrl).toBeTruthy();
     } else {
@@ -645,7 +645,7 @@ test.describe("Noise Removal", () => {
       test.skip();
       return;
     }
-    // NAFNet may fail on very small images — accept both success and error
+    // NAFNet may fail on very small images, accept both success and error
     if (result.ok) {
       expect(result.body.downloadUrl).toBeTruthy();
     } else {
@@ -793,11 +793,11 @@ test.describe("Erase Object", () => {
     if (!result.installed) {
       expect(result.body.feature).toBe("object-eraser-colorize");
       expect(result.body.code).toBe("FEATURE_NOT_INSTALLED");
-      // This is the expected state — erase-object needs a mask and LaMa model
+      // This is the expected state, erase-object needs a mask and LaMa model
       return;
     }
     // If installed, it may fail because no mask was provided
-    // That's still a valid test — we're checking the tool doesn't crash
+    // That's still a valid test, we're checking the tool doesn't crash
     expect(typeof result.body.error === "string" || result.body.downloadUrl).toBeTruthy();
   });
 });
@@ -1006,9 +1006,9 @@ test.describe("Transparency Fixer", () => {
   });
 });
 
-// ─── Smart Crop — Additional ──────────────────────────────────────
+// ─── Smart Crop: Additional ──────────────────────────────────────
 
-test.describe("Smart Crop — additional", () => {
+test.describe("Smart Crop: additional", () => {
   test("smart crop with square output", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
     const result = await callAiTool(
@@ -1046,9 +1046,9 @@ test.describe("Smart Crop — additional", () => {
   });
 });
 
-// ─── Colorize — Additional ───────────────────────────────────────
+// ─── Colorize: Additional ───────────────────────────────────────
 
-test.describe("Colorize — additional", () => {
+test.describe("Colorize: additional", () => {
   test("colorize with auto model", async ({ request }) => {
     const bwPortrait = contentFixture("portrait-bw.jpeg");
     const result = await callAiTool(

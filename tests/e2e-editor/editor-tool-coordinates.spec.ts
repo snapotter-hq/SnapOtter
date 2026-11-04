@@ -2,7 +2,7 @@ import { expect, loadTestImage, test } from "./helpers";
 
 // Regression coverage for issue #259: editor pixel tools captured the document
 // *through* the stage's zoom/pan transform (`stage.toCanvas`), so they read and
-// wrote the wrong pixels — the paint bucket produced a misplaced rectangle
+// wrote the wrong pixels, the paint bucket produced a misplaced rectangle
 // instead of flood-filling the clicked region, the eyedropper sampled the wrong
 // colour, etc. The shared `captureDocumentCanvas` helper now normalizes the
 // transform before capturing.
@@ -49,7 +49,7 @@ test.describe("Editor tool coordinates (issue #259)", () => {
     );
 
     expect(pixel).not.toBeNull();
-    expect(pixel?.a ?? 0).toBeGreaterThan(200); // opaque — the seed was filled
+    expect(pixel?.a ?? 0).toBeGreaterThan(200); // opaque: the seed was filled
     expect(pixel?.r ?? 255).toBeLessThan(50);
     expect(pixel?.g ?? 255).toBeLessThan(50);
     expect(pixel?.b ?? 255).toBeLessThan(50);

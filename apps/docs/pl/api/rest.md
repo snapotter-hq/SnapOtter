@@ -537,7 +537,7 @@ Aby automatycznie zapisać wynik narzędzia w bibliotece, dołącz `fileId` jako
 
 ## Ustawienia {#settings}
 
-Konfiguracja środowiska uruchomieniowego używa zamkniętego zbioru rozpoznawanych kluczy. Odczyt wymaga uprawnienia `settings:read`, a zapis — `settings:write`; klucze zabezpieczeń i zgodności dodatkowo wymagają uprawnienia `security:manage` lub `compliance:manage`. Ustawienia tajne wymagają uprawnień pełnego administratora, natomiast poświadczenia i stan zarządzane przez dedykowane punkty końcowe są tutaj tylko do odczytu. Aktualizacje zbiorcze są weryfikowane przed zapisaniem jakiejkolwiek wartości.
+Konfiguracja środowiska uruchomieniowego używa zamkniętego zbioru rozpoznawanych kluczy. Odczyt wymaga uprawnienia `settings:read`, a zapis, `settings:write`; klucze zabezpieczeń i zgodności dodatkowo wymagają uprawnienia `security:manage` lub `compliance:manage`. Ustawienia tajne wymagają uprawnień pełnego administratora, natomiast poświadczenia i stan zarządzane przez dedykowane punkty końcowe są tutaj tylko do odczytu. Aktualizacje zbiorcze są weryfikowane przed zapisaniem jakiejkolwiek wartości.
 
 | Metoda | Ścieżka | Opis |
 |--------|------|-------------|

@@ -5284,7 +5284,7 @@ export const uk: TranslationKeys = {
       apiRefLink: "Довідник API (Swagger)",
       licenseLabel: "Ліцензія:",
       licenseDescription:
-        "SnapOtter — програмне забезпечення з відкритим кодом, ліцензоване за GNU Affero General Public License v3 (AGPLv3).",
+        "SnapOtter: програмне забезпечення з відкритим кодом, ліцензоване за GNU Affero General Public License v3 (AGPLv3).",
     },
   },
   auth: {

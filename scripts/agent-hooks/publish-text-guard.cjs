@@ -20,7 +20,7 @@ const OUTWARD_KINDS = new Set([
 ]);
 const BODY_FLAGS = new Set(["-F", "--file", "--body-file"]);
 const SESSION_LINK = /Claude-Session:|claude\.ai\/code\/session/i;
-const EM_DASH = /—/;
+const EM_DASH = /\u2014/;
 
 function kindOf(tokens) {
   if (gitSubcommand(tokens) === "commit") return "git commit";

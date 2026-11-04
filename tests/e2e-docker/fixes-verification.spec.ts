@@ -23,7 +23,7 @@ async function waitForProcessingDone(page: Page, timeoutMs = 120_000): Promise<v
       await spinner.waitFor({ state: "hidden", timeout: timeoutMs });
     }
   } catch {
-    // No spinner — processing may have been instant
+    // No spinner: processing may have been instant
   }
   await page.waitForTimeout(500);
 }
@@ -101,7 +101,7 @@ test.describe("Image-to-PDF", () => {
   test("single image converts to PDF without auth error", async ({ page }) => {
     await page.goto("/image-to-pdf");
 
-    // image-to-pdf has its own upload UI — use the Upload button
+    // image-to-pdf has its own upload UI, use the Upload button
     const fileChooserPromise = page.waitForEvent("filechooser");
     await page.getByText("Upload from computer").click();
     const fileChooser = await fileChooserPromise;
@@ -306,7 +306,7 @@ test.describe("Passport photo", () => {
       await analyzeSpinner.waitFor({ state: "hidden", timeout: 180_000 });
     }
 
-    // Face detection should succeed — look for the Generate button
+    // Face detection should succeed, look for the Generate button
     const generateBtn = page.getByRole("button", { name: /generate|create/i });
     const analyzeError = page.locator("p.text-destructive-ink, .text-red-500");
     const gotButton = await generateBtn.isVisible({ timeout: 10_000 }).catch(() => false);

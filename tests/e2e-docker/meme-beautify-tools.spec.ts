@@ -65,9 +65,9 @@ const JPG_100x100 = fixture("test-100x100.jpg");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const JPG_SAMPLE = formatFixture("sample.jpg");
 
-// ─── Meme Generator — Custom Image ───────────────────────────────
+// ─── Meme Generator: Custom Image ───────────────────────────────
 
-test.describe("Meme Generator — custom image", () => {
+test.describe("Meme Generator: custom image", () => {
   test("meme with top-bottom text layout", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/meme-generator", {
       headers: { Authorization: `Bearer ${token}` },
@@ -215,9 +215,9 @@ test.describe("Meme Generator — custom image", () => {
   });
 });
 
-// ─── Meme Generator — Template Mode ─────────────────────────────
+// ─── Meme Generator: Template Mode ─────────────────────────────
 
-test.describe("Meme Generator — template mode", () => {
+test.describe("Meme Generator: template mode", () => {
   test("meme with template ID (JSON body)", async ({ request }) => {
     // First, fetch the available templates to find a valid ID
     // Use a well-known template if available, otherwise skip
@@ -256,9 +256,9 @@ test.describe("Meme Generator — template mode", () => {
   });
 });
 
-// ─── Beautify — Basic Scenarios ──────────────────────────────────
+// ─── Beautify: Basic Scenarios ──────────────────────────────────
 
-test.describe("Beautify — basic", () => {
+test.describe("Beautify: basic", () => {
   test("beautify with default settings", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -352,9 +352,9 @@ test.describe("Beautify — basic", () => {
   });
 });
 
-// ─── Beautify — Shadow Presets ──────────────────────────────────
+// ─── Beautify: Shadow Presets ──────────────────────────────────
 
-test.describe("Beautify — shadows", () => {
+test.describe("Beautify: shadows", () => {
   test("beautify with subtle shadow", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -404,9 +404,9 @@ test.describe("Beautify — shadows", () => {
   });
 });
 
-// ─── Beautify — Frames ──────────────────────────────────────────
+// ─── Beautify: Frames ──────────────────────────────────────────
 
-test.describe("Beautify — frames", () => {
+test.describe("Beautify: frames", () => {
   test("beautify with macOS light frame", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -478,9 +478,9 @@ test.describe("Beautify — frames", () => {
   });
 });
 
-// ─── Beautify — Social Presets ──────────────────────────────────
+// ─── Beautify: Social Presets ──────────────────────────────────
 
-test.describe("Beautify — social presets", () => {
+test.describe("Beautify: social presets", () => {
   test("beautify for Twitter", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -532,9 +532,9 @@ test.describe("Beautify — social presets", () => {
   });
 });
 
-// ─── Beautify — Watermark ───────────────────────────────────────
+// ─── Beautify: Watermark ───────────────────────────────────────
 
-test.describe("Beautify — watermark", () => {
+test.describe("Beautify: watermark", () => {
   test("beautify with watermark text", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -572,9 +572,9 @@ test.describe("Beautify — watermark", () => {
   });
 });
 
-// ─── Beautify — Output Formats ──────────────────────────────────
+// ─── Beautify: Output Formats ──────────────────────────────────
 
-test.describe("Beautify — output formats", () => {
+test.describe("Beautify: output formats", () => {
   test("beautify with JPEG output", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },
@@ -629,9 +629,9 @@ test.describe("Beautify — output formats", () => {
   });
 });
 
-// ─── Beautify — Background Image ────────────────────────────────
+// ─── Beautify: Background Image ────────────────────────────────
 
-test.describe("Beautify — background image", () => {
+test.describe("Beautify: background image", () => {
   test("beautify with custom background image", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -665,9 +665,9 @@ test.describe("Beautify — background image", () => {
   });
 });
 
-// ─── Beautify — Validation ──────────────────────────────────────
+// ─── Beautify: Validation ──────────────────────────────────────
 
-test.describe("Beautify — validation", () => {
+test.describe("Beautify: validation", () => {
   test("beautify rejects request with no file", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/beautify", {
       headers: { Authorization: `Bearer ${token}` },

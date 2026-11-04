@@ -71,7 +71,7 @@ describe("register route escalation", () => {
     expect(JSON.parse(res.body).role).toBe("user");
   });
 
-  it("4. editor cannot register anyone (403 — lacks users:manage)", async () => {
+  it("4. editor cannot register anyone (403: lacks users:manage)", async () => {
     await registerUser(adminToken, `edt_${ts}_4`, "editor");
     const editorToken = await loginAs(`edt_${ts}_4`);
 
@@ -79,7 +79,7 @@ describe("register route escalation", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("5. user cannot register anyone (403 — lacks users:manage)", async () => {
+  it("5. user cannot register anyone (403: lacks users:manage)", async () => {
     await registerUser(adminToken, `usr_${ts}_5`, "user");
     const userToken = await loginAs(`usr_${ts}_5`);
 
@@ -185,7 +185,7 @@ describe("update user role escalation", () => {
     //
     // Simpler approach: demote every admin except the original to non-admin
     // via DB, then verify self-demote blocks the last admin.  SELF_DEMOTE
-    // fires first in the code, which is correct — both guards protect the
+    // fires first in the code, which is correct, both guards protect the
     // last admin.
 
     const sessionRes = await testApp.app.inject({
@@ -215,7 +215,7 @@ describe("update user role escalation", () => {
     expect(admins.length).toBe(1);
 
     // Attempt to demote the sole admin (self-demote fires first, which is
-    // the correct behavior — the last admin is protected)
+    // the correct behavior: the last admin is protected)
     const res = await testApp.app.inject({
       method: "PUT",
       url: `/api/auth/users/${originalAdminId}`,

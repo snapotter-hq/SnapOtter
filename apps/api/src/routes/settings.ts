@@ -1,9 +1,9 @@
 /**
  * Application settings routes (key-value store).
  *
- * GET  /api/v1/settings      — Get all settings as a key-value object
- * PUT  /api/v1/settings      — Save settings (admin only)
- * GET  /api/v1/settings/:key — Get a specific setting
+ * GET  /api/v1/settings: Get all settings as a key-value object
+ * PUT  /api/v1/settings: Save settings (admin only)
+ * GET  /api/v1/settings/:key: Get a specific setting
  */
 
 import { SafeError } from "@snapotter/shared";
@@ -83,7 +83,7 @@ async function decryptIfNeeded(
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
-  // GET /api/v1/settings — Get all settings as a key-value object
+  // GET /api/v1/settings: Get all settings as a key-value object
   app.get(
     "/api/v1/settings",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
@@ -113,7 +113,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // PUT /api/v1/settings — Save settings (admin only)
+  // PUT /api/v1/settings: Save settings (admin only)
   const updateSettings = async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
     if (!admin) return;
@@ -302,7 +302,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     updateSettings,
   );
 
-  // GET /api/v1/settings/:key — Get a specific setting
+  // GET /api/v1/settings/:key: Get a specific setting
   app.get(
     "/api/v1/settings/:key",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },

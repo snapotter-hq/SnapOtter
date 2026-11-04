@@ -850,7 +850,7 @@ describe("API lib", () => {
 // useAuth security
 // ==========================================================================
 
-describe("useAuth security — network error", () => {
+describe("useAuth security: network error", () => {
   beforeEach(() => {
     fetchMock.mockReset();
   });
@@ -866,7 +866,7 @@ describe("useAuth security — network error", () => {
     // Flush the async checkAuth() call
     await act(async () => {});
 
-    // loading stays true — setState was never called
+    // loading stays true: setState was never called
     expect(result.current.loading).toBe(true);
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.role).toBeNull();

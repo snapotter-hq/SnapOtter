@@ -11,7 +11,7 @@ import {
 } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
-// login() — fill the login form and submit (for tests that need fresh login)
+// login(): fill the login form and submit (for tests that need fresh login)
 // ---------------------------------------------------------------------------
 export async function login(page: Page, username = "admin", password = "admin") {
   await page.goto("/login");
@@ -22,7 +22,7 @@ export async function login(page: Page, username = "admin", password = "admin") 
 }
 
 // ---------------------------------------------------------------------------
-// createTestImageFile() — create a small test PNG on disk and return its path
+// createTestImageFile(): create a small test PNG on disk and return its path
 // ---------------------------------------------------------------------------
 let _testImagePath: string | null = null;
 
@@ -112,14 +112,14 @@ export function getTestImagePath(): string {
 }
 
 // ---------------------------------------------------------------------------
-// getTestHeicPath() — return a small HEIC test image (from fixtures)
+// getTestHeicPath(): return a small HEIC test image (from fixtures)
 // ---------------------------------------------------------------------------
 export function getTestHeicPath(): string {
   return path.join(process.cwd(), "tests", "fixtures", "image", "valid", "test-200x150.heic");
 }
 
 // ---------------------------------------------------------------------------
-// uploadTestImage() — upload a test image via the file chooser on a tool page
+// uploadTestImage(): upload a test image via the file chooser on a tool page
 // ---------------------------------------------------------------------------
 export async function uploadTestImage(page: Page): Promise<void> {
   const testImagePath = getTestImagePath();
@@ -143,7 +143,7 @@ export async function uploadTestImage(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// mockAiFeaturesInstalled() — make AI-tool bundles report as installed.
+// mockAiFeaturesInstalled(): make AI-tool bundles report as installed.
 //
 // AI tools (erase-object, upscale, ...) render a FeatureInstallPrompt instead of
 // the tool UI when their bundle is missing, so their e2e specs otherwise skip in
@@ -180,7 +180,7 @@ export async function mockAiFeaturesInstalled(
 }
 
 // ---------------------------------------------------------------------------
-// waitForProcessing() — wait for processing to complete
+// waitForProcessing(): wait for processing to complete
 // ---------------------------------------------------------------------------
 export async function waitForProcessing(page: Page, timeoutMs = 30_000) {
   try {
@@ -189,17 +189,17 @@ export async function waitForProcessing(page: Page, timeoutMs = 30_000) {
       await spinner.waitFor({ state: "hidden", timeout: timeoutMs });
     }
   } catch {
-    // No spinner appeared — processing may have been instant
+    // No spinner appeared: processing may have been instant
   }
 }
 
 // ---------------------------------------------------------------------------
-// Custom test fixture — loggedInPage uses the saved storageState
+// Custom test fixture: loggedInPage uses the saved storageState
 // (all "chromium" project tests already have auth via storageState,
 //  but this provides backward compatibility for tests that use it)
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// putSettings() — write system settings through the API using the page's
+// putSettings(): write system settings through the API using the page's
 // bearer token (the app stores it in localStorage, so page.request alone
 // sends no auth).
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ export async function putPreferences(
 }
 
 /**
- * expectNoPinnedSection() — call right before a screenshot of the home page.
+ * expectNoPinnedSection(): call right before a screenshot of the home page.
  * Every spec shares one admin, and pinned tools are a server-side preference
  * of that admin, so a pin left by another spec puts a Pinned section in the
  * shot (#1706). This names that cause instead of leaving a bare pixel diff.
@@ -253,7 +253,7 @@ export async function expectNoPinnedSection(page: Page): Promise<void> {
 }
 
 /**
- * changePasswordViaApi() — revert a password change without driving the UI.
+ * changePasswordViaApi(): revert a password change without driving the UI.
  * The current session token survives a password change (the API only revokes
  * other sessions), so tests that successfully change the admin password MUST
  * call this to restore it before finishing.
@@ -290,7 +290,7 @@ export const test = base.extend<{ loggedInPage: Page }>({
 });
 
 // ---------------------------------------------------------------------------
-// isAiSidecarRunning() — check if the Python AI dispatcher is ready
+// isAiSidecarRunning(): check if the Python AI dispatcher is ready
 // ---------------------------------------------------------------------------
 export async function isAiSidecarRunning(page: Page): Promise<boolean> {
   try {
@@ -306,7 +306,7 @@ export async function isAiSidecarRunning(page: Page): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// openSettings() — reliably open the Settings dialog across all viewports
+// openSettings(): reliably open the Settings dialog across all viewports
 // ---------------------------------------------------------------------------
 export async function openSettings(page: Page): Promise<void> {
   // 2.0 removed the desktop sidebar. Settings now opens from the mobile bottom

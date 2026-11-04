@@ -9,16 +9,16 @@ import { useEditorStore } from "@/stores/editor-store";
  *
  * The Stage carries the editor's zoom/pan as a transform (scaleX/scaleY/x/y).
  * `stage.toCanvas()` bakes that transform into its output, so the naive
- * `stage.toCanvas({ x: 0, y: 0, width, height })` returns the *viewport* — the
+ * `stage.toCanvas({ x: 0, y: 0, width, height })` returns the *viewport* (the
  * document scaled and offset by the current zoom/pan, clipped to the on-screen
- * stage size — instead of the document in its own coordinate space (issue
+ * stage size) instead of the document in its own coordinate space (issue
  * #259). Every pixel tool (fill, magic wand, clone stamp, eyedropper,
  * dodge/burn, blur/sharpen/smudge) and the exporter need the document pixels,
  * so we temporarily normalize the stage to the document size with an identity
  * transform, render, capture, then restore.
  *
  * This runs synchronously inside the calling event handler, so the browser
- * never paints the intermediate (resized) state — there is no visible flicker.
+ * never paints the intermediate (resized) state; there is no visible flicker.
  * The stage is always restored, even if the capture throws.
  */
 export function captureDocumentCanvas(

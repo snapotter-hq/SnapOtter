@@ -18,7 +18,7 @@ i18n_output_hash: c4ebc858c103
 | Параметр | Тип | Обов’язковий | За замовчуванням | Опис |
 |-----------|------|----------|---------|-------------|
 | direction | string | Ні | `"horizontal"` | Напрямок компонування: `horizontal`, `vertical`, `grid` |
-| gridColumns | integer | Ні | 2 | Кількість стовпців, коли напрямок — `grid` (від 2 до 100) |
+| gridColumns | integer | Ні | 2 | Кількість стовпців, коли напрямок, `grid` (від 2 до 100) |
 | resizeMode | string | Ні | `"fit"` | Як зображення змінюють розмір: `fit`, `original`, `stretch`, `crop` |
 | alignment | string | Ні | `"center"` | Вирівнювання поперечної осі: `start`, `center`, `end` |
 | gap | number | Ні | 0 | Проміжок між зображеннями у пікселях (від 0 до 1000) |

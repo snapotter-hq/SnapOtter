@@ -245,7 +245,7 @@ describe("ZIP response format", () => {
 // ── Filename deduplication ──────────────────────────────────────
 describe("Filename deduplication in batch", () => {
   it("deduplicates identical output filenames", async () => {
-    // Upload two files with the same name — output names should be deduped
+    // Upload two files with the same name, output names should be deduped
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "same.png", contentType: "image/png", content: PNG },
       { name: "file", filename: "same.png", contentType: "image/png", content: PNG },

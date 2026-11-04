@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # PDF Multi-Tool {#multi-tool-pdf}
 
-Złóż plik PDF z jawnego planu stron: zmień kolejność, duplikuj, obróć lub usuń strony oraz pobierz strony z dodatkowych plików PDF — wszystko w jednym żądaniu.
+Złóż plik PDF z jawnego planu stron: zmień kolejność, duplikuj, obróć lub usuń strony oraz pobierz strony z dodatkowych plików PDF, wszystko w jednym żądaniu.
 
 ## Punkt końcowy API {#api-endpoint}
 

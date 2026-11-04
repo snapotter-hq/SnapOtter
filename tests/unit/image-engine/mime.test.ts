@@ -2,7 +2,7 @@ import { extToMime, formatToExt, formatToMime, mimeToExt } from "@snapotter/imag
 import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
-// extToMime — file extension to MIME type
+// extToMime: file extension to MIME type
 // ---------------------------------------------------------------------------
 describe("extToMime", () => {
   const cases: Array<[string, string]> = [
@@ -55,7 +55,7 @@ describe("extToMime", () => {
 });
 
 // ---------------------------------------------------------------------------
-// mimeToExt — MIME type to file extension
+// mimeToExt: MIME type to file extension
 // ---------------------------------------------------------------------------
 describe("mimeToExt", () => {
   const cases: Array<[string, string]> = [
@@ -102,7 +102,7 @@ describe("mimeToExt", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatToMime — Sharp format string to MIME type
+// formatToMime: Sharp format string to MIME type
 // ---------------------------------------------------------------------------
 describe("formatToMime", () => {
   it("maps 'jpeg' (Sharp format) to 'image/jpeg'", () => {
@@ -139,7 +139,7 @@ describe("formatToMime", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatToExt — Sharp format string to file extension
+// formatToExt: Sharp format string to file extension
 // ---------------------------------------------------------------------------
 describe("formatToExt", () => {
   it("maps 'jpeg' to 'jpg'", () => {

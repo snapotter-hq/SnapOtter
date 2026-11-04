@@ -100,7 +100,7 @@ export const updateRoleSchema = z.object({
 });
 
 export async function rolesRoutes(app: FastifyInstance): Promise<void> {
-  // GET /api/v1/roles — List all roles (requires audit:read to view)
+  // GET /api/v1/roles: List all roles (requires audit:read to view)
   app.get("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("audit:read")(request, reply);
     if (!user) return;
@@ -131,7 +131,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // POST /api/v1/roles — Create custom role
+  // POST /api/v1/roles: Create custom role
   app.post("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("security:manage")(request, reply);
     if (!user) return;
@@ -200,7 +200,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // PUT /api/v1/roles/:id — Update custom role
+  // PUT /api/v1/roles/:id: Update custom role
   app.put(
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -382,7 +382,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // DELETE /api/v1/roles/:id — Delete custom role
+  // DELETE /api/v1/roles/:id: Delete custom role
   app.delete(
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {

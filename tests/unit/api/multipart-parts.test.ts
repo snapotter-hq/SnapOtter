@@ -244,7 +244,7 @@ describe("multipartParts", () => {
 
   it("never leaves an over-limit file stream with zero error listeners", async () => {
     // env.MAX_UPLOAD_SIZE_MB is "10" for all vitest runs (vitest.config.ts), so
-    // busboy's fileSize limit is 10MB here — same as production with that setting.
+    // busboy's fileSize limit is 10MB here, same as production with that setting.
     // A caller that inspects a part but doesn't immediately drain it (e.g. a
     // route that rejects on some other check first, such as wrong file type)
     // must not leave the file stream's eventual "limit" -> destroy(error) as an
@@ -257,7 +257,7 @@ describe("multipartParts", () => {
     const { value: part } = await generator.next();
     if (part?.type !== "file") throw new Error("expected a file part");
 
-    // Deliberately do NOT drain part.file here — this is the abandoned-stream
+    // Deliberately do NOT drain part.file here, this is the abandoned-stream
     // scenario. The stream must already be safe against an unhandled "limit"
     // error the moment it's handed to the caller, not only once something
     // starts reading it.

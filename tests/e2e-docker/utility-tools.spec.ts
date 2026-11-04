@@ -306,7 +306,7 @@ test.describe("Find Duplicates", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
 
-    // Visually distinct images — zero duplicate groups
+    // Visually distinct images: zero duplicate groups
     expect(json.duplicateGroups).toBeInstanceOf(Array);
     expect(json.duplicateGroups.length).toBe(0);
   });
@@ -759,9 +759,9 @@ test.describe("QR Read", () => {
   });
 });
 
-// ─── Compare — Additional ──────────────────────────────────────
+// ─── Compare: Additional ──────────────────────────────────────
 
-test.describe("Compare — additional", () => {
+test.describe("Compare: additional", () => {
   test("compare HEIC and PNG images", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -800,9 +800,9 @@ test.describe("Compare — additional", () => {
   });
 });
 
-// ─── Find Duplicates — Additional ─────────────────────────────
+// ─── Find Duplicates: Additional ─────────────────────────────
 
-test.describe("Find Duplicates — additional", () => {
+test.describe("Find Duplicates: additional", () => {
   test("find duplicates with 4 files (2 pairs)", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -843,9 +843,9 @@ test.describe("Find Duplicates — additional", () => {
   });
 });
 
-// ─── QR Generate — Output Verification ─────────────────────────
+// ─── QR Generate: Output Verification ─────────────────────────
 
-test.describe("QR Generate — output verification", () => {
+test.describe("QR Generate: output verification", () => {
   test("QR code image can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/qr-generate", {
       headers: { Authorization: `Bearer ${token}` },
@@ -885,9 +885,9 @@ test.describe("QR Generate — output verification", () => {
   });
 });
 
-// ─── Color Palette — Additional ────────────────────────────────
+// ─── Color Palette: Additional ────────────────────────────────
 
-test.describe("Color Palette — additional", () => {
+test.describe("Color Palette: additional", () => {
   test("extract colors from WebP image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/color-palette", {
       headers: { Authorization: `Bearer ${token}` },

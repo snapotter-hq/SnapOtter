@@ -787,12 +787,12 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
             <DetailRow label={t.files.name} value={details.originalName} />
             <DetailRow
               label={t.files.format}
-              value={fileFormatLabel(details.originalName, details.mimeType) || "—"}
+              value={fileFormatLabel(details.originalName, details.mimeType) || "-"}
             />
             <DetailRow label={t.files.size} value={formatSize(details.size)} />
             <DetailRow
               label={t.files.dimensions}
-              value={details.width && details.height ? `${details.width} × ${details.height}` : "—"}
+              value={details.width && details.height ? `${details.width} × ${details.height}` : "-"}
             />
             <DetailRow label={t.files.version} value={`V${details.version}`} />
             <DetailRow

@@ -11508,7 +11508,7 @@ paths:
       tags:
         - PDF
       summary: PDF 多功能工具
-      description: 依明確的頁面計畫組裝 PDF——重新排序、複製、旋轉或刪除頁面，並在單次提交中從其他 PDF 拉入頁面。
+      description: 依明確的頁面計畫組裝 PDF，重新排序、複製、旋轉或刪除頁面，並在單次提交中從其他 PDF 拉入頁面。
       security:
         - bearerAuth: []
       requestBody:

@@ -83,7 +83,7 @@ pnpm test:coverage      # tests with coverage report
 
 ## 数据库 {#database}
 
-通过 Drizzle ORM（pg-core）使用 PostgreSQL 17。本地开发需要运行 Postgres 和 Redis——用以下命令启动它们：
+通过 Drizzle ORM（pg-core）使用 PostgreSQL 17。本地开发需要运行 Postgres 和 Redis，用以下命令启动它们：
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d

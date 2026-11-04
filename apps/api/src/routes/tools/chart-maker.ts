@@ -100,7 +100,7 @@ const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
 const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
 const YEAR_HEADER = /^(?:19\d{2}|20\d{2}|2100)$/;
 const MISSING_VALUE_CELL =
-  /^(?:n\/a|n\.a\.|nan|#n\/a|#value!|#ref!|#div\/0!|#name\?|#num!|#null!|[-–—]+)$/i;
+  /^(?:n\/a|n\.a\.|nan|#n\/a|#value!|#ref!|#div\/0!|#name\?|#num!|#null!|[-–\u2014]+)$/i;
 const MONTH_NAMES =
   /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/gi;
 const WEEKDAY_NAMES =

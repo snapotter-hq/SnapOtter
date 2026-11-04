@@ -5,10 +5,10 @@ import { expect, test } from "@playwright/test";
 
 // ─── Pipeline Tools ─────────────────────────────────────────────────
 // Tests for the pipeline/automation system:
-//   POST /api/v1/pipeline/execute  — run a multi-step pipeline
-//   POST /api/v1/pipeline/save     — save a pipeline definition
-//   GET  /api/v1/pipeline/list     — list saved pipelines
-//   DELETE /api/v1/pipeline/:id    — delete a saved pipeline
+//   POST /api/v1/pipeline/execute: run a multi-step pipeline
+//   POST /api/v1/pipeline/save: save a pipeline definition
+//   GET  /api/v1/pipeline/list: list saved pipelines
+//   DELETE /api/v1/pipeline/:id: delete a saved pipeline
 //
 // Pipelines chain tool steps: the output of step N feeds into step N+1.
 // AI tools in a pipeline respect the same FEATURE_NOT_INSTALLED guard.
@@ -614,7 +614,7 @@ test.describe("Batch pipeline execution", () => {
         expect(buffer.length).toBeGreaterThan(0);
       }
     } else {
-      // Batch pipeline may not be supported — single-file only
+      // Batch pipeline may not be supported, single-file only
       // Verify the error is coherent, not a crash
       const body = await res.json();
       expect(body.error).toBeDefined();

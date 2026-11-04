@@ -121,7 +121,7 @@ describe("getImageInfo", () => {
 });
 
 // ---------------------------------------------------------------------------
-// sanitizeValue — these tests complement the ones in operations.test.ts
+// sanitizeValue: these tests complement the ones in operations.test.ts
 // ---------------------------------------------------------------------------
 describe("sanitizeValue", () => {
   it("converts Date to ISO string", () => {
