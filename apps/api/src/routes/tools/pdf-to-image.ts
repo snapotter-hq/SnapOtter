@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
 import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
+import { claimBatchAlias } from "../../jobs/batch-alias.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
@@ -26,7 +28,6 @@ import {
   normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
-import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
@@ -526,27 +527,36 @@ export function registerPdfToImageRoute(
         settings.format = opts.lockedFormat as typeof settings.format;
       }
 
-      const jobId = clientJobId || randomUUID();
+      // The id names every document's pages under outputs/<jobId>-f<n>/,
+      // which the public download route serves by id alone, so it is always
+      // ours. A clientJobId only gets an alias row that SSE and cancel follow.
+      const jobId = randomUUID();
+      const progressJobId = clientJobId ?? jobId;
 
-      // Reserve the id before the first progress write. The progress persist
-      // updates whatever row already has this id, so a clientJobId naming
-      // another job would write into that job's row, and a fault would fail
-      // it (#1554). The insert makes a collision fail on the primary key.
-      // No toolId: reconciliation treats a non-terminal row with a tool id as
-      // queued work, and this inline run has no queue entry.
-      try {
-        await db.insert(schema.jobs).values({
-          id: jobId,
+      // Reserve the row before the first progress write, which updates
+      // whatever row has this id (#1554). No toolId: reconciliation treats a
+      // non-terminal row with a tool id as queued work, and this inline run
+      // has no queue entry.
+      await db.insert(schema.jobs).values({
+        id: jobId,
+        userId: authUser.id,
+        type: "batch",
+        status: "processing",
+        inputRefs: [],
+      });
+      if (clientJobId) {
+        const claim = await claimBatchAlias({
+          clientJobId,
+          batchJobId: jobId,
           userId: authUser.id,
-          type: "batch",
-          status: "processing",
-          inputRefs: [],
+          toolId: opts.toolId,
         });
-      } catch (err) {
-        if (isUniqueViolation(err)) {
+        // "attach" stays a conflict here: this route streams its ZIP and
+        // keeps nothing a resent request could attach to.
+        if (claim !== "claimed") {
+          await db.delete(schema.jobs).where(eq(schema.jobs.id, jobId));
           return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
         }
-        throw err;
       }
 
       const results: Array<{ key: string; prefix: string; filename: string } | null> = new Array(
@@ -715,9 +725,9 @@ export function registerPdfToImageRoute(
       reply.hijack();
       reply.raw.writeHead(200, {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="batch-${opts.toolId}-${jobId.slice(0, 8)}.zip"`,
+        "Content-Disposition": `attachment; filename="batch-${opts.toolId}-${progressJobId.slice(0, 8)}.zip"`,
         "Transfer-Encoding": "chunked",
-        "X-Job-Id": jobId,
+        "X-Job-Id": progressJobId,
         "X-File-Results": encodeURIComponent(JSON.stringify(fileResultsMap)),
         ...getSecurityHeaders(),
       });
