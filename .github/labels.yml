@@ -15,6 +15,18 @@
   color: "7057ff"
   description: New or updated translation
 
+- name: question
+  color: "d876e3"
+  description: Further information is requested
+
+- name: feedback
+  color: "c2e0c6"
+  description: Submitted through the feedback issue form
+
+- name: dependencies
+  color: "0366d6"
+  description: Pull requests that update a dependency file
+
 # Contribution Flow
 - name: good first issue
   color: "7057ff"
@@ -31,23 +43,6 @@
 - name: needs discussion
   color: "fbca04"
   description: Requires maintainer input before proceeding
-
-# PR Status
-- name: awaiting review
-  color: "f9d0c4"
-  description: PR is ready for maintainer review
-
-- name: changes requested
-  color: "e11d48"
-  description: PR needs changes before merge
-
-- name: cla-signed
-  color: "0e8a16"
-  description: Contributor has signed the CLA
-
-- name: cla-needed
-  color: "b60205"
-  description: CLA signature required
 
 # Scope
 - name: "area: frontend"
@@ -70,6 +65,30 @@
   color: "0075ca"
   description: Changes to apps/docs
 
+- name: "area: landing"
+  color: "f7d6b4"
+  description: Changes to apps/landing
+
+- name: "area: media-engine"
+  color: "1D76DB"
+  description: Media engine (FFmpeg pipeline)
+
+- name: "area: doc-engine"
+  color: "1D76DB"
+  description: Doc engine (qpdf, LibreOffice, Ghostscript)
+
+- name: "area: ai"
+  color: "D93F0B"
+  description: Changes to packages/ai
+
+- name: "area: infrastructure"
+  color: "1D76DB"
+  description: Docker, CI workflows, release tooling, enterprise gates
+
+- name: "area: testing"
+  color: "1D76DB"
+  description: Test suites, CI shards, drift guards
+
 # Priority
 - name: "priority: critical"
   color: "b60205"
@@ -78,6 +97,10 @@
 - name: "priority: high"
   color: "d93f0b"
   description: Important, fix soon
+
+- name: "priority: medium"
+  color: "f6a935"
+  description: Worth scheduling, not urgent
 
 - name: "priority: low"
   color: "c2e0c6"
@@ -101,6 +124,17 @@
   description: Requested by the community
 
 # Meta
+- name: released
+  color: "ededed"
+  description: Shipped in a published release
+
+- name: qa-sweep
+  color: "FBCA04"
+  description: Found by the master QA sweep
+
+- name: self-driving
+  color: "ededed"
+
 - name: duplicate
   color: "cfd3d7"
   description: This issue or PR already exists
