@@ -233,3 +233,24 @@ describe("engine overrides", () => {
     expect(missing).toEqual([]);
   });
 });
+
+/**
+ * PROCESSING_TIMEOUT_S was documented as the per-request ceiling while only the
+ * AI sidecar read it, and the variables that do set job deadlines and the sync
+ * window had no row at all (#4300).
+ */
+describe("job deadlines", () => {
+  const configRows = ROWS.filter((r) => r.doc === "apps/docs/guide/configuration.md");
+
+  it("configuration.md documents the variables that bound a job", () => {
+    const documented = new Set(configRows.map((r) => r.name));
+    const deadlines = ["JOB_TIMEOUT_FAST_S", "JOB_TIMEOUT_LONG_S", "SYNC_WAIT_MS"];
+    expect(deadlines.filter((name) => !documented.has(name))).toEqual([]);
+  });
+
+  it("PROCESSING_TIMEOUT_S is described as the AI sidecar timeout", () => {
+    const row = configRows.find((r) => r.name === "PROCESSING_TIMEOUT_S");
+    expect(row?.description).toMatch(/sidecar/i);
+    expect(row?.description).not.toMatch(/per request/i);
+  });
+});

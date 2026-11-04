@@ -143,6 +143,8 @@ const envSchema = z
     MAX_USERS: z.coerce.number().default(0),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     MAX_WORKER_THREADS: z.coerce.number().default(0),
+    // Only the AI sidecar bridge honors this (packages/ai/src/bridge.ts reads it
+    // from process.env). Worker job deadlines are JOB_TIMEOUT_FAST_S/_LONG_S.
     PROCESSING_TIMEOUT_S: z.coerce.number().default(0),
     MAX_PIPELINE_STEPS: z.coerce.number().default(20),
     MAX_PIPELINE_STEP_PIXELS: z.coerce.number().default(67_108_864),
