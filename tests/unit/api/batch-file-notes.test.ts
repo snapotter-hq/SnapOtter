@@ -131,6 +131,23 @@ describe("pickChildFileNotes", () => {
     ).toEqual({ resizedTo: { width: 10, height: 5 }, targetMet: false, targetKb: 2 });
   });
 
+  it("lets a later step's own target replace an earlier miss", () => {
+    expect(
+      pickChildFileNotes({
+        steps: [
+          { notes: { targetKb: 20, targetMet: false } },
+          { notes: { targetKb: 50, resizedTo: { width: 10, height: 5 } } },
+        ],
+      }),
+    ).toEqual({ targetKb: 50, resizedTo: { width: 10, height: 5 } });
+  });
+
+  it("reads a tool whose steps are plain strings as an ordinary result", () => {
+    expect(
+      pickChildFileNotes({ steps: ["detect", "restore"], targetKb: 100, targetMet: false }),
+    ).toEqual({ targetKb: 100, targetMet: false });
+  });
+
   it("gives nothing when no step has a note", () => {
     expect(pickChildFileNotes({ steps: [{ step: 1, toolId: "resize", size: 9 }] })).toBeUndefined();
   });
