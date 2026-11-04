@@ -2,7 +2,7 @@
  * Tool UI registry.
  *
  * Maps each toolId to its settings component, display mode, and capabilities.
- * Adding a new tool means adding one entry here instead of editing a 750-line file.
+ * Adding a new tool means adding one entry here.
  */
 
 import {
