@@ -20,6 +20,10 @@ const settingsSchema = z
     message: "Provide timestamps",
   });
 
+// The probe doesn't report fps, so frame counts are estimated at a safe ceiling.
+const ASSUMED_FPS = 30;
+const MAX_FRAMES = 2000;
+
 export function registerVideoToFrames(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "video-to-frames",
@@ -39,8 +43,7 @@ export function registerVideoToFrames(app: FastifyInstance) {
       await mkdir(framesDir, { recursive: true });
 
       if (settings.mode === "all") {
-        // Guard: estimate frames as durationS * 30 (safe ceiling; probe lacks fps)
-        if (durationS * 30 > 2000) {
+        if (durationS * ASSUMED_FPS > MAX_FRAMES) {
           throw new InputValidationError("Too many frames; use every-Nth or timestamps mode");
         }
         ctx.report(5, "Extracting frames");
@@ -49,6 +52,9 @@ export function registerVideoToFrames(app: FastifyInstance) {
           timeoutMs: 30 * 60_000,
         });
       } else if (settings.mode === "nth") {
+        if ((durationS * ASSUMED_FPS) / settings.n > MAX_FRAMES) {
+          throw new InputValidationError("Too many frames; raise N or use timestamps mode");
+        }
         ctx.report(5, "Extracting frames");
         await runFfmpeg(
           [
