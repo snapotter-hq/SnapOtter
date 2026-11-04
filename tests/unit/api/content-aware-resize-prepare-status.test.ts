@@ -148,9 +148,11 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
     const res = await send({ width: 8192 });
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: "Content-aware resize failed",
       details: inputErr.message,
+      code: "UNPROCESSABLE_ENTITY",
+      requestId: expect.any(String),
     });
 
     const config = getToolConfig("content-aware-resize");
@@ -173,9 +175,10 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
     const res = await send({ width: 50 });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: missingCaireErr.message,
       code: "ENGINE_UNAVAILABLE",
+      requestId: expect.any(String),
     });
 
     const config = getToolConfig("content-aware-resize");
@@ -204,9 +207,10 @@ describe("content-aware-resize route validation and prepare catch", () => {
 
       const res = await send({ width: 50 });
       expect(res.statusCode).toBe(503);
-      expect(res.json()).toMatchObject({
+      expect(res.json()).toEqual({
         error: oomMessage,
         code: "ENGINE_UNAVAILABLE",
+        requestId: expect.any(String),
       });
 
       const config = getToolConfig("content-aware-resize");

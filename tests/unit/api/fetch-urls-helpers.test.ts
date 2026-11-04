@@ -877,13 +877,13 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         err: server500Fault,
         expectedStatus: 500,
         expectedError: "Internal server error",
-        expectedCode: undefined,
+        expectedCode: "INTERNAL_ERROR",
       },
       {
         err: new Error("unclassified storage failure at /data/uploads/job/.snapotter-staging-5"),
         expectedStatus: 500,
         expectedError: "Internal server error",
-        expectedCode: undefined,
+        expectedCode: "INTERNAL_ERROR",
       },
     ];
 
@@ -901,10 +901,10 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         });
 
         expect(res.statusCode).toBe(expectedStatus);
-        const body = JSON.parse(res.body) as { error: string; code?: string };
+        const body = JSON.parse(res.body) as { error: string; code: string; requestId: string };
         expect(body.error).toBe(expectedError);
-        // Every error body carries a code now; a route error without a SafeError code falls back to the status-derived one.
-        expect(body.code).toBe(expectedCode ?? "INTERNAL_ERROR");
+        expect(body.code).toBe(expectedCode);
+        expect(body.requestId).toEqual(expect.any(String));
         expect(res.body).not.toContain("/data/uploads");
         expect(res.body).not.toContain(".snapotter-staging");
         expect(requestLogError).toHaveBeenCalledOnce();
