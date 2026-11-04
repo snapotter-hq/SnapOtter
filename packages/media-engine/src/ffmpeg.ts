@@ -20,6 +20,25 @@ const INPUT_ERROR_PATTERNS = [
   /moov atom not found/i,
 ];
 
+// ffmpeg ends a failed write with the OS's errno text: "No space left on
+// device" for ENOSPC, "Disk quota exceeded" ("Disc" on macOS) for EDQUOT.
+// Anchored to the line end so an input path holding the phrase can't match.
+const STORAGE_FULL_PATTERNS: [RegExp, "ENOSPC" | "EDQUOT"][] = [
+  [/No space left on device\)?\s*$/im, "ENOSPC"],
+  [/Dis[ck] quota exceeded\)?\s*$/im, "EDQUOT"],
+];
+
+/**
+ * Gives a failed run the errno a full disk means, shaped like a failed write,
+ * so callers answer it as the server's storage fault rather than a bad input
+ * (#4148). Returns undefined when stderr shows no full disk.
+ */
+function storageFullError(message: string, stderr: string): NodeJS.ErrnoException | undefined {
+  const hit = STORAGE_FULL_PATTERNS.find(([re]) => re.test(stderr));
+  if (!hit) return undefined;
+  return Object.assign(new Error(message), { code: hit[1], syscall: "write" });
+}
+
 /**
  * Applies the isToolInputError marker (see @snapotter/shared tool-errors.ts)
  * when the captured stderr matches a known input-failure shape.
@@ -134,8 +153,12 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
         reject(ffmpegSpawnFailure(bin, code, signal, stderrTail));
         return;
       }
-      const err = new Error(`ffmpeg exited ${code}: ${stderrTail}`);
-      reject(markIfInputError(err, stderrTail));
+      const message = `ffmpeg exited ${code}: ${stderrTail}`;
+      // A full disk wins over an input-error shape: it can truncate the
+      // output ffmpeg then fails to read back, and it is never the upload's fault.
+      reject(
+        storageFullError(message, stderrTail) ?? markIfInputError(new Error(message), stderrTail),
+      );
     });
   });
 }

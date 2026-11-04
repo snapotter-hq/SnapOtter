@@ -29,6 +29,20 @@ function libreofficeSpawnFailure(
   });
 }
 
+// LibreOffice reports a store that ran out of room as an Io/Space error code
+// (ERRCODE_IO_OUTOFSPACE) on stderr, then usually exits 0 with no output.
+const OUT_OF_SPACE = /Error Area:Io Class:Space\b/;
+
+/**
+ * Gives a failed conversion the ENOSPC a full disk means, shaped like a failed
+ * write, so callers answer it as the server's storage fault rather than a
+ * document LibreOffice couldn't read (#4148).
+ */
+function failure(message: string, stderr: string): Error {
+  const err = new Error(message);
+  return OUT_OF_SPACE.test(stderr) ? Object.assign(err, { code: "ENOSPC", syscall: "write" }) : err;
+}
+
 /**
  * Split a target string into the output file extension and the full
  * --convert-to argument. Bare extensions ("pdf") pass through unchanged.
@@ -68,6 +82,7 @@ export async function convertDocument(
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const profileDir = join(tmpdir(), `snapotter-lo-${randomUUID()}`);
   const { ext, convertTo } = parseConvertTarget(target);
+  let err = "";
   try {
     await new Promise<void>((resolvePromise, reject) => {
       const [limBin, limArgs] = wrapWithMemoryLimit(bin, [
@@ -83,7 +98,6 @@ export async function convertDocument(
         inputPath,
       ]);
       const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
-      let err = "";
       let settled = false;
       const onAbort = () => {
         if (settled) return;
@@ -123,14 +137,14 @@ export async function convertDocument(
           reject(libreofficeSpawnFailure(bin, code, signal, err));
           return;
         }
-        reject(new Error(`LibreOffice exited ${code}: ${err.slice(-1000)}`));
+        reject(failure(`LibreOffice exited ${code}: ${err.slice(-1000)}`, err));
       });
       opts.signal?.addEventListener("abort", onAbort, { once: true });
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);
     if (!produced)
-      throw new Error(`LibreOffice produced no ${ext} output for ${basename(inputPath)}`);
+      throw failure(`LibreOffice produced no ${ext} output for ${basename(inputPath)}`, err);
     return join(outDir, produced);
   } finally {
     await rm(profileDir, { recursive: true, force: true }).catch(() => {});
