@@ -1,14 +1,14 @@
 ---
-description: "모든 SnapOtter 환경 변수와 기본값. 인증, 스토리지, AI 모델, 분석 등을 구성합니다."
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: c93ec183e7e0
+description: "기본값과 함께 정리한 SnapOtter 환경 변수 전체 목록입니다. 인증, 스토리지, AI 모델, 분석 등을 설정합니다."
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: de7adba59749
 i18n_hash_version: 2
 ---
 
 # 구성 {#configuration}
 
-모든 구성은 환경 변수를 통해 이루어집니다. 모든 변수에는 합리적인 기본값이 있으므로 SnapOtter는 아무것도 설정하지 않아도 바로 작동합니다.
+모든 구성은 환경 변수로 합니다. 모든 변수에 적절한 기본값이 있으므로 아무것도 설정하지 않아도 SnapOtter는 바로 동작합니다.
 
 ## 환경 변수 {#environment-variables}
 
@@ -17,127 +17,127 @@ i18n_hash_version: 2
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `PORT` | `1349` | 서버가 수신 대기하는 포트입니다. |
-| `BASE_PATH` | (비어 있음) | 공개 배포 경로입니다(예: `/snapotter`). 비워 두거나 `/`로 설정하면 도메인 루트에서 제공합니다. 런타임에 적용되며 이미지를 다시 빌드할 필요가 없습니다. |
-| `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 최대 요청 수입니다. 속도 제한을 비활성화하려면 0으로 설정합니다. |
-| `CORS_ORIGIN` | (비어 있음) | CORS에 대해 허용된 오리진의 쉼표 구분 목록이며, 동일 오리진만 허용하려면 비워 둡니다. |
-| `LOG_LEVEL` | `info` | 로그 상세 수준입니다. 다음 중 하나: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어를 지정합니다. 기본값은 사설 네트워크의 피어만 믿으므로 Docker 네트워크나 LAN의 리버스 프록시는 신뢰되고, 공개 클라이언트가 위조한 헤더는 신뢰되지 않습니다. 공개 주소에서 직접 관리하는 프록시를 앞에 둔 경우에만 `true`로 설정하세요. |
+| `BASE_PATH` | (비어 있음) | 공개 배포 경로입니다. 예: `/snapotter`. 비어 있거나 `/`이면 도메인 루트에서 서비스합니다. 런타임에 적용되며 이미지를 다시 빌드할 필요가 없습니다. |
+| `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 최대 요청 수입니다. 0으로 설정하면 속도 제한이 꺼집니다. |
+| `CORS_ORIGIN` | (비어 있음) | CORS에 허용할 출처를 쉼표로 구분한 목록입니다. 비워 두면 동일 출처만 허용합니다. |
+| `LOG_LEVEL` | `info` | 로그 상세 수준입니다. 다음 중 하나입니다: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 지정할 수 있는 피어를 정합니다. 기본값은 사설 네트워크 피어만 신뢰하므로, Docker 네트워크나 LAN에 있는 리버스 프록시는 신뢰하고 공개 클라이언트가 위조한 헤더는 신뢰하지 않습니다. `true`은 직접 관리하는 프록시가 공개 주소 앞단에 있을 때만 설정하세요. |
 
 ### 인증 {#authentication}
 
-아래 두 불리언 값은 `true`와 `false`만 허용합니다. `1`, `yes`, `on` 같은 그 밖의 값은 검증에 실패하며, 서버는 수신 대기를 시작하기 전에 종료됩니다.
+아래 두 불리언 값은 `true`과 `false`만 허용합니다. `1`, `yes`, `on` 같은 다른 값은 검증에 실패하고, 서버는 수신 대기를 시작하기 전에 종료됩니다.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | 로그인을 요구합니다. 계정을 전혀 두지 않고 실행하려면 `false`로 설정합니다. 이 경우 모든 요청에 관리자 권한이 부여되므로 신뢰할 수 있는 네트워크에서만 사용하세요. |
-| `DEFAULT_USERNAME` | `admin` | 초기 관리자 계정의 사용자 이름입니다. 첫 실행 시에만 사용됩니다. |
+| `AUTH_ENABLED` | `true` | 로그인을 요구합니다. `false`로 설정하면 계정 없이 실행되며 모든 요청에 관리자 권한이 부여되므로, 신뢰할 수 있는 네트워크에서만 사용하세요. |
+| `DEFAULT_USERNAME` | `admin` | 초기 관리자 계정의 사용자 이름입니다. 최초 실행 시에만 사용됩니다. |
 | `DEFAULT_PASSWORD` | `admin` | 초기 관리자 계정의 비밀번호입니다. 첫 로그인 후 변경하세요. |
-| `MAX_USERS` | `0` (무제한) | 등록된 사용자 계정의 최대 수입니다. 무제한으로 하려면 0으로 설정합니다. |
-| `SESSION_DURATION_HOURS` | `168` | 로그인 세션 수명(시간 단위, 기본값은 7일)입니다. |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | 첫 로그인 시 강제 비밀번호 변경 프롬프트를 건너뛰려면 `true`로 설정합니다. |
+| `MAX_USERS` | `0` (무제한) | 등록할 수 있는 사용자 계정의 최대 수입니다. 0으로 설정하면 무제한입니다. |
+| `SESSION_DURATION_HOURS` | `168` | 로그인 세션 유지 시간(시간 단위)입니다. 기본값은 7일입니다. |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | `true`로 설정하면 첫 로그인 시 강제로 표시되는 비밀번호 변경 안내를 건너뜁니다. |
 
 ### 스토리지 {#storage}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` 또는 `s3`. S3와 MinIO에는 s3_storage 기능이 포함된 라이선스와 아래의 `S3_*` 변수가 필요합니다. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 연결 문자열이며 모든 요청이 사용하는 연결입니다. 2.3.0 이상에서는 `DATABASE_MIGRATION_URL`도 설정하면 이 값이 앱 테이블에 대한 DML만 보유하는 최소 권한 런타임 역할이 됩니다. Compose 스택은 이 값을 자체 `postgres` 서비스로 지정합니다. (`REDIS_URL`과 함께) 설정하지 않은 채로 두면 임베디드 모드가 됩니다. |
-| `DATABASE_MIGRATION_URL` | (비어 있음) | 2.3.0부터 사용할 수 있습니다. 2.2.0 이미지는 이 값을 무시하며 `DATABASE_URL`이 데이터베이스 소유자를 가리켜야 합니다. 부팅 중에만 마이그레이션을 실행하고 런타임 역할에 권한을 부여하는 데 사용되는 권한 있는 연결이며, 첫 요청 전에 닫힙니다. 비워 두면 SnapOtter는 단일 역할로 실행되고 `DATABASE_URL`이 두 작업을 모두 수행합니다. [최소 권한 역할](/ko/guide/database#least-privilege-roles)을 참고하세요. |
-| `REDIS_URL` | `redis://localhost:6379` | Redis 연결 문자열(BullMQ 작업 큐에 사용)입니다. Compose는 이 값을 자체 `redis` 서비스로 지정합니다. |
-| `WORKSPACE_PATH` | `./tmp/workspace` | 처리 중 임시 파일을 위한 디렉터리입니다. 자동으로 정리됩니다. 이미지는 `/tmp/workspace`로 설정합니다. |
-| `FILES_STORAGE_PATH` | `./data/files` | 영구 사용자 파일(업로드된 이미지, 저장된 결과)을 위한 디렉터리입니다. 이미지는 `/data/files`로 설정합니다. |
+| `STORAGE_MODE` | `local` | `local` 또는 `s3`입니다. S3와 MinIO를 쓰려면 s3_storage 기능이 포함된 라이선스와 아래의 `S3_*` 변수가 필요합니다. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 연결 문자열이며, 모든 요청이 처리되는 연결입니다. 2.3.0 이상에서는 `DATABASE_MIGRATION_URL`도 함께 설정하면 이 변수가 최소 권한 런타임 역할이 되어, 앱 테이블에 대한 DML 권한만 가집니다. Compose 스택은 이 변수를 `postgres` 서비스로 연결합니다. 임베디드 모드를 쓰려면 이 변수를 (`REDIS_URL`와 함께) 설정하지 않은 채로 두세요. |
+| `DATABASE_MIGRATION_URL` | (비어 있음) | 부팅 중에만 마이그레이션을 실행하고 런타임 역할에 권한을 부여하는 데 쓰는 권한 있는 연결이며, 첫 요청 전에 닫힙니다. 비워 두면 SnapOtter는 단일 역할로 실행되며 `DATABASE_URL`이 두 작업을 모두 맡습니다. [최소 권한 역할](/ko/guide/database#least-privilege-roles)을 참고하세요. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis 연결 문자열입니다(BullMQ 작업 큐에 사용). Compose는 이 변수를 `redis` 서비스로 연결합니다. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | 처리 중 임시 파일을 두는 디렉터리입니다. 자동으로 정리됩니다. 이미지는 `/tmp/workspace`을 설정합니다. |
+| `FILES_STORAGE_PATH` | `./data/files` | 영구 사용자 파일(업로드한 이미지, 저장한 결과)을 두는 디렉터리입니다. 이미지는 `/data/files`을 설정합니다. |
 
 ### S3 오브젝트 스토리지 {#s3-object-storage}
 
-`STORAGE_MODE=s3`일 때만 읽습니다. 필수인 세 가지 중 하나라도 빠지면 시작이 실패하며, 빠뜨린 변수 이름을 알려줍니다.
+`STORAGE_MODE=s3`일 때만 읽습니다. 필수 변수 세 가지 중 하나라도 빠지면 시작에 실패하며, 빠뜨린 변수의 이름이 표시됩니다.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `S3_BUCKET` | (비어 있음) | 업로드와 출력을 담는 버킷입니다. 필수입니다. |
-| `S3_ACCESS_KEY_ID` | (비어 있음) | 액세스 키입니다. 필수입니다. 컨테이너에서는 `S3_ACCESS_KEY_ID_FILE`을 통해 대신 마운트할 수 있습니다. |
-| `S3_SECRET_ACCESS_KEY` | (비어 있음) | 시크릿 키입니다. 필수입니다. 같은 파일 규칙을 씁니다: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_BUCKET` | (비어 있음) | 업로드와 출력을 보관하는 버킷입니다. 필수입니다. |
+| `S3_ACCESS_KEY_ID` | (비어 있음) | 액세스 키입니다. 필수입니다. 컨테이너에서는 `S3_ACCESS_KEY_ID_FILE`을 통해 마운트할 수도 있습니다. |
+| `S3_SECRET_ACCESS_KEY` | (비어 있음) | 시크릿 키입니다. 필수입니다. 같은 파일 규칙을 따릅니다: `S3_SECRET_ACCESS_KEY_FILE`. |
 | `S3_REGION` | `us-east-1` | 버킷 리전입니다. |
-| `S3_ENDPOINT` | (비어 있음) | MinIO, R2, Backblaze를 비롯한 S3 호환 스토리지를 위한 사용자 지정 엔드포인트입니다. 비워 두면 AWS를 뜻합니다. |
-| `S3_FORCE_PATH_STYLE` | `false` | MinIO처럼 가상 호스트 주소 지정 대신 `endpoint/bucket/key`를 요구하는 경우 `true`로 설정합니다. |
-| `S3_PREFIX` | (비어 있음) | 키 접두사입니다. 버킷 하나에 여러 인스턴스를 담을 수 있습니다. |
+| `S3_ENDPOINT` | (비어 있음) | MinIO, R2, Backblaze 등 S3 호환 스토어를 위한 사용자 지정 엔드포인트입니다. 비어 있으면 AWS를 뜻합니다. |
+| `S3_FORCE_PATH_STYLE` | `false` | MinIO처럼 가상 호스트 방식 대신 `endpoint/bucket/key`을 요구하는 경우 `true`로 설정하세요. |
+| `S3_PREFIX` | (비어 있음) | 키 접두사입니다. 버킷 하나에 여러 인스턴스를 둘 수 있습니다. |
 
-### 저장 데이터 암호화 {#encryption-at-rest}
+### 저장 시 암호화 {#encryption-at-rest}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `DATA_ENCRYPTION_KEY` | (비어 있음) | 16진수 64자(32바이트)입니다. 데이터베이스에 저장된 민감한 설정을 암호화합니다. 16진수 64자가 아니면 시작 시 거부됩니다. |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (비어 있음) | 교체해서 물러나는 이전 키이며 형식은 같습니다. 교체 중에는 둘 다 설정해 기존 행이 계속 복호화되도록 한 뒤, 이 값을 제거하세요. |
+| `DATA_ENCRYPTION_KEY` | (비어 있음) | 16진수 64자(32바이트)입니다. 데이터베이스에 저장되는 민감한 설정을 암호화합니다. 16진수 64자가 아니면 시작할 때 거부됩니다. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (비어 있음) | 교체하려는 이전 키이며 형식은 같습니다. 키를 교체하는 동안에는 기존 행을 계속 복호화할 수 있도록 두 변수를 모두 설정하고, 이후에 이 변수를 제거하세요. |
 
 ### 임베디드 모드 {#embedded-mode}
 
-`DATABASE_URL`와 `REDIS_URL` 없이 이미지를 실행하면 컨테이너 내부에서 자체 PostgreSQL 17과 Redis를 시작하며, 루프백에 바인딩되고 모든 데이터는 `/data` 볼륨에 저장됩니다. 이는 빠른 시작, 홈랩, 1.x에서의 업그레이드를 위한 단일 명령 `docker run` 경험을 복원합니다. 이는 프로덕션 배포가 아니라 편의를 위한 경로입니다. 프로덕션에서는 별도의 PostgreSQL과 Redis가 있는 3개 컨테이너 Compose 스택을 실행하세요. 임베디드 모드는 컨테이너를 루트로 실행해야 하며 임의 UID 런타임(OpenShift, Kubernetes `runAsNonRoot`)과 호환되지 않습니다. 그런 환경에서는 Compose를 사용하세요.
+`DATABASE_URL`과 `REDIS_URL` 없이 이미지를 실행하면 컨테이너 안에서 PostgreSQL 17과 Redis를 직접 시작합니다. 둘 다 루프백에 바인딩되며 모든 데이터는 `/data` 볼륨에 저장됩니다. 이렇게 하면 빠른 시작, 홈랩, 1.x에서의 업그레이드를 위한 한 줄 `docker run` 환경이 되살아납니다. 이것은 편의를 위한 경로이며 프로덕션 배포용이 아닙니다. 프로덕션에서는 PostgreSQL과 Redis를 분리한 3컨테이너 Compose 스택을 실행하세요. 임베디드 모드는 컨테이너를 root로 실행해야 하며, 임의 UID 런타임(OpenShift, Kubernetes `runAsNonRoot`)과는 호환되지 않으므로 그런 환경에서는 Compose를 사용하세요.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `EMBEDDED` | `auto` | `DATABASE_URL`과 `REDIS_URL`이 모두 설정되지 않으면 자동 활성화됩니다. 비활성화하려면 `0`로 설정합니다(그러면 외부 `DATABASE_URL`/`REDIS_URL`이 설정되지 않은 경우 앱이 조용히 컨테이너 내 데이터베이스를 시작하는 대신 즉시 실패합니다). |
-| `REDIS_MAXMEMORY` | `512mb` | 임베디드 Redis의 메모리 상한(임베디드 모드 전용)입니다. Raspberry Pi처럼 메모리가 제한된 호스트에서는 이 값을 낮추세요. |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 부팅 시 임베디드 Redis가 `PING`에 응답하기를 기다리는 시간(초)이며, 이 시간이 지나면 포기합니다. 시간 초과가 되면 컨테이너가 계속 멈춰 있는 대신 종료되고 그 이유를 로그에 남깁니다. 1에서 999999 사이의 정수 초이며 무제한 값은 없습니다. 영원히 기다리는 것이 바로 이 제한이 방지하려는 실패이기 때문입니다. 느린 호스트에서 이 값에 걸리는 경우에만 늘리세요. |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 임베디드 PostgreSQL에 대해 동일하게 적용됩니다. 타이머는 첫 부팅의 `initdb`가 끝난 뒤 시작되므로, 초기 데이터베이스 생성이 아니라 서버 시작과 크래시 복구 시간을 측정합니다. |
+| `EMBEDDED` | `auto` | `DATABASE_URL`와 `REDIS_URL`가 둘 다 설정되지 않았을 때 자동으로 켜집니다. `0`로 설정하면 끌 수 있으며, 이 경우 외부 `DATABASE_URL`/`REDIS_URL`가 없으면 앱이 컨테이너 내부 데이터베이스를 조용히 시작하는 대신 즉시 실패합니다. |
+| `REDIS_MAXMEMORY` | `512mb` | 임베디드 Redis의 메모리 상한입니다(임베디드 모드 전용). Raspberry Pi처럼 메모리가 제한된 호스트에서는 값을 낮추세요. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 부팅 시 임베디드 Redis가 `PING`에 응답하기를 기다리는 시간(초)이며, 이 시간이 지나면 포기합니다. 시간이 초과되면 컨테이너는 멈춘 채로 있지 않고 중지되어 원인을 로그에 남깁니다. 1에서 999999 사이의 정수 초이며 무제한 값은 없습니다. 무한정 기다리는 것이 바로 이 제한이 막으려는 장애이기 때문입니다. 느린 호스트에서 시간이 초과될 때만 늘리세요. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 임베디드 PostgreSQL에 대한 같은 설정입니다. 시계는 최초 부팅 시 `initdb`가 끝난 뒤부터 시작하므로, 초기 데이터베이스 생성이 아니라 서버 시작과 충돌 복구에 걸리는 시간을 다룹니다. |
 
-1.x에서 업그레이드하기: 기존 `snapotter.db`을 볼륨의 `/data/snapotter.db`에 두면 임베디드 모드가 첫 부팅 시 이를 임베디드 PostgreSQL로 가져옵니다. 가져오기는 한 번만 실행되며 이후 부팅에서는 건너뜁니다.
+1.x에서 업그레이드하는 경우: 이전 `snapotter.db`를 볼륨의 `/data/snapotter.db`에 두면 임베디드 모드가 첫 부팅 때 이를 임베디드 PostgreSQL로 가져옵니다. 가져오기는 한 번만 실행되며 이후 부팅에서는 건너뜁니다.
 
-텔레메트리 참고: 임베디드 모드는 다른 구성과 마찬가지로 이미지의 분석 기본값을 상속합니다. 게시된 이미지는 분석이 켜진 상태로 제공됩니다. 비활성화하려면 `--build-arg SNAPOTTER_ANALYTICS=off`로 빌드하거나 앱 내 관리자 옵트아웃을 사용하세요.
+원격 분석 참고: 임베디드 모드도 다른 구성과 마찬가지로 이미지의 분석 기본값을 그대로 따릅니다. 배포 이미지는 분석이 켜진 상태로 제공됩니다. 끄려면 `--build-arg SNAPOTTER_ANALYTICS=off`로 빌드하거나 앱 내 관리자 옵트아웃을 사용하세요.
 
 ### 처리 제한 {#processing-limits}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (무제한) | 업로드당 최대 파일 크기(메가바이트)입니다. 무제한으로 하려면 0으로 설정합니다. 게시된 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다. |
-| `MAX_BATCH_SIZE` | `0` (무제한) | 단일 배치 요청의 최대 파일 수입니다. 무제한으로 하려면 0으로 설정합니다. 게시된 이미지는 `0`으로 제공되며, 소스 빌드는 100에서 시작합니다. |
-| `CONCURRENT_JOBS` | `0` (자동) | 병렬로 실행되는 배치 작업 수입니다. 사용 가능한 CPU 코어를 기준으로 자동 감지하려면 0으로 설정합니다. |
-| `MAX_MEGAPIXELS` | `0` (무제한) | 허용되는 최대 이미지 해상도(메가픽셀)입니다. 무제한으로 하려면 0으로 설정합니다. |
-| `MAX_WORKER_THREADS` | `0` (자동) | 이미지 처리를 위한 최대 워커 스레드 수입니다. 사용 가능한 CPU 코어를 기준으로 자동 감지하려면 0으로 설정합니다. |
-| `PROCESSING_TIMEOUT_S` | `0` (제한 없음) | 요청당 최대 처리 시간(초)입니다. 시간 초과 없음으로 하려면 0으로 설정합니다. |
-| `MAX_PIPELINE_STEPS` | `20` | 파이프라인의 최대 단계 수입니다. 제한 없음으로 하려면 0으로 설정합니다. |
-| `MAX_CANVAS_PIXELS` | `0` (제한 없음) | 출력 이미지의 최대 캔버스 크기(픽셀)입니다. 제한 없음으로 하려면 0으로 설정합니다. |
-| `MAX_SVG_SIZE_MB` | `50` | 새니타이즈하기 전에 허용하는 최대 SVG 크기(메가바이트)입니다. 여기서 `0`은 주변 행과 다르게 동작합니다. 상한을 높이는 것이 아니라 파싱 전 크기 제한을 아예 없애므로, 이 값은 설정된 상태로 두세요. |
-| `MAX_PDF_PAGES` | `0` (무제한) | PDF-to-image 변환의 최대 PDF 페이지 수입니다. 무제한으로 하려면 0으로 설정합니다. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (무제한) | 업로드당 최대 파일 크기(MB)입니다. 0으로 설정하면 무제한입니다. 배포 이미지는 `0`을 사용하고, 소스 빌드는 100에서 시작합니다. |
+| `MAX_BATCH_SIZE` | `0` (무제한) | 단일 일괄 요청에 포함할 수 있는 최대 파일 수입니다. 0으로 설정하면 무제한입니다. 배포 이미지는 `0`을 사용하고, 소스 빌드는 100에서 시작합니다. |
+| `CONCURRENT_JOBS` | `0` (자동) | 병렬로 실행하는 일괄 작업 수입니다. 0으로 설정하면 사용 가능한 CPU 코어 수에 따라 자동으로 정합니다. |
+| `MAX_MEGAPIXELS` | `0` (무제한) | 허용하는 최대 이미지 해상도(메가픽셀)입니다. 0으로 설정하면 무제한입니다. |
+| `MAX_WORKER_THREADS` | `0` (자동) | 이미지 처리에 사용하는 최대 워커 스레드 수입니다. 0으로 설정하면 사용 가능한 CPU 코어 수에 따라 자동으로 정합니다. |
+| `PROCESSING_TIMEOUT_S` | `0` (제한 없음) | 요청당 최대 처리 시간(초)입니다. 0으로 설정하면 시간 제한이 없습니다. |
+| `MAX_PIPELINE_STEPS` | `20` | 파이프라인의 최대 단계 수입니다. 0으로 설정하면 제한이 없습니다. |
+| `MAX_CANVAS_PIXELS` | `0` (제한 없음) | 출력 이미지의 최대 캔버스 크기(픽셀)입니다. 0으로 설정하면 제한이 없습니다. |
+| `MAX_SVG_SIZE_MB` | `50` | 정리(sanitize)하기 전에 허용하는 가장 큰 SVG의 크기(MB)입니다. `0`은 이 변수에서만 주변 행과 다르게 동작합니다. 상한을 높이는 것이 아니라 파싱 전 크기 제한을 아예 없애므로, 이 변수는 값을 설정한 채로 두세요. |
+| `MAX_PDF_PAGES` | `0` (무제한) | PDF를 이미지로 변환할 때 처리하는 최대 PDF 페이지 수입니다. 0으로 설정하면 무제한입니다. |
 
 ### 엔진 {#engines}
 
-SnapOtter는 컨테이너 내부의 `$PATH`에서 각 처리 바이너리를 찾으므로, 직접 빌드한 바이너리를 마운트하지 않는 한 이 값들은 비어 있습니다.
+SnapOtter는 컨테이너 안의 `$PATH`에서 각 처리 바이너리를 찾으므로, 직접 빌드한 바이너리를 마운트하지 않는 한 아래 변수는 비워 둡니다.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `FFMPEG_PATH` | (비어 있음) | 비디오 및 오디오 도구 뒤에 있는 `ffmpeg` 바이너리 경로입니다. |
-| `FFPROBE_PATH` | (비어 있음) | 미디어 파일을 처리 전에 읽는 `ffprobe` 경로입니다. `FFMPEG_PATH`와 동일한 빌드를 가리키도록 설정하세요. |
-| `QPDF_PATH` | (비어 있음) | PDF 도구와 업로드된 PDF 검사에 사용되는 `qpdf` 경로입니다. |
-| `SOFFICE_PATH` | (비어 있음) | 오피스 문서 변환에 사용되는 LibreOffice의 `soffice` 경로입니다. |
-| `PDFCPU_PATH` | (비어 있음) | 일부 PDF 도구에서 사용되는 `pdfcpu` 경로입니다. |
-| `SNAPOTTER_HW_ACCEL` | (비어 있음) | 하드웨어 비디오 인코더 계열로, `nvenc` 또는 `vaapi`입니다. 비워 두면 소프트웨어로 인코딩합니다. |
+| `FFMPEG_PATH` | (비어 있음) | 비디오 및 오디오 도구가 사용하는 `ffmpeg` 바이너리의 경로입니다. |
+| `FFPROBE_PATH` | (비어 있음) | 처리 전에 미디어 파일을 읽는 `ffprobe`의 경로입니다. `FFMPEG_PATH`와 같은 빌드를 가리키게 하세요. |
+| `QPDF_PATH` | (비어 있음) | PDF 도구와 업로드된 PDF 검사에 사용하는 `qpdf`의 경로입니다. |
+| `SOFFICE_PATH` | (비어 있음) | 오피스 문서 변환에 사용하는 LibreOffice의 `soffice` 경로입니다. |
+| `PDFCPU_PATH` | (비어 있음) | 일부 PDF 도구가 사용하는 `pdfcpu`의 경로입니다. |
+| `SNAPOTTER_HW_ACCEL` | (비어 있음) | 하드웨어 비디오 인코더 계열이며 `nvenc` 또는 `vaapi`입니다. 비워 두면 소프트웨어로 인코딩합니다. |
 
-`SNAPOTTER_HW_ACCEL`에는 해당 인코더 계열로 빌드된 ffmpeg가 필요하지만, 이미지에 포함된 ffmpeg에는 둘 다 없습니다. 이미지 자체의 바이너리를 사용하면 이 설정은 소프트웨어 인코딩으로 폴백하고 그 사실을 시작 로그에 남깁니다. 이 설정을 사용하려면 직접 빌드한 ffmpeg를 마운트하고 `FFMPEG_PATH`와 `FFPROBE_PATH`를 그쪽으로 지정한 뒤 컨테이너에 GPU 장치를 제공하세요. `nvenc`의 경우 `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`도 설정해야 합니다. 이미지는 `compute,utility`만 요청하는데, `video`가 없으면 NVIDIA 런타임이 인코드 라이브러리를 마운트하지 않으므로 인코더가 목록에는 표시되지만 모든 인코딩이 실패합니다. 존재하지 않거나 실행 권한이 없는 경로 재정의 역시 시작 로그에 표시되며, 해당 바이너리가 필요한 모든 작업은 경로를 수정하거나 설정을 해제할 때까지 실패합니다.
+`SNAPOTTER_HW_ACCEL`을 사용하려면 해당 인코더 계열로 빌드한 ffmpeg가 필요한데, 이미지에 포함된 ffmpeg는 둘 다 지원하지 않습니다. 이미지에 들어 있는 바이너리를 쓰면 이 설정은 소프트웨어 인코딩으로 대체되며 시작 로그에 그 사실이 기록됩니다. 사용하려면 직접 빌드한 ffmpeg를 마운트하고, `FFMPEG_PATH`와 `FFPROBE_PATH`가 이를 가리키게 한 다음, 컨테이너에 GPU 장치를 제공하세요. `nvenc`의 경우 `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`도 설정해야 합니다. 이미지는 `compute,utility`만 요청하는데, `video`가 없으면 NVIDIA 런타임이 인코드 라이브러리를 마운트하지 않아서 인코더는 목록에 나타나지만 모든 인코딩이 실패합니다. 존재하지 않거나 실행할 수 없는 경로 재정의도 시작 로그에 표시되며, 경로를 고치거나 설정을 해제할 때까지 해당 바이너리가 필요한 모든 작업이 실패합니다.
 
-게시된 Compose 파일은 이 여섯 개 값을 모두 `.env`에서 전달하므로, `.env`에 설정하는 것으로 충분합니다.
+배포된 Compose 파일은 여섯 가지 모두를 `.env`에서 전달하므로 거기에 설정하면 충분합니다.
 
 ### 정리 {#cleanup}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | 저장되지 않은 처리 결과(원시 업로드 및 도구 출력)를 자동 삭제 전까지 보관하는 기간입니다. Files 라이브러리에 명시적으로 저장한 파일은 영향을 받지 않으며 삭제할 때까지 유지됩니다. |
-| `CLEANUP_INTERVAL_MINUTES` | `60` | 정리 작업이 실행되는 빈도입니다. |
+| `FILE_MAX_AGE_HOURS` | `72` | 저장하지 않은 처리 결과(원본 업로드와 도구 출력)를 자동 삭제하기 전까지 보관하는 기간입니다. 파일 라이브러리에 직접 저장한 파일은 영향을 받지 않으며 삭제할 때까지 유지됩니다. |
+| `CLEANUP_INTERVAL_MINUTES` | `60` | 정리 작업을 실행하는 주기입니다. |
 
-### 외관 {#appearance}
+### 모양 {#appearance}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | 새 세션의 기본 테마입니다. `light`, `dark` 또는 `system`. |
+| `DEFAULT_THEME` | `light` | 새 세션의 기본 테마입니다. `light`, `dark`, `system` 중 하나입니다. |
 | `DEFAULT_LOCALE` | `en` | 기본 인터페이스 언어입니다. |
-| `DEFAULT_TOOL_VIEW` | `sidebar` | 기본 도구 레이아웃입니다. `sidebar` 또는 `fullscreen`. |
+| `DEFAULT_TOOL_VIEW` | `sidebar` | 기본 도구 레이아웃입니다. `sidebar` 또는 `fullscreen`입니다. |
 
 ### Docker 권한 {#docker-permissions}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `PUID` | `999` | 컨테이너 프로세스를 이 UID로 실행합니다. 바인드 마운트를 위해 호스트 사용자와 일치하도록 설정합니다(`id -u`). |
-| `PGID` | `999` | 컨테이너 프로세스를 이 GID로 실행합니다. 바인드 마운트를 위해 호스트 그룹과 일치하도록 설정합니다(`id -g`). |
+| `PUID` | `999` | 컨테이너 프로세스를 이 UID로 실행합니다. 바인드 마운트를 쓸 때는 호스트 사용자와 맞추세요(`id -u`). |
+| `PGID` | `999` | 컨테이너 프로세스를 이 GID로 실행합니다. 바인드 마운트를 쓸 때는 호스트 그룹과 맞추세요(`id -g`). |
 
-## Docker 예제 {#docker-example}
+## Docker 예시 {#docker-example}
 
 ```yaml
 services:
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 로컬이 아닌 배포의 경우 이를 변경합니다.
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -200,9 +200,9 @@ volumes:
 
 ## 볼륨 {#volumes}
 
-Docker Compose 스택은 네 개의 볼륨을 사용합니다.
+Docker Compose 스택은 볼륨 네 개를 사용합니다.
 
-- `/data` (app) - AI 모델, Python venv, 사용자 파일입니다. 재시작 전반에 걸쳐 업로드된 파일과 설치된 AI 번들을 유지하려면 이것을 마운트하세요.
-- `/tmp/workspace` (app) - 처리 중인 파일을 위한 임시 저장소입니다. 임시적일 수 있지만 마운트하면 컨테이너의 쓰기 가능한 계층이 가득 차는 것을 방지합니다.
-- `SnapOtter-pgdata` (postgres) - PostgreSQL 데이터 디렉터리입니다. 모든 관계형 데이터(사용자, 설정, 파이프라인, 작업, 감사 로그)를 보관합니다. `pg_dump` 또는 볼륨 스냅샷으로 백업하세요.
+- `/data` (app) - AI 모델, Python venv, 사용자 파일입니다. 재시작 후에도 업로드한 파일과 설치한 AI 번들을 유지하려면 마운트하세요.
+- `/tmp/workspace` (app) - 처리 중인 파일을 위한 임시 저장소입니다. 휘발성이어도 되지만, 마운트하면 컨테이너의 쓰기 가능 레이어가 가득 차는 것을 막을 수 있습니다.
+- `SnapOtter-pgdata` (postgres) - PostgreSQL 데이터 디렉터리입니다. 모든 관계형 데이터(사용자, 설정, 파이프라인, 작업, 감사 로그)가 여기에 있습니다. `pg_dump` 또는 볼륨 스냅샷으로 백업하세요.
 - `SnapOtter-redisdata` (redis) - 내구성 있는 작업 큐를 위한 Redis append-only 파일입니다.

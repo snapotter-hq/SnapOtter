@@ -1,23 +1,17 @@
 ---
-description: "使用 Docker 將 SnapOtter 部署到正式環境。硬體需求、GPU 設定，以及 Nginx、Traefik 和 Cloudflare 的反向代理設定。"
-i18n_source_hash: 4cae787c775e
-i18n_provenance: human
-i18n_output_hash: 425d7896694a
+description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 和 Cloudflare 的反向代理設定。"
+i18n_source_hash: b8c4ed2cc086
+i18n_provenance: machine
+i18n_output_hash: 63bf2da35732
 i18n_hash_version: 2
 ---
 
 # 部署 {#deployment}
 
-SnapOtter 以 3 個容器的 Docker Compose 堆疊部署：SnapOtter 應用程式映像檔、PostgreSQL 17 和 Redis 8。應用程式映像檔支援 **linux/amd64**（搭配 NVIDIA CUDA 進行 AI 加速）與 **linux/arm64**（CPU），因此可原生執行於 Intel/AMD 伺服器、Apple Silicon Mac，以及 Raspberry Pi 4/5 等 ARM 裝置。目前不支援透過 VA-API、Quick Sync 或 OpenCL 進行 Intel/AMD iGPU 加速的 AI 推論。
+SnapOtter 以 3 個容器的 Docker Compose 堆疊部署：SnapOtter 應用程式映像檔、PostgreSQL 17 與 Redis 8。應用程式映像檔支援 **linux/amd64**（搭配 NVIDIA CUDA 進行 AI 加速）與 **linux/arm64**（CPU），因此可原生執行於 Intel/AMD 伺服器、Apple Silicon Mac，以及 Raspberry Pi 4/5 等 ARM 裝置。目前 AI 推論不支援透過 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 內顯加速。
 
-關於 GPU 設定、Docker Compose 範例與版本鎖定，請參閱 [Docker Image](./docker-tags)。
+GPU 設定、Docker Compose 範例與版本固定，請參閱 [Docker 映像檔](./docker-tags)。
 
-
-<!-- korean-ocr-contract:start -->
-::: info 韓語 OCR 相容性
-快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`) 和阿拉伯語 (`ar`)。韓語和阿拉伯語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語或阿拉伯語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
-:::
-<!-- korean-ocr-contract:end -->
 ## 快速開始（CPU） {#quick-start-cpu}
 
 ```yaml
@@ -38,7 +32,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -53,6 +51,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -114,13 +123,15 @@ volumes:
 docker compose up -d
 ```
 
-之後即可在 `http://localhost:1349` 存取應用程式。
+之後即可在 `http://localhost:1349` 使用應用程式。
 
-> **遇到 Docker Hub 速率限制？** 將 `snapotter/snapotter:latest` 換成 `ghcr.io/snapotter-hq/snapotter:latest`，改從 GitHub Container Registry 拉取。兩個登錄檔在每次發行時都會收到相同的映像檔。
+上述堆疊以資料庫擁有者的身分連線。從 SnapOtter 2.3.0 起，您可以改用只能讀寫資料列的角色來處理請求；請參閱[最小權限角色](./database#least-privilege-roles)。
+
+> **遇到 Docker Hub 速率限制？** 將 `snapotter/snapotter:latest` 換成 `ghcr.io/snapotter-hq/snapotter:latest`，即可改從 GitHub Container Registry 拉取。兩個登錄庫在每次發行時都會收到相同的映像檔。
 
 ## 快速開始（NVIDIA CUDA） {#quick-start-nvidia-cuda}
 
-對於支援的 AI 工具上的 NVIDIA CUDA 加速（背景去除、放大、臉部增強）：
+若要讓支援的 AI 工具（去背、放大、臉部增強）使用 NVIDIA CUDA 加速：
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -138,8 +149,18 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,14 +191,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 針對非本地部署更改此設置
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -210,43 +234,43 @@ docker compose -f docker-compose-gpu.yml up -d
 
 ### 驗證 GPU 加速 {#verify-gpu-acceleration}
 
-檢查日誌中的 CUDA 檢測：
+在日誌中檢查 CUDA 偵測結果：
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-如果 AI 工具在 CPU 上運行，即使 `--gpus all` 和 NVIDIA Container Toolkit 設定正確，請從 **設定 → AI 功能** 重新安裝受影響的捆綁包（例如背景刪除）。安裝程式會恢復 ONNX 運行時的 GPU 版本，而由另一個捆綁包（例如轉錄）引入的僅 CPU 版本可能會在共享 AI 環境中隱藏。如果從 UI 重新安裝無法恢復舊映像上的 GPU，請參閱 [問題 #490](https://github.com/snapotter-hq/SnapOtter/issues/490) 中的手動修復。
+如果 `--gpus all` 與 NVIDIA Container Toolkit 都已正確設定，AI 工具卻仍在 CPU 上執行，請從 **設定 → AI 功能** 重新安裝受影響的套件組合（例如去背）。安裝程式會還原 ONNX Runtime 的 GPU 版本；在共用的 AI 環境中，由其他套件組合（例如轉錄）帶入的僅 CPU 版本，可能會遮蔽它。如果在較舊的映像檔上從使用者介面重新安裝仍無法恢復 GPU，請參閱 [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) 中的手動修復方式。
 
 ## 硬體需求 {#hardware-requirements}
 
-這些數字來自跨多種系統的效能測試，從搭載 NVIDIA RTX 4070 的現代 amd64 工作站，一直到 Raspberry Pi，在每台機器上執行整個工具目錄，並掃描 Docker 資源限制以找出實際的下限。
+這些數字來自對各種系統的基準測試，從搭載 NVIDIA RTX 4070 的現代 amd64 工作站，到 Raspberry Pi，在每一台上都執行完整的工具目錄，並調整 Docker 資源限制，以找出真正的下限。
 
-在這些等級的最低階（Pi、舊筆電、2 GB 的 VPS）上執行？[低資源環境部署](/zh-TW/guide/low-resource)將這些數字轉化為一份帶有調校上限的具體逐步教學。
+要在這些等級中偏小的一端執行嗎（Pi、舊筆電、2 GB 的 VPS）？[低資源環境設定](/zh-TW/guide/low-resource)會將這些數字轉化為具體的操作步驟，並附上調校過的上限。
 
 ### 快速參考 {#quick-reference}
 
 | 等級 | 使用情境 | CPU | RAM | GPU | 儲存空間 |
 |------|----------|-----|-----|-----|---------|
-| 最低 | 影像、檔案與輕量 PDF 工具；單一使用者；小批次 | 2 核心 | 2 GB | 無 | ~7 GB |
-| 建議 | 全部五種模態，包含影片、PDF 與 CPU 上的 AI；批次；少數使用者 | 4 核心 | 4 GB | 無 | ~25 GB |
-| 完整 | 全部高速運作，包含 GPU AI；大量批次；多位使用者 | 6-8 核心 | 8 GB | NVIDIA 8 GB 以上 VRAM（12 GB 較充裕） | ~35 GB |
+| 最低 | 非 AI 工具（圖片、檔案、輕量 PDF）加上內建的快速 OCR 與臉部偵測；單一使用者；小型批次 | 2 核心 | 2 GB | 無 | 約 7 GB |
+| 建議 | 全部五種類型，包括影片、PDF，以及在 CPU 上執行的標準 AI 套件組合；批次；少數使用者 | 4 核心 | 4 GB（HQ 修補需 8 GB） | 無 | 約 25 GB |
+| 完整 | 全速執行所有項目，包括 GPU AI；大型批次；多位使用者 | 6-8 核心 | 8 GB | NVIDIA 8 GB+ VRAM（12 GB 較充裕） | 約 35 GB |
 
-**架構：僅限 64 位元**（`linux/amd64` 或 `linux/arm64`）。SnapOtter 可原生執行於 Intel/AMD 伺服器、Apple Silicon Mac，以及 64 位元 ARM 板，包括 **Raspberry Pi 4 和 5**（4-8 GB）。它**無法**執行於 32 位元 ARM（`armv7`/`armhf`），因為沒有為其建置映像檔，也無法執行於 Pi Zero 這類 512 MB 等級的板子，因為它們低於記憶體下限（見下文）。
+**架構：僅支援 64 位元**（`linux/amd64` 或 `linux/arm64`）。SnapOtter 可原生執行於 Intel/AMD 伺服器、Apple Silicon Mac，以及 64 位元 ARM 開發板，包括 **Raspberry Pi 4 與 5**（4-8 GB）。它**無法**在 32 位元 ARM（`armv7`/`armhf`）上執行，因為沒有為其建置映像檔；也無法在 Pi Zero 等 512 MB 等級的開發板上執行，這些開發板低於記憶體下限（見下文）。
 
-### 最低（影像、檔案與輕量 PDF 工具；無 AI） {#minimum-image-files-and-light-pdf-tools-no-ai}
+### 最低（圖片、檔案與輕量 PDF 工具；無 AI） {#minimum-image-files-and-light-pdf-tools-no-ai}
 
 | 資源 | 需求 |
 |---|---|
 | CPU | 2 核心 |
 | RAM | 2 GB |
-| 磁碟 | ~5.5 GB（映像檔）+ 資料磁碟區 |
-| GPU | 非必要 |
+| 磁碟 | 約 5.5 GB（映像檔）+ 資料磁碟區 |
+| GPU | 不需要 |
 
-全部 222 個非 AI 目錄工具，包括影像（調整大小、裁切、轉換、壓縮、調整、浮水印）、影片（修剪、靜音、重新封裝）、音訊（轉換、正規化、修剪）、PDF（合併、分割、壓縮、旋轉、保護）、檔案轉換，以及專屬的轉換預設，都能在一般硬體上執行。即使是大型檔案，多數作業也能在遠低於一秒內完成：一張 2.7 MB 的影像調整大小約需 ~0.05 秒，重新編碼為 WebP 約需 ~2 秒。
+全部 222 個非 AI 目錄工具，包括圖片（調整大小、裁切、轉換、壓縮、調整、浮水印）、影片（剪輯、靜音、重新封裝）、音訊（轉換、正規化、剪輯）、PDF（合併、分割、壓縮、旋轉、保護）、檔案轉換，以及專用的轉換預設，都能在普通硬體上執行。即使是大型檔案，大多數操作也能在不到一秒內完成：2.7 MB 的圖片調整大小約 0.05 秒，重新編碼為 WebP 約 2 秒。
 
-記憶體下限是真實存在的，這來自一次 Docker 資源限制掃描：**512 MB 無法啟動堆疊**（即使是單一影像調整大小也會被終止），**1 GB** 可處理單一檔案作業，但多檔案批次會耗盡記憶體，而 **2 GB / 2 核心** 是能舒適處理批次的最小組態。
+記憶體下限是真實存在的，來自 Docker 資源限制的掃描測試：**512 MB 無法啟動整個堆疊**（連一次圖片調整大小都會被終止），**1 GB** 可處理單一檔案操作，但多檔案批次會耗盡記憶體，而 **2 GB / 2 核心** 是能從容處理非 AI 批次的最小配置。內建的快速 OCR 與 `face-detection` 套件組合也能放進 2 GB，但較大的 AI 套件組合（Whisper、LaMa/DDColor、rembg、RealESRGAN、照片修復，以及 SD1.5 HQ 修補）需要 4 到 8 GB 的 RAM，當可用記憶體低於各套件組合的下限時，會事先被拒絕。
 
 ```yaml
 deploy:
@@ -256,7 +280,7 @@ deploy:
       memory: 2G
 ```
 
-**唯一吃重 CPU 的例外是影片重新編碼。** 串流複製作業（修剪、靜音、容器重新封裝）是瞬間完成的，但轉碼為不同的編解碼器則受限於 CPU。一段 1080p / 45 秒的影片重新編碼為 VP9（WebM），在快速的現代 CPU 上約需 **~40 秒**，在 Apple Silicon 上約 ~45 秒，在較舊的行動 4 核心上約 ~80 秒，在較舊的 4 核心伺服器上則需 **~130 秒**。如果你的工作負載偏重影片，請優先考慮 CPU 核心數與時脈速度，或提高容器的 `cpus:` 限制。隨附的 compose 預設將應用程式上限設為 4 核心（GPU compose 為 8 核心）。
+**唯一吃重 CPU 的例外是影片重新編碼。** 串流複製操作（剪輯、靜音、容器重新封裝）是即時的，但轉碼成不同的編解碼器則受限於 CPU。將 1080p / 45 秒的片段重新編碼為 VP9（WebM），在高速的現代 CPU 上約需 **40 秒**，在 Apple Silicon 上約 45 秒，在較舊的行動版 4 核心上約 80 秒，在較舊的 4 核心伺服器上約需 **130 秒**。如果您的工作負載以影片為主，請優先考慮 CPU 核心數與時脈速度，或調高容器的 `cpus:` 限制：隨附的 compose 預設將應用程式限制為 4 個核心（GPU compose 為 8 個）。
 
 ### 建議（CPU 上的 AI 工具） {#recommended-ai-tools-on-cpu}
 
@@ -264,44 +288,45 @@ deploy:
 |---|---|
 | CPU | 4 核心 |
 | RAM | 4 GB |
-| Disk | 3 GB（影像）+ 約 20 GB（所有選用 AI 套件）+ 工作區 |
-| GPU | 非必要（CPU 後備） |
+| 磁碟 | 3 GB（映像檔）+ 約 20 GB（所有選用 AI 套件）+ 工作區 |
+| GPU | 不需要（退回 CPU） |
 
-**安裝和運行更大的 AI 捆綁包將 RAM 的建議量推至 4 GB。** 如果未安裝可選包，則應用程式空閒時間約為 360 MB。 舊版 Python 工具共享 sidecar，而精確的 OCR 使用固定到活動不可變產生的專用長壽命 dispatcher。 在啟動之前，安裝程式會在候選程式上執行 smoke test。 然後，它會自動切換到新的 dispatcher，並在 garbage collection 之前耗盡先前的 dispatcher。 每個官方準確的 OCR 工件都必須通過 4 GiB cgroup 內最壞情況的 release suite， 雖然 4 GB 主機建議為 Node.js 應用程式留出了空間， Postgres, Redis, 隊列， 並同時進行工作。
+**安裝並執行較大的 AI 套件組合，才是將建議值推高到 4 GB RAM 的原因。** 未安裝任何選用套件時，應用程式閒置的記憶體用量約為 360 MB。舊版 Python 工具共用一個 sidecar，而精準 OCR 則使用專用的長駐分派器，並固定在目前有效的不可變世代。啟用之前，安裝程式會對候選版本執行冒煙測試，接著以原子方式切換到新的分派器，並在垃圾回收之前耗盡舊的分派器。每個官方的精準 OCR 成品都必須在 4 GiB 的 cgroup 內通過其最壞情況的發行測試套件，而主機建議的 4 GB 則為 Node.js 應用程式、Postgres、Redis、佇列與並行工作保留了餘裕。
 
-多數 AI 工具在 CPU 上完全可用；少數確實需要 GPU。在現代 4 核心 CPU 上測得：
+大多數 AI 工具在 CPU 上完全可用；少數工具確實需要 GPU。在現代 4 核心 CPU 上的實測結果：
 
-| AI 工具 | CPU 時間 | CPU 上可用？ |
+| AI 工具 | CPU 耗時 | CPU 上可用？ |
 |---|---|---|
-| 臉部偵測（模糊臉部、智慧裁切、紅眼）、雜訊移除 | 不到 1 秒 | 是 |
-| OCR、轉錄、字幕 | 1-3 秒 | 是 |
-| 上色、臉部強化 | ~10 秒 | 是 |
-| 去背 / 替換 / 模糊 | ~29 秒 | 是（需等待） |
-| AI 放大（RealESRGAN） | 小圖 ~33 秒；大圖需數分鐘 | 勉強可用 — 強烈建議 GPU |
-| 相片修復（完整流程） | 數分鐘 | 否 — 需要 GPU 或快速的多核心 CPU |
+| 臉部偵測（blur-faces、smart-crop、red-eye）、noise-removal | 不到 1 秒 | 可用 |
+| OCR、轉錄、字幕 | 1-3 秒 | 可用 |
+| 上色、臉部增強 | 約 10 秒 | 可用 |
+| 去背 / 替換 / 模糊 | 約 29 秒 | 可用（需要等待） |
+| AI 放大（RealESRGAN） | 小圖約 33 秒；大型圖片需數分鐘 | 勉強可用，強烈建議使用 GPU |
+| 照片修復（完整管線） | 數分鐘 | 不建議，需要 GPU 或高速多核心 CPU |
 
-SnapOtter 刻意不將這些模型下載內建於 Docker 映像檔中。AI 套件組僅在管理員啟用相關工具時才會拉取，儲存於持久化的 `/data/ai` 磁碟區，並由所有依賴相同模型堆疊的工具共用。這讓最終容器映像檔保持精簡，同時仍允許完整的 AI 安裝達到下方較大的儲存數字。
+SnapOtter 刻意不將這些模型下載內建到 Docker 映像檔中。AI 套件組合只會在管理員啟用相關工具時才拉取，儲存在持久化的 `/data/ai` 磁碟區中，並由所有依賴同一模型堆疊的工具共用。這能讓最終的容器映像檔保持精簡，同時仍可讓完整的 AI 安裝達到下方較大的儲存空間數字。
 
-有些工具依賴不只一個共用套件組。舉例來說，證件照同時需要 `background-removal` 和 `face-detection`；如果 `background-removal` 已安裝，啟用證件照只會下載缺少的 `face-detection` 套件組。相同的重用機制適用於所有 AI 工具。
+部分工具依賴一個以上的共用套件組合。例如，證件照需要 `background-removal` 與 `face-detection`；如果 `background-removal` 已安裝，啟用證件照只會下載缺少的 `face-detection` 套件組合。所有 AI 工具都採用同樣的重複使用方式。
 
-可選 AI 包儲存估算：
+選用 AI 套件的儲存空間與 CPU 記憶體下限（SnapOtter 會在分派到 Python sidecar 之前檢查可用記憶體，並在低於套件組合的可用記憶體下限時立即拒絕執行）：
 
-| 套件組 | 磁碟大小 |
-|---|---|
-| 去背 | 4-5 GB |
-| 放大 + 臉部強化 + 雜訊移除 | 5-6 GB |
-| 臉部偵測 | 200-300 MB |
-| 物件消除 + 上色 | 1-2 GB |
-| 精確 OCR（`balanced`/`best`） | ~208-234 MiB 下載 / ~409-488 MiB 安裝 |
-| 相片修復 | 4-5 GB |
-| 轉錄 | 〜600MB |
-| **所有捆綁包** | **已安裝~20 GB** |
+| 套件組合 | 磁碟大小 | CPU 記憶體下限 |
+|---|---|---|
+| 臉部偵測 | 200-300 MB | 2 GB 主機 RAM（約 0.5 GB 可用） |
+| 轉錄 | 約 600 MB | 4 GB 主機 RAM（約 2 GB 可用） |
+| 物件擦除 + 上色 | 1-2 GB | 4 GB 主機 RAM（約 2 GB 可用） |
+| 精準 OCR（`balanced`/`best`） | 下載約 208-234 MiB / 安裝後約 409-488 MiB | 4 GiB 設定的有效記憶體（`fast` 可在 2 GB 上執行） |
+| 去背 | 4-5 GB | 4 GB 主機 RAM（約 2.5 GB 可用） |
+| 放大 + 臉部增強 + 降噪 | 5-6 GB | 4 GB 主機 RAM（約 2.5 GB 可用） |
+| 照片修復 | 4-5 GB | 4 GB 主機 RAM（約 3 GB 可用） |
+| 高品質修補（`inpaint-hq`） | 5-7 GB | 8 GB 主機 RAM（約 6 GB 可用） |
+| **所有套件組合** | **安裝後約 25 GB** | **4 GB（使用 `inpaint-hq` 時為 8 GB）** |
 
-Fast OCR 透過 Tesseract 內建到映像中，增加約 25 個 MiB，並且不需要選購的 OCR 套件或其 4 個 GiB 記憶體需求。 準確的包可以在官方找到 Linux  amd64 和 arm64 容器和運行 ONNX Runtime 在 CPU。 NVIDIA 主機使用相同的 CPU OCR 執行時，因此 OCR 不依賴 CUDA 版本或 GPU 架構。 準確的運行時需要至少 4 GiB 的有效記憶體：配置的容器 cgroup 限制，否則為主機記憶體。 在下載套件之前，SnapOtter 拒絕低於簽章相容性最低值的系統。 在無法保證 libc 和 Python ABI 的 bare-metal/預建檔案上，也會拒絕準確的套件安裝。
+快速 OCR 透過 Tesseract 內建於映像檔，約增加 25 MiB，不需要選用的 OCR 套件或其 4 GiB 記憶體需求。快速模式支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓文（`ko`）或阿拉伯文（`ar`）。這兩者使用 `balanced` 或 `best`，因此需要精準套件。精準套件可在官方的 Linux amd64 與 arm64 容器中使用，並在 CPU 上執行 ONNX Runtime。NVIDIA 主機同樣使用這個 CPU OCR 執行階段，因此 OCR 不依賴 CUDA 版本或 GPU 架構。精準執行階段至少需要 4 GiB 的有效記憶體：即設定的容器 cgroup 限制，若無則為主機記憶體。在下載套件之前，SnapOtter 會拒絕低於該簽署相容性下限的系統。在 libc 與 Python ABI 無法保證的裸機或預先建置封存檔上，同樣會拒絕安裝精準套件。在這些不受支援的主機上，韓文與阿拉伯文 OCR 會回傳明確的不相容錯誤，絕不會悄悄退回快速模式。
 
-共用同一個 `DATA_DIR` 的複本必須使用相同的 CPU 架構；請透過節點親和性將多複本部署固定在相容的節點上。混合使用 amd64/arm64 的複本需要各自獨立的資料磁碟區和 SnapOtter 部署。
+共用同一個 `DATA_DIR` 的複本必須使用相同的 CPU 架構；多複本部署請以節點親和性（node affinity）固定。混合 amd64/arm64 的複本需要各自獨立的資料磁碟區與獨立的 SnapOtter 部署。
 
-精確的運行時保持一代處於活動狀態，並在啟動後清除其下載快取。 對於此版本，首次安裝暫時需要大約 620-720 MiB 用於存檔和暫存，升級可以在老一代保持活動狀態時達到接近 1.2 GiB 的峰值。 安裝程式在下載或提取之前根據簽章索引和當前代計算確切的要求，如果資料量太小，安裝程式會提前失敗。
+精準執行階段只保留一個有效世代，並在啟用後清除其下載快取。在此版本中，首次安裝暫時需要約 620-720 MiB 用於封存檔與暫存，而升級時在舊世代仍為有效的期間，尖峰可能接近 1.2 GiB。安裝程式會在下載或解壓縮之前，根據簽署的索引與目前的世代計算確切需求，若資料磁碟區太小則提早失敗。
 
 ```yaml
 deploy:
@@ -315,28 +340,28 @@ deploy:
 
 | 資源 | 需求 |
 |---|---|
-| CPU | 6-8 核心（即使使用 GPU AI，影片前置處理與並行仍在 CPU 上執行） |
+| CPU | 6-8 核心（即使使用 GPU AI，影片前處理與並行也在 CPU 上執行） |
 | RAM | 8 GB |
-| GPU | NVIDIA，8 GB 以上 VRAM（建議 12 GB） |
-| 磁碟 | 總計 ~35 GB |
+| GPU | NVIDIA，8+ GB VRAM（建議 12 GB） |
+| 磁碟 | 總計約 35 GB |
 
-NVIDIA GPU（CUDA）能大幅加速吃重的 AI 模型。在 RTX 4070 與現代 CPU 上測得：
+NVIDIA GPU（CUDA）能大幅加快大型 AI 模型的速度。在 RTX 4070 與現代 CPU 上的實測比較：
 
-| AI 工具 | GPU 加速倍數 | 備註 |
+| AI 工具 | GPU 加速倍率 | 備註 |
 |---|---|---|
-| AI 放大（RealESRGAN 2×） | **~47×** | 最大的收益 — 不到一秒，對比 ~33 秒（大圖需數分鐘） |
-| 臉部強化（CodeFormer） | **~12×** | ~0.9 秒對比 ~11 秒 |
-| 轉錄（Whisper） | ~4.5× | |
-| 去背 / 替換 / 模糊 | ~4× | GPU 上 ~7 秒對比 CPU 上 ~29 秒 |
-| 上色 | ~1.8× | |
-| OCR、臉部偵測、紅眼、雜訊移除 | ~1× | 在 CPU 上已很快 — GPU 幫不上忙 |
-| 相片修復 | 無 | 即使在 GPU 上也受限於 CPU（0% GPU 使用率）；此處快速的 CPU 比 GPU 更重要 |
+| AI 放大（RealESRGAN 2×） | **約 47×** | 最大的收益：不到一秒，對比約 33 秒（大型圖片需數分鐘） |
+| 臉部增強（CodeFormer） | **約 12×** | 約 0.9 秒對比約 11 秒 |
+| 轉錄（Whisper） | 約 4.5× | |
+| 去背 / 替換 / 模糊 | 約 4× | GPU 約 7 秒，CPU 約 29 秒 |
+| 上色 | 約 1.8× | |
+| OCR、臉部偵測、紅眼、降噪 | 約 1× | 在 CPU 上已經很快，GPU 沒有幫助 |
+| 照片修復 | 無 | 即使有 GPU 也受限於 CPU（GPU 使用率 0%）；在這裡，高速 CPU 比 GPU 更重要 |
 
-值得使用 GPU 的工具是 **放大、臉部強化、轉錄和去背**。臉部偵測、OCR 和紅眼受限於 CPU 且已經很快，因此 GPU 幫不上忙。
+值得配備 GPU 的工具是 **放大、臉部增強、轉錄與去背**。臉部偵測、OCR 與紅眼受限於 CPU 且已經很快，所以 GPU 沒有任何幫助。
 
-在放大搭配臉部強化時，VRAM 峰值使用量達到 7.5 GB。6 GB 的 NVIDIA GPU 對多數個別 AI 工具都能運作，但在放大時會失敗。8-12 GB VRAM 可處理所有情況。
+在放大並搭配臉部增強時，VRAM 用量尖峰可達 7.5 GB。6 GB 的 NVIDIA GPU 能個別執行大多數 AI 工具，但放大會失敗。8-12 GB 的 VRAM 可處理所有項目。
 
-目前不支援透過 VA-API、Quick Sync 或 OpenCL 進行 Intel/AMD iGPU 加速的 AI 推論。將 `/dev/dri` 對應到容器中並不會啟用 AI GPU 加速；除非有 NVIDIA CUDA 可用，否則 SnapOtter 會在 CPU 上執行 AI 工具。
+目前 AI 推論不支援透過 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 內顯加速。將 `/dev/dri` 對應到容器中，並不會啟用 AI 的 GPU 加速；除非有 NVIDIA CUDA，否則 SnapOtter 會在 CPU 上執行 AI 工具。
 
 ```yaml
 deploy:
@@ -353,7 +378,7 @@ deploy:
 
 ### 並行使用者 {#concurrent-users}
 
-對預設限制 4 核心的應用程式容器發出的並行影像調整大小請求：
+針對預設限制為 4 核心的應用程式容器，同時發出圖片調整大小請求的結果：
 
 | 並行請求數 | 平均回應時間 | 錯誤 |
 |---|---|---|
@@ -361,39 +386,39 @@ deploy:
 | 5 | 1.2s | 0 |
 | 10 | 2.1s | 0 |
 
-隨著工作者集區飽和，回應時間以次線性方式劣化，且無錯誤。提高應用程式容器的 `cpus:` 限制（或使用核心數更多的主機）可提升上限。請注意，吃重的作業（影片轉碼、CPU AI）在整個執行期間都會佔住一個工作者，因此請依你預期的並行吃重作業數量來調整 CPU，而不只是依請求數。
+隨著工作執行緒池趨於飽和，回應時間以次線性方式變慢，且沒有錯誤。調高應用程式容器的 `cpus:` 限制（或使用核心數更多的主機）可提高上限。請注意，繁重的工作（影片轉碼、CPU 上的 AI）會在整個執行期間佔用一個工作執行緒，因此請依預期同時執行的繁重工作數量來規劃 CPU，而不只是請求數量。
 
-### 支援的影像格式 {#supported-image-formats}
+### 支援的圖片格式 {#supported-image-formats}
 
-SnapOtter 支援 **55+ 種輸入格式** 與 **14 種輸出格式**，包括來自 20+ 相機品牌的 RAW 檔、專業格式（PSD、EPS、OpenEXR、HDR）、現代編解碼器（JPEG XL、AVIF、HEIC、QOI），以及科學/遊戲格式（FITS、DDS）。
+SnapOtter 支援 **55 種以上的輸入格式**與 **14 種輸出格式**，包括來自 20 多個相機品牌的 RAW 檔案、專業格式（PSD、EPS、OpenEXR、HDR）、現代編解碼器（JPEG XL、AVIF、HEIC、QOI），以及科學與遊戲格式（FITS、DDS）。
 
-關於每種支援格式、使用的解碼器與可用的品質控制的詳細資訊，請參閱[完整格式清單](/zh-TW/guide/supported-formats)。
+每種支援格式、所用解碼器與可用品質控制項的詳細資訊，請參閱[完整格式清單](/zh-TW/guide/supported-formats)。
 
 ### 已知限制 {#known-limitations}
 
-- **內容感知調整大小**在大型影像（>5 MP）上會因 caire 二進位檔的限制而當機。對較小的影像運作正常。
-- **HEIF 解碼**需要 13-23 秒。HEIC（Apple 的變體）快得多，僅需 0.3-0.9 秒。
-- **放大**在 CPU 上對超出小圖的任何影像都會逾時。實務使用需要 GPU。
-- **CodeFormer** 臉部強化明顯比 GFPGAN 慢（GPU 上 53 秒對比 2 秒）。多數使用情境建議使用 GFPGAN。
+- **內容感知調整大小**在處理大型圖片（>5 MP）時會當機，這是 caire 執行檔的限制。較小的圖片可正常運作。
+- **HEIF 解碼**需要 13-23 秒。HEIC（Apple 的變體）快得多，只需 0.3-0.9 秒。
+- **放大**在 CPU 上處理小圖以外的圖片會逾時。實際使用需要 GPU。
+- **CodeFormer** 臉部增強明顯比 GFPGAN 慢（GPU 上為 53 秒對比 2 秒）。大多數使用情境建議使用 GFPGAN。
 
 ## 磁碟區 {#volumes}
 
-| 掛載 / 磁碟區 | 用途 | 是否必要？ |
+| 掛載點 / 磁碟區 | 用途 | 是否必要？ |
 |---|---|---|
-| `/data`（app） | AI 模型、Python venv、使用者檔案 | **是** — 少了會遺失檔案 |
-| `/tmp/workspace`（app） | 暫存處理檔案（自動清理） | 建議 |
-| `SnapOtter-pgdata`（postgres） | PostgreSQL 資料目錄（使用者、設定、管線、作業） | **是** — 少了會遺失資料 |
-| `SnapOtter-redisdata`（redis） | Redis 僅附加檔案，用於持久化的作業佇列 | 建議 |
+| `/data`（app） | AI 模型、Python venv、使用者檔案 | **是**：沒有它會遺失檔案 |
+| `/tmp/workspace`（app） | 暫時性處理檔案（自動清理） | 建議 |
+| `SnapOtter-pgdata`（postgres） | PostgreSQL 資料目錄（使用者、設定、管線、工作） | **是**：沒有它會遺失資料 |
+| `SnapOtter-redisdata`（redis） | 用於持久化工作佇列的 Redis append-only 檔案 | 建議 |
 
-### 繫結掛載 vs. 具名磁碟區 {#bind-mounts-vs-named-volumes}
+### 綁定掛載與具名磁碟區 {#bind-mounts-vs-named-volumes}
 
-**具名磁碟區**（建議）— Docker 會自動管理權限：
+**具名磁碟區**（建議）：由 Docker 自動管理權限：
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**繫結掛載** — 由你管理權限。設定 `PUID`/`PGID` 以符合你的主機使用者：
+**綁定掛載**：由您自行管理權限。請設定 `PUID`/`PGID` 以符合您的主機使用者：
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -402,15 +427,15 @@ environment:
   - PGID=1000    # Your host GID (run: id -g)
 ```
 
-### 儲存權限 {#storage-permissions}
+### 儲存空間權限 {#storage-permissions}
 
-SnapOtter 在執行期間會寫入兩個位置：`/data`（使用者檔案、記錄、AI 模型與 Python venv）和 `/tmp/workspace`（暫存處理暫存區）。兩者都必須可由容器所執行的使用者寫入。若其中之一不可寫入，容器會在**啟動時快速失敗**，並顯示一則訊息，指出該目錄、執行中的 UID/GID，以及修正方式，而不是在啟動時看似「健康」，然後在第一次上傳時以難解的錯誤失敗。
+SnapOtter 在執行階段會寫入兩個位置：`/data`（使用者檔案、日誌、AI 模型與 Python venv）以及 `/tmp/workspace`（暫時性處理暫存區）。兩者都必須可由容器所執行的使用者寫入。如果其中任何一個不可寫入，容器會在**啟動時立即失敗**，並顯示一則訊息，指出目錄、目前執行的 UID/GID 以及修復方式，而不是看似「健康」地啟動，卻在第一次上傳時以含糊的錯誤失敗。日誌目錄（`LOG_DIR`，映像檔中為 `/data/logs`）在每種儲存模式下都以同樣方式檢查，因為即使檔案存放在 S3，日誌仍留在本機。
 
 權限的處理方式取決於容器的啟動方式：
 
-**預設（以 root 啟動，降權至 `snapotter`）** — 進入點以 root 啟動，修正已掛載磁碟區的擁有權，然後透過 `gosu` 降權至非特權的 `snapotter` 使用者。具名磁碟區無需任何設定即可運作。對於繫結掛載，請將 `PUID`/`PGID` 設為你的主機使用者（如上），使它寫入的檔案由你擁有。
+**預設（以 root 啟動，再降權為 `snapotter`）**：entrypoint 以 root 啟動，修正已掛載磁碟區的擁有者，然後透過 `gosu` 降權為非特權的 `snapotter` 使用者。具名磁碟區無須任何設定即可運作。對於綁定掛載，請將 `PUID`/`PGID` 設為您的主機使用者（如上所示），讓它寫入的檔案歸您所有。
 
-**Kubernetes / OpenShift（透過 `runAsUser` 以非 root 執行）** — 直接以非 root 使用者啟動時，容器無法自行 chown 磁碟區，因此協調器必須使其可寫入。請設定 `fsGroup`：
+**Kubernetes / OpenShift（透過 `runAsUser` 以非 root 身分執行）**：直接以非 root 使用者啟動時，容器無法自行對磁碟區執行 chown，因此必須由協調器讓它們可寫入。請設定 `fsGroup`：
 
 ```yaml
 securityContext:
@@ -419,45 +444,45 @@ securityContext:
   fsGroup: 999        # makes mounted volumes writable by the pod
 ```
 
-映像檔的可寫入目錄群組擁有者為 GID 0 且群組可寫入，因此以**任意 UID** 加上 root 補充群組（OpenShift 的預設值）執行的 pod 無需 `chown` 即可寫入。
+映像檔的可寫入目錄由 GID 0 群組擁有且群組可寫入，因此以**任意 UID** 加上 root 補充群組執行的 Pod（OpenShift 預設）無須 `chown` 即可寫入。
 
-**TrueNAS Scale（以及其他「外來 UID」設定）** — TrueNAS 以非 root 使用者執行應用程式（通常是 `568:568`），並掛載由不同使用者擁有的主機資料集，因此進入點和 `fsGroup` 都無法自行使其可寫入。請擇一：
+**TrueNAS Scale（以及其他「外部 UID」設定）**：TrueNAS 以非 root 使用者（通常是 `568:568`）執行應用程式，並掛載由不同使用者擁有的主機資料集，因此 entrypoint 與 `fsGroup` 都無法單獨讓它們可寫入。請擇一處理：
 
-- **以 root 執行應用程式**（建議）— 將應用程式的使用者保持未設定或設為 `0`，讓預設進入點修正權限並降權至 `snapotter`。
-- **以 UID `999` 執行** — 將應用程式的使用者/群組設為 `999:999`（SnapOtter 內建的 `snapotter` 使用者），使其符合映像檔的擁有權。
-- 從 TrueNAS shell 將主機資料集 **`chown`** 至容器所執行的 UID：
+- **以 root 執行應用程式**（建議）：不設定應用程式的使用者，或將其設為 `0`，讓預設的 entrypoint 修正權限並降權為 `snapotter`。
+- **以 UID `999` 執行**：將應用程式的使用者/群組設為 `999:999`（SnapOtter 內建的 `snapotter` 使用者），使其符合映像檔的擁有者設定。
+- 從 TrueNAS shell 對主機資料集執行 **`chown`**，改為容器所執行的 UID：
 
   ```bash
-  # 使用啟動錯誤中的 UID（或在容器內執行 `id`）
+  # Use the UID from the startup error (or run `id` inside the container)
   chown -R 568:568 /mnt/<pool>/<dataset>
   ```
 
-啟動錯誤會指出要使用的確切 UID，因此最快的做法是先啟動一次應用程式、讀取訊息，然後據此 `chown`（或調整使用者）。
+啟動錯誤會指出該使用的確切 UID，因此最快的做法是先啟動一次應用程式，讀取訊息，然後據此 `chown`（或調整使用者）。
 
 ## 環境變數 {#environment-variables}
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | 啟用/停用登入需求 |
+| `AUTH_ENABLED` | `true` | 啟用或停用登入要求 |
 | `DEFAULT_USERNAME` | `admin` | 初始管理員使用者名稱 |
 | `DEFAULT_PASSWORD` | `admin` | 初始管理員密碼（首次登入時強制變更） |
-| `MAX_UPLOAD_SIZE_MB` | `0`（無限制） | 每個檔案的上傳限制（MB）。映像檔出廠即為 `0`；從原始碼建置則從 100 起 |
-| `MAX_BATCH_SIZE` | `0`（無限制） | 每個批次請求的最大檔案數。映像檔出廠即為 `0`；從原始碼建置則從 100 起 |
-| `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 以停用） |
-| `MAX_USERS` | `0`（無限制） | 最大使用者帳號數 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 允許哪些對端透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私有網路 |
-| `PUID` | `999` | 以此 UID 執行（用於繫結掛載權限） |
-| `PGID` | `999` | 以此 GID 執行（用於繫結掛載權限） |
-| `LOG_LEVEL` | `info` | 記錄詳細程度：fatal、error、warn、info、debug、trace |
-| `CONCURRENT_JOBS` | `0`（自動） | 最大並行 AI 處理作業數 |
-| `SESSION_DURATION_HOURS` | `168` | 登入工作階段存留期（7 天） |
-| `CORS_ORIGIN` | （空白） | 以逗號分隔的允許來源，或留空表示同源 |
+| `MAX_UPLOAD_SIZE_MB` | `0`（無限制） | 單一檔案的上傳上限（MB）。映像檔預設為 `0`；從原始碼建置時起始值為 100 |
+| `MAX_BATCH_SIZE` | `0`（無限制） | 每個批次請求的最大檔案數。映像檔預設為 `0`；從原始碼建置時起始值為 100 |
+| `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 可停用） |
+| `MAX_USERS` | `0`（無限制） | 使用者帳號數上限 |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些對端可以透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私人網路 |
+| `PUID` | `999` | 以此 UID 執行（用於綁定掛載權限） |
+| `PGID` | `999` | 以此 GID 執行（用於綁定掛載權限） |
+| `LOG_LEVEL` | `info` | 日誌詳細程度：fatal、error、warn、info、debug、trace |
+| `CONCURRENT_JOBS` | `0`（自動） | 並行 AI 處理工作的最大數量 |
+| `SESSION_DURATION_HOURS` | `168` | 登入工作階段的有效期限（7 天） |
+| `CORS_ORIGIN` | （空白） | 以逗號分隔的允許來源，留空則為同源 |
 
-### 出站代理程式和私人 CA {#outbound-proxy-and-private-ca}
+### 對外代理與私有 CA {#outbound-proxy-and-private-ca}
 
-官方容器啟用了 Node 的環境代理支援。 如果 SnapOtter 必須透過企業代理程式到達 OCR 執行階段儲存庫或其他 HTTPS 服務，請設定 `HTTPS_PROXY`（並在需要時設定 `HTTP_PROXY`）。 將 `NO_PROXY` 設定為必須直接存取的以逗號分隔的主機列表，例如 Postgres、Redis 和內部物件儲存。
+官方容器啟用了 Node 的環境代理支援。如果 SnapOtter 必須透過企業代理連線到 OCR 執行階段儲存庫或其他 HTTPS 服務，請設定 `HTTPS_PROXY`（必要時也設定 `HTTP_PROXY`）。將 `NO_PROXY` 設為必須直接連線的主機清單，以逗號分隔，例如 Postgres、Redis 與內部物件儲存空間。
 
-如果代理程式或內部服務由私有憑證授權單位簽署，請將 CA 憑證掛載為唯讀並將 `NODE_EXTRA_CA_CERTS` 指向它。 Node進程啟動時該檔案必須存在：
+如果代理或內部服務是由私有憑證授權單位簽署，請以唯讀方式掛載該 CA 憑證，並讓 `NODE_EXTRA_CA_CERTS` 指向它。該檔案必須在 Node 處理程序啟動時就已存在：
 
 ```yaml
 services:
@@ -471,11 +496,11 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-將代理憑證保留在 Compose 檔案外部（例如，在受保護的 `.env` 檔案或機密中）。不要停用 TLS 驗證：簽署的 OCR 索引對發布元資料進行身份驗證，而正常的 TLS 驗證仍然保護傳輸和所有其他出站請求。
+請將代理憑證放在 Compose 檔案之外（例如放在受保護的 `.env` 檔案或機密中）。請勿停用 TLS 驗證：簽署的 OCR 索引會驗證發行中繼資料，而一般的 TLS 驗證仍會保護傳輸過程以及所有其他對外請求。
 
 ## 健康檢查 {#health-check}
 
-容器內建健康檢查：
+容器包含內建的健康檢查：
 
 ```bash
 # Check container health status
@@ -488,23 +513,23 @@ curl http://localhost:1349/api/v1/health
 
 ## 反向代理 {#reverse-proxy}
 
-`TRUST_PROXY` 預設為 `loopback,linklocal,uniquelocal`，因此 SnapOtter 只相信來自私有網路對端的 `X-Forwarded-For`。同一主機、Docker 網路或區域網路中的反向代理開箱即受信任，這表示速率限制、登入暴力破解限制、稽核記錄以及 enterprise 版的 IP 允許清單，都不必設定就能看到真實的用戶端 IP。
+`TRUST_PROXY` 預設為 `loopback,linklocal,uniquelocal`，因此 SnapOtter 只會相信來自私人網路對端的 `X-Forwarded-For`。位於同一主機、Docker 網路或區域網路上的反向代理預設即受信任，這表示速率限制、登入暴力破解限制器、稽核日誌與企業版 IP 允許清單，無須任何設定就能看到真實的用戶端 IP。
 
-只有當前置代理從**公開**位址連到 SnapOtter 時才設為 `TRUST_PROXY=true`，例如位於另一個網路的雲端負載平衡器。在直接曝露的執行個體上，這個值會讓 `request.ip` 落入攻擊者手中，因為不斷更換該標頭的呼叫端每次請求都能拿到全新的速率限制計數。
+只有在前端代理是從**公開**位址連線到 SnapOtter 時才設定 `TRUST_PROXY=true`，例如位於不同網路的雲端負載平衡器。在直接對外暴露的執行個體上，該值會讓 `request.ip` 受攻擊者控制，因為呼叫端只要輪替該標頭，每個請求都會得到一個全新的速率限制桶。
 
-動手量測用戶端 IP 之前，有兩件事要知道。macOS 與 Windows 上的 Docker Desktop 透過使用者空間代理提供已發布的連接埠，會把所有來源位址改寫成虛擬機閘道 `192.168.65.1`，因此在那裡無論 `TRUST_PROXY` 設成什麼都拿不回真實用戶端；面向網際網路的部署請放在 Linux 上。而且在任何平台上，經由 `localhost` 連到已發布的連接埠都會被視為橋接閘道而非你的用戶端，所以 localhost 測試完全說明不了真實用戶端是如何歸屬的。`TRUST_PROXY` 各種取值的完整表格與 Docker Desktop 注意事項請見 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy)。
+在測量用戶端 IP 之前，有兩件事需要知道。macOS 與 Windows 上的 Docker Desktop 會透過使用者空間代理提供已發布的連接埠，並將每個來源位址改寫為 VM 閘道 `192.168.65.1`，因此在那裡，任何 `TRUST_PROXY` 的值都無法還原真實的用戶端；任何面向網際網路的部署都請使用 Linux。另外，在任何平台上，透過 `localhost` 連線到已發布的連接埠時，觀察到的會是橋接閘道，而不是您的用戶端，因此 localhost 測試無法說明真實用戶端的歸屬方式。`TRUST_PROXY` 值的完整對照表與 Docker Desktop 的注意事項，請見 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy)。
 
-對於下面的每個代理來說，有兩件事很重要：允許大型請求正文（上傳），並且不緩衝回應。響應緩衝代理會破壞 SSE 進度，更明顯的是，使大文件下載“開始但永遠不會完成”，因為代理在傳遞之前保存整個文件。 SnapOtter 在下載時發送 `X-Accel-Buffering: no`，因此即使在其他地方保留緩衝，nginx 也會對它們進行串流傳輸，但除 nginx 之外的代理需要明確停用回應緩衝（如下面的每個配置所示）。如果下載中途停止，首先要檢查前面的緩衝代理。
+下面每種代理都需要注意兩件事：允許較大的請求本文（上傳），以及不要緩衝回應。緩衝回應的代理會破壞 SSE 進度，更明顯的是會讓大型檔案下載「開始了卻永遠無法完成」，因為代理會先保留整個檔案，才往下傳遞。SnapOtter 在下載時會送出 `X-Accel-Buffering: no`，因此即使其他地方保持緩衝開啟，nginx 也會以串流方式傳送；但 nginx 以外的代理需要明確停用回應緩衝（每個設定範例中都有示範）。如果下載中途停滯，首先要檢查的就是前端是否有緩衝型代理。
 
-關於 HSTS 的說明：API 本身會在每個回應送出 `Strict-Transport-Security`，因此只要代理會原樣傳遞回應標頭（下文所有設定都會這麼做），就不必自行設定 HSTS。唯有當你的代理設定為移除或覆寫上游的回應標頭時，才需要保留該標頭，或在邊緣重新加上它。
+關於 HSTS 的說明：API 會在每個回應中自行送出 `Strict-Transport-Security`，因此會直接傳遞回應標頭的代理（下面所有設定都是如此）無須自行設定 HSTS。只有在您的代理被設定為移除或覆寫上游回應標頭時，才需要保留該標頭，或在邊緣重新加入。
 
 ### Nginx {#nginx}
 
 ```nginx
 server {
-    # 為求簡潔，這裡只顯示純 HTTP。請在你自己的 `listen 443 ssl`
-    # 伺服器區塊中終止 TLS；API 送出的 Strict-Transport-Security 標頭
-    # 會隨著每個經代理的回應一併傳遞，因此該處不需要 add_header。
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -521,20 +546,21 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # 串流響應而不是緩衝：SSE 進度（批次、AI、功能安裝）和大檔案下載需要。
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
 }
 ```
 
-### 部署於子路徑 {#subpath}
+### 部署在子路徑下 {#subpath}
 
-若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器的環境變數中設定 `BASE_PATH=/snapotter`，然後重新啟動。官方的 CPU 與 GPU Compose 檔案也會從你的 shell 或 Compose `.env` 檔案接受 `BASE_PATH`。同一個映像檔可在任何路徑運作，不需要重新建置前端。
+若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器環境中設定 `BASE_PATH=/snapotter` 並重新啟動。官方的 CPU 與 GPU Compose 檔案也接受來自您的 shell 或 Compose `.env` 檔案的 `BASE_PATH`。同一個映像檔可用於任何路徑，無須重新建置前端。
 
-`BASE_PATH` 接受以斜線分隔、包含字母、數字、`_` 或 `-` 的區段，也包含像 `/apps/snapotter` 這樣的巢狀路徑。結尾的斜線可加可不加。留空（預設值），或設為 `/`，即為根目錄部署。
+`BASE_PATH` 接受以斜線分隔、由字母、數字、`_` 或 `-` 組成的區段，包括 `/apps/snapotter` 這類巢狀路徑。結尾的斜線是選用的。若是根路徑部署，請留空（預設值），或設定 `/`。
 
-在你現有的 Nginx HTTPS 伺服器區塊中使用：
+在您現有的 Nginx HTTPS server 區塊中，使用：
 
 ```nginx
 location = /snapotter {
@@ -553,21 +579,21 @@ location /snapotter/ {
 }
 ```
 
-這個範例會保留前置路徑。在轉送前剝除 `/snapotter` 的代理也同樣支援。內部健康檢查可以繼續使用 `/api/v1/health`。若使用 OIDC 或 SAML，還需設定 `EXTERNAL_URL=https://example.com/snapotter`，並將身分提供者的回呼 URL 更新為包含 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
+此範例會保留前綴。在轉送前先移除 `/snapotter` 的代理同樣受到支援。內部健康檢查可以繼續使用 `/api/v1/health`。對於 OIDC 或 SAML，另外請設定 `EXTERNAL_URL=https://example.com/snapotter`，並更新識別提供者的回呼 URL，分別加入 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
 
-API 指令碼維持不變即可運作：API 回應中的 URL（例如工具的 `downloadUrl`）無論 `BASE_PATH` 為何，都會以 `/api/` 開頭。請將它們附加到執行個體的基底 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不是對網域根目錄解析。
+API 指令碼不需修改即可繼續運作：API 回應中的 URL（例如工具的 `downloadUrl`）無論 `BASE_PATH` 為何，都以 `/api/` 開頭。請將它們附加到您執行個體的基礎 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不要依網域根目錄解析它們。
 
-請透過帶有前置路徑的 URL（`https://example.com/snapotter`）開啟 UI。未帶前置路徑抵達的瀏覽器會自動被導向該處；只有 API 請求預期會在不帶前置路徑的情況下到達應用程式。如果日誌顯示 `Requests arrive under /snapotter/ but BASE_PATH is empty`，表示你的代理正在轉送 `BASE_PATH` 未宣告的前置路徑：請將 `BASE_PATH` 設為該路徑，或在代理端剝除該前置路徑。
+請透過帶有前綴的 URL（`https://example.com/snapotter`）開啟使用者介面。沒有帶前綴就抵達的瀏覽器會被自動導向該處；只有 API 請求預期會不帶前綴就送達應用程式。如果日誌顯示 `Requests arrive under /snapotter/ but BASE_PATH is empty`，表示您的代理轉送了 `BASE_PATH` 未宣告的前綴：請將 `BASE_PATH` 設為該前綴，或在代理處移除前綴。
 
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
-1. 新增一個 Proxy Host
-2. 將 Domain Name 設為你的網域
-3. 將 Scheme 設為 `http`，Forward Hostname 設為 `SnapOtter`（或你的容器 IP），Forward Port 設為 `1349`
+1. 新增 Proxy Host
+2. 將 Domain Name 設為您的網域
+3. 將 Scheme 設為 `http`，Forward Hostname 設為 `SnapOtter`（或您的容器 IP），Forward Port 設為 `1349`
 4. 啟用 WebSocket 支援
-5. 在 Advanced 底下，加入：`client_max_body_size 500M;` 和 `proxy_buffering off;`
+5. 在 Advanced 中加入：`client_max_body_size 500M;` 與 `proxy_buffering off;`
 
-API 的 `Strict-Transport-Security` 標頭會原樣通過 NPM；SSL 分頁上的 HSTS 開關只是額外選項。
+API 的 `Strict-Transport-Security` 標頭會原封不動地通過 NPM；SSL 分頁上的 HSTS 開關是額外的選用項目。
 
 ### Traefik {#traefik}
 
@@ -584,7 +610,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-Traefik 會原樣轉送上游的回應標頭，因此 API 的 `Strict-Transport-Security` 標頭無須 `headers` 中介軟體就會送達瀏覽器。如果你已經執行會改寫回應標頭的中介軟體，請確認它會讓該標頭保持原樣。
+Traefik 會原封不動地轉送上游回應標頭，因此 API 的 `Strict-Transport-Security` 標頭不需要 `headers` 中介軟體就能到達瀏覽器。如果您已經執行了會改寫回應標頭的中介軟體，請確認它不會動到該標頭。
 
 ### Caddy {#caddy}
 
@@ -600,7 +626,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` 停用回應緩衝，這是 SSE 進度事件（批次、AI 工具、功能安裝）以及大檔案下載串流（而不是停滯）所必需的。延長的逾時允許完成大檔案上傳，而無需 Caddy 提前關閉連線。Caddy 也會原樣傳遞 API 的 `Strict-Transport-Security` 標頭，因此 HSTS 不需要任何 `header` 指令。
+`flush_interval -1` 會停用回應緩衝，這是 SSE 進度事件（批次處理、AI 工具、功能安裝）以及大型檔案下載以串流方式通過而不停滯所必需的。延長的逾時設定可讓大型檔案上傳順利完成，而不會被 Caddy 提早關閉連線。Caddy 也會原封不動地傳遞 API 的 `Strict-Transport-Security` 標頭，因此 HSTS 不需要 `header` 指令。
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -608,59 +634,59 @@ images.example.com {
 cloudflared tunnel --url http://localhost:1349
 ```
 
-注意：Cloudflare 在免費方案上有 100 MB 的上傳限制。請將 `MAX_UPLOAD_SIZE_MB=100` 設為相符。
+注意：Cloudflare 在免費方案上有 100 MB 的上傳限制。請設定 `MAX_UPLOAD_SIZE_MB=100` 以符合此限制。
 
-通道會轉送 API 的回應標頭，包括 `Strict-Transport-Security`，因此不需要在儀表板中設定 HSTS（Cloudflare 自家邊緣的 HSTS 設定只是額外選項）。
+通道會轉送 API 的回應標頭，包括 `Strict-Transport-Security`，因此不需要在儀表板中設定 HSTS（Cloudflare 自身邊緣的 HSTS 設定則是額外的選用項目）。
 
 ## 疑難排解 {#troubleshooting}
 
-### 首次啟動失敗後立刻出現「Postgres not reachable: EAI_AGAIN」 {#eai-again-after-failed-first-start}
+### 首次啟動失敗後出現「Postgres not reachable: EAI_AGAIN」 {#eai-again-after-failed-first-start}
 
-如果第一次執行 `docker compose up -d` 時中途失敗（最常見的原因是連接埠已被占用），單純重試 `up -d` 可能會啟動應用程式容器，卻沒有將它連上 compose 網路。應用程式接著會陷入不斷重啟的迴圈，並顯示：
+如果第一次 `docker compose up -d` 中途失敗（連接埠已被佔用是常見原因），單純重試 `up -d` 可能會啟動 app 容器，卻沒有將它接上 compose 網路。接著應用程式會不斷崩潰重啟，並出現：
 
 ```
 Postgres not reachable: EAI_AGAIN
 ```
 
-而 `docker ps` 卻顯示 postgres 健康。這個錯誤是真的，但指向了錯誤的容器：少了網路，`postgres` 主機名稱的 DNS 根本無法解析，而重新啟動原則會永遠重播同樣的失敗。
+而 `docker ps` 卻顯示 postgres 是健康的。這個錯誤是真的，但指向了錯誤的容器：沒有網路，`postgres` 主機名稱的 DNS 完全無法解析，而重新啟動原則會永遠重複同樣的失敗。
 
-先修復導致首次啟動失敗的原因（通常是：釋放連接埠），然後強制重新建立應用程式容器，讓它重新連上網路：
+請先修復造成第一次啟動失敗的問題（通常是釋放該連接埠），然後強制重新建立 app 容器，使其重新接上網路：
 
 ```bash
 docker compose up -d --force-recreate SnapOtter
 ```
 
-### Windows：其他裝置可連線，PC 本身卻不行 {#windows-wsl2-loopback}
+### Windows：其他裝置可連線，但 PC 本身不行 {#windows-wsl2-loopback}
 
-當 Docker 在 WSL2 內執行（Windows 上常見的設定）時，整個堆疊可能可以從網路上的其他每一台機器連線，但 Windows 主機本身的 `http://localhost:1349` 卻逾時，即使已啟用 WSL 的鏡像網路模式也一樣。該連接埠永遠不會出現在 Windows 的 `netstat` 中，而容器本身沒有任何問題。
+當 Docker 執行於 WSL2 內（常見的 Windows 設定）時，堆疊可能可以從網路上的其他每台機器連線，但在 Windows 主機本身上，`http://localhost:1349` 卻逾時，即使啟用了 WSL 的鏡像網路模式也一樣。該連接埠不會出現在 Windows 的 `netstat` 中，而容器本身並沒有任何問題。
 
-請從其他裝置開啟應用程式，或在發行版內使用它自己的位址（在 WSL shell 中執行 `hostname -I`）開啟。如果你的 WSL 版本剛好能讓 localhost 轉送運作，就把它當成額外的好處，而不是可以依賴的功能。
+請從另一台裝置開啟應用程式，或在發行版內使用它自己的位址（在 WSL shell 中使用 `hostname -I`）。如果 localhost 轉送在您的 WSL 版本上剛好可用，請把它視為額外的好處，而不要依賴它。
 
 ## CI/CD {#ci-cd}
 
 GitHub 儲存庫有三個工作流程：
 
-- **ci.yml** — 在每次推送與 PR 時自動執行。進行 lint、型別檢查、測試、建置，並驗證 Docker 映像檔（不推送）。
-- **release.yml** — 透過 `workflow_dispatch` 手動觸發。執行 semantic-release 以建立版本標籤與 GitHub 發行，然後建置多架構 Docker 映像檔（amd64 + arm64）並推送到 Docker Hub（`snapotter/snapotter`）和 GitHub Container Registry（`ghcr.io/snapotter-hq/snapotter`）。
-- **deploy-docs.yml** — 建置這個文件網站，並在推送到 `main` 時部署到 Cloudflare Pages。
+- **ci.yml**：在每次推送與 PR 時自動執行。進行 Lint、型別檢查、測試、建置，並驗證 Docker 映像檔（不推送）。
+- **release.yml**：透過 `workflow_dispatch` 手動觸發。執行 semantic-release 以建立版本標籤與 GitHub release，接著建置多架構 Docker 映像檔（amd64 + arm64），並推送到 Docker Hub（`snapotter/snapotter`）與 GitHub Container Registry（`ghcr.io/snapotter-hq/snapotter`）。
+- **deploy-docs.yml**：在推送到 `main` 時，建置本文件網站並部署到 Cloudflare Pages。
 
-若要建立發行，請在 GitHub UI 中前往 **Actions > Release > Run workflow**，或執行：
+若要建立發行版本，請在 GitHub 使用者介面中前往 **Actions > Release > Run workflow**，或執行：
 
 ```bash
 gh workflow run release.yml
 ```
 
-Semantic-release 會依提交歷史決定版本。`latest` Docker 標籤永遠指向最近一次的發行。
+Semantic-release 會根據提交歷史決定版本。`latest` Docker 標籤一律指向最新的發行版本。
 
 ## 分析 {#analytics}
 
-SnapOtter 包含匿名的產品分析（工具使用模式、錯誤回報），以協助抓出錯誤並改善功能。它預設為開啟。你的檔案、檔案名稱與個人資料絕不屬於這些資料的一部分。停用分析後，SnapOtter 仍正常運作。
+SnapOtter 包含匿名產品分析（工具使用模式、錯誤報告），以協助找出錯誤並改進功能。此功能預設為開啟。您的檔案、檔名與個人資料絕不會成為其中的一部分。停用分析後，SnapOtter 仍可正常運作。
 
 ### 停用分析 {#disabling-analytics}
 
-執行期間的退出是一鍵式的管理員切換。開啟 Settings > System > Privacy，關閉 Anonymous Product Analytics。它會立即對整個執行個體停止，無需重新建置。
+執行階段的退出方式是管理員的一鍵開關。開啟「設定 > 系統 > 隱私權」，並關閉匿名產品分析。整個執行個體會立即停止，無須重新建置。
 
-若要取得一個絕不會發出分析的映像檔，請透過複製儲存庫並重新建置來設定建置時的硬性關閉：
+若要取得永遠不會送出分析的映像檔，請複製儲存庫並重新建置，設定建置時的硬性關閉：
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -669,7 +695,7 @@ docker compose -f docker/docker-compose.yml build --build-arg SNAPOTTER_ANALYTIC
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-或將建置引數加入你現有的 `docker-compose.yml`：
+或將建置參數加入您現有的 `docker-compose.yml`：
 
 ```yaml
 services:

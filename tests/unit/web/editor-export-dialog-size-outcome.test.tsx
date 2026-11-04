@@ -791,7 +791,7 @@ describe("server-converted formats follow 202 progress and surface errors (#2171
     },
   );
 
-  it("surfaces the worker's error message in a toast when a 202 export fails on the stream", async () => {
+  it("toasts the translated fallback, not the worker's English text, when a 202 export fails on the stream", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -817,7 +817,7 @@ describe("server-converted formats follow 202 progress and surface errors (#2171
     });
 
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Encoder out of memory: Try smaller dimensions"),
+      expect(toastError).toHaveBeenCalledWith(en.errors.processingFailedNoDetail),
     );
     expect(markClean).not.toHaveBeenCalled();
     expect(await exported()).toEqual([
@@ -1014,13 +1014,13 @@ describe("server-converted formats follow 202 progress and surface errors (#2171
       "a 400 error with details",
       400,
       { error: "Invalid settings", details: "quality: out of range" },
-      "Invalid settings: quality: out of range",
+      en.editor.ui.exportDialog.exportFailed,
     ],
     [
       "a 422 error with details alone",
       422,
       { details: "Image exceeds maximum allowed megapixels" },
-      "Image exceeds maximum allowed megapixels",
+      en.editor.ui.exportDialog.exportFailed,
     ],
     ["a 413 payload too large", 413, { error: "Payload Too Large" }, en.errors.fileTooLarge],
     [
@@ -1030,7 +1030,7 @@ describe("server-converted formats follow 202 progress and surface errors (#2171
       en.editor.ui.exportDialog.exportFailed,
     ],
   ])(
-    "turns %s into a readable toast via parseApiError/failedAnswerMessage",
+    "turns %s into a translated toast via failedAnswerMessage, keeping the server reason out of it",
     async (_label, status, body, expectedMessage) => {
       vi.stubGlobal(
         "fetch",

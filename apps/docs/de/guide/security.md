@@ -1,64 +1,61 @@
 ---
-description: "Leitfaden zur Sicherheitshärtung für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker-Secrets, Kubernetes-Deployment und Compliance-Artefakte."
-i18n_source_hash: f37bcb6cc1c5
+description: "Sicherheitshärtungsleitfaden für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker Secrets, Kubernetes-Bereitstellung und Compliance-Artefakte."
+i18n_source_hash: 5cf773ddb4c0
 i18n_provenance: machine
-i18n_output_hash: ec85a2663f1c
+i18n_output_hash: 754972374965
 i18n_hash_version: 2
 ---
 
-# Sicherheit & Härtung {#security-hardening}
+# Sicherheit und Härtung {#security-hardening}
 
-SnapOtter verarbeitet Dateien vollständig auf deiner Infrastruktur. Es sendet standardmäßig anonyme, inhaltsfreie Produkt-Analytics und Absturzberichte, um das Projekt zu verbessern. Es sendet niemals deine Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bild-Metadaten oder Dokumenttext. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur wenn Analytics aktiviert ist, und Kontaktfelder werden nur mit ausdrücklicher Kontaktzustimmung einbezogen. Ein Administrator kann Analytics und Feedback-Erfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, kein Neuaufbau erforderlich. Die Dateiverarbeitung bleibt immer innerhalb deines Containers.
+SnapOtter verarbeitet Dateien vollständig auf Ihrer Infrastruktur. Standardmäßig sendet es anonyme, inhaltsfreie Produktanalysen und Absturzberichte, um das Projekt zu verbessern. Es sendet niemals Ihre Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur bei aktivierten Analysen, und Kontaktfelder sind nur mit ausdrücklicher Kontakteinwilligung enthalten. Ein Administrator kann Analysen und die Feedbackerfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, ohne Neubau. Die Dateiverarbeitung bleibt immer innerhalb Ihres Containers.
 
-Der Container läuft als dedizierter Non-Root-Benutzer (`snapotter`) mit allen entfernten Linux-Capabilities außer dem minimal erforderlichen Satz. Für die vollständige Richtlinie zur Offenlegung von Schwachstellen und die Sicherheitsarchitektur siehe [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) auf GitHub.
+Der Container läuft als dedizierter Nicht-root-Benutzer (`snapotter`), bei dem alle Linux-Capabilities bis auf die minimal erforderliche Menge entfernt sind. Die vollständige Richtlinie zur Offenlegung von Schwachstellen und die Sicherheitsarchitektur finden Sie in [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) auf GitHub.
 
-## Containerhärtung {#container-hardening}
+## Container-Härtung {#container-hardening}
 
-Die kanonischen Compose-Dateien [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) sind die Quelle der Wahrheit. Kopieren Sie kein gekürztes Beispiel in die Produktion. Stellen Sie die Datei mit dem von Ihnen überprüften Release-Tag bereit.
+Die kanonischen Compose-Dateien für [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) und [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) sind die maßgebliche Quelle. Kopieren Sie kein verkürztes Beispiel in die Produktion; stellen Sie die Datei aus dem von Ihnen geprüften Release-Tag bereit.
 
-Beide Stapel wenden die folgenden Steuerelemente an:
+Beide Stacks wenden folgende Kontrollen an:
 
-- Speicher-, Swap-, CPU- und PID-Grenzwerte führen zu einer außer Kontrolle geratenen nativen Verarbeitung.
-- Jeder Dienst lässt alle Linux-Funktionen fallen. Die Anwendung fügt nur `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` für den Volume-Besitz, den unidirektionalen `gosu`-Identitätsverlust und die ordnungsgemäße Signalweiterleitung zurück. PostgreSQL und Redis erhalten nur die Teilmenge, die ihre offiziellen Einstiegspunkte benötigen.
+- Limits für Speicher, Swap, CPU und PIDs begrenzen außer Kontrolle geratene native Verarbeitung.
+- Jeder Dienst entfernt alle Linux-Capabilities. Die Anwendung fügt nur `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` für die Volume-Eigentümerschaft, den unumkehrbaren Identitätswechsel mit `gosu` und die ordnungsgemäße Signalweiterleitung wieder hinzu. PostgreSQL und Redis erhalten nur die Teilmenge, die ihre offiziellen Entrypoints benötigen.
+- `security_opt: [no-new-privileges:true]` verhindert, dass Prozesse in den Containern von Anwendung, PostgreSQL und Redis zusätzliche Rechte erlangen. Das bleibt mit `gosu` kompatibel: Der Entrypoint beginnt als root, bereitet die Volumes vor und wechselt erst dann zum dedizierten Benutzer `snapotter`.
+- Die Image-Eingaben von PostgreSQL und Redis sind per Digest fixiert. Auch die Anwendung sollte auf ein geprüftes Release-Tag oder einen Digest fixiert werden statt auf `latest`.
+- Health-Checks, begrenzte JSON-Log-Rotation, dauerhaftes Redis-AOF und die Neustart-Richtlinie sind zentral in den kanonischen Dateien definiert.
 
-– `security_opt: [no-new-privileges:true]` verhindert, dass Prozesse in den Anwendungs-, PostgreSQL- und Redis-Containern zusätzliche Berechtigungen erhalten. Dies bleibt mit `gosu` kompatibel: Der Einstiegspunkt beginnt als Root, bereitet die Volumes vor und fällt nur auf den dedizierten `snapotter`-Benutzer.
+Binden Sie bei einer aus dem Internet erreichbaren Bereitstellung Port 1349 an Loopback und beenden Sie TLS an einem gepflegten Reverse-Proxy. Erzeugen Sie eindeutige Zugangsdaten für PostgreSQL und Redis, speichern Sie Secrets in geschützten Dateien oder einem Secret-Manager und ändern Sie das initiale Administratorpasswort umgehend.
 
-– PostgreSQL- und Redis-Bildeingaben werden durch Digest gepinnt. Die Anwendung sollte ebenfalls an ein verifiziertes Release-Tag oder Digest angeheftet werden und nicht an `latest`.
+### Warum `read_only` nicht gesetzt ist {#why-read-only-is-not-set}
 
-– Gesundheitsprüfungen, begrenzte JSON-Protokollrotation, dauerhaftes Redis AOF und Neustartrichtlinie werden zentral in den kanonischen Dateien definiert.
+`read_only: true` ist nicht gesetzt, weil die PUID/PGID-Umsetzung beim Start nach `/etc/passwd` und `/etc/group` schreibt. Wenn Sie anstelle von PUID/PGID das Docker-Flag `--user` oder Kubernetes `runAsUser` verwenden, können Sie bedenkenlos ein schreibgeschütztes Root-Dateisystem aktivieren.
 
-Binden Sie für eine mit dem Internet verbundene Bereitstellung Port 1349 an den Loopback und beenden Sie TLS an einem verwalteten Reverse-Proxy. Generieren Sie eindeutige PostgreSQL- und Redis-Anmeldeinformationen, speichern Sie Geheimnisse in geschützten Dateien oder einem Secret Manager und ändern Sie sofort das anfängliche Administratorkennwort.
+## Netzwerkisolierung {#network-isolation}
 
-### Warum `read_only` nicht auf {#why-read-only-is-not-set} gesetzt ist
+Die Dateiverarbeitung ist lokal, aber eine Standardinstallation ist **kein System ohne ausgehenden Datenverkehr**. Anonyme Produktanalysen verwenden PostHog und die Absturzberichte Sentry, wenn die Telemetrie aktiviert ist. Setzen Sie `SNAPOTTER_TELEMETRY=0` (oder deaktivieren Sie Analysen unter Einstellungen > System > Datenschutz), um beides auszuschalten. SnapOtter nimmt niemals hochgeladene Dateien, Dateinamen, OCR-Ausgaben, Dokumenttexte oder andere Dateiinhalte in diese Ereignisse auf.
 
-`read_only: true` ist nicht festgelegt, da die PUID/PGID-Neuzuordnung beim Start in `/etc/passwd` und `/etc/group` schreibt. Wenn Sie das `--user`-Flag von Docker oder Kubernetes `runAsUser` anstelle von PUID/PGID verwenden, können Sie sicher ein schreibgeschütztes Root-Dateisystem aktivieren.
-
-## Netzwerkisolation {#network-isolation}
-
-Die Dateiverarbeitung erfolgt lokal, aber eine Standardinstallation ist **kein ausgangsfreies System**. Anonyme Produktanalysen nutzen PostHog und Absturzberichte nutzen Sentry, wenn Telemetrie aktiviert ist. Stellen Sie `SNAPOTTER_TELEMETRY=0` ein (oder deaktivieren Sie die Analyse unter Einstellungen > System > Datenschutz), um beides zu deaktivieren. SnapOtter bezieht niemals hochgeladene Dateien, Dateinamen, OCR-Ausgaben, Dokumenttexte oder andere Dateiinhalte in diese Ereignisse ein.
-
-Anderer ausgehender Datenverkehr ist funktionsgesteuert: Die AI-Bundle-/Modellinstallation lädt signierte Release-Eingaben herunter; Der URL-Import ruft eine vom Benutzer angeforderte öffentliche URL ab. und explizit konfigurierte OIDC, SAML, OpenTelemetry, Webhooks, S3-kompatibler Speicher oder ähnliche Integrationen wenden sich an die vom Administrator ausgewählten Ziele. Modell-Downloads zur Laufzeit sind standardmäßig deaktiviert. Setzen Sie `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` nur, um automatische Fallback-Downloads ausdrücklich zu aktivieren. Ein [Offline-Bundle-Import](/de/guide/deployment) kann KI-Funktionen ohne Laufzeitmodellausgang bereitstellen.
+Anderer ausgehender Datenverkehr ist funktionsabhängig: Die Installation von KI-Bundles/-Modellen lädt signierte Release-Eingaben herunter; der URL-Import ruft eine vom Benutzer angeforderte öffentliche URL ab; und ausdrücklich konfigurierte Integrationen wie OIDC, SAML, OpenTelemetry, Webhooks, S3-kompatibler Speicher oder Ähnliches kontaktieren die vom Administrator gewählten Ziele. Modell-Downloads zur Laufzeit sind standardmäßig deaktiviert. Setzen Sie `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` nur, wenn Sie sich ausdrücklich für automatische Fallback-Downloads entscheiden. Ein [Offline-Bundle-Import](/de/guide/deployment) kann KI-Funktionen ohne ausgehenden Modell-Datenverkehr zur Laufzeit bereitstellen.
 
 **Firewall-Empfehlungen:**
 
-|Szenario|Ausgehende Regel|
+| Szenario | Regel für ausgehenden Datenverkehr |
 |---|---|
-|Luftspaltig|Legen Sie `SNAPOTTER_TELEMETRY=0` und `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` fest, verwenden Sie den Offline-AI-Bundle-Import, deaktivieren Sie den URL-Import und externe Integrationen und blockieren Sie dann den ausgehenden Datenverkehr|
-|Standardtelemetrie|Erlauben Sie die in Ihren Browser-/Netzwerkprotokollen aufgeführten PostHog- und Sentry-Endpunkte; Deaktivieren Sie die Telemetrie, wenn die Richtlinie dies nicht zulässt|
-|KI-Pakete erforderlich|Erlauben Sie während der Installation HTTPS zu `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; Blockieren Sie dann diese Hosts|
-|Externe Integrationen|Lassen Sie nur die genauen vom Administrator konfigurierten OIDC-/SAML-/OTLP-/Webhook-/Objektspeicherziele zu|
+| Air-Gap | Setzen Sie `SNAPOTTER_TELEMETRY=0` und `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`, nutzen Sie den Offline-Import von KI-Bundles, deaktivieren Sie URL-Import und externe Integrationen und blockieren Sie dann den ausgehenden Datenverkehr |
+| Standard-Telemetrie | Erlauben Sie die PostHog- und Sentry-Endpunkte aus Ihren Browser-/Netzwerk-Logs; deaktivieren Sie die Telemetrie, wenn die Richtlinie sie nicht zulässt |
+| KI-Bundles erforderlich | Erlauben Sie während der Installation HTTPS zu `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; blockieren Sie diese Hosts danach |
+| Externe Integrationen | Erlauben Sie nur die genauen vom Administrator konfigurierten Ziele für OIDC/SAML/OTLP/Webhook/Objektspeicher |
 
-Bundle-Archive werden vom Xet-Speicher von Hugging Face bereitgestellt, der parallel über die `*.xethub.hf.co`-Endpunkte übertragen wird und Paket-Downloads mit mehreren GB schnell ermöglicht. Wenn Ihre Firewall `huggingface.co` zulässt, `*.xethub.hf.co` jedoch blockiert, sind Installationen weiterhin erfolgreich, greifen jedoch auf einen langsameren Single-Stream-Download zurück. Setzen Sie die Xet-Hosts daher auf die Zulassungsliste, um auf dem schnellen Pfad zu bleiben. Vollständige Offline-Installationen können dies alles überspringen und stattdessen [Offline-Bundle-Import](/de/guide/deployment) verwenden.
+Bundle-Archive werden aus dem Xet-Speicher von Hugging Face ausgeliefert, der über die `*.xethub.hf.co`-Endpunkte parallel überträgt und Downloads von Bundles mit mehreren GB schnell macht. Wenn Ihre Firewall `huggingface.co` erlaubt, aber `*.xethub.hf.co` blockiert, gelingen Installationen weiterhin, fallen aber auf einen langsameren Download mit einem einzelnen Stream zurück. Setzen Sie die Xet-Hosts daher auf die Allowlist, um den schnellen Weg zu behalten. Vollständig offline durchgeführte Installationen können all das überspringen und stattdessen den [Offline-Bundle-Import](/de/guide/deployment) nutzen.
 
-Informationen zur Reverse-Proxy-Konfiguration (Nginx, Traefik, Caddy, Cloudflare Tunnels) finden Sie im [Bereitstellungshandbuch](/de/guide/deployment#reverse-proxy).
+Die Konfiguration von Reverse-Proxys (Nginx, Traefik, Caddy, Cloudflare Tunnels) finden Sie in der [Bereitstellungsanleitung](/de/guide/deployment#reverse-proxy).
 
-## Docker-Secrets {#docker-secrets}
+## Docker Secrets {#docker-secrets}
 
-Für Produktions-Deployments solltest du das Übergeben von Secrets als Klartext-Umgebungsvariablen vermeiden. Der Entrypoint unterstützt Dockers `_FILE`-Konvention: Binde ein Secret als Datei ein und setze die entsprechende `_FILE`-Variable auf ihren Pfad.
+Vermeiden Sie bei Produktivbereitstellungen, Secrets als Klartext-Umgebungsvariablen zu übergeben. Der Entrypoint unterstützt die Docker-Konvention `_FILE`: Binden Sie ein Secret als Datei ein und setzen Sie die entsprechende Variable `_FILE` auf deren Pfad.
 
 **Unterstützte Secrets:**
 
-| Variable | `_FILE`-Entsprechung |
+| Variable | Entsprechung mit `_FILE` |
 |---|---|
 | `DEFAULT_PASSWORD` | `DEFAULT_PASSWORD_FILE` |
 | `COOKIE_SECRET` | `COOKIE_SECRET_FILE` |
@@ -93,9 +90,9 @@ secrets:
 Docker-Compose-Secrets (ohne Swarm) erfordern Compose v2.23 oder neuer.
 :::
 
-## Kubernetes-Deployment {#kubernetes-deployment}
+## Kubernetes-Bereitstellung {#kubernetes-deployment}
 
-Der Entrypoint erkennt, wenn der Container bereits als Non-Root läuft (z. B. über Kubernetes `runAsUser`), und überspringt den gosu-Privilegienabwurf automatisch. In diesem Fall kann er die eingebundenen Volumes nicht selbst chownen, daher überprüft er, ob sie beschreibbar sind, und beendet sich frühzeitig mit umsetzbaren Hinweisen, falls nicht - siehe [Speicherberechtigungen](/de/guide/deployment#storage-permissions) für `fsGroup`- und Fremd-UID-Setups (TrueNAS, OpenShift).
+Der Entrypoint erkennt, wenn der Container bereits als Nicht-root-Benutzer läuft (z. B. über Kubernetes `runAsUser`), und überspringt den gosu-Rechtewechsel automatisch. In diesem Fall kann er die eingebundenen Volumes nicht selbst per chown übernehmen. Er prüft daher, ob sie beschreibbar sind, und bricht frühzeitig mit umsetzbaren Hinweisen ab, falls nicht. Siehe [Speicherberechtigungen](/de/guide/deployment#storage-permissions) für `fsGroup` und Setups mit fremder UID (TrueNAS, OpenShift).
 
 **Empfohlener Pod-SecurityContext:**
 
@@ -164,26 +161,26 @@ spec:
             sizeLimit: 2Gi
 ```
 
-Da `runAsUser: 999` auf Pod-Ebene gesetzt ist, überspringt der Entrypoint gosu vollständig. Dies erlaubt die Capabilities `allowPrivilegeEscalation: false` und `drop: [ALL]` ohne Konflikt.
+Da `runAsUser: 999` auf Pod-Ebene gesetzt ist, überspringt der Entrypoint gosu vollständig. Das erlaubt die Capabilities `allowPrivilegeEscalation: false` und `drop: [ALL]` ohne Konflikt.
 
-Für die Ressourcendimensionierung siehe [Hardware-Anforderungen](/de/guide/deployment#hardware-requirements).
+Hinweise zur Ressourcendimensionierung finden Sie unter [Hardwareanforderungen](/de/guide/deployment#hardware-requirements).
 
-## Sicherung und Wiederherstellung {#backup-and-recovery}
+## Backup und Wiederherstellung {#backup-and-recovery}
 
-Der Compose-Produktionsstapel definiert vier Bände. Stoppen Sie den eingehenden Datenverkehr und lassen Sie aktive Jobs beenden, bevor Sie ein koordiniertes Backup erstellen, damit PostgreSQL, Redis und Dateistatus denselben Zeitpunkt beschreiben.
+Der Produktions-Compose-Stack definiert vier Volumes. Stoppen Sie den eingehenden Datenverkehr und lassen Sie aktive Aufträge abschließen, bevor Sie ein koordiniertes Backup erstellen, damit PostgreSQL, Redis und der Dateizustand denselben Zeitpunkt beschreiben.
 
-|Volumen|Inhalt|Erholungsbehandlung|
+| Volume | Inhalt | Behandlung bei der Wiederherstellung |
 |---|---|---|
-|`SnapOtter-pgdata`|PostgreSQL-Benutzer, Einstellungen, Pipelines, Jobs, Dateimetadaten und Prüfprotokoll|Kritisch; Verwenden Sie einen ausfallsicheren logischen Speicherauszug für die tragbare Wiederherstellung|
-|`SnapOtter-data`|Gespeicherte Bibliotheksobjekte, Protokolle und AI-Status (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Sichern Sie das gesamte Volume; Um Platz zu sparen, lassen Sie bewusst alle AI-Status weg und installieren Sie die Bundles neu|
-|`SnapOtter-redisdata`|Redis AOF für dauerhaften BullMQ-Warteschlangenstatus|Sichern Sie, nachdem Sie die App angehalten und `SAVE` erzwungen haben. erforderlich, um die in der Warteschlange befindliche Arbeit genau fortzusetzen|
-|`SnapOtter-workspace`|Temporäre Objektspeicherschlüssel (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Führen Sie kein Backup durch, nachdem alle Jobs gelöscht oder abgebrochen wurden. Verwerfen Sie es niemals, während Jobs aktiv sind|
+| `SnapOtter-pgdata` | PostgreSQL-Benutzer, Einstellungen, Pipelines, Aufträge, Dateimetadaten und Audit-Log | Kritisch; verwenden Sie für eine portable Wiederherstellung einen fail-fast-Logikdump |
+| `SnapOtter-data` | Gespeicherte Bibliotheksobjekte, Logs und KI-Zustand (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Sichern Sie das gesamte Volume; um Platz zu sparen, lassen Sie den gesamten KI-Zustand bewusst weg und installieren Sie die Bundles neu |
+| `SnapOtter-redisdata` | Redis-AOF für den dauerhaften BullMQ-Warteschlangenzustand | Sichern Sie nach dem Pausieren der App und dem Erzwingen von `SAVE`; erforderlich, um in die Warteschlange gestellte Arbeit exakt fortzusetzen |
+| `SnapOtter-workspace` | Temporäre Objektspeicher-Schlüssel (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Nicht sichern, nachdem alle Aufträge abgearbeitet oder abgebrochen wurden; niemals verwerfen, solange Aufträge aktiv sind |
 
-Compose stellt Volume-Namen normalerweise den Projektnamen voran. Lösen Sie das tatsächliche Quell-Volume aus dem gemounteten Container auf, anstatt davon auszugehen, dass ein Anzeigename wie `SnapOtter-data` der Name des Docker-Volumes ist.
+Compose stellt Volume-Namen normalerweise den Projektnamen voran. Ermitteln Sie das tatsächliche Quell-Volume aus dem eingebundenen Container, anstatt anzunehmen, dass ein Anzeigename wie `SnapOtter-data` der Name des Docker-Volumes ist.
 
-### Datenbanksicherung {#database-backup}
+### Datenbank-Backup {#database-backup}
 
-Verwenden Sie das benutzerdefinierte Archivformat von PostgreSQL und überprüfen Sie das Archiv, bevor Sie die Sicherung als abgeschlossen betrachten:
+Verwenden Sie das benutzerdefinierte Archivformat von PostgreSQL und überprüfen Sie das Archiv, bevor Sie das Backup als vollständig betrachten:
 
 ```bash
 docker exec SnapOtter-postgres \
@@ -197,13 +194,13 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Testen Sie jedes Backup, indem Sie es in einem isolierten Stapel wiederherstellen, Datenbankeinträge und Dateiprüfsummen überprüfen und die Anwendung starten. Das `tests/qa/backup-restore-drill.sh` des Repositorys automatisiert dieses Release-Gate gegen ein explizites `QA_IMAGE`.
+Testen Sie jedes Backup, indem Sie es in einen isolierten Stack zurückspielen, Datenbankeinträge und Datei-Prüfsummen kontrollieren und die Anwendung starten. Das `tests/qa/backup-restore-drill.sh` des Repositorys automatisiert dieses Release-Gate gegen ein explizites `QA_IMAGE`.
 
-Wenn Ihre Plattform stattdessen absturzkonsistente Volume-Snapshots erstellt, stoppen Sie zuerst den gesamten Stack und erstellen Sie Snapshots aller kritischen Volumes als einen Satz. Eine Rohkopie des PostgreSQL-Datenverzeichnisses aus einem laufenden Container ist kein unterstütztes logisches Backup.
+Wenn Ihre Plattform stattdessen absturzkonsistente Volume-Snapshots erstellt, stoppen Sie zuerst den gesamten Stack und erstellen Sie von allen kritischen Volumes einen Snapshot als einen Satz. Eine Rohkopie des PostgreSQL-Datenverzeichnisses aus einem laufenden Container ist kein unterstütztes logisches Backup.
 
-### Datei- und Warteschlangensicherung {#file-and-queue-backup}
+### Datei- und Warteschlangen-Backup {#file-and-queue-backup}
 
-Halten Sie die Anwendung an, bevor Sie Datei- und Warteschlangenvolumes erfassen. Verwenden Sie `docker inspect`, um den tatsächlichen Volume-Namen aufzulösen, Redis zu zwingen, seinen aktuellen Status beizubehalten, und unter Beibehaltung von Besitz und Berechtigungen zu archivieren:
+Pausieren Sie die Anwendung, bevor Sie Datei- und Warteschlangen-Volumes sichern. Verwenden Sie `docker inspect`, um den tatsächlichen Volume-Namen zu ermitteln, erzwingen Sie, dass Redis seinen aktuellen Zustand persistiert, und archivieren Sie mit erhaltener Eigentümerschaft und Berechtigungen:
 
 ```bash
 docker stop SnapOtter
@@ -221,28 +218,28 @@ docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-Starten Sie Redis vor der Anwendung neu. Wenn Sie `/data/ai` absichtlich ausschließen, entfernen Sie den gesamten AI-Teilbaum, anstatt einen `installed.json`-Datensatz ohne seine Modelle oder die virtuelle Umgebung beizubehalten. Bewahren Sie Sicherungsdateien verschlüsselt, zugriffskontrolliert und getrennt vom Host auf, auf dem SnapOtter ausgeführt wird.
+Starten Sie Redis vor der Anwendung neu. Wenn Sie `/data/ai` absichtlich ausschließen, entfernen Sie den gesamten KI-Unterbaum, anstatt einen `installed.json`-Eintrag ohne seine Modelle oder virtuelle Umgebung beizubehalten. Halten Sie Backup-Dateien verschlüsselt, zugriffsgeschützt und getrennt vom Host, auf dem SnapOtter läuft.
 
 ## Compliance-Artefakte {#compliance-artifacts}
 
-Jede SnapOtter-Version enthält die folgenden Sicherheitsartefakte:
+Jedes SnapOtter-Release enthält die folgenden Sicherheitsartefakte:
 
-| Artefakt | Format | Wo es zu finden ist |
+| Artefakt | Format | Fundort |
 |---|---|---|
-| Betreffbindung freigeben | Kanonische JSON + GitHub-Bescheinigung | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) Asset: `snapotter-v{version}-release-subjects.json` |
-| Archiv SBOM | CycloneDX und SPDX JSON | Release-Assets: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Bild SBOM | CycloneDX und SPDX JSON | Release-Assets: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Schwachstellenscans | Trivy JSON | Geben Sie Assets mit passenden `archive-linux-{arch}`- oder `image-linux-{arch}`-Präfixen frei |
-| Schwachstellenscan | SARIF | Registerkarte [GitHub Sicherheit](https://github.com/snapotter-hq/SnapOtter/security). |
-| Statische Analyse | CodeQL (JS/TS + Python) | Registerkarte [GitHub Sicherheit](https://github.com/snapotter-hq/SnapOtter/security), wird wöchentlich und pro PR ausgeführt |
-| Abhängigkeitsüberprüfung | GitHub nativ | Die Prüfung pro PR schlägt bei Ergänzungen mit hohem Schweregrad fehl |
-| Python Abhängigkeitsprüfung | pip-audit | CI-Ausführungsprotokoll bei jedem Push |
-| Sicherheitspolitik | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) im Repository |
-| Abhängigkeitsaktualisierungen | Dependabot | Automatisierte wöchentliche PRs für npm, pip, Docker, Aktionen |
+| Release-Subjektbindung | Kanonisches JSON + GitHub-Attestierung | Asset des [GitHub-Releases](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
+| Archiv-SBOM | CycloneDX- und SPDX-JSON | Release-Assets: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Image-SBOM | CycloneDX- und SPDX-JSON | Release-Assets: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Schwachstellen-Scans | Trivy-JSON | Release-Assets mit passendem Präfix `archive-linux-{arch}` oder `image-linux-{arch}` |
+| Schwachstellen-Scan | SARIF | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
+| Statische Analyse | CodeQL (JS/TS + Python) | Tab [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), läuft wöchentlich + pro PR |
+| Abhängigkeitsprüfung | GitHub-nativ | Prüfung pro PR, schlägt bei neuen Abhängigkeiten mit hohem Schweregrad fehl |
+| Python-Abhängigkeitsaudit | pip-audit | CI-Lauf-Log bei jedem Push |
+| Sicherheitsrichtlinie | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) im Repository |
+| Abhängigkeitsaktualisierungen | Dependabot | Automatisierte wöchentliche PRs für npm, pip, Docker, Actions |
 
-**Führen Sie Ihren eigenen Scan durch:**
+**Eigenen Scan ausführen:**
 
-Laden Sie das Release-Subjekt-Manifest herunter und überprüfen Sie, ob es vom Release-Workflow bestätigt wurde:
+Laden Sie das Release-Subjekt-Manifest herunter und überprüfen Sie, dass es vom Release-Workflow attestiert wurde:
 
 ```bash
 gh attestation verify snapotter-v2.3.0-release-subjects.json \
@@ -250,9 +247,9 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
 
-Das Manifest zeichnet `releaseTag`, `releaseCommit` und `workflowTriggerCommit` separat auf. Stellen Sie sicher, dass es sich bei `releaseCommit` um den Commit handelt, der aus dem unveränderlichen Tag entfernt wurde, und überprüfen Sie dann den SHA-256-Digest des Archivs, Images, SBOM oder Scans, den Sie verwenden, anhand seines Eintrags in `subjects`. Diese Unterscheidung ist beabsichtigt: Das Auschecken eines neu erstellten Release-Commits ändert nicht die Commit-Identität in den OIDC-Anmeldeinformationen des Workflows.
+Das Manifest erfasst `releaseTag`, `releaseCommit` und `workflowTriggerCommit` getrennt. Überprüfen Sie, dass `releaseCommit` der aus dem unveränderlichen Tag aufgelöste Commit ist, und prüfen Sie dann den SHA-256-Digest des Archivs, Images, der SBOM oder des Scans, den Sie verwenden, anhand seines Eintrags in `subjects`. Diese Unterscheidung ist beabsichtigt: Das Auschecken eines neu erstellten Release-Commits ändert nichts an der Commit-Identität in den OIDC-Zugangsdaten des Workflows.
 
-Sie können auch ein heruntergeladenes SBOM oder das Bild direkt scannen:
+Sie können auch eine heruntergeladene SBOM oder das Image direkt scannen:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
@@ -265,6 +262,6 @@ trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 trivy image snapotter/snapotter:2.3.0
 ```
 
-::: info
-Das Image SBOMs und die Scans spiegeln genau das architekturspezifische Image wider, das für diese Version veröffentlicht wurde. Archiv SBOMs und Scans beschreiben das vorgefertigte Archiv separat. Nach der Bereitstellung installierte AI-Modellpakete sind in diesen SBOMs nicht enthalten, da sie zur Laufzeit heruntergeladen werden.
+::: info 
+Image-SBOMs und -Scans spiegeln das exakte architekturspezifische Image wider, das für dieses Release veröffentlicht wurde. Archiv-SBOMs und -Scans beschreiben das vorgefertigte Archiv separat. KI-Modell-Bundles, die nach der Bereitstellung installiert werden, sind in diesen SBOMs nicht enthalten, da sie zur Laufzeit heruntergeladen werden.
 :::

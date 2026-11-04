@@ -19,7 +19,7 @@ const CHUNK = 20; // units per write, for resumability
  * @param {Map<string, StoredEntry>} stored
  * @returns {{ pending: Array<{unit: any, srcHash: string}>, merged: Map<string, StoredEntry>, stats: { skipped: number, stale: number } }}
  */
-export function collectPending(units, stored) {
+export function collectPending(units, stored, { refreshStale = false } = {}) {
   const merged = new Map(stored);
   const pending = [];
   const stats = { skipped: 0, stale: 0 };
@@ -36,7 +36,8 @@ export function collectPending(units, stored) {
       stats.skipped++;
       continue;
     }
-    if (provenance === "human") {
+    // A human translation is kept by default; refreshStale re-translates it too.
+    if (provenance === "human" && !refreshStale) {
       merged.set(unit.id, { ...prev, provenance, stale: true });
       stats.stale++;
       continue;
@@ -56,14 +57,20 @@ export function collectPending(units, stored) {
  * }} args
  * @returns {Promise<Record<string, { translated: number, skipped: number, stale: number, failed: number }>>}
  */
-export async function runTranslation({ adapter, locales, translate, log = () => {} }) {
+export async function runTranslation({
+  adapter,
+  locales,
+  translate,
+  log = () => {},
+  refreshStale = false,
+}) {
   const units = await adapter.extract();
   const summary = {};
 
   for (const locale of locales) {
     if (locale === "en") continue; // English is the source
     const stored = await adapter.load(locale);
-    const { pending: todo, merged, stats: base } = collectPending(units, stored);
+    const { pending: todo, merged, stats: base } = collectPending(units, stored, { refreshStale });
     const stats = { translated: 0, skipped: base.skipped, stale: base.stale, failed: 0 };
 
     for (let i = 0; i < todo.length; i += CHUNK) {

@@ -574,7 +574,9 @@ describe("self-posting tool panels: upload selected entry and land result by cap
 
       // Re-run on b.png and fail.
       fireEvent.click(screen.getByTestId("compose-submit"));
-      await waitFor(() => expect(screen.getByText("Compose re-run failed")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument(),
+      );
       expect(screen.queryByTestId("compose-download")).not.toBeInTheDocument();
       expect(
         screen.queryByText(format(en.toolSettings.compose.originalKb, { size: "0.6" })),
@@ -624,7 +626,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(useFileStore.getState().entries[0].status).toBe("completed");
 
       fireEvent.click(screen.getByTestId("compare-submit"));
-      await waitFor(() => expect(screen.getByText("Compare re-run failed")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument());
       expect(screen.queryByTestId("compare-download")).not.toBeInTheDocument();
       expect(
         screen.queryByText(format(en.toolSettings.compare.similarity, { percent: "88.4" })),
@@ -707,7 +709,9 @@ describe("self-posting tool panels: upload selected entry and land result by cap
 
       // Single-file failed re-run clears entry[0].
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
-      await waitFor(() => expect(screen.getByText("Watermark re-run failed")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument(),
+      );
       expect(screen.queryByTestId("watermark-image-download")).not.toBeInTheDocument();
       expect(
         screen.queryByText(format(en.toolSettings["watermark-image"].originalKb, { size: "0.5" })),
@@ -746,7 +750,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(entriesAfterBatch[1].processedPreviewUrl).toBeNull();
       expect(entriesAfterBatch[1].processedSize).toBeNull();
       expect(entriesAfterBatch[1].status).toBe("failed");
-      expect(entriesAfterBatch[1].error).toBe("Watermark batch item failed");
+      expect(entriesAfterBatch[1].error).toBe(en.errors.processingFailedNoDetail);
       expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:prior-b");
       unmount();
     }
@@ -790,7 +794,11 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       );
 
       fireEvent.click(screen.getByTestId("beautify-submit"));
-      await waitFor(() => expect(screen.getByText("Beautify re-run failed")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings.beautify.processingFailedStatus),
+        ).toBeInTheDocument(),
+      );
       expect(screen.queryByTestId("beautify-download")).not.toBeInTheDocument();
       const entryA = useFileStore.getState().entries[0];
       expect(entryA.processedUrl).toBeNull();
@@ -854,7 +862,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       fireEvent.click(screen.getByTestId("stitch-submit"));
       await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
       FakeXhr.instances[1].respond(500, { error: "Stitch re-run failed" });
-      await waitFor(() => expect(screen.getByText("Stitch re-run failed")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument());
       expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
       const entryA = useFileStore.getState().entries[0];
       expect(entryA.processedUrl).toBeNull();
@@ -990,7 +998,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
     // Re-running on blue.png when the request fails clears blue.png's stale palette,
     // while leaving red.png's previously extracted palette intact.
     fireEvent.click(screen.getByTestId("color-palette-submit"));
-    await waitFor(() => expect(screen.getByText("Palette extraction failed")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Failed: 500")).toBeInTheDocument());
     expect(screen.queryByText("#0000ff")).not.toBeInTheDocument();
 
     act(() => {

@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: 331b11cd21d1
+i18n_source_hash: 2150213f21da
 i18n_provenance: machine
-i18n_output_hash: 0c2305505e16
+i18n_output_hash: f85602dbff85
 i18n_hash_version: 2
 ---
 
@@ -10,32 +10,32 @@ i18n_hash_version: 2
 
 SnapOtter gebruikt PostgreSQL 17 met [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) voor gegevensopslag. Het schema is gedefinieerd in `apps/api/src/db/schema.ts`.
 
-De verbinding wordt geconfigureerd via de omgevingsvariabele `DATABASE_URL` (standaard `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose slaat de Postgres-container zijn gegevens op in het benoemde volume `SnapOtter-pgdata`. Verzoeken worden afgehandeld door een rol die alleen rijen kan lezen en schrijven, wat hieronder wordt behandeld onder [Rollen met minimale rechten](#least-privilege-roles).
+De verbinding wordt geconfigureerd via de omgevingsvariabele `DATABASE_URL` (standaard `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose slaat de Postgres-container zijn gegevens op in het benoemde volume `SnapOtter-pgdata`. Verzoeken worden afgehandeld onder een rol die alleen rijen kan lezen en schrijven, zoals hieronder onder [Rollen met minimale rechten](#least-privilege-roles) wordt beschreven.
 
 ## Tabellen {#tables}
 
 ### users {#users}
 
-Slaat gebruikersaccounts op. Wordt bij de eerste run automatisch aangemaakt op basis van `DEFAULT_USERNAME` en `DEFAULT_PASSWORD`.
+Slaat gebruikersaccounts op. Wordt bij de eerste start automatisch aangemaakt op basis van `DEFAULT_USERNAME` en `DEFAULT_PASSWORD`.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
 | `id` | uuid | Primaire sleutel |
-| `username` | varchar | Uniek, vereist |
+| `username` | varchar | Uniek, verplicht |
 | `passwordHash` | varchar | scrypt-hash |
 | `role` | varchar | `admin`, `editor` of `user` |
-| `mustChangePassword` | boolean | Vlag voor geforceerde wachtwoordreset |
+| `mustChangePassword` | boolean | Vlag voor verplichte wachtwoordreset |
 | `createdAt` | timestamp | Aanmaaktijd |
-| `updatedAt` | timestamp | Tijd van laatste update |
+| `updatedAt` | timestamp | Tijd van laatste wijziging |
 
 ### sessions {#sessions}
 
-Actieve aanmeldsessies. Elke rij koppelt een sessietoken aan een gebruiker.
+Actieve loginsessies. Elke rij koppelt een sessietoken aan een gebruiker.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
 | `id` | varchar | Primaire sleutel (sessietoken) |
-| `userId` | uuid | Vreemde sleutel naar `users.id` |
+| `userId` | uuid | Foreign key naar `users.id` |
 | `expiresAt` | timestamp | Vervaltijd |
 | `createdAt` | timestamp | Aanmaaktijd |
 
@@ -51,22 +51,22 @@ Groepen om gebruikers te organiseren. Beheerders kunnen gebruikers aan teams toe
 
 ### api_keys {#api-keys}
 
-API-sleutels voor programmatische toegang. De onbewerkte sleutel wordt eenmalig getoond bij aanmaken; alleen de hash wordt opgeslagen.
+API-sleutels voor programmatische toegang. De ruwe sleutel wordt eenmalig bij het aanmaken getoond; alleen de hash wordt opgeslagen.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
 | `id` | uuid | Primaire sleutel |
-| `userId` | uuid | Vreemde sleutel naar `users.id` |
+| `userId` | uuid | Foreign key naar `users.id` |
 | `keyHash` | varchar | scrypt-hash van de sleutel |
 | `name` | varchar | Door de gebruiker opgegeven label |
 | `createdAt` | timestamp | Aanmaaktijd |
-| `lastUsedAt` | timestamp | Bijgewerkt bij elk geauthenticeerd verzoek |
+| `lastUsedAt` | timestamp | Wordt bij elk geauthenticeerd verzoek bijgewerkt |
 
 Sleutels beginnen met het voorvoegsel `si_` gevolgd door 96 hexadecimale tekens (48 willekeurige bytes).
 
 ### pipelines {#pipelines}
 
-Opgeslagen toolketens die gebruikers in de UI aanmaken.
+Opgeslagen toolketens die gebruikers in de interface maken.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
@@ -78,33 +78,33 @@ Opgeslagen toolketens die gebruikers in de UI aanmaken.
 
 ### user_files {#user-files}
 
-Persistente bestandsbibliotheek. Een opgeslagen bewerking wordt standaard als een onafhankelijke root-rij ingevoegd ("opslaan als nieuw": `version` 1, `parentId` null, zodat het origineel in de lijst blijft staan), of als een aan de bovenliggende rij gekoppelde versie wanneer je het origineel overschrijft (`parentId` ingesteld, `version` opgehoogd, waarmee het wordt vervangen). De kolom `toolChain` registreert welke tools zijn toegepast.
+Permanente bestandenbibliotheek. Een opgeslagen bewerking wordt standaard ingevoegd als een onafhankelijke hoofdrij ("opslaan als nieuw": `version` 1, `parentId` null, zodat het origineel zichtbaar blijft), of als een aan de bovenliggende versie gekoppelde versie wanneer u het origineel overschrijft (`parentId` ingesteld, `version` verhoogd, waardoor het origineel wordt vervangen). De kolom `toolChain` legt de toegepaste tools vast.
 
 | Kolom | Type | Beschrijving |
 |--------|------|-------------|
 | `id` | uuid | Primaire sleutel |
 | `userId` | uuid | FK naar users (CASCADE DELETE) |
-| `originalName` | varchar | Oorspronkelijke bestandsnaam bij upload |
+| `originalName` | varchar | Oorspronkelijke bestandsnaam van de upload |
 | `storedName` | varchar | Bestandsnaam op schijf |
 | `mimeType` | varchar | MIME-type |
 | `size` | integer | Bestandsgrootte in bytes |
-| `width` | integer | Breedte van de afbeelding in px |
-| `height` | integer | Hoogte van de afbeelding in px |
+| `width` | integer | Afbeeldingsbreedte in px |
+| `height` | integer | Afbeeldingshoogte in px |
 | `version` | integer | Versienummer (1 = origineel) |
 | `parentId` | uuid of null | FK naar user_files (bovenliggende versie) |
-| `toolChain` | jsonb | Tool-ID's die op volgorde zijn toegepast om deze versie te maken |
+| `toolChain` | jsonb | Tool-ID's in de volgorde waarin ze zijn toegepast om deze versie te maken |
 | `createdAt` | timestamp | Aanmaaktijd |
 
 ### jobs {#jobs}
 
-Volgt verwerkingsjobs voor voortgangsrapportage en opschoning.
+Houdt verwerkingsjobs bij voor voortgangsrapportage en opschoning.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
 | `id` | uuid | Primaire sleutel |
-| `type` | varchar | Tool- of pipeline-identifier |
+| `type` | varchar | Identificatie van tool of pipeline |
 | `status` | varchar | `queued`, `processing`, `completed` of `failed` |
-| `progress` | real | Fractie van 0.0-1.0 |
+| `progress` | real | Fractie van 0.0 tot 1.0 |
 | `inputFiles` | jsonb | Array van invoerbestandspaden |
 | `outputPath` | varchar | Pad naar het resultaatbestand |
 | `settings` | jsonb | Gebruikte toolinstellingen |
@@ -114,17 +114,17 @@ Volgt verwerkingsjobs voor voortgangsrapportage en opschoning.
 
 ### settings {#settings}
 
-Sleutel-waardeopslag voor serverbrede instellingen die beheerders vanuit de UI kunnen wijzigen.
+Sleutel-waardeopslag voor serverbrede instellingen die beheerders in de interface kunnen wijzigen.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
 | `key` | varchar | Primaire sleutel |
-| `value` | varchar | Instellingswaarde |
-| `updatedAt` | timestamp | Tijd van laatste update |
+| `value` | varchar | Waarde van de instelling |
+| `updatedAt` | timestamp | Tijd van laatste wijziging |
 
 ### roles {#roles}
 
-Aangepaste rollen met granulaire rechten.
+Aangepaste rollen met fijnmazige rechten.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
@@ -136,7 +136,7 @@ Aangepaste rollen met granulaire rechten.
 
 ### audit_log {#audit-log}
 
-Logboek van beveiligingsrelevante acties.
+Log van beveiligingsrelevante acties.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
@@ -144,22 +144,22 @@ Logboek van beveiligingsrelevante acties.
 | `userId` | uuid | FK naar users |
 | `action` | varchar | Actietype |
 | `details` | jsonb | Actiespecifieke gegevens |
-| `createdAt` | timestamp | Tijd van de actie |
+| `createdAt` | timestamp | Tijdstip van de actie |
 
 ### user_preferences {#user-preferences}
 
-UI-status per gebruiker, gesleuteld op voorkeursnaam. Bewaart de vastgezette tools van de startpagina, die via `PUT /api/v1/preferences` worden geschreven.
+UI-status per gebruiker, geïndexeerd op voorkeursnaam. Ondersteunt de vastgezette tools van het dashboard via `PUT /api/v1/preferences`.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
-| `userId` | text | FK naar users, cascaderend verwijderen. Samen met `key` de primaire sleutel |
-| `key` | text | Naam van de voorkeur. Samen met `userId` de primaire sleutel |
+| `userId` | text | FK naar users, cascade bij verwijderen. Primaire sleutel samen met `key` |
+| `key` | text | Voorkeursnaam. Primaire sleutel samen met `userId` |
 | `value` | jsonb | Inhoud van de voorkeur |
 | `updatedAt` | timestamp | Laatste schrijfactie |
 
 ## Migraties {#migrations}
 
-Drizzle verzorgt schemamigraties. Migratiebestanden staan in `apps/api/drizzle/`. Tijdens ontwikkeling:
+Drizzle beheert schemamigraties. Migratiebestanden staan in `apps/api/drizzle/`. Tijdens de ontwikkeling:
 
 ```bash
 cd apps/api
@@ -167,51 +167,53 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-In productie worden openstaande migraties automatisch toegepast bij het opstarten.
+In productie worden openstaande migraties bij het opstarten automatisch toegepast.
 
 ## Rollen met minimale rechten {#least-privilege-roles}
 
-Twee rollen, twee taken. `DATABASE_URL` handelt verzoeken af en heeft `SELECT`, `INSERT`, `UPDATE`, `DELETE` op de tabellen van de app, plus `USAGE` en `SELECT` op hun sequences. Dat is de hele lijst. De rol kan geen tabel aanmaken of verwijderen, geen extensie installeren, geen `TRUNCATE` uitvoeren, `pg_authid` niet lezen, geen database aanmaken, geen rol wijzigen en niet aan het `drizzle`-schema komen, waar de migratiegeschiedenis staat.
+Twee rollen, twee taken. `DATABASE_URL` handelt verzoeken af en heeft `SELECT`, `INSERT`, `UPDATE` en `DELETE` op de tabellen van de app, plus `USAGE` en `SELECT` op de bijbehorende sequences. Dat is de volledige lijst. De rol kan geen tabel aanmaken of verwijderen, geen extensie installeren, geen `TRUNCATE` uitvoeren, `pg_authid` niet lezen, geen database aanmaken, geen rol wijzigen en het schema `drizzle`, waar de migratiegeschiedenis staat, niet aanraken.
 
-`DATABASE_MIGRATION_URL` is de bevoorrechte rol. Die voert migraties uit en kent tijdens het opstarten rechten toe aan de runtime-rol, en sluit daarna af voordat er ook maar één verzoek wordt afgehandeld.
+`DATABASE_MIGRATION_URL` is de bevoorrechte rol. Deze voert migraties uit en verleent rechten aan de runtimerol tijdens het opstarten, en wordt gesloten voordat één verzoek wordt afgehandeld.
 
-Compose en de alles-in-één-image zijn al zo ingericht, bestaande installaties inbegrepen. Bij het opstarten maakt SnapOtter de runtime-rol aan als die ontbreekt, kent de rechten toe, voert de migraties uit en trekt de rechten daarna door naar tabellen die er al stonden. Upgraden vergt geen handmatige SQL.
+De scheiding wordt geleverd met SnapOtter 2.3.0. Vanaf die release zijn de Compose-bestanden in de repository en de all-in-one-image zo ingericht, bestaande installaties inbegrepen: bij het opstarten maakt SnapOtter de runtimerol aan als die ontbreekt, verleent de rechten, migreert en past de rechten daarna toe op tabellen die er al waren. Voor het upgraden is geen handmatige SQL nodig.
 
-Laat je `DATABASE_MIGRATION_URL` leeg, dan draait alles op één rol en doet `DATABASE_URL` beide taken, precies zoals vóór de splitsing. Dat is een ondersteunde configuratie en geen verouderde. Op beheerde Postgres is het vaak het juiste antwoord, want daar mag je meestal zelf geen rollen aanmaken.
+De 2.2.0-image leest alleen de runtimeverbindingsreeks en maakt de tweede rol nooit aan. Geeft u hem de gesplitste configuratie, dan komt hij nooit op: het applicatielog toont dat wachtwoordauthenticatie voor die rol mislukt, en het Postgres-log meldt dat de rol niet bestaat. Upgrade de image naar 2.3.0 of later voordat u een Compose-bestand naar de gesplitste configuratie omzet.
+
+Laat u `DATABASE_MIGRATION_URL` leeg, dan draait SnapOtter met één rol, waarbij `DATABASE_URL` beide taken uitvoert, precies zoals vóór de scheiding. Dat is een ondersteunde configuratie, geen verouderde. Het is het juiste antwoord op beheerde Postgres, waar het aanmaken van rollen vaak niet aan u is.
 
 ### Externe en beheerde Postgres {#external-and-managed-postgres}
 
-Op RDS, Supabase, Cloud SQL of een cluster dat je zelf draait, is de splitsing optioneel. Maak de runtime-rol eenmalig aan:
+Op RDS, Supabase, Cloud SQL of een cluster dat u zelf beheert, is de scheiding optioneel. Maak de runtimerol eenmalig aan:
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
 
-Geef SnapOtter vervolgens beide verbindingsstrings, gericht op dezelfde host, poort en database:
+Geef SnapOtter vervolgens beide verbindingsreeksen, gericht op dezelfde host, poort en database:
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-Meer is niet nodig. SnapOtter kent de rechten zelf toe en doet dat na elke migratie opnieuw, zodat een tabel die in een toekomstige release bij komt gedekt is zonder dat iemand daar SQL voor hoeft te draaien.
+Daar houdt het op. SnapOtter past de rechten zelf toe en past ze na elke migratie opnieuw toe, zodat een tabel die in een toekomstige release wordt toegevoegd is gedekt zonder dat iemand er SQL voor hoeft uit te voeren.
 
-De rol in `DATABASE_MIGRATION_URL` moet eigenaar zijn van de SnapOtter-tabellen, want alleen de eigenaar van een tabel kan er rechten op toekennen. Op een bestaande installatie is dat de rol waaronder je SnapOtter al draait, niet een verse rol die je er speciaal voor aanmaakt. Wijs je een nieuwe rol aan die nergens eigenaar van is, dan mislukt het opstarten met precies die foutmelding. De rol heeft ook `CREATEROLE` nodig om de runtime-rol aan te maken en te onderhouden, plus het recht om het `drizzle`-schema aan te maken.
+De rol in `DATABASE_MIGRATION_URL` moet eigenaar zijn van de SnapOtter-tabellen, omdat alleen de eigenaar van een tabel er rechten op kan verlenen. Op een bestaande installatie is dat de rol waaronder u SnapOtter tot nu toe draait, niet een nieuwe rol die speciaal hiervoor is aangemaakt. Wijst u naar een nieuwe rol die niets bezit, dan mislukt het opstarten met een foutmelding die precies dit zegt. Ook heeft de rol `CREATEROLE` nodig om de runtimerol aan te maken en te onderhouden, en het recht om het schema `drizzle` aan te maken.
 
-Noem je in beide URL's dezelfde rol, dan is de splitsing uit, en SnapOtter meldt dat in het log in plaats van te doen alsof. Geeft je provider je geen rol die zowel eigenaar van de tabellen kan zijn als `CREATEROLE` kan hebben, draai dan op één rol.
+Gebruikt u dezelfde rol in beide URL's, dan is de scheiding uitgeschakeld en meldt SnapOtter dat in het log in plaats van te doen alsof. Biedt uw provider geen rol die zowel eigenaar van de tabellen kan zijn als `CREATEROLE` kan hebben, draai dan met één rol.
 
-### Waarom het superuser-bit ongemoeid blijft {#why-the-superuser-bit-is-left-alone}
+### Waarom het superuser-bit ongemoeid wordt gelaten {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter haalt nooit uit zichzelf `SUPERUSER` bij een rol weg. Op een installatie die van vóór de splitsing dateert, is `snapotter` de enige superuser van het cluster, en degraderen zou het cluster er zonder achterlaten, alleen nog te herstellen via de single-user-modus met een gestopte server. De bescherming komt in plaats daarvan van het verplaatsen van de langlopende verbinding naar de beperkte rol. De superuser zit de paar seconden van het opstarten op de lijn en is daarna weg.
+SnapOtter verwijdert nooit zelf `SUPERUSER` van een rol. Op een installatie die vóór de scheiding is gemaakt, is `snapotter` de enige superuser van het cluster, en degraderen zou het cluster zonder superuser achterlaten, alleen herstelbaar via de single-usermodus met de server gestopt. In plaats daarvan biedt het verplaatsen van de langlopende verbinding naar de beperkte rol de bescherming. De superuser staat slechts enkele seconden tijdens het opstarten op de lijn en is daarna weg.
 
-Nieuwe alles-in-één-installaties hebben dat probleem nooit. Die krijgen drie rollen: `postgres` (bootstrap-superuser, komt in geen enkele verbindingsstring van SnapOtter voor), `snapotter` (`NOSUPERUSER`, eigenaar van de gegevens, verbindt alleen bij het opstarten) en `snapotter_app` (alleen rijen, handelt verzoeken af).
+Nieuwe all-in-one-installaties hebben dat probleem nooit. Ze krijgen drie rollen: `postgres` (bootstrap-superuser, afwezig in elke verbindingsreeks die SnapOtter gebruikt), `snapotter` (`NOSUPERUSER`, bezit de gegevens, verbindt alleen bij het opstarten) en `snapotter_app` (alleen rijen, handelt verzoeken af).
 
-Wil je een oudere `snapotter` toch degraderen, maak dan eerst een tweede superuser aan en log daarmee in om te bevestigen dat die werkt. Voer daarna `ALTER ROLE snapotter NOSUPERUSER` uit.
+Om een oudere `snapotter` toch te degraderen, maakt u eerst een tweede superuser aan en logt u daarmee in om te bevestigen dat het werkt. Daarna `ALTER ROLE snapotter NOSUPERUSER`.
 
 ## Back-up en herstel {#backup-and-restore}
 
-De relationele database bevindt zich in het `SnapOtter-pgdata`-volume van de Postgres-container, niet in het `/data`-volume van de app.
+De relationele database staat in het volume `SnapOtter-pgdata` van de Postgres-container, niet in het volume `/data` van de app.
 
 **Logische back-up met validatie (aanbevolen)**
 
@@ -228,11 +230,11 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Beide commando's verbinden als `snapotter`, de eigenaar, en dat moet zo blijven. De runtime-rol kan het `drizzle`-schema niet zien, dus een dump die onder die rol wordt gemaakt komt er onvolledig uit. `--no-owner` laat herstelde objecten in eigendom van degene die het herstel uitvoert, dus door het als eigenaar te draaien komt het eigendom te liggen waar de rechten het verwachten. Eén valkuil op een vers cluster: `pg_dump` neemt de rechten wel mee, maar niet de rollen waar ze naar verwijzen, dus maak `snapotter_app` aan vóór het herstellen, anders stopt `--exit-on-error` bij de eerste `GRANT`. SnapOtter kent de rechten hoe dan ook opnieuw toe bij de volgende keer opstarten.
+Beide commando's verbinden als `snapotter`, de eigenaar, en dat moet zo blijven. De runtimerol kan het schema `drizzle` niet zien, dus een dump die als die rol is gemaakt, zou onvolledig zijn. `--no-owner` laat herstelde objecten eigendom zijn van degene die het herstel uitvoert, dus uitvoeren als de eigenaar plaatst het eigendom waar de rechten het verwachten. Een kanttekening bij een nieuw cluster: `pg_dump` bevat de rechten maar niet de rollen die ze noemen, dus maak `snapotter_app` aan vóór het herstellen, anders stopt `--exit-on-error` bij de eerste `GRANT`. SnapOtter past de rechten bij de volgende start hoe dan ook opnieuw toe.
 
-Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` of de duurzame BullMQ-status in Redis. Maak een back-up en herstel deze met de gecoördineerde procedure in [Beveiliging en verharding](/nl/guide/security#backup-and-recovery).
+Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` en geen duurzame BullMQ-status in Redis. Maak daarvan een back-up en herstel ze met de gecoördineerde procedure in [Beveiliging en hardening](/nl/guide/security#backup-and-recovery).
 
-**Koude volumemomentopname**
+**Koude volume-snapshot**
 
 ```bash
 # Stop every service first, then use your storage platform to snapshot the
@@ -240,8 +242,8 @@ Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` of 
 docker compose -f docker/docker-compose.yml stop
 ```
 
-Kopieer geen live PostgreSQL-gegevensmap met `tar`. Stel volumenamen voor voorvoegsels samen per project, dus los de gekoppelde volume-ID's van `docker inspect` of uw opslagplatform op in plaats van het letterlijke label `SnapOtter-pgdata` aan te nemen.
+Kopieer een draaiende PostgreSQL-gegevensmap niet met `tar`. Compose voegt een projectvoorvoegsel toe aan volumenamen, dus bepaal de gemounte volume-ID's via `docker inspect` of uw opslagplatform in plaats van uit te gaan van het letterlijke label `SnapOtter-pgdata`.
 
 ### Migreren vanaf 1.x (SQLite) {#migrating-from-1-x-sqlite}
 
-Upgraden vanaf SnapOtter 1.x heeft een eigen gids: zie [Upgraden van 1.x naar 2.0](./upgrading). Kort gezegd: hergebruik je bestaande `/data`-volume, en 2.0 detecteert en importeert `/data/snapotter.db` automatisch bij de eerste keer opstarten (of stel `SQLITE_MIGRATE_PATH` in om er expliciet naar te verwijzen). Maak eerst een back-up van het volledige `/data`-volume, niet alleen van `snapotter.db`: 1.x gebruikt de SQLite WAL-modus, dus een gestopte container laat vaak het grootste deel van zijn gegevens in `snapotter.db-wal` staan naast een bijna leeg `snapotter.db`.
+Upgraden vanaf SnapOtter 1.x heeft een eigen handleiding: zie [Upgraden van 1.x naar 2.0](./upgrading). Kort gezegd: hergebruik uw bestaande volume `/data` en 2.0 detecteert `/data/snapotter.db` automatisch en importeert het bij de eerste start (of stel `SQLITE_MIGRATE_PATH` in om er expliciet naar te verwijzen). Maak eerst een back-up van het hele volume `/data`, niet alleen van `snapotter.db`: 1.x gebruikt de WAL-modus van SQLite, dus een gestopte container laat vaak het grootste deel van zijn gegevens achter in `snapotter.db-wal` naast een bijna lege `snapotter.db`.

@@ -13,12 +13,14 @@ function parseArgs(argv) {
     mode: "export",
     batchDir: ".i18n-batches",
     help: false,
+    refreshStale: false,
   };
   for (const a of argv) {
     if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--export") args.mode = "export";
     else if (a === "--import") args.mode = "import";
     else if (a === "--dry-run") args.mode = "dry-run";
+    else if (a === "--refresh-stale") args.refreshStale = true;
     else if (a.startsWith("--engine=")) args.engine = a.slice("--engine=".length);
     else if (a.startsWith("--surface=")) args.surface = a.slice("--surface=".length);
     else if (a.startsWith("--locale=")) args.locale = a.slice("--locale=".length);
@@ -80,7 +82,7 @@ async function main() {
       const units = await adapter.extract();
       for (const locale of locales) {
         const stored = await adapter.load(locale);
-        const { pending } = collectPending(units, stored);
+        const { pending } = collectPending(units, stored, { refreshStale: args.refreshStale });
         if (pending.length === 0) continue;
         const path = writePending(args.batchDir, surface, locale, pending);
         console.log(`export ${surface} ${locale}: ${pending.length} -> ${path}`);
@@ -100,6 +102,7 @@ async function main() {
           adapter,
           locales: [locale],
           translate: batchResultTranslator(doneMap),
+          refreshStale: args.refreshStale,
           log: (m) => process.stdout.write(`${m}\n`),
         });
         console.log(`import ${surface} ${locale}:`, JSON.stringify(summary[locale]));

@@ -198,11 +198,11 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     await act(async () => {
       settleEffects({ ok: false, status: 500, json: async () => ({ error: "composite failed" }) });
     });
-    expect(await screen.findByText("composite failed")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
     expect(screen.getByTestId("remove-background-rerun")).toBeEnabled();
 
     fireEvent.click(screen.getByTestId("remove-background-rerun"));
-    expect(screen.queryByText("composite failed")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
   });
 
   it("still offers to run again for a result restored after a remount", async () => {
@@ -732,7 +732,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
   it("shows any other failure as before, without running the removal again", async () => {
     await applyEffects({ status: 500, body: { error: "disk on fire" } });
 
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
     expect(screen.queryByText(en.toolSettings["remove-background"].effectsExpired)).toBeNull();
     expect(deployment.processFiles).not.toHaveBeenCalled();
   });
@@ -791,19 +791,19 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
 
   it("clears a Phase 2 effectsError when Undo clears the cutout (#2490)", async () => {
     const view = await applyEffects({ status: 500, body: { error: "disk on fire" } });
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     // Undo clears the entry's processed URL without starting a new removal.
     deployment.beforeRun = true;
     view.rerender(<RemoveBgSettings />);
 
     expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
-    expect(screen.queryByText("disk on fire")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
   });
 
   it("clears a Phase 2 effectsError when the loaded file is replaced (#2490)", async () => {
     await applyEffects({ status: 500, body: { error: "disk on fire" } });
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     act(() => {
       useFileStore
@@ -812,7 +812,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     });
 
     expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
-    expect(screen.queryByText("disk on fire")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
   });
 
   it("clears the 410 expired notice if the file is replaced while the automatic re-run is in flight (#2490)", async () => {
@@ -847,7 +847,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
 
   it("clears effectsError when a second file is added and keeps it cleared when removed (#2490)", async () => {
     await applyEffects({ status: 500, body: { error: "disk on fire" } });
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     act(() => {
       useFileStore
@@ -855,7 +855,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
         .addFiles([new File([new Uint8Array([4, 5, 6])], "second.png", { type: "image/png" })]);
     });
 
-    expect(screen.queryByText("disk on fire")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
 
     // Removing the second file restores the original single-file cutout without bringing back the old error.
     act(() => {
@@ -863,7 +863,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     });
 
     expect(screen.getByTestId("remove-background-download-effects")).toBeInTheDocument();
-    expect(screen.queryByText("disk on fire")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
   });
 
   it("does not surface an in-flight Phase 2 error or 410 re-run if Undo ran before the response arrived (#2490)", async () => {
@@ -908,7 +908,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
 
   it("preserves a Phase 2 effectsError across a remount and clears it on retry or a new downloadUrl (#2559)", async () => {
     const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     // Crossing the 768px mobile/desktop breakpoint unmounts and remounts RemoveBgSettings
     // while the same file and cutout downloadUrl stay loaded.
@@ -916,7 +916,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     const second = render(<RemoveBgSettings />);
 
     expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
-    expect(screen.getByText("disk on fire")).toBeVisible();
+    expect(screen.getByText("Effects failed: 500")).toBeVisible();
 
     // Retrying Phase 2 after the remount sends the hydrated jobId/filename and clears the error on 200.
     const retryFetch = vi.fn().mockResolvedValue({
@@ -934,28 +934,28 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
       filename: "pic.png",
       outputFormat: "webp",
     });
-    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Effects failed: 500")).toBeNull());
 
     // Another remount after the successful retry keeps the error cleared.
     second.unmount();
     render(<RemoveBgSettings />);
     expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
-    expect(screen.queryByText("disk on fire")).toBeNull();
+    expect(screen.queryByText("Effects failed: 500")).toBeNull();
   });
 
   it("clears a remount-restored Phase 2 effectsError when a new downloadUrl arrives (#2559)", async () => {
     const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
-    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     first.unmount();
     const second = render(<RemoveBgSettings />);
     expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
-    expect(screen.getByText("disk on fire")).toBeVisible();
+    expect(screen.getByText("Effects failed: 500")).toBeVisible();
 
     deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
     second.rerender(<RemoveBgSettings />);
 
-    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Effects failed: 500")).toBeNull());
   });
 
   it.each([
@@ -990,14 +990,14 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     "drops a stored effectsError on remount if $label landed while unmounted (#2559)",
     async ({ mutateWhileUnmounted, assertAfterRemount }) => {
       const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
-      expect(await screen.findByText("disk on fire")).toBeVisible();
+      expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
       first.unmount();
       mutateWhileUnmounted();
       const second = render(<RemoveBgSettings />);
 
       await assertAfterRemount();
-      expect(screen.queryByText("disk on fire")).toBeNull();
+      expect(screen.queryByText("Effects failed: 500")).toBeNull();
       second.unmount();
 
       // Even if the original cutout state is restored afterwards, the stored error was cleared.
@@ -1006,7 +1006,7 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
       deployment.downloadUrl = "/api/v1/download/JOB123/pic_mask.png";
       render(<RemoveBgSettings />);
       expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
-      expect(screen.queryByText("disk on fire")).toBeNull();
+      expect(screen.queryByText("Effects failed: 500")).toBeNull();
     },
   );
 });

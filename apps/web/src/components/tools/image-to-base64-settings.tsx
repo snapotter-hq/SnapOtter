@@ -166,7 +166,7 @@ export function ImageToBase64Settings() {
           addError({
             entryId,
             filename: file.name,
-            error: userErrorMessage(t, err, "Failed to convert"),
+            error: userErrorMessage(t, err, t.errors.conversionFailed),
           });
           continue;
         }

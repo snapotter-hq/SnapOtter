@@ -1,23 +1,17 @@
 ---
-description: "Déployez SnapOtter en production avec Docker. Exigences matérielles, configuration GPU et configs de reverse proxy pour Nginx, Traefik et Cloudflare."
-i18n_source_hash: 4cae787c775e
-i18n_provenance: human
-i18n_output_hash: 9567b45b96fc
+description: "Déployez SnapOtter en production avec Docker. Configuration matérielle requise, installation du GPU et configurations de reverse proxy pour Nginx, Traefik et Cloudflare."
+i18n_source_hash: b8c4ed2cc086
+i18n_provenance: machine
+i18n_output_hash: d0610347e500
 i18n_hash_version: 2
 ---
 
 # Déploiement {#deployment}
 
-SnapOtter se déploie sous la forme d'une pile Docker Compose à 3 conteneurs : l'image applicative SnapOtter, PostgreSQL 17 et Redis 8. L'image applicative prend en charge **linux/amd64** (avec NVIDIA CUDA pour l'accélération de l'IA) et **linux/arm64** (CPU), elle s'exécute donc nativement sur les serveurs Intel/AMD, les Mac Apple Silicon et les appareils ARM comme le Raspberry Pi 4/5. L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas prise en charge pour l'inférence IA aujourd'hui.
+SnapOtter se déploie sous la forme d'une pile Docker Compose de 3 conteneurs : l'image de l'application SnapOtter, PostgreSQL 17 et Redis 8. L'image de l'application prend en charge **linux/amd64** (avec NVIDIA CUDA pour l'accélération de l'IA) et **linux/arm64** (CPU) : elle s'exécute donc nativement sur les serveurs Intel/AMD, les Mac Apple Silicon et les appareils ARM comme le Raspberry Pi 4/5. L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas prise en charge aujourd'hui pour l'inférence IA.
 
-Consultez [Image Docker](./docker-tags) pour la configuration GPU, les exemples Docker Compose et l'épinglage de version.
+Consultez [Image Docker](./docker-tags) pour l'installation du GPU, des exemples Docker Compose et l'épinglage de version.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Compatibilité de l’OCR coréen
-L’OCR rapide prend en charge `auto`, `en`, `de`, `es`, `fr`, `zh` et `ja`, mais ni le coréen (`ko`) ni l’arabe (`ar`). Ils nécessitent le pack OCR précis et `balanced` ou `best`. Le pack fonctionne dans les conteneurs Linux amd64 et arm64 officiels, y compris sur les hôtes NVIDIA où l’OCR reste exécuté sur le CPU. Un système non pris en charge reçoit une erreur de compatibilité explicite, sans repli silencieux vers `fast`. Le coréen ou l’arabe avec `fast` ou l’alias historique `tesseract` est refusé avant la mise en file avec `FEATURE_INCOMPATIBLE` et `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Démarrage rapide (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -38,7 +32,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -53,6 +51,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -114,13 +123,15 @@ volumes:
 docker compose up -d
 ```
 
-L'application est ensuite disponible sur `http://localhost:1349`.
+L'application est alors disponible à l'adresse `http://localhost:1349`.
 
-> **Limites de débit Docker Hub ?** Remplacez `snapotter/snapotter:latest` par `ghcr.io/snapotter-hq/snapotter:latest` pour récupérer l'image depuis GitHub Container Registry à la place. Les deux registres reçoivent la même image à chaque publication.
+La pile ci-dessus se connecte en tant que propriétaire de la base de données. À partir de SnapOtter 2.3.0, vous pouvez traiter les requêtes avec un rôle qui ne fait que lire et écrire des lignes ; consultez [Rôles à privilèges minimaux](./database#least-privilege-roles).
+
+> **Limites de débit Docker Hub ?** Remplacez `snapotter/snapotter:latest` par `ghcr.io/snapotter-hq/snapotter:latest` pour récupérer l'image depuis GitHub Container Registry. Les deux registres reçoivent la même image à chaque version.
 
 ## Démarrage rapide (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Pour l’accélération NVIDIA CUDA sur les outils d’IA pris en charge (suppression de l’arrière-plan, mise à l’échelle, amélioration du visage) :
+Pour l'accélération NVIDIA CUDA sur les outils d'IA pris en charge (suppression d'arrière-plan, agrandissement, amélioration des visages) :
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -138,8 +149,18 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,14 +191,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Changez ceci pour les déploiements non locaux
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -210,32 +234,32 @@ docker compose -f docker-compose-gpu.yml up -d
 
 ### Vérifier l'accélération GPU {#verify-gpu-acceleration}
 
-Vérifiez la détection CUDA dans les journaux :
+Vérifiez la détection de CUDA dans les journaux :
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-Si les outils d'IA s'exécutent sur le processeur même si `--gpus all` et NVIDIA Container Toolkit sont correctement configurés, réinstallez le bundle concerné (par exemple Suppression de l'arrière-plan) depuis **Paramètres → Fonctionnalités IA**. Le programme d'installation restaure la version GPU d'ONNX Runtime, qu'une version CPU uniquement extraite par un autre ensemble (tel que la transcription) peut autrement masquer dans l'environnement d'IA partagé. Si la réinstallation à partir de l'interface utilisateur ne restaure pas le GPU sur une image plus ancienne, consultez la réparation manuelle dans [numéro 490] (https://github.com/snapotter-hq/SnapOtter/issues/490).
+Si les outils d'IA s'exécutent sur le CPU alors que `--gpus all` et le NVIDIA Container Toolkit sont correctement configurés, réinstallez le bundle concerné (par exemple Suppression d'arrière-plan) depuis **Paramètres → Fonctionnalités d'IA**. L'installeur restaure la version GPU d'ONNX Runtime, qu'une version CPU seule tirée par un autre bundle (comme la transcription) peut sinon masquer dans l'environnement d'IA partagé. Si la réinstallation depuis l'interface ne rétablit pas le GPU sur une image plus ancienne, consultez la réparation manuelle dans l'[issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
-## Exigences matérielles {#hardware-requirements}
+## Configuration matérielle requise {#hardware-requirements}
 
-Ces chiffres proviennent de tests de performance sur toute une gamme de systèmes, d'un poste de travail amd64 moderne équipé d'une NVIDIA RTX 4070 jusqu'à un Raspberry Pi, en exécutant l'intégralité du catalogue d'outils sur chacun et en balayant les limites de ressources Docker pour trouver le plancher réel.
+Ces chiffres proviennent de benchmarks réalisés sur toute une gamme de systèmes, d'une station de travail amd64 moderne avec une NVIDIA RTX 4070 jusqu'à un Raspberry Pi, en exécutant tout le catalogue d'outils sur chacun et en faisant varier les limites de ressources Docker pour trouver le vrai seuil.
 
-Vous tournez au bas de ces niveaux (un Pi, un vieux portable, un VPS de 2 Go) ? [Configurations à ressources limitées](/fr/guide/low-resource) transforme ces chiffres en un pas à pas concret avec des plafonds ajustés.
+Vous êtes en bas de ces niveaux (un Pi, un vieil ordinateur portable, un VPS de 2 Go) ? [Configurations à faibles ressources](/fr/guide/low-resource) transforme ces chiffres en un pas-à-pas concret avec des plafonds ajustés.
 
 ### Référence rapide {#quick-reference}
 
 | Niveau | Cas d'usage | CPU | RAM | GPU | Stockage |
 |------|----------|-----|-----|-----|---------|
-| Minimum | Outils image, fichiers et PDF légers ; utilisateur unique ; petits lots | 2 cœurs | 2 Go | Aucun | ~7 Go |
-| Recommandé | Les cinq modalités, y compris vidéo, PDF et IA sur CPU ; lots ; quelques utilisateurs | 4 cœurs | 4 Go | Aucun | ~25 Go |
-| Complet | Tout à pleine vitesse, y compris IA sur GPU ; grands lots ; nombreux utilisateurs | 6-8 cœurs | 8 Go | NVIDIA 8 Go+ de VRAM (12 Go confortable) | ~35 Go |
+| Minimum | Outils hors IA (image, fichiers, PDF léger) plus OCR rapide intégré et détection de visages ; un seul utilisateur ; petits lots | 2 cœurs | 2 Go | Aucun | ~7 Go |
+| Recommandé | Les cinq modalités, dont vidéo, PDF et bundles d'IA standard sur CPU ; lots ; quelques utilisateurs | 4 cœurs | 4 Go (8 Go pour l'inpainting HQ) | Aucun | ~25 Go |
+| Complet | Tout à pleine vitesse, y compris l'IA sur GPU ; gros lots ; nombreux utilisateurs | 6-8 cœurs | 8 Go | NVIDIA 8 Go+ de VRAM (12 Go confortable) | ~35 Go |
 
-**Architecture : 64 bits uniquement** (`linux/amd64` ou `linux/arm64`). SnapOtter s'exécute nativement sur les serveurs Intel/AMD, les Mac Apple Silicon et les cartes ARM 64 bits, y compris le **Raspberry Pi 4 et 5** (4-8 Go). Il **ne** fonctionne **pas** sur ARM 32 bits (`armv7`/`armhf`), aucune image n'étant construite pour cette cible, ni sur les cartes de la classe 512 Mo comme le Pi Zero, qui sont sous le plancher mémoire (voir ci-dessous).
+**Architecture : 64 bits uniquement** (`linux/amd64` ou `linux/arm64`). SnapOtter s'exécute nativement sur les serveurs Intel/AMD, les Mac Apple Silicon et les cartes ARM 64 bits, y compris le **Raspberry Pi 4 et 5** (4-8 Go). Il ne s'exécute **pas** sur l'ARM 32 bits (`armv7`/`armhf`), car aucune image n'est construite pour celui-ci, ni sur les cartes de classe 512 Mo comme le Pi Zero, qui sont sous le seuil de mémoire (voir ci-dessous).
 
-### Minimum (outils image, fichiers et PDF légers ; sans IA) {#minimum-image-files-and-light-pdf-tools-no-ai}
+### Minimum (outils d'image, de fichiers et de PDF léger ; sans IA) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
 | Ressource | Exigence |
 |---|---|
@@ -244,9 +268,9 @@ Vous tournez au bas de ces niveaux (un Pi, un vieux portable, un VPS de 2 Go) ? 
 | Disque | ~5,5 Go (image) + volume de données |
 | GPU | Non requis |
 
-Les 222 outils non-IA du catalogue - image (redimensionner, rogner, convertir, compresser, ajuster, filigraner), vidéo (couper, rendre muet, remultiplexer), audio (convertir, normaliser, couper), PDF (fusionner, diviser, compresser, pivoter, protéger), conversions de fichiers et préréglages de conversion dédiés - s'exécutent sur du matériel modeste. La plupart des opérations se terminent en bien moins d'une seconde, même sur un gros fichier : une image de 2,7 Mo est redimensionnée en ~0,05 s et réencodée en WebP en ~2 s.
+Les 222 outils du catalogue hors IA fonctionnent sur du matériel modeste : image (redimensionner, recadrer, convertir, compresser, ajuster, filigrane), vidéo (couper, couper le son, remuxer), audio (convertir, normaliser, couper), PDF (fusionner, diviser, compresser, pivoter, protéger), conversions de fichiers et préréglages de conversion dédiés. La plupart des opérations se terminent en bien moins d'une seconde, même sur un gros fichier : une image de 2,7 Mo est redimensionnée en ~0,05 s et réencodée en WebP en ~2 s.
 
-Le plancher mémoire est réel, d'après un balayage des limites de ressources Docker : **512 Mo ne peuvent pas démarrer la pile** (même un simple redimensionnement d'image est tué), **1 Go** gère les opérations sur un seul fichier mais un lot multi-fichiers manque de mémoire, et **2 Go / 2 cœurs** est la plus petite configuration qui gère les lots confortablement.
+Le seuil de mémoire est réel, d'après un balayage des limites de ressources Docker : **512 Mo ne suffisent pas pour démarrer la pile** (même un simple redimensionnement d'image est tué), **1 Go** gère les opérations sur un seul fichier mais un lot de plusieurs fichiers manque de mémoire, et **2 Go / 2 cœurs** est la plus petite configuration qui gère confortablement les lots hors IA. L'OCR rapide intégré et le bundle `face-detection` tiennent aussi dans 2 Go, alors que les plus gros bundles d'IA (Whisper, LaMa/DDColor, rembg, RealESRGAN, restauration de photos et inpainting HQ SD1.5) demandent de 4 à 8 Go de RAM et sont refusés d'emblée lorsque la mémoire libre est inférieure à leur seuil par bundle.
 
 ```yaml
 deploy:
@@ -256,52 +280,53 @@ deploy:
       memory: 2G
 ```
 
-**La seule exception gourmande en CPU est le réencodage vidéo.** Les opérations de copie de flux (couper, rendre muet, remultiplexage de conteneur) sont instantanées, mais le transcodage vers un codec différent est limité par le CPU. Un clip 1080p / 45 secondes réencodé en VP9 (WebM) prend environ **~40 s** sur un CPU moderne rapide, ~45 s sur Apple Silicon, ~80 s sur un ancien 4 cœurs mobile et **~130 s** sur un ancien serveur 4 cœurs. Si votre charge de travail est axée sur la vidéo, privilégiez les cœurs CPU et la fréquence d'horloge, ou augmentez la limite `cpus:` du conteneur : le compose fourni plafonne l'application à 4 cœurs par défaut (8 sur le compose GPU).
+**La seule exception gourmande en CPU est le réencodage vidéo.** Les opérations en copie de flux (couper, couper le son, remuxage de conteneur) sont instantanées, mais le transcodage vers un autre codec est limité par le CPU. Un clip 1080p de 45 secondes réencodé en VP9 (WebM) prend environ **~40 s** sur un CPU moderne rapide, ~45 s sur Apple Silicon, ~80 s sur un ancien 4 cœurs mobile et **~130 s** sur un ancien serveur 4 cœurs. Si votre charge de travail est centrée sur la vidéo, privilégiez les cœurs CPU et la fréquence d'horloge, ou relevez la limite `cpus:` du conteneur : le Compose fourni plafonne l'application à 4 cœurs par défaut (8 sur le Compose GPU).
 
-### Recommandé (outils IA sur CPU) {#recommended-ai-tools-on-cpu}
+### Recommandé (outils d'IA sur CPU) {#recommended-ai-tools-on-cpu}
 
 | Ressource | Exigence |
 |---|---|
 | CPU | 4 cœurs |
 | RAM | 4 Go |
-| Disk | 3 Go (image) + environ 20 Go (tous les packs AI en option) + espace de travail |
-| GPU | Non requis (repli sur CPU) |
+| Disque | 3 Go (image) + environ 20 Go (tous les packs d'IA facultatifs) + espace de travail |
+| GPU | Non requis (repli sur le CPU) |
 
-**L'installation et l'exécution des plus gros bundles d'IA sont ce qui pousse la recommandation à 4 Go de RAM.** Sans packs optionnels installés, l'application reste inactive autour de 360 ​​Mo. Les anciens outils Python partagent un sidecar, tandis que les outils OCR précis utilisent un dispatcher dédié à longue durée de vie épinglé à la génération active immuable. Avant l'activation, le programme d'installation exécute un smoke test sur le candidat. Il passe ensuite de manière atomique au nouveau dispatcher et draine le dispatcher précédent avant garbage collection. Chaque artefact OCR précis officiel doit transmettre son release suite le plus défavorable dans un 4 GiB cgroup, tandis que la recommandation d'hôte de 4 Go laisse une marge pour l'application Node.js, Postgres, Redis, les files d'attente et le travail simultané.
+**L'installation et l'exécution des plus gros bundles d'IA sont ce qui fait monter la recommandation à 4 Go de RAM.** Sans pack facultatif installé, l'application consomme environ 360 Mo au repos. Les anciens outils Python partagent un sidecar, tandis que l'OCR précis utilise un répartiteur dédié de longue durée, épinglé sur la génération immuable active. Avant l'activation, l'installeur exécute un test de fumée sur le candidat. Il bascule ensuite atomiquement vers le nouveau répartiteur et vide le précédent avant le ramasse-miettes. Chaque artefact officiel d'OCR précis doit réussir sa suite de validation du pire cas dans un cgroup de 4 GiB, tandis que la recommandation de 4 Go d'hôte laisse de la marge pour l'application Node.js, Postgres, Redis, les files d'attente et le travail concurrent.
 
-La plupart des outils IA sont parfaitement utilisables sur CPU ; deux ou trois veulent vraiment un GPU. Mesuré sur un CPU 4 cœurs moderne :
+La plupart des outils d'IA sont parfaitement utilisables sur CPU ; quelques-uns demandent vraiment un GPU. Mesuré sur un CPU 4 cœurs moderne :
 
-| Outil IA | Temps CPU | Utilisable sur CPU ? |
+| Outil d'IA | Durée sur CPU | Utilisable sur CPU ? |
 |---|---|---|
-| Détection de visages (flouter les visages, recadrage intelligent, yeux rouges), suppression du bruit | moins de 1 s | Oui |
+| Détection de visages (blur-faces, smart-crop, red-eye), noise-removal | moins de 1 s | Oui |
 | OCR, transcription, sous-titres | 1-3 s | Oui |
-| Coloriser, amélioration des visages | ~10 s | Oui |
-| Suppression / remplacement / floutage d'arrière-plan | ~29 s | Oui (il faudra patienter) |
-| Agrandissement IA (RealESRGAN) | ~33 s sur petit format ; plusieurs minutes sur les grandes images | Limite - GPU fortement recommandé |
-| Restauration de photo (pipeline complet) | plusieurs minutes | Non - nécessite un GPU ou un CPU rapide à nombreux cœurs |
+| Colorisation, amélioration des visages | ~10 s | Oui |
+| Suppression / remplacement / flou d'arrière-plan | ~29 s | Oui (il faudra patienter) |
+| Agrandissement par IA (RealESRGAN) | ~33 s en petit ; plusieurs minutes sur les grandes images | Limite : GPU fortement recommandé |
+| Restauration de photos (pipeline complet) | plusieurs minutes | Non : nécessite un GPU ou un CPU rapide à nombreux cœurs |
 
-SnapOtter n'intègre volontairement pas ces téléchargements de modèles dans l'image Docker. Les bundles IA ne sont récupérés que lorsqu'un administrateur active l'outil concerné, stockés dans le volume persistant `/data/ai` et partagés par chaque outil qui dépend de la même pile de modèles. Cela maintient l'image finale du conteneur petite tout en permettant à une installation IA complète d'atteindre les chiffres de stockage plus élevés ci-dessous.
+SnapOtter n'intègre volontairement pas ces téléchargements de modèles dans l'image Docker. Les bundles d'IA ne sont récupérés que lorsqu'un administrateur active l'outil correspondant, sont stockés dans le volume persistant `/data/ai` et sont partagés par tous les outils qui dépendent de la même pile de modèles. Cela garde l'image finale du conteneur petite tout en permettant à une installation d'IA complète d'atteindre les chiffres de stockage plus élevés ci-dessous.
 
-Certains outils dépendent de plus d'un bundle partagé. Par exemple, Photo d'identité a besoin à la fois de `background-removal` et de `face-detection` ; si `background-removal` est déjà installé, activer Photo d'identité ne télécharge que le bundle `face-detection` manquant. La même réutilisation s'applique à tous les outils IA.
+Certains outils dépendent de plusieurs bundles partagés. Par exemple, Photo d'identité nécessite à la fois `background-removal` et `face-detection` ; si `background-removal` est déjà installé, l'activation de Photo d'identité ne télécharge que le bundle `face-detection` manquant. La même réutilisation s'applique à tous les outils d'IA.
 
-Estimations de stockage du pack AI en option :
+Stockage des packs d'IA facultatifs et seuils de mémoire CPU (SnapOtter vérifie la mémoire disponible avant de transmettre au sidecar Python et refuse immédiatement les exécutions sous le seuil de mémoire libre du bundle) :
 
-| Bundle | Taille disque |
-|---|---|
-| Suppression d'arrière-plan | 4-5 Go |
-| Agrandissement + Amélioration des visages + Suppression du bruit | 5-6 Go |
-| Détection de visages | 200-300 Mo |
-| Gomme d'objets + Coloriser | 1-2 Go |
-| OCR précis (`balanced`/`best`) | ~208-234 MiB téléchargé / ~409-488 MiB installé |
-| Restauration de photo | 4-5 Go |
-| Transcription | ~600 Mo |
-| **Tous les forfaits** | **~20 Go installés** |
+| Bundle | Taille sur disque | Seuil de mémoire CPU |
+|---|---|---|
+| Détection de visages | 200-300 Mo | 2 Go de RAM hôte (~0,5 Go libre) |
+| Transcription | ~600 Mo | 4 Go de RAM hôte (~2 Go libres) |
+| Gomme d'objets + Colorisation | 1-2 Go | 4 Go de RAM hôte (~2 Go libres) |
+| OCR précis (`balanced`/`best`) | ~208-234 MiB à télécharger / ~409-488 MiB installés | 4 GiB de mémoire effective configurée (`fast` fonctionne avec 2 Go) |
+| Suppression d'arrière-plan | 4-5 Go | 4 Go de RAM hôte (~2,5 Go libres) |
+| Agrandissement + Amélioration des visages + Suppression du bruit | 5-6 Go | 4 Go de RAM hôte (~2,5 Go libres) |
+| Restauration de photos | 4-5 Go | 4 Go de RAM hôte (~3 Go libres) |
+| Inpainting haute qualité (`inpaint-hq`) | 5-7 Go | 8 Go de RAM hôte (~6 Go libres) |
+| **Tous les bundles** | **~25 Go installés** | **4 Go (8 Go avec `inpaint-hq`)** |
 
-Fast OCR est intégré à l'image via Tesseract, ajoute environ 25 MiB et ne nécessite pas le pack OCR en option ni ses 4 exigences de mémoire GiB. Le pack précis est disponible dans les conteneurs officiels Linux amd64 et arm64 et exécute ONNX Runtime sur CPU. Les hôtes NVIDIA utilisent le même environnement d'exécution CPU OCR, donc OCR ne dépend pas de la version CUDA ou de l'architecture GPU. Le temps d'exécution précis nécessite au moins 4 GiB de mémoire effective : la limite cgroup du conteneur configuré, sinon la mémoire hôte. SnapOtter rejette les systèmes inférieurs au minimum de compatibilité signé avant de télécharger le pack. L'installation d'un pack précis est également rejetée sur les archives bare-metal/préconstruites dont les libc et Python ABI ne peuvent pas être garanties.
+L'OCR rapide est intégré à l'image via Tesseract, ajoute environ 25 MiB et ne nécessite ni le pack d'OCR facultatif ni ses 4 GiB de mémoire. Le mode rapide prend en charge `auto`, `en`, `de`, `es`, `fr`, `zh` et `ja`, mais pas le coréen (`ko`) ni l'arabe (`ar`). Ces deux langues utilisent `balanced` ou `best` et nécessitent donc le pack précis. Le pack précis est disponible dans les conteneurs Linux officiels amd64 et arm64 et exécute ONNX Runtime sur le CPU. Les hôtes NVIDIA utilisent ce même runtime d'OCR sur CPU : l'OCR ne dépend donc ni de la version de CUDA ni de l'architecture du GPU. Le runtime précis nécessite au moins 4 GiB de mémoire effective : la limite cgroup configurée du conteneur, sinon la mémoire de l'hôte. SnapOtter rejette les systèmes sous ce minimum de compatibilité signé avant de télécharger le pack. L'installation du pack précis est également rejetée sur les archives bare-metal/précompilées dont la libc et l'ABI Python ne peuvent pas être garanties. Sur ces hôtes non pris en charge, l'OCR coréen et arabe renvoie une erreur d'incompatibilité explicite et ne bascule jamais silencieusement sur le mode rapide.
 
-Les répliques qui partagent le même `DATA_DIR` doivent utiliser la même architecture de processeur ; épinglez les déploiements à plusieurs répliques à des nœuds compatibles au moyen de l'affinité de nœuds. Les répliques amd64/arm64 mixtes nécessitent des volumes de données distincts et des déploiements SnapOtter indépendants.
+Les réplicas qui partagent le même `DATA_DIR` doivent utiliser la même architecture CPU ; épinglez les déploiements multi-réplicas avec une affinité de nœud. Les réplicas amd64/arm64 mixtes nécessitent des volumes de données distincts et des déploiements SnapOtter indépendants.
 
-Le runtime précis conserve une génération active et purge son cache de téléchargement après l'activation. Pour cette version, une première installation nécessite temporairement environ 620-720 MiB pour l'archive plus le staging, et une mise à niveau peut culminer près de 1,2 GiB tandis que l'ancienne génération reste active. Le programme d'installation calcule les exigences exactes à partir de l'index signé et des générations actuelles avant le téléchargement ou l'extraction, et échoue prématurément si le volume de données est trop petit.
+Le runtime précis conserve une seule génération active et purge son cache de téléchargement après l'activation. Pour cette version, une première installation nécessite temporairement environ 620-720 MiB pour l'archive et la préparation, et une mise à niveau peut atteindre un pic proche de 1,2 GiB tant que l'ancienne génération reste active. L'installeur calcule l'exigence exacte à partir de l'index signé et des générations actuelles avant de télécharger ou d'extraire, et échoue tôt si le volume de données est trop petit.
 
 ```yaml
 deploy:
@@ -311,32 +336,32 @@ deploy:
       memory: 4G
 ```
 
-### Complet (outils IA sur NVIDIA CUDA) {#full-ai-tools-on-nvidia-cuda}
+### Complet (outils d'IA sur NVIDIA CUDA) {#full-ai-tools-on-nvidia-cuda}
 
 | Ressource | Exigence |
 |---|---|
-| CPU | 6-8 cœurs (la préparation vidéo + la concurrence s'exécutent sur CPU même avec l'IA sur GPU) |
+| CPU | 6-8 cœurs (la préparation vidéo et la concurrence s'exécutent sur le CPU même avec l'IA sur GPU) |
 | RAM | 8 Go |
-| GPU | NVIDIA avec 8+ Go de VRAM (12 Go recommandé) |
+| GPU | NVIDIA avec 8+ Go de VRAM (12 Go recommandés) |
 | Disque | ~35 Go au total |
 
-Un GPU NVIDIA (CUDA) accélère considérablement les modèles IA lourds. Mesuré sur une RTX 4070 par rapport à un CPU moderne :
+Un GPU NVIDIA (CUDA) accélère considérablement les modèles d'IA lourds. Mesuré sur une RTX 4070 par rapport à un CPU moderne :
 
-| Outil IA | Accélération avec GPU | Notes |
+| Outil d'IA | Gain avec le GPU | Remarques |
 |---|---|---|
-| Agrandissement IA (RealESRGAN 2×) | **~47×** | Le plus gros gain - moins d'une seconde contre ~33 s (plusieurs minutes sur les grandes images) |
+| Agrandissement par IA (RealESRGAN 2×) | **~47×** | Le plus gros gain : moins d'une seconde contre ~33 s (plusieurs minutes sur les grandes images) |
 | Amélioration des visages (CodeFormer) | **~12×** | ~0,9 s contre ~11 s |
 | Transcription (Whisper) | ~4,5× | |
-| Suppression / remplacement / floutage d'arrière-plan | ~4× | ~7 s sur GPU contre ~29 s sur CPU |
-| Coloriser | ~1,8× | |
-| OCR, détection de visages, yeux rouges, suppression du bruit | ~1× | Déjà rapide sur CPU - un GPU n'apporte rien |
-| Restauration de photo | aucune | Limité par le CPU même sur un GPU (0 % d'utilisation du GPU) ; un CPU rapide compte plus qu'un GPU ici |
+| Suppression / remplacement / flou d'arrière-plan | ~4× | ~7 s sur GPU contre ~29 s sur CPU |
+| Colorisation | ~1,8× | |
+| OCR, détection de visages, red-eye, noise-removal | ~1× | Déjà rapide sur CPU : un GPU n'apporte rien |
+| Restauration de photos | aucun | Limité par le CPU même sur un GPU (0 % d'utilisation du GPU) ; un CPU rapide compte plus qu'un GPU ici |
 
-Les outils qui valent un GPU sont **l'agrandissement, l'amélioration des visages, la transcription et la suppression d'arrière-plan**. La détection de visages, l'OCR et les yeux rouges sont limités par le CPU et déjà rapides, un GPU n'apporte donc rien.
+Les outils qui justifient un GPU sont **l'agrandissement, l'amélioration des visages, la transcription et la suppression d'arrière-plan**. La détection de visages, l'OCR et le red-eye sont limités par le CPU et déjà rapides : un GPU n'y ajoute rien.
 
-L'utilisation de VRAM en pic atteint 7,5 Go pendant un agrandissement avec amélioration des visages. Un GPU NVIDIA de 6 Go convient pour la plupart des outils IA pris individuellement, mais échouera sur l'agrandissement. 8-12 Go de VRAM gèrent tout.
+L'utilisation maximale de VRAM atteint 7,5 Go pendant l'agrandissement avec amélioration des visages. Un GPU NVIDIA de 6 Go fonctionne pour la plupart des outils d'IA pris individuellement, mais échouera sur l'agrandissement. 8 à 12 Go de VRAM gèrent tout.
 
-L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas prise en charge pour l'inférence IA aujourd'hui. Mapper `/dev/dri` dans le conteneur n'active pas l'accélération GPU de l'IA ; SnapOtter exécutera les outils IA sur CPU sauf si NVIDIA CUDA est disponible.
+L'accélération par iGPU Intel/AMD via VA-API, Quick Sync ou OpenCL n'est pas prise en charge aujourd'hui pour l'inférence IA. Le mappage de `/dev/dri` dans le conteneur n'active pas l'accélération GPU de l'IA ; SnapOtter exécutera les outils d'IA sur le CPU sauf si NVIDIA CUDA est disponible.
 
 ```yaml
 deploy:
@@ -353,47 +378,47 @@ deploy:
 
 ### Utilisateurs simultanés {#concurrent-users}
 
-Requêtes de redimensionnement d'image parallèles sur le conteneur applicatif plafonné à 4 cœurs par défaut :
+Requêtes parallèles de redimensionnement d'image sur le conteneur d'application par défaut plafonné à 4 cœurs :
 
 | Requêtes simultanées | Temps de réponse moyen | Erreurs |
 |---|---|---|
-| 1 | 0,4 s | 0 |
-| 5 | 1,2 s | 0 |
-| 10 | 2,1 s | 0 |
+| 1 | 0,4s | 0 |
+| 5 | 1,2s | 0 |
+| 10 | 2,1s | 0 |
 
-Le temps de réponse se dégrade de manière sous-linéaire sans erreur à mesure que le pool de workers sature. Augmenter la limite `cpus:` du conteneur applicatif (ou utiliser un hôte avec plus de cœurs) relève le plafond. Notez que les tâches lourdes (transcodage vidéo, IA sur CPU) mobilisent un worker pendant toute leur durée, dimensionnez donc le CPU selon votre nombre attendu de tâches lourdes simultanées, et pas seulement selon le nombre de requêtes.
+Le temps de réponse se dégrade de façon sous-linéaire et sans erreur à mesure que le pool de workers sature. Relever la limite `cpus:` du conteneur d'application (ou utiliser un hôte avec plus de cœurs) repousse le plafond. Notez que les tâches lourdes (transcodage vidéo, IA sur CPU) occupent un worker pendant toute leur durée : dimensionnez donc le CPU en fonction du nombre attendu de tâches lourdes simultanées, pas seulement du nombre de requêtes.
 
 ### Formats d'image pris en charge {#supported-image-formats}
 
-SnapOtter prend en charge **55+ formats d'entrée** et **14 formats de sortie**, dont les fichiers RAW de 20+ marques d'appareils photo, les formats professionnels (PSD, EPS, OpenEXR, HDR), les codecs modernes (JPEG XL, AVIF, HEIC, QOI) et les formats scientifiques/de jeu (FITS, DDS).
+SnapOtter prend en charge **plus de 55 formats d'entrée** et **14 formats de sortie**, y compris les fichiers RAW de plus de 20 marques d'appareils photo, des formats professionnels (PSD, EPS, OpenEXR, HDR), des codecs modernes (JPEG XL, AVIF, HEIC, QOI) et des formats scientifiques et de jeu (FITS, DDS).
 
-Consultez la [liste complète des formats](/fr/guide/supported-formats) pour les détails sur chaque format pris en charge, le décodeur utilisé et les contrôles de qualité disponibles.
+Consultez la [liste complète des formats](/fr/guide/supported-formats) pour le détail de chaque format pris en charge, du décodeur utilisé et des contrôles de qualité disponibles.
 
 ### Limitations connues {#known-limitations}
 
-- **Le redimensionnement sensible au contenu** plante sur les grandes images (>5 MP) en raison d'une limitation du binaire caire. Fonctionne bien avec des images plus petites.
-- **Le décodage HEIF** prend 13-23 secondes. HEIC (la variante d'Apple) est bien plus rapide, à 0,3-0,9 seconde.
-- **L'agrandissement** expire sur CPU pour tout ce qui dépasse les petites images. GPU requis pour un usage pratique.
+- **Le redimensionnement sensible au contenu** plante sur les grandes images (>5 MP) en raison d'une limitation du binaire caire. Il fonctionne bien avec des images plus petites.
+- **Le décodage HEIF** prend 13 à 23 secondes. HEIC (la variante d'Apple) est beaucoup plus rapide, avec 0,3 à 0,9 seconde.
+- **L'agrandissement** dépasse le délai sur CPU pour tout ce qui dépasse de petites images. Un GPU est nécessaire pour un usage pratique.
 - **L'amélioration des visages CodeFormer** est nettement plus lente que GFPGAN (53 s contre 2 s sur GPU). GFPGAN est recommandé pour la plupart des cas d'usage.
 
 ## Volumes {#volumes}
 
-| Montage / Volume | Rôle | Requis ? |
+| Montage / Volume | Rôle | Obligatoire ? |
 |---|---|---|
-| `/data` (app) | Modèles IA, venv Python, fichiers utilisateur | **Oui** - perte de fichiers sans lui |
+| `/data` (app) | Modèles d'IA, venv Python, fichiers des utilisateurs | **Oui** : perte de fichiers sans lui |
 | `/tmp/workspace` (app) | Fichiers de traitement temporaires (nettoyés automatiquement) | Recommandé |
-| `SnapOtter-pgdata` (postgres) | Répertoire de données PostgreSQL (utilisateurs, paramètres, pipelines, tâches) | **Oui** - perte de données sans lui |
-| `SnapOtter-redisdata` (redis) | Fichier append-only Redis pour des files de tâches durables | Recommandé |
+| `SnapOtter-pgdata` (postgres) | Répertoire de données PostgreSQL (utilisateurs, paramètres, pipelines, tâches) | **Oui** : perte de données sans lui |
+| `SnapOtter-redisdata` (redis) | Fichier append-only de Redis pour des files de tâches durables | Recommandé |
 
-### Montages liés (bind mounts) vs volumes nommés {#bind-mounts-vs-named-volumes}
+### Montages bind ou volumes nommés {#bind-mounts-vs-named-volumes}
 
-**Volumes nommés** (recommandés) - Docker gère les permissions automatiquement :
+**Volumes nommés** (recommandés) : Docker gère automatiquement les permissions :
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Montages liés** - Vous gérez les permissions. Réglez `PUID`/`PGID` pour correspondre à votre utilisateur hôte :
+**Montages bind** : vous gérez les permissions. Définissez `PUID`/`PGID` pour correspondre à votre utilisateur hôte :
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -404,13 +429,13 @@ environment:
 
 ### Permissions de stockage {#storage-permissions}
 
-SnapOtter écrit à deux emplacements à l'exécution : `/data` (fichiers utilisateur, journaux, modèles IA et le venv Python) et `/tmp/workspace` (espace de travail temporaire de traitement). Les deux doivent être accessibles en écriture par l'utilisateur sous lequel le conteneur s'exécute. Si l'un ne l'est pas, le conteneur **échoue rapidement au démarrage** avec un message nommant le répertoire, l'UID/GID en cours d'exécution et comment corriger, au lieu de démarrer « en bonne santé » puis d'échouer au premier téléversement avec une erreur cryptique.
+SnapOtter écrit à deux emplacements à l'exécution : `/data` (fichiers des utilisateurs, journaux, modèles d'IA et venv Python) et `/tmp/workspace` (espace temporaire de traitement). Les deux doivent être accessibles en écriture par l'utilisateur sous lequel le conteneur s'exécute. Si l'un des deux ne l'est pas, le conteneur **échoue immédiatement au démarrage** avec un message indiquant le répertoire, l'UID/GID en cours et comment corriger, au lieu de démarrer en étant « sain » puis d'échouer au premier téléversement avec une erreur cryptique. Le répertoire des journaux (`LOG_DIR`, `/data/logs` dans l'image) est vérifié de la même façon, dans tous les modes de stockage, puisque les journaux restent locaux même lorsque les fichiers se trouvent sur S3.
 
-La façon dont les permissions sont gérées dépend de la manière dont le conteneur est lancé :
+La gestion des permissions dépend de la façon dont le conteneur est lancé :
 
-**Par défaut (démarre en root, redescend vers `snapotter`)** - le point d'entrée démarre en root, corrige la propriété des volumes montés, puis redescend vers l'utilisateur non privilégié `snapotter` via `gosu`. Les volumes nommés fonctionnent sans aucune configuration. Pour les montages liés, réglez `PUID`/`PGID` sur votre utilisateur hôte (ci-dessus) afin que les fichiers qu'il écrit vous appartiennent.
+**Par défaut (démarre en root, bascule vers `snapotter`)** : le point d'entrée démarre en root, corrige la propriété des volumes montés, puis bascule vers l'utilisateur non privilégié `snapotter` via `gosu`. Les volumes nommés fonctionnent sans configuration. Pour les montages bind, définissez `PUID`/`PGID` sur votre utilisateur hôte (ci-dessus) afin que les fichiers qu'il écrit vous appartiennent.
 
-**Kubernetes / OpenShift (non-root via `runAsUser`)** - lancé directement en tant qu'utilisateur non-root, le conteneur ne peut pas chown les volumes lui-même, l'orchestrateur doit donc les rendre accessibles en écriture. Réglez `fsGroup` :
+**Kubernetes / OpenShift (non-root via `runAsUser`)** : lancé directement en tant qu'utilisateur non root, le conteneur ne peut pas exécuter chown sur les volumes lui-même : l'orchestrateur doit donc les rendre accessibles en écriture. Définissez `fsGroup` :
 
 ```yaml
 securityContext:
@@ -419,45 +444,45 @@ securityContext:
   fsGroup: 999        # makes mounted volumes writable by the pod
 ```
 
-Les répertoires accessibles en écriture de l'image appartiennent au groupe GID 0 et sont accessibles en écriture par le groupe, de sorte qu'un pod s'exécutant avec un **UID arbitraire** plus le groupe supplémentaire root (le défaut OpenShift) peut écrire sans `chown`.
+Les répertoires inscriptibles de l'image appartiennent au groupe GID 0 et sont accessibles en écriture par le groupe : un pod exécuté avec un **UID arbitraire** plus le groupe supplémentaire root (le comportement par défaut d'OpenShift) peut donc écrire sans `chown`.
 
-**TrueNAS Scale (et autres configurations à « UID étranger »)** - TrueNAS exécute les applications sous un utilisateur non-root (souvent `568:568`) et monte des jeux de données hôtes appartenant à un autre utilisateur, de sorte que ni le point d'entrée ni `fsGroup` ne les rendent accessibles en écriture par lui-même. Choisissez l'une des options :
+**TrueNAS Scale (et autres configurations à « UID étranger »)** : TrueNAS exécute les applications sous un utilisateur non root (souvent `568:568`) et monte des datasets hôtes appartenant à un autre utilisateur : ni le point d'entrée ni `fsGroup` ne les rend donc accessibles en écriture à lui seul. Choisissez l'une des options :
 
-- **Exécuter l'application en root** (recommandé) - laissez l'utilisateur de l'application non défini ou réglez-le sur `0`, et laissez le point d'entrée par défaut corriger les permissions et redescendre vers `snapotter`.
-- **Exécuter en tant qu'UID `999`** - réglez l'utilisateur/groupe de l'application sur `999:999` (l'utilisateur intégré `snapotter` de SnapOtter) pour qu'il corresponde à la propriété de l'image.
-- **`chown` le jeu de données hôte** vers l'UID sous lequel le conteneur s'exécute, depuis le shell TrueNAS :
+- **Exécuter l'application en root** (recommandé) : laissez l'utilisateur de l'application non défini ou définissez-le sur `0`, et laissez le point d'entrée par défaut corriger les permissions et basculer vers `snapotter`.
+- **Exécuter avec l'UID `999`** : définissez l'utilisateur/groupe de l'application sur `999:999` (l'utilisateur intégré `snapotter` de SnapOtter) pour qu'il corresponde à la propriété de l'image.
+- **`chown` le dataset hôte** vers l'UID sous lequel le conteneur s'exécute, depuis le shell TrueNAS :
 
   ```bash
-  # Utilisez l'UID de l'erreur de démarrage (ou exécutez `id` dans le conteneur)
+  # Use the UID from the startup error (or run `id` inside the container)
   chown -R 568:568 /mnt/<pool>/<dataset>
   ```
 
-L'erreur de démarrage nomme l'UID exact à utiliser, le chemin le plus rapide est donc de démarrer l'application une fois, de lire le message, puis d'exécuter `chown` (ou d'ajuster l'utilisateur) en conséquence.
+L'erreur de démarrage indique l'UID exact à utiliser : le plus rapide est donc de démarrer l'application une fois, de lire le message, puis d'exécuter `chown` (ou d'ajuster l'utilisateur) en conséquence.
 
 ## Variables d'environnement {#environment-variables}
 
-| Variable | Défaut | Description |
+| Variable | Valeur par défaut | Description |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Activer/désactiver l'exigence de connexion |
-| `DEFAULT_USERNAME` | `admin` | Nom d'utilisateur admin initial |
-| `DEFAULT_PASSWORD` | `admin` | Mot de passe admin initial (changement forcé à la première connexion) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (illimité) | Limite de téléversement par fichier en Mo. L'image est livrée avec `0` ; une compilation depuis les sources démarre à 100 |
-| `MAX_BATCH_SIZE` | `0` (illimité) | Nombre max de fichiers par requête de lot. L'image est livrée avec `0` ; une compilation depuis les sources démarre à 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Requêtes API par minute et par IP (mettez 0 pour désactiver) |
-| `MAX_USERS` | `0` (illimité) | Nombre maximal de comptes utilisateur |
+| `AUTH_ENABLED` | `true` | Active ou désactive l'obligation de connexion |
+| `DEFAULT_USERNAME` | `admin` | Nom d'utilisateur administrateur initial |
+| `DEFAULT_PASSWORD` | `admin` | Mot de passe administrateur initial (changement forcé à la première connexion) |
+| `MAX_UPLOAD_SIZE_MB` | `0` (illimité) | Limite de téléversement par fichier en Mo. L'image fournit `0` ; une compilation depuis les sources démarre à 100 |
+| `MAX_BATCH_SIZE` | `0` (illimité) | Nombre maximal de fichiers par requête de lot. L'image fournit `0` ; une compilation depuis les sources démarre à 100 |
+| `RATE_LIMIT_PER_MIN` | `1000` | Requêtes d'API par minute et par IP (0 pour désactiver) |
+| `MAX_USERS` | `0` (illimité) | Nombre maximal de comptes utilisateurs |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quels pairs peuvent définir l'IP du client via `X-Forwarded-For`. Réseaux privés uniquement par défaut |
-| `PUID` | `999` | Exécuter sous cet UID (pour les permissions de montage lié) |
-| `PGID` | `999` | Exécuter sous ce GID (pour les permissions de montage lié) |
+| `PUID` | `999` | Exécuter avec cet UID (pour les permissions des montages bind) |
+| `PGID` | `999` | Exécuter avec ce GID (pour les permissions des montages bind) |
 | `LOG_LEVEL` | `info` | Verbosité des journaux : fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (auto) | Nombre max de tâches de traitement IA en parallèle |
+| `CONCURRENT_JOBS` | `0` (auto) | Nombre maximal de tâches de traitement IA en parallèle |
 | `SESSION_DURATION_HOURS` | `168` | Durée de vie de la session de connexion (7 jours) |
-| `CORS_ORIGIN` | (vide) | Origines autorisées séparées par des virgules, ou vide pour même origine |
+| `CORS_ORIGIN` | (vide) | Origines autorisées séparées par des virgules, ou vide pour la même origine |
 
-### Proxy sortant et CA privée {#outbound-proxy-and-private-ca}
+### Proxy sortant et autorité de certification privée {#outbound-proxy-and-private-ca}
 
-Le conteneur officiel permet la prise en charge du proxy d'environnement de Node. Si SnapOtter doit atteindre le référentiel d'exécution OCR ou d'autres services HTTPS via un proxy d'entreprise, définissez `HTTPS_PROXY` (et `HTTP_PROXY` si nécessaire). Définissez `NO_PROXY` sur une liste d'hôtes séparés par des virgules qui doivent être atteints directement, tels que Postgres, Redis et le stockage d'objets interne.
+Le conteneur officiel active la prise en charge du proxy par variables d'environnement de Node. Si SnapOtter doit joindre le dépôt du runtime d'OCR ou d'autres services HTTPS via un proxy d'entreprise, définissez `HTTPS_PROXY` (et `HTTP_PROXY` si nécessaire). Définissez `NO_PROXY` sur une liste d'hôtes séparés par des virgules qui doivent être joints directement, comme Postgres, Redis et le stockage objet interne.
 
-Si le proxy ou un service interne est signé par une autorité de certification privée, montez le certificat CA en lecture seule et pointez `NODE_EXTRA_CA_CERTS` vers celui-ci. Le fichier doit exister au démarrage du processus Node :
+Si le proxy ou un service interne est signé par une autorité de certification privée, montez le certificat de l'AC en lecture seule et faites-y pointer `NODE_EXTRA_CA_CERTS`. Le fichier doit exister au démarrage du processus Node :
 
 ```yaml
 services:
@@ -471,11 +496,11 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-Conservez les informations d'identification du proxy en dehors du fichier Compose (par exemple dans un fichier `.env` protégé ou secret). Ne désactivez pas la vérification TLS : l'index OCR signé authentifie les métadonnées de version, tandis que la validation TLS normale protège toujours le transport et toutes les autres requêtes sortantes.
+Gardez les identifiants du proxy en dehors du fichier Compose (par exemple dans un fichier `.env` protégé ou un secret). Ne désactivez pas la vérification TLS : l'index d'OCR signé authentifie les métadonnées de version, tandis que la validation TLS normale continue de protéger le transport et toutes les autres requêtes sortantes.
 
-## Vérification d'état (health check) {#health-check}
+## Contrôle de santé {#health-check}
 
-Le conteneur inclut une vérification d'état intégrée :
+Le conteneur inclut un contrôle de santé intégré :
 
 ```bash
 # Check container health status
@@ -488,23 +513,23 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse proxy {#reverse-proxy}
 
-`TRUST_PROXY` vaut `loopback,linklocal,uniquelocal` par défaut : SnapOtter ne croit donc l'en-tête `X-Forwarded-For` que s'il vient d'un pair situé sur un réseau privé. Un reverse proxy sur le même hôte, sur un réseau Docker ou sur votre LAN est digne de confiance d'emblée, ce qui fait que la limitation de débit, le limiteur de force brute à la connexion, le journal d'audit et la liste d'IP autorisées de l'édition enterprise voient tous l'IP client réelle sans aucune configuration.
+`TRUST_PROXY` vaut par défaut `loopback,linklocal,uniquelocal` : SnapOtter ne croit donc `X-Forwarded-For` que s'il provient d'un pair situé sur un réseau privé. Un reverse proxy sur le même hôte, sur un réseau Docker ou sur votre réseau local est approuvé d'office, ce qui signifie que la limitation de débit, le limiteur de force brute de connexion, le journal d'audit et la liste d'autorisation d'IP entreprise voient tous la vraie IP du client sans configuration.
 
-Ne mettez `TRUST_PROXY=true` que lorsque le proxy placé devant atteint SnapOtter depuis une adresse **publique**, un répartiteur de charge cloud sur un autre réseau par exemple. Sur une instance directement exposée, cette valeur rend `request.ip` contrôlable par un attaquant, car un appelant qui fait tourner l'en-tête obtient un nouveau compteur de limitation de débit à chaque requête.
+Ne définissez `TRUST_PROXY=true` que lorsque le proxy placé devant joint SnapOtter depuis une adresse **publique**, par exemple un répartiteur de charge cloud sur un autre réseau. Sur une instance directement exposée, cette valeur rend `request.ip` contrôlable par un attaquant, car un appelant qui fait tourner l'en-tête obtient un nouveau compartiment de limitation de débit à chaque requête.
 
-Deux choses à savoir avant de vous lancer dans la mesure des IP clientes. Docker Desktop sur macOS et Windows sert un port publié via un proxy en espace utilisateur qui réécrit toutes les adresses source vers la passerelle de la VM `192.168.65.1` ; aucune valeur de `TRUST_PROXY` n'y récupère le client réel, déployez donc sous Linux tout ce qui est exposé à internet. Et sur n'importe quelle plateforme, atteindre un port publié via `localhost` est observé comme la passerelle du pont plutôt que comme votre client : un test en localhost ne vous apprend donc rien sur la façon dont un vrai client est attribué. Le tableau complet des valeurs de `TRUST_PROXY` et la mise en garde sur Docker Desktop se trouvent dans [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
+Deux points à connaître avant de mesurer les IP des clients. Docker Desktop sur macOS et Windows sert un port publié via un proxy en espace utilisateur qui réécrit toute adresse source vers la passerelle de la VM `192.168.65.1` : aucune valeur de `TRUST_PROXY` ne permet d'y retrouver le vrai client ; déployez sous Linux pour tout ce qui est exposé sur Internet. Et sur n'importe quelle plateforme, joindre un port publié via `localhost` est observé comme provenant de la passerelle du bridge et non de votre client : un test en localhost ne vous dit donc rien sur la façon dont un vrai client est attribué. Le tableau complet des valeurs de `TRUST_PROXY` et la mise en garde sur Docker Desktop se trouvent dans [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
-Deux choses comptent pour chaque proxy ci-dessous : autoriser les corps de requêtes volumineux (téléchargements) et ne pas mettre les réponses en mémoire tampon. Un proxy tamponnant les réponses interrompt la progression de SSE et, plus visiblement, fait "démarrer mais ne jamais terminer" le téléchargement d'un fichier volumineux, car le proxy conserve l'intégralité du fichier avant de le transmettre. SnapOtter envoie `X-Accel-Buffering: no` lors des téléchargements afin que nginx les diffuse même si la mise en mémoire tampon est laissée ailleurs, mais les proxys autres que nginx doivent désactiver explicitement la mise en mémoire tampon des réponses (indiquée dans chaque configuration ci-dessous). Si un téléchargement s'arrête en cours de route, un proxy de mise en mémoire tampon devant est la première chose à vérifier.
+Deux points comptent pour chaque proxy ci-dessous : autoriser les gros corps de requête (téléversements) et ne pas mettre les réponses en mémoire tampon. Un proxy qui met les réponses en tampon casse la progression SSE et, de façon plus visible, fait qu'un téléchargement de gros fichier « démarre mais ne se termine jamais », car le proxy retient tout le fichier avant de le transmettre. SnapOtter envoie `X-Accel-Buffering: no` sur les téléchargements pour que nginx les diffuse en flux même si la mise en tampon reste activée ailleurs, mais les proxies autres que nginx nécessitent que la mise en tampon des réponses soit désactivée explicitement (indiqué dans chaque configuration ci-dessous). Si un téléchargement s'arrête en cours de route, un proxy qui met en tampon placé devant est la première chose à vérifier.
 
-Une remarque sur HSTS : l'API envoie elle-même l'en-tête `Strict-Transport-Security` sur chaque réponse, donc un proxy qui laisse passer les en-têtes de réponse (toutes les configurations ci-dessous le font) n'a besoin d'aucune configuration HSTS de son côté. C'est seulement si votre proxy est configuré pour supprimer ou remplacer les en-têtes de réponse en amont que vous devez préserver l'en-tête ou le rajouter en périphérie.
+Une remarque sur HSTS : l'API envoie elle-même `Strict-Transport-Security` sur chaque réponse ; un proxy qui transmet les en-têtes de réponse (toutes les configurations ci-dessous le font) n'a donc besoin d'aucune configuration HSTS propre. Ce n'est que si votre proxy est configuré pour supprimer ou remplacer les en-têtes de réponse en amont que vous devez préserver l'en-tête ou le rajouter en périphérie.
 
 ### Nginx {#nginx}
 
 ```nginx
 server {
-    # HTTP en clair, montré par souci de concision. Terminez TLS dans votre propre
-    # bloc serveur `listen 443 ssl` ; l'en-tête Strict-Transport-Security que l'API
-    # envoie passe avec chaque réponse relayée, aucun add_header n'y est nécessaire.
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -521,7 +546,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Diffusez les réponses au lieu de la mise en mémoire tampon : nécessaire pour la progression de SSE (par lots, IA, installations de fonctionnalités) et pour les téléchargements de fichiers volumineux.
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
@@ -530,9 +556,14 @@ server {
 
 ### Déployer sous un sous-chemin {#subpath}
 
-Pour servir `https://example.com/snapotter`, définissez `BASE_PATH=/snapotter` dans l'environnement du conteneur SnapOtter et redémarrez-le. Les fichiers Compose officiels CPU et GPU acceptent aussi `BASE_PATH` depuis votre shell ou depuis le fichier `.env` de Compose. La même image fonctionne à n'importe quel chemin ; aucune reconstruction du frontend n'est nécessaire.
+Pour servir `https://example.com/snapotter`, définissez `BASE_PATH=/snapotter` dans l'environnement du
+conteneur SnapOtter et redémarrez-le. Les fichiers Compose officiels CPU et GPU
+acceptent aussi `BASE_PATH` depuis votre shell ou votre fichier Compose `.env`. La même
+image fonctionne à n'importe quel chemin ; aucune reconstruction du frontend n'est nécessaire.
 
-`BASE_PATH` accepte des segments séparés par des barres obliques contenant des lettres, des chiffres, `_` ou `-`, y compris des chemins imbriqués comme `/apps/snapotter`. Une barre oblique finale est facultative. Laissez `BASE_PATH` vide (la valeur par défaut), ou définissez `/`, pour un déploiement à la racine.
+`BASE_PATH` accepte des segments séparés par des barres obliques contenant des lettres, des chiffres, `_` ou
+`-`, y compris des chemins imbriqués tels que `/apps/snapotter`. Une barre oblique finale est
+facultative. Laissez-le vide (valeur par défaut), ou définissez `/`, pour un déploiement à la racine.
 
 Dans votre bloc serveur HTTPS Nginx existant, utilisez :
 
@@ -553,18 +584,30 @@ location /snapotter/ {
 }
 ```
 
-Cet exemple conserve le préfixe. Les proxys qui retirent `/snapotter` avant de transmettre les requêtes sont aussi pris en charge. Les vérifications d'état internes peuvent continuer d'utiliser `/api/v1/health`. Pour OIDC ou SAML, définissez aussi `EXTERNAL_URL=https://example.com/snapotter` et mettez à jour les URL de rappel du fournisseur d'identité pour inclure `/snapotter/api/auth/oidc/callback` ou `/snapotter/api/auth/saml/callback` selon le cas.
+Cet exemple conserve le préfixe. Les proxies qui retirent `/snapotter` avant de
+transmettre sont également pris en charge. Les contrôles de santé internes peuvent continuer à utiliser
+`/api/v1/health`. Pour OIDC ou SAML, définissez aussi
+`EXTERNAL_URL=https://example.com/snapotter` et mettez à jour les URL de rappel du fournisseur d'identité pour inclure `/snapotter/api/auth/oidc/callback` ou
+`/snapotter/api/auth/saml/callback` respectivement.
 
-Les scripts API continuent de fonctionner sans modification : les URL des réponses de l'API, comme le `downloadUrl` d'un outil, commencent par `/api/` quel que soit `BASE_PATH`. Ajoutez-les à l'URL de base de votre instance (`https://example.com/snapotter` + `/api/v1/download/...`) plutôt que de les résoudre par rapport à la racine du domaine.
+Les scripts d'API continuent de fonctionner sans changement : les URL dans les réponses de l'API, comme le
+`downloadUrl` d'un outil, commencent par `/api/` quelle que soit la valeur de `BASE_PATH`. Ajoutez-les à l'URL de base
+de votre instance (`https://example.com/snapotter` + `/api/v1/download/...`)
+plutôt que de les résoudre par rapport à la racine du domaine.
 
-Ouvrez l'interface via l'URL préfixée (`https://example.com/snapotter`). Un navigateur qui arrive sans le préfixe y est renvoyé automatiquement ; seules les requêtes API sont censées atteindre l'application sans préfixe. Si les journaux indiquent `Requests arrive under /snapotter/ but BASE_PATH is empty`, votre proxy transmet un préfixe que `BASE_PATH` ne déclare pas : définissez `BASE_PATH` en conséquence, ou retirez le préfixe au niveau du proxy.
+Ouvrez l'interface via l'URL préfixée (`https://example.com/snapotter`). Un
+navigateur qui arrive sans le préfixe y est redirigé automatiquement ; seules les requêtes d'API
+sont censées atteindre l'application sans préfixe. Si les journaux indiquent
+`Requests arrive under /snapotter/ but BASE_PATH is empty`, votre proxy
+transmet un préfixe que `BASE_PATH` ne déclare pas : définissez `BASE_PATH` sur ce préfixe,
+ou retirez le préfixe au niveau du proxy.
 
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Ajoutez un nouveau Proxy Host
-2. Réglez Domain Name sur votre domaine
-3. Réglez Scheme sur `http`, Forward Hostname sur `SnapOtter` (ou l'IP de votre conteneur), Forward Port sur `1349`
-4. Activez la prise en charge WebSocket
+2. Définissez Domain Name sur votre domaine
+3. Définissez Scheme sur `http`, Forward Hostname sur `SnapOtter` (ou l'IP de votre conteneur), Forward Port sur `1349`
+4. Activez la prise en charge de WebSocket
 5. Sous Advanced, ajoutez : `client_max_body_size 500M;` et `proxy_buffering off;`
 
 L'en-tête `Strict-Transport-Security` de l'API traverse NPM tel quel ; la bascule HSTS de l'onglet SSL est facultative en complément.
@@ -584,7 +627,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-Traefik transmet les en-têtes de réponse amont sans modification, l'en-tête `Strict-Transport-Security` de l'API atteint donc les navigateurs sans middleware `headers`. Si vous en exécutez déjà un qui réécrit les en-têtes de réponse, assurez-vous qu'il laisse cet en-tête intact.
+Traefik transmet les en-têtes de réponse en amont sans les modifier : l'en-tête `Strict-Transport-Security` de l'API atteint donc les navigateurs sans middleware `headers`. Si vous en exécutez déjà un qui réécrit les en-têtes de réponse, assurez-vous qu'il laisse cet en-tête intact.
 
 ### Caddy {#caddy}
 
@@ -600,7 +643,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` désactive la mise en mémoire tampon des réponses, qui est requise pour les événements de progression SSE (traitement par lots, outils d'IA, installations de fonctionnalités) et pour que les téléchargements de fichiers volumineux soient diffusés au lieu de se bloquer. Les délais d'attente prolongés permettent de télécharger des fichiers volumineux sans que Caddy ne ferme la connexion prématurément. Caddy transmet également l'en-tête `Strict-Transport-Security` de l'API sans y toucher, aucune directive `header` n'est donc nécessaire pour HSTS.
+`flush_interval -1` désactive la mise en tampon des réponses, ce qui est nécessaire pour les événements de progression SSE (traitement par lot, outils d'IA, installations de fonctionnalités) et pour que les téléchargements de gros fichiers soient diffusés en flux au lieu de rester bloqués. Les délais d'attente étendus permettent aux téléversements de gros fichiers de se terminer sans que Caddy ferme la connexion trop tôt. Caddy transmet aussi l'en-tête `Strict-Transport-Security` de l'API sans le toucher : aucune directive `header` n'est donc nécessaire pour HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -608,59 +651,59 @@ images.example.com {
 cloudflared tunnel --url http://localhost:1349
 ```
 
-Remarque : Cloudflare impose une limite de téléversement de 100 Mo sur les offres gratuites. Réglez `MAX_UPLOAD_SIZE_MB=100` en conséquence.
+Remarque : Cloudflare impose une limite de téléversement de 100 Mo sur les offres gratuites. Définissez `MAX_UPLOAD_SIZE_MB=100` en conséquence.
 
-Le tunnel transmet les en-têtes de réponse de l'API, `Strict-Transport-Security` inclus, aucune configuration HSTS dans le tableau de bord n'est donc requise (le réglage HSTS de l'edge Cloudflare est facultatif en complément).
+Le tunnel transmet les en-têtes de réponse de l'API, y compris `Strict-Transport-Security` : aucune configuration HSTS dans le tableau de bord n'est donc nécessaire (le paramètre HSTS de la périphérie de Cloudflare est facultatif en complément).
 
 ## Dépannage {#troubleshooting}
 
-### « Postgres not reachable: EAI_AGAIN » juste après un premier démarrage échoué {#eai-again-after-failed-first-start}
+### « Postgres not reachable: EAI_AGAIN » juste après un premier démarrage raté {#eai-again-after-failed-first-start}
 
-Si le tout premier `docker compose up -d` échoue en cours de route (un port déjà utilisé en est la raison habituelle), une simple nouvelle tentative `up -d` peut démarrer le conteneur de l'application sans le rattacher au réseau Compose. L'application entre alors dans une boucle de plantage avec :
+Si le tout premier `docker compose up -d` échoue en cours de route (un port déjà utilisé en est la raison habituelle), une nouvelle tentative avec un simple `up -d` peut démarrer le conteneur de l'application sans l'attacher au réseau Compose. L'application boucle alors en plantant avec :
 
 ```
 Postgres not reachable: EAI_AGAIN
 ```
 
-alors que `docker ps` indique que postgres est sain. L'erreur est réelle mais désigne le mauvais conteneur : sans le réseau, le DNS du nom d'hôte `postgres` ne peut pas être résolu du tout, et la politique de redémarrage rejoue la même défaillance indéfiniment.
+alors que `docker ps` montre postgres sain. L'erreur est réelle mais pointe vers le mauvais conteneur : sans le réseau, le DNS du nom d'hôte `postgres` ne peut pas du tout être résolu, et la politique de redémarrage rejoue indéfiniment le même échec.
 
-Corrigez ce qui a fait échouer le premier démarrage (le plus souvent : libérer le port), puis forcez la recréation du conteneur de l'application pour qu'il se rattache au réseau :
+Corrigez ce qui a fait échouer le premier démarrage (en général : libérez le port), puis forcez la recréation du conteneur de l'application pour qu'il se rattache au réseau :
 
 ```bash
 docker compose up -d --force-recreate SnapOtter
 ```
 
-### Windows : joignable depuis les autres appareils, mais pas depuis le PC lui-même {#windows-wsl2-loopback}
+### Windows : accessible depuis les autres appareils, mais pas depuis le PC lui-même {#windows-wsl2-loopback}
 
-Avec Docker exécuté dans WSL2 (la configuration Windows habituelle), la pile peut être joignable depuis toutes les autres machines de votre réseau alors que `http://localhost:1349` expire sur l'hôte Windows lui-même, même avec le mode de mise en réseau en miroir de WSL activé. Le port n'apparaît jamais dans `netstat` sous Windows, et rien ne cloche du côté des conteneurs.
+Avec Docker s'exécutant dans WSL2 (la configuration Windows habituelle), la pile peut être accessible depuis toutes les autres machines de votre réseau alors que `http://localhost:1349` expire sur l'hôte Windows lui-même, même avec le mode réseau mis en miroir de WSL activé. Le port n'apparaît jamais dans `netstat` de Windows, et rien ne cloche avec les conteneurs.
 
-Ouvrez l'application depuis un autre appareil, ou depuis l'intérieur de la distribution en utilisant sa propre adresse (`hostname -I` dans le shell WSL). Si la redirection de localhost fonctionne sur votre version de WSL, considérez-le comme un bonus plutôt que comme quelque chose sur quoi compter.
+Ouvrez l'application depuis un autre appareil, ou depuis l'intérieur de la distribution en utilisant sa propre adresse (`hostname -I` dans le shell WSL). Si la redirection de localhost fonctionne par chance sur votre version de WSL, considérez-la comme un bonus plutôt que comme quelque chose sur quoi s'appuyer.
 
 ## CI/CD {#ci-cd}
 
-Le dépôt GitHub comporte trois workflows :
+Le dépôt GitHub contient trois workflows :
 
-- **ci.yml** - S'exécute automatiquement à chaque push et PR. Effectue le lint, la vérification de types, les tests, la construction et la validation de l'image Docker (sans push).
-- **release.yml** - Déclenché manuellement via `workflow_dispatch`. Exécute semantic-release pour créer un tag de version et une release GitHub, puis construit une image Docker multi-architecture (amd64 + arm64) et la pousse vers Docker Hub (`snapotter/snapotter`) et GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
-- **deploy-docs.yml** - Construit ce site de documentation et le déploie sur Cloudflare Pages lors d'un push vers `main`.
+- **ci.yml** : s'exécute automatiquement à chaque push et PR. Il exécute le lint, la vérification des types, les tests, la compilation et valide l'image Docker (sans la publier).
+- **release.yml** : déclenché manuellement via `workflow_dispatch`. Il exécute semantic-release pour créer un tag de version et une version GitHub, puis construit une image Docker multi-architecture (amd64 + arm64) et la publie sur Docker Hub (`snapotter/snapotter`) et GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
+- **deploy-docs.yml** : construit ce site de documentation et le déploie sur Cloudflare Pages lors d'un push vers `main`.
 
-Pour créer une release, allez dans **Actions > Release > Run workflow** dans l'interface GitHub, ou exécutez :
+Pour créer une version, allez dans **Actions > Release > Run workflow** dans l'interface GitHub, ou exécutez :
 
 ```bash
 gh workflow run release.yml
 ```
 
-Semantic-release détermine la version à partir de l'historique des commits. Le tag Docker `latest` pointe toujours vers la release la plus récente.
+Semantic-release détermine la version à partir de l'historique des commits. Le tag Docker `latest` pointe toujours vers la version la plus récente.
 
-## Analytique {#analytics}
+## Analyses {#analytics}
 
-SnapOtter inclut une analytique produit anonyme (schémas d'utilisation des outils, rapports d'erreurs) pour aider à détecter les bugs et améliorer les fonctionnalités. Elle est activée par défaut. Vos fichiers, leurs noms et vos données personnelles n'en font jamais partie. SnapOtter fonctionne normalement avec l'analytique désactivée.
+SnapOtter inclut des analyses de produit anonymes (habitudes d'utilisation des outils, rapports d'erreurs) pour aider à détecter les bugs et à améliorer les fonctionnalités. Elles sont activées par défaut. Vos fichiers, noms de fichiers et données personnelles n'en font jamais partie. SnapOtter fonctionne normalement avec les analyses désactivées.
 
-### Désactiver l'analytique {#disabling-analytics}
+### Désactiver les analyses {#disabling-analytics}
 
-Le retrait à l'exécution est un basculement admin en un clic. Ouvrez Settings > System > Privacy et désactivez Anonymous Product Analytics. Cela s'arrête immédiatement pour toute l'instance, sans reconstruction requise.
+La désactivation à l'exécution se fait par une bascule administrateur en un clic. Ouvrez Paramètres > Système > Confidentialité et désactivez Analyses de produit anonymes. Elles s'arrêtent immédiatement pour toute l'instance, sans reconstruction.
 
-Pour une image qui ne peut jamais émettre d'analytique, définissez l'arrêt matériel au moment de la construction en clonant le dépôt et en le reconstruisant :
+Pour une image qui ne pourra jamais émettre d'analyses, définissez la désactivation stricte à la compilation en clonant le dépôt et en reconstruisant :
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -669,7 +712,7 @@ docker compose -f docker/docker-compose.yml build --build-arg SNAPOTTER_ANALYTIC
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Ou ajoutez l'argument de construction à votre `docker-compose.yml` existant :
+Ou ajoutez l'argument de build à votre `docker-compose.yml` existant :
 
 ```yaml
 services:

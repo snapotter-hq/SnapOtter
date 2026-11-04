@@ -1,143 +1,143 @@
 ---
-description: "すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。"
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: 6520246265e3
+description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: e068968cb111
 i18n_hash_version: 2
 ---
 
-# 設定 {#configuration}
+# Configuratie {#configuration}
 
-すべての設定は環境変数を通じて行います。各変数には妥当なデフォルト値があるため、SnapOtter は何も設定しなくてもそのまま動作します。
+Alle configuratie verloopt via omgevingsvariabelen. Elke variabele heeft een zinvolle standaardwaarde, dus SnapOtter werkt direct zonder dat u er een instelt.
 
-## 環境変数 {#environment-variables}
+## Omgevingsvariabelen {#environment-variables}
 
-### サーバー {#server}
+### Server {#server}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `PORT` | `1349` | サーバーがリッスンするポート。 |
-| `BASE_PATH` | (空) | 公開デプロイ用のパス（例: `/snapotter`）。空または `/` の場合、ドメインのルートで配信されます。実行時に適用されるため、イメージの再ビルドは不要です。 |
-| `RATE_LIMIT_PER_MIN` | `1000` | IP ごとの 1 分あたりの最大リクエスト数。レート制限を無効にするには 0 に設定します。 |
-| `CORS_ORIGIN` | (空) | CORS で許可するオリジンのカンマ区切りリスト。空の場合は同一オリジンのみ。 |
-| `LOG_LEVEL` | `info` | ログの詳細度。`fatal`、`error`、`warn`、`info`、`debug`、`trace` のいずれか。 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` でクライアント IP を設定できるピアを指定します。デフォルトはプライベートネットワークのピアだけを信じるため、Docker ネットワークや LAN 上のリバースプロキシは信頼され、公開クライアントが偽装したヘッダーは信頼されません。公開アドレスで自分が管理するプロキシを前段に置いている場合にのみ `true` に設定してください。 |
+| `PORT` | `1349` | Poort waarop de server luistert. |
+| `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijvoorbeeld `/snapotter`. Leeg of `/` serveert op de hoofdmap van het domein. Wordt tijdens runtime toegepast; er is geen nieuwe image-build nodig. |
+| `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
+| `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
+| `LOG_LEVEL` | `info` | Uitgebreidheid van de logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. De standaardinstelling vertrouwt alleen een peer in een privénetwerk, zodat een reverse proxy op een Docker-netwerk of LAN wordt vertrouwd en een vervalste header van een publieke client niet. Stel `true` alleen in als er een proxy onder uw beheer op een openbaar adres voor staat. |
 
-### 認証 {#authentication}
+### Authenticatie {#authentication}
 
-以下の 2 つのブール値は `true` と `false` のみを受け付けます。`1`、`yes`、`on` などそれ以外の値は検証に失敗し、サーバーはリッスンを開始する前に終了します。
+De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `1` of `yes` of `on`, mislukt bij de validatie en de server stopt voordat hij gaat luisteren.
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | ログインを必須にします。アカウントをまったく持たずに実行するには `false` に設定します。その場合はすべてのリクエストに admin 権限が与えられるため、信頼できるネットワークに限定してください。 |
-| `DEFAULT_USERNAME` | `admin` | 初期 admin アカウントのユーザー名。初回起動時のみ使用されます。 |
-| `DEFAULT_PASSWORD` | `admin` | 初期 admin アカウントのパスワード。初回ログイン後に変更してください。 |
-| `MAX_USERS` | `0` (無制限) | 登録済みユーザーアカウントの最大数。無制限にするには 0 に設定します。 |
-| `SESSION_DURATION_HOURS` | `168` | ログインセッションの有効期間（時間単位、デフォルトは 7 日）。 |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | 初回ログイン時の強制パスワード変更プロンプトをスキップするには `true` に設定します。 |
+| `AUTH_ENABLED` | `true` | Vereis een login. Stel in op `false` om zonder accounts te draaien, waardoor elk verzoek beheerdersrechten krijgt. Beperk dat dus tot een vertrouwd netwerk. |
+| `DEFAULT_USERNAME` | `admin` | Gebruikersnaam voor het eerste beheerdersaccount. Wordt alleen bij de eerste start gebruikt. |
+| `DEFAULT_PASSWORD` | `admin` | Wachtwoord voor het eerste beheerdersaccount. Wijzig dit na de eerste login. |
+| `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal geregistreerde gebruikersaccounts. Stel in op 0 voor onbeperkt. |
+| `SESSION_DURATION_HOURS` | `168` | Levensduur van een loginsessie in uren (standaard 7 dagen). |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Stel in op `true` om de verplichte wachtwoordwijziging bij de eerste login over te slaan. |
 
-### ストレージ {#storage}
+### Opslag {#storage}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` または `s3`。S3 と MinIO には s3_storage 機能を含むライセンスに加えて、以下の `S3_*` 変数が必要です。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 接続文字列であり、すべてのリクエストが処理される接続です。2.3.0 以降では `DATABASE_MIGRATION_URL` も設定すると、こちらはアプリのテーブルに対する DML のみを持つ最小権限のランタイムロールになります。Compose スタックではこれを自身の `postgres` サービスに向けます。組み込みモードにするには、（`REDIS_URL` と併せて）未設定のままにします。 |
-| `DATABASE_MIGRATION_URL` | (空) | 2.3.0 から利用可能です。2.2.0 イメージはこの変数を無視し、`DATABASE_URL` にデータベース所有者を指定する必要があります。特権接続で、起動時にのみマイグレーションの実行とランタイムロールへの権限付与に使用され、最初のリクエストの前に切断されます。空のままにすると SnapOtter は単一ロールで動作し、`DATABASE_URL` が両方の役割を担います。[最小権限ロール](/ja/guide/database#least-privilege-roles) を参照してください。 |
-| `REDIS_URL` | `redis://localhost:6379` | Redis 接続文字列（BullMQ ジョブキューに使用）。Compose ではこれを自身の `redis` サービスに向けます。 |
-| `WORKSPACE_PATH` | `./tmp/workspace` | 処理中の一時ファイル用ディレクトリ。自動的にクリーンアップされます。イメージでは `/tmp/workspace` が設定されます。 |
-| `FILES_STORAGE_PATH` | `./data/files` | 永続的なユーザーファイル（アップロードした画像、保存した結果）用ディレクトリ。イメージでは `/data/files` が設定されます。 |
+| `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de functie s3_storage plus de onderstaande `S3_*`-variabelen. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-verbindingsreeks, en de verbinding waarop elk verzoek wordt afgehandeld. Vanaf 2.3.0 geldt: stel ook `DATABASE_MIGRATION_URL` in en dit wordt de runtimerol met minimale rechten, die alleen DML heeft op de tabellen van de app en niets anders. De Compose-stack wijst het naar de service `postgres`; laat het (samen met `REDIS_URL`) ongedefinieerd om de embedded-modus te krijgen. |
+| `DATABASE_MIGRATION_URL` | (leeg) | Bevoorrechte verbinding, alleen tijdens het opstarten gebruikt om migraties uit te voeren en de runtimerol rechten te geven, en gesloten vóór het eerste verzoek. Laat u dit leeg, dan draait SnapOtter met één rol, waarbij `DATABASE_URL` beide taken uitvoert. Zie [Rollen met minimale rechten](/ja/guide/database#least-privilege-roles). |
+| `REDIS_URL` | `redis://localhost:6379` | Redis-verbindingsreeks (gebruikt voor BullMQ-jobwachtrijen). Compose wijst dit naar de service `redis`. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeruimd. De image stelt `/tmp/workspace` in. |
+| `FILES_STORAGE_PATH` | `./data/files` | Map voor permanente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
 
-### S3 オブジェクトストレージ {#s3-object-storage}
+### S3-objectopslag {#s3-object-storage}
 
-`STORAGE_MODE=s3` のときにのみ読み取られます。必須の 3 つのうちどれか 1 つでも欠けていると起動は失敗し、設定し忘れた変数名が表示されます。
+Wordt alleen gelezen wanneer `STORAGE_MODE=s3`. Ontbreekt een van de drie verplichte variabelen, dan mislukt het opstarten met de naam van de variabele die u hebt weggelaten.
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `S3_BUCKET` | (空) | アップロードと出力を保持するバケット。必須。 |
-| `S3_ACCESS_KEY_ID` | (空) | アクセスキー。必須。コンテナ内では、代わりに `S3_ACCESS_KEY_ID_FILE` でマウントすることもできます。 |
-| `S3_SECRET_ACCESS_KEY` | (空) | シークレットキー。必須。同じファイル方式が使えます: `S3_SECRET_ACCESS_KEY_FILE`。 |
-| `S3_REGION` | `us-east-1` | バケットのリージョン。 |
-| `S3_ENDPOINT` | (空) | MinIO、R2、Backblaze など S3 互換ストア向けのカスタムエンドポイント。空の場合は AWS を指します。 |
-| `S3_FORCE_PATH_STYLE` | `false` | MinIO のように、仮想ホスト形式ではなく `endpoint/bucket/key` を必要とするものでは `true` に設定します。 |
-| `S3_PREFIX` | (空) | キーのプレフィックス。1 つのバケットで複数のインスタンスを扱えるようになります。 |
+| `S3_BUCKET` | (leeg) | Bucket met uploads en uitvoer. Verplicht. |
+| `S3_ACCESS_KEY_ID` | (leeg) | Toegangssleutel. Verplicht. In de container kunt u deze in plaats daarvan mounten via `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (leeg) | Geheime sleutel. Verplicht. Zelfde bestandsconventie: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Regio van de bucket. |
+| `S3_ENDPOINT` | (leeg) | Aangepast eindpunt voor MinIO, R2, Backblaze en andere S3-compatibele opslag. Leeg betekent AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Stel in op `true` voor MinIO en al het andere dat `endpoint/bucket/key` wil in plaats van virtual-host-adressering. |
+| `S3_PREFIX` | (leeg) | Sleutelvoorvoegsel, zodat één bucket meerdere instanties kan bevatten. |
 
-### 保存データの暗号化 {#encryption-at-rest}
+### Versleuteling in rust {#encryption-at-rest}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `DATA_ENCRYPTION_KEY` | (空) | 64 文字の 16 進数（32 バイト）。データベースに保存された機密設定を暗号化します。64 文字の 16 進数でないものは起動時に拒否されます。 |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (空) | ローテーションで置き換える前のキー。形式は同じです。ローテーション中は両方を設定して既存の行を復号できるようにし、その後こちらを削除します。 |
+| `DATA_ENCRYPTION_KEY` | (leeg) | 64 hexadecimale tekens (32 bytes). Versleutelt gevoelige instellingen die in de database zijn opgeslagen. Alles wat geen 64 hexadecimale tekens is, wordt bij het opstarten geweigerd. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (leeg) | De sleutel waarvan u afstapt, in hetzelfde formaat. Stel beide in tijdens een rotatie zodat bestaande rijen nog kunnen worden ontsleuteld, en verwijder deze daarna. |
 
-### 組み込みモード {#embedded-mode}
+### Embedded-modus {#embedded-mode}
 
-`DATABASE_URL` も `REDIS_URL` も指定せずにイメージを実行すると、コンテナ内で独自の PostgreSQL 17 と Redis を起動し、ループバックにバインドして、すべてのデータを `/data` ボリューム上に置きます。これにより、クイックスタート、ホームラボ、1.x からのアップグレード向けに、ワンコマンドの `docker run` 体験が復活します。これは利便性のための手段であり、本番デプロイではありません。本番環境では、PostgreSQL と Redis を分離した 3 コンテナの Compose スタックを実行してください。組み込みモードはコンテナを root として実行する必要があり、任意 UID のランタイム（OpenShift、Kubernetes `runAsNonRoot`）とは互換性がありません。その場合は Compose を使用してください。
+Start u de image zonder `DATABASE_URL` en zonder `REDIS_URL`, dan start hij binnen de container zijn eigen PostgreSQL 17 en Redis, gebonden aan loopback, met alle gegevens op het volume `/data`. Dit herstelt de ervaring met één enkel `docker run`-commando voor snel starten, homelab en upgrades vanaf 1.x. Het is een gemaksroute, geen productie-implementatie: draai voor productie de Compose-stack met drie containers en aparte PostgreSQL en Redis. De embedded-modus vereist dat de container als root draait en is niet compatibel met runtimes met willekeurige UID (OpenShift, Kubernetes `runAsNonRoot`); gebruik daar Compose.
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `EMBEDDED` | `auto` | `DATABASE_URL` と `REDIS_URL` の両方が未設定の場合に自動で有効になります。無効にするには `0` に設定します（その場合、外部の `DATABASE_URL`/`REDIS_URL` が設定されていなければ、アプリはコンテナ内データベースを黙って起動する代わりに即座に失敗します）。 |
-| `REDIS_MAXMEMORY` | `512mb` | 組み込み Redis のメモリ上限（組み込みモードのみ）。Raspberry Pi のようなメモリ制約のあるホストでは下げてください。 |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 組み込み Redis が `PING` に応答するまで起動時に待機する秒数。タイムアウトすると、ハングする代わりにコンテナが停止し、理由をログに記録します。1 から 999999 までの整数で、無制限の値はありません。永久に待ち続けることが、この上限を設けている理由そのものだからです。遅いホストで引っかかる場合にのみ引き上げてください。 |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 組み込み PostgreSQL についても同様です。計測は初回起動の `initdb` 完了後に始まるため、初回のデータベース作成ではなく、サーバー起動とクラッシュリカバリを対象とします。 |
+| `EMBEDDED` | `auto` | Wordt automatisch ingeschakeld wanneer zowel `DATABASE_URL` als `REDIS_URL` niet zijn ingesteld. Stel in op `0` om uit te schakelen (de app stopt dan direct als er geen externe `DATABASE_URL`/`REDIS_URL` is ingesteld, in plaats van stilzwijgend een database in de container te starten). |
+| `REDIS_MAXMEMORY` | `512mb` | Geheugenlimiet voor de embedded Redis (alleen embedded-modus). Verlaag deze op hosts met weinig geheugen, zoals een Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Aantal seconden dat het opstarten wacht tot de embedded Redis antwoordt op `PING` voordat het opgeeft. Bij een time-out stopt de container en logt hij waarom, in plaats van te blijven hangen. Hele seconden van 1 tot 999999; er is geen onbeperkte waarde, omdat eindeloos wachten juist de storing is die deze grens moet voorkomen. Verhoog dit alleen als een trage host de grens bereikt. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Hetzelfde, voor de embedded PostgreSQL. De klok start nadat `initdb` bij de eerste start klaar is, dus hij dekt het starten van de server en het herstel na een crash, niet het aanmaken van de database zelf. |
 
-1.x からのアップグレード: 古い `snapotter.db` をボリューム内の `/data/snapotter.db` に配置すると、組み込みモードが初回起動時にそれを組み込み PostgreSQL へインポートします。インポートは一度だけ実行され、以降の起動ではスキップされます。
+Upgraden vanaf 1.x: plaats uw oude `snapotter.db` op `/data/snapotter.db` in het volume en de embedded-modus importeert het bij de eerste start in de embedded PostgreSQL. De import wordt één keer uitgevoerd; latere starts slaan hem over.
 
-テレメトリに関する注記: 組み込みモードは、他の設定と同様にイメージの分析デフォルトを継承します。公開イメージは分析を有効にした状態で出荷されます。無効にするには `--build-arg SNAPOTTER_ANALYTICS=off` でビルドするか、アプリ内の admin オプトアウトを使用してください。
+Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics ingeschakeld; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, of gebruik de opt-out voor beheerders in de app, om dit uit te schakelen.
 
-### 処理制限 {#processing-limits}
+### Verwerkingslimieten {#processing-limits}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (無制限) | アップロードあたりの最大ファイルサイズ（メガバイト単位）。無制限にするには 0 に設定します。公開イメージは `0` で出荷されます。ソースからのビルドは 100 で始まります。 |
-| `MAX_BATCH_SIZE` | `0` (無制限) | 単一バッチリクエスト内の最大ファイル数。無制限にするには 0 に設定します。公開イメージは `0` で出荷されます。ソースからのビルドは 100 で始まります。 |
-| `CONCURRENT_JOBS` | `0` (自動) | 並列実行されるバッチジョブの数。利用可能な CPU コア数に基づいて自動検出するには 0 に設定します。 |
-| `MAX_MEGAPIXELS` | `0` (無制限) | 許可される最大画像解像度（メガピクセル単位）。無制限にするには 0 に設定します。 |
-| `MAX_WORKER_THREADS` | `0` (自動) | 画像処理の最大ワーカースレッド数。利用可能な CPU コア数に基づいて自動検出するには 0 に設定します。 |
-| `PROCESSING_TIMEOUT_S` | `0` (制限なし) | リクエストあたりの最大処理時間（秒単位）。タイムアウトなしにするには 0 に設定します。 |
-| `MAX_PIPELINE_STEPS` | `20` | パイプライン内の最大ステップ数。制限なしにするには 0 に設定します。 |
-| `MAX_CANVAS_PIXELS` | `0` (制限なし) | 出力画像の最大キャンバスサイズ（ピクセル単位）。制限なしにするには 0 に設定します。 |
-| `MAX_SVG_SIZE_MB` | `50` | サニタイズ前に受け付ける SVG の最大サイズ（メガバイト単位）。ここでの `0` は前後の行とは動作が異なります。上限を引き上げるのではなく、解析前のサイズ上限そのものを取り除くため、この項目は設定したままにしてください。 |
-| `MAX_PDF_PAGES` | `0` (無制限) | PDF-to-image 変換での PDF の最大ページ数。無制限にするには 0 に設定します。 |
+| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
+| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
+| `CONCURRENT_JOBS` | `0` (automatisch) | Aantal batchjobs dat parallel draait. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
+| `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane afbeeldingsresolutie in megapixels. Stel in op 0 voor onbeperkt. |
+| `MAX_WORKER_THREADS` | `0` (automatisch) | Maximaal aantal workerthreads voor beeldverwerking. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
+| `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Maximale verwerkingstijd per verzoek in seconden. Stel in op 0 voor geen time-out. |
+| `MAX_PIPELINE_STEPS` | `20` | Maximaal aantal stappen in een pipeline. Stel in op 0 voor geen limiet. |
+| `MAX_CANVAS_PIXELS` | `0` (geen limiet) | Maximale canvasgrootte in pixels voor uitvoerafbeeldingen. Stel in op 0 voor geen limiet. |
+| `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van die te verhogen, dus laat deze ingesteld. |
+| `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-afbeelding-conversie. Stel in op 0 voor onbeperkt. |
 
-### エンジン {#engines}
+### Engines {#engines}
 
-SnapOtter は各処理バイナリをコンテナ内の `$PATH` から探すため、独自にビルドしたものを持ち込まない限り、これらは空のままで問題ありません。
+SnapOtter zoekt elk verwerkingsprogramma op `$PATH` binnen de container, dus deze blijven leeg tenzij u een eigen build mount.
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `FFMPEG_PATH` | （空） | ビデオおよびオーディオ ツールが使用する `ffmpeg` バイナリのパス。 |
-| `FFPROBE_PATH` | （空） | メディア ファイルを処理前に読み取る `ffprobe` のパス。`FFMPEG_PATH` と同じビルドを指定してください。 |
-| `QPDF_PATH` | （空） | `qpdf` のパス。PDF ツールと、アップロードされた PDF のチェックに使用されます。 |
-| `SOFFICE_PATH` | （空） | LibreOffice の `soffice` のパス。オフィス ドキュメントの変換に使用されます。 |
-| `PDFCPU_PATH` | （空） | `pdfcpu` のパス。一部の PDF ツールで使用されます。 |
-| `SNAPOTTER_HW_ACCEL` | （空） | ハードウェア ビデオ エンコーダーのファミリー。`nvenc` または `vaapi`。空の場合はソフトウェア エンコードになります。 |
+| `FFMPEG_PATH` | (leeg) | Pad naar het programma `ffmpeg` achter de video- en audiotools. |
+| `FFPROBE_PATH` | (leeg) | Pad naar `ffprobe`, dat mediabestanden leest voordat ze worden verwerkt. Wijs het naar dezelfde build als `FFMPEG_PATH`. |
+| `QPDF_PATH` | (leeg) | Pad naar `qpdf`, gebruikt door de PDF-tools en om geüploade PDF's te controleren. |
+| `SOFFICE_PATH` | (leeg) | Pad naar `soffice` van LibreOffice, gebruikt voor conversies van kantoordocumenten. |
+| `PDFCPU_PATH` | (leeg) | Pad naar `pdfcpu`, gebruikt door sommige PDF-tools. |
+| `SNAPOTTER_HW_ACCEL` | (leeg) | Familie van hardwarematige video-encoders, `nvenc` of `vaapi`. Leeg codeert in software. |
 
-`SNAPOTTER_HW_ACCEL` には、そのエンコーダー ファミリーでビルドされた ffmpeg が必要ですが、イメージ内の ffmpeg はどちらも備えていません。イメージ同梱のバイナリを使う場合、この設定はソフトウェア エンコードにフォールバックし、起動ログでその旨が通知されます。使用するには、独自にビルドした ffmpeg をマウントし、`FFMPEG_PATH` と `FFPROBE_PATH` をそこに向け、コンテナに GPU デバイスを渡してください。`nvenc` の場合はさらに `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` を設定します。イメージは `compute,utility` のみを要求するため、`video` がないと NVIDIA ランタイムがエンコード ライブラリをマウントせず、エンコーダーは一覧に表示されるもののすべてのエンコードが失敗します。存在しない、または実行できないパスを上書きした場合も起動ログで通知され、パスを修正するか設定を解除するまで、そのバイナリを必要とするすべてのジョブが失敗します。
+`SNAPOTTER_HW_ACCEL` vereist een ffmpeg die met die encoderfamilie is gebouwd, en de ffmpeg in de image heeft geen van beide. Met het eigen programma van de image valt de instelling terug op software-encodering en meldt dat in het opstartlog. Om het te gebruiken mount u uw eigen ffmpeg-build, wijst u `FFMPEG_PATH` en `FFPROBE_PATH` ernaar en geeft u de container het GPU-apparaat. Stel voor `nvenc` ook `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` in: de image vraagt alleen om `compute,utility`, en zonder `video` mount de NVIDIA-runtime de encodeerbibliotheek niet, zodat de encoder wel wordt vermeld maar elke encodering mislukt. Een padoverschrijving die niet bestaat of niet uitvoerbaar is, wordt eveneens in het opstartlog genoemd, en elke job die dat programma nodig heeft mislukt totdat u het pad herstelt of de instelling verwijdert.
 
-公開されている Compose ファイルはこの 6 つすべてを `.env` から渡すため、そこで設定すれば十分です。
+De gepubliceerde Compose-bestanden geven alle zes door vanuit `.env`, dus instellen daar volstaat.
 
-### クリーンアップ {#cleanup}
+### Opschonen {#cleanup}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | 未保存の処理結果（生のアップロードとツール出力）を自動削除するまで保持する期間。Files ライブラリに明示的に保存したファイルは影響を受けず、削除するまで保持されます。 |
-| `CLEANUP_INTERVAL_MINUTES` | `60` | クリーンアップジョブを実行する頻度。 |
+| `FILE_MAX_AGE_HOURS` | `72` | Hoe lang niet-opgeslagen verwerkingsresultaten (ruwe uploads en toolresultaten) worden bewaard vóór automatische verwijdering. Bestanden die u expliciet in de bestandenbibliotheek opslaat, worden niet beïnvloed en blijven bestaan totdat u ze verwijdert. |
+| `CLEANUP_INTERVAL_MINUTES` | `60` | Hoe vaak de opschoontaak draait. |
 
-### 外観 {#appearance}
+### Uiterlijk {#appearance}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `DEFAULT_THEME` | `light` | 新規セッションのデフォルトテーマ。`light`、`dark`、`system` のいずれか。 |
-| `DEFAULT_LOCALE` | `en` | デフォルトのインターフェース言語。 |
-| `DEFAULT_TOOL_VIEW` | `sidebar` | デフォルトのツールレイアウト。`sidebar` または `fullscreen`。 |
+| `DEFAULT_THEME` | `light` | Standaardthema voor nieuwe sessies. `light`, `dark` of `system`. |
+| `DEFAULT_LOCALE` | `en` | Standaardtaal van de interface. |
+| `DEFAULT_TOOL_VIEW` | `sidebar` | Standaardindeling van de tools. `sidebar` of `fullscreen`. |
 
-### Docker 権限 {#docker-permissions}
+### Docker-rechten {#docker-permissions}
 
-| 変数 | デフォルト | 説明 |
+| Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `PUID` | `999` | コンテナプロセスをこの UID として実行します。バインドマウントの場合はホストユーザーに合わせて設定します（`id -u`）。 |
-| `PGID` | `999` | コンテナプロセスをこの GID として実行します。バインドマウントの場合はホストグループに合わせて設定します（`id -g`）。 |
+| `PUID` | `999` | Draai het containerproces onder deze UID. Stel in op die van uw hostgebruiker voor bind mounts (`id -u`). |
+| `PGID` | `999` | Draai het containerproces onder deze GID. Stel in op die van uw hostgroep voor bind mounts (`id -g`). |
 
-## Docker の例 {#docker-example}
+## Docker-voorbeeld {#docker-example}
 
 ```yaml
 services:
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # 非ローカル展開の場合はこれを変更します
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -198,11 +198,11 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-## ボリューム {#volumes}
+## Volumes {#volumes}
 
-Docker Compose スタックは 4 つのボリュームを使用します:
+De Docker Compose-stack gebruikt vier volumes:
 
-- `/data` (app) - AI モデル、Python venv、ユーザーファイル。アップロードしたファイルとインストール済みの AI バンドルを再起動を越えて保持するには、これをマウントします。
-- `/tmp/workspace` (app) - 処理中のファイルの一時ストレージ。エフェメラルでも構いませんが、マウントするとコンテナの書き込み可能レイヤーが埋まるのを防げます。
-- `SnapOtter-pgdata` (postgres) - PostgreSQL データディレクトリ。すべてのリレーショナルデータ（ユーザー、設定、パイプライン、ジョブ、監査ログ）を保持します。`pg_dump` またはボリュームスナップショットでバックアップします。
-- `SnapOtter-redisdata` (redis) - 永続的なジョブキュー用の Redis 追記専用ファイル。
+- `/data` (app) - AI-modellen, Python-venv en gebruikersbestanden. Mount dit om geüploade bestanden en geïnstalleerde AI-bundels te behouden na herstarts.
+- `/tmp/workspace` (app) - Tijdelijke opslag voor bestanden die worden verwerkt. Dit mag vluchtig zijn, maar door het te mounten voorkomt u dat de beschrijfbare laag van de container volloopt.
+- `SnapOtter-pgdata` (postgres) - PostgreSQL-gegevensmap. Hierin staan alle relationele gegevens (gebruikers, instellingen, pipelines, jobs, auditlog). Maak een back-up via `pg_dump` of een volume-snapshot.
+- `SnapOtter-redisdata` (redis) - Append-only-bestand van Redis voor duurzame jobwachtrijen.

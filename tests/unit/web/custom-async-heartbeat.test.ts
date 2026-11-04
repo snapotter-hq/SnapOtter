@@ -143,7 +143,7 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
           data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
         }),
       ).toThrow("onFailed broke");
-      expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
+      expect(onFailed).toHaveBeenNthCalledWith(1, { reason: "noDetail" });
       expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
       expect(FakeEventSource.instances[0].readyState).toBe(2);
       expect(consoleError).toHaveBeenCalledWith(
@@ -160,7 +160,7 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     }
   });
 
-  it("passes the server's own error through as the failure message", () => {
+  it("keeps the server's English error out of the failure and reports no detail", () => {
     const onFailed = vi.fn();
     subscribe("job-failed", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
 
@@ -172,7 +172,7 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
       }),
     });
 
-    expect(onFailed).toHaveBeenCalledWith({ message: "Signature box is off the page" });
+    expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
   });
 
   // #1593: this used to hand onFailed the English "Processing failed", which

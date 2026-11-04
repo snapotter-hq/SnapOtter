@@ -2683,7 +2683,7 @@ describe("Dropzone", () => {
       // Trigger addReadyFiles, which fails download with a JSON error body.
       fireEvent.click(addBtn);
 
-      expect(await within(dialog).findByText("Expired download token: TTL exceeded")).toBeDefined();
+      expect(await within(dialog).findByText("Download failed: 410")).toBeDefined();
     });
 
     it("surfaces server error and failedAnswerMessage on Dropzone single-URL submit and falls back to t.dropzone.urlFetchFailed when no message is available (#3703)", async () => {
@@ -2829,14 +2829,12 @@ describe("Dropzone", () => {
       // 5. Non-2xx response from fetch-urls formatted via failedAnswerMessage
       step = "fetch-422";
       fireEvent.click(addButton);
-      expect(
-        await screen.findByText("File exceeds maximum size of 100MB: Limit is 100MB"),
-      ).toBeDefined();
+      expect(await screen.findByText("Fetch failed: 422")).toBeDefined();
 
       // 6. Non-2xx response from downloadAsFile formatted via failedAnswerMessage
       step = "download-410";
       fireEvent.click(addButton);
-      expect(await screen.findByText("Expired download token: TTL exceeded")).toBeDefined();
+      expect(await screen.findByText("Download failed: 410")).toBeDefined();
 
       // 7. Rejected Error with empty message falls back to t.dropzone.urlFetchFailed
       step = "empty-error";

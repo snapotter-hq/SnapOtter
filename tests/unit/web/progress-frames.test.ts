@@ -18,18 +18,18 @@ import {
 } from "@/lib/progress-frames";
 
 describe("failedFrameMessage (#1432)", () => {
-  it("appends the operator hint an engine-unavailable frame carries", () => {
+  it("shows the fallback, not the server text or hint, for an engine-unavailable frame with no code", () => {
     expect(
       failedFrameMessage(
         { phase: "failed", error: "qpdf could not be started.", details: "Check QPDF_PATH." },
         "Processing failed",
       ),
-    ).toBe("qpdf could not be started.: Check QPDF_PATH.");
+    ).toBe("Processing failed");
   });
 
-  it("keeps a plain error as it is", () => {
+  it("shows the fallback for a plain error with no code", () => {
     expect(failedFrameMessage({ phase: "failed", error: "boom" }, "Processing failed")).toBe(
-      "boom",
+      "Processing failed",
     );
   });
 
@@ -60,15 +60,15 @@ describe("failedFrameMessage (#1432)", () => {
 });
 
 describe("frameFailure with a hint (#1432)", () => {
-  it("appends details to the message", () => {
+  it("drops the server text and details when the code is unknown", () => {
     expect(frameFailure("qpdf could not be started.", "Check QPDF_PATH.")).toEqual({
-      message: "qpdf could not be started.: Check QPDF_PATH.",
+      reason: "noDetail",
     });
   });
 
-  it("ignores a blank or missing hint", () => {
-    expect(frameFailure("boom", "")).toEqual({ message: "boom" });
-    expect(frameFailure("boom", undefined)).toEqual({ message: "boom" });
+  it("gives noDetail for a blank or missing hint too", () => {
+    expect(frameFailure("boom", "")).toEqual({ reason: "noDetail" });
+    expect(frameFailure("boom", undefined)).toEqual({ reason: "noDetail" });
   });
 
   it("still reports noDetail when there's no error, hint or not", () => {

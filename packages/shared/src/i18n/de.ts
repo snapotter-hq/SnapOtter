@@ -5691,6 +5691,59 @@ export const de: TranslationKeys = {
     uninstallFailed: "Deinstallation fehlgeschlagen",
     resetFailed: "Zurücksetzen fehlgeschlagen",
     codes: {
+      MFA_ENROLLMENT_REQUIRED:
+        "Ihr Administrator verlangt eine Zwei-Faktor-Anmeldung. Richten Sie sie ein, um fortzufahren.",
+      ANALYSIS_EXPIRED: "Diese Analyse ist abgelaufen. Beginnen Sie von vorn.",
+      BACKGROUND_REMOVAL_EXPIRED:
+        "Diese Hintergrundentfernung ist abgelaufen. Beginnen Sie von vorn.",
+      BROWSER_CRASHED: "Der Browser ist beim Rendern abgestürzt. Versuchen Sie es erneut.",
+      BROWSER_NOT_AVAILABLE:
+        "Der Browser, den dieses Werkzeug benötigt, ist derzeit nicht verfügbar.",
+      DEPENDENCY_VALIDATION_FAILED:
+        "Diese Einstellung hängt von einer anderen Einstellung ab, die nicht gültig ist.",
+      FEATURE_INCOMPATIBLE:
+        "Diese Funktion kann mit den aktuellen Einstellungen nicht ausgeführt werden.",
+      FST_REQ_FILE_TOO_LARGE: "Diese Datei ist zu groß zum Hochladen.",
+      IDLE_TIMEOUT: "Sie wurden wegen Inaktivität abgemeldet. Melden Sie sich erneut an.",
+      INPUT_MISSING: "Eine Datei oder Einstellung, die dieser Schritt benötigt, fehlt.",
+      INVALID_CIDR: "Dieser IP-Adressbereich ist ungültig.",
+      INVALID_CODE: "Dieser Code ist ungültig. Versuchen Sie es erneut.",
+      INVALID_PASSWORD: "Dieses Passwort ist nicht korrekt.",
+      INVALID_STORED_NAME: "Dieser gespeicherte Dateiname ist ungültig.",
+      LOGIN_THROTTLED:
+        "Zu viele Anmeldeversuche. Warten Sie einige Minuten und versuchen Sie es erneut.",
+      MFA_ALREADY_ENABLED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto bereits aktiviert.",
+      MFA_ATTEMPTS_EXHAUSTED: "Zu viele falsche Codes. Starten Sie die Anmeldung neu.",
+      MFA_NOT_CONFIGURED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto nicht eingerichtet.",
+      MFA_NOT_ENABLED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto nicht aktiviert.",
+      MFA_POLICY_UNAVAILABLE:
+        "Die Zwei-Faktor-Richtlinie konnte nicht geprüft werden. Versuchen Sie es erneut.",
+      MUST_CHANGE_PASSWORD: "Sie müssen Ihr Passwort ändern, bevor Sie fortfahren.",
+      NOT_ANIMATED: "Diese Datei ist kein animiertes GIF.",
+      NO_PENDING_ENROLLMENT: "Es läuft keine Zwei-Faktor-Einrichtung. Starten Sie sie erneut.",
+      OIDC_DISCOVERY_FAILED: "Der Single-Sign-on-Anbieter konnte nicht erreicht werden.",
+      OIDC_DISCOVERY_TIMEOUT: "Der Single-Sign-on-Anbieter hat nicht rechtzeitig geantwortet.",
+      OIDC_END_SESSION_INVALID: "Die Abmeldeadresse des Single Sign-on ist ungültig.",
+      OIDC_END_SESSION_SCHEME: "Die Abmeldeadresse des Single Sign-on muss HTTPS verwenden.",
+      OIDC_ISSUER_SCHEME_MISMATCH:
+        "Die Issuer-Adresse des Single Sign-on passt nicht zu ihrem Schema.",
+      OIDC_NO_PASSWORD:
+        "Dieses Konto meldet sich per Single Sign-on an und hat daher kein Passwort.",
+      PASSWORD_CHANGED: "Ihr Passwort wurde geändert. Melden Sie sich erneut an.",
+      READONLY_SETTING: "Diese Einstellung ist schreibgeschützt.",
+      SELF_DELETE: "Sie können Ihr eigenes Konto nicht löschen.",
+      SELF_DEMOTE: "Sie können Ihre eigene Administratorrolle nicht entfernen.",
+      SELF_LOCKOUT: "Diese Änderung würde Sie aussperren.",
+      SETTING_DECRYPTION_FAILED:
+        "Diese Einstellung konnte nicht gelesen werden. Geben Sie sie erneut ein.",
+      STAGED_DISCARD_FAILED: "Die bereitgestellte Datei konnte nicht verworfen werden.",
+      UNKNOWN_ROLE: "Diese Rolle existiert nicht.",
+      UNKNOWN_SETTING: "Diese Einstellung existiert nicht.",
+      UNKNOWN_TEAM: "Dieses Team existiert nicht.",
+      USERNAME_RACE_EXHAUSTED: "Dieser Benutzername ist vergeben. Wählen Sie einen anderen.",
+      USER_LIMIT_REACHED: "Diese Instanz hat ihr Benutzerlimit erreicht.",
+      WEBHOOK_DECRYPTION_FAILED:
+        "Das Webhook-Geheimnis konnte nicht gelesen werden. Geben Sie es erneut ein.",
       FEATURE_NOT_INSTALLED: "Diese Funktion ist noch nicht installiert.",
       FEATURE_NOT_LICENSED: "Für diese Funktion ist eine Lizenz erforderlich.",
       ESCALATION_DENIED: "Sie können nicht mehr Zugriff vergeben, als Sie selbst haben.",

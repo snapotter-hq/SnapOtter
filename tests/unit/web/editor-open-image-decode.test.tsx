@@ -334,10 +334,10 @@ describe("EditorPage Open Image server decode (#2530)", () => {
 
   it.each([
     [
-      "a 422 error with details",
+      "a 422 error with details (the fallback shows, the reason stays in the body for logs)",
       422,
       { error: "Unsupported PSD color mode", details: "CMYK 32-bit is not supported" },
-      "Unsupported PSD color mode: CMYK 32-bit is not supported",
+      SOURCE_IMAGE_FAILED,
     ],
     ["a 413 payload too large", 413, { error: "Payload Too Large" }, en.errors.fileTooLarge],
     ["an empty 500 error body", 500, {}, SOURCE_IMAGE_FAILED],
@@ -382,7 +382,7 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     expect(loadImageSpy).not.toHaveBeenCalled();
   });
 
-  it("surfaces the worker's failure message when a 202 decode fails on the SSE stream", async () => {
+  it("toasts the translated fallback, not the worker's English text, when a 202 decode fails on the SSE stream", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -408,7 +408,7 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     });
 
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Corrupt EXR header: missing channels attribute"),
+      expect(toastError).toHaveBeenCalledWith(en.errors.processingFailedNoDetail),
     );
     expect(loadImageSpy).not.toHaveBeenCalled();
   });
@@ -1711,7 +1711,7 @@ describe("EditorPage Open Image server decode (#2530)", () => {
       },
     );
 
-    it("surfaces a server error toast when a dropped .psd fails server conversion", async () => {
+    it("toasts the sourceImageFailed fallback, not the server reason, when a dropped .psd fails server conversion", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(async () => ({
@@ -1727,11 +1727,7 @@ describe("EditorPage Open Image server decode (#2530)", () => {
       renderEditor();
       await dropFileOnWelcomeScreen(new File(["bad-psd"], "lab.psd"));
 
-      await waitFor(() =>
-        expect(toastError).toHaveBeenCalledWith(
-          "Unsupported PSD color mode: Lab color is not supported",
-        ),
-      );
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith(SOURCE_IMAGE_FAILED));
       expect(captureHandledError).toHaveBeenCalledTimes(1);
       expect(loadImageSpy).not.toHaveBeenCalled();
     });

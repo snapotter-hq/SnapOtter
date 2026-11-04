@@ -373,16 +373,17 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     }
   });
 
-  it("shows the server's error text for a failed request without reporting it", async () => {
+  it("shows the translated fallback for a failed request, keeping the server's text out of the UI, without reporting it", async () => {
     render(<StitchSettings />);
 
     (await submit("stitch-submit")).respond(422, { error: "Stitching failed" });
 
-    await waitFor(() => expect(screen.getByText("Stitching failed")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument());
+    expect(screen.queryByText("Stitching failed")).not.toBeInTheDocument();
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
-  it("keeps the server's error text and rethrows the first teardown error when failing a non-2xx request throws", async () => {
+  it("keeps the translated fallback and rethrows the first teardown error when failing a non-2xx request throws", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     render(<StitchSettings />);
     const xhr = await submit("stitch-submit");
@@ -405,7 +406,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
         expect.objectContaining({ message: "later teardown broke" }),
       );
       expect(useFileStore.getState().entries[0].status).toBe("failed");
-      expect(useFileStore.getState().entries[0].error).toBe("Stitching failed");
+      expect(useFileStore.getState().entries[0].error).toBe(en.errors.failedWithStatus);
       expect(useFileStore.getState().processing).toBe(false);
       expect(screen.getByTestId("stitch-submit")).toBeEnabled();
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
@@ -482,7 +483,8 @@ describe("collage: a malformed sync answer apart from our own store write", () =
 
     // If the second run fails, stale result link and sizes stay hidden
     secondXhr.respondRaw(500, JSON.stringify({ error: "Server exploded" }));
-    await waitFor(() => expect(screen.getByText("Server exploded")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument());
+    expect(screen.queryByText("Server exploded")).not.toBeInTheDocument();
     expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
     expect(screen.queryByText(/Input total:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Collage:/i)).not.toBeInTheDocument();
@@ -895,13 +897,13 @@ describe("barcode read: a malformed sync answer apart from our own store write",
     });
   });
 
-  it("shows the server's error text for a failed request without reporting it", async () => {
+  it("shows the translated fallback for a failed request, keeping the server's text out of the error, without reporting it", async () => {
     render(<BarcodeReadSettings />);
 
     (await submit("barcode-read-submit")).respond(422, { error: "Barcode detection failed" });
     await settle();
 
-    expect(useFileStore.getState().error).toBe("photo.png: Barcode detection failed");
+    expect(useFileStore.getState().error).toBe(`photo.png: ${en.errors.failedWithStatus}`);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 });
@@ -1066,7 +1068,7 @@ describe("image-to-pdf: a malformed sync answer apart from our own store write (
     }
   });
 
-  it("keeps the server's error text and rethrows the first teardown error when failing a non-2xx request throws", async () => {
+  it("keeps the translated fallback and rethrows the first teardown error when failing a non-2xx request throws", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const { unmount } = render(<ImageToPdfSettings />);
     const xhr = await submit("image-to-pdf-submit");
@@ -1088,7 +1090,7 @@ describe("image-to-pdf: a malformed sync answer apart from our own store write (
         "Ending the run failed",
         expect.objectContaining({ message: "later teardown broke" }),
       );
-      expect(useFileStore.getState().error).toBe("PDF creation failed");
+      expect(useFileStore.getState().error).toBe(en.errors.failedWithStatus);
       expect(useFileStore.getState().processing).toBe(false);
       expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
@@ -1097,7 +1099,7 @@ describe("image-to-pdf: a malformed sync answer apart from our own store write (
       consoleError.mockRestore();
     }
     unmount();
-    expect(useFileStore.getState().error).toBe("PDF creation failed");
+    expect(useFileStore.getState().error).toBe(en.errors.failedWithStatus);
   });
 
   it("keeps the error and settles processing and busy when onerror or ontimeout teardown writes throw (#3472)", async () => {
@@ -1306,7 +1308,7 @@ describe("favicon: our own store write failure when landing a sync 2xx answer (#
     }
   });
 
-  it("keeps the server's error text and rethrows the first teardown error when a non-2xx onload teardown throws (#3472)", async () => {
+  it("keeps the translated fallback and rethrows the first teardown error when a non-2xx onload teardown throws (#3472)", async () => {
     const { rejections, restore } = takeOverUnhandledRejections();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     let unsubscribe = () => {};
@@ -1336,7 +1338,7 @@ describe("favicon: our own store write failure when landing a sync 2xx answer (#
         "Ending the run failed",
         expect.objectContaining({ message: "later teardown broke" }),
       );
-      expect(useFileStore.getState().error).toBe("Favicon failed");
+      expect(useFileStore.getState().error).toBe(en.toolSettings.favicon.generationFailed);
       expect(useFileStore.getState().processing).toBe(false);
       expect(screen.getByTestId("favicon-submit")).toBeEnabled();
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
@@ -1346,7 +1348,7 @@ describe("favicon: our own store write failure when landing a sync 2xx answer (#
       restore();
     }
     unmount();
-    expect(useFileStore.getState().error).toBe("Favicon failed");
+    expect(useFileStore.getState().error).toBe(en.toolSettings.favicon.generationFailed);
   });
 
   it("keeps the error and settles processing and busy when onerror or ontimeout teardown writes throw (#3472)", async () => {

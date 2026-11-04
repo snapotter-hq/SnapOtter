@@ -1195,7 +1195,7 @@ describe("usePdfToImageStore", () => {
     await usePdfToImageStore.getState().loadPreview(file);
 
     const s = usePdfToImageStore.getState();
-    expect(s.error).toBe("Server error");
+    expect(s.error).toBe("Failed: 500");
     expect(s.file).toBeNull();
     expect(s.pageCount).toBeNull();
     expect(s.loadingPreview).toBe(false);
@@ -1345,7 +1345,7 @@ describe("usePdfToImageStore", () => {
 
     await usePdfToImageStore.getState().convert();
 
-    expect(usePdfToImageStore.getState().error).toBe("Conversion error");
+    expect(usePdfToImageStore.getState().error).toBe("Conversion failed: 500");
     expect(usePdfToImageStore.getState().processing).toBe(false);
   });
 
@@ -3224,7 +3224,7 @@ describe("useFeaturesStore", () => {
     expect(useFeaturesStore.getState().installing["ai-rembg"]).toBeUndefined();
   });
 
-  it("listenToProgress handles failed phase from EventSource", async () => {
+  it("listenToProgress shows the install fallback, not the server text, for a failed phase from EventSource", async () => {
     const captured: { onMessage: ((event: MessageEvent) => void) | null } = { onMessage: null };
     const mockClose = vi.fn();
     vi.stubGlobal(
@@ -3254,7 +3254,7 @@ describe("useFeaturesStore", () => {
       } as MessageEvent);
     }
     expect(mockClose).toHaveBeenCalled();
-    expect(useFeaturesStore.getState().errors["ai-rembg"]).toBe("Disk full");
+    expect(useFeaturesStore.getState().errors["ai-rembg"]).toBe("Failed to start installation");
     expect(useFeaturesStore.getState().installing["ai-rembg"]).toBeUndefined();
   });
 

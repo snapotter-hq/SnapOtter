@@ -34,6 +34,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     formatHeaders: () => new Map<string, string>(),
+    translatedCodeMessage: () => undefined,
     parseApiError: (body: Record<string, unknown>, status: number, fallback?: string) => {
       const parsed = actual.parseApiError(body, status, fallback);
       if (typeof parsed === "object" || parsed === fallback) return parsed;
@@ -2612,19 +2613,19 @@ describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
     },
   );
 
-  it("ends a single run on a failed frame and keeps the server's message", () => {
+  it("ends a single run on a failed frame and shows the fallback", () => {
     const { unmount } = startSingleRun();
     // A sync single run arms no cancel handle; the degrade does.
     degrade();
     breakJobClear();
 
     // The run ended before the throw reached the frame handler's catch, so
-    // its #1287 fallback leaves the server's message alone.
+    // its #1287 fallback leaves the shown fallback alone.
     expect(() => act(() => sendSingleFrame({ phase: "failed", error: "server said no" }))).toThrow(
       "teardown broke",
     );
 
-    expectRunEnded("server said no");
+    expectRunEnded("Processing failed");
     unmount();
   });
 

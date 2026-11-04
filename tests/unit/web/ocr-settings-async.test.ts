@@ -173,7 +173,7 @@ describe("OCR async response handling", () => {
     xhr.responseText = JSON.stringify({ error: "OCR failed" });
     xhr.onload?.();
 
-    await expect(promise).rejects.toThrow("OCR failed");
+    await expect(promise).rejects.toThrow("Failed: 422");
     expect(events.close).toHaveBeenCalledTimes(1);
   });
 
@@ -186,7 +186,7 @@ describe("OCR async response handling", () => {
     xhr.onload?.();
     events.emit({ type: "single", phase: "failed", error: "runtime crashed" });
 
-    await expect(promise).rejects.toThrow("runtime crashed");
+    await expect(promise).rejects.toThrow("Processing failed");
     expect(events.close).toHaveBeenCalledTimes(1);
   });
 
@@ -356,7 +356,7 @@ describe("OCR async response handling", () => {
         xhr.status = 422;
         xhr.responseText = JSON.stringify({ error: "OCR failed" });
         xhr.onload?.();
-        await expect(promise).rejects.toThrow("OCR failed");
+        await expect(promise).rejects.toThrow("Failed: 422");
       },
     ],
   ] as const)("ignores queued SSE frames arriving after %s (#2949)", async (_label, settle) => {
@@ -699,7 +699,7 @@ describe("OCR canceling a job the client gave up on (#2721)", () => {
     expect(() =>
       events.emit({ type: "single", phase: "failed", error: "runtime crashed" }),
     ).toThrow("close broke");
-    await expect(promise).rejects.toThrow("runtime crashed");
+    await expect(promise).rejects.toThrow("Processing failed");
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 

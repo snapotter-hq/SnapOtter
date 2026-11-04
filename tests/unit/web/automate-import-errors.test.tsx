@@ -263,14 +263,14 @@ describe("automate pipeline save (#1987)", () => {
     expect(screen.getByText(en.common.save)).toBeEnabled();
   });
 
-  it("shows the server's reason and keeps the save form open when the save answers non-2xx", async () => {
+  it("shows the translated fallback (the server's reason stays in the logs) and keeps the save form open when the save answers non-2xx", async () => {
     server = {
       save: () =>
         new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
       list: listOk,
     };
     await savePipeline("Evening Batch");
-    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.saveFailed)).toBeInTheDocument());
     expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Evening Batch");
   });
 
@@ -443,7 +443,7 @@ describe("automate pipeline delete (#1987)", () => {
     expect(usePipelineStore.getState().savedPipelines).toHaveLength(4);
   });
 
-  it("shows the server's reason and skips refreshing the list when the delete answers non-2xx", async () => {
+  it("shows the translated fallback (the server's reason stays in the logs) and skips refreshing the list when the delete answers non-2xx", async () => {
     server = {
       save: savedOk,
       list: listOk,
@@ -453,9 +453,7 @@ describe("automate pipeline delete (#1987)", () => {
         }),
     };
     await deleteFirstSavedPipeline();
-    await waitFor(() =>
-      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument());
     const listCalls = vi
       .mocked(fetch)
       .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
@@ -704,7 +702,7 @@ describe("automate initial saved pipelines load (#1987)", () => {
     expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
   });
 
-  it("shows the server's reason instead of 'No saved pipelines' when the initial list answers non-2xx", async () => {
+  it("shows the translated fallback (the server's reason stays in the logs) instead of 'No saved pipelines' when the initial list answers non-2xx", async () => {
     server = {
       initialList: () =>
         new Response(JSON.stringify({ error: "Insufficient permissions" }), { status: 403 }),
@@ -712,7 +710,7 @@ describe("automate initial saved pipelines load (#1987)", () => {
       list: listOk,
     };
     renderAutomate();
-    await waitFor(() => expect(screen.getByText("Insufficient permissions")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
     expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
   });
 
@@ -802,12 +800,12 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
 
     await importFile(JSON.stringify(PIPELINE));
-    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.importFailed)).toBeInTheDocument());
 
     await act(async () => {
       resolveInitialList(new Response(JSON.stringify({ pipelines: [SAVED] })));
     });
-    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(screen.getByText(en.automate.importFailed)).toBeInTheDocument();
     expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["p1"]);
   });
 
@@ -824,12 +822,12 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
 
     await importFile(JSON.stringify(PIPELINE));
-    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.importFailed)).toBeInTheDocument());
 
     await act(async () => {
       resolveInitialList(new Response("busy", { status: 503 }));
     });
-    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(screen.getByText(en.automate.importFailed)).toBeInTheDocument();
     expect(screen.queryByText(en.automate.loadFailed)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(en.common.close));
@@ -852,14 +850,12 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
 
     await deleteFirstSavedPipeline();
-    await waitFor(() =>
-      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument());
 
     await act(async () => {
       resolveInitialList(new Response(JSON.stringify({ pipelines: [] })));
     });
-    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+    expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument();
   });
 
   it("does not re-fetch /api/v1/pipeline/list when a non-English locale finishes loading, and translates an initial load error into that locale (#2980)", async () => {
@@ -890,9 +886,7 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
     usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
     await deleteFirstSavedPipeline();
-    await waitFor(() =>
-      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument());
 
     // Clicking Import without picking a file must not wipe the delete error.
     const realCreate = document.createElement.bind(document);
@@ -902,7 +896,7 @@ describe("automate initial saved pipelines load (#1987)", () => {
       return el;
     }) as typeof document.createElement);
     fireEvent.click(screen.getByText(en.automate.importButton));
-    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+    expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument();
 
     // Saving a pipeline in the builder refreshes the list without clearing the delete error.
     fireEvent.click(screen.getByText(en.automate.saveButton));
@@ -911,6 +905,6 @@ describe("automate initial saved pipelines load (#1987)", () => {
     });
     fireEvent.click(screen.getByText(en.common.save));
     await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
-    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+    expect(screen.getByText(en.automate.deleteFailed)).toBeInTheDocument();
   });
 });

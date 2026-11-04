@@ -1,61 +1,61 @@
 ---
-description: "Handleiding voor beveiligingsverharding van SnapOtter. Containerbeveiliging, netwerkisolatie, Docker-secrets, Kubernetes-implementatie en compliance-artefacten."
-i18n_source_hash: f37bcb6cc1c5
+description: "Beveiligingsgids voor SnapOtter. Containerbeveiliging, netwerkisolatie, Docker secrets, Kubernetes-implementatie en compliance-artefacten."
+i18n_source_hash: 5cf773ddb4c0
 i18n_provenance: machine
-i18n_output_hash: 9637a13165d0
+i18n_output_hash: 481d83d8f81d
 i18n_hash_version: 2
 ---
 
-# Beveiliging & verharding {#security-hardening}
+# Beveiliging en hardening {#security-hardening}
 
-SnapOtter verwerkt bestanden volledig op je eigen infrastructuur. Het verstuurt standaard anonieme, inhoudsloze productanalytics en crashrapporten om het project te helpen verbeteren. Het verstuurt nooit je bestanden, bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Optionele feedback wordt alleen verzonden nadat een gebruiker deze indient, alleen wanneer analytics is ingeschakeld, en contactvelden worden alleen opgenomen met expliciete contacttoestemming. Een beheerder kan analytics en het vastleggen van feedback met één klik uitschakelen onder Instellingen > Systeem > Privacy, geen herbouw vereist. Bestandsverwerking blijft altijd binnen je container.
+SnapOtter verwerkt bestanden volledig op uw eigen infrastructuur. Standaard verstuurt het anonieme, inhoudsvrije productanalyses en crashrapporten om het project te helpen verbeteren. Het verstuurt nooit uw bestanden, bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Optionele feedback wordt alleen verzonden nadat een gebruiker die heeft ingediend, alleen wanneer analyse is ingeschakeld, en contactgegevens worden alleen meegestuurd met expliciete toestemming voor contact. Een beheerder kan analyse en het vastleggen van feedback met één klik uitschakelen onder Settings > System > Privacy, zonder opnieuw te bouwen. Bestandsverwerking blijft altijd binnen uw container.
 
-De container draait als een dedicated niet-root-gebruiker (`snapotter`) met alle Linux-capabilities verwijderd behalve de minimaal vereiste set. Zie voor het volledige beleid voor kwetsbaarheidsonthulling en de beveiligingsarchitectuur [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) op GitHub.
+De container draait als een speciale niet-rootgebruiker (`snapotter`) waarbij alle Linux-capabilities zijn weggelaten behalve de minimaal vereiste set. Voor het volledige beleid voor het melden van kwetsbaarheden en de beveiligingsarchitectuur, zie [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) op GitHub.
 
-## Containerharding {#container-hardening}
+## Containerhardening {#container-hardening}
 
-De canonieke [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) en [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose-bestanden zijn de bron van de waarheid. Kopieer geen verkort voorbeeld naar productie; implementeer het bestand vanaf de releasetag die u heeft geverifieerd.
+De canonieke Compose-bestanden voor [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) en [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) zijn de bron van waarheid. Kopieer geen verkort voorbeeld naar productie; implementeer het bestand van de releasetag die u hebt gecontroleerd.
 
-Beide stapels passen de volgende besturingselementen toe:
+Beide stacks passen de volgende maatregelen toe:
 
-- Geheugen-, swap-, CPU- en PID-limieten bevatten op hol geslagen native verwerking.
-- Elke service laat alle Linux-mogelijkheden vallen. De applicatie voegt alleen `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` toe voor volume-eigendom, de eenrichtings-`gosu`-identiteitsdaling en sierlijke signaaldoorsturing. PostgreSQL en Redis ontvangen alleen de subset die hun officiële toegangspunten nodig hebben.
-- `security_opt: [no-new-privileges:true]` voorkomt dat processen in de applicatie-, PostgreSQL- en Redis-containers extra rechten krijgen. Dit blijft compatibel met `gosu`: het toegangspunt begint als root, bereidt de volumes voor en gaat alleen naar de toegewijde `snapotter`-gebruiker.
-- PostgreSQL- en Redis-afbeeldingsinvoer wordt vastgezet door digest. De applicatie moet ook worden vastgemaakt aan een geverifieerde releasetag of samenvatting in plaats van aan `latest`.
-- Gezondheidscontroles, begrensde JSON-logboekrotatie, duurzame Redis AOF en herstartbeleid worden centraal in de canonieke bestanden gedefinieerd.
+- Limieten voor geheugen, swap, CPU en PID's beperken op hol geslagen native verwerking.
+- Elke service laat alle Linux-capabilities vallen. De applicatie voegt alleen `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` weer toe voor volume-eigendom, de eenrichtings-identiteitswissel `gosu` en het netjes doorsturen van signalen. PostgreSQL en Redis krijgen alleen de subset die hun officiële entrypoints nodig hebben.
+- `security_opt: [no-new-privileges:true]` voorkomt dat processen in de applicatie-, PostgreSQL- en Redis-containers extra rechten verkrijgen. Dit blijft compatibel met `gosu`: de entrypoint begint als root, bereidt de volumes voor en schakelt pas daarna over naar de speciale gebruiker `snapotter`.
+- Image-invoer voor PostgreSQL en Redis is vastgezet op digest. De applicatie moet eveneens worden vastgezet op een gecontroleerde releasetag of digest in plaats van op `latest`.
+- Healthchecks, begrensde JSON-logrotatie, duurzame Redis AOF en het herstartbeleid worden centraal in de canonieke bestanden gedefinieerd.
 
-Voor een internetgerichte implementatie bindt u poort 1349 aan loopback en beëindigt u TLS bij een onderhouden omgekeerde proxy. Genereer unieke PostgreSQL- en Redis-inloggegevens, sla geheimen op in beveiligde bestanden of in een geheime manager en wijzig het initiële beheerderswachtwoord onmiddellijk.
+Koppel voor een implementatie die aan internet is blootgesteld poort 1349 aan loopback en beëindig TLS bij een onderhouden reverse proxy. Genereer unieke PostgreSQL- en Redis-inloggegevens, bewaar geheimen in beveiligde bestanden of een secretmanager en wijzig het initiële beheerderswachtwoord direct.
 
-### Waarom `read_only` niet is ingesteld op {#why-read-only-is-not-set}
+### Waarom `read_only` niet is ingesteld {#why-read-only-is-not-set}
 
-`read_only: true` is niet ingesteld omdat het opnieuw toewijzen van PUID/PGID bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u Docker's `--user`-vlag of Kubernetes `runAsUser` gebruikt in plaats van PUID/PGID, kunt u veilig een alleen-lezen rootbestandssysteem inschakelen.
+`read_only: true` is niet ingesteld omdat PUID/PGID-remapping bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u in plaats van PUID/PGID de Docker-vlag `--user` of Kubernetes `runAsUser` gebruikt, kunt u veilig een alleen-lezen root-bestandssysteem inschakelen.
 
 ## Netwerkisolatie {#network-isolation}
 
-Bestandsverwerking is lokaal, maar een standaardinstallatie is **geen uitgaand systeem**. Anonieme productanalyses gebruiken PostHog en crashrapportage gebruikt Sentry wanneer telemetrie is ingeschakeld. Stel `SNAPOTTER_TELEMETRY=0` in (of schakel analyses uit onder Instellingen > Systeem > Privacy) om beide uit te schakelen. SnapOtter neemt nooit geüploade bestanden, bestandsnamen, OCR-uitvoer, documenttekst of andere bestandsinhoud op in deze gebeurtenissen.
+Bestandsverwerking is lokaal, maar een standaardinstallatie is **geen systeem zonder uitgaand verkeer**. Anonieme productanalyse gebruikt PostHog en crashrapportage gebruikt Sentry wanneer telemetrie is ingeschakeld. Stel `SNAPOTTER_TELEMETRY=0` in (of schakel analyse uit onder Settings > System > Privacy) om beide uit te schakelen. SnapOtter neemt geüploade bestanden, bestandsnamen, OCR-uitvoer, documenttekst of andere bestandsinhoud nooit op in die gebeurtenissen.
 
-Ander uitgaand verkeer is functiegestuurd: AI-bundel-/modelinstallatie downloadt ondertekende release-invoer; URL-import haalt een door de gebruiker aangevraagde openbare URL op; en expliciet geconfigureerde OIDC, SAML, OpenTelemetry, webhooks, S3-compatibele opslag of soortgelijke integraties maken contact met de door de beheerder gekozen bestemmingen. Modeldownloads tijdens runtime zijn standaard uitgeschakeld. Stel `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` alleen in om automatische fallback-downloads expliciet in te schakelen. Met een [offlinebundelimport](/nl/guide/deployment) kunnen AI-functies worden ingericht zonder uitgaand runtimemodel.
+Ander uitgaand verkeer wordt door functies bepaald: installatie van AI-bundels en modellen downloadt ondertekende release-invoer; URL-import haalt een door de gebruiker opgegeven openbare URL op; en expliciet geconfigureerde OIDC-, SAML-, OpenTelemetry-, webhook-, S3-compatibele opslag- of vergelijkbare integraties nemen contact op met de door de beheerder gekozen bestemmingen. Modeldownloads tijdens runtime zijn standaard uitgeschakeld. Stel `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1` alleen in om expliciet te kiezen voor automatische fallback-downloads. Een [import van een offline bundel](/nl/guide/deployment) kan AI-functies beschikbaar maken zonder uitgaand modelverkeer tijdens runtime.
 
-**Firewall-aanbevelingen:**
+**Firewallaanbevelingen:**
 
-|Scenario|Uitgaande regel|
+| Scenario | Regel voor uitgaand verkeer |
 |---|---|
-|Luchtopening|Stel `SNAPOTTER_TELEMETRY=0` en `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` in, gebruik offline AI-bundelimport, schakel URL-import en externe integraties uit en blokkeer vervolgens uitgaand verkeer|
-|Standaardtelemetrie|Sta de PostHog- en Sentry-eindpunten toe die worden vermeld in uw browser-/netwerklogboeken; schakel telemetrie uit als het beleid dit niet toestaat|
-|AI-bundels nodig|Sta tijdens de installatie HTTPS naar `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org` toe; blokkeer vervolgens die hosts|
-|Externe integraties|Alleen de exacte door de beheerder geconfigureerde OIDC/SAML/OTLP/webhook/object-storage-bestemmingen toestaan|
+| Air-gapped | Stel `SNAPOTTER_TELEMETRY=0` en `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0` in, gebruik import van offline AI-bundels, schakel URL-import en externe integraties uit en blokkeer daarna uitgaand verkeer |
+| Standaardtelemetrie | Sta de PostHog- en Sentry-endpoints toe die in uw browser-/netwerklogs staan; schakel telemetrie uit als het beleid ze niet toestaat |
+| AI-bundels nodig | Sta tijdens de installatie HTTPS naar `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org` toe; blokkeer die hosts daarna |
+| Externe integraties | Sta alleen de exacte door de beheerder geconfigureerde OIDC-/SAML-/OTLP-/webhook-/objectopslagbestemmingen toe |
 
-Bundelarchieven worden geleverd vanuit de Xet-opslag van Hugging Face, die parallel wordt overgedragen via de `*.xethub.hf.co`-eindpunten en waardoor downloads van bundels van meerdere GB snel verlopen. Als uw firewall `huggingface.co` toestaat maar `*.xethub.hf.co` blokkeert, slagen de installaties nog steeds, maar vallen ze terug op een langzamere download in één stream. Zet daarom de Xet-hosts op de toelatingslijst om op het snelle pad te blijven. Bij volledig offline installaties kunt u dit allemaal overslaan en in plaats daarvan [Offline Bundle Import](/nl/guide/deployment) gebruiken.
+Bundelarchieven worden aangeboden vanaf de Xet-opslag van Hugging Face, die parallel via de endpoints `*.xethub.hf.co` overdraagt en multi-GB-bundeldownloads snel maakt. Staat uw firewall `huggingface.co` toe maar blokkeert hij `*.xethub.hf.co`, dan slagen installaties nog steeds maar vallen ze terug op een tragere download met één stroom, dus zet de Xet-hosts op de toelatingslijst om het snelle pad te behouden. Volledig offline installaties kunnen dit alles overslaan en in plaats daarvan [Import van offline bundels](/nl/guide/deployment) gebruiken.
 
-Voor reverse proxy-configuratie (Nginx, Traefik, Caddy, Cloudflare Tunnels), zie de [Implementatiehandleiding](/nl/guide/deployment#reverse-proxy).
+Voor de configuratie van een reverse proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels) zie de [Implementatiegids](/nl/guide/deployment#reverse-proxy).
 
-## Docker-secrets {#docker-secrets}
+## Docker secrets {#docker-secrets}
 
-Vermijd bij productie-implementaties het doorgeven van secrets als platte-tekst-omgevingsvariabelen. De entrypoint ondersteunt Dockers `_FILE`-conventie: koppel een secret als bestand en stel de bijbehorende `_FILE`-variabele in op het pad ervan.
+Vermijd voor productie-implementaties het doorgeven van geheimen als omgevingsvariabelen in platte tekst. De entrypoint ondersteunt de `_FILE`-conventie van Docker: koppel een geheim als bestand en stel de bijbehorende variabele `_FILE` in op het pad ervan.
 
-**Ondersteunde secrets:**
+**Ondersteunde geheimen:**
 
-| Variabele | `_FILE`-equivalent |
+| Variabele | Equivalent met `_FILE` |
 |---|---|
 | `DEFAULT_PASSWORD` | `DEFAULT_PASSWORD_FILE` |
 | `COOKIE_SECRET` | `COOKIE_SECRET_FILE` |
@@ -64,7 +64,7 @@ Vermijd bij productie-implementaties het doorgeven van secrets als platte-tekst-
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
 | `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
 
-**Voorbeeld met Docker Compose-secrets:**
+**Voorbeeld met Docker Compose secrets:**
 
 ```yaml
 services:
@@ -87,12 +87,12 @@ secrets:
 ```
 
 ::: tip 
-Docker Compose-secrets (zonder Swarm) vereisen Compose v2.23 of later.
+Docker Compose secrets (zonder Swarm) vereisen Compose v2.23 of nieuwer.
 :::
 
 ## Kubernetes-implementatie {#kubernetes-deployment}
 
-De entrypoint detecteert wanneer de container al als niet-root draait (bijv. via Kubernetes `runAsUser`) en slaat de gosu-privilegeverlaging automatisch over. In dat geval kan het de gekoppelde volumes niet zelf chown'en, dus verifieert het of ze beschrijfbaar zijn en stopt het vroegtijdig met bruikbare aanwijzingen als dat niet zo is — zie [Opslagpermissies](/nl/guide/deployment#storage-permissions) voor `fsGroup` en foreign-UID-configuraties (TrueNAS, OpenShift).
+De entrypoint detecteert wanneer de container al als niet-root draait (bijvoorbeeld via Kubernetes `runAsUser`) en slaat de gosu-rechtendaling automatisch over. In dat geval kan hij de gekoppelde volumes niet zelf met chown overnemen, dus controleert hij of ze schrijfbaar zijn en stopt hij vroegtijdig met bruikbare aanwijzingen als dat niet zo is. Zie [Opslagrechten](/nl/guide/deployment#storage-permissions) voor `fsGroup` en setups met een vreemde UID (TrueNAS, OpenShift).
 
 **Aanbevolen Pod SecurityContext:**
 
@@ -161,26 +161,26 @@ spec:
             sizeLimit: 2Gi
 ```
 
-Omdat `runAsUser: 999` op podniveau is ingesteld, slaat de entrypoint gosu volledig over. Dit maakt `allowPrivilegeEscalation: false`- en `drop: [ALL]`-capabilities zonder conflict mogelijk.
+Omdat `runAsUser: 999` op podniveau is ingesteld, slaat de entrypoint gosu volledig over. Hierdoor zijn de capabilities `allowPrivilegeEscalation: false` en `drop: [ALL]` zonder conflict mogelijk.
 
-Zie voor de dimensionering van resources [Hardwarevereisten](/nl/guide/deployment#hardware-requirements).
+Voor het bepalen van de omvang van resources zie [Hardwarevereisten](/nl/guide/deployment#hardware-requirements).
 
 ## Back-up en herstel {#backup-and-recovery}
 
-De productie Compose-stack definieert vier volumes. Stop het binnendringen en laat actieve taken voltooien voordat u een gecoördineerde back-up maakt, zodat PostgreSQL, Redis en de bestandsstatus hetzelfde tijdstip beschrijven.
+De Compose-stack voor productie definieert vier volumes. Stop inkomend verkeer en laat actieve jobs afronden voordat u een gecoördineerde back-up maakt, zodat PostgreSQL, Redis en de bestandsstatus hetzelfde moment in de tijd beschrijven.
 
-|Volume|Inhoud|Herstelbehandeling|
+| Volume | Inhoud | Behandeling bij herstel |
 |---|---|---|
-|`SnapOtter-pgdata`|PostgreSQL-gebruikers, instellingen, pijplijnen, taken, metagegevens van bestanden en auditlogboek|Kritisch; gebruik een fail-fast logische dump voor draagbaar herstel|
-|`SnapOtter-data`|Opgeslagen bibliotheekobjecten, logboeken en AI-status (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|Maak een back-up van het hele volume; om ruimte te besparen, laat u opzettelijk alle AI-statussen weg en installeert u de bundels opnieuw|
-|`SnapOtter-redisdata`|Redis AOF voor duurzame BullMQ-wachtrijstatus|Maak een back-up nadat u de app hebt gepauzeerd en `SAVE` hebt geforceerd; vereist om het werk in de wachtrij precies te hervatten|
-|`SnapOtter-workspace`|Tijdelijke objectopslagsleutels (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|Maak geen back-up nadat alle taken zijn leeggemaakt of geannuleerd; gooi het nooit weg terwijl er banen actief zijn|
+| `SnapOtter-pgdata` | PostgreSQL-gebruikers, instellingen, pipelines, jobs, bestandsmetadata en auditlog | Kritiek; gebruik een fail-fast logische dump voor overdraagbaar herstel |
+| `SnapOtter-data` | Opgeslagen bibliotheekobjecten, logs en AI-status (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Maak een back-up van het hele volume; laat om ruimte te besparen bewust alle AI-status weg en installeer de bundels opnieuw |
+| `SnapOtter-redisdata` | Redis AOF voor duurzame BullMQ-wachtrijstatus | Maak een back-up nadat u de app hebt gepauzeerd en `SAVE` hebt geforceerd; vereist om wachtrijwerk exact te hervatten |
+| `SnapOtter-workspace` | Tijdelijke objectopslagsleutels (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Geen back-up maken nadat alle jobs zijn afgerond of geannuleerd; gooi het nooit weg terwijl jobs actief zijn |
 
-Bij Compose worden volumenamen normaal gesproken voorafgegaan door de projectnaam. Los het echte bronvolume op vanuit de gekoppelde container in plaats van aan te nemen dat een weergavenaam zoals `SnapOtter-data` de Docker-volumenaam is.
+Compose voegt normaal gesproken de projectnaam als voorvoegsel toe aan volumenamen. Bepaal het echte bronvolume vanuit de gekoppelde container in plaats van aan te nemen dat een weergavenaam zoals `SnapOtter-data` de naam van het Docker-volume is.
 
 ### Databaseback-up {#database-backup}
 
-Gebruik het aangepaste archiefformaat van PostgreSQL en verifieer het archief voordat u de back-up als voltooid beschouwt:
+Gebruik het aangepaste archiefformaat van PostgreSQL en controleer het archief voordat u de back-up als compleet beschouwt:
 
 ```bash
 docker exec SnapOtter-postgres \
@@ -194,13 +194,13 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Test elke back-up door deze terug te zetten naar een geïsoleerde stapel, databaserecords en bestandscontrolesommen te controleren en de toepassing te starten. De `tests/qa/backup-restore-drill.sh` van de repository automatiseert de vrijgavepoort tegen een expliciete `QA_IMAGE`.
+Test elke back-up door deze te herstellen in een geïsoleerde stack, databaserecords en bestandschecksums te controleren en de applicatie te starten. De `tests/qa/backup-restore-drill.sh` van de repository automatiseert die releasepoort tegen een expliciete `QA_IMAGE`.
 
-Als uw platform in plaats daarvan crash-consistente volume-snapshots maakt, stop dan eerst de hele stack en maak een snapshot van alle kritieke volumes als één set. Een onbewerkte kopie van de PostgreSQL-gegevensmap uit een actieve container is geen ondersteunde logische back-up.
+Als uw platform in plaats daarvan crash-consistente volumesnapshots maakt, stop dan eerst de hele stack en maak een snapshot van alle kritieke volumes als één set. Een ruwe kopie van de PostgreSQL-datamap vanuit een draaiende container is geen ondersteunde logische back-up.
 
-### Bestands- en wachtrijback-up {#file-and-queue-backup}
+### Bestanden- en wachtrijback-up {#file-and-queue-backup}
 
-Pauzeer de toepassing voordat u bestands- en wachtrijvolumes vastlegt. Gebruik `docker inspect` om de daadwerkelijke volumenaam om te zetten, Redis te dwingen de huidige status te behouden en te archiveren met behoud van eigendom en machtigingen:
+Pauzeer de applicatie voordat u de bestands- en wachtrijvolumes vastlegt. Gebruik `docker inspect` om de werkelijke volumenaam te bepalen, forceer Redis om de huidige status op te slaan en archiveer met behoud van eigendom en rechten:
 
 ```bash
 docker stop SnapOtter
@@ -218,28 +218,28 @@ docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-Start Redis opnieuw vóór de toepassing. Als u opzettelijk `/data/ai` uitsluit, verwijder dan de hele AI-subboom in plaats van een `installed.json`-record te behouden zonder de modellen of virtuele omgeving ervan. Houd back-upbestanden gecodeerd, met toegangscontrole en gescheiden van de host waarop SnapOtter draait.
+Start Redis opnieuw op vóór de applicatie. Als u `/data/ai` bewust uitsluit, verwijder dan de hele AI-substructuur in plaats van een record van `installed.json` te bewaren zonder de bijbehorende modellen of virtuele omgeving. Houd back-upbestanden versleuteld, toegangsbeperkt en gescheiden van de host waarop SnapOtter draait.
 
-## Nalevingsartefacten {#compliance-artifacts}
+## Compliance-artefacten {#compliance-artifacts}
 
 Elke SnapOtter-release bevat de volgende beveiligingsartefacten:
 
-| Artefact | Formaat | Waar je het kunt vinden |
+| Artefact | Formaat | Waar te vinden |
 |---|---|---|
-| Onderwerpbinding vrijgeven | Canonieke JSON + GitHub-attest | [GitHub-vrijgave](https://github.com/snapotter-hq/SnapOtter/releases) item: `snapotter-v{version}-release-subjects.json` |
-| Archief SBOM | CycloneDX en SPDX JSON | Activa vrijgeven: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Afbeelding SBOM | CycloneDX en SPDX JSON | Activa vrijgeven: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
-| Kwetsbaarheidsscans | Trivy JSON | Activa vrijgeven met overeenkomende `archive-linux-{arch}`- of `image-linux-{arch}`-voorvoegsels |
-| Kwetsbaarheidsscan | SARIF | Tabblad [GitHub Beveiliging](https://github.com/snapotter-hq/SnapOtter/security). |
-| Statische analyse | CodeQL (JS/TS + Python) | Tabblad [GitHub Beveiliging](https://github.com/snapotter-hq/SnapOtter/security), wordt wekelijks + per PR uitgevoerd |
-| Afhankelijkheidsbeoordeling | GitHub eigen | Controle per PR, mislukt bij zeer ernstige toevoegingen |
-| Python-afhankelijkheidsaudit | pip-audit | CI voert log uit bij elke druk |
+| Release subject binding | Canonieke JSON + GitHub-attestatie | Asset van de [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases): `snapotter-v{version}-release-subjects.json` |
+| Archief-SBOM | CycloneDX en SPDX JSON | Release-assets: `snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Image-SBOM | CycloneDX en SPDX JSON | Release-assets: `snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| Kwetsbaarheidsscans | Trivy JSON | Release-assets met overeenkomende voorvoegsels `archive-linux-{arch}` of `image-linux-{arch}` |
+| Kwetsbaarheidsscan | SARIF | Tabblad [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) |
+| Statische analyse | CodeQL (JS/TS + Python) | Tabblad [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security), draait wekelijks + per PR |
+| Dependency review | GitHub native | Controle per PR, faalt bij toevoegingen met hoge ernst |
+| Python-dependency-audit | pip-audit | CI-runlog bij elke push |
 | Beveiligingsbeleid | Markdown | [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) in de repository |
-| Afhankelijkheidsupdates | Dependabot | Geautomatiseerde wekelijkse PR's voor npm, pip, Docker, acties |
+| Dependency-updates | Dependabot | Geautomatiseerde wekelijkse PR's voor npm, pip, Docker, Actions |
 
 **Uw eigen scan uitvoeren:**
 
-Download het release-onderwerpmanifest en controleer of dit is bevestigd door de releaseworkflow:
+Download het manifest van het releasesubject en controleer of het door de releaseworkflow is geattesteerd:
 
 ```bash
 gh attestation verify snapotter-v2.3.0-release-subjects.json \
@@ -247,9 +247,9 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
 
-Het manifest registreert `releaseTag`, `releaseCommit` en `workflowTriggerCommit` afzonderlijk. Controleer of `releaseCommit` de commit is die is gepeld uit de onveranderlijke tag en verifieer vervolgens de SHA-256-samenvatting van het archief, de afbeelding, SBOM of de scan die u gebruikt, ten opzichte van de vermelding ervan in `subjects`. Dit onderscheid is opzettelijk gemaakt: het uitchecken van een nieuw gemaakte release commit verandert niets aan de commit-identiteit in de OIDC-referentie van de workflow.
+Het manifest legt `releaseTag`, `releaseCommit` en `workflowTriggerCommit` afzonderlijk vast. Controleer dat `releaseCommit` de commit is die uit de onveranderlijke tag is afgeleid, en controleer vervolgens de SHA-256-digest van het archief, de image, de SBOM of de scan die u gebruikt aan de hand van de vermelding ervan in `subjects`. Dit onderscheid is bewust: het uitchecken van een nieuw aangemaakte releasecommit verandert de commit-identiteit in de OIDC-inloggegevens van de workflow niet.
 
-U kunt ook een gedownloade SBOM of de afbeelding rechtstreeks scannen:
+U kunt ook een gedownloade SBOM of de image rechtstreeks scannen:
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
@@ -262,6 +262,6 @@ trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 trivy image snapotter/snapotter:2.3.0
 ```
 
-::: info
-Afbeelding SBOMs en scans weerspiegelen de exacte architectuurspecifieke afbeelding die voor die release is gepubliceerd. Archief SBOMs en scans beschrijven het vooraf gebouwde archief afzonderlijk. AI-modelbundels die na de implementatie zijn geïnstalleerd, zijn niet opgenomen in deze SBOMs omdat ze tijdens runtime worden gedownload.
+::: info 
+Image-SBOM's en scans weerspiegelen de exacte architectuurspecifieke image die voor die release is gepubliceerd. Archief-SBOM's en scans beschrijven het vooraf gebouwde archief afzonderlijk. AI-modelbundels die na de implementatie worden geïnstalleerd, zijn niet opgenomen in deze SBOM's omdat ze tijdens runtime worden gedownload.
 :::
