@@ -7270,6 +7270,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: Hämta jobbstatus
@@ -7317,6 +7319,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Jobbframsteg (SSE)
@@ -7629,6 +7633,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Skicka produktfeedback
@@ -7694,6 +7700,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: Hämta den nyare utgåvan som finns tillgänglig
@@ -7726,6 +7734,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Återställ alla AI-funktionspaket
@@ -7764,6 +7774,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Installera alla funktionspaket som ett verktyg behöver
@@ -20701,6 +20713,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Lista SCIM-användare
@@ -20710,6 +20724,8 @@ paths:
           description: Lista över SCIM-användare
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Skapa SCIM-användare
@@ -20720,6 +20736,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Hämta SCIM-användare
@@ -20735,6 +20753,8 @@ paths:
           description: SCIM-användare
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Uppdatera SCIM-användare
@@ -20750,6 +20770,8 @@ paths:
           description: SCIM-användare uppdaterad
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Ta bort SCIM-användare
@@ -20765,6 +20787,8 @@ paths:
           description: SCIM-användare inaktiverad
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Delvis uppdatera en SCIM-användare
@@ -20829,6 +20853,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Lista SCIM-grupper
@@ -20838,6 +20864,8 @@ paths:
           description: Lista över SCIM-grupper
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Skapa SCIM-grupp
@@ -20848,6 +20876,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Hämta SCIM-grupp
@@ -20863,6 +20893,8 @@ paths:
           description: SCIM-grupp
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Uppdatera SCIM-grupp
@@ -20878,6 +20910,8 @@ paths:
           description: SCIM-grupp uppdaterad
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Ta bort SCIM-grupp
@@ -20893,6 +20927,8 @@ paths:
           description: SCIM-grupp borttagen
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Delvis uppdatera en SCIM-grupp

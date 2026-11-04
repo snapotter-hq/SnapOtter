@@ -7269,6 +7269,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: Lấy trạng thái công việc
@@ -7316,6 +7318,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Tiến trình công việc (SSE)
@@ -7629,6 +7633,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Gửi phản hồi sản phẩm
@@ -7694,6 +7700,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: Lấy bản phát hành mới hơn đang có sẵn
@@ -7726,6 +7734,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Đặt lại toàn bộ gói tính năng AI
@@ -7764,6 +7774,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Cài mọi gói tính năng mà một công cụ cần
@@ -20704,6 +20716,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Liệt kê người dùng SCIM
@@ -20713,6 +20727,8 @@ paths:
           description: Danh sách người dùng SCIM
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Tạo người dùng SCIM
@@ -20723,6 +20739,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Lấy người dùng SCIM
@@ -20738,6 +20756,8 @@ paths:
           description: Người dùng SCIM
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Cập nhật người dùng SCIM
@@ -20753,6 +20773,8 @@ paths:
           description: Đã cập nhật người dùng SCIM
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Xóa người dùng SCIM
@@ -20768,6 +20790,8 @@ paths:
           description: Đã vô hiệu hóa người dùng SCIM
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Cập nhật một phần người dùng SCIM
@@ -20832,6 +20856,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Liệt kê nhóm SCIM
@@ -20841,6 +20867,8 @@ paths:
           description: Danh sách nhóm SCIM
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Tạo nhóm SCIM
@@ -20851,6 +20879,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Lấy nhóm SCIM
@@ -20866,6 +20896,8 @@ paths:
           description: Nhóm SCIM
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Cập nhật nhóm SCIM
@@ -20881,6 +20913,8 @@ paths:
           description: Đã cập nhật nhóm SCIM
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Xóa nhóm SCIM
@@ -20896,6 +20930,8 @@ paths:
           description: Đã xóa nhóm SCIM
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Cập nhật một phần nhóm SCIM

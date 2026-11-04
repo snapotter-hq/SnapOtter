@@ -7268,6 +7268,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: Job की स्थिति प्राप्त करें
@@ -7315,6 +7317,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Job प्रगति (SSE)
@@ -7628,6 +7632,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Product feedback सबमिट करें
@@ -7693,6 +7699,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: नया उपलब्ध release प्राप्त करें
@@ -7725,6 +7733,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: सभी AI feature bundles रीसेट करें
@@ -7763,6 +7773,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: किसी tool के लिए आवश्यक हर feature bundle इंस्टॉल करें
@@ -20701,6 +20713,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM users सूचीबद्ध करें
@@ -20710,6 +20724,8 @@ paths:
           description: SCIM उपयोगकर्ता सूची
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM user बनाएं
@@ -20720,6 +20736,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM user प्राप्त करें
@@ -20735,6 +20753,8 @@ paths:
           description: SCIM उपयोगकर्ता
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM user अपडेट करें
@@ -20750,6 +20770,8 @@ paths:
           description: SCIM उपयोगकर्ता अपडेट किया गया
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM user हटाएं
@@ -20765,6 +20787,8 @@ paths:
           description: SCIM उपयोगकर्ता निष्क्रिय किया गया
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM user को आंशिक रूप से अपडेट करें
@@ -20829,6 +20853,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM groups सूचीबद्ध करें
@@ -20838,6 +20864,8 @@ paths:
           description: SCIM समूह सूची
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM group बनाएं
@@ -20848,6 +20876,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM group प्राप्त करें
@@ -20863,6 +20893,8 @@ paths:
           description: SCIM समूह
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM group अपडेट करें
@@ -20878,6 +20910,8 @@ paths:
           description: SCIM समूह अपडेट किया गया
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM group हटाएं
@@ -20893,6 +20927,8 @@ paths:
           description: SCIM समूह हटाया गया
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM group को आंशिक रूप से अपडेट करें

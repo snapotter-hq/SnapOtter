@@ -7269,6 +7269,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: 작업 상태 조회
@@ -7316,6 +7318,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: 작업 진행 상황(SSE)
@@ -7628,6 +7632,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: 제품 피드백 제출
@@ -7693,6 +7699,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: 사용 가능한 새 릴리스 조회
@@ -7725,6 +7733,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: 모든 AI 기능 번들 초기화
@@ -7763,6 +7773,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: 도구에 필요한 기능 번들 모두 설치
@@ -20700,6 +20712,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 목록
@@ -20709,6 +20723,8 @@ paths:
           description: SCIM 사용자 목록
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 생성
@@ -20719,6 +20735,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 가져오기
@@ -20734,6 +20752,8 @@ paths:
           description: SCIM 사용자
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 업데이트
@@ -20749,6 +20769,8 @@ paths:
           description: SCIM 사용자 업데이트됨
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 삭제
@@ -20764,6 +20786,8 @@ paths:
           description: SCIM 사용자 비활성화됨
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 사용자 부분 업데이트
@@ -20828,6 +20852,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 목록
@@ -20837,6 +20863,8 @@ paths:
           description: SCIM 그룹 목록
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 생성
@@ -20847,6 +20875,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 가져오기
@@ -20862,6 +20892,8 @@ paths:
           description: SCIM 그룹
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 업데이트
@@ -20877,6 +20909,8 @@ paths:
           description: SCIM 그룹 업데이트됨
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 삭제
@@ -20892,6 +20926,8 @@ paths:
           description: SCIM 그룹 삭제됨
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM 그룹 부분 업데이트

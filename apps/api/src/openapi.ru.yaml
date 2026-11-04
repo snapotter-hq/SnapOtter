@@ -7272,6 +7272,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: Получить статус задачи
@@ -7319,6 +7321,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Прогресс задачи (SSE)
@@ -7632,6 +7636,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Отправить отзыв о продукте
@@ -7697,6 +7703,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: Получить доступный более новый релиз
@@ -7729,6 +7737,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Сбросить все наборы AI-функций
@@ -7767,6 +7777,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Установить все наборы функций, которые нужны инструменту
@@ -20708,6 +20720,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Список пользователей SCIM
@@ -20717,6 +20731,8 @@ paths:
           description: Список пользователей SCIM
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Создание пользователя SCIM
@@ -20727,6 +20743,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Получить пользователя SCIM
@@ -20742,6 +20760,8 @@ paths:
           description: Пользователь SCIM
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Обновление пользователя SCIM
@@ -20757,6 +20777,8 @@ paths:
           description: Пользователь SCIM обновлён
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Удаление пользователя SCIM
@@ -20772,6 +20794,8 @@ paths:
           description: Пользователь SCIM деактивирован
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Частично обновить пользователя SCIM
@@ -20836,6 +20860,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Список групп SCIM
@@ -20845,6 +20871,8 @@ paths:
           description: Список групп SCIM
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Создание группы SCIM
@@ -20855,6 +20883,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Получить группу SCIM
@@ -20870,6 +20900,8 @@ paths:
           description: Группа SCIM
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Обновление группы SCIM
@@ -20885,6 +20917,8 @@ paths:
           description: Группа SCIM обновлена
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Удаление группы SCIM
@@ -20900,6 +20934,8 @@ paths:
           description: Группа SCIM удалена
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Частично обновить группу SCIM

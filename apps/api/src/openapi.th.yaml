@@ -7234,6 +7234,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: ดูสถานะของงาน
@@ -7281,6 +7283,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: ความคืบหน้าของงาน (SSE)
@@ -7589,6 +7593,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: ส่งความคิดเห็นเกี่ยวกับผลิตภัณฑ์
@@ -7654,6 +7660,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: ดูรีลีสใหม่ที่พร้อมใช้งาน
@@ -7686,6 +7694,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: รีเซ็ตชุดฟีเจอร์ AI ทั้งหมด
@@ -7724,6 +7734,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: ติดตั้งชุดฟีเจอร์ทั้งหมดที่เครื่องมือต้องใช้
@@ -20633,6 +20645,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: แสดงผู้ใช้ SCIM
@@ -20642,6 +20656,8 @@ paths:
           description: รายการผู้ใช้ SCIM
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: สร้างผู้ใช้ SCIM
@@ -20652,6 +20668,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: รับผู้ใช้ SCIM
@@ -20667,6 +20685,8 @@ paths:
           description: ผู้ใช้ SCIM
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: อัปเดตผู้ใช้ SCIM
@@ -20682,6 +20702,8 @@ paths:
           description: อัปเดตผู้ใช้ SCIM แล้ว
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: ลบผู้ใช้ SCIM
@@ -20697,6 +20719,8 @@ paths:
           description: ปิดการใช้งานผู้ใช้ SCIM แล้ว
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: อัปเดตผู้ใช้ SCIM บางส่วน
@@ -20761,6 +20785,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: แสดงกลุ่ม SCIM
@@ -20770,6 +20796,8 @@ paths:
           description: รายการกลุ่ม SCIM
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: สร้างกลุ่ม SCIM
@@ -20780,6 +20808,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: รับกลุ่ม SCIM
@@ -20795,6 +20825,8 @@ paths:
           description: กลุ่ม SCIM
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: อัปเดตกลุ่ม SCIM
@@ -20810,6 +20842,8 @@ paths:
           description: อัปเดตกลุ่ม SCIM แล้ว
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: ลบกลุ่ม SCIM
@@ -20825,6 +20859,8 @@ paths:
           description: ลบกลุ่ม SCIM แล้ว
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: อัปเดตกลุ่ม SCIM บางส่วน

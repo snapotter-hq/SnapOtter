@@ -7141,6 +7141,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags: [Jobs]
       summary: Get job status
       description: |
@@ -7188,6 +7190,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags: [System]
       summary: Job progress (SSE)
       description: >
@@ -7468,6 +7472,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags: [System]
       summary: Submit product feedback
       description: Records one feedback event from the signed-in user. Limited to 10 requests per minute. `accepted` is false when the server did not record the event.
@@ -7530,6 +7536,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags: [Admin]
       summary: Get the newer release available
       description: Returns the newest published release when it is newer than the running version, or null. Requires settings:write.
@@ -7561,6 +7569,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags: [Features]
       summary: Reset all AI feature bundles
       description: |
@@ -7599,6 +7609,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags: [Features]
       summary: Install every feature bundle a tool needs
       description: Queues each bundle the tool requires and reports, per bundle, whether it was queued or skipped. Requires features:manage.
@@ -20309,6 +20321,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: List SCIM users
       description: List SCIM users. Requires the SCIM bearer token.
@@ -20317,6 +20331,8 @@ paths:
           description: SCIM user list
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Create SCIM user
       description: Create a SCIM user. Requires the SCIM bearer token.
@@ -20327,6 +20343,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Get SCIM user
       description: Get a SCIM user by ID. Requires the SCIM bearer token.
@@ -20341,6 +20359,8 @@ paths:
           description: SCIM user
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Update SCIM user
       description: Replace a SCIM user by ID. Requires the SCIM bearer token.
@@ -20355,6 +20375,8 @@ paths:
           description: SCIM user updated
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Delete SCIM user
       description: Soft deactivate a SCIM user by ID. Requires the SCIM bearer token.
@@ -20370,6 +20392,8 @@ paths:
 
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Partially update a SCIM user
       description: RFC 7644 PatchOp. Supports add, remove, and replace on the paths the server allows. Users paths are validated per operation.
@@ -20429,6 +20453,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: List SCIM groups
       description: List SCIM groups. Requires the SCIM bearer token.
@@ -20437,6 +20463,8 @@ paths:
           description: SCIM group list
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Create SCIM group
       description: Create a SCIM group. Requires the SCIM bearer token.
@@ -20447,6 +20475,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Get SCIM group
       description: Get a SCIM group by ID. Requires the SCIM bearer token.
@@ -20461,6 +20491,8 @@ paths:
           description: SCIM group
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Update SCIM group
       description: Replace a SCIM group by ID. Requires the SCIM bearer token.
@@ -20475,6 +20507,8 @@ paths:
           description: SCIM group updated
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Delete SCIM group
       description: Delete a SCIM group by ID. Requires the SCIM bearer token.
@@ -20490,6 +20524,8 @@ paths:
 
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags: [Enterprise]
       summary: Partially update a SCIM group
       description: RFC 7644 PatchOp. Supports add, remove, and replace on the paths the server allows. Group members are validated per operation.

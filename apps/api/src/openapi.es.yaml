@@ -7270,6 +7270,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: Obtener el estado del trabajo
@@ -7317,6 +7319,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Progreso del trabajo (SSE)
@@ -7632,6 +7636,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Enviar comentarios sobre el producto
@@ -7697,6 +7703,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: Obtener la versión más reciente disponible
@@ -7729,6 +7737,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Restablecer todos los paquetes de funciones de IA
@@ -7767,6 +7777,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Instalar todos los paquetes de funciones que necesita una herramienta
@@ -20708,6 +20720,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Listar usuarios SCIM
@@ -20717,6 +20731,8 @@ paths:
           description: Lista de usuarios de SCIM
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Crear usuario SCIM
@@ -20727,6 +20743,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Obtener usuario SCIM
@@ -20742,6 +20760,8 @@ paths:
           description: Usuario de SCIM
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Actualizar usuario SCIM
@@ -20757,6 +20777,8 @@ paths:
           description: Usuario de SCIM actualizado
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Eliminar usuario SCIM
@@ -20772,6 +20794,8 @@ paths:
           description: Usuario de SCIM desactivado
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Actualizar parcialmente un usuario SCIM
@@ -20836,6 +20860,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Listar grupos SCIM
@@ -20845,6 +20871,8 @@ paths:
           description: Lista de grupos de SCIM
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Crear grupo SCIM
@@ -20855,6 +20883,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Obtener grupo SCIM
@@ -20870,6 +20900,8 @@ paths:
           description: Grupo de SCIM
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Actualizar grupo SCIM
@@ -20885,6 +20917,8 @@ paths:
           description: Grupo de SCIM actualizado
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Eliminar grupo SCIM
@@ -20900,6 +20934,8 @@ paths:
           description: Grupo de SCIM eliminado
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Actualizar parcialmente un grupo SCIM

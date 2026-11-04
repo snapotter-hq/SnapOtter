@@ -7270,6 +7270,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: İş durumunu al
@@ -7317,6 +7319,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: İş ilerlemesi (SSE)
@@ -7630,6 +7634,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: Ürün geri bildirimi gönder
@@ -7695,6 +7701,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: Kullanılabilir daha yeni sürümü al
@@ -7727,6 +7735,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Tüm AI özellik paketlerini sıfırla
@@ -7765,6 +7775,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: Bir aracın ihtiyaç duyduğu tüm özellik paketlerini kur
@@ -20705,6 +20717,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM kullanıcılarını listele
@@ -20714,6 +20728,8 @@ paths:
           description: SCIM kullanıcı listesi
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM kullanıcısı oluştur
@@ -20724,6 +20740,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM kullanıcısını al
@@ -20739,6 +20757,8 @@ paths:
           description: SCIM kullanıcısı
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM kullanıcısını güncelle
@@ -20754,6 +20774,8 @@ paths:
           description: SCIM kullanıcısı güncellendi
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM kullanıcısını sil
@@ -20769,6 +20791,8 @@ paths:
           description: SCIM kullanıcısı devre dışı bırakıldı
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Bir SCIM kullanıcısını kısmen güncelle
@@ -20833,6 +20857,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM gruplarını listele
@@ -20842,6 +20868,8 @@ paths:
           description: SCIM grup listesi
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM grubu oluştur
@@ -20852,6 +20880,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM grubunu al
@@ -20867,6 +20897,8 @@ paths:
           description: SCIM grubu
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM grubunu güncelle
@@ -20882,6 +20914,8 @@ paths:
           description: SCIM grubu güncellendi
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM grubunu sil
@@ -20897,6 +20931,8 @@ paths:
           description: SCIM grubu silindi
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: Bir SCIM grubunu kısmen güncelle

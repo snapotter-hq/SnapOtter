@@ -7234,6 +7234,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: 取得工作狀態
@@ -7281,6 +7283,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: 工作進度（SSE）
@@ -7589,6 +7593,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: 提交產品回饋
@@ -7654,6 +7660,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: 取得可用的較新版本
@@ -7686,6 +7694,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: 重設所有 AI 功能套件
@@ -7724,6 +7734,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: 安裝工具所需的所有功能套件
@@ -20617,6 +20629,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 列出 SCIM 使用者
@@ -20626,6 +20640,8 @@ paths:
           description: SCIM 使用者清單
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 建立 SCIM 使用者
@@ -20636,6 +20652,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 取得 SCIM 使用者
@@ -20651,6 +20669,8 @@ paths:
           description: SCIM 使用者
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 更新 SCIM 使用者
@@ -20666,6 +20686,8 @@ paths:
           description: SCIM 使用者已更新
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 刪除 SCIM 使用者
@@ -20681,6 +20703,8 @@ paths:
           description: SCIM 使用者已停用
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 部分更新 SCIM 使用者
@@ -20745,6 +20769,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 列出 SCIM 群組
@@ -20754,6 +20780,8 @@ paths:
           description: SCIM 群組清單
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 建立 SCIM 群組
@@ -20764,6 +20792,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 取得 SCIM 群組
@@ -20779,6 +20809,8 @@ paths:
           description: SCIM 群組
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 更新 SCIM 群組
@@ -20794,6 +20826,8 @@ paths:
           description: SCIM 群組已更新
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 刪除 SCIM 群組
@@ -20809,6 +20843,8 @@ paths:
           description: SCIM 群組已刪除
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: 部分更新 SCIM 群組
