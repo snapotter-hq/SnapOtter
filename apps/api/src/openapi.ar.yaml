@@ -7269,6 +7269,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: الحصول على حالة المهمة
@@ -7316,6 +7318,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: تقدم المهمة (SSE)
@@ -7632,6 +7636,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: إرسال ملاحظات حول المنتج
@@ -7697,6 +7703,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: الحصول على الإصدار الأحدث المتاح
@@ -7729,6 +7737,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: إعادة ضبط كل حزم ميزات الذكاء الاصطناعي
@@ -7767,6 +7777,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: تثبيت كل حزم الميزات التي تحتاجها أداة
@@ -20708,6 +20720,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: سرد مستخدمي SCIM
@@ -20717,6 +20731,8 @@ paths:
           description: قائمة مستخدمي SCIM
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: إنشاء مستخدم SCIM
@@ -20727,6 +20743,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: الحصول على مستخدم SCIM
@@ -20742,6 +20760,8 @@ paths:
           description: مستخدم SCIM
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: تحديث مستخدم SCIM
@@ -20757,6 +20777,8 @@ paths:
           description: تم تحديث مستخدم SCIM
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: حذف مستخدم SCIM
@@ -20772,6 +20794,8 @@ paths:
           description: تم تعطيل مستخدم SCIM
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: تحديث جزئي لمستخدم SCIM
@@ -20836,6 +20860,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: سرد مجموعات SCIM
@@ -20845,6 +20871,8 @@ paths:
           description: قائمة مجموعات SCIM
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: إنشاء مجموعة SCIM
@@ -20855,6 +20883,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: الحصول على مجموعة SCIM
@@ -20870,6 +20900,8 @@ paths:
           description: مجموعة SCIM
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: تحديث مجموعة SCIM
@@ -20885,6 +20917,8 @@ paths:
           description: تم تحديث مجموعة SCIM
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: حذف مجموعة SCIM
@@ -20900,6 +20934,8 @@ paths:
           description: تم حذف مجموعة SCIM
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: تحديث جزئي لمجموعة SCIM

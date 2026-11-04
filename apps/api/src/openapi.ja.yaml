@@ -7235,6 +7235,8 @@ paths:
   /api/v1/jobs/{jobId}:
     get:
       operationId: getJobStatus
+      security:
+        - bearerAuth: []
       tags:
         - Jobs
       summary: ジョブのステータスを取得
@@ -7282,6 +7284,8 @@ paths:
   /api/v1/jobs/{jobId}/progress:
     get:
       operationId: getJobProgress
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: ジョブ進捗（SSE）
@@ -7590,6 +7594,8 @@ paths:
   /api/v1/feedback:
     post:
       operationId: submitFeedback
+      security:
+        - bearerAuth: []
       tags:
         - System
       summary: 製品フィードバックを送信
@@ -7655,6 +7661,8 @@ paths:
   /api/v1/admin/latest-release:
     get:
       operationId: getLatestRelease
+      security:
+        - bearerAuth: []
       tags:
         - Admin
       summary: 利用可能な新しいリリースを取得
@@ -7687,6 +7695,8 @@ paths:
   /api/v1/admin/features/reset:
     post:
       operationId: resetFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: すべての AI 機能バンドルをリセット
@@ -7725,6 +7735,8 @@ paths:
   /api/v1/admin/tools/{toolId}/features/install:
     post:
       operationId: installToolFeatures
+      security:
+        - bearerAuth: []
       tags:
         - Features
       summary: ツールに必要なすべての機能バンドルをインストール
@@ -20635,6 +20647,8 @@ paths:
   /api/v1/scim/v2/Users:
     get:
       operationId: listScimUsers
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーの一覧
@@ -20644,6 +20658,8 @@ paths:
           description: SCIM ユーザーの一覧
     post:
       operationId: createScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーの作成
@@ -20654,6 +20670,8 @@ paths:
   /api/v1/scim/v2/Users/{id}:
     get:
       operationId: getScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーの取得
@@ -20669,6 +20687,8 @@ paths:
           description: SCIM ユーザー
     put:
       operationId: updateScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーの更新
@@ -20684,6 +20704,8 @@ paths:
           description: SCIM ユーザーを更新しました
     delete:
       operationId: deleteScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーの削除
@@ -20699,6 +20721,8 @@ paths:
           description: SCIM ユーザーを無効化しました
     patch:
       operationId: patchScimUser
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM ユーザーを部分更新
@@ -20763,6 +20787,8 @@ paths:
   /api/v1/scim/v2/Groups:
     get:
       operationId: listScimGroups
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループの一覧
@@ -20772,6 +20798,8 @@ paths:
           description: SCIM グループの一覧
     post:
       operationId: createScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループの作成
@@ -20782,6 +20810,8 @@ paths:
   /api/v1/scim/v2/Groups/{id}:
     get:
       operationId: getScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループの取得
@@ -20797,6 +20827,8 @@ paths:
           description: SCIM グループ
     put:
       operationId: updateScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループの更新
@@ -20812,6 +20844,8 @@ paths:
           description: SCIM グループを更新しました
     delete:
       operationId: deleteScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループの削除
@@ -20827,6 +20861,8 @@ paths:
           description: SCIM グループを削除しました
     patch:
       operationId: patchScimGroup
+      security:
+        - bearerAuth: []
       tags:
         - Enterprise
       summary: SCIM グループを部分更新
