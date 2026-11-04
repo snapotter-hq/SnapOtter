@@ -7118,3 +7118,85 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
     expect(jobsTotalIncMock.mock.calls).toEqual([[{ pool: "image", status: "canceled" }]]);
   });
 });
+
+describe("Worker error log throttle (#4360)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  type ErrorListener = (err: Error) => void;
+
+  /** Start the workers against mocks and return each queue's "error" listener. */
+  async function errorListeners(): Promise<{
+    listeners: Map<string, ErrorListener>;
+    loggerError: ReturnType<typeof vi.fn>;
+  }> {
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    workerMod.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: { on: { mock: { calls: unknown[][] } } } }[] };
+    };
+    const listeners = new Map<string, ErrorListener>();
+    workerMock.mock.calls.forEach((call, i) => {
+      const onError = workerMock.mock.results[i].value.on.mock.calls.find((c) => c[0] === "error");
+      if (onError) listeners.set(call[0] as string, onError[1] as ErrorListener);
+    });
+    return { listeners, loggerError: logger.error as unknown as ReturnType<typeof vi.fn> };
+  }
+
+  function workerErrorLogs(loggerError: ReturnType<typeof vi.fn>) {
+    return loggerError.mock.calls.filter((c) => c[1] === "Worker error");
+  }
+
+  function misconf(): Error {
+    return Object.assign(
+      new Error("MISCONF Errors writing to the AOF file: No space left on device"),
+      { name: "ReplyError" },
+    );
+  }
+
+  it("logs one line per pool for a burst of Redis errors instead of one per event", async () => {
+    vi.useFakeTimers();
+    const { listeners, loggerError } = await errorListeners();
+    expect(listeners.size).toBe(5);
+
+    for (const listener of listeners.values()) {
+      for (let i = 0; i < 1_000; i++) listener(misconf());
+    }
+
+    const logs = workerErrorLogs(loggerError);
+    expect(logs).toHaveLength(5);
+    expect(new Set(logs.map((c) => (c[0] as { pool: string }).pool)).size).toBe(5);
+  });
+
+  it("reports how many errors it held back once the window has passed", async () => {
+    vi.useFakeTimers();
+    const { listeners, loggerError } = await errorListeners();
+    const system = [...listeners.entries()].find(([queue]) => queue.endsWith("system"))?.[1];
+    if (!system) throw new Error("no error listener for the system pool");
+
+    for (let i = 0; i < 250; i++) system(misconf());
+    vi.advanceTimersByTime(30_000);
+    system(misconf());
+
+    const logs = workerErrorLogs(loggerError);
+    expect(logs).toHaveLength(2);
+    expect(logs[0][0]).not.toHaveProperty("suppressed");
+    expect(logs[1][0]).toMatchObject({ pool: "system", suppressed: 249 });
+  });
+});

@@ -42,6 +42,7 @@ import { createBullMQConnection } from "./connection.js";
 import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import { POOLS, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 import { processBatchChild, processBatchFinalize } from "./worker-batch.js";
+import { createWorkerErrorLogger } from "./worker-error-log.js";
 import {
   isCanceledPipelineFlow,
   processPipelineFinalize,
@@ -92,9 +93,7 @@ export function startWorkers(): void {
         stalledInterval: 30_000,
       });
 
-      worker.on("error", (err) => {
-        logger.error({ err, pool }, "Worker error");
-      });
+      worker.on("error", createWorkerErrorLogger(pool));
 
       worker.on("failed", (job, err) => {
         if (!job) return;
@@ -198,9 +197,7 @@ export function startWorkers(): void {
       stalledInterval: 30_000,
     });
 
-    worker.on("error", (err) => {
-      logger.error({ err, pool }, "Worker error");
-    });
+    worker.on("error", createWorkerErrorLogger(pool));
 
     worker.on("failed", (job, err) => {
       if (!job) return;
