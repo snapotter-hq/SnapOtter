@@ -593,6 +593,45 @@ describe("createToolRoute", () => {
       // This validates the guard code path exists without false positives.
     });
 
+    it("answers 501 for a bundle the settings need, and skips the job (#4303)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      const missingBundle = vi.fn((s: unknown) =>
+        (s as { mode?: string }).mode === "face" ? "face-detection" : null,
+      );
+      createToolRoute(app as never, { ...makeMockConfig(id), missingBundle } as never);
+      const handler = app.routes[apiToolPath(id)];
+
+      const faceReply = createMockReply();
+      await handler(
+        createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          settings: JSON.stringify({ mode: "face" }),
+        }),
+        faceReply,
+      );
+      expect(faceReply.status).toHaveBeenCalledWith(501);
+      expect(faceReply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "FEATURE_NOT_INSTALLED",
+          feature: "face-detection",
+          featureName: "Face Detection",
+        }),
+      );
+      expect(enqueueToolJob).not.toHaveBeenCalled();
+
+      const trimReply = createMockReply();
+      await handler(
+        createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          settings: JSON.stringify({ mode: "trim" }),
+        }),
+        trimReply,
+      );
+      expect(trimReply.status).not.toHaveBeenCalledWith(501);
+      expect(enqueueToolJob).toHaveBeenCalledTimes(1);
+    });
+
     it("returns 501 naming the first missing extra bundle for multi-bundle AI tools", async () => {
       vi.mocked(isToolInstalled).mockReturnValueOnce(false);
       vi.mocked(getFirstMissingBundleForTool).mockReturnValueOnce("face-detection");

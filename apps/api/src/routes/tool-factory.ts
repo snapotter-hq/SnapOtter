@@ -130,6 +130,14 @@ export interface ToolRouteConfig<T> {
    * When absent, the tool's modality drives a single handler as before.
    */
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
+  /**
+   * For a tool whose bundle is needed only by some settings (smart-crop's face
+   * mode): the id of the bundle these settings need but that is not installed,
+   * or null. A bundle id answers with the standard 501 FEATURE_NOT_INSTALLED
+   * before any job is enqueued. Direct processV2 callers (batch, pipelines)
+   * skip it, so the process function must refuse the same case itself.
+   */
+  missingBundle?: (settings: T) => string | null;
   /** Zod schema that validates the settings JSON from the request. */
   settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
@@ -579,6 +587,18 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             }
             throw err;
           }
+        }
+
+        const settingsBundleId = config.missingBundle?.(settings);
+        if (settingsBundleId) {
+          const bundle = FEATURE_BUNDLES[settingsBundleId];
+          return reply.status(501).send({
+            error: "Feature not installed",
+            code: "FEATURE_NOT_INSTALLED",
+            feature: settingsBundleId,
+            featureName: bundle?.name ?? settingsBundleId,
+            estimatedSize: bundle?.estimatedSize ?? "unknown",
+          });
         }
 
         // Guard: check if the tool's AI feature bundle is installed
