@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compactFileNotes,
   pickBatchFileNotes,
+  pickChildFileNotes,
 } from "../../../apps/api/src/lib/batch-file-notes.js";
 
 // #1292: a batch reports a note only for a file with something to warn about,
@@ -101,5 +102,44 @@ describe("pickBatchFileNotes: skipped Deep Enhance", () => {
         resizedTo: { width: 10, height: 10 },
       }),
     ).toEqual({ deepEnhanceSkipped: "failed", targetKb: 20, resizedTo: { width: 10, height: 10 } });
+  });
+});
+
+// #1374: a pipeline child's stored result is { stepsCompleted, steps }, with
+// each step's note under steps[k].notes.
+describe("pickChildFileNotes", () => {
+  it("lifts a missed target out of a pipeline child's steps", () => {
+    expect(
+      pickChildFileNotes({
+        stepsCompleted: 2,
+        steps: [
+          { step: 1, toolId: "resize", size: 9 },
+          { step: 2, toolId: "compress-pdf", size: 8, notes: { targetKb: 100, targetMet: false } },
+        ],
+      }),
+    ).toEqual({ targetKb: 100, targetMet: false });
+  });
+
+  it("merges every step's notes, a later step overriding an earlier field", () => {
+    expect(
+      pickChildFileNotes({
+        steps: [
+          { notes: { resizedTo: { width: 10, height: 5 }, targetMet: false, targetKb: 1 } },
+          { notes: { targetMet: false, targetKb: 2 } },
+        ],
+      }),
+    ).toEqual({ resizedTo: { width: 10, height: 5 }, targetMet: false, targetKb: 2 });
+  });
+
+  it("gives nothing when no step has a note", () => {
+    expect(pickChildFileNotes({ steps: [{ step: 1, toolId: "resize", size: 9 }] })).toBeUndefined();
+  });
+
+  it("reads a plain tool child's result as before", () => {
+    expect(pickChildFileNotes({ targetKb: 100, targetMet: false })).toEqual({
+      targetKb: 100,
+      targetMet: false,
+    });
+    expect(pickChildFileNotes(null)).toBeUndefined();
   });
 });

@@ -37,6 +37,7 @@ import {
   type ToolJobResult,
 } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
+import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import {
   type BatchFault,
@@ -2038,6 +2039,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   filename: string;
                   size: number;
                   fileResults: Record<string, string>;
+                  fileNotes?: Record<string, unknown>;
                 };
               }
             | undefined;
@@ -2092,6 +2094,16 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             "Content-Length": String(zip.size),
             "X-Job-Id": progressJobId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
+            // Per-file notes from each file's steps (a missed compress target,
+            // a Deep Enhance that didn't run), keyed like X-File-Results (#1374).
+            "X-File-Notes": encodeURIComponent(
+              JSON.stringify(
+                compactFileNotes(
+                  (zip.fileNotes ?? {}) as Record<string, BatchFileNotes>,
+                  zip.fileResults,
+                ),
+              ),
+            ),
             ...getSecurityHeaders(),
           });
 

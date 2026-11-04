@@ -57,6 +57,25 @@ export function pickBatchFileNotes(
 }
 
 /**
+ * The note for one batch child's stored result. A pipeline child's result is
+ * `{ stepsCompleted, steps }` with each step's note under `steps[k].notes`
+ * (#1374), so the steps' notes are merged in order, a later step overriding an
+ * earlier one's field. Any other child's result is picked directly.
+ */
+export function pickChildFileNotes(
+  result: Record<string, unknown> | null | undefined,
+): BatchFileNotes | undefined {
+  const steps = result?.steps;
+  if (!Array.isArray(steps)) return pickBatchFileNotes(result);
+  const merged: BatchFileNotes = {};
+  for (const step of steps) {
+    const notes = (step as { notes?: BatchFileNotes } | null)?.notes;
+    if (notes && typeof notes === "object") Object.assign(merged, notes);
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+/**
  * The X-File-Notes map as sent in the header: a single FILE_NOTES_ALL_FILES
  * entry when every file with a result carries the same note, otherwise the
  * per-file map unchanged. A batch of 500 files the bundle can't deep-enhance
