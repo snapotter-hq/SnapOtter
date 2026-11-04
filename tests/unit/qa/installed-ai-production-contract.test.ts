@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readExpandedAiBundlesWorkflow } from "../../helpers/ai-bundles-workflow.js";
 
 const ROOT = process.cwd();
 const DOLLAR = "$";
 
 describe("installed AI production-container release lane", () => {
   it("runs for release calls, manual dispatch, and a weekly schedule", () => {
-    const workflow = readFileSync(join(ROOT, ".github/workflows/ai-bundles.yml"), "utf8");
+    const workflow = readExpandedAiBundlesWorkflow(ROOT);
 
     expect(workflow).toContain("workflow_call:");
     expect(workflow).toContain("workflow_dispatch:");
@@ -20,7 +21,7 @@ describe("installed AI production-container release lane", () => {
   });
 
   it("uses exact run-scoped resources and always cleans only those resources", () => {
-    const workflow = readFileSync(join(ROOT, ".github/workflows/ai-bundles.yml"), "utf8");
+    const workflow = readExpandedAiBundlesWorkflow(ROOT);
     const lane = workflow.slice(workflow.indexOf("  installed-ai-production:"));
 
     expect(lane).toContain(`sha256:${DOLLAR}{IMAGE_DIGEST}`);
@@ -77,7 +78,7 @@ describe("installed AI production-container release lane", () => {
     expect(config).toContain("self-hosted-runner:");
     expect(config).toContain("snapotter-nvidia");
 
-    const workflow = readFileSync(join(ROOT, ".github/workflows/ai-bundles.yml"), "utf8");
+    const workflow = readExpandedAiBundlesWorkflow(ROOT);
     expect(workflow).not.toContain("queue: max");
   });
 });
