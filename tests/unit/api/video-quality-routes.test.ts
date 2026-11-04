@@ -229,7 +229,7 @@ describe("compress-video and convert-video on a VAAPI host (#3977)", () => {
     });
     expect(args.slice(0, 2)).toEqual(["-vaapi_device", "/dev/dri/renderD128"]);
     expect(args.filter((a) => a === "-vf")).toHaveLength(1);
-    expect(flagValue(args, "-vf")).toBe("scale=-2:720,format=nv12,hwupload");
+    expect(flagValue(args, "-vf")).toBe("scale=-2:'min(ih,720)',format=nv12,hwupload");
     expect(flagValue(args, "-c:v")).toBe("h264_vaapi");
     expect(args).not.toContain("-pix_fmt");
   });
