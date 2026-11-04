@@ -685,7 +685,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? timeoutMessage(deadline.timeoutMs())
+          ? timeoutMessage(deadline.timeoutMs(), data.pool)
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see
