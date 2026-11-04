@@ -141,12 +141,12 @@ describe("upload responses in the API reference (#1422)", () => {
     await app.close();
     expect(res.statusCode).toBe(200);
 
-    // "- `413` <dash> <description>", one line per documented response.
-    const responseLines = res.body.split("\n").filter((line) => /^- `\d{3}` \S /.test(line));
+    // "- `413`: <description>", one line per documented response.
+    const responseLines = res.body.split("\n").filter((line) => /^- `\d{3}`: \S/.test(line));
     expect(responseLines.length).toBeGreaterThan(1000);
-    expect(responseLines.filter((line) => /^- `\d{3}` \S\s*$/.test(line))).toEqual([]);
+    expect(responseLines.filter((line) => /^- `\d{3}`:\s*$/.test(line))).toEqual([]);
 
     const resize = res.body.split("### POST /api/v1/tools/image/resize ")[1]?.split("\n### ")[0];
-    expect(resize).toMatch(/^- `413` \S .*MAX_UPLOAD_SIZE_MB/m);
+    expect(resize).toMatch(/^- `413`: .*MAX_UPLOAD_SIZE_MB/m);
   });
 });
