@@ -7,6 +7,10 @@ import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import { expandAiBundlesScripts } from "../../helpers/ai-bundles-workflow.js";
+import {
+  readReleaseWorkflowWithScripts,
+  releaseScriptPath,
+} from "../../helpers/release-workflow.js";
 
 const root = process.cwd();
 
@@ -180,7 +184,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("scans and inventories both architecture-specific release images", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const scanJob = job(workflow, "scan", "sbom");
     const sbomJob = job(workflow, "sbom", "ai-bundles");
 
@@ -1123,7 +1127,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("keeps public image tags behind the verified signed-index gate", () => {
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const releaseJob = job(release, "release", "prebuilt");
     const docker = job(release, "docker", "scan");
     const aiBundles = job(release, "ai-bundles", "manifest");
@@ -1165,7 +1169,7 @@ describe("OCR v3 bundle release workflow", () => {
 
   it("rejects non-canonical public-key base64 at the earliest release boundaries", () => {
     const bundles = readBundlesWorkflow();
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const bundleValidation = job(bundles, "validate-inputs", "build-ocr");
     const releaseValidation = job(release, "release", "prebuilt");
 
@@ -1231,7 +1235,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("binds every downstream checkout to one peeled release commit", () => {
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const bundles = readBundlesWorkflow();
     const releaseJob = job(release, "release", "prebuilt");
 
@@ -1331,7 +1335,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("repairs and verifies an immutable reused image digest in both registries", () => {
-    const dockerJob = job(readRequired(releaseWorkflowPath), "docker", "scan");
+    const dockerJob = job(readReleaseWorkflowWithScripts(root), "docker", "scan");
 
     expect(dockerJob).toContain('ghcr_ref="ghcr.io/snapotter-hq/snapotter"');
     expect(dockerJob).toContain('dockerhub_ref="snapotter/snapotter"');
@@ -1357,16 +1361,19 @@ describe("OCR v3 bundle release workflow", () => {
     expect(releaseShellReady, "CI must provide bash 4+, jq and sha256sum for this harness").toBe(
       true,
     );
-    const dockerJob = job(readRequired(releaseWorkflowPath), "docker", "scan");
+    const dockerJob = job(readReleaseWorkflowWithScripts(root), "docker", "scan");
     const stepName = "Reuse an existing published platform digest";
     const stepStart = dockerJob.indexOf(`      - name: ${stepName}\n`);
     expect(stepStart).toBeGreaterThanOrEqual(0);
-    const runStart = dockerJob.indexOf("        run: |\n", stepStart);
+    const runStart = dockerJob.indexOf(
+      "        run: bash scripts/release/reuse-platform-digest.sh\n",
+      stepStart,
+    );
     expect(runStart).toBeGreaterThan(stepStart);
-    const bodyStart = runStart + "        run: |\n".length;
-    const nextStep = dockerJob.indexOf("\n      - name:", bodyStart);
-    expect(nextStep).toBeGreaterThan(bodyStart);
-    const script = dockerJob.slice(bodyStart, nextStep).replace(/^ {10}/gm, "");
+    const nextStep = dockerJob.indexOf("\n      - name:", runStart);
+    expect(nextStep).toBeGreaterThan(runStart);
+    // The step body lives in scripts/release/ (#4452); run that file the way the step does.
+    const scriptPath = releaseScriptPath(root, "reuse-platform-digest.sh");
 
     const releaseCommit = "a".repeat(40);
     const wrongCommit = "b".repeat(40);
@@ -1382,8 +1389,6 @@ describe("OCR v3 bundle release workflow", () => {
     const tempRoot = mkdtempSync(path.join(tmpdir(), "snapotter-release-provenance-"));
     const binDir = path.join(tempRoot, "bin");
     execFileSync("mkdir", ["-p", binDir]);
-    const scriptPath = path.join(tempRoot, "reuse.sh");
-    writeFileSync(scriptPath, script, { mode: 0o700 });
     writeFileSync(
       path.join(binDir, "docker"),
       [
@@ -1487,7 +1492,7 @@ describe("OCR v3 bundle release workflow", () => {
       execFileSync("mkdir", ["-p", stateDir]);
       let exitCode = 0;
       try {
-        execFileSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", scriptPath], {
+        execFileSync("bash", ["--noprofile", "--norc", scriptPath], {
           env: {
             ...process.env,
             PATH: `${binDir}:${process.env.PATH ?? ""}`,
@@ -1688,7 +1693,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("cannot publish manifests from recovered checkpoints without provenance revalidation", () => {
-    const manifestJob = job(readRequired(releaseWorkflowPath), "manifest", "aliases");
+    const manifestJob = job(readReleaseWorkflowWithScripts(root), "manifest", "aliases");
     const recovery = manifestJob.indexOf(
       "Recover expired digest artifacts from the GitHub release",
     );
@@ -1727,7 +1732,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("serializes mutation boundaries without locking the approval-gated manifest", () => {
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const releaseJob = job(release, "release", "prebuilt");
     const prebuiltJob = job(release, "prebuilt", "archive-security");
     const dockerJob = job(release, "docker", "scan");
@@ -1752,14 +1757,14 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("requires application SBOM completion before publishing public image tags", () => {
-    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "image-provenance");
+    const manifest = job(readReleaseWorkflowWithScripts(root), "manifest", "image-provenance");
     expect(manifest).toContain(
       "needs: [release, prebuilt, archive-security, docker, scan, sbom, ai-bundles]",
     );
   });
 
   it("revalidates the remote release tag after approval and at both immutable publications", () => {
-    const manifest = job(readRequired(releaseWorkflowPath), "manifest", "image-provenance");
+    const manifest = job(readReleaseWorkflowWithScripts(root), "manifest", "image-provenance");
 
     expect(manifest).toContain("ref: ${{ needs.release.outputs.release_commit }}");
     expect(manifest).toContain("persist-credentials: false");
@@ -1784,7 +1789,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("publishes immutable version tags separately and never regresses moving aliases", () => {
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const manifest = job(release, "manifest", "image-provenance");
     const aliases = job(release, "aliases");
 
@@ -1802,19 +1807,30 @@ describe("OCR v3 bundle release workflow", () => {
     expect(aliases).toContain("same_minor");
     expect(aliases).toContain("same_major");
     expect(aliases).toContain('aliases.append("latest")');
-    expect(aliases).toContain("No non-regressing Docker Hub aliases are eligible");
-    expect(aliases).toContain("No non-regressing GHCR aliases are eligible");
-    expect(aliases).toContain('arguments+=("-t" "snapotter/snapotter:${alias}")');
-    expect(aliases).toContain('arguments+=("-t" "ghcr.io/snapotter-hq/snapotter:${alias}")');
+    // Both alias steps run scripts/release/publish-image-aliases.sh; the step
+    // env picks the registry, so the per-registry text is pinned there.
+    const dockerHubAliases = aliases.slice(
+      aliases.indexOf("Fetch and evaluate stable tags immediately before Docker Hub aliases"),
+      aliases.indexOf("Fetch and evaluate stable tags immediately before GHCR aliases"),
+    );
+    const ghcrAliases = aliases.slice(
+      aliases.indexOf("Fetch and evaluate stable tags immediately before GHCR aliases"),
+    );
+    expect(aliases).toContain("No non-regressing ${ALIAS_REGISTRY_LABEL} aliases are eligible");
+    expect(dockerHubAliases).toContain("ALIAS_REGISTRY_LABEL: Docker Hub");
+    expect(ghcrAliases).toContain("ALIAS_REGISTRY_LABEL: GHCR");
+    expect(aliases).toContain('arguments+=("-t" "${ALIAS_IMAGE}:${alias}")');
+    expect(dockerHubAliases).toContain("ALIAS_IMAGE: snapotter/snapotter\n");
+    expect(ghcrAliases).toContain("ALIAS_IMAGE: ghcr.io/snapotter-hq/snapotter\n");
   });
 
   it("computes moving aliases from the highest stable tag in each semver scope", () => {
-    const aliasesJob = job(readRequired(releaseWorkflowPath), "aliases");
-    const embedded = aliasesJob.match(
-      /cat > \/tmp\/eligible-image-aliases\.py <<'PY'\n([\s\S]*?)\n {10}PY/,
+    const aliasesJob = job(readReleaseWorkflowWithScripts(root), "aliases");
+    // The evaluator lives in scripts/release/ (#4452); the job copies it to /tmp.
+    expect(aliasesJob).toContain(
+      "run: cp scripts/release/eligible-image-aliases.py /tmp/eligible-image-aliases.py",
     );
-    expect(embedded).not.toBeNull();
-    const script = embedded?.[1].replace(/^ {10}/gm, "") ?? "";
+    const script = readRequired(releaseScriptPath(root, "eligible-image-aliases.py"));
     const repository = mkdtempSync(path.join(tmpdir(), "snapotter-aliases-"));
     const scriptPath = path.join(repository, "eligible-image-aliases.py");
     const outputPath = path.join(repository, "aliases.txt");
@@ -1860,7 +1876,7 @@ describe("OCR v3 bundle release workflow", () => {
   });
 
   it("builds deterministic immutable prebuilt archive and checksum assets", () => {
-    const release = readRequired(releaseWorkflowPath);
+    const release = readReleaseWorkflowWithScripts(root);
     const prebuilt = job(release, "prebuilt", "archive-security");
     const archiveSecurity = job(release, "archive-security", "docker");
 
