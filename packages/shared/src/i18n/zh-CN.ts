@@ -448,7 +448,7 @@ export const zhCN: TranslationKeys = {
     },
     "color-blindness": {
       name: "色盲模拟",
-      description: "模拟不同类型色觉缺陷下图片的显示效果",
+      description: "模拟图像在色觉缺陷下的显示效果",
     },
     "remove-background": {
       name: "移除背景",
@@ -458,7 +458,7 @@ export const zhCN: TranslationKeys = {
     "erase-object": { name: "物体擦除", description: "AI 智能移除不需要的物体" },
     ocr: {
       name: "从图片提取文字 (OCR)",
-      description: "AI 高精度图片文字识别",
+      description: "从图像中提取文字",
     },
     "ocr-pdf": {
       name: "PDF 文字识别",
@@ -478,7 +478,7 @@ export const zhCN: TranslationKeys = {
     },
     "image-enhancement": {
       name: "图片增强",
-      description: "一键自动优化曝光、对比度、色彩和锐度",
+      description: "通过智能分析一键自动优化",
     },
     "noise-removal": {
       name: "降噪",
@@ -502,11 +502,11 @@ export const zhCN: TranslationKeys = {
     },
     colorize: {
       name: "AI 上色",
-      description: "利用 AI 深度学习模型将黑白照片转为彩色",
+      description: "使用 AI 将黑白照片转为全彩",
     },
     "passport-photo": {
       name: "证件照",
-      description: "自动人脸检测，生成符合各国规格的护照、签证和证件照",
+      description: "AI 驱动的护照和证件照生成器",
     },
     "transcribe-audio": {
       name: "音频转文字",
@@ -534,8 +534,7 @@ export const zhCN: TranslationKeys = {
     compose: { name: "图片合成", description: "通过位置和透明度叠加图层" },
     "meme-generator": {
       name: "Meme 生成器",
-      description:
-        "使用热门模板或自己的图片制作 Meme。经典 Impact 风格文字，可自定义字体、颜色和位置。",
+      description: "使用模板和自定义文字创建表情包",
     },
     info: { name: "图片信息", description: "查看所有元数据和图片属性" },
     compare: { name: "图片对比", description: "两张图片并排对比" },
@@ -573,11 +572,11 @@ export const zhCN: TranslationKeys = {
     },
     border: {
       name: "边框与相框",
-      description: "添加边框、内边距、圆角和阴影，支持一键预设",
+      description: "添加边框、圆角和阴影",
     },
     beautify: {
       name: "截图美化",
-      description: "为截图添加渐变背景、设备外框、阴影和社交媒体尺寸",
+      description: "添加渐变背景、设备边框、阴影和社交媒体尺寸",
     },
     "circle-crop": {
       name: "圆形裁剪",

@@ -637,7 +637,7 @@ export const sv: TranslationKeys = {
     },
     "color-blindness": {
       name: "Färgblindhetssimulering",
-      description: "Simulera hur bilder ser ut vid olika typer av färgseendebrist",
+      description: "Simulera hur bilder ser ut vid nedsatt färgseende",
     },
     "remove-background": {
       name: "Ta bort bakgrund",
@@ -653,7 +653,7 @@ export const sv: TranslationKeys = {
     },
     ocr: {
       name: "Extrahera text från bild (OCR)",
-      description: "Extrahera text från bilder med AI-precision",
+      description: "Extrahera text från bilder",
     },
     "ocr-pdf": {
       name: "Extrahera text från PDF (OCR)",
@@ -673,8 +673,7 @@ export const sv: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Bildförstärkning",
-      description:
-        "Ettklicksförstärkning med smart exponerings-, kontrast-, färg- och skärpekorrigering",
+      description: "Automatisk förbättring med ett klick genom smart analys",
     },
     "noise-removal": {
       name: "Brusborttagning",
@@ -698,12 +697,11 @@ export const sv: TranslationKeys = {
     },
     colorize: {
       name: "AI-färgläggning",
-      description: "Konvertera svartvita foton till färg med AI-djupinlärningsmodeller",
+      description: "Konvertera svartvita foton till full färg med AI",
     },
     "passport-photo": {
       name: "Passfoto",
-      description:
-        "Skapa myndighetsgodkända pass-, visum- och ID-foton med automatisk ansiktsdetektion",
+      description: "AI-driven generator för pass- och ID-foton",
     },
     "transcribe-audio": {
       name: "Transkribera ljud",
@@ -743,8 +741,7 @@ export const sv: TranslationKeys = {
     },
     "meme-generator": {
       name: "Meme-generator",
-      description:
-        "Skapa memes med populära mallar eller egna bilder. Klassisk Impact-stil med anpassningsbara typsnitt, färger och positionering.",
+      description: "Skapa memes med mallar och egen text",
     },
     info: {
       name: "Bildinformation",
@@ -788,12 +785,12 @@ export const sv: TranslationKeys = {
     },
     border: {
       name: "Ram & Kant",
-      description: "Lägg till ramar, utfyllnad, rundade horn och skuggor med ettklicksmallar",
+      description: "Lägg till ramar, rundade hörn och skuggor",
     },
     beautify: {
       name: "Försköna skärmklipp",
       description:
-        "Lägg till tonade bakgrunder, enhetsramar, skuggor och sociala medier-format för skärmklipp",
+        "Lägg till gradientbakgrunder, enhetsramar, skuggor och format för sociala medier",
     },
     "circle-crop": {
       name: "Cirkelbeskärning",

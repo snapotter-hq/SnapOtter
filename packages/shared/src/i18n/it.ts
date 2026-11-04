@@ -635,8 +635,7 @@ export const it: TranslationKeys = {
     },
     "color-blindness": {
       name: "Simulazione daltonismo",
-      description:
-        "Simula come appaiono le immagini con diversi tipi di deficit della visione dei colori",
+      description: "Simula l'aspetto delle immagini con deficit della visione dei colori",
     },
     "remove-background": {
       name: "Rimuovi sfondo",
@@ -652,7 +651,7 @@ export const it: TranslationKeys = {
     },
     ocr: {
       name: "Estrai testo da immagine (OCR)",
-      description: "Estrai testo dalle immagini con precisione basata sull'IA",
+      description: "Estrai il testo dalle immagini",
     },
     "ocr-pdf": {
       name: "OCR PDF",
@@ -672,8 +671,7 @@ export const it: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Miglioramento immagine",
-      description:
-        "Miglioramento automatico con un clic: esposizione, contrasto, colore e nitidezza intelligenti",
+      description: "Miglioramento automatico con un clic grazie all'analisi intelligente",
     },
     "noise-removal": {
       name: "Rimozione rumore",
@@ -698,12 +696,11 @@ export const it: TranslationKeys = {
     },
     colorize: {
       name: "Colorizzazione IA",
-      description: "Converti le foto in bianco e nero a colori usando modelli di deep learning IA",
+      description: "Converti le foto in bianco e nero a colori con l'IA",
     },
     "passport-photo": {
       name: "Foto tessera",
-      description:
-        "Crea foto per passaporto, visto e documenti d'identità conformi ai requisiti ufficiali con rilevamento automatico del volto",
+      description: "Generatore di foto per passaporto e documenti con IA",
     },
     "transcribe-audio": {
       name: "Trascrivi audio",
@@ -743,8 +740,7 @@ export const it: TranslationKeys = {
     },
     "meme-generator": {
       name: "Generatore di Meme",
-      description:
-        "Crea meme con modelli popolari o le tue immagini. Testo classico stile Impact con caratteri, colori e posizionamento personalizzabili.",
+      description: "Crea meme con modelli e testo personalizzato",
     },
     info: {
       name: "Info immagine",
@@ -789,12 +785,12 @@ export const it: TranslationKeys = {
     },
     border: {
       name: "Bordo e cornice",
-      description: "Aggiungi bordi, spaziatura, angoli arrotondati e ombre con preset in un clic",
+      description: "Aggiungi bordi, angoli arrotondati e ombre",
     },
     beautify: {
       name: "Abbellisci screenshot",
       description:
-        "Aggiungi sfondi sfumati, cornici per dispositivi, ombre e dimensioni per social media agli screenshot",
+        "Aggiungi sfondi sfumati, cornici di dispositivi, ombre e dimensioni per i social",
     },
     "circle-crop": {
       name: "Ritaglio Circolare",

@@ -468,7 +468,7 @@ export const hi: TranslationKeys = {
     },
     "color-blindness": {
       name: "कलर ब्लाइंडनेस सिमुलेशन",
-      description: "विभिन्न प्रकार की रंग दृष्टि कमी के साथ इमेज कैसी दिखती हैं, यह सिमुलेट करें",
+      description: "रंग दृष्टि दोष के साथ छवियाँ कैसी दिखती हैं, इसका अनुकरण करें",
     },
     "remove-background": {
       name: "बैकग्राउंड हटाएं",
@@ -484,7 +484,7 @@ export const hi: TranslationKeys = {
     },
     ocr: {
       name: "छवि से टेक्स्ट निकालें (OCR)",
-      description: "AI-संचालित सटीकता से इमेज से टेक्स्ट निकालें",
+      description: "छवियों से टेक्स्ट निकालें",
     },
     "ocr-pdf": {
       name: "PDF OCR",
@@ -504,7 +504,7 @@ export const hi: TranslationKeys = {
     },
     "image-enhancement": {
       name: "इमेज एन्हांसमेंट",
-      description: "स्मार्ट एक्सपोज़र, कंट्रास्ट, रंग और शार्पनेस करेक्शन के साथ वन-क्लिक ऑटो-इम्प्रूव",
+      description: "स्मार्ट विश्लेषण के साथ एक क्लिक में ऑटो-सुधार",
     },
     "noise-removal": {
       name: "नॉइज़ रिमूवल",
@@ -528,11 +528,11 @@ export const hi: TranslationKeys = {
     },
     colorize: {
       name: "AI कलराइज़ेशन",
-      description: "AI डीप लर्निंग मॉडल का उपयोग करके ब्लैक एंड व्हाइट फोटो को रंगीन बनाएं",
+      description: "AI से श्वेत-श्याम फ़ोटो को पूरे रंग में बदलें",
     },
     "passport-photo": {
       name: "पासपोर्ट फोटो",
-      description: "ऑटो फेस डिटेक्शन के साथ सरकारी मानकों के अनुरूप पासपोर्ट, वीज़ा और ID फोटो बनाएं",
+      description: "AI-संचालित पासपोर्ट और ID फ़ोटो जनरेटर",
     },
     "transcribe-audio": {
       name: "ऑडियो ट्रांसक्राइब करें",
@@ -572,8 +572,7 @@ export const hi: TranslationKeys = {
     },
     "meme-generator": {
       name: "Meme जनरेटर",
-      description:
-        "लोकप्रिय टेम्प्लेट या अपनी इमेज से Meme बनाएं। कस्टमाइज़ करने योग्य फॉन्ट, रंग और पोज़िशनिंग के साथ क्लासिक Impact-स्टाइल टेक्स्ट।",
+      description: "टेम्पलेट और कस्टम टेक्स्ट से मीम बनाएँ",
     },
     info: {
       name: "इमेज जानकारी",
@@ -617,11 +616,11 @@ export const hi: TranslationKeys = {
     },
     border: {
       name: "बॉर्डर और फ्रेम",
-      description: "वन-क्लिक प्रीसेट के साथ बॉर्डर, पैडिंग, गोल कोने और शैडो जोड़ें",
+      description: "बॉर्डर, गोल कोने और शैडो जोड़ें",
     },
     beautify: {
       name: "स्क्रीनशॉट ब्यूटीफाई",
-      description: "स्क्रीनशॉट में ग्रेडिएंट बैकग्राउंड, डिवाइस फ्रेम, शैडो और सोशल मीडिया साइज़िंग जोड़ें",
+      description: "ग्रेडिएंट बैकग्राउंड, डिवाइस फ़्रेम, शैडो और सोशल मीडिया साइज़ जोड़ें",
     },
     "circle-crop": {
       name: "गोल क्रॉप",

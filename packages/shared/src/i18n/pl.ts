@@ -633,7 +633,7 @@ export const pl: TranslationKeys = {
     },
     "color-blindness": {
       name: "Symulacja daltonizmu",
-      description: "Symulacja postrzegania obrazów przy różnych typach zaburzeń widzenia kolorów",
+      description: "Symuluj wygląd obrazów przy zaburzeniach widzenia barw",
     },
     "remove-background": {
       name: "Usuwanie tła",
@@ -649,7 +649,7 @@ export const pl: TranslationKeys = {
     },
     ocr: {
       name: "Wyodrębnij tekst z obrazu (OCR)",
-      description: "Wyodrębnianie tekstu z obrazów z dokładnością AI",
+      description: "Wyodrębnij tekst z obrazów",
     },
     "ocr-pdf": {
       name: "PDF OCR",
@@ -669,8 +669,7 @@ export const pl: TranslationKeys = {
     },
     "image-enhancement": {
       name: "Ulepszanie obrazu",
-      description:
-        "Automatyczne ulepszanie jednym kliknięciem: inteligentna korekta ekspozycji, kontrastu, koloru i ostrości",
+      description: "Automatyczna poprawa jednym kliknięciem dzięki inteligentnej analizie",
     },
     "noise-removal": {
       name: "Usuwanie szumu",
@@ -694,13 +693,11 @@ export const pl: TranslationKeys = {
     },
     colorize: {
       name: "Koloryzacja AI",
-      description:
-        "Konwersja zdjęć czarno-białych na kolorowe za pomocą modeli głębokiego uczenia AI",
+      description: "Zamień czarno-białe zdjęcia na kolorowe za pomocą AI",
     },
     "passport-photo": {
       name: "Zdjęcie paszportowe",
-      description:
-        "Tworzenie zdjęć paszportowych, wizowych i do dowodów zgodnych z wymogami z automatycznym wykrywaniem twarzy",
+      description: "Generator zdjęć paszportowych i do dokumentów oparty na AI",
     },
     "transcribe-audio": {
       name: "Transkrypcja audio",
@@ -740,8 +737,7 @@ export const pl: TranslationKeys = {
     },
     "meme-generator": {
       name: "Generator Meme",
-      description:
-        "Tworzenie memów z popularnymi szablonami lub własnymi obrazami. Klasyczny tekst w stylu Impact z konfigurowalnymi czcionkami, kolorami i pozycjonowaniem.",
+      description: "Twórz memy z szablonów i własnym tekstem",
     },
     info: {
       name: "Informacje o obrazie",
@@ -787,13 +783,12 @@ export const pl: TranslationKeys = {
     },
     border: {
       name: "Ramka i obramowanie",
-      description:
-        "Dodawanie ramek, marginesów, zaokrąglonych rogów i cieni z szablonami jednym kliknięciem",
+      description: "Dodaj ramki, zaokrąglone rogi i cienie",
     },
     beautify: {
       name: "Upiększanie zrzutu ekranu",
       description:
-        "Dodawanie gradientowych teł, ramek urządzeń, cieni i rozmiarów dla mediów społecznościowych do zrzutów ekranu",
+        "Dodaj tła z gradientem, ramki urządzeń, cienie i rozmiary do mediów społecznościowych",
     },
     "circle-crop": {
       name: "Kadrowanie do koła",
