@@ -54,8 +54,9 @@ If you are contributing on behalf of your employer and your employer retains IP 
 ### Getting Started
 
 ```bash
-# Fork and clone
-git clone https://github.com/<your-username>/snapotter.git
+# Fork and clone. The history is several GB of test fixtures and visual
+# baselines; a blobless clone downloads old file versions only when needed.
+git clone --filter=blob:none https://github.com/<your-username>/snapotter.git
 cd snapotter
 
 # Install dependencies
