@@ -4,7 +4,7 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 # Changelog {#changelog}
 
-## v2.3.0
+## v2.3.0 {#v2-3-0}
 
 SnapOtter just passed one million image pulls across Docker Hub and GHCR, and 3,000 stars on GitHub. That's a lot of self-hosted servers, so this release is our thank-you to everyone running them.
 
