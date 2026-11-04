@@ -15,6 +15,12 @@ import { z } from "zod";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
+interface FlowTree {
+  opts?: { jobId?: string };
+  data?: { jobId?: string };
+  children?: FlowTree[];
+}
+
 const mocks = vi.hoisted(() => ({
   autoOrient: vi.fn(async (buf: Buffer) => buf),
   deleteObject: vi.fn(async () => {}),
@@ -22,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   flowAdd: vi.fn(async () => {}),
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
   getToolConfig: vi.fn((_toolId?: string) => ({ settingsSchema: z.record(z.unknown()) })),
+  insertValues: vi.fn((_row: Record<string, unknown>) => Promise.resolve()),
   putObject: vi.fn<(key: string, data: Buffer) => Promise<void>>(async () => {}),
   putObjectStream: vi.fn<(key: string, stream: Readable, opts?: unknown) => Promise<number>>(
     async () => 42,
@@ -69,7 +76,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         all: () => [],
       }),
     }),
-    insert: () => ({ values: () => Promise.resolve() }),
+    insert: () => ({ values: (row: Record<string, unknown>) => mocks.insertValues(row) }),
     update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     delete: () => ({ where: () => Promise.resolve() }),
   },
@@ -448,6 +455,16 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     mocks.failBatchJob.mockResolvedValue(true);
   });
 
+  // The parent id is server-generated, so tests read it back from the
+  // batch row the route inserted (the latest one when a test runs twice).
+  function lastBatchParentId(): string {
+    const parent = mocks.insertValues.mock.calls
+      .map((call) => call[0])
+      .filter((row) => row.type === "batch")
+      .at(-1);
+    return String(parent?.id);
+  }
+
   async function invokeBatchRoute(opts: {
     section: string;
     toolId: string;
@@ -550,6 +567,63 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ]);
     for (const p of spooledPaths) {
       expect(existsSync(p)).toBe(false);
+    }
+  });
+
+  // The batch parent id names everything GET /api/v1/download serves without
+  // auth (the ZIP and every child output), so a client-chosen clientJobId must
+  // never become it. The client id only gets an alias row for SSE and cancel.
+  it("keys a batch's storage and download id by a server id, never the clientJobId", async () => {
+    const clientJobId = "guessable-batch-1";
+    const uploadedKeys: string[] = [];
+    mocks.putObject.mockImplementation(async (key: string) => {
+      uploadedKeys.push(key);
+    });
+
+    const reply = await invokeBatchRoute({
+      section: "image",
+      toolId: "compress",
+      parts: [
+        { type: "file", filename: "first.png", content: Buffer.from("first-content") },
+        { type: "file", filename: "second.png", content: Buffer.from("second-content") },
+        { type: "field", fieldname: "settings", value: "{}" },
+        { type: "field", fieldname: "clientJobId", value: clientJobId },
+      ],
+    });
+
+    expect(reply.statusCode).toBe(202);
+    // The client keeps correlating by its own id.
+    expect(reply.payload).toEqual({
+      jobId: clientJobId,
+      async: true,
+      statusUrl: `/api/v1/jobs/${clientJobId}`,
+      progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+    });
+
+    const rows = mocks.insertValues.mock.calls.map((call) => call[0]);
+    const parent = rows.find((row) => row.type === "batch");
+    expect(parent?.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(parent?.id).not.toContain(clientJobId);
+    expect(rows.find((row) => row.id === clientJobId)).toMatchObject({
+      type: "batch-alias",
+      status: "completed",
+      settings: { batchJobId: parent?.id, batchToolId: "compress" },
+    });
+
+    const children = rows.filter((row) => row.type === "batch-child");
+    expect(children).toHaveLength(2);
+    for (const child of children) {
+      expect(String(child.id).startsWith(`${parent?.id}-f`)).toBe(true);
+    }
+
+    const tree = (mocks.flowAdd.mock.calls as unknown as Array<[FlowTree]>)[0]?.[0];
+    expect(tree?.opts?.jobId).toBe(parent?.id);
+    expect(tree?.data?.jobId).toBe(parent?.id);
+    expect(uploadedKeys).toHaveLength(2);
+    for (const key of [...uploadedKeys, ...(tree?.children ?? []).map((c) => c.opts?.jobId)]) {
+      expect(String(key)).not.toContain(clientJobId);
     }
   });
 
@@ -672,17 +746,17 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       ).rejects.toBe(storeErr);
 
       expect(mocks.deleteObject.mock.calls).toEqual([
-        ["uploads/ocr-pdf-batch-2911-f1/second.pdf"],
-        ["uploads/ocr-pdf-batch-2911-f0/first.pdf"],
+        [`uploads/${lastBatchParentId()}-f1/second.pdf`],
+        [`uploads/${lastBatchParentId()}-f0/first.pdf`],
       ]);
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        { err: deleteErr, key: "uploads/ocr-pdf-batch-2911-f1/second.pdf" },
+        { err: deleteErr, key: `uploads/${lastBatchParentId()}-f1/second.pdf` },
         "Failed to delete failed OCR PDF upload",
       );
       expect(log.warn).toHaveBeenCalledTimes(1);
       expect(log.warn).toHaveBeenCalledWith(
-        { err: deleteErr, key: "uploads/ocr-pdf-batch-2911-f0/first.pdf" },
+        { err: deleteErr, key: `uploads/${lastBatchParentId()}-f0/first.pdf` },
         "batch ingress cleanup failed",
       );
 
@@ -711,7 +785,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       );
 
       expect(mocks.deleteObject.mock.calls).toEqual([
-        ["uploads/ocr-pdf-batch-2911-size-f0/mismatch.pdf"],
+        [`uploads/${lastBatchParentId()}-f0/mismatch.pdf`],
       ]);
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(log.warn).not.toHaveBeenCalled();
@@ -743,12 +817,12 @@ describe("batch route spooled multipart ingress (#1239)", () => {
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith(
       expect.objectContaining({
-        jobId: "mid-batch-read-fail",
+        jobId: lastBatchParentId(),
         totalFiles: 2,
         failedFiles: 2,
       }),
     );
-    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/mid-batch-read-fail-f0/first.png");
+    expect(mocks.deleteObject).toHaveBeenCalledWith(`uploads/${lastBatchParentId()}-f0/first.png`);
 
     // V8 allocation RangeError when reading the spooled scratch file converts to DecoderOutOfMemoryError (#3946)
     mocks.failBatchJob.mockClear();
@@ -785,7 +859,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       cause: v8Oom,
     });
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "mid-batch-read-oom",
+      jobId: lastBatchParentId(),
       totalFiles: 2,
       completedFiles: 2,
       failedFiles: 2,
@@ -793,7 +867,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       message: oomMessage,
       code: "ENGINE_UNAVAILABLE",
     });
-    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/mid-batch-read-oom-f0/first.png");
+    expect(mocks.deleteObject).toHaveBeenCalledWith(`uploads/${lastBatchParentId()}-f0/first.png`);
   });
 
   it("answers 413 with the OCR aggregate safety limit message when spooled OCR parts cross the aggregate cap", async () => {
@@ -883,7 +957,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     });
     expect(allEmptyReply.statusCode).toBe(422);
     expect(allEmptyReply.log.warn).toHaveBeenCalledWith(
-      { jobId: "batch-unapplied-prefail" },
+      { jobId: lastBatchParentId() },
       expect.stringContaining("no terminal frame announced"),
     );
 
@@ -909,7 +983,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }),
     ).rejects.toThrow("EIO: i/o error reading scratch file");
     expect(faultLog.warn).toHaveBeenCalledWith(
-      { jobId: "batch-unapplied-fault" },
+      { jobId: lastBatchParentId() },
       expect.stringContaining("no terminal frame announced"),
     );
   });
@@ -1058,7 +1132,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       expect(uploadedPayloads[0]).not.toContain("<script");
       expect(uploadedPayloads[0]).not.toContain("169.254.169.254");
       expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
-        "batch-disguised-svg",
+        lastBatchParentId(),
         2,
         "padded.dng",
         "SVG exceeds maximum element count of 5000",
@@ -1098,15 +1172,15 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     });
 
     expect(reply.statusCode).toBe(202);
-    expect(uploadedKeys).toEqual(["uploads/batch-svg-prefail-f0/good.png"]);
+    expect(uploadedKeys).toEqual([`uploads/${lastBatchParentId()}-f0/good.png`]);
     expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
-      "batch-svg-prefail",
+      lastBatchParentId(),
       3,
       "bad.svgz",
       "SVGZ file does not contain valid SVG content after decompression",
     );
     expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
-      "batch-svg-prefail",
+      lastBatchParentId(),
       3,
       "too-many.svg",
       "SVG exceeds maximum element count of 5000",
@@ -1159,7 +1233,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       ).rejects.toBe(sanitizeFault);
       expect(mocks.failBatchJob).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: "batch-svg-sanitize-fault",
+          jobId: lastBatchParentId(),
           message: "Internal server error",
         }),
       );
@@ -1181,7 +1255,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       ).rejects.toBe(decompressFault);
       expect(mocks.failBatchJob).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: "batch-svg-decompress-fault",
+          jobId: lastBatchParentId(),
           message: "Internal server error",
         }),
       );
@@ -1299,7 +1373,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(workspaceCap);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-3289-prefail-fault",
+      jobId: lastBatchParentId(),
       totalFiles: 2,
       completedFiles: 2,
       failedFiles: 2,
@@ -1332,7 +1406,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(enqueueFault);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-3289-flow-add-fault",
+      jobId: lastBatchParentId(),
       totalFiles: 2,
       completedFiles: 2,
       failedFiles: 2,
@@ -1365,7 +1439,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(taggedServerFault);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-2816-tagged-500",
+      jobId: lastBatchParentId(),
       totalFiles: 1,
       completedFiles: 1,
       failedFiles: 1,
@@ -1390,7 +1464,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(untaggedRedisFault);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-2816-untagged-500",
+      jobId: lastBatchParentId(),
       totalFiles: 1,
       completedFiles: 1,
       failedFiles: 1,
@@ -1417,7 +1491,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(statuslessSafeError);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-2816-statusless-safe",
+      jobId: lastBatchParentId(),
       totalFiles: 1,
       completedFiles: 1,
       failedFiles: 1,
@@ -1445,7 +1519,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(upstreamGatewayFault);
 
     expect(mocks.failBatchJob).toHaveBeenCalledWith({
-      jobId: "batch-2816-502-code",
+      jobId: lastBatchParentId(),
       totalFiles: 1,
       completedFiles: 1,
       failedFiles: 1,

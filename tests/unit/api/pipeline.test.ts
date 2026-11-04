@@ -22,6 +22,16 @@ const defaultInsertValuesImpl = vi.hoisted(() => (..._args: unknown[]) => {
   return p;
 });
 const insertValuesMock = vi.hoisted(() => vi.fn(defaultInsertValuesImpl));
+
+// Batch parent ids are server-generated, so tests read the id back from the
+// batch row the route inserted (the latest one when a test runs twice).
+function lastBatchParentId(): string {
+  const parent = insertValuesMock.mock.calls
+    .map((call) => call[0] as Record<string, unknown> | undefined)
+    .filter((row) => row?.type === "batch")
+    .at(-1);
+  return String(parent?.id);
+}
 const updateSetMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const readFileSpy = vi.hoisted(() => vi.fn());
@@ -1416,7 +1426,7 @@ describe("pipeline step error message formatting", () => {
         .find((row) => row?.type === "pipeline-step");
       expect(stepInsert).toEqual(
         expect.objectContaining({
-          id: "pipeline-batch-3347-f0-s0",
+          id: `${lastBatchParentId()}-f0-s0`,
           toolId: "content-aware-resize",
           type: "pipeline-step",
         }),
@@ -1575,7 +1585,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       rmSpy.mock.calls.some((call: unknown[]) => String(call[0]).endsWith("/0-empty.png")),
     ).toBe(true);
     expect(recordChildOutcomeMock).toHaveBeenCalledWith(
-      "pipeline-batch-empty-slot",
+      lastBatchParentId(),
       2,
       "empty.png",
       "File is empty",
@@ -1626,7 +1636,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     expect(flowAddMock).not.toHaveBeenCalled();
     expect(failBatchJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        jobId: "pipeline-batch-all-empty",
+        jobId: lastBatchParentId(),
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 1,
@@ -1652,7 +1662,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ]);
       expect(unappliedReply.statusCode).toBe(422);
       expect(unappliedReply.log.warn).toHaveBeenCalledWith(
-        { jobId: "pipeline-batch-unapplied" },
+        { jobId: lastBatchParentId() },
         expect.stringContaining("no terminal frame announced"),
       );
 
@@ -1674,7 +1684,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
         ),
       ).rejects.toThrow("storage unavailable");
       expect(faultLog.warn).toHaveBeenCalledWith(
-        { jobId: "pipeline-batch-unapplied-fault" },
+        { jobId: lastBatchParentId() },
         expect.stringContaining("no terminal frame announced"),
       );
     } finally {
@@ -2034,17 +2044,17 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       );
       expect(firstStored).toContain("<svg");
       expect(firstStored).not.toContain("<script");
-      expect(secondCall ? String(secondCall[0]) : "").toMatch(
-        /^uploads\/pipeline-batch-svg-f1-s0\/good\.png$/,
+      expect(secondCall ? String(secondCall[0]) : "").toBe(
+        `uploads/${lastBatchParentId()}-f1-s0/good.png`,
       );
       expect(recordChildOutcomeMock).toHaveBeenCalledWith(
-        "pipeline-batch-svg",
+        lastBatchParentId(),
         4,
         "bad.svgz",
         "SVGZ file does not contain valid SVG content after decompression",
       );
       expect(recordChildOutcomeMock).toHaveBeenCalledWith(
-        "pipeline-batch-svg",
+        lastBatchParentId(),
         4,
         "too-many.svg",
         "SVG exceeds maximum element count of 5000",
@@ -2111,7 +2121,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(sanitizeFault);
       expect(failBatchJobMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: "pipeline-batch-svg-sanitize-fault",
+          jobId: lastBatchParentId(),
           message: "Internal server error",
         }),
       );
@@ -2136,7 +2146,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(decompressFault);
       expect(failBatchJobMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: "pipeline-batch-svg-decompress-fault",
+          jobId: lastBatchParentId(),
           message: "Internal server error",
         }),
       );
@@ -2242,6 +2252,49 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     }
   });
 
+  // The pipeline-batch parent id names the ZIP and every per-file output the
+  // public download route serves by id alone, so a client-chosen clientJobId
+  // must never become it; the client id only gets an alias row.
+  it("keys a pipeline batch's storage and download id by a server id, never the clientJobId", async () => {
+    vi.clearAllMocks();
+    const clientJobId = "guessable-pipeline-batch-1";
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "one.png", content: Buffer.from("one-png") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+      },
+      { type: "field", fieldname: "clientJobId", value: clientJobId },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(reply.payload).toEqual({
+      jobId: clientJobId,
+      async: true,
+      statusUrl: `/api/v1/jobs/${clientJobId}`,
+      progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+    });
+    const rows = insertValuesMock.mock.calls.map((call) => call[0] as Record<string, unknown>);
+    const parent = rows.find((row) => row?.type === "batch");
+    expect(parent?.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(rows.find((row) => row?.id === clientJobId)).toMatchObject({
+      type: "batch-alias",
+      settings: { batchJobId: parent?.id, batchToolId: "pipeline-batch" },
+    });
+    const ids = rows.filter((row) => row?.id !== clientJobId).map((row) => String(row?.id));
+    expect(ids.length).toBeGreaterThan(1);
+    for (const id of ids) {
+      expect(id.startsWith(String(parent?.id))).toBe(true);
+    }
+    for (const [key] of putObjectMock.mock.calls as unknown as Array<[string]>) {
+      expect(key).not.toContain(clientJobId);
+    }
+  });
+
   it("stamps inputRefs on each per-file pipeline-finalize row so batch-finalize preserves filenames (#3141)", async () => {
     vi.clearAllMocks();
 
@@ -2262,14 +2315,14 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       .filter((row) => row?.type === "pipeline-finalize");
     expect(finalizeInserts).toEqual([
       expect.objectContaining({
-        id: "pipeline-batch-3141-f0",
+        id: `${lastBatchParentId()}-f0`,
         type: "pipeline-finalize",
-        inputRefs: ["uploads/pipeline-batch-3141-f0-s0/one.png"],
+        inputRefs: [`uploads/${lastBatchParentId()}-f0-s0/one.png`],
       }),
       expect.objectContaining({
-        id: "pipeline-batch-3141-f1",
+        id: `${lastBatchParentId()}-f1`,
         type: "pipeline-finalize",
-        inputRefs: ["uploads/pipeline-batch-3141-f1-s0/two.png"],
+        inputRefs: [`uploads/${lastBatchParentId()}-f1-s0/two.png`],
       }),
     ]);
   });
@@ -2297,7 +2350,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(workspaceCap);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-3289-prefail-fault",
+        jobId: lastBatchParentId(),
         totalFiles: 2,
         completedFiles: 2,
         failedFiles: 2,
@@ -2330,7 +2383,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(enqueueFault);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-3289-flow-add-fault",
+        jobId: lastBatchParentId(),
         totalFiles: 2,
         completedFiles: 2,
         failedFiles: 2,
@@ -2371,7 +2424,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(taggedServerFault);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-2816-tagged-500",
+        jobId: lastBatchParentId(),
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 1,
@@ -2396,7 +2449,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(untaggedRedisFault);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-2816-untagged-500",
+        jobId: lastBatchParentId(),
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 1,
@@ -2427,7 +2480,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(statuslessSafeError);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-2816-statusless-safe",
+        jobId: lastBatchParentId(),
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 1,
@@ -2459,7 +2512,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(upstreamGatewayFault);
 
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-2816-502-code",
+        jobId: lastBatchParentId(),
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 1,
@@ -2506,7 +2559,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
         ),
       ).toBe(true);
       expect(putObjectMock).toHaveBeenCalledWith(
-        "uploads/pipeline-batch-2879-rm-reject-f0-s0/first.png",
+        `uploads/${lastBatchParentId()}-f0-s0/first.png`,
         Buffer.from("first-ok"),
       );
     } finally {
@@ -2550,14 +2603,14 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).toBe(true);
       expect(putObjectMock).toHaveBeenCalledTimes(1);
       expect(putObjectMock).toHaveBeenCalledWith(
-        "uploads/pipeline-batch-2879-read-reject-f0-s0/first.png",
+        `uploads/${lastBatchParentId()}-f0-s0/first.png`,
         Buffer.from("first-ok"),
       );
       expect(deleteObjectMock).toHaveBeenCalledWith(
-        "uploads/pipeline-batch-2879-read-reject-f0-s0/first.png",
+        `uploads/${lastBatchParentId()}-f0-s0/first.png`,
       );
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-2879-read-reject",
+        jobId: lastBatchParentId(),
         totalFiles: 2,
         completedFiles: 2,
         failedFiles: 2,
@@ -2598,10 +2651,10 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
         cause: v8Oom,
       });
       expect(deleteObjectMock).toHaveBeenCalledWith(
-        "uploads/pipeline-batch-3946-read-oom-f0-s0/first.png",
+        `uploads/${lastBatchParentId()}-f0-s0/first.png`,
       );
       expect(failBatchJobMock).toHaveBeenCalledWith({
-        jobId: "pipeline-batch-3946-read-oom",
+        jobId: lastBatchParentId(),
         totalFiles: 2,
         completedFiles: 2,
         failedFiles: 2,
@@ -2656,12 +2709,12 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       ).rejects.toBe(storeErr);
 
       expect(deleteObjectMock.mock.calls).toEqual([
-        ["uploads/pipeline-batch-2911-f1-s0/second.pdf"],
-        ["uploads/pipeline-batch-2911-f0-s0/first.pdf"],
+        [`uploads/${lastBatchParentId()}-f1-s0/second.pdf`],
+        [`uploads/${lastBatchParentId()}-f0-s0/first.pdf`],
       ]);
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        { err: deleteErr, key: "uploads/pipeline-batch-2911-f1-s0/second.pdf" },
+        { err: deleteErr, key: `uploads/${lastBatchParentId()}-f1-s0/second.pdf` },
         "Failed to delete failed OCR PDF upload",
       );
 
@@ -2690,7 +2743,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       );
 
       expect(deleteObjectMock.mock.calls).toEqual([
-        ["uploads/pipeline-batch-2911-size-f0-s0/mismatch.pdf"],
+        [`uploads/${lastBatchParentId()}-f0-s0/mismatch.pdf`],
       ]);
       expect(warnSpy).toHaveBeenCalledTimes(1);
     } finally {

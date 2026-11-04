@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   row: null as Record<string, unknown> | null,
+  // Rows handed out one per select before falling back to `row`.
+  queue: [] as Array<Record<string, unknown> | null>,
   user: { id: "user-1", username: "alice", role: "user" } as { id: string } | null,
 }));
 
@@ -26,7 +28,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: async () => (state.row ? [state.row] : []),
+        where: async () => {
+          const row = state.queue.length > 0 ? state.queue.shift() : state.row;
+          return row ? [row] : [];
+        },
       }),
     }),
   },
@@ -34,6 +39,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     jobs: {
       id: {},
       userId: {},
+      type: {},
       settings: {},
       status: {},
       progress: {},
@@ -64,6 +70,7 @@ describe("GET /api/v1/jobs/:jobId", () => {
   beforeEach(() => {
     state.user = { id: "user-1" };
     state.row = null;
+    state.queue = [];
   });
 
   it("reports a queued job with zero percent and its progress URL", async () => {
@@ -139,6 +146,46 @@ describe("GET /api/v1/jobs/:jobId", () => {
     state.row = null;
     const app = await buildApp();
     const res = await app.inject({ method: "GET", url: "/api/v1/jobs/missing" });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("follows a batch alias so a client id reports the server-keyed batch", async () => {
+    state.queue = [
+      {
+        ...base,
+        type: "batch-alias",
+        settings: { batchJobId: "server-batch-id", batchToolId: "resize" },
+        status: "completed",
+        progress: null,
+        error: null,
+      },
+      { ...base, type: "batch", status: "processing", progress: { percent: 30 }, error: null },
+    ];
+    const app = await buildApp();
+    const res = await app.inject({ method: "GET", url: "/api/v1/jobs/client-id" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      jobId: "client-id",
+      status: "processing",
+      progress: { percent: 30 },
+      progressUrl: "/api/v1/jobs/client-id/progress",
+    });
+  });
+
+  it("checks ownership on the batch an alias points at", async () => {
+    state.queue = [
+      {
+        ...base,
+        type: "batch-alias",
+        settings: { batchJobId: "server-batch-id", batchToolId: "resize" },
+        status: "completed",
+        progress: null,
+        error: null,
+      },
+      { ...base, userId: "user-2", type: "batch", status: "completed", progress: {}, error: null },
+    ];
+    const app = await buildApp();
+    const res = await app.inject({ method: "GET", url: "/api/v1/jobs/client-id" });
     expect(res.statusCode).toBe(404);
   });
 });

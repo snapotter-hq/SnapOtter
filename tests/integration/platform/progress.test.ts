@@ -23,6 +23,7 @@ import {
   updateSingleFileProgress,
 } from "../../../apps/api/src/routes/progress.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { batchJobIdFor, resolveBatchJobId } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -62,9 +63,10 @@ const flushPersist = async (
     await new Promise((r) => setTimeout(r, 200));
     return;
   }
+  const rowId = await resolveBatchJobId(jobId);
   const start = Date.now();
   while (Date.now() - start < maxMs) {
-    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, rowId));
     if (row && terminalStatuses.includes(row.status)) return;
     await new Promise((r) => setTimeout(r, 50));
   }
@@ -141,7 +143,10 @@ describe("Batch progress tracking", () => {
     await flushPersist(clientJobId);
 
     // Check the jobs table for the persisted progress
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [job] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
@@ -178,7 +183,10 @@ describe("Batch progress tracking", () => {
     expect(res.statusCode).toBe(422);
 
     await flushPersist(clientJobId);
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [job] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     expect(job).toBeDefined();
     expect(job?.status).toBe("failed");
@@ -214,7 +222,10 @@ describe("Batch progress tracking", () => {
     expect(res.statusCode).toBe(200);
 
     await flushPersist(clientJobId);
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [job] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
@@ -259,7 +270,10 @@ describe("Pipeline batch progress tracking", () => {
 
     // Verify DB persistence
     await flushPersist(clientJobId);
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [job] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     expect(job).toBeDefined();
     expect(job?.status).toBe("completed");
@@ -315,10 +329,13 @@ describe("Job DB record structure", () => {
     });
 
     await flushPersist(clientJobId);
-    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [job] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     expect(job).toBeDefined();
-    expect(job?.id).toBe(clientJobId);
+    expect(job?.id).toBe(await batchJobIdFor(clientJobId));
     expect(job?.type).toBe("batch");
     const progressObj = job?.progress as { percent: number } | null;
     expect(progressObj).not.toBeNull();
