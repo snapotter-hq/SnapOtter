@@ -125,7 +125,9 @@ describe("Korean OCR product contract", () => {
         const content = readFileSync(join(root, "apps/docs", locale, document), "utf8");
         expect(content, `${locale}/${document}`).toContain("`fast-korean-unsupported`");
         expect(content, `${locale}/${document}`).toContain("`FEATURE_INCOMPATIBLE`");
-        expect(content, `${locale}/${document}`).toContain("Linux amd64");
+        expect(content, `${locale}/${document}`).toContain(
+          locale === "en" ? "Linux amd64" : "amd64",
+        );
         expect(content, `${locale}/${document}`).toContain("arm64");
         expect(content, `${locale}/${document}`).toContain("NVIDIA");
       }
