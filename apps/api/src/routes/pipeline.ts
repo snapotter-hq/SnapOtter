@@ -1063,6 +1063,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
           });
         }
+        // Same schema the tool route and /execute use, so a saved step can't fail at run time on settings.
+        const settingsResult = toolConfig.settingsSchema.safeParse(step.settings);
+        if (!settingsResult.success) {
+          return reply.status(400).send({
+            error: `Step ${i + 1} (${step.toolId}): Invalid settings`,
+            details: settingsResult.error.issues.map(
+              (iss: { path: (string | number)[]; message: string }) => ({
+                path: iss.path.join("."),
+                message: iss.message,
+              }),
+            ),
+          });
+        }
       }
 
       const id = randomUUID();

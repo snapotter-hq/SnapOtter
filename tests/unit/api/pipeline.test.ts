@@ -1288,6 +1288,63 @@ describe("pipeline step error message formatting", () => {
     }
   });
 
+  it("rejects invalid step settings on /api/v1/pipeline/save and names the step (#2283)", async () => {
+    vi.clearAllMocks();
+
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerPipelineRoutes(app);
+    await app.ready();
+
+    try {
+      const invalidRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Bad Settings Pipeline",
+          steps: [
+            { toolId: stepErrorTestToolId, settings: { width: 100 } },
+            { toolId: stepErrorTestToolId, settings: { width: -5 } },
+          ],
+        },
+      });
+      expect(invalidRes.statusCode).toBe(400);
+      expect(invalidRes.json()).toMatchObject({
+        error: `Step 2 (${stepErrorTestToolId}): Invalid settings`,
+        details: [{ path: "width", message: "Width must be positive" }],
+      });
+      expect(insertValuesMock).not.toHaveBeenCalled();
+
+      const wrongTypeRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Wrong Type Pipeline",
+          steps: [{ toolId: stepErrorTestToolId, settings: { width: "abc" } }],
+        },
+      });
+      expect(wrongTypeRes.statusCode).toBe(400);
+      expect(wrongTypeRes.json().error).toBe(`Step 1 (${stepErrorTestToolId}): Invalid settings`);
+      expect(insertValuesMock).not.toHaveBeenCalled();
+
+      const validRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Good Settings Pipeline",
+          steps: [{ toolId: stepErrorTestToolId, settings: { width: 100 } }],
+        },
+      });
+      expect(validRes.statusCode).toBe(201);
+      expect(insertValuesMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("resolves resize with contentAware to content-aware-resize in /api/v1/pipeline/save and /api/v1/pipeline/batch (#3347)", async () => {
     vi.clearAllMocks();
 
