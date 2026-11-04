@@ -3,7 +3,7 @@
  * CONTROLLED manifest and AI data dir (unlike feature-install-queue.test.ts,
  * which points at the real docker manifest): uninstall's protected-model
  * bookkeeping, install short-circuits driven by model verification, the
- * disk-usage walker, native (non-Docker) GET /features OCR capability shapes,
+ * disk-usage walker, GET /features without a manifest,
  * offline OCR import success/failure mapping, install-queue failure paths when
  * the shared lease dir is corrupt, and the deferred OCR generation-cleanup
  * timer.
@@ -185,8 +185,7 @@ const manifestPath = join(testRoot, "feature-manifest.json");
 process.env.DATA_DIR = testRoot;
 // A crafted manifest (instead of the real docker one) so the tests control
 // exactly which model files each bundle owns and which are shared. While the
-// file exists, isManagedAiEnvironment() is true; deleting it flips the GET
-// /api/v1/features handler into its native (non-Docker) branch.
+// file exists, isManagedAiEnvironment() is true.
 process.env.FEATURE_MANIFEST_PATH = manifestPath;
 
 const craftedManifest = {
@@ -233,7 +232,6 @@ const queue = await import("../../../apps/api/src/lib/feature-install-queue.js")
 const { OcrRuntimeDiskSpaceError } = await import(
   "../../../apps/api/src/lib/ocr-runtime-install.js"
 );
-const { FEATURE_BUNDLES } = await import("@snapotter/shared");
 const { createMultipartPayload, loginAsAdmin } = await import("../test-server.js");
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -246,7 +244,6 @@ async function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
   }
 }
 
-const runningInDocker = existsSync("/.dockerenv");
 const runningAsRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 interface FeatureRow {
@@ -415,7 +412,7 @@ describe("feature bundle route contracts", () => {
     });
   }
 
-  async function withNativeMode<T>(run: () => Promise<T>): Promise<T> {
+  async function withManifestMissing<T>(run: () => Promise<T>): Promise<T> {
     rmSync(manifestPath, { force: true });
     try {
       return await run();
@@ -578,106 +575,13 @@ describe("feature bundle route contracts", () => {
     }
   });
 
-  // ── GET /api/v1/features in native (non-Docker) mode ─────────────
+  // ── GET /api/v1/features without a manifest ──────────────────────
 
-  it.skipIf(runningInDocker)("native mode reports every bundle installed", async () => {
-    await withNativeMode(async () => {
-      hoisted.ocrCapability.current = readyOcrCapability;
-
-      const bundles = await getBundles();
-      expect(bundles).toHaveLength(Object.keys(FEATURE_BUNDLES).length);
-
-      const br = bundles.find((b) => b.id === "background-removal");
-      expect(br).toMatchObject({
-        status: "installed",
-        installedVersion: null,
-        downloadBytes: null,
-        installedBytes: null,
-        progress: null,
-        error: null,
-      });
-      expect(br).not.toHaveProperty("compatibility");
-
-      const ocr = bundles.find((b) => b.id === "ocr");
-      expect(ocr).toMatchObject({
-        status: "installed",
-        installedVersion: "3.0.0",
-        compatibility: "compatible",
-        compatibilityReason: null,
-        selectedTarget: "linux-amd64-cpu-py312",
-        missingDownloadBytes: null,
-        healthyGeneration: "gen-1",
-        availableQualities: ["fast", "balanced"],
-        error: null,
-      });
-    });
-  });
-
-  it.skipIf(runningInDocker)("native mode surfaces an invalid OCR descriptor", async () => {
-    await withNativeMode(async () => {
-      hoisted.ocrCapability.current = {
-        available: false,
-        status: "invalid",
-        reason: "descriptor-invalid",
-        qualities: [],
-        providers: [],
-      };
-
-      const ocr = await getBundleRow("ocr");
-      expect(ocr).toMatchObject({
-        status: "error",
-        installedVersion: null,
-        compatibility: "invalid",
-        compatibilityReason: "descriptor-invalid",
-        selectedTarget: "linux-amd64-cpu-py312",
-        healthyGeneration: null,
-        availableQualities: ["fast"],
-        error: "OCR runtime descriptor is invalid",
-      });
-    });
-  });
-
-  it.skipIf(runningInDocker)("native mode explains an unsupported OCR host", async () => {
-    await withNativeMode(async () => {
-      hoisted.ocrCapability.current = {
-        available: false,
-        status: "missing",
-        reason: "unsupported-host",
-        qualities: [],
-        providers: [],
-      };
-      hoisted.selectOcrRuntimeTargetMock.mockReturnValue(null as never);
-
-      const ocr = await getBundleRow("ocr");
-      expect(ocr).toMatchObject({
-        status: "not_installed",
-        compatibility: "compatible",
-        compatibilityReason: "unsupported-host",
-        selectedTarget: null,
-        availableQualities: ["fast"],
-        error: "Accurate OCR is not supported on this host; Fast OCR remains available",
-      });
-    });
-  });
-
-  it.skipIf(runningInDocker)("native mode flags an incompatible OCR artifact", async () => {
-    await withNativeMode(async () => {
-      hoisted.ocrCapability.current = {
-        available: false,
-        status: "incompatible",
-        reason: "artifact-incompatible",
-        qualities: [],
-        providers: [],
-      };
-
-      const ocr = await getBundleRow("ocr");
-      expect(ocr).toMatchObject({
-        status: "not_installed",
-        compatibility: "incompatible",
-        compatibilityReason: "artifact-incompatible",
-        selectedTarget: "linux-amd64-cpu-py312",
-        error: null,
-      });
+  it("reports a bundle as not installed when no manifest is configured (#4302)", async () => {
+    await withManifestMissing(async () => {
+      const br = await getBundleRow("background-removal");
+      // The status route and the tool gates must agree: both read installed.json.
+      expect(br).toMatchObject({ status: "not_installed", installedVersion: null });
     });
   });
 
