@@ -68,6 +68,10 @@ const KNOWN_ENGINE_OVERRIDES = [
   "QPDF_PATH",
   "SOFFICE_PATH",
   "PDFCPU_PATH",
+  "GS_PATH",
+  "PANDOC_PATH",
+  "SNAPOTTER_FONT_FILE",
+  "SNAPOTTER_FONT_FAMILY",
   "SNAPOTTER_HW_ACCEL",
 ];
 
@@ -136,6 +140,19 @@ describe("engine resolvers treat an empty override as unset", () => {
     expect(resolveQpdf()).not.toBe("");
     expect(resolveSoffice()).not.toBe("");
     expect(resolvePdfcpu()).not.toBe("");
+  });
+
+  it("GS_PATH and the font variables fall back when empty (#4316)", async () => {
+    setEmpty("GS_PATH");
+    setEmpty("SNAPOTTER_FONT_FILE");
+    setVar("SNAPOTTER_FONT_FAMILY", "");
+    vi.resetModules();
+    const { resolveGs } = await import("../../../packages/doc-engine/src/binaries.js");
+    expect(resolveGs()).not.toBe("");
+    // An empty family next to a set file must not reach ffmpeg as "".
+    setVar("SNAPOTTER_FONT_FILE", "/nonexistent/sentinel.ttf");
+    const { resolveFontFile } = await import("../../../packages/media-engine/src/fonts.js");
+    expect(resolveFontFile()).toEqual({ file: "/nonexistent/sentinel.ttf", family: "Sans" });
   });
 
   it("media-engine reports no requested family for an empty SNAPOTTER_HW_ACCEL", async () => {

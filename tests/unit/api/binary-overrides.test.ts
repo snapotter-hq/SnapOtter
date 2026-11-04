@@ -56,6 +56,14 @@ describe("checkBinaryOverrides", () => {
     ]);
   });
 
+  it("checks GS_PATH and PANDOC_PATH at boot (#4316)", () => {
+    const problems = checkBinaryOverrides(
+      { GS_PATH: "/typo/gs", PANDOC_PATH: "/typo/pandoc" },
+      () => "does not exist",
+    );
+    expect(problems.map((p) => p.variable)).toEqual(["GS_PATH", "PANDOC_PATH"]);
+  });
+
   describe("with the real filesystem probe", () => {
     let dir: string;
 
