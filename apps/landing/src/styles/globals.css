@@ -32,6 +32,8 @@ html {
 @theme {
   /* Primary -- Otter Orange (sunlit fur) */
   --color-primary: #E07832;
+  /* Fills and graphics everywhere. The one text exception is small accents on the
+     dark bands (7.0:1 or better on every band surface, pinned in palette-contrast.test.ts). */
   --color-primary-light: #F09550;
   --color-primary-dark: #C06520;
   --color-primary-subtle: #FFF5ED;
