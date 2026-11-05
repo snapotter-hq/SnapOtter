@@ -1,12 +1,18 @@
 ---
 description: "ملاحظات الإصدار وسجل النسخ في SnapOtter. اطّلع على الجديد والمحسَّن والمُصلَح في كل إصدار."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 8d902181a615
+i18n_output_hash: 54e5a8bab350
 i18n_hash_version: 2
 ---
 
 # سجل التغييرات {#changelog}
+
+## غير مُصدَر بعد {#unreleased}
+
+### ميزات مهجورة {#unreleased-deprecated}
+
+- **عمليات الضغط إلى حجم محدد الخمس للصور مهجورة.** وُسمت `/api/v1/tools/image/compress-image-to-20kb` و`-50kb` و`-100kb` و`-200kb` و`-500kb` بأنها مهجورة في مواصفة OpenAPI وستبقى لإصدار فرعي واحد على الأقل. أرسل `POST /api/v1/tools/image/compress` مع ضبط `settings` على `{"mode":"targetSize","targetSizeKb":20}` (أو 50 أو 100 أو 200 أو 500). المخرجات نفسها. أما مسارات الإعدادات المسبقة لـ PDF فلم تتغير.
 
 ## v2.3.0 {#v2-3-0}
 

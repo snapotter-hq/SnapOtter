@@ -1,12 +1,18 @@
 ---
 description: "SnapOtter のリリースノートとバージョン履歴です。各リリースの新機能、改善点、修正内容を確認できます。"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 42736e10bab1
+i18n_output_hash: 37fef7a186d6
 i18n_hash_version: 2
 ---
 
 # 変更履歴 {#changelog}
+
+## Unreleased {#unreleased}
+
+### 非推奨 {#unreleased-deprecated}
+
+- **画像の目標サイズ圧縮オペレーション 5 件は非推奨になりました。** `/api/v1/tools/image/compress-image-to-20kb`、`-50kb`、`-100kb`、`-200kb`、`-500kb` は OpenAPI 仕様で非推奨としてマークされており、少なくとも 1 つのマイナーリリースの間は維持されます。`POST /api/v1/tools/image/compress` を送信し、`settings` に `{"mode":"targetSize","targetSizeKb":20}` (または 50、100、200、500) を設定してください。出力は同じです。PDF プリセットのパスは変更ありません。
 
 ## v2.3.0 {#v2-3-0}
 

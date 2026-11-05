@@ -1,12 +1,18 @@
 ---
 description: "Versionsanteckningar och versionshistorik för SnapOtter. Se vad som är nytt, förbättrat och åtgärdat i varje version."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: a280f74a26b9
+i18n_output_hash: f5cb66c3dff0
 i18n_hash_version: 2
 ---
 
 # Ändringslogg {#changelog}
+
+## Ej släppt {#unreleased}
+
+### Föråldrat {#unreleased-deprecated}
+
+- **De fem operationerna för att komprimera bilder till en viss storlek är föråldrade.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` och `-500kb` är markerade som föråldrade i OpenAPI-specifikationen och finns kvar i minst en minorversion. Skicka `POST /api/v1/tools/image/compress` med `settings` satt till `{"mode":"targetSize","targetSizeKb":20}` (eller 50, 100, 200, 500). Resultatet blir detsamma. Sökvägarna för PDF-förinställningar är oförändrade.
 
 ## v2.3.0 {#v2-3-0}
 

@@ -659,7 +659,9 @@ paths:
       tags:
         - Image
       summary: 壓縮影像
-      description: 依品質等級或目標大小縮減圖片檔案大小。
+      description: |-
+        依品質等級或目標大小縮減圖片檔案大小。
+        目標大小模式用來取代已棄用的 compress-image-to-{20,50,100,200,500}kb 操作。
       security:
         - bearerAuth: []
       requestBody:
@@ -720,9 +722,10 @@ paths:
       tags:
         - Image
       summary: 將圖片壓縮至 20 KB
-      description: |
-        將圖片壓縮至 20 KB 目標大小
-        此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+      description: |-
+        將圖片壓縮至 20 KB 的目標大小
+        這是專用的壓縮預設組合端點，以 `compress` 的 targetSize 模式為基礎。
+        已由 POST /api/v1/tools/image/compress 取代，請將設定 `mode` 設為 `targetSize`，並將 `targetSizeKb` 設為 20。至少會保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -792,9 +795,10 @@ paths:
       tags:
         - Image
       summary: 將圖片壓縮至 50 KB
-      description: |
-        將圖片壓縮至 50 KB 目標大小
-        此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+      description: |-
+        將圖片壓縮至 50 KB 的目標大小
+        這是專用的壓縮預設組合端點，以 `compress` 的 targetSize 模式為基礎。
+        已由 POST /api/v1/tools/image/compress 取代，請將設定 `mode` 設為 `targetSize`，並將 `targetSizeKb` 設為 50。至少會保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -864,9 +868,10 @@ paths:
       tags:
         - Image
       summary: 將圖片壓縮至 100 KB
-      description: |
-        將圖片壓縮至 100 KB 目標大小
-        此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+      description: |-
+        將圖片壓縮至 100 KB 的目標大小
+        這是專用的壓縮預設組合端點，以 `compress` 的 targetSize 模式為基礎。
+        已由 POST /api/v1/tools/image/compress 取代，請將設定 `mode` 設為 `targetSize`，並將 `targetSizeKb` 設為 100。至少會保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -936,9 +941,10 @@ paths:
       tags:
         - Image
       summary: 將圖片壓縮至 200 KB
-      description: |
-        將圖片壓縮至 200 KB 目標大小
-        此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+      description: |-
+        將圖片壓縮至 200 KB 的目標大小
+        這是專用的壓縮預設組合端點，以 `compress` 的 targetSize 模式為基礎。
+        已由 POST /api/v1/tools/image/compress 取代，請將設定 `mode` 設為 `targetSize`，並將 `targetSizeKb` 設為 200。至少會保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -1008,9 +1014,10 @@ paths:
       tags:
         - Image
       summary: 將圖片壓縮至 500 KB
-      description: |
-        將圖片壓縮至 500 KB 目標大小
-        此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+      description: |-
+        將圖片壓縮至 500 KB 的目標大小
+        這是專用的壓縮預設組合端點，以 `compress` 的 targetSize 模式為基礎。
+        已由 POST /api/v1/tools/image/compress 取代，請將設定 `mode` 設為 `targetSize`，並將 `targetSizeKb` 設為 500。至少會保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -24772,49 +24779,49 @@ x-i18n:
       provenance: machine
       outputHash: 3f5b322d3d67
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 4cc692d8cc1c
+      outputHash: ed6529c07be5
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 27abc071fab5
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 08e03fe33f17
+      outputHash: 3e197e9ddeda
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: f4fed326e99d
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: b70d46a83da3
+      outputHash: ce0427f839d5
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: e4e12fd272de
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: bac94d5cfe47
+      outputHash: 57c7cfb3d7df
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 09842f184aa7
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: a3d1f0eed792
+      outputHash: 87cd9929680c
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 5c4b97062d9f
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: e3688edf3446
+      outputHash: 60f3724254c8
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine

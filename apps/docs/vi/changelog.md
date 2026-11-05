@@ -1,12 +1,18 @@
 ---
 description: "Ghi chú phát hành và lịch sử phiên bản của SnapOtter. Xem những gì mới, được cải thiện và được sửa trong từng bản phát hành."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: b066c244efc7
+i18n_output_hash: b9c851afe7bf
 i18n_hash_version: 2
 ---
 
 # Nhật ký thay đổi {#changelog}
+
+## Chưa phát hành {#unreleased}
+
+### Không còn được khuyến nghị {#unreleased-deprecated}
+
+- **Năm thao tác nén ảnh về dung lượng cố định không còn được khuyến nghị.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` và `-500kb` được đánh dấu deprecated trong đặc tả OpenAPI và sẽ được giữ lại ít nhất một bản phát hành phụ. Hãy gửi `POST /api/v1/tools/image/compress` với `settings` đặt là `{"mode":"targetSize","targetSizeKb":20}` (hoặc 50, 100, 200, 500). Kết quả đầu ra là như nhau. Các đường dẫn preset PDF không thay đổi.
 
 ## v2.3.0 {#v2-3-0}
 

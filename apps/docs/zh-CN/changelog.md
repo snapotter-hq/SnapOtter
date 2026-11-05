@@ -1,12 +1,18 @@
 ---
 description: "SnapOtter 的发布说明与版本历史。了解每个版本的新增、改进和修复内容。"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 399a8cfd30a6
+i18n_output_hash: 06a15be93a24
 i18n_hash_version: 2
 ---
 
 # 更新日志 {#changelog}
+
+## 未发布 {#unreleased}
+
+### 已弃用 {#unreleased-deprecated}
+
+- **五个图片按大小压缩操作已弃用。** `/api/v1/tools/image/compress-image-to-20kb`、`-50kb`、`-100kb`、`-200kb` 和 `-500kb` 在 OpenAPI 规范中已标记为弃用，并将至少保留一个次要版本。请发送 `POST /api/v1/tools/image/compress`，并将 `settings` 设为 `{"mode":"targetSize","targetSizeKb":20}`（或 50、100、200、500）。输出相同。PDF 预设路径不变。
 
 ## v2.3.0 {#v2-3-0}
 
@@ -86,11 +92,11 @@ SnapOtter 在 Docker Hub 和 GHCR 上的镜像拉取量刚刚突破一百万次�
 
 迁移会在启动时自动运行。你不需要执行任何 SQL。
 
-- **数据库角色。** 规范的 Compose 文件现在为应用提供一个只能读写数据的角色（`DATABASE_URL`），以及一个单独的特权连接（`DATABASE_MIGRATION_URL`），后者仅在启动时用于迁移和授权。现有的 Compose 文件仍像以前一样可用：不设置 `DATABASE_MIGRATION_URL`，SnapOtter 就以单一角色运行。对于非本地部署，请在设置 `POSTGRES_PASSWORD` 的同时设置 `POSTGRES_APP_PASSWORD`。
+- **数据库角色。** 规范的 Compose 文件现在为应用提供一个只能读写数据的角色（`DATABASE_URL`），以及一个单独的特权连接（`DATABASE_MIGRATION_URL`），后者仅在启动时用于迁移和授权。现有的 Compose 文件仍像以前一样可用：不设置 `DATABASE_MIGRATION_URL`，SnapOtter 就以单一角色运行。对于非本地部署，请在设置 `POSTGRES_APP_PASSWORD` 的同时设置 `POSTGRES_PASSWORD`。
 - **更严格的启动检查。** 这些问题以前会在之后才失败，或者悄无声息。现在它们会停止容器，并给出点名相关变量的消息：不受支持的 `DEFAULT_LOCALE`（请使用受支持的代码，如 `de`，而不是 `de_DE`）、格式错误的 `SAML_IDP_SSO_URL`、`SAML_CALLBACK_URL`，或启用 SSO 时的 `OIDC_ISSUER_URL`、无效的 `TRUST_PROXY` 列表、错误的 `BASE_PATH`，以及不可写的 `LOG_DIR`。
 - **`TRUST_PROXY` 不再接受跳数。** 像 `TRUST_PROXY=2` 这样的数字现在会在启动时停止容器，而不是悄悄地不信任任何代理。请将其设置为代理地址或命名范围（默认值为 `loopback,linklocal,uniquelocal`）；当没有代理位于 SnapOtter 前面时设置为 `false`；仅当你控制的代理位于公网地址之前时才设置为 `true`。(#998)
 - **`MAX_WORKER_THREADS` 现已生效。** 如果你之前设置了它却没有看到变化，现在就会看到了。
-- **API 状态码。** 引擎和存储故障返回 503 `ENGINE_UNAVAILABLE`（批处理端点以前返回 422）。超出限制的上传返回 413（以前是 400）。格式错误的 `clientJobId` 返回 400，重复使用的返回 409（以前是 500）。重放你自己的管道批处理返回 202。缺少 `targetSizeKb` 的 `mode=targetSize` 返回 400。在 SSO 强制模式下被拒绝的本地登录返回 401，而不是 403 `SSO_ENFORCED`。被限流的登录返回 429 `LOGIN_THROTTLED`。remove-background 的结果不再包含 `originalUrl`。
+- **API 状态码。** 引擎和存储故障返回 503 `ENGINE_UNAVAILABLE`（批处理端点以前返回 422）。超出限制的上传返回 413（以前是 400）。格式错误的 `clientJobId` 返回 400，重复使用的返回 409（以前是 500）。重放你自己的管道批处理返回 202。缺少 `mode=targetSize` 的 `targetSizeKb` 返回 400。在 SSO 强制模式下被拒绝的本地登录返回 401，而不是 403 `SSO_ENFORCED`。被限流的登录返回 429 `LOGIN_THROTTLED`。remove-background 的结果不再包含 `originalUrl`。
 - **新增可选变量**：`BASE_PATH`、`DATABASE_MIGRATION_URL`、`GDPR_EXPORT_TIMEOUT_MS`（默认 15 分钟，`0` 表示禁用）、`EMBEDDED_REDIS_TIMEOUT_S`（180）和 `EMBEDDED_POSTGRES_TIMEOUT_S`（600）。
 - **Compose 文件随版本发布。** `docker-compose.yml` 和 `docker-compose-gpu.yml` 已附在此版本上，你可以直接从发布页面下载。
 

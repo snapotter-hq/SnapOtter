@@ -1,12 +1,18 @@
 ---
 description: "SnapOtter के रिलीज़ नोट्स और संस्करण इतिहास। देखें कि हर रिलीज़ में क्या नया, बेहतर और ठीक किया गया है।"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 76c6d18aedb4
 i18n_provenance: machine
-i18n_output_hash: 9ae2cc8f90fa
+i18n_output_hash: ed3ba840288d
 i18n_hash_version: 2
 ---
 
 # चेंजलॉग {#changelog}
+
+## अनरिलीज़्ड {#unreleased}
+
+### अप्रचलित {#unreleased-deprecated}
+
+- **इमेज की पाँचों compress-to-size ऑपरेशन अब अप्रचलित (deprecated) हैं।** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` और `-500kb` OpenAPI स्पेक में deprecated चिह्नित हैं और कम से कम एक माइनर रिलीज़ तक बने रहेंगे। `POST /api/v1/tools/image/compress` भेजें, जिसमें `settings` को `{"mode":"targetSize","targetSizeKb":20}` पर सेट किया गया हो (या 50, 100, 200, 500)। आउटपुट वही रहता है। PDF प्रीसेट पाथ अपरिवर्तित हैं।
 
 ## v2.3.0 {#v2-3-0}
 
@@ -324,11 +330,13 @@ SnapOtter 2.0 इमेज टूलकिट को पूर्ण फ़ा�
 
 ### अपग्रेड {#upgrade}
 
+
 ```bash
 docker pull snapotter/snapotter:2.0.0
 ```
 
 या Docker Compose के साथ:
+
 
 ```bash
 docker compose pull && docker compose up -d
@@ -379,11 +387,13 @@ docker compose pull && docker compose up -d
 
 ### अपग्रेड {#upgrade-1}
 
+
 ```bash
 docker pull snapotter/snapotter:1.17.2
 ```
 
 या Docker Compose के साथ:
+
 
 ```bash
 docker compose pull && docker compose up -d
@@ -424,11 +434,13 @@ docker compose pull && docker compose up -d
 
 ### अपग्रेड {#upgrade-2}
 
+
 ```bash
 docker pull snapotter/snapotter:1.17.1
 ```
 
 या Docker Compose के साथ:
+
 
 ```bash
 docker compose pull && docker compose up -d
@@ -484,11 +496,13 @@ docker compose pull && docker compose up -d
 
 ### अपग्रेड {#upgrade-3}
 
+
 ```bash
 docker pull snapotter/snapotter:1.17.0
 ```
 
 या Docker Compose के साथ:
+
 
 ```bash
 docker compose pull && docker compose up -d
