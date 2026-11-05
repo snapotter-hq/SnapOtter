@@ -9,20 +9,16 @@ import { registerSvgToRasterPreset } from "./svg-to-raster.js";
 /**
  * Narrow settings schema per preset base. Presets lock the output format, so
  * they expose only an optional quality/video knob (or nothing). The locked
- * format is merged in before the base's own processV2 re-validates.
+ * format is merged in before the base's own processV2 re-validates. Only
+ * registry-group bases reach this; the three custom ZIP bases register through
+ * their own parameterized registrars.
  */
 function presetSchema(base: string) {
-  if (base === "convert" || base === "svg-to-raster") {
+  if (base === "convert") {
     return z.object({ quality: z.number().int().min(1).max(100).optional() });
   }
   if (base === "convert-video") {
     return z.object({ quality: z.enum(["high", "balanced", "small"]).optional() });
-  }
-  if (base === "image-to-pdf") {
-    return z.object({
-      pageSize: z.enum(["A4", "Letter", "A3", "A5"]).optional(),
-      orientation: z.enum(["portrait", "landscape"]).optional(),
-    });
   }
   return z.object({});
 }
