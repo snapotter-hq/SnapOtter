@@ -189,7 +189,7 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/unit/ --reporter=verbose --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run tests/unit/ packages/image-engine/tests packages/media-engine/tests packages/doc-engine/tests --reporter=verbose --shard=${{ matrix.shard }}/2
 
   test-unit-result:
     # Keeps the required "Unit Tests" context stable across shard counts, the
