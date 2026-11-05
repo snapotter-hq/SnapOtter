@@ -684,7 +684,16 @@ describe("site-packages import", () => {
       SNAPOTTER_API_TOKEN: "api-token-hunter2",
       HF_TOKEN: "hf-token-hunter2",
       SENTRY_AUTH_TOKEN: "sentry-token-hunter2",
+      // The import never touches the network, so proxy and index credentials stay out too (#4536).
+      HTTPS_PROXY: "http://user:proxy-hunter2@proxy:3128",
+      http_proxy: "http://user:proxy-lower-hunter2@proxy:3128",
+      ALL_PROXY: "socks5://user:proxy-all-hunter2@proxy:1080",
+      PIP_INDEX_URL: "https://user:index-hunter2@pypi.example/simple",
+      PIP_EXTRA_INDEX_URL: "https://user:extra-index-hunter2@pypi.example/simple",
+      PIP_TRUSTED_HOST: "pypi.example",
     };
+    vi.stubEnv("PIP_CONFIG_FILE", join(testRoot, "pip-with-credentials.conf"));
+    vi.stubEnv("SSL_CERT_FILE", "/etc/ssl/offline-import-ca.pem");
     for (const [key, value] of Object.entries(secrets)) vi.stubEnv(key, value);
     try {
       await expectRejectedImport(tarPath, /mediapipe.*env probe/s);
@@ -712,12 +721,13 @@ describe("site-packages import", () => {
       ...[process.env.DATABASE_URL, process.env.REDIS_URL].filter((v): v is string => Boolean(v)),
     ];
     for (const record of records) {
-      for (const key of [...Object.keys(secrets), "DATABASE_URL", "REDIS_URL"]) {
+      for (const key of [...Object.keys(secrets), "DATABASE_URL", "REDIS_URL", "PIP_CONFIG_FILE"]) {
         expect(record.env, `${record.tag} ${record.argv.join(" ")}`).not.toHaveProperty(key);
       }
       const values = Object.values(record.env).join("\n");
       for (const value of forbiddenValues) expect(values).not.toContain(value);
       expect(record.env.PATH).toBe(process.env.PATH);
+      expect(record.env.SSL_CERT_FILE).toBe("/etc/ssl/offline-import-ca.pem");
     }
     expect(pipInstall?.env.PIP_NO_INDEX).toBe("1");
     expect(smoke?.env.HF_HUB_OFFLINE).toBe("1");
