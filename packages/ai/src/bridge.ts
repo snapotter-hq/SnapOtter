@@ -151,6 +151,39 @@ export function buildInstallerEnv(extra: Record<string, string> = {}): Record<st
   return { ...env, ...extra };
 }
 
+/**
+ * Installer variables only a network fetch uses. Proxy and private-index URLs
+ * often embed user:password, and a PIP_CONFIG_FILE can hold the same.
+ */
+const NETWORK_ONLY_INSTALLER_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "PIP_INDEX_URL",
+  "PIP_EXTRA_INDEX_URL",
+  "PIP_TRUSTED_HOST",
+  "PIP_CONFIG_FILE",
+];
+
+/**
+ * Environment for the offline bundle import's venv children. The import runs
+ * code from a user-supplied archive and never touches the network, so it gets
+ * the installer allowlist minus proxy and pip index settings. CA bundle paths
+ * stay: they hold no secrets.
+ */
+export function buildOfflineInstallerEnv(
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const env = buildInstallerEnv();
+  for (const key of NETWORK_ONLY_INSTALLER_KEYS) delete env[key];
+  return { ...env, ...extra };
+}
+
 /** Try the given venv first, then system python. */
 function getPythonPath(venvPath: string = resolveAiVenvPath()): string {
   const path = process.platform === "win32" ? win32 : posix;

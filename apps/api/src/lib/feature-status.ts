@@ -30,6 +30,7 @@ import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
   buildInstallerEnv,
+  buildOfflineInstallerEnv,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
   resolveAiVenvPath,
@@ -1930,7 +1931,7 @@ export async function importBundleArchive(
               stdio: ["ignore", "pipe", "pipe", installLockFd],
               timeout: 30_000,
               encoding: "utf-8",
-              env: buildInstallerEnv(),
+              env: buildOfflineInstallerEnv(),
             },
           );
           if (uninst.error || uninst.status !== 0) {
@@ -2050,7 +2051,7 @@ function resolveVenvSitePackages(venvPath: string): string {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 10_000,
       encoding: "utf-8",
-      env: buildInstallerEnv(),
+      env: buildOfflineInstallerEnv(),
     },
   );
   if (result.error || result.status !== 0 || !result.stdout?.trim()) {
@@ -2154,7 +2155,7 @@ function installFixupWheel(
       stdio: ["ignore", "pipe", "pipe", installLockFd],
       timeout: 30_000,
       encoding: "utf-8",
-      env: buildInstallerEnv({ PIP_NO_INDEX: "1" }),
+      env: buildOfflineInstallerEnv({ PIP_NO_INDEX: "1" }),
     },
   );
   if (result.error || result.status !== 0) {
@@ -2193,7 +2194,7 @@ function verifyBundleSmokeImports(
       encoding: "utf-8",
       // The imported archive is user-supplied and its code runs here (and via
       // any .pth it ships, in every later venv child), so never hand it process.env.
-      env: buildInstallerEnv({
+      env: buildOfflineInstallerEnv({
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONNOUSERSITE: "1",
         HF_HUB_OFFLINE: "1",
