@@ -98,18 +98,6 @@ export interface EditMetadataOptions {
   dateTimeOriginal?: string;
   clearGps?: boolean;
   fieldsToRemove?: string[];
-  gpsLatitude?: number;
-  gpsLongitude?: number;
-  gpsAltitude?: number;
-  keywords?: string[];
-  keywordsMode?: "add" | "set";
-  dateShift?: string;
-  setAllDates?: string;
-  iptcTitle?: string;
-  iptcHeadline?: string;
-  iptcCity?: string;
-  iptcState?: string;
-  iptcCountry?: string;
 }
 
 export interface BrightnessOptions {
