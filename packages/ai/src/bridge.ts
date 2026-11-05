@@ -795,9 +795,10 @@ export class PythonDispatcher {
               aiLog.info(`[python] ${parsed.info}`);
               return;
             }
+            // Warnings still join the request buffer: a CUDA or ORT failure
+            // reported only as a warning has to reach the poison check.
             if (typeof parsed?.warning === "string") {
               aiLog.warn(`[python] ${parsed.warning}`);
-              return;
             }
           } catch {
             // Malformed JSON object - collect as regular stderr.
@@ -1151,7 +1152,6 @@ export class PythonDispatcher {
               }
               if (typeof parsed?.warning === "string") {
                 aiLog.warn(`[python] ${parsed.warning}`);
-                return;
               }
             } catch {
               // Malformed JSON object - collect as regular stderr.
