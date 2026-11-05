@@ -61,22 +61,30 @@ else
   echo "Embedded Postgres: initialized."
 fi
 
+# set_role_password <role> <password>, in single-user mode, so nothing is
+# listening yet. printf is a builtin, so the password is in no process's argv.
+# The settings keep the statement out of the log whatever the data dir's own
+# logging says: log_min_error_statement=panic for a statement that fails, the
+# others for statement logging an operator turned on. A missing snapotter_app (a
+# data dir from before the role split) only errors here; the app creates it at
+# boot with the DATABASE_URL password.
+set_role_password() {
+  printf "ALTER ROLE %s PASSWORD '%s';\n" "$1" "$2" | \
+    s6-setuidgid postgres "$PGBIN/postgres" --single -D "$PGDATA" \
+      -c log_min_error_statement=panic -c log_statement=none \
+      -c log_min_duration_statement=-1 -c log_min_duration_sample=-1 \
+      -c log_transaction_sample_rate=0 postgres > /dev/null
+}
+
 # Secured installs (EMBEDDED_DB_PASSWORDS): TCP needs the per-install passwords.
 # They are set on every boot, so a data dir first created unsecured, or a
-# replaced secret file, converges. Single-user mode, so nothing is listening yet.
-# log_min_error_statement=panic keeps a failed statement, password included, out
-# of the log. A missing snapotter_app (a data dir from before the role split) only
-# errors here; the app creates it at boot with the DATABASE_URL password.
+# replaced secret file, converges. A missing or invalid secret stops the boot.
 if embedded_db_secured "$EMBEDDED_DB_SECRETS_DIR"; then
   OWNER_PW="$(read_embedded_secret "$EMBEDDED_DB_SECRETS_DIR" pg-owner)"
   APP_PW="$(read_embedded_secret "$EMBEDDED_DB_SECRETS_DIR" pg-app)"
   write_embedded_pg_hba "$PGDATA"
-  printf "ALTER ROLE snapotter PASSWORD '%s';\n" "$OWNER_PW" | \
-    s6-setuidgid postgres "$PGBIN/postgres" --single -D "$PGDATA" \
-      -c log_min_error_statement=panic postgres > /dev/null
-  printf "ALTER ROLE snapotter_app PASSWORD '%s';\n" "$APP_PW" | \
-    s6-setuidgid postgres "$PGBIN/postgres" --single -D "$PGDATA" \
-      -c log_min_error_statement=panic postgres > /dev/null
+  set_role_password snapotter "$OWNER_PW"
+  set_role_password snapotter_app "$APP_PW"
   unset OWNER_PW APP_PW
   echo "Embedded Postgres: per-install passwords applied."
 fi

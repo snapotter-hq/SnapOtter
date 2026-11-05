@@ -508,6 +508,20 @@ async function main() {
   !secretValues.some((secret) => logs9.includes(secret) || commandLines.includes(secret))
     ? ok("no password in the logs or on a command line")
     : bad("a per-install password reached the logs or a command line");
+  // Nor in the database servers' environment, which any account with the
+  // server's UID can read in /proc. The app itself needs its URLs.
+  const serverEnvs = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'for d in /proc/[0-9]*; do c="$(cat "$d/comm" 2>/dev/null)"; case "$c" in postgres|redis-server) echo "== $c"; tr "\\0" "\\n" < "$d/environ";; esac; done',
+  ]);
+  serverEnvs.includes("== postgres") &&
+  serverEnvs.includes("== redis-server") &&
+  !/^(DATABASE_URL|DATABASE_MIGRATION_URL|REDIS_URL|REDISCLI_AUTH)=/m.test(serverEnvs)
+    ? ok("the database servers run without the connection URLs")
+    : bad("a database server's environment carries a connection URL");
   // docker exec starts without the entrypoint's exports, so this proves
   // snapotter-admin finds both databases on its own: Postgres for the user
   // lookup, Redis for the throttle key.

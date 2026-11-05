@@ -446,6 +446,23 @@ describe("embedded-lib.sh per-install database secrets", () => {
   });
 });
 
+describe("embedded-lib.sh exec_without_db_urls", () => {
+  it("starts the command without the variables that carry the passwords", () => {
+    const r = runLib("exec_without_db_urls env", {
+      DATABASE_URL: "postgres://snapotter_app:a@127.0.0.1:5432/snapotter",
+      DATABASE_MIGRATION_URL: "postgres://snapotter:b@127.0.0.1:5432/snapotter",
+      REDIS_URL: "redis://:c@127.0.0.1:6379",
+      REDISCLI_AUTH: "c",
+      EMBEDDED_REDIS_PORT: "16379",
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).not.toMatch(
+      /^(DATABASE_URL|DATABASE_MIGRATION_URL|REDIS_URL|REDISCLI_AUTH)=/m,
+    );
+    expect(r.stdout).toMatch(/^EMBEDDED_REDIS_PORT=16379$/m);
+  });
+});
+
 // Probe stubs live in a temp dir prepended to PATH: the readiness helpers call
 // redis-cli / pg_isready by name, and neither exists on a dev machine. The
 // `sleep` stub records each call and then really sleeps, because the wait loop's

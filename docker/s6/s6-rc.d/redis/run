@@ -4,7 +4,7 @@
 REDIS_CONF=/run/snapotter-redis.conf
 write_embedded_redis_conf "$REDIS_CONF" "$EMBEDDED_DB_SECRETS_DIR" || exit 1
 chown snapotter:snapotter "$REDIS_CONF" || exit 1
-exec s6-setuidgid snapotter redis-server "$REDIS_CONF" \
+exec_without_db_urls s6-setuidgid snapotter redis-server "$REDIS_CONF" \
   --dir /data/redis \
   --bind 127.0.0.1 \
   --port "${EMBEDDED_REDIS_PORT:-6379}" \

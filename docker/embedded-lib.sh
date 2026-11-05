@@ -309,6 +309,15 @@ export_embedded_db_env() {
   unset _eede_pg_port _eede_redis_port _eede_owner _eede_app _eede_redis
 }
 
+# exec_without_db_urls <command> [args...]
+# Runs <command> in place of the shell without the variables
+# export_embedded_db_env sets that carry the passwords. The database servers
+# need none of them, and /proc/<pid>/environ is readable by any account with the
+# server's UID, on the host as well as in the container.
+exec_without_db_urls() {
+  exec env -u DATABASE_URL -u DATABASE_MIGRATION_URL -u REDIS_URL -u REDISCLI_AUTH "$@"
+}
+
 # wait_for_service <label> <timeout_seconds> <expect> <probe> [args...]
 # Polls <probe> once a second until it exits 0 and, when <expect> is non-empty,
 # its output contains that string. Returns 0 the moment that holds. On timeout it
