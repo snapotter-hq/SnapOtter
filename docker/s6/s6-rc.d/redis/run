@@ -2,7 +2,7 @@
 . /usr/local/bin/embedded-lib.sh
 # A secured install's requirepass lives in this file, never on the command line.
 REDIS_CONF=/run/snapotter-redis.conf
-write_embedded_redis_conf "$REDIS_CONF" /data/.secrets || exit 1
+write_embedded_redis_conf "$REDIS_CONF" "$EMBEDDED_DB_SECRETS_DIR" || exit 1
 chown snapotter:snapotter "$REDIS_CONF" || exit 1
 exec s6-setuidgid snapotter redis-server "$REDIS_CONF" \
   --dir /data/redis \

@@ -10,7 +10,6 @@ PGDATA=/data/postgres
 PGBIN=/usr/lib/postgresql/17/bin
 INSTALLED_MAJOR=17
 TMP=/data/postgres.bootstrapping   # same filesystem as PGDATA so the mv is atomic
-SECRETS=/data/.secrets
 
 # Clean any interrupted previous bootstrap.
 rm -rf "$TMP"
@@ -68,9 +67,9 @@ fi
 # log_min_error_statement=panic keeps a failed statement, password included, out
 # of the log. A missing snapotter_app (a data dir from before the role split) only
 # errors here; the app creates it at boot with the DATABASE_URL password.
-if embedded_db_secured "$SECRETS"; then
-  OWNER_PW="$(read_embedded_secret "$SECRETS" pg-owner)"
-  APP_PW="$(read_embedded_secret "$SECRETS" pg-app)"
+if embedded_db_secured "$EMBEDDED_DB_SECRETS_DIR"; then
+  OWNER_PW="$(read_embedded_secret "$EMBEDDED_DB_SECRETS_DIR" pg-owner)"
+  APP_PW="$(read_embedded_secret "$EMBEDDED_DB_SECRETS_DIR" pg-app)"
   write_embedded_pg_hba "$PGDATA"
   printf "ALTER ROLE snapotter PASSWORD '%s';\n" "$OWNER_PW" | \
     s6-setuidgid postgres "$PGBIN/postgres" --single -D "$PGDATA" \

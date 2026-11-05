@@ -3,8 +3,9 @@
 # Sourced by docker/entrypoint.sh, docker/snapotter-admin,
 # docker/embedded/postgres-bootstrap.sh and the s6 service scripts. Kept in its
 # own file so the decision logic can be unit-tested directly
-# (tests/unit/security/embedded-mode.test.ts) rather than mirrored. Sourcing has
-# no side effects, only function definitions. POSIX sh only (no bashisms).
+# (tests/unit/security/embedded-mode.test.ts) rather than mirrored. Sourcing
+# only defines functions and a few constants, and has no other side effects.
+# POSIX sh only (no bashisms).
 #
 # Functions use _-prefixed locals (sh has no portable `local`).
 
@@ -113,34 +114,79 @@ embedded_port() {
 # Per-install database passwords (EMBEDDED_DB_PASSWORDS=1). Without a private
 # network namespace, such as with --network host, other local programs can
 # reach 127.0.0.1, so the fixed passwords and trust auth that are safe behind
-# Docker's network namespace are not. Once these files exist they are used on
-# every boot, even if the variable is later unset, so a secured install never
-# falls back to trust.
+# Docker's network namespace are not. An install is secured once
+# EMBEDDED_DB_SECRETS_DIR exists, even if the variable is later unset, and from
+# then on every secret has to be valid: a missing or broken one stops whatever
+# needs it instead of falling back to trust, the fixed passwords or an open
+# Redis.
+# shellcheck disable=SC2034 # read by the scripts that source this file
+EMBEDDED_DB_SECRETS_DIR=/data/.secrets
 EMBEDDED_DB_SECRET_NAMES="pg-owner pg-app redis"
 
-# embedded_db_secured <dir>: returns 0 when every secret file exists.
-embedded_db_secured() {
-  for _eds_name in $EMBEDDED_DB_SECRET_NAMES; do
-    [ -f "$1/$_eds_name" ] || return 1
-  done
-  return 0
+# embedded_db_passwords_requested
+# Echoes 1 when EMBEDDED_DB_PASSWORDS is 1, or 0 when it is unset, empty or 0.
+# Any other value prints a fatal message and returns 1, so a setting such as
+# `true` can't leave an install on trust auth without anyone noticing.
+embedded_db_passwords_requested() {
+  case "${EMBEDDED_DB_PASSWORDS:-}" in
+    "" | 0) printf '0\n' ;;
+    1) printf '1\n' ;;
+    *)
+      printf 'FATAL: EMBEDDED_DB_PASSWORDS must be 1 or 0, not "%s".\n' "$EMBEDDED_DB_PASSWORDS" >&2
+      return 1
+      ;;
+  esac
 }
 
-# ensure_embedded_db_secrets <dir>: creates whichever secrets are missing, as 64
-# hex characters from /dev/urandom. Hex needs no quoting in a URL or in SQL.
-# g-s as well as 700: a directory made under the image's setgid /data inherits
-# the bit, and GNU chmod keeps a directory's setgid bit through `chmod 700`.
+# embedded_db_secured <dir>: returns 0 when <dir> exists, in any form, which
+# makes the install a secured one.
+embedded_db_secured() {
+  [ -e "$1" ] || [ -L "$1" ]
+}
+
+# embedded_secret_ok <value>: returns 0 when <value> is exactly 64 lowercase hex
+# characters, the only form a secret may take, because it is spliced into SQL
+# and connection URLs unquoted.
+embedded_secret_ok() {
+  case "$1" in
+    "" | *[!0-9a-f]*) return 1 ;;
+  esac
+  [ "${#1}" -eq 64 ]
+}
+
+# ensure_embedded_db_secrets <dir>: run on every boot of a secured install.
+# Creates whichever secrets are missing, as 64 hex characters from /dev/urandom,
+# and refuses one that is there but unusable. It also takes the directory back:
+# booting with external databases hands all of /data to the app user, so the
+# directory and its files go back to the account running the boot (root in the
+# image), 700 and 600. g-s as well as 700: a directory made under the image's
+# setgid /data inherits the bit, and GNU chmod keeps it through `chmod 700`.
 ensure_embedded_db_secrets() {
   _ees_dir="$1"
-  if ! mkdir -p "$_ees_dir" || ! chmod 700 "$_ees_dir" || ! chmod g-s "$_ees_dir"; then
+  if [ -L "$_ees_dir" ]; then
+    printf 'FATAL: %s has to be a directory, not a symbolic link.\n' "$_ees_dir" >&2
+    return 1
+  fi
+  if ! mkdir -p "$_ees_dir" || ! chown -R "$(id -u):$(id -g)" "$_ees_dir" ||
+    ! chmod 700 "$_ees_dir" || ! chmod g-s "$_ees_dir"; then
     printf 'FATAL: could not create %s for the embedded database passwords.\n' "$_ees_dir" >&2
     return 1
   fi
   for _ees_name in $EMBEDDED_DB_SECRET_NAMES; do
-    [ -f "$_ees_dir/$_ees_name" ] && continue
+    _ees_file="$_ees_dir/$_ees_name"
+    if [ -e "$_ees_file" ] || [ -L "$_ees_file" ]; then
+      (read_embedded_secret "$_ees_dir" "$_ees_name" > /dev/null) || return 1
+      chmod 600 "$_ees_file" || return 1
+      continue
+    fi
+    # Removed first, so a leftover file or link by that name can't redirect the
+    # write, and checked before the rename, so a failed read of /dev/urandom
+    # can't leave an empty secret behind.
     _ees_tmp="$_ees_dir/.$_ees_name.tmp"
+    rm -f "$_ees_tmp"
     if ! (umask 077 && od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$_ees_tmp") ||
-      ! mv "$_ees_tmp" "$_ees_dir/$_ees_name"; then
+      ! embedded_secret_ok "$(cat "$_ees_tmp" 2>/dev/null)" ||
+      ! mv "$_ees_tmp" "$_ees_file"; then
       rm -f "$_ees_tmp"
       printf 'FATAL: could not write the embedded %s password in %s.\n' "$_ees_name" "$_ees_dir" >&2
       return 1
@@ -149,17 +195,24 @@ ensure_embedded_db_secrets() {
   return 0
 }
 
-# read_embedded_secret <dir> <name>: echoes the secret. Anything other than
-# exactly 64 lowercase hex characters is refused, because the value is spliced
-# into SQL and connection URLs.
+# read_embedded_secret <dir> <name>: echoes the secret, which has to be a
+# regular file of exactly 64 lowercase hex characters. Anything else is refused,
+# and the message says how to recover: every boot generates the secrets that
+# are missing and applies them all again.
 read_embedded_secret() {
-  _res_value="$(cat "$1/$2" 2>/dev/null)" || _res_value=""
-  case "$_res_value" in
-    "" | *[!0-9a-f]*) _res_ok=no ;;
-    *) _res_ok=yes ;;
-  esac
-  if [ "$_res_ok" = no ] || [ "${#_res_value}" -ne 64 ]; then
-    printf 'FATAL: %s/%s is not a valid embedded database password.\n' "$1" "$2" >&2
+  _res_file="$1/$2"
+  if [ ! -e "$_res_file" ] && [ ! -L "$_res_file" ]; then
+    printf 'FATAL: %s is missing. Restart the container: every boot generates missing passwords and applies them.\n' \
+      "$_res_file" >&2
+    return 1
+  fi
+  _res_value=""
+  if [ -f "$_res_file" ] && [ ! -L "$_res_file" ]; then
+    _res_value="$(cat "$_res_file" 2>/dev/null)" || _res_value=""
+  fi
+  if ! embedded_secret_ok "$_res_value"; then
+    printf 'FATAL: %s is not a valid embedded database password (a file of 64 lowercase hex characters). It is safe to delete it and restart the container: every boot generates missing passwords and applies them.\n' \
+      "$_res_file" >&2
     return 1
   fi
   printf '%s\n' "$_res_value"
@@ -174,6 +227,8 @@ read_embedded_secret() {
 # is what guards that login.
 write_embedded_pg_hba() {
   _wph_tmp="$1/pg_hba.conf.tmp"
+  # Removed first, so a leftover file or link by that name can't redirect the write.
+  rm -f "$_wph_tmp"
   if ! printf '%s\n' \
     "# Managed by SnapOtter (EMBEDDED_DB_PASSWORDS). Rewritten on every boot." \
     "local all all trust" \
@@ -187,8 +242,14 @@ write_embedded_pg_hba() {
 
 # write_embedded_redis_conf <file> <secrets_dir>: the config file redis-server
 # reads first. A secured install gets requirepass here, not on the command line,
-# because /proc/<pid>/cmdline is readable by every local user.
+# because /proc/<pid>/cmdline is readable by every local user. s6 runs this
+# again whenever Redis restarts, long after the boot checked the secrets, so a
+# secret that has gone missing since then stops Redis instead of opening it.
 write_embedded_redis_conf() {
+  if [ -z "$2" ]; then
+    printf 'FATAL: write_embedded_redis_conf needs the secrets directory.\n' >&2
+    return 1
+  fi
   if embedded_db_secured "$2"; then
     _wrc_pw="$(read_embedded_secret "$2" redis)" || return 1
     (umask 077 && printf 'requirepass %s\n' "$_wrc_pw" > "$1") || return 1
@@ -200,12 +261,16 @@ write_embedded_redis_conf() {
 # export_embedded_db_env <secrets_dir>
 # Validates EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT (unset or empty means 5432
 # and 6379) and exports them, with the URLs the app reaches the embedded
-# databases through. A secured install (every secret present in <secrets_dir>)
-# gets its per-install passwords. The entrypoint calls it before s6 starts.
-# snapotter-admin calls it too, because a `docker exec` shell never sees the
-# entrypoint's exports. Nothing is set until everything has passed, so a
-# refusal leaves the caller's variables as they were.
+# databases through. A secured install (<secrets_dir> exists) gets its
+# per-install passwords and fails without all three. The entrypoint calls it
+# before s6 starts. snapotter-admin calls it too, because a `docker exec` shell
+# never sees the entrypoint's exports. Nothing is set until everything has
+# passed, so a refusal leaves the caller's variables as they were.
 export_embedded_db_env() {
+  if [ -z "$1" ]; then
+    printf 'FATAL: export_embedded_db_env needs the secrets directory.\n' >&2
+    return 1
+  fi
   _eede_pg_port="$(embedded_port EMBEDDED_PG_PORT "${EMBEDDED_PG_PORT:-5432}")" || return 1
   _eede_redis_port="$(embedded_port EMBEDDED_REDIS_PORT "${EMBEDDED_REDIS_PORT:-6379}")" || return 1
   # Otherwise Redis takes the port first and Postgres retries the bind until its

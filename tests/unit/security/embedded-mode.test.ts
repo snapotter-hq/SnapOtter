@@ -2,10 +2,12 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -163,6 +165,16 @@ describe("embedded-lib.sh embedded_port", () => {
 });
 
 describe("embedded-lib.sh export_embedded_db_env", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "db-env-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // No secrets directory, so the install runs on the fixed passwords.
+  const exportEnv = () => `export_embedded_db_env "${join(dir, "secrets")}"`;
   const printEnv =
     'printf "%s\\n" "$EMBEDDED_PG_PORT" "$EMBEDDED_REDIS_PORT" "$DATABASE_URL" "$DATABASE_MIGRATION_URL" "$REDIS_URL"';
 
@@ -172,7 +184,7 @@ describe("embedded-lib.sh export_embedded_db_env", () => {
       { EMBEDDED_PG_PORT: "", EMBEDDED_REDIS_PORT: "" },
     ];
     for (const env of unsetOrEmpty) {
-      const r = runLib(`export_embedded_db_env && ${printEnv}`, env);
+      const r = runLib(`${exportEnv()} && ${printEnv}`, env);
       expect(r.status).toBe(0);
       expect(r.stdout.split("\n")).toEqual([
         "5432",
@@ -185,7 +197,7 @@ describe("embedded-lib.sh export_embedded_db_env", () => {
   });
 
   it("puts the configured ports in every URL", () => {
-    const r = runLib(`export_embedded_db_env && ${printEnv}`, {
+    const r = runLib(`${exportEnv()} && ${printEnv}`, {
       EMBEDDED_PG_PORT: "15432",
       EMBEDDED_REDIS_PORT: "16379",
     });
@@ -200,7 +212,7 @@ describe("embedded-lib.sh export_embedded_db_env", () => {
   });
 
   it("stops on a bad port instead of building URLs around it", () => {
-    const r = runLib("export_embedded_db_env", { EMBEDDED_REDIS_PORT: "6379x" });
+    const r = runLib(exportEnv(), { EMBEDDED_REDIS_PORT: "6379x" });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("EMBEDDED_REDIS_PORT must be a port number from 1 to 65535");
   });
@@ -208,12 +220,35 @@ describe("embedded-lib.sh export_embedded_db_env", () => {
   it("refuses one port for both databases", () => {
     // Redis would take it first, and Postgres would retry the bind until its
     // readiness timeout ran out, ten minutes by default.
-    const r = runLib("export_embedded_db_env", {
+    const r = runLib(exportEnv(), {
       EMBEDDED_PG_PORT: "16379",
       EMBEDDED_REDIS_PORT: "16379",
     });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both 16379");
+  });
+});
+
+describe("embedded-lib.sh embedded_db_passwords_requested", () => {
+  const accepted: Array<[string, string, Record<string, string>]> = [
+    ["unset", "0", {}],
+    ["empty", "0", { EMBEDDED_DB_PASSWORDS: "" }],
+    ["0", "0", { EMBEDDED_DB_PASSWORDS: "0" }],
+    ["1", "1", { EMBEDDED_DB_PASSWORDS: "1" }],
+  ];
+
+  it.each(accepted)("reads %s as %s", (_label, expected, env) => {
+    const r = runLib("embedded_db_passwords_requested", env);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe(expected);
+  });
+
+  it.each(["true", "yes", "on", "2", " 1", "1 "])("refuses %j and names the variable", (value) => {
+    // Only 1 turns the passwords on, so any other value would quietly leave the
+    // databases on trust auth.
+    const r = runLib("embedded_db_passwords_requested", { EMBEDDED_DB_PASSWORDS: value });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("EMBEDDED_DB_PASSWORDS must be 1 or 0");
   });
 });
 
@@ -254,12 +289,36 @@ describe("embedded-lib.sh per-install database secrets", () => {
     expect(statSync(secrets()).mode & 0o7777).toBe(0o700);
   });
 
-  it("counts an install as secured only when every secret exists", () => {
-    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(1);
+  it("puts the directory and secret modes back on every boot", () => {
     runLib(`ensure_embedded_db_secrets "${secrets()}"`);
-    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(0);
-    rmSync(join(secrets(), "redis"));
+    chmodSync(secrets(), 0o755);
+    chmodSync(join(secrets(), "pg-owner"), 0o644);
+    expect(runLib(`ensure_embedded_db_secrets "${secrets()}"`).status).toBe(0);
+    expect(mode(secrets())).toBe(0o700);
+    expect(mode(join(secrets(), "pg-owner"))).toBe(0o600);
+  });
+
+  it("keeps no secret when the random source fails", () => {
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "od"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    const r = runLib(`ensure_embedded_db_secrets "${secrets()}"`, {
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("could not write the embedded pg-owner password");
+    expect(existsSync(join(secrets(), "pg-owner"))).toBe(false);
+  });
+
+  it("counts an install as secured once its secrets directory exists", () => {
     expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(1);
+    mkdirSync(secrets());
+    // Empty, or later missing a file, it still counts: from here on every
+    // consumer insists on valid secrets instead of falling back.
+    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(0);
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    rmSync(join(secrets(), "redis"));
+    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(0);
   });
 
   it("reads a valid secret and refuses one that could break out of SQL or a URL", () => {
@@ -272,6 +331,24 @@ describe("embedded-lib.sh per-install database secrets", () => {
       const r = runLib(`read_embedded_secret "${secrets()}" pg-app`);
       expect(r.status).toBe(1);
       expect(r.stderr).toContain("is not a valid embedded database password");
+    }
+  });
+
+  it.each(["directory", "symbolic link"])("refuses a %s in place of a secret", (kind) => {
+    // A directory there used to swallow the generated file, and the install then
+    // fell back to the fixed passwords and an open Redis.
+    mkdirSync(secrets());
+    const taken = join(secrets(), "pg-app");
+    if (kind === "directory") {
+      mkdirSync(taken);
+    } else {
+      writeFileSync(join(dir, "elsewhere"), "a".repeat(64));
+      symlinkSync(join(dir, "elsewhere"), taken);
+    }
+    for (const call of ["ensure_embedded_db_secrets", "export_embedded_db_env"]) {
+      const r = runLib(`${call} "${secrets()}"`);
+      expect(r.status, call).toBe(1);
+      expect(r.stderr, call).toContain(`${taken} is not a valid embedded database password`);
     }
   });
 
@@ -297,6 +374,24 @@ describe("embedded-lib.sh per-install database secrets", () => {
     const r = runLib(`export_embedded_db_env "${secrets()}"`);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("pg-owner is not a valid embedded database password");
+  });
+
+  it("fails closed when a secret goes missing after boot", () => {
+    // s6 restarts Redis on its own, long after the entrypoint ran. Falling back
+    // to an empty config there would bring Redis up with no password.
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    rmSync(join(secrets(), "redis"));
+    const missing = `${join(secrets(), "redis")} is missing`;
+    const conf = join(dir, "redis.conf");
+    const redis = runLib(`write_embedded_redis_conf "${conf}" "${secrets()}"`);
+    expect(redis.status).toBe(1);
+    expect(redis.stderr).toContain(missing);
+    expect(existsSync(conf)).toBe(false);
+    const env = runLib(
+      `export_embedded_db_env "${secrets()}"\nprintf '%s|%s' "$?" "\${REDIS_URL-unset}"`,
+    );
+    expect(env.stdout).toBe("1|unset");
+    expect(env.stderr).toContain(missing);
   });
 
   it("leaves the caller's port variables as they were when it refuses", () => {
@@ -337,6 +432,17 @@ describe("embedded-lib.sh per-install database secrets", () => {
     const password = readFileSync(join(secrets(), "redis"), "utf8");
     expect(readFileSync(conf, "utf8")).toBe(`requirepass ${password}\n`);
     expect(mode(conf)).toBe(0o600);
+  });
+
+  it("refuses an empty secrets directory rather than looking for secrets at /", () => {
+    for (const call of [
+      'export_embedded_db_env ""',
+      `write_embedded_redis_conf "${join(dir, "redis.conf")}" ""`,
+    ]) {
+      const r = runLib(call);
+      expect(r.status, call).toBe(1);
+      expect(r.stderr, call).toContain("needs the secrets directory");
+    }
   });
 });
 
