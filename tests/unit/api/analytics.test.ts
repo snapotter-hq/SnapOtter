@@ -1,3 +1,4 @@
+import { APP_VERSION } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const bakedConfig = vi.hoisted(() => ({
@@ -232,7 +233,7 @@ describe("trackEvent", () => {
     expect(mockCapture).toHaveBeenCalledWith({
       distinctId: "did-boot",
       event: "instance_started",
-      properties: { arch: "arm64" },
+      properties: { arch: "arm64", app_version: APP_VERSION },
     });
   });
 
@@ -251,8 +252,54 @@ describe("trackEvent", () => {
       distinctId: "unknown",
       event: "tool_used",
       // error_message is free-text and never allow-listed.
-      properties: { tool_id: "resize", status: "completed" },
+      properties: { tool_id: "resize", status: "completed", app_version: APP_VERSION },
     });
+  });
+
+  // #4215: failures could not be split by release because server events
+  // carried no version.
+  it.each([
+    ["tool_used", { tool_id: "resize", status: "failed" }],
+    ["pipeline_executed", { step_count: 2, status: "completed" }],
+    ["ai_bundle_action", { bundle_id: "ocr", action: "installed" }],
+    ["instance_started", { arch: "arm64" }],
+    ["auth_login", { method: "local" }],
+  ])("stamps app_version on %s", async (event, props) => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.trackEvent(event, props, "did-1", { ignoreSampleRate: true });
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockCapture.mock.calls[0][0].properties.app_version).toBe(APP_VERSION);
+  });
+
+  it("does not let a caller override app_version", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.trackEvent("tool_used", { tool_id: "resize", app_version: "9.9.9" });
+    expect(mockCapture.mock.calls[0][0].properties.app_version).toBe(APP_VERSION);
+  });
+
+  it("sends nothing, version included, once analytics is switched off", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+    bakedConfig.enabled = false;
+
+    await mod.trackEvent("tool_used", { tool_id: "resize" });
+    expect(mockCapture).not.toHaveBeenCalled();
+  });
+
+  it("adds no properties to an event that is not allow-listed", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.trackEvent("totally_new_event", { x: 1 });
+    expect(mockCapture.mock.calls[0][0].properties).toEqual({});
   });
 
   it("uses provided distinctId when given", async () => {
