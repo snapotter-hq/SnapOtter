@@ -180,11 +180,11 @@ const BAKED_BASE_VENV = "/opt/venv";
 const RESEED_SCRIPT = "/usr/local/bin/reseed-ai-venv.sh";
 
 /**
- * True where AI bundles are installed on demand into a shared venv we manage:
- * the official image, and native installs (bare metal, the community-scripts
- * LXC) that point FEATURE_MANIFEST_PATH at a manifest. False on a plain dev
- * checkout, where the developer's own venv already has the ML packages and
- * every bundle reports as installed.
+ * True in a container, or wherever a feature manifest exists. The default
+ * manifest path is docker/feature-manifest.json, which every checkout has, so
+ * this is true on a dev checkout too; only a FEATURE_MANIFEST_PATH pointing at
+ * a missing file makes it false. Bundle status and the tool gates both read
+ * installed.json regardless, so this only decides whether ensureAiDirs() runs.
  */
 export function isManagedAiEnvironment(): boolean {
   return existsSync("/.dockerenv") || existsSync(MANIFEST_PATH);
