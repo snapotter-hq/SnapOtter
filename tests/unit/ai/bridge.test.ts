@@ -4674,6 +4674,29 @@ describe("bridge - pre-dispatch sidecar memory floor (issue #1162)", () => {
     }
   });
 
+  it("counts a WSL2 NVIDIA GPU before the first probe (#4449)", async () => {
+    const { isNvidiaDevicePresent } = await import("../../../packages/ai/src/bridge.js");
+    const savedGpu = process.env.SNAPOTTER_GPU;
+    const savedVisible = process.env.CUDA_VISIBLE_DEVICES;
+    onTestFinished(() => {
+      if (savedGpu === undefined) delete process.env.SNAPOTTER_GPU;
+      else process.env.SNAPOTTER_GPU = savedGpu;
+      if (savedVisible === undefined) delete process.env.CUDA_VISIBLE_DEVICES;
+      else process.env.CUDA_VISIBLE_DEVICES = savedVisible;
+    });
+    delete process.env.SNAPOTTER_GPU;
+    delete process.env.CUDA_VISIBLE_DEVICES;
+
+    // Docker on WSL2 through the toolkit's legacy hook: /dev/dxg and no /dev/nvidia*.
+    const wslDocker = (p: string) =>
+      p === "/dev/dxg" || p === "/usr/lib/x86_64-linux-gnu/libcuda.so.1";
+    expect(isNvidiaDevicePresent(wslDocker)).toBe(true);
+    expect(isNvidiaDevicePresent((p) => p === "/dev/dxg")).toBe(false);
+
+    process.env.SNAPOTTER_GPU = "0";
+    expect(isNvidiaDevicePresent(wslDocker)).toBe(false);
+  });
+
   it("uses probed dispatcher GPU state when ready and falls back to deviceExists on cold start", async () => {
     const { initDispatcher, runPythonWithProgress, shutdownDispatcher } = await import(
       "../../../packages/ai/src/bridge.js"

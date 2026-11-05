@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { isSafeMessageError, SafeError } from "@snapotter/shared";
+import { isSafeMessageError, nvidiaDeviceVisible, SafeError } from "@snapotter/shared";
 import {
   type GpuFramework,
   type GpuFrameworks,
@@ -436,7 +436,7 @@ export function isNvidiaDevicePresent(
   if (gpuEnv === "0" || gpuEnv === "false" || gpuEnv === "no") return false;
   const visible = process.env.CUDA_VISIBLE_DEVICES?.trim();
   if (visible === "" || visible === "-1" || visible?.toLowerCase() === "none") return false;
-  return deviceExists("/dev/nvidiactl") || deviceExists("/dev/nvidia0");
+  return nvidiaDeviceVisible(deviceExists);
 }
 
 function pythonAbortError(): Error {
