@@ -245,17 +245,23 @@ test.describe("Navbar Star button", () => {
     await expect(star).toHaveAccessibleName(/^Star on GitHub \(.+\)$/);
   });
 
-  // The Ukrainian nav has no room for the label at this width, so it must drop
-  // to octocat + count instead of pushing the CTAs past the container.
+  // The Ukrainian nav has no room for the label at this width, so it drops to
+  // octocat + count. The row can still overflow without the label (#4521, and
+  // wider on Linux fonts), so assert only that the label is what gives way.
   test("drops the label when a localized nav would overflow", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/uk/");
     const star = page.locator("[data-star-button]");
     await expect(star).toHaveAttribute("data-compact", "");
     await expect(star.getByText("Зірка", { exact: true })).toBeHidden();
-    const overflow = await page
-      .locator("[data-nav-row]")
-      .evaluate((row) => row.scrollWidth - row.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
+    const fullOverflow = await page.locator("[data-nav-row]").evaluate((row) => {
+      const button = row.querySelector<HTMLElement>("[data-star-button]");
+      if (!button) return 0;
+      delete button.dataset.compact;
+      const overflow = row.scrollWidth - row.clientWidth;
+      button.dataset.compact = "";
+      return overflow;
+    });
+    expect(fullOverflow).toBeGreaterThan(0);
   });
 });
