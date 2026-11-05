@@ -239,6 +239,10 @@ vi.mock("@snapotter/ai", () => ({
     PATH: process.env.PATH ?? "",
     ...extra,
   }),
+  buildOfflineInstallerEnv: (extra: Record<string, string> = {}) => ({
+    PATH: process.env.PATH ?? "",
+    ...extra,
+  }),
   getOcrRuntimeEffectiveMemoryBytes: ocrRuntime.getEffectiveMemory,
   getOcrRuntimeCapability: ocrRuntime.getCapability,
   selectOcrRuntimeTarget: ocrRuntime.selectTarget,
