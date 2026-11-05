@@ -71,10 +71,11 @@ const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
     // The address the API binds. Containers keep 0.0.0.0 so published ports
-    // work. Outside a container the API shares the machine's network, and
-    // 127.0.0.1 keeps it off the LAN. Anything but an IP stops the boot, so an
-    // empty or mistyped value never quietly widens the bind to 0.0.0.0. tcsh
-    // sets HOST to the machine name, so the message shows the value it got.
+    // work. Outside a container, or in one on the host network, the API shares
+    // the machine's network, and 127.0.0.1 keeps it off the LAN. Anything but
+    // an IP stops the boot, so an empty or mistyped value never quietly widens
+    // the bind to 0.0.0.0. tcsh sets HOST to the machine name, so the message
+    // shows the value it got.
     HOST: z
       .string()
       .default("0.0.0.0")
