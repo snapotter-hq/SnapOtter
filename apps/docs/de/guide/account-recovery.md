@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 84cad1747158
+i18n_output_hash: 977487114c13
 i18n_hash_version: 2
 ---
 # Kontowiederherstellung {#account-recovery}
@@ -82,8 +82,8 @@ Als letzten Ausweg auf jeder Version setzt du die Richtlinie in der Datenbank. A
 All-in-One-Image läuft Postgres innerhalb des Containers:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 Beim Setup mit mehreren Containern richtest du `psql` stattdessen auf dein eigenes `DATABASE_URL`.

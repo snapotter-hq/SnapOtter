@@ -763,7 +763,7 @@ export const th: TranslationKeys = {
     },
     collage: {
       name: "คอลลาจและกริด",
-      description: "รวมภาพเป็นคอลลาจกริดสวยงามด้วยเทมเพลตกว่า 25 แบบ",
+      description: "รวมภาพเป็นคอลลาจกริดสวยงามด้วยเทมเพลตหลากหลายแบบ",
     },
     stitch: {
       name: "ต่อและรวมภาพ",
@@ -848,7 +848,7 @@ export const th: TranslationKeys = {
     },
     "convert-video": {
       name: "แปลงวิดีโอ",
-      description: "แปลงวิดีโอระหว่าง MP4, MOV และ WebM",
+      description: "แปลงวิดีโอระหว่าง MP4, MOV, WebM, AVI และ MKV",
     },
     "compress-video": {
       name: "บีบอัดวิดีโอ",
@@ -1605,6 +1605,7 @@ export const th: TranslationKeys = {
       separatePdfMode: "PDF แยก หนึ่งไฟล์ต่อหนึ่งภาพ",
       combineAllImages: "รวมทุกภาพเป็น PDF เดียว",
       pageSize: "ขนาดหน้า",
+      pageSizeLetter: "US Letter",
       orientation: "การวางแนว",
       portrait: "แนวตั้ง",
       landscape: "แนวนอน",
@@ -2811,6 +2812,7 @@ export const th: TranslationKeys = {
       stretchMode: "ยืด",
       cropMode: "ครอป",
       alignment: "การจัดตำแหน่ง",
+      allCaps: "ตัวพิมพ์ใหญ่ทั้งหมด",
       start: "เริ่มต้น",
       center: "กลาง",
       end: "ท้าย",
@@ -4006,6 +4008,8 @@ export const th: TranslationKeys = {
     cancelButton: "ยกเลิก",
     readyCount: "{count} พร้อม",
     failedStatus: "ล้มเหลว",
+    fetchFailed: "ไม่สามารถดึง URL นี้ได้ (ข้อผิดพลาด {status})",
+    downloadFailed: "ไม่สามารถดาวน์โหลดไฟล์นี้ได้ (ข้อผิดพลาด {status})",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[ไฟล์ของฉัน](https://example.com/recording.mp3)",
   },

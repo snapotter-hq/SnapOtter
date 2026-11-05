@@ -1,8 +1,13 @@
 #!/command/with-contenv sh
-exec s6-setuidgid snapotter redis-server \
+. /usr/local/bin/embedded-lib.sh
+# A secured install's requirepass lives in this file, never on the command line.
+REDIS_CONF=/run/snapotter-redis.conf
+write_embedded_redis_conf "$REDIS_CONF" "$EMBEDDED_DB_SECRETS_DIR" || exit 1
+chown snapotter:snapotter "$REDIS_CONF" || exit 1
+exec_without_db_urls s6-setuidgid snapotter redis-server "$REDIS_CONF" \
   --dir /data/redis \
   --bind 127.0.0.1 \
-  --port 6379 \
+  --port "${EMBEDDED_REDIS_PORT:-6379}" \
   --maxmemory-policy noeviction \
   --appendonly yes \
   --maxmemory "${REDIS_MAXMEMORY:-512mb}"

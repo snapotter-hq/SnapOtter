@@ -26,11 +26,12 @@ import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import {
   acquireVenvLock,
+  buildInstallerEnv,
   drainOcrDispatcher,
-  getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
   handoffOcrDispatcher,
   probeOcrDispatcher,
+  resolveAiVenvPath,
   rotateOcrDispatcher,
   selectOcrRuntimeTarget,
   shutdownDispatcher,
@@ -71,7 +72,6 @@ import {
   importBundleArchive,
   invalidateCache,
   isFeatureInstalled,
-  isManagedAiEnvironment,
   markUninstalled,
   readManifest,
   releaseInstallLock,
@@ -107,8 +107,7 @@ import {
   updateSingleFileProgress,
 } from "./progress.js";
 
-const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
-const pythonPath = `${venvPath}/bin/python3`;
+const pythonPath = `${resolveAiVenvPath()}/bin/python3`;
 
 async function handoffInstalledOcrRuntime(
   installResult: Record<string, unknown>,
@@ -390,11 +389,10 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
       stdio: ["ignore", "pipe", "pipe", installLockFd],
-      env: {
-        ...process.env,
+      env: buildInstallerEnv({
         BUNDLE_ID: bundleId,
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
-      },
+      }),
     });
 
     const stallMs = env.INSTALL_STALL_MS;
@@ -982,68 +980,6 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
-
-      // Where no venv is managed for us (a dev checkout), the developer's own
-      // environment already has the ML packages, so every bundle is available.
-      if (!isManagedAiEnvironment()) {
-        const ocrCapability = getOcrRuntimeCapability();
-        const selectedOcrTarget = ocrCapability.available
-          ? ocrCapability.descriptor.artifact.target
-          : selectOcrRuntimeTarget();
-        const bundles = Object.values(FEATURE_BUNDLES).map((bundle) => {
-          const base = {
-            id: bundle.id,
-            name: bundle.name,
-            description: bundle.description,
-            status: "installed" as const,
-            installedVersion: null,
-            estimatedSize: bundle.estimatedSize,
-            // Native mode runs legacy models in-process. OCR is different: Fast
-            // is built in, but its optional immutable runtime remains capability-
-            // driven and is unsupported by default outside controlled containers.
-            downloadBytes: null,
-            installedBytes: null,
-            enablesTools: bundle.enablesTools,
-            progress: null,
-            error: null,
-          };
-          if (bundle.id !== "ocr") return base;
-
-          const invalid = !ocrCapability.available && ocrCapability.status === "invalid";
-          const incompatible = !ocrCapability.available && ocrCapability.status === "incompatible";
-          return {
-            ...base,
-            status: ocrCapability.available
-              ? ("installed" as const)
-              : invalid
-                ? ("error" as const)
-                : ("not_installed" as const),
-            installedVersion: ocrCapability.available
-              ? ocrCapability.descriptor.artifact.version
-              : null,
-            compatibility: invalid
-              ? ("invalid" as const)
-              : incompatible
-                ? ("incompatible" as const)
-                : ("compatible" as const),
-            compatibilityReason: ocrCapability.available ? null : ocrCapability.reason,
-            selectedTarget: selectedOcrTarget,
-            missingDownloadBytes: null,
-            healthyGeneration: ocrCapability.available ? ocrCapability.descriptor.generation : null,
-            availableQualities: [
-              "fast" as const,
-              ...(ocrCapability.available ? ocrCapability.qualities : []),
-            ],
-            error:
-              !ocrCapability.available && ocrCapability.reason === "unsupported-host"
-                ? "Accurate OCR is not supported on this host; Fast OCR remains available"
-                : invalid
-                  ? "OCR runtime descriptor is invalid"
-                  : null,
-          };
-        });
-        return reply.send({ bundles });
-      }
 
       return reply.send({ bundles: getFeatureStates() });
     },

@@ -160,9 +160,11 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
     });
 
     expect(res.statusCode).toBe(422);
-    expect(res.json()).toMatchObject({
+    expect(res.json()).toEqual({
       error: "Passport photo analysis failed",
       details: "passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB",
+      code: "UNPROCESSABLE_ENTITY",
+      requestId: expect.any(String),
     });
 
     expect(withRouteScratchSpy).not.toHaveBeenCalled();
@@ -337,9 +339,11 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       ...buildAnalyzeMultipart(validPng, "client-job-persist-fail"),
     });
     expect(failRes.statusCode).toBe(422);
-    expect(failRes.json()).toMatchObject({
+    expect(failRes.json()).toEqual({
       error: "Passport photo analysis failed",
       details: "face model error",
+      code: "UNPROCESSABLE_ENTITY",
+      requestId: expect.any(String),
     });
 
     detectFaceLandmarks.mockResolvedValueOnce({
@@ -464,8 +468,10 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       ...buildAnalyzeMultipart(validPng),
     });
     expect(baseRes.statusCode).toBe(400);
-    expect(baseRes.json()).toMatchObject({
+    expect(baseRes.json()).toEqual({
       error: "Use /api/v1/tools/image/passport-photo/analyze or /generate",
+      code: "BAD_REQUEST",
+      requestId: expect.any(String),
     });
     await expect(
       resolveBenchmarkResponse({

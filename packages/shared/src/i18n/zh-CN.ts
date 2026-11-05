@@ -554,7 +554,7 @@ export const zhCN: TranslationKeys = {
     },
     collage: {
       name: "拼贴和网格",
-      description: "使用 25+ 模板将图片拼成精美网格拼贴",
+      description: "使用众多模板将图片拼成精美网格拼贴",
     },
     stitch: {
       name: "拼接合并图片",
@@ -638,7 +638,7 @@ export const zhCN: TranslationKeys = {
     },
     "convert-video": {
       name: "转换视频",
-      description: "在 MP4、MOV 和 WebM 格式之间转换视频",
+      description: "在 MP4、MOV、WebM、AVI 和 MKV 格式之间转换视频",
     },
     "compress-video": {
       name: "压缩视频",
@@ -1392,6 +1392,7 @@ export const zhCN: TranslationKeys = {
       separatePdfMode: "独立 PDF，每张图片一个",
       combineAllImages: "将所有图片合并为一个 PDF",
       pageSize: "页面大小",
+      pageSizeLetter: "美国信纸 (Letter)",
       orientation: "方向",
       portrait: "纵向",
       landscape: "横向",
@@ -2591,6 +2592,7 @@ export const zhCN: TranslationKeys = {
       stretchMode: "拉伸",
       cropMode: "裁剪",
       alignment: "对齐",
+      allCaps: "全部大写",
       start: "起始",
       center: "居中",
       end: "末尾",
@@ -3787,6 +3789,8 @@ export const zhCN: TranslationKeys = {
     cancelButton: "取消",
     readyCount: "{count} 个就绪",
     failedStatus: "失败",
+    fetchFailed: "无法获取此网址(错误 {status})。",
+    downloadFailed: "无法下载此文件(错误 {status})。",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[我的文件](https://example.com/recording.mp3)",
   },

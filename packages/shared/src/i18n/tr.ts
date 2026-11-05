@@ -769,7 +769,7 @@ export const tr: TranslationKeys = {
     },
     collage: {
       name: "Kolaj ve Izgara",
-      description: "25+ şablonla görüntüleri güzel ızgara kolajlarda birleştirin",
+      description: "birçok şablonla görüntüleri güzel ızgara kolajlarda birleştirin",
     },
     stitch: {
       name: "Görüntüleri Birleştir",
@@ -860,7 +860,7 @@ export const tr: TranslationKeys = {
     },
     "convert-video": {
       name: "Video Dönüştür",
-      description: "Videoları MP4, MOV ve WebM arasında dönüştür",
+      description: "Videoları MP4, MOV, WebM, AVI ve MKV arasında dönüştür",
     },
     "compress-video": {
       name: "Video Sıkıştır",
@@ -1632,6 +1632,7 @@ export const tr: TranslationKeys = {
       separatePdfMode: "ayrı PDF dosyaları, her görüntü için bir tane",
       combineAllImages: "Tüm görüntüleri tek PDF'de birleştir",
       pageSize: "Sayfa Boyutu",
+      pageSizeLetter: "US Letter",
       orientation: "Yönlendirme",
       portrait: "Dikey",
       landscape: "Yatay",
@@ -2861,6 +2862,7 @@ export const tr: TranslationKeys = {
       stretchMode: "Esnet",
       cropMode: "Kırp",
       alignment: "Hizalama",
+      allCaps: "Tümü büyük harf",
       start: "Başlangıç",
       center: "Orta",
       end: "Son",
@@ -4064,6 +4066,8 @@ export const tr: TranslationKeys = {
     cancelButton: "İptal",
     readyCount: "{count} hazır",
     failedStatus: "Başarısız",
+    fetchFailed: "Bu URL alınamadı (hata {status}).",
+    downloadFailed: "Bu dosya indirilemedi (hata {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Dosyam](https://example.com/recording.mp3)",
   },

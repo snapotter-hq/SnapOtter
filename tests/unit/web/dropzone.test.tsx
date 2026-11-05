@@ -1712,7 +1712,7 @@ describe("Dropzone", () => {
           url: "https://example.com/b.png",
           status: "failed",
           filename: "b.png",
-          error: "Download failed: 404",
+          error: en.urlImport.downloadFailed.replace("{status}", "404"),
         }),
       ]);
 
@@ -1729,7 +1729,7 @@ describe("Dropzone", () => {
           url: "https://example.com/b.png",
           status: "failed",
           filename: "b.png",
-          error: "Download failed: 404",
+          error: en.urlImport.downloadFailed.replace("{status}", "404"),
         }),
       ]);
     });
@@ -2683,7 +2683,9 @@ describe("Dropzone", () => {
       // Trigger addReadyFiles, which fails download with a JSON error body.
       fireEvent.click(addBtn);
 
-      expect(await within(dialog).findByText("Download failed: 410")).toBeDefined();
+      expect(
+        await within(dialog).findByText(en.urlImport.downloadFailed.replace("{status}", "410")),
+      ).toBeDefined();
     });
 
     it("surfaces server error and failedAnswerMessage on Dropzone single-URL submit and falls back to t.dropzone.urlFetchFailed when no message is available (#3703)", async () => {
@@ -2829,12 +2831,16 @@ describe("Dropzone", () => {
       // 5. Non-2xx response from fetch-urls formatted via failedAnswerMessage
       step = "fetch-422";
       fireEvent.click(addButton);
-      expect(await screen.findByText("Fetch failed: 422")).toBeDefined();
+      expect(
+        await screen.findByText(en.urlImport.fetchFailed.replace("{status}", "422")),
+      ).toBeDefined();
 
       // 6. Non-2xx response from downloadAsFile formatted via failedAnswerMessage
       step = "download-410";
       fireEvent.click(addButton);
-      expect(await screen.findByText("Download failed: 410")).toBeDefined();
+      expect(
+        await screen.findByText(en.urlImport.downloadFailed.replace("{status}", "410")),
+      ).toBeDefined();
 
       // 7. Rejected Error with empty message falls back to t.dropzone.urlFetchFailed
       step = "empty-error";
@@ -3194,7 +3200,9 @@ describe("Dropzone", () => {
       expect(within(dialog).getByText("notes.txt")).toBeDefined();
       expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
       expect(within(dialog).getByText("photo.png")).toBeDefined();
-      expect(within(dialog).getByText("Download failed: 404")).toBeDefined();
+      expect(
+        within(dialog).getByText(en.urlImport.downloadFailed.replace("{status}", "404")),
+      ).toBeDefined();
       expect(within(dialog).getByText("0 ready")).toBeDefined();
 
       // Step 3: Retry photo.png (index 1), then click Add 1 Files.
@@ -3397,7 +3405,7 @@ describe("Dropzone", () => {
         expect.objectContaining({
           url: "https://example.com/missing.png",
           status: "failed",
-          error: "Download failed: 404",
+          error: en.urlImport.downloadFailed.replace("{status}", "404"),
         }),
       ]);
 

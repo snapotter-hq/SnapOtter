@@ -21,10 +21,15 @@ function allowlist(): string[] {
   return (JSON.parse(readFileSync(ALLOWLIST_PATH, "utf8")) as { values: string[] }).values;
 }
 
+/** An entry is either bare text (any file) or `repo/relative/path::text` (that file only). */
+function isAllowed(allow: Set<string>, h: { file: string; text: string }): boolean {
+  return allow.has(h.text) || allow.has(`${h.file}::${h.text}`);
+}
+
 describe("web UI literal drift (#906, #909)", () => {
   it("renders no unallowlisted English literals in apps/web/src", () => {
     const allow = new Set(allowlist());
-    const offenders = scanToolUiLiterals(WEB_SRC).filter((h) => !allow.has(h.text));
+    const offenders = scanToolUiLiterals(WEB_SRC).filter((h) => !isAllowed(allow, h));
     const summary = offenders
       .slice(0, 50)
       .map((h) => `${h.file}:${h.line} [${h.kind}] ${JSON.stringify(h.text)}`)
@@ -37,7 +42,8 @@ describe("web UI literal drift (#906, #909)", () => {
   });
 
   it("keeps the allowlist free of entries that no longer occur", () => {
-    const present = new Set(scanToolUiLiterals(WEB_SRC).map((h) => h.text));
+    const hits = scanToolUiLiterals(WEB_SRC);
+    const present = new Set(hits.flatMap((h) => [h.text, `${h.file}::${h.text}`]));
     const stale = allowlist().filter((v) => !present.has(v));
     expect(stale, `Allowlist entries with no remaining occurrence: ${stale.join(", ")}`).toEqual(
       [],

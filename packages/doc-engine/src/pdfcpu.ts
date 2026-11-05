@@ -34,7 +34,8 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
     return Promise.reject(new Error("Canceled"));
   }
   const bin = resolvePdfcpu();
-  if (!bin) throw new Error("pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)");
+  if (!bin)
+    return Promise.reject(new Error("pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)"));
   const timeoutMs = opts.timeoutMs ?? 60_000;
   return new Promise<string>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, ["-c", "disable", ...args]);

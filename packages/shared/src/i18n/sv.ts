@@ -769,7 +769,7 @@ export const sv: TranslationKeys = {
     },
     collage: {
       name: "Collage & Rutnät",
-      description: "Kombinera bilder i rutnätscollage med 25+ mallar",
+      description: "Kombinera bilder i rutnätscollage med många mallar",
     },
     stitch: {
       name: "Sammanfoga bilder",
@@ -857,7 +857,7 @@ export const sv: TranslationKeys = {
     },
     "convert-video": {
       name: "Konvertera video",
-      description: "Konvertera videor mellan MP4, MOV och WebM",
+      description: "Konvertera videor mellan MP4, MOV, WebM, AVI och MKV",
     },
     "compress-video": {
       name: "Komprimera video",
@@ -1628,6 +1628,7 @@ export const sv: TranslationKeys = {
       separatePdfMode: "separata PDFs, en per bild",
       combineAllImages: "Kombinera alla bilder i en PDF",
       pageSize: "Sidstorlek",
+      pageSizeLetter: "US Letter",
       orientation: "Orientering",
       portrait: "Stående",
       landscape: "Liggande",
@@ -2854,6 +2855,7 @@ export const sv: TranslationKeys = {
       stretchMode: "Sträcka",
       cropMode: "Beskära",
       alignment: "Justering",
+      allCaps: "Alla versaler",
       start: "Början",
       center: "Mitten",
       end: "Slut",
@@ -4058,6 +4060,8 @@ export const sv: TranslationKeys = {
     cancelButton: "Avbryt",
     readyCount: "{count} redo",
     failedStatus: "Misslyckades",
+    fetchFailed: "Det gick inte att hämta den här webbadressen (fel {status}).",
+    downloadFailed: "Det gick inte att ladda ner den här filen (fel {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Min fil](https://example.com/recording.mp3)",
   },

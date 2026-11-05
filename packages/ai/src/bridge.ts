@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { isSafeMessageError, SafeError } from "@snapotter/shared";
+import { isSafeMessageError, nvidiaDeviceVisible, SafeError } from "@snapotter/shared";
 import {
   type GpuFramework,
   type GpuFrameworks,
@@ -14,6 +14,7 @@ import {
 } from "./feature-gate.js";
 import { aiLog, describeUnexpectedExit } from "./log.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
+import { resolveAiVenvPath } from "./venv-path.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -91,18 +92,100 @@ export function buildMinimalEnv(): Record<string, string> {
   return env;
 }
 
-/** Venv the AI sidecar runs from. Bundle installs write into it. */
-function aiVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");
+/**
+ * Extra variables the bundle installer needs beyond the sidecar allowlist:
+ * outbound proxy and CA settings (pip, urllib and huggingface_hub honor them),
+ * the Hugging Face endpoint and cache locations, temp dirs, and the install
+ * knobs install_feature.py reads. Credentials stay out on purpose, including
+ * HF_TOKEN: the feature-bundles repo is public, and the installer runs
+ * third-party wheel code that could read anything it is handed.
+ */
+const INSTALLER_PASSTHROUGH = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "PIP_INDEX_URL",
+  "PIP_EXTRA_INDEX_URL",
+  "PIP_CERT",
+  "PIP_TRUSTED_HOST",
+  "PIP_CONFIG_FILE",
+  "HF_ENDPOINT",
+  "HF_HOME",
+  "HF_HUB_CACHE",
+  "HF_HUB_DOWNLOAD_TIMEOUT",
+  "HF_HUB_ETAG_TIMEOUT",
+  "HF_HUB_DISABLE_XET",
+  "XDG_CACHE_HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "SNAPOTTER_BUNDLE_LOCAL_PATH",
+  "SNAPOTTER_SKIP_INSTALL_SMOKE",
+];
+
+/**
+ * Environment for the feature-bundle installer child. Starts from the sidecar
+ * allowlist so the API's database URLs, auth secrets, and storage keys never
+ * reach a process that downloads and runs third-party packages.
+ */
+export function buildInstallerEnv(extra: Record<string, string> = {}): Record<string, string> {
+  const env = buildMinimalEnv();
+  // OTLP headers usually carry bearer tokens, and the installer exports no telemetry.
+  delete env.OTEL_EXPORTER_OTLP_HEADERS;
+  for (const key of INSTALLER_PASSTHROUGH) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key] as string;
+    }
+  }
+  // Always name the venv: install_feature.py would otherwise pick its own default.
+  env.PYTHON_VENV_PATH = resolveAiVenvPath();
+  return { ...env, ...extra };
 }
 
-/** Venv bundle installs write into; mirrors the install route's default. */
-function installVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || "/opt/venv";
+/**
+ * Installer variables only a network fetch uses. Proxy and private-index URLs
+ * often embed user:password, and a PIP_CONFIG_FILE can hold the same.
+ */
+const NETWORK_ONLY_INSTALLER_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "PIP_INDEX_URL",
+  "PIP_EXTRA_INDEX_URL",
+  "PIP_TRUSTED_HOST",
+  "PIP_CONFIG_FILE",
+];
+
+/**
+ * Environment for the offline bundle import's venv children. The import runs
+ * code from a user-supplied archive and never touches the network, so it gets
+ * the installer allowlist minus proxy and pip index settings. CA bundle paths
+ * stay: they hold no secrets.
+ */
+export function buildOfflineInstallerEnv(
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const env = buildInstallerEnv();
+  for (const key of NETWORK_ONLY_INSTALLER_KEYS) delete env[key];
+  return { ...env, ...extra };
 }
 
 /** Try the given venv first, then system python. */
-function getPythonPath(venvPath: string = aiVenvPath()): string {
+function getPythonPath(venvPath: string = resolveAiVenvPath()): string {
   const path = process.platform === "win32" ? win32 : posix;
   const venvPython = path.join(
     venvPath,
@@ -120,7 +203,7 @@ function getPythonPath(venvPath: string = aiVenvPath()): string {
 function docsDispatcherOptions(): { venvPath?: string; takesVenvLock: boolean } {
   const docsVenv = process.env.DOCS_PYTHON_VENV_PATH;
   if (!docsVenv) return { takesVenvLock: true };
-  const sharesInstallVenv = resolve(docsVenv) === resolve(installVenvPath());
+  const sharesInstallVenv = resolve(docsVenv) === resolve(resolveAiVenvPath());
   return { venvPath: docsVenv, takesVenvLock: sharesInstallVenv };
 }
 
@@ -379,7 +462,7 @@ export function isNvidiaDevicePresent(
   if (gpuEnv === "0" || gpuEnv === "false" || gpuEnv === "no") return false;
   const visible = process.env.CUDA_VISIBLE_DEVICES?.trim();
   if (visible === "" || visible === "-1" || visible?.toLowerCase() === "none") return false;
-  return deviceExists("/dev/nvidiactl") || deviceExists("/dev/nvidia0");
+  return nvidiaDeviceVisible(deviceExists);
 }
 
 function pythonAbortError(): Error {
@@ -738,9 +821,10 @@ export class PythonDispatcher {
               aiLog.info(`[python] ${parsed.info}`);
               return;
             }
+            // Warnings still join the request buffer: a CUDA or ORT failure
+            // reported only as a warning has to reach the poison check.
             if (typeof parsed?.warning === "string") {
               aiLog.warn(`[python] ${parsed.warning}`);
-              return;
             }
           } catch {
             // Malformed JSON object - collect as regular stderr.
@@ -1094,7 +1178,6 @@ export class PythonDispatcher {
               }
               if (typeof parsed?.warning === "string") {
                 aiLog.warn(`[python] ${parsed.warning}`);
-                return;
               }
             } catch {
               // Malformed JSON object - collect as regular stderr.

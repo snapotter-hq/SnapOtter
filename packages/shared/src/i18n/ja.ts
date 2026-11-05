@@ -737,7 +737,7 @@ export const ja: TranslationKeys = {
     },
     collage: {
       name: "コラージュとグリッド",
-      description: "25以上のテンプレートで画像を美しいグリッドコラージュに合成",
+      description: "多数のテンプレートで画像を美しいグリッドコラージュに合成",
     },
     stitch: {
       name: "画像を結合",
@@ -822,7 +822,7 @@ export const ja: TranslationKeys = {
     },
     "convert-video": {
       name: "動画変換",
-      description: "MP4、MOV、WebM 間で動画を変換",
+      description: "MP4、MOV、WebM、AVI、MKV 間で動画を変換",
     },
     "compress-video": {
       name: "動画圧縮",
@@ -1588,6 +1588,7 @@ export const ja: TranslationKeys = {
       separatePdfMode: "個別のPDF（1画像につき1つ）",
       combineAllImages: "すべての画像を1つのPDFにまとめる",
       pageSize: "ページサイズ",
+      pageSizeLetter: "USレター",
       orientation: "向き",
       portrait: "縦向き",
       landscape: "横向き",
@@ -2813,6 +2814,7 @@ export const ja: TranslationKeys = {
       stretchMode: "ストレッチ",
       cropMode: "クロップ",
       alignment: "配置",
+      allCaps: "すべて大文字",
       start: "先頭",
       center: "中央",
       end: "末尾",
@@ -4013,6 +4015,8 @@ export const ja: TranslationKeys = {
     cancelButton: "キャンセル",
     readyCount: "{count}件準備完了",
     failedStatus: "失敗",
+    fetchFailed: "このURLを取得できませんでした(エラー {status})。",
+    downloadFailed: "このファイルをダウンロードできませんでした(エラー {status})。",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[ファイル名](https://example.com/recording.mp3)",
   },

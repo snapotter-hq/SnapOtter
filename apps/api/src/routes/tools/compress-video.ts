@@ -15,11 +15,16 @@ const CRF: Record<string, number> = {
   strong: 33,
 };
 
-const SCALE: Record<string, string> = {
-  "1080p": "scale=-2:1080",
-  "720p": "scale=-2:720",
-  "480p": "scale=-2:480",
+const TARGET_HEIGHT: Record<string, number> = {
+  "1080p": 1080,
+  "720p": 720,
+  "480p": 480,
 };
+
+/** The quotes keep ffmpeg from reading the comma in min() as a filter separator. */
+function downscaleFilter(height: number): string {
+  return `scale=-2:'min(ih,${height})'`;
+}
 
 export function registerCompressVideo(app: FastifyInstance) {
   createToolRoute(app, {
@@ -42,7 +47,7 @@ export function registerCompressVideo(app: FastifyInstance) {
           ...mp4TimescaleArgs(".mp4"),
         ];
         if (settings.resolution !== "original") {
-          args.push("-vf", SCALE[settings.resolution]);
+          args.push("-vf", downscaleFilter(TARGET_HEIGHT[settings.resolution]));
         }
         args.push("-c:a", resolveEncoder("aac"), "-b:a", "96k", "-movflags", "+faststart", out);
         return withVaapiEncodeArgs(args);

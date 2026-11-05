@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { format } from "@/lib/format";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -82,7 +83,14 @@ export function useUrlImport(options?: UseUrlImportOptions) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(failedAnswerMessage(t, body, res.status, `Fetch failed: ${res.status}`));
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.urlImport.fetchFailed, { status: res.status }),
+          ),
+        );
       }
       return resolveServerUrls(await res.json());
     },
@@ -114,7 +122,14 @@ export function useUrlImport(options?: UseUrlImportOptions) {
       const res = await fetch(downloadUrl, { headers: formatHeaders(), signal });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(failedAnswerMessage(t, body, res.status, `Download failed: ${res.status}`));
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.urlImport.downloadFailed, { status: res.status }),
+          ),
+        );
       }
       const blob = await res.blob();
       return new File([blob], filename, { type: blob.type });

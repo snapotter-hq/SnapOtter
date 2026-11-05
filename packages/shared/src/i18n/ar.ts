@@ -764,7 +764,7 @@ export const ar: TranslationKeys = {
     },
     collage: {
       name: "صورة مجمّعة وشبكة",
-      description: "دمج الصور في شبكات مجمّعة جميلة مع أكثر من 25 قالبًا",
+      description: "دمج الصور في شبكات مجمّعة جميلة مع العديد من القوالب",
     },
     stitch: {
       name: "دمج الصور وتجميعها",
@@ -850,7 +850,7 @@ export const ar: TranslationKeys = {
     },
     "convert-video": {
       name: "تحويل الفيديو",
-      description: "تحويل الفيديو بين MP4 وMOV وWebM",
+      description: "تحويل الفيديو بين MP4 وMOV وWebM وAVI وMKV",
     },
     "compress-video": {
       name: "ضغط الفيديو",
@@ -1614,6 +1614,7 @@ export const ar: TranslationKeys = {
       separatePdfMode: "ملفات PDF منفصلة، واحد لكل صورة",
       combineAllImages: "دمج جميع الصور في PDF واحد",
       pageSize: "حجم الصفحة",
+      pageSizeLetter: "US Letter",
       orientation: "الاتجاه",
       portrait: "عمودي",
       landscape: "أفقي",
@@ -2833,6 +2834,7 @@ export const ar: TranslationKeys = {
       stretchMode: "تمديد",
       cropMode: "قص",
       alignment: "المحاذاة",
+      allCaps: "أحرف كبيرة",
       start: "البداية",
       center: "الوسط",
       end: "النهاية",
@@ -4033,6 +4035,8 @@ export const ar: TranslationKeys = {
     cancelButton: "إلغاء",
     readyCount: "{count} جاهز",
     failedStatus: "فشل",
+    fetchFailed: "تعذّر جلب هذا الرابط (الخطأ {status}).",
+    downloadFailed: "تعذّر تنزيل هذا الملف (الخطأ {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[ملفي](https://example.com/recording.mp3)",
   },

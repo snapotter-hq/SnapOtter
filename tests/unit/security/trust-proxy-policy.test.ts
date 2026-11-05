@@ -120,7 +120,9 @@ describe("TRUST_PROXY default", () => {
 describe("IP-keyed controls exist and are wired to request.ip", () => {
   it("keeps the login-attempt limiter on the login route", () => {
     const auth = read("apps/api/src/plugins/auth.ts");
-    expect(auth).toMatch(/"\/api\/auth\/login",\s*\n\s*\{\s*config:\s*\{\s*rateLimit:/);
+    expect(auth).toMatch(
+      /"\/api\/auth\/login",\s*\n\s*\{\s*(?:bodyLimit:[^,]+,\s*)?config:\s*\{\s*rateLimit:/,
+    );
     expect(auth).toContain("getLoginAttemptLimit");
   });
 

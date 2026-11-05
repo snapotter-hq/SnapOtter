@@ -55,6 +55,24 @@ describe("Dockerfile build args", () => {
     }
   });
 
+  it("builds every Node stage on the patched 22.23.4 release (CVE-2026-111497)", () => {
+    for (const [name, source] of [
+      ["Dockerfile", dockerfile],
+      ["Dockerfile.test", dockerfileTest],
+    ] as const) {
+      const nodeBases = source
+        .split(/\r?\n/)
+        .filter((line) => /^FROM\s+(?:--platform=\S+\s+)?node:/.test(line));
+
+      expect(nodeBases.length, `${name} should contain Node stages`).toBeGreaterThan(0);
+      for (const base of nodeBases) {
+        expect(base, `${name} Node base is not 22.23.4: ${base}`).toMatch(
+          /^FROM\s+(?:--platform=\S+\s+)?node:22\.23\.4-bookworm@sha256:18a6d90fd60542269850c80ca03b29b1d9b14d6b221ac7ee8e35b0d33ef904bd/,
+        );
+      }
+    }
+  });
+
   it("pins fixed Go toolchains and checksummed dependency overrides for shipped binaries", () => {
     const goBuilder =
       "golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9";
@@ -349,6 +367,40 @@ describe("Dockerfile build args", () => {
     expect(dockerfile, "Dockerfile must chmod +x snapotter/finish").toContain(
       "/etc/s6-overlay/s6-rc.d/snapotter/finish",
     );
+  });
+
+  it("gives snapotter-admin the embedded database URLs the entrypoint exports", () => {
+    // `docker exec` never sees what the entrypoint exported. Without this the
+    // recovery CLI falls back to the schema default, localhost:5432 with the
+    // fixed owner password, which fails once either embedded port moves.
+    const dest = dockerfile.match(/^COPY docker\/embedded-lib\.sh (\S+)$/m)?.[1];
+    expect(dest).toBeDefined();
+    for (const script of ["docker/entrypoint.sh", "docker/snapotter-admin"]) {
+      const source = readFileSync(resolve(root, script), "utf8");
+      expect(source, `${script} must source ${dest}`).toContain(`. ${dest}`);
+      expect(source, `${script} must call export_embedded_db_env`).toMatch(
+        /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+      );
+    }
+  });
+
+  it("only gives snapotter-admin the embedded URLs when the container runs embedded", () => {
+    // Compose passes the app container its own DATABASE_URL and REDIS_URL, and a
+    // `docker exec` shell sees them. Without the mode check, every recovery
+    // command there would swap them for 127.0.0.1:5432 inside the app
+    // container, where no database listens.
+    const admin = readFileSync(resolve(root, "docker/snapotter-admin"), "utf8");
+    const guard = admin.match(
+      /^([ \t]*)if \[ "\$\(decide_run_mode\b[^)]*\)" = "embedded" \]; then\n([\s\S]*?)^\1fi$/m,
+    );
+    expect(guard, "snapotter-admin must check decide_run_mode for embedded").not.toBeNull();
+    expect(guard?.[2], "the export must sit inside the embedded-mode check").toMatch(
+      /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+    );
+    expect(
+      admin.replace(guard?.[0] ?? "", ""),
+      "snapotter-admin must not call export_embedded_db_env outside that check",
+    ).not.toMatch(/^[^#\n]*\bexport_embedded_db_env\b/m);
   });
 
   it("documents the readiness timeouts the lib actually ships", () => {

@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
+import { MIGRATIONS_FOLDER, readLastAppliedMigrationAt } from "../../db/migrate.js";
 import { pingRedis } from "../../jobs/connection.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { requirePermission } from "../../permissions.js";
@@ -22,7 +23,7 @@ function requireUpgradeFeature(reply: FastifyReply): Promise<boolean> {
 
 function readJournal(): { version: string; entries: JournalEntry[] } | null {
   try {
-    const journalPath = join(process.cwd(), "drizzle", "meta", "_journal.json");
+    const journalPath = join(MIGRATIONS_FOLDER, "meta", "_journal.json");
     return JSON.parse(readFileSync(journalPath, "utf-8"));
   } catch {
     return null;
@@ -69,22 +70,19 @@ export async function registerUpgradeRoutes(app: FastifyInstance): Promise<void>
         return reply.status(500).send({ error: "Could not read migration journal" });
       }
 
-      // Try to read applied migrations from DB
-      let applied: string[] = [];
+      let lastAppliedAt: number | null;
       try {
-        const rows = await db.execute(
-          sql`SELECT hash FROM __drizzle_migrations ORDER BY created_at`,
-        );
-        applied = (rows.rows as { hash: string }[]).map((r) => r.hash);
-      } catch {
-        // Table may not exist yet
+        lastAppliedAt = await readLastAppliedMigrationAt();
+      } catch (err) {
+        request.log.error({ err }, "Could not read applied migrations");
+        return reply.status(500).send({ error: "Could not read applied migrations" });
       }
 
       const migrations = journal.entries.map((entry) => ({
         idx: entry.idx,
         tag: entry.tag,
         when: entry.when,
-        applied: applied.includes(entry.tag),
+        applied: lastAppliedAt !== null && entry.when <= lastAppliedAt,
       }));
 
       const appliedCount = migrations.filter((m) => m.applied).length;

@@ -239,6 +239,21 @@ function upsertFrontmatter(text, fields) {
  * @param {string} text
  * @returns {string}
  */
+// The value of one i18n_* stamp in a page's frontmatter, unquoted, or undefined.
+function stampOf(text, key) {
+  const m = text.match(new RegExp(`^${key}: (.*)$`, "m"));
+  return m ? m[1].replace(/^"(.*)"$/, "$1") : undefined;
+}
+
+// True when re-writing a page would change nothing a reader or the pipeline
+// reads: the same body and the same source, provenance and stale stamps.
+function unchangedPage(existing, next) {
+  if (stripI18nFrontmatter(existing) !== stripI18nFrontmatter(next)) return false;
+  return ["i18n_source_hash", "i18n_provenance", "i18n_stale"].every(
+    (key) => stampOf(existing, key) === stampOf(next, key),
+  );
+}
+
 function stripI18nFrontmatter(text) {
   const { fm, body } = splitFrontmatter(text);
   if (fm == null) return text;
@@ -367,14 +382,22 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
         const table = tokenTables.get(id) ?? [];
         const undone = restoreDocs(stripI18nFrontmatter(entry.text), table);
         const linked = quoteFrontmatterScalars(rewriteLinks(undone, locale));
-        const withMeta = upsertFrontmatter(linked, {
+        const meta = {
           i18n_source_hash: entry.sourceHash,
           i18n_provenance: entry.provenance,
-          i18n_output_hash: hash(linked),
+          i18n_output_hash: "",
           i18n_hash_version: "2",
           ...(entry.stale ? { i18n_stale: "true" } : {}),
-        });
-        await writeFile(abs, withMeta, "utf8");
+        };
+        // Hash what load() will read back (the written file minus i18n_* keys),
+        // not the pre-render text, so the stored hash round-trips (#884).
+        meta.i18n_output_hash = hash(stripI18nFrontmatter(upsertFrontmatter(linked, meta)));
+        const body = upsertFrontmatter(linked, meta);
+        // An import writes only what changed. A page whose body and stamps already
+        // match is left alone, so a re-import does not re-stamp the whole tree (#884).
+        const existing = await readFile(abs, "utf8").catch(() => null);
+        if (existing !== null && unchangedPage(existing, body)) continue;
+        await writeFile(abs, body, "utf8");
       }
     },
 

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import PQueue from "p-queue";
 import { type Browser, chromium, type Page } from "playwright";
+import { logger } from "./logger.js";
 import { MAX_URL_FETCH_SIZE, safeFetch } from "./ssrf.js";
 
 const MAX_PAGES = Math.max(1, parseInt(process.env.BROWSER_MAX_PAGES || "3", 10));
@@ -48,7 +49,7 @@ function recordCrash(): void {
   lastCrashTime = now;
   if (consecutiveCrashes >= MAX_CONSECUTIVE_CRASHES) {
     browserFailed = true;
-    console.error(
+    logger.error(
       `Browser service permanently disabled after ${MAX_CONSECUTIVE_CRASHES} crashes in ${CRASH_WINDOW_MS / 1000}s`,
     );
     return;

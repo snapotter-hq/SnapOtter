@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasFor } from "../../../apps/api/src/routes/tools/aspect-pad.js";
+import { canvasFor } from "../../../apps/api/src/lib/media-tool.js";
 
 describe("canvasFor", () => {
   it("wide source into tall ratio (landscape into 9:16)", () => {

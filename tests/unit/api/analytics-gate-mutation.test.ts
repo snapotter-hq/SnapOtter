@@ -33,6 +33,7 @@ const redisState = vi.hoisted(() => ({
   subscriberQuit: vi.fn().mockResolvedValue(undefined),
   sharedPublish: vi.fn().mockResolvedValue(1),
   messageHandler: null as null | (() => void),
+  errorHandler: null as null | ((err: Error) => void),
   createdSubscribers: 0,
 }));
 
@@ -56,6 +57,9 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 
 vi.mock("drizzle-orm", () => ({ eq: () => "mocked-eq" }));
 
+const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
 vi.mock("../../../apps/api/src/jobs/types.js", () => ({
   bullPrefix: () => "test_prefix",
 }));
@@ -67,6 +71,7 @@ vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
       on: (event: string, handler: () => void) => {
         redisState.subscriberOn(event, handler);
         if (event === "message") redisState.messageHandler = handler;
+        if (event === "error") redisState.errorHandler = handler;
       },
       subscribe: redisState.subscriberSubscribe,
       quit: redisState.subscriberQuit,
@@ -91,6 +96,8 @@ beforeEach(async () => {
   redisState.subscriberQuit.mockClear();
   redisState.sharedPublish.mockClear();
   redisState.messageHandler = null;
+  redisState.errorHandler = null;
+  loggerMock.error.mockClear();
   redisState.createdSubscribers = 0;
 
   process.env.NODE_ENV = "test";
@@ -356,6 +363,15 @@ describe("Redis gate listener wiring", () => {
     expect(redisState.messageHandler).toBeTypeOf("function");
     redisState.messageHandler?.();
     await vi.waitFor(() => expect(gate.analyticsEnabled()).toBe(false));
+  });
+
+  it("logs a subscriber error with the error in the err field (#4178)", async () => {
+    await gate.startAnalyticsGateListener();
+
+    const boom = new Error("ECONNRESET");
+    redisState.errorHandler?.(boom);
+
+    expect(loggerMock.error).toHaveBeenCalledWith({ err: boom }, "Analytics gate subscriber error");
   });
 
   it("publishes the invalidation on the same channel", async () => {

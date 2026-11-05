@@ -71,8 +71,9 @@ export async function qpdfRotate(
  * in qpdf's error text.
  *
  * The `=`-joined flag form (`--encrypt --user-password=...`) also avoids this, but
- * only on qpdf 11.7 and newer; the shipped image carries 11.3, which rejects it
- * outright. Job JSON is accepted by both (verified against 11.3.0 and 12.1.0) and
+ * only on qpdf 11.7 and newer. The arm64 image (Debian bookworm) carries 11.3, which
+ * rejects it outright; the amd64 image is built on Ubuntu 24.04 and takes whatever
+ * version that release packages, so it is not pinned to 11.3 and is not verified here. Job JSON is accepted by both (verified against 11.3.0 and 12.1.0) and
  * has the side benefit of keeping the passwords out of /proc/<pid>/cmdline, which
  * the note above asks for.
  */

@@ -32,6 +32,8 @@ html {
 @theme {
   /* Primary -- Otter Orange (sunlit fur) */
   --color-primary: #E07832;
+  /* Fills and graphics everywhere. The one text exception is small accents on the
+     dark bands (7.0:1 or better on every band surface, pinned in palette-contrast.test.ts). */
   --color-primary-light: #F09550;
   --color-primary-dark: #C06520;
   --color-primary-subtle: #FFF5ED;
@@ -99,8 +101,12 @@ code, pre, kbd {
 .section-dark h1, .section-dark h2, .section-dark h3, .section-dark h4 {
   color: var(--color-dark-fg);
 }
-.section-dark p, .section-dark span {
-  color: var(--color-dark-muted);
+/* Layered on purpose: an unlayered rule beats Tailwind's utilities layer, which made
+   text-primary-light and text-dark-fg on spans render muted (#4297). */
+@layer base {
+  .section-dark p, .section-dark span {
+    color: var(--color-dark-muted);
+  }
 }
 .section-dark .text-foreground {
   color: var(--color-dark-fg);

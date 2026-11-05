@@ -14,6 +14,7 @@ export * from "./compress-presets.js";
 export * from "./constants.js";
 export * from "./conversion-presets.js";
 export * from "./features.js";
+export * from "./gpu-devices.js";
 export * from "./i18n/index.js";
 export * from "./image-mime.js";
 export * from "./latest-release.js";

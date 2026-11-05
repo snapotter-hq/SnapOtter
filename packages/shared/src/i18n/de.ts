@@ -770,7 +770,7 @@ export const de: TranslationKeys = {
     },
     collage: {
       name: "Collage & Raster",
-      description: "Bilder in Rastercollages mit über 25 Vorlagen zusammenfügen",
+      description: "Bilder in Rastercollages mit vielen Vorlagen zusammenfügen",
     },
     stitch: {
       name: "Bilder zusammenfügen",
@@ -862,7 +862,7 @@ export const de: TranslationKeys = {
     },
     "convert-video": {
       name: "Video konvertieren",
-      description: "Videos zwischen MP4, MOV und WebM konvertieren",
+      description: "Videos zwischen MP4, MOV, WebM, AVI und MKV konvertieren",
     },
     "compress-video": {
       name: "Video komprimieren",
@@ -1638,6 +1638,7 @@ export const de: TranslationKeys = {
       separatePdfMode: "separate PDFs, eines pro Bild",
       combineAllImages: "Alle Bilder in ein PDF zusammenfügen",
       pageSize: "Seitengröße",
+      pageSizeLetter: "US Letter",
       orientation: "Ausrichtung",
       portrait: "Hochformat",
       landscape: "Querformat",
@@ -2879,6 +2880,7 @@ export const de: TranslationKeys = {
       stretchMode: "Strecken",
       cropMode: "Zuschneiden",
       alignment: "Ausrichtung",
+      allCaps: "Großbuchstaben",
       start: "Anfang",
       center: "Mitte",
       end: "Ende",
@@ -4088,6 +4090,8 @@ export const de: TranslationKeys = {
     cancelButton: "Abbrechen",
     readyCount: "{count} bereit",
     failedStatus: "Fehlgeschlagen",
+    fetchFailed: "Diese URL konnte nicht abgerufen werden (Fehler {status}).",
+    downloadFailed: "Diese Datei konnte nicht heruntergeladen werden (Fehler {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Meine Datei](https://example.com/recording.mp3)",
   },

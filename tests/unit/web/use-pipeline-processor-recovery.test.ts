@@ -4251,3 +4251,65 @@ describe("usePipelineProcessor slow-upload SSE close recovery (#3923)", () => {
     unmount();
   });
 });
+
+// #1374: a pipeline batch settles each file with the notes its steps reported,
+// so a compress-pdf step that missed its target is marked like a single run.
+describe("usePipelineProcessor batch result notes (#1374)", () => {
+  const MISSED = { targetKb: 100, targetMet: false };
+
+  it("marks the files named in X-File-Notes on the sync path", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) => {
+        if (name === "X-File-Results") return encodedFileResults();
+        if (name === "X-File-Notes") return encodeURIComponent(JSON.stringify({ "1": MISSED }));
+        return null;
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    const [first, second] = useFileStore.getState().entries;
+    expect(first.resultNotes).toBeNull();
+    expect(second.resultNotes).toEqual(MISSED);
+
+    unmount();
+  });
+
+  it("applies a note shared by every file on the durable-ZIP path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+      ),
+    );
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      const terminal = completedBatchTerminal();
+      sendBatchFrame({
+        ...terminal,
+        result: { ...terminal.result, fileNotes: { "*": MISSED } },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry.resultNotes).toEqual(MISSED);
+    }
+
+    unmount();
+  });
+});

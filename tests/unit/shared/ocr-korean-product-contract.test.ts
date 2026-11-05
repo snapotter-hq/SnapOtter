@@ -113,17 +113,21 @@ describe("Korean OCR product contract", () => {
   });
 
   it("documents the compatibility boundary in all localized OCR guides", () => {
-    // guide/deployment.md is left out: the English page no longer states the
-    // Korean boundary, so its translations cannot carry it. Restoring that note
-    // is a docs decision, tracked separately.
-    const documents = ["api/ai.md", "tools/image/ocr.md", "tools/pdf/ocr-pdf.md"];
+    const documents = [
+      "api/ai.md",
+      "guide/deployment.md",
+      "tools/image/ocr.md",
+      "tools/pdf/ocr-pdf.md",
+    ];
 
     for (const locale of localizedCodes) {
       for (const document of documents) {
         const content = readFileSync(join(root, "apps/docs", locale, document), "utf8");
         expect(content, `${locale}/${document}`).toContain("`fast-korean-unsupported`");
         expect(content, `${locale}/${document}`).toContain("`FEATURE_INCOMPATIBLE`");
-        expect(content, `${locale}/${document}`).toContain("Linux amd64");
+        expect(content, `${locale}/${document}`).toContain(
+          locale === "en" ? "Linux amd64" : "amd64",
+        );
         expect(content, `${locale}/${document}`).toContain("arm64");
         expect(content, `${locale}/${document}`).toContain("NVIDIA");
       }

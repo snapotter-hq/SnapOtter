@@ -377,3 +377,48 @@ describe("convertDocument timeout", () => {
     }
   });
 });
+
+describe("convertDocument on a full disk (#4148)", () => {
+  // Captured from LibreOffice 26.2 converting onto a volume with no room left:
+  // it exits 0 and writes nothing.
+  const SPACE_STDERR =
+    "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///data/files/.previews/x/input.pdf> failed: 0x909(Error Area:Io Class:Space Code:9))\n";
+
+  it("tags a missing output as ENOSPC when LibreOffice reported an out-of-space store", async () => {
+    nextClose({ stderr: SPACE_STDERR, code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice produced no pdf output for report.docx",
+      code: "ENOSPC",
+      syscall: "write",
+    });
+  });
+
+  it("tags a non-zero exit as ENOSPC when LibreOffice reported an out-of-space store", async () => {
+    nextClose({ stderr: SPACE_STDERR, code: 1 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("leaves a missing output without the out-of-space store untagged", async () => {
+    nextClose({
+      stderr:
+        "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///o/input.pdf> failed: 0x81a(Error Area:Io Class:Parameter Code:26))\n",
+      code: 0,
+    });
+    readdir.mockResolvedValueOnce([]);
+    const err = await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+    expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+});

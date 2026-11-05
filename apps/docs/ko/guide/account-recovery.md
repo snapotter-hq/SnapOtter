@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: d5b5dfbc164f
+i18n_output_hash: 91ada95d9ba4
 i18n_hash_version: 2
 ---
 # 계정 복구 {#account-recovery}
@@ -82,8 +82,8 @@ docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
 이미지에서는 Postgres가 컨테이너 내부에서 실행됩니다:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 멀티 컨테이너 설정에서는 `psql`을(를) 대신 사용자의 `DATABASE_URL`(으)로 지정하세요.

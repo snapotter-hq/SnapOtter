@@ -19,6 +19,7 @@ interface FakeQueue {
 
 const queueInstances: FakeQueue[] = [];
 const queueCtor = vi.hoisted(() => vi.fn());
+const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 
 async function loadQueuesModule() {
   vi.resetModules();
@@ -41,6 +42,8 @@ async function loadQueuesModule() {
   vi.doMock("../../../apps/api/src/jobs/connection.js", () => ({
     createBullMQConnection: vi.fn(() => ({ marker: "conn" })),
   }));
+  vi.doMock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 
   return import("../../../apps/api/src/jobs/queues.js");
 }
@@ -148,7 +151,6 @@ describe("queues.ts mutation coverage", () => {
     });
 
     it("attaches an error listener once per created queue that logs the pool error", async () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const { getQueue } = await loadQueuesModule();
       const { queueName } = await import("../../../apps/api/src/jobs/types.js");
 
@@ -160,7 +162,11 @@ describe("queues.ts mutation coverage", () => {
       const handler = queueInstances[0].on.mock.calls[0][1] as (err: Error) => void;
       const boom = new Error("redis blip");
       handler(boom);
-      expect(errorSpy).toHaveBeenCalledWith(`[queue] ${queueName("image")} error`, boom);
+      // The error goes in the err field: pino drops a positional second argument.
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { err: boom },
+        `[queue] ${queueName("image")} error`,
+      );
     });
   });
 

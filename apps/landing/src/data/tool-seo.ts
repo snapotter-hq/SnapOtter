@@ -4284,7 +4284,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   collage: {
     searchTitle: "Photo Collage Maker - Grid Layouts and Templates",
     longDescription:
-      "Create photo collages and grid layouts from multiple images with 25+ built-in templates. Control spacing, background colors, and image arrangement. Drag to reorder and resize individual cells. Export at custom resolutions for print or web.",
+      "Create photo collages and grid layouts from multiple images with many built-in templates. Control spacing, background colors, and image arrangement. Drag to reorder and resize individual cells. Export at custom resolutions for print or web.",
     useCases: [
       "Create photo collages for social media posts and stories",
       "Build product grid layouts for catalogs and lookbooks",
@@ -4292,7 +4292,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Generate comparison grids showing before-and-after results",
     ],
     features: [
-      "25+ grid templates (2x2, 3x3, masonry, horizontal strip, and more)",
+      "Many grid templates (2x2, 3x3, masonry, horizontal strip, and more)",
       "Custom spacing and background color",
       "Drag-and-drop cell reordering",
       "Custom output resolution for print or web",
@@ -5053,7 +5053,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "convert-video": {
     searchTitle: "Convert Video Between MP4 MOV WebM",
     longDescription:
-      "Convert videos between MP4, MOV, and WebM formats with control over codec, quality, and compatibility settings. Handles format differences transparently while preserving audio, subtitles, and metadata. All transcoding runs locally on your self-hosted server.",
+      "Convert videos between MP4, MOV, WebM, AVI, and MKV formats with control over codec, quality, and compatibility settings. Handles format differences transparently while preserving audio, subtitles, and metadata. All transcoding runs locally on your self-hosted server.",
     useCases: [
       "Converting MOV files from iPhone recordings to MP4 for universal web playback",
       "Producing WebM versions of marketing videos for better browser-native performance",
@@ -5061,7 +5061,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Converting client-delivered footage into the format required by an editing workflow",
     ],
     features: [
-      "Supports MP4, MOV, and WebM containers with modern codec options",
+      "Supports MP4, MOV, WebM, AVI, and MKV containers with modern codec options",
       "Preserves audio tracks, subtitle streams, and file metadata during conversion",
       "Configurable quality and bitrate settings for size-quality tradeoff control",
       "Hardware acceleration support for faster transcoding on capable servers",

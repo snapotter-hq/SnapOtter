@@ -527,3 +527,81 @@ describe("runFfmpeg: missing binary", () => {
     vi.doUnmock("../src/binaries.js");
   });
 });
+
+describe("runFfmpeg: a full disk (#4148)", () => {
+  // Captured from ffmpeg 7.1 encoding onto a volume with no room left.
+  const VIDEO_FULL = [
+    "[vost#0:0/libx264 @ 0xc0f0a4000] Error submitting a packet to the muxer: No space left on device",
+    "    Last message repeated 1 times",
+    "[out#0/mp4 @ 0xc0ec54300] Error muxing a packet",
+    "[out#0/mp4 @ 0xc0ec54300] Task finished with error code: -28 (No space left on device)",
+    "[out#0/mp4 @ 0xc0ec54300] Error writing trailer: No space left on device",
+    "Conversion failed!",
+    "",
+  ].join("\n");
+  const OPEN_FULL = [
+    "[out#0/mp3 @ 0xa59460300] Error opening output /data/files/.previews/x.part.mp3: No space left on device",
+    "Error opening output file /data/files/.previews/x.part.mp3.",
+    "Error opening output files: No space left on device",
+    "",
+  ].join("\n");
+
+  async function failWith(stderr: string, code = 228): Promise<unknown> {
+    const child = makeChild();
+    mockSpawnReturns(child);
+    const runFfmpeg = await loadRunFfmpeg();
+    const p = runFfmpeg(["out.mp4"]);
+    child.stderr.emit("data", Buffer.from(stderr));
+    child.proc.emit("close", code, null);
+    return p.then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+  }
+
+  it.each([
+    ["a muxer write", VIDEO_FULL],
+    ["opening the output", OPEN_FULL],
+  ])("tags a no-space failure on %s as ENOSPC with the stderr kept", async (_what, stderr) => {
+    const err = await failWith(stderr);
+    expect(err).toMatchObject({
+      message: `ffmpeg exited 228: ${stderr}`,
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    expect(isToolInputError(err)).toBe(false);
+  });
+
+  it("tags a quota failure as EDQUOT", async () => {
+    const err = await failWith("[out#0/mp4 @ 0x1] Error writing trailer: Disk quota exceeded\n");
+    expect(err).toMatchObject({ code: "EDQUOT", syscall: "write" });
+  });
+
+  it("still finds the no-space line when the 16 KiB tail cut the start of the log", async () => {
+    const child = makeChild();
+    mockSpawnReturns(child);
+    const runFfmpeg = await loadRunFfmpeg();
+    const p = runFfmpeg(["out.mp4"]);
+    child.stderr.emit("data", Buffer.from(`${"frame= 1 fps=0\n".repeat(2000)}`));
+    child.stderr.emit("data", Buffer.from(VIDEO_FULL));
+    child.proc.emit("close", 228, null);
+    await expect(p).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("prefers the full disk over an input-error shape, since a full disk truncates output", async () => {
+    const err = await failWith(`[mov @ 0x1] moov atom not found\n${VIDEO_FULL}`);
+    expect(err).toMatchObject({ code: "ENOSPC", syscall: "write" });
+    expect(isToolInputError(err)).toBe(false);
+  });
+
+  it("ignores the phrase when it is only part of a longer line, like an input path", async () => {
+    const err = await failWith(
+      "Input #0, mov, from '/uploads/No space left on device.mp4':\n" +
+        "[in#0 @ 0x1] Error opening input: Invalid data found when processing input\n",
+      1,
+    );
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect(isToolInputError(err)).toBe(true);
+  });
+});

@@ -771,7 +771,7 @@ export const nl: TranslationKeys = {
     },
     collage: {
       name: "Collage & Raster",
-      description: "Afbeeldingen samenvoegen in rastercollages met 25+ templates",
+      description: "Afbeeldingen samenvoegen in rastercollages met veel templates",
     },
     stitch: {
       name: "Afbeeldingen samenvoegen",
@@ -861,7 +861,7 @@ export const nl: TranslationKeys = {
     },
     "convert-video": {
       name: "Video converteren",
-      description: "Converteer video's tussen MP4, MOV en WebM",
+      description: "Converteer video's tussen MP4, MOV, WebM, AVI en MKV",
     },
     "compress-video": {
       name: "Video comprimeren",
@@ -1636,6 +1636,7 @@ export const nl: TranslationKeys = {
       separatePdfMode: "aparte PDFs, een per afbeelding",
       combineAllImages: "Alle afbeeldingen samenvoegen in een PDF",
       pageSize: "Paginaformaat",
+      pageSizeLetter: "US Letter",
       orientation: "Orientatie",
       portrait: "Staand",
       landscape: "Liggend",
@@ -2872,6 +2873,7 @@ export const nl: TranslationKeys = {
       stretchMode: "Uitrekken",
       cropMode: "Bijsnijden",
       alignment: "Uitlijning",
+      allCaps: "Alles in hoofdletters",
       start: "Begin",
       center: "Midden",
       end: "Einde",
@@ -4078,6 +4080,8 @@ export const nl: TranslationKeys = {
     cancelButton: "Annuleren",
     readyCount: "{count} gereed",
     failedStatus: "Mislukt",
+    fetchFailed: "Deze URL kon niet worden opgehaald (fout {status}).",
+    downloadFailed: "Dit bestand kon niet worden gedownload (fout {status}).",
     textareaPlaceholder:
       "https://example.com/foto.jpg\nhttps://example.com/rapport.pdf\n- https://example.com/clip.mp4\n[Mijn bestand](https://example.com/opname.mp3)",
   },

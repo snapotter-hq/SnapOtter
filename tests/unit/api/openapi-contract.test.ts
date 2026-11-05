@@ -36,6 +36,13 @@ describe("openapi.yaml contract", () => {
     expect(spec.info.version).toMatch(/^[1-9]\d*\.0\.0$/);
   });
 
+  it("declares security on every operation instead of inheriting the global one", () => {
+    const implicit = operations
+      .filter((o) => !("security" in o.op))
+      .map((o) => `${o.method} ${o.path}`);
+    expect(implicit).toEqual([]);
+  });
+
   it("gives every operation a unique operationId", () => {
     const ids = operations.map((o) => o.op.operationId);
     expect(new Set(ids).size).toBe(ids.length);

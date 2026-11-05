@@ -768,7 +768,7 @@ export const pl: TranslationKeys = {
     },
     collage: {
       name: "Kolaż i siatka",
-      description: "Łączenie obrazów w piękne kolaże siatkowe z ponad 25 szablonami",
+      description: "Łączenie obrazów w piękne kolaże siatkowe z wieloma szablonami",
     },
     stitch: {
       name: "Połącz obrazy",
@@ -859,7 +859,7 @@ export const pl: TranslationKeys = {
     },
     "convert-video": {
       name: "Konwertuj wideo",
-      description: "Konwertuj wideo pomiędzy MP4, MOV i WebM",
+      description: "Konwertuj wideo pomiędzy MP4, MOV, WebM, AVI i MKV",
     },
     "compress-video": {
       name: "Kompresuj wideo",
@@ -1631,6 +1631,7 @@ export const pl: TranslationKeys = {
       separatePdfMode: "oddzielnych plików PDF, po jednym na obraz",
       combineAllImages: "Połącz wszystkie obrazy w jeden PDF",
       pageSize: "Rozmiar strony",
+      pageSizeLetter: "US Letter",
       orientation: "Orientacja",
       portrait: "Pionowa",
       landscape: "Pozioma",
@@ -2865,6 +2866,7 @@ export const pl: TranslationKeys = {
       stretchMode: "Rozciągnij",
       cropMode: "Kadruj",
       alignment: "Wyrównanie",
+      allCaps: "Wszystkie wielkie litery",
       start: "Początek",
       center: "Środek",
       end: "Koniec",
@@ -4070,6 +4072,8 @@ export const pl: TranslationKeys = {
     cancelButton: "Anuluj",
     readyCount: "{count} gotowe",
     failedStatus: "Niepowodzenie",
+    fetchFailed: "Nie udało się pobrać tego adresu URL (błąd {status}).",
+    downloadFailed: "Nie udało się pobrać tego pliku (błąd {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Mój plik](https://example.com/recording.mp3)",
   },

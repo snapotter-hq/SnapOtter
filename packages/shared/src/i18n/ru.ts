@@ -772,7 +772,7 @@ export const ru: TranslationKeys = {
     },
     collage: {
       name: "Коллаж и сетка",
-      description: "Объединение изображений в красивые сетки-коллажи с 25+ шаблонами",
+      description: "Объединение изображений в красивые сетки-коллажи с множеством шаблонов",
     },
     stitch: {
       name: "Склейка изображений",
@@ -861,7 +861,7 @@ export const ru: TranslationKeys = {
     },
     "convert-video": {
       name: "Конвертация видео",
-      description: "Конвертация видео между форматами MP4, MOV и WebM",
+      description: "Конвертация видео между форматами MP4, MOV, WebM, AVI и MKV",
     },
     "compress-video": {
       name: "Сжатие видео",
@@ -1633,6 +1633,7 @@ export const ru: TranslationKeys = {
       separatePdfMode: "отдельные PDF, по одному на изображение",
       combineAllImages: "Объединить все изображения в один PDF",
       pageSize: "Размер страницы",
+      pageSizeLetter: "US Letter",
       orientation: "Ориентация",
       portrait: "Книжная",
       landscape: "Альбомная",
@@ -2864,6 +2865,7 @@ export const ru: TranslationKeys = {
       stretchMode: "Растянуть",
       cropMode: "Обрезать",
       alignment: "Выравнивание",
+      allCaps: "Все заглавные",
       start: "Начало",
       center: "Центр",
       end: "Конец",
@@ -4069,6 +4071,8 @@ export const ru: TranslationKeys = {
     cancelButton: "Отмена",
     readyCount: "{count} готово",
     failedStatus: "Ошибка",
+    fetchFailed: "Не удалось получить этот URL (ошибка {status}).",
+    downloadFailed: "Не удалось скачать этот файл (ошибка {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Мой файл](https://example.com/recording.mp3)",
   },

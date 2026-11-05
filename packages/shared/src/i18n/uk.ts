@@ -768,7 +768,7 @@ export const uk: TranslationKeys = {
     },
     collage: {
       name: "Колаж та сітка",
-      description: "Об'єднання зображень у красиві колажі-сітки з 25+ шаблонами",
+      description: "Об'єднання зображень у красиві колажі-сітки з багатьма шаблонами",
     },
     stitch: {
       name: "Склейка зображень",
@@ -860,7 +860,7 @@ export const uk: TranslationKeys = {
     },
     "convert-video": {
       name: "Конвертація відео",
-      description: "Конвертувати відео між форматами MP4, MOV та WebM",
+      description: "Конвертувати відео між форматами MP4, MOV, WebM, AVI та MKV",
     },
     "compress-video": {
       name: "Стиснення відео",
@@ -1631,6 +1631,7 @@ export const uk: TranslationKeys = {
       separatePdfMode: "окремі PDF, по одному на зображення",
       combineAllImages: "Об'єднати всі зображення в один PDF",
       pageSize: "Розмір сторінки",
+      pageSizeLetter: "US Letter",
       orientation: "Орієнтація",
       portrait: "Книжкова",
       landscape: "Альбомна",
@@ -2865,6 +2866,7 @@ export const uk: TranslationKeys = {
       stretchMode: "Розтягнути",
       cropMode: "Обрізати",
       alignment: "Вирівнювання",
+      allCaps: "Усі великі літери",
       start: "Початок",
       center: "Центр",
       end: "Кінець",
@@ -4069,6 +4071,8 @@ export const uk: TranslationKeys = {
     cancelButton: "Скасувати",
     readyCount: "{count} готово",
     failedStatus: "Помилка",
+    fetchFailed: "Не вдалося отримати цю URL-адресу (помилка {status}).",
+    downloadFailed: "Не вдалося завантажити цей файл (помилка {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Мій файл](https://example.com/recording.mp3)",
   },

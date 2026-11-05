@@ -723,7 +723,7 @@ export const ko: TranslationKeys = {
     },
     collage: {
       name: "콜라주 및 그리드",
-      description: "25가지 이상의 템플릿으로 이미지를 아름다운 그리드 콜라주로 합성",
+      description: "다양한 템플릿으로 이미지를 아름다운 그리드 콜라주로 합성",
     },
     stitch: {
       name: "이미지 결합",
@@ -807,7 +807,7 @@ export const ko: TranslationKeys = {
     },
     "convert-video": {
       name: "동영상 변환",
-      description: "MP4, MOV, WebM 간 동영상 변환",
+      description: "MP4, MOV, WebM, AVI, MKV 간 동영상 변환",
     },
     "compress-video": {
       name: "동영상 압축",
@@ -1568,6 +1568,7 @@ export const ko: TranslationKeys = {
       separatePdfMode: "개별 PDF, 이미지당 1개",
       combineAllImages: "모든 이미지를 하나의 PDF로 합치기",
       pageSize: "페이지 크기",
+      pageSizeLetter: "US 레터",
       orientation: "방향",
       portrait: "세로",
       landscape: "가로",
@@ -2788,6 +2789,7 @@ export const ko: TranslationKeys = {
       stretchMode: "늘리기",
       cropMode: "크롭",
       alignment: "정렬",
+      allCaps: "모두 대문자",
       start: "시작",
       center: "중앙",
       end: "끝",
@@ -3989,6 +3991,8 @@ export const ko: TranslationKeys = {
     cancelButton: "취소",
     readyCount: "{count}개 준비 완료",
     failedStatus: "실패",
+    fetchFailed: "이 URL을 가져오지 못했습니다(오류 {status}).",
+    downloadFailed: "이 파일을 다운로드하지 못했습니다(오류 {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[내 파일](https://example.com/recording.mp3)",
   },

@@ -57,6 +57,37 @@ export function pickBatchFileNotes(
 }
 
 /**
+ * The note for one batch child's stored result. A pipeline child's result is
+ * `{ stepsCompleted, steps }` with each step's note under `steps[k].notes`
+ * (#1374), so the steps' notes are merged in order and a later step overrides
+ * an earlier one's field. `targetKb` and `targetMet` move together: a later
+ * step with its own target replaces the earlier verdict instead of inheriting
+ * its `targetMet: false`. A met target carries no note, so a miss followed by
+ * a met step with nothing else to say still reports the miss. Any other
+ * child's result, including a tool whose `steps` are plain strings, is picked
+ * directly.
+ */
+export function pickChildFileNotes(
+  result: Record<string, unknown> | null | undefined,
+): BatchFileNotes | undefined {
+  const steps = result?.steps;
+  if (!Array.isArray(steps) || !steps.some((step) => step && typeof step === "object")) {
+    return pickBatchFileNotes(result);
+  }
+  const merged: BatchFileNotes = {};
+  for (const step of steps) {
+    const notes = (step as { notes?: BatchFileNotes } | null)?.notes;
+    if (!notes || typeof notes !== "object") continue;
+    if (notes.targetKb !== undefined) {
+      delete merged.targetKb;
+      delete merged.targetMet;
+    }
+    Object.assign(merged, notes);
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+/**
  * The X-File-Notes map as sent in the header: a single FILE_NOTES_ALL_FILES
  * entry when every file with a result carries the same note, otherwise the
  * per-file map unchanged. A batch of 500 files the bundle can't deep-enhance

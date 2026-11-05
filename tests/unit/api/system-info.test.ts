@@ -48,6 +48,15 @@ describe("gatherSystemProperties", () => {
     expect(gatherSystemProperties().gpu_present).toBe(false);
   });
 
+  it("reports gpu_present true for an NVIDIA GPU under WSL2 (#4449)", () => {
+    // Docker on WSL2 through the toolkit's legacy hook: /dev/dxg and no /dev/nvidia*.
+    mockExistsSync.mockImplementation(
+      (p: string) => p === "/dev/dxg" || p === "/usr/lib/x86_64-linux-gnu/libcuda.so.1",
+    );
+    mockDeployMode.mockReturnValue("external");
+    expect(gatherSystemProperties().gpu_present).toBe(true);
+  });
+
   it("carries the app version so release adoption is measurable", () => {
     mockDeployMode.mockReturnValue("embedded");
     mockExistsSync.mockReturnValue(false);

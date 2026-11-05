@@ -554,7 +554,7 @@ export const zhTW: TranslationKeys = {
     },
     collage: {
       name: "拼貼畫與格線",
-      description: "使用25+範本將影像組合為精美的格線拼貼畫",
+      description: "使用多種範本將影像組合為精美的格線拼貼畫",
     },
     stitch: {
       name: "拼接影像",
@@ -638,7 +638,7 @@ export const zhTW: TranslationKeys = {
     },
     "convert-video": {
       name: "轉換影片",
-      description: "在 MP4、MOV 與 WebM 之間轉換影片",
+      description: "在 MP4、MOV、WebM、AVI 與 MKV 之間轉換影片",
     },
     "compress-video": {
       name: "壓縮影片",
@@ -1392,6 +1392,7 @@ export const zhTW: TranslationKeys = {
       separatePdfMode: "獨立PDF，每張影像一個",
       combineAllImages: "將所有影像合併為一個PDF",
       pageSize: "頁面大小",
+      pageSizeLetter: "美國信紙 (Letter)",
       orientation: "方向",
       portrait: "直向",
       landscape: "橫向",
@@ -2591,6 +2592,7 @@ export const zhTW: TranslationKeys = {
       stretchMode: "延展",
       cropMode: "裁切",
       alignment: "對齊",
+      allCaps: "全部大寫",
       start: "起始",
       center: "置中",
       end: "末尾",
@@ -3787,6 +3789,8 @@ export const zhTW: TranslationKeys = {
     cancelButton: "取消",
     readyCount: "{count}個已就緒",
     failedStatus: "失敗",
+    fetchFailed: "無法擷取此網址(錯誤 {status})。",
+    downloadFailed: "無法下載此檔案(錯誤 {status})。",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[我的檔案](https://example.com/recording.mp3)",
   },

@@ -771,7 +771,7 @@ export const vi: TranslationKeys = {
     },
     collage: {
       name: "Ảnh ghép và Lưới",
-      description: "Kết hợp hình ảnh thành ảnh ghép dạng lưới đẹp mắt với hơn 25 mẫu",
+      description: "Kết hợp hình ảnh thành ảnh ghép dạng lưới đẹp mắt với nhiều mẫu",
     },
     stitch: {
       name: "Ghép nối ảnh",
@@ -860,7 +860,7 @@ export const vi: TranslationKeys = {
     },
     "convert-video": {
       name: "Chuyển đổi video",
-      description: "Chuyển đổi video giữa các định dạng MP4, MOV và WebM",
+      description: "Chuyển đổi video giữa các định dạng MP4, MOV, WebM, AVI và MKV",
     },
     "compress-video": {
       name: "Nén video",
@@ -1628,6 +1628,7 @@ export const vi: TranslationKeys = {
       separatePdfMode: "các tệp PDF riêng lẻ, mỗi ảnh một tệp",
       combineAllImages: "Kết hợp tất cả ảnh vào một PDF",
       pageSize: "Khổ giấy",
+      pageSizeLetter: "US Letter",
       orientation: "Hướng",
       portrait: "Dọc",
       landscape: "Ngang",
@@ -2853,6 +2854,7 @@ export const vi: TranslationKeys = {
       stretchMode: "Kéo giãn",
       cropMode: "Cắt",
       alignment: "Căn chỉnh",
+      allCaps: "Viết hoa tất cả",
       start: "Đầu",
       center: "Giữa",
       end: "Cuối",
@@ -4055,6 +4057,8 @@ export const vi: TranslationKeys = {
     cancelButton: "Hủy",
     readyCount: "{count} sẵn sàng",
     failedStatus: "Thất bại",
+    fetchFailed: "Không thể tải URL này (lỗi {status}).",
+    downloadFailed: "Không thể tải xuống tệp này (lỗi {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Tệp của tôi](https://example.com/recording.mp3)",
   },

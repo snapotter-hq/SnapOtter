@@ -5,7 +5,7 @@
  * under the key "webhook_destinations". Each destination can be type "siem"
  * (forward audit events) or "alerts" (receive admin alert conditions).
  *
- * Gated behind the `webhooks:manage` permission + `admin_alerts` enterprise feature.
+ * Gated behind the `webhooks:manage` permission + `admin_alerts` and `webhooks` enterprise features.
  */
 import { SafeError } from "@snapotter/shared";
 import { and, eq } from "drizzle-orm";
@@ -98,10 +98,12 @@ async function writeDestinations(destinations: WebhookDestination[]): Promise<vo
 }
 
 async function checkFeatureGate(reply: FastifyReply): Promise<boolean> {
-  const featureEnabled = await isEnterpriseFeatureEnabled("admin_alerts");
+  const featureEnabled =
+    (await isEnterpriseFeatureEnabled("admin_alerts")) &&
+    (await isEnterpriseFeatureEnabled("webhooks"));
   if (!featureEnabled) {
     reply.status(403).send({
-      error: "Webhook management requires a license with the admin_alerts feature",
+      error: "Webhook management requires a license with the admin_alerts and webhooks features",
     });
     return false;
   }

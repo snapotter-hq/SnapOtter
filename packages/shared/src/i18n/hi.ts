@@ -598,7 +598,7 @@ export const hi: TranslationKeys = {
     },
     collage: {
       name: "कोलाज और ग्रिड",
-      description: "25+ टेम्प्लेट के साथ इमेज को सुंदर ग्रिड कोलाज में मिलाएं",
+      description: "अनेक टेम्प्लेट के साथ इमेज को सुंदर ग्रिड कोलाज में मिलाएं",
     },
     stitch: {
       name: "इमेज जोड़ें",
@@ -682,7 +682,7 @@ export const hi: TranslationKeys = {
     },
     "convert-video": {
       name: "वीडियो कन्वर्ट",
-      description: "वीडियो को MP4, MOV, और WebM के बीच कन्वर्ट करें",
+      description: "वीडियो को MP4, MOV, WebM, AVI, और MKV के बीच कन्वर्ट करें",
     },
     "compress-video": {
       name: "वीडियो कंप्रेस",
@@ -1444,6 +1444,7 @@ export const hi: TranslationKeys = {
       separatePdfMode: "अलग-अलग PDF, प्रत्येक इमेज के लिए एक",
       combineAllImages: "सभी इमेज को एक PDF में मिलाएं",
       pageSize: "पेज साइज़",
+      pageSizeLetter: "US Letter",
       orientation: "ओरिएंटेशन",
       portrait: "पोर्ट्रेट",
       landscape: "लैंडस्केप",
@@ -2661,6 +2662,7 @@ export const hi: TranslationKeys = {
       stretchMode: "स्ट्रेच",
       cropMode: "क्रॉप",
       alignment: "अलाइनमेंट",
+      allCaps: "सभी अक्षर बड़े",
       start: "शुरू",
       center: "केंद्र",
       end: "अंत",
@@ -3859,6 +3861,8 @@ export const hi: TranslationKeys = {
     cancelButton: "रद्द करें",
     readyCount: "{count} तैयार",
     failedStatus: "विफल",
+    fetchFailed: "यह URL प्राप्त नहीं की जा सकी (त्रुटि {status})।",
+    downloadFailed: "यह फ़ाइल डाउनलोड नहीं हो सकी (त्रुटि {status})।",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[मेरी फ़ाइल](https://example.com/recording.mp3)",
   },

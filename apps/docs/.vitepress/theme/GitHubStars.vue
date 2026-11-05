@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useData } from "vitepress";
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { normalizeLocale, t } from "../i18n/ui.mjs";
 import { data as githubStars } from "./github-stars.data.ts";
 
@@ -12,6 +12,47 @@ const starLabel = computed(() => t(locale.value, "github.star"));
 // api.github.com is made from the browser.
 const stars = githubStars.display;
 const repo = "https://github.com/snapotter-hq/snapotter";
+
+// Localized navs are often too full for the labelled button, and the fixed nav
+// clips rather than scrolls (#556). Step down to octocat + count, then to
+// nothing, until the nav fits. The state is an attribute on <html>, not Vue
+// state, so each step restyles synchronously before the next measurement, and
+// github-stars.css can bring back VitePress's own GitHub icon once hidden.
+// Edges, not scrollWidth: VitePress's closed flyout menus are absolutely
+// positioned and inflate scrollWidth even when everything fits.
+function navOverflows(): boolean {
+  const body = document.querySelector(".VPNavBar .content-body");
+  if (!body) return false;
+  const { left, right } = body.getBoundingClientRect();
+  return left < 0 || right > document.documentElement.clientWidth;
+}
+
+function refit() {
+  const root = document.documentElement;
+  root.dataset.starFit = "full";
+  if (navOverflows()) root.dataset.starFit = "compact";
+  if (navOverflows()) root.dataset.starFit = "hidden";
+}
+
+// The nav keeps settling after mount (web fonts, sibling components), so refit
+// whenever its content box changes size as well as on viewport resizes.
+let observer: ResizeObserver | undefined;
+onMounted(() => {
+  refit();
+  window.addEventListener("resize", refit);
+  const content = document.querySelector(".VPNavBar .content");
+  if (content) {
+    observer = new ResizeObserver(refit);
+    observer.observe(content);
+  }
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", refit);
+  observer?.disconnect();
+  delete document.documentElement.dataset.starFit;
+});
+// Nav labels change width with the locale, without a resize.
+watch(locale, refit, { flush: "post" });
 </script>
 
 <template>

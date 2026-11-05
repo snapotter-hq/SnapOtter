@@ -768,7 +768,7 @@ export const ptBR: TranslationKeys = {
     },
     collage: {
       name: "Collage e Grade",
-      description: "Combine imagens em belos collages com mais de 25 modelos",
+      description: "Combine imagens em belos collages com muitos modelos",
     },
     stitch: {
       name: "Juntar Imagens",
@@ -860,7 +860,7 @@ export const ptBR: TranslationKeys = {
     },
     "convert-video": {
       name: "Converter Vídeo",
-      description: "Converta vídeos entre MP4, MOV e WebM",
+      description: "Converta vídeos entre MP4, MOV, WebM, AVI e MKV",
     },
     "compress-video": {
       name: "Comprimir Vídeo",
@@ -1634,6 +1634,7 @@ export const ptBR: TranslationKeys = {
       separatePdfMode: "PDFs separados, um por imagem",
       combineAllImages: "Combinar todas as imagens em um PDF",
       pageSize: "Tamanho da página",
+      pageSizeLetter: "Carta (EUA)",
       orientation: "Orientação",
       portrait: "Retrato",
       landscape: "Paisagem",
@@ -2864,6 +2865,7 @@ export const ptBR: TranslationKeys = {
       stretchMode: "Esticar",
       cropMode: "Cortar",
       alignment: "Alinhamento",
+      allCaps: "Tudo em maiúsculas",
       start: "Início",
       center: "Centro",
       end: "Fim",
@@ -4069,6 +4071,8 @@ export const ptBR: TranslationKeys = {
     cancelButton: "Cancelar",
     readyCount: "{count} prontos",
     failedStatus: "Falhou",
+    fetchFailed: "Não foi possível buscar este URL (erro {status}).",
+    downloadFailed: "Não foi possível baixar este arquivo (erro {status}).",
     textareaPlaceholder:
       "https://exemplo.com/foto.jpg\nhttps://exemplo.com/relatorio.pdf\n- https://exemplo.com/clipe.mp4\n[Meu arquivo](https://exemplo.com/gravacao.mp3)",
   },

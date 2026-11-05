@@ -13,6 +13,8 @@ export const BINARY_OVERRIDE_VARS = [
   "QPDF_PATH",
   "SOFFICE_PATH",
   "PDFCPU_PATH",
+  "GS_PATH",
+  "PANDOC_PATH",
 ] as const;
 
 export interface BinaryOverrideProblem {

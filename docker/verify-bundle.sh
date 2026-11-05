@@ -6,8 +6,11 @@ set -euo pipefail
 #
 # Usage: verify-bundle.sh <bundleId> <arch>
 #
-#   bundleId  - One of: background-removal, face-detection, object-eraser-colorize,
-#               upscale-enhance, photo-restoration, transcription
+#   bundleId  - Any bundle id in /app/docker/feature-manifest.json; the script
+#               reads the list from there and prints it on a bad id. Not ocr:
+#               its v3 runtime goes through verify-ocr-runtime.sh. inpaint-hq
+#               gets the import check here; its functional check lives in
+#               verify-model-bundle-runtime.sh.
 #   arch      - Architecture variant: amd64-gpu or arm64-cpu
 #
 # Expects:
@@ -31,6 +34,17 @@ STAGING="/tmp/verify-staging"
 VENV="/opt/venv"
 PYTHON="${VENV}/bin/python3"
 SITE_PACKAGES="$("${PYTHON}" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+
+MANIFEST="/app/docker/feature-manifest.json"
+KNOWN_IDS="$("${PYTHON}" -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["bundles"]))' "${MANIFEST}")" \
+  || { echo "FAIL: cannot read bundle ids from ${MANIFEST}" >&2; exit 2; }
+case " ${KNOWN_IDS} " in
+  *" ${BUNDLE_ID} "*) ;;
+  *)
+    echo "FAIL: unknown bundle '${BUNDLE_ID}'. Manifest bundles: ${KNOWN_IDS}" >&2
+    exit 2
+    ;;
+esac
 
 export MODELS_PATH="${MODELS_PATH:-/tmp/verify-models}"
 export U2NET_HOME="${MODELS_PATH}/rembg"
@@ -169,6 +183,9 @@ case "${BUNDLE_ID}" in
     # upscale-enhance script imports it and gpu.py degrades cleanly without it.
     check_imports "torch realesrgan"
     ;;
+  inpaint-hq)
+    check_imports "diffusers torch transformers"
+    ;;
   photo-restoration)
     check_imports "torch onnxruntime mediapipe"
     ;;
@@ -285,6 +302,7 @@ case "${BUNDLE_ID}" in
   object-eraser-colorize) smoke_object_eraser_colorize ;;
   upscale-enhance)       smoke_upscale_enhance ;;
   photo-restoration)     smoke_photo_restoration ;;
+  inpaint-hq)            echo "  No smoke test here; run verify-model-bundle-runtime.sh for inpaint-hq" ;;
   ocr)                   fail "OCR v3 runtimes must use verify-ocr-runtime.sh" 2 ;;
   transcription)         smoke_transcription ;;
 esac

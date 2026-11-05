@@ -768,7 +768,7 @@ export const id: TranslationKeys = {
     },
     collage: {
       name: "Kolase & Grid",
-      description: "Gabungkan gambar menjadi kolase grid yang indah dengan 25+ template",
+      description: "Gabungkan gambar menjadi kolase grid yang indah dengan banyak template",
     },
     stitch: {
       name: "Gabungkan Gambar",
@@ -859,7 +859,7 @@ export const id: TranslationKeys = {
     },
     "convert-video": {
       name: "Konversi Video",
-      description: "Konversi video antara format MP4, MOV, dan WebM",
+      description: "Konversi video antara format MP4, MOV, WebM, AVI, dan MKV",
     },
     "compress-video": {
       name: "Kompres Video",
@@ -1628,6 +1628,7 @@ export const id: TranslationKeys = {
       separatePdfMode: "PDF terpisah, satu per gambar",
       combineAllImages: "Gabungkan semua gambar ke satu PDF",
       pageSize: "Ukuran Halaman",
+      pageSizeLetter: "US Letter",
       orientation: "Orientasi",
       portrait: "Potret",
       landscape: "Lanskap",
@@ -2857,6 +2858,7 @@ export const id: TranslationKeys = {
       stretchMode: "Regangkan",
       cropMode: "Potong",
       alignment: "Perataan",
+      allCaps: "Huruf kapital semua",
       start: "Awal",
       center: "Tengah",
       end: "Akhir",
@@ -4062,6 +4064,8 @@ export const id: TranslationKeys = {
     cancelButton: "Batal",
     readyCount: "{count} siap",
     failedStatus: "Gagal",
+    fetchFailed: "Tidak dapat mengambil URL ini (galat {status}).",
+    downloadFailed: "Tidak dapat mengunduh file ini (galat {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[File saya](https://example.com/recording.mp3)",
   },
