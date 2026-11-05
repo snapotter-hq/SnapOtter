@@ -455,6 +455,18 @@ export function loadEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
 }
 
 /**
+ * The AI bridge reads PROCESSING_TIMEOUT_S straight from process.env, where an
+ * unset value used to mean a 600 s cap while the parsed default here is 0
+ * (unlimited). Write the parsed value back when the variable is unset or blank
+ * so both sides see one default (#4313).
+ */
+export function publishSidecarEnv(parsed: Env, target: NodeJS.ProcessEnv = process.env): void {
+  if (!target.PROCESSING_TIMEOUT_S?.trim()) {
+    target.PROCESSING_TIMEOUT_S = String(parsed.PROCESSING_TIMEOUT_S);
+  }
+}
+
+/**
  * Log once at boot when SSO is on and EXTERNAL_URL was rewritten to its
  * canonical form (#1876). Trailing slashes and surrounding whitespace are
  * stripped either way (#1599), so only a change to the URL itself (uppercase
