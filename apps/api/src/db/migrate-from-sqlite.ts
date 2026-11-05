@@ -379,8 +379,10 @@ async function targetColumns(
 
 export async function migrateFromSqlite(
   sqlitePath: string,
-  opts: { force: boolean },
+  // The boot import passes the pino logger here; the CLI keeps the console default.
+  opts: { force: boolean; warn?: (message: string) => void },
 ): Promise<MigrationResult> {
+  const warn = opts.warn ?? console.warn;
   const { default: Database } = await import("better-sqlite3"); // lazy: only the migrator needs it
   // Intentionally also called by the boot path (idempotent via advisory lock + drizzle journal)
   // so the CLI works standalone; do not remove.
@@ -472,7 +474,7 @@ export async function migrateFromSqlite(
   }
   // Reported only once the transaction committed: a rolled-back import detached
   // nothing, and saying otherwise sends the operator looking for ghosts.
-  for (const d of detached) console.warn(detachedIdentityWarning(d));
+  for (const d of detached) warn(detachedIdentityWarning(d));
   return result;
 }
 // The CLI (including --dry-run) lives in sqlite-import.ts, the orchestrator that
