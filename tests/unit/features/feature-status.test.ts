@@ -242,6 +242,7 @@ vi.mock("@snapotter/ai", () => ({
   getOcrRuntimeEffectiveMemoryBytes: ocrRuntime.getEffectiveMemory,
   getOcrRuntimeCapability: ocrRuntime.getCapability,
   selectOcrRuntimeTarget: ocrRuntime.selectTarget,
+  resolveAiVenvPath: () => process.env.PYTHON_VENV_PATH || "/opt/venv",
 }));
 
 let mod: typeof import("../../../apps/api/src/lib/feature-status.js");
@@ -297,6 +298,9 @@ beforeEach(async () => {
   mkdirSync(modelsDir, { recursive: true });
 
   process.env.DATA_DIR = tempDir;
+  // The shared venv is resolveAiVenvPath(); pin it under the temp dir so these
+  // tests keep their own venv instead of whatever the host has.
+  process.env.PYTHON_VENV_PATH = join(aiDir, "venv");
   process.env.FEATURE_MANIFEST_PATH = join(tempDir, "feature-manifest.json");
 
   mod = await import("../../../apps/api/src/lib/feature-status.js");
@@ -309,6 +313,7 @@ afterEach(() => {
   delete process.env.DATA_DIR;
   delete process.env.AI_DATA_DIR;
   delete process.env.FEATURE_MANIFEST_PATH;
+  delete process.env.PYTHON_VENV_PATH;
   rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -1014,7 +1019,8 @@ describe("resetAiEnvironment", () => {
 
   it("keeps the venv when a base venv exists but the reseed script does not", () => {
     // /opt/venv is also where a native install puts its own venv when
-    // PYTHON_VENV_PATH is unset, so its presence alone proves nothing.
+    // PYTHON_VENV_PATH is unset (resolveAiVenvPath), so its presence alone
+    // proves nothing.
     markManagedEnvironment();
     fsFaults.bakedBaseVenv = true;
     fsFaults.reseedScript = false;

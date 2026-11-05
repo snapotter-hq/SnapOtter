@@ -32,6 +32,7 @@ import {
   buildInstallerEnv,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
+  resolveAiVenvPath,
   selectOcrRuntimeTarget,
 } from "@snapotter/ai";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
@@ -199,7 +200,7 @@ export function isManagedAiEnvironment(): boolean {
  * configured manifest as proof of a baked base is what left native installs
  * with an empty venv after a reset (issue #796). The script has to be checked
  * too, because /opt/venv is also where a native install puts its own venv when
- * PYTHON_VENV_PATH is unset (see venvPath in routes/features.ts).
+ * PYTHON_VENV_PATH is unset (see resolveAiVenvPath in @snapotter/ai).
  */
 function canReseedFromBakedBase(): boolean {
   return existsSync(RESEED_SCRIPT) && existsSync(BAKED_BASE_VENV);
@@ -207,7 +208,7 @@ function canReseedFromBakedBase(): boolean {
 
 /** The venv bundle installs write into, and the dispatcher runs python from. */
 function sharedVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || join(AI_DIR, "venv");
+  return resolveAiVenvPath();
 }
 
 // ── installed.json cache ────────────────────────────────────────────────
