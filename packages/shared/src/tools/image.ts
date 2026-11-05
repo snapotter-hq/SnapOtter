@@ -98,7 +98,7 @@ export const IMAGE_TOOLS: Tool[] = [
   {
     id: "edit-metadata",
     name: "Edit Image Metadata",
-    description: "Edit EXIF, GPS, and camera info",
+    description: "Edit EXIF, IPTC, XMP, GPS, keywords, and dates",
     category: "optimization",
     icon: "PenLine",
     route: "/edit-metadata",
@@ -371,7 +371,7 @@ export const IMAGE_TOOLS: Tool[] = [
   {
     id: "content-aware-resize",
     name: "Content-Aware Resize",
-    description: "Seam carving resize that preserves important content with face protection",
+    description: "Intelligently resize images while preserving important content",
     category: "enhance",
     icon: "Scaling",
     route: "/content-aware-resize",
@@ -640,7 +640,7 @@ export const IMAGE_TOOLS: Tool[] = [
   {
     id: "border",
     name: "Border & Frame",
-    description: "Add borders, rounded corners, shadows",
+    description: "Add borders, rounded corners, and shadows",
     category: "layout",
     icon: "Frame",
     route: "/border",
@@ -794,7 +794,7 @@ export const IMAGE_TOOLS: Tool[] = [
   {
     id: "vectorize",
     name: "Image to SVG",
-    description: "Vectorize images using tracing",
+    description: "Convert images to scalable vector graphics",
     category: "format",
     icon: "PenTool",
     route: "/vectorize",
