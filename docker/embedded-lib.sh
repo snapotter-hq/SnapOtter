@@ -120,7 +120,7 @@ embedded_port() {
 # needs it instead of falling back to trust, the fixed passwords or an open
 # Redis.
 # shellcheck disable=SC2034 # read by the scripts that source this file
-EMBEDDED_DB_SECRETS_DIR=/data/.secrets
+EMBEDDED_DB_SECRETS_DIR=/data/.embedded-db-secrets
 EMBEDDED_DB_SECRET_NAMES="pg-owner pg-app redis"
 
 # embedded_db_passwords_requested
@@ -245,12 +245,14 @@ write_embedded_pg_hba() {
 # because /proc/<pid>/cmdline is readable by every local user. s6 runs this
 # again whenever Redis restarts, long after the boot checked the secrets, so a
 # secret that has gone missing since then stops Redis instead of opening it.
+# That holds even when the whole directory went: the boot exports REDISCLI_AUTH
+# only for a secured install, and s6 passes it on to every restart.
 write_embedded_redis_conf() {
   if [ -z "$2" ]; then
     printf 'FATAL: write_embedded_redis_conf needs the secrets directory.\n' >&2
     return 1
   fi
-  if embedded_db_secured "$2"; then
+  if embedded_db_secured "$2" || [ -n "${REDISCLI_AUTH:-}" ]; then
     _wrc_pw="$(read_embedded_secret "$2" redis)" || return 1
     (umask 077 && printf 'requirepass %s\n' "$_wrc_pw" > "$1") || return 1
   else
@@ -305,6 +307,9 @@ export_embedded_db_env() {
     export REDISCLI_AUTH="$_eede_redis"
   else
     export REDIS_URL="redis://127.0.0.1:${EMBEDDED_REDIS_PORT}"
+    # An inherited value would make write_embedded_redis_conf treat this
+    # install as secured.
+    unset REDISCLI_AUTH
   fi
   unset _eede_pg_port _eede_redis_port _eede_owner _eede_app _eede_redis
 }

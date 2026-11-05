@@ -394,6 +394,24 @@ describe("embedded-lib.sh per-install database secrets", () => {
     expect(env.stderr).toContain(missing);
   });
 
+  it("keeps Redis locked when the whole directory goes missing after a secured boot", () => {
+    // Only a secured boot leaves REDISCLI_AUTH set, and s6 hands it to every
+    // later Redis restart, so it still marks the install once the directory is
+    // gone. An unsecured boot clears an inherited one to keep that signal exact.
+    const cleared = runLib(
+      `export_embedded_db_env "${secrets()}"\nprintf '%s' "\${REDISCLI_AUTH-unset}"`,
+      { REDISCLI_AUTH: "inherited" },
+    );
+    expect(cleared.stdout).toBe("unset");
+    const conf = join(dir, "redis.conf");
+    const r = runLib(`write_embedded_redis_conf "${conf}" "${secrets()}"`, {
+      REDISCLI_AUTH: "a".repeat(64),
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(`${join(secrets(), "redis")} is missing`);
+    expect(existsSync(conf)).toBe(false);
+  });
+
   it("leaves the caller's port variables as they were when it refuses", () => {
     // Every consumer falls back to 5432 or 6379 when a port is empty or unset, so
     // a caller that carried on after a refusal would quietly use the defaults.

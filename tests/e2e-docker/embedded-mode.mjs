@@ -436,10 +436,10 @@ async function main() {
     "stat",
     "-c",
     "%a %U",
-    "/data/.secrets",
-    "/data/.secrets/pg-owner",
-    "/data/.secrets/pg-app",
-    "/data/.secrets/redis",
+    "/data/.embedded-db-secrets",
+    "/data/.embedded-db-secrets/pg-owner",
+    "/data/.embedded-db-secrets/pg-app",
+    "/data/.embedded-db-secrets/redis",
   ])
     .trim()
     .split("\n")
@@ -485,7 +485,7 @@ async function main() {
     NAME,
     "sh",
     "-c",
-    'REDISCLI_AUTH="$(cat /data/.secrets/redis)" redis-cli -p 16379 ping',
+    'REDISCLI_AUTH="$(cat /data/.embedded-db-secrets/redis)" redis-cli -p 16379 ping',
   ]).trim() === "PONG"
     ? ok("Redis answers with the per-install password")
     : bad("Redis rejected its own password");
@@ -510,7 +510,7 @@ async function main() {
     NAME,
     "sh",
     "-c",
-    'for f in /data/.secrets/*; do cat "$f"; echo; done',
+    'for f in /data/.embedded-db-secrets/*; do cat "$f"; echo; done',
   ])
     .trim()
     .split("\n");
@@ -549,12 +549,12 @@ async function main() {
   )
     ? ok("snapotter-admin reaches both databases under docker exec")
     : bad("snapotter-admin could not reach the embedded databases");
-  const secretsBefore = quiet(["exec", NAME, "sh", "-c", "cat /data/.secrets/*"]);
+  const secretsBefore = quiet(["exec", NAME, "sh", "-c", "cat /data/.embedded-db-secrets/*"]);
   restartEmbeddedContainer();
   (await waitHealthy(300000))
     ? ok("secured container healthy after a restart")
     : bad("secured container unhealthy after a restart");
-  quiet(["exec", NAME, "sh", "-c", "cat /data/.secrets/*"]) === secretsBefore
+  quiet(["exec", NAME, "sh", "-c", "cat /data/.embedded-db-secrets/*"]) === secretsBefore
     ? ok("passwords survive a restart")
     : bad("passwords changed across a restart");
   cleanup();
@@ -610,14 +610,14 @@ async function main() {
     ? ok("healthy with the variable unset again")
     : bad("unhealthy with the variable unset again");
   expectSecured("variable unset");
-  const appSecret = quiet(["exec", NAME, "cat", "/data/.secrets/pg-app"]);
-  quiet(["exec", NAME, "rm", "/data/.secrets/pg-app"]);
-  quiet(["exec", NAME, "chown", "-R", "snapotter:snapotter", "/data/.secrets"]);
+  const appSecret = quiet(["exec", NAME, "cat", "/data/.embedded-db-secrets/pg-app"]);
+  quiet(["exec", NAME, "rm", "/data/.embedded-db-secrets/pg-app"]);
+  quiet(["exec", NAME, "chown", "-R", "snapotter:snapotter", "/data/.embedded-db-secrets"]);
   restartEmbeddedContainer();
   (await waitHealthy(300000))
     ? ok("healthy after a secret was deleted")
     : bad("unhealthy after a secret was deleted");
-  const newAppSecret = quiet(["exec", NAME, "cat", "/data/.secrets/pg-app"]);
+  const newAppSecret = quiet(["exec", NAME, "cat", "/data/.embedded-db-secrets/pg-app"]);
   /^[0-9a-f]{64}$/.test(newAppSecret) && newAppSecret !== appSecret
     ? ok("the deleted secret was generated again")
     : bad("the deleted secret was not generated again");
@@ -628,10 +628,10 @@ async function main() {
     "stat",
     "-c",
     "%a %U:%G",
-    "/data/.secrets",
-    "/data/.secrets/pg-owner",
-    "/data/.secrets/pg-app",
-    "/data/.secrets/redis",
+    "/data/.embedded-db-secrets",
+    "/data/.embedded-db-secrets/pg-owner",
+    "/data/.embedded-db-secrets/pg-app",
+    "/data/.embedded-db-secrets/redis",
   ])
     .trim()
     .split("\n")
