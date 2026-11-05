@@ -59,9 +59,9 @@ describe("index.ts console use", () => {
     );
 
     expect(calls.length).toBeGreaterThan(0);
+    // Either the FATAL message itself, or the error printed right after it.
     for (const call of calls) {
-      expect(call, call).toMatch(/^console\.error\(/);
-      expect(call.includes("FATAL") || call === "console.error(err);", call).toBe(true);
+      expect(call, call).toMatch(/^console\.error\((\s*[`"]\[?FATAL|err\);$)/);
     }
   });
 
