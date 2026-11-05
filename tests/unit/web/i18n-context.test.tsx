@@ -377,20 +377,40 @@ describe("I18nProvider document direction when a locale chunk fails (#4031)", ()
 
   it("keeps rtl and lang=ar when the Arabic chunk loads", async () => {
     const originalLoader = localeLoaders.ar;
-    localeLoaders.ar = () =>
-      new Promise((resolve) => setTimeout(() => resolve(originalLoader()), 1500));
-    storageMap.set("snapotter-locale", "ar");
+    let releaseChunk!: () => void;
+    const chunkGate = new Promise<void>((resolve) => {
+      releaseChunk = resolve;
+    });
+    try {
+      localeLoaders.ar = async () => {
+        await chunkGate;
+        return originalLoader();
+      };
+      storageMap.set("snapotter-locale", "ar");
 
-    render(
-      <I18nProvider>
-        <LocaleProbe />
-      </I18nProvider>,
-    );
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
 
-    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"), CHUNK_TIMEOUT);
-    expect(document.documentElement.dir).toBe("rtl");
-    expect(document.documentElement.lang).toBe("ar");
-    localeLoaders.ar = originalLoader;
+      // Held open by the test, so ltr is the state until the chunk is released.
+      expect(screen.getByTestId("dir").textContent).toBe("ltr");
+      expect(document.documentElement.dir).toBe("ltr");
+      expect(document.documentElement.lang).toBe("en");
+      releaseChunk();
+
+      // The probe re-renders in the commit that applies the catalog, but the
+      // document attributes are written by an effect that can flush a task
+      // later on a loaded runner. Wait on every observable together.
+      await waitFor(() => {
+        expect(screen.getByTestId("dir").textContent).toBe("rtl");
+        expect(document.documentElement.dir).toBe("rtl");
+        expect(document.documentElement.lang).toBe("ar");
+      }, CHUNK_TIMEOUT);
+    } finally {
+      localeLoaders.ar = originalLoader;
+    }
   });
 });
 
