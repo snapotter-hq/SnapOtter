@@ -42,6 +42,26 @@ describe("legacy bundle release workflow", () => {
     }
   });
 
+  it("covers every manifest bundle except ocr and reads the id list from the manifest (#4317)", () => {
+    const verifier = readRequired(verifierPath);
+    const manifest = JSON.parse(readRequired(manifestPath));
+    const header = verifier.split("\n").slice(0, 25).join("\n");
+
+    // The usage text must not carry its own copy of the ids.
+    expect(header).not.toMatch(/background-removal|face-detection|upscale-enhance/);
+    expect(verifier).toContain("/app/docker/feature-manifest.json");
+
+    for (const bundleId of Object.keys(manifest.bundles)) {
+      if (bundleId === "ocr") continue;
+      // Phase 3 (import check) names every non-OCR bundle.
+      expect(verifier, `${bundleId} has no import-check case`).toMatch(
+        new RegExp(`^  ${bundleId}\\)`, "m"),
+      );
+    }
+    // OCR is routed to its own verifier rather than silently unsupported.
+    expect(verifier).toContain("verify-ocr-runtime.sh");
+  });
+
   it("derives the verification purelib directory from the image interpreter", () => {
     const verifier = readRequired(verifierPath);
 
