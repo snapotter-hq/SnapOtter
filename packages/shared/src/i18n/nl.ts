@@ -771,7 +771,7 @@ export const nl: TranslationKeys = {
     },
     collage: {
       name: "Collage & Raster",
-      description: "Afbeeldingen samenvoegen in rastercollages met 25+ templates",
+      description: "Afbeeldingen samenvoegen in rastercollages met veel templates",
     },
     stitch: {
       name: "Afbeeldingen samenvoegen",

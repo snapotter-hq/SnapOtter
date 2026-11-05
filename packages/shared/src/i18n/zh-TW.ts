@@ -554,7 +554,7 @@ export const zhTW: TranslationKeys = {
     },
     collage: {
       name: "拼貼畫與格線",
-      description: "使用25+範本將影像組合為精美的格線拼貼畫",
+      description: "使用多種範本將影像組合為精美的格線拼貼畫",
     },
     stitch: {
       name: "拼接影像",

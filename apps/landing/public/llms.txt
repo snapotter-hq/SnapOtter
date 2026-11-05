@@ -24,7 +24,7 @@ Watermark & Overlay: Text Watermark, Image Watermark, Text Overlay, Image Compos
 
 Analysis: Image Info, Image Compare, Find Duplicates, Color Palette, Histogram, LQIP Placeholder.
 
-Layout: Collage & Grid (25+ templates), Stitch Images, Split Image, Border & Frame, Beautify Screenshot, Circle Crop, Rounded Crop, Image Pad, Sprite Sheet.
+Layout: Collage & Grid, Stitch Images, Split Image, Border & Frame, Beautify Screenshot, Circle Crop, Rounded Crop, Image Pad, Sprite Sheet.
 
 Format: SVG to Raster, Image to SVG (vectorize), GIF Tools, GIF/WebP Converter, Image to Base64.
 

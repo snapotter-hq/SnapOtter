@@ -4284,7 +4284,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   collage: {
     searchTitle: "Photo Collage Maker - Grid Layouts and Templates",
     longDescription:
-      "Create photo collages and grid layouts from multiple images with 25+ built-in templates. Control spacing, background colors, and image arrangement. Drag to reorder and resize individual cells. Export at custom resolutions for print or web.",
+      "Create photo collages and grid layouts from multiple images with many built-in templates. Control spacing, background colors, and image arrangement. Drag to reorder and resize individual cells. Export at custom resolutions for print or web.",
     useCases: [
       "Create photo collages for social media posts and stories",
       "Build product grid layouts for catalogs and lookbooks",
@@ -4292,7 +4292,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Generate comparison grids showing before-and-after results",
     ],
     features: [
-      "25+ grid templates (2x2, 3x3, masonry, horizontal strip, and more)",
+      "Many grid templates (2x2, 3x3, masonry, horizontal strip, and more)",
       "Custom spacing and background color",
       "Drag-and-drop cell reordering",
       "Custom output resolution for print or web",

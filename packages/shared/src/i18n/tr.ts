@@ -769,7 +769,7 @@ export const tr: TranslationKeys = {
     },
     collage: {
       name: "Kolaj ve Izgara",
-      description: "25+ şablonla görüntüleri güzel ızgara kolajlarda birleştirin",
+      description: "birçok şablonla görüntüleri güzel ızgara kolajlarda birleştirin",
     },
     stitch: {
       name: "Görüntüleri Birleştir",

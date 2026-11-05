@@ -770,7 +770,7 @@ export const de: TranslationKeys = {
     },
     collage: {
       name: "Collage & Raster",
-      description: "Bilder in Rastercollages mit über 25 Vorlagen zusammenfügen",
+      description: "Bilder in Rastercollages mit vielen Vorlagen zusammenfügen",
     },
     stitch: {
       name: "Bilder zusammenfügen",

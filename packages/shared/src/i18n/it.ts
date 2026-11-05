@@ -769,7 +769,7 @@ export const it: TranslationKeys = {
     },
     collage: {
       name: "Collage e griglia",
-      description: "Combina immagini in bellissimi collage con oltre 25 modelli",
+      description: "Combina immagini in bellissimi collage con molti modelli",
     },
     stitch: {
       name: "Unisci immagini",

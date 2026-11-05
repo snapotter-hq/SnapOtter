@@ -768,7 +768,7 @@ export const ptBR: TranslationKeys = {
     },
     collage: {
       name: "Collage e Grade",
-      description: "Combine imagens em belos collages com mais de 25 modelos",
+      description: "Combine imagens em belos collages com muitos modelos",
     },
     stitch: {
       name: "Juntar Imagens",
