@@ -35,6 +35,9 @@ export type OutputFormat =
   | "jp2"
   | "qoi";
 
+/** The formats processImage can encode: OutputFormat minus the ones FORMAT_MAP lacks. */
+export type ProcessImageFormat = Exclude<OutputFormat, "heic" | "bmp" | "ico" | "jp2" | "qoi">;
+
 export interface ResizeOptions {
   width?: number;
   height?: number;
