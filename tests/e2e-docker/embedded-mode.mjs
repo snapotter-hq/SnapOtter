@@ -473,10 +473,10 @@ async function main() {
   superuser.status !== 0 && /no pg_hba\.conf entry/.test(superuser.stderr)
     ? ok("the superuser cannot log in over TCP")
     : bad(`superuser TCP login was not refused: ${superuser.stderr}`);
-  const oldPassword = psql("snapotter_app", "snapotter_app");
-  oldPassword.status !== 0 && /password authentication failed/.test(oldPassword.stderr)
+  const staleLogin = psql("snapotter_app", "snapotter_app");
+  staleLogin.status !== 0 && /password authentication failed/.test(staleLogin.stderr)
     ? ok("the old fixed app password is refused")
-    : bad(`the old app password still works: ${oldPassword.stderr}`);
+    : bad(`the old app password still works: ${staleLogin.stderr}`);
   combined(["exec", NAME, "redis-cli", "-p", "16379", "ping"]).includes("NOAUTH")
     ? ok("Redis refuses unauthenticated clients")
     : bad("Redis answered without a password");
