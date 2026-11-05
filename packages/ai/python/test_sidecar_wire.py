@@ -71,7 +71,6 @@ AI_ENTRYPOINT_SCRIPTS = (
     "inpaint.py",
     "inpaint_hq.py",
     "noise_removal.py",
-    "ocr_preprocess.py",
     "outpaint.py",
     "red_eye_removal.py",
     "remove_bg.py",
