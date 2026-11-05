@@ -13,7 +13,7 @@ describe("nvidiaDeviceVisible (#4449)", () => {
   });
 
   it.each([
-    ["a WSL distro or a chroot inside one", "/usr/lib/wsl/lib/libcuda.so.1"],
+    ["a WSL distro", "/usr/lib/wsl/lib/libcuda.so.1"],
     ["a container from the toolkit's legacy hook", "/usr/lib/x86_64-linux-gnu/libcuda.so.1"],
     ["a container from a CDI spec", "/usr/bin/nvidia-smi"],
   ])("sees an NVIDIA GPU under WSL2 in %s", (_layout, marker) => {

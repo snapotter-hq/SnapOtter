@@ -5,9 +5,9 @@ const NVIDIA_DEVICE_NODES = ["/dev/nvidiactl", "/dev/nvidia0"];
 
 // WSL2 never creates those nodes (#4449). The GPU arrives as /dev/dxg, which
 // Intel and AMD GPUs create too, so an NVIDIA driver file has to be visible as
-// well. Where it lands depends on how the runtime was started.
+// well. Where it lands depends on how the process was started.
 const WSL_NVIDIA_MARKERS = [
-  // A WSL distro, including a chroot inside one that mounts /usr/lib/wsl.
+  // A WSL distro, where WSL mounts the Windows driver's user-mode libraries.
   "/usr/lib/wsl/lib/libcuda.so.1",
   // A container from the toolkit's legacy hook, which bind-mounts the library
   // into the image's lib directory.
