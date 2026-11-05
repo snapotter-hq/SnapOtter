@@ -64,7 +64,7 @@ import {
   MULTI_FILE_TOOLS,
   REORDERABLE_TOOLS,
 } from "@/lib/tool-display-modes";
-import { getToolName } from "@/lib/tool-i18n";
+import { getSectionName, getToolName } from "@/lib/tool-i18n";
 import { type ComparisonPreview, getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -418,7 +418,7 @@ function ToolPageContent({
     const section = toolSection(tool);
     const sectionInfo = SECTIONS.find((s) => s.id === section);
     return {
-      modality: sectionInfo?.name ?? section,
+      modality: getSectionName(t, section, sectionInfo?.name ?? section),
       modalityTab: section,
       toolName: getToolName(t, tool.id, tool.name),
     };
