@@ -67,6 +67,9 @@ function normalizeExternalUrl(raw: string): string {
   return trimmed;
 }
 
+// Lowercase only, so one instance never shows up in analytics under two spellings.
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
@@ -85,6 +88,19 @@ const envSchema = z
           message: `HOST must be an IP address such as 0.0.0.0 or 127.0.0.1, not '${value}'. If you never set HOST, unset it (tcsh sets it to the machine name).`,
         }),
       ),
+    // Lets whatever launches the server choose the instance id before the
+    // first boot, so events it sends before the server is up share that id.
+    // Used only while the settings row doesn't exist; see lib/instance-id.ts.
+    SNAPOTTER_INSTANCE_ID: z
+      .string()
+      .default("")
+      .refine((value) => value === "" || UUID_V4.test(value), {
+        message: "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
+      }),
+    // "off" starts a new instance with analytics switched off, for any
+    // deployment that wants opt-in. It only seeds a missing setting, so an
+    // admin's later choice always stands.
+    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).default("on"),
     BASE_PATH: z
       .string()
       .default("")

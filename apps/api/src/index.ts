@@ -47,6 +47,7 @@ import {
   stopInterruptedInstallRecovery,
 } from "./lib/feature-status.js";
 import { gpuBootLine } from "./lib/gpu-boot-line.js";
+import { ensureInstanceId } from "./lib/instance-id.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
@@ -243,21 +244,10 @@ try {
   process.exit(1);
 }
 
-async function ensureInstanceId(): Promise<string> {
-  const [existing] = await db
-    .select()
-    .from(schema.settings)
-    .where(eq(schema.settings.key, "instance_id"));
-  if (existing) return existing.value;
-  const value = randomUUID();
-  await db.insert(schema.settings).values({ key: "instance_id", value });
-  return value;
-}
-
 // Tag every Sentry event with the anonymized instance id so triage can tell one
 // broken install from the whole fleet, and cross-reference an event to the same
 // instance_id used by the PostHog server-side stream.
-await setSentryInstanceTag(await ensureInstanceId());
+await setSentryInstanceTag(await ensureInstanceId(env.SNAPOTTER_INSTANCE_ID));
 
 await ensureDefaultSettings();
 

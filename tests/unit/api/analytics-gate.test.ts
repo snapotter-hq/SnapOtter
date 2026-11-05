@@ -4,6 +4,8 @@ import {
   __setReaderForTests,
   analyticsEnabled,
   bakedEnabled,
+  gatePrimed,
+  primeAnalyticsGate,
   refreshAnalyticsGate,
   telemetryEnvKilled,
 } from "../../../apps/api/src/lib/analytics-gate.js";
@@ -130,6 +132,24 @@ describe("fail closed", () => {
       throw new Error("db down");
     });
     await refreshAnalyticsGate();
+    expect(analyticsEnabled()).toBe(false);
+  });
+});
+
+describe("primeAnalyticsGate", () => {
+  it("rejects when the first read fails, so the boot stops instead of trusting the default-on guess", async () => {
+    __setReaderForTests(async () => {
+      throw new Error("db down at boot");
+    });
+    await expect(primeAnalyticsGate()).rejects.toThrow(
+      "Could not read the analyticsEnabled setting at startup",
+    );
+    expect(gatePrimed()).toBe(false);
+  });
+
+  it("resolves once the stored opt-out is read", async () => {
+    __setReaderForTests(async () => false);
+    await expect(primeAnalyticsGate()).resolves.toBeUndefined();
     expect(analyticsEnabled()).toBe(false);
   });
 });

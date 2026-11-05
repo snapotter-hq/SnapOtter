@@ -103,9 +103,20 @@ export async function refreshAnalyticsGate(): Promise<void> {
   }
 }
 
-/** Warm the cache at boot before traffic is served. */
+/**
+ * Warm the cache at boot before traffic is served. Rejects when the read
+ * fails, which stops the boot: the cache would otherwise keep its default-on
+ * guess, and instance_started, GET /api/v1/config/analytics and the PostHog
+ * proxy would all act on it for an instance that opted out. Sentry already
+ * waits for a successful read (instrument.ts).
+ */
 export async function primeAnalyticsGate(): Promise<void> {
   await refreshAnalyticsGate();
+  if (!primed) {
+    throw new Error(
+      "Could not read the analyticsEnabled setting at startup, so analytics can't be confirmed off. Check the database connection.",
+    );
+  }
 }
 
 /**

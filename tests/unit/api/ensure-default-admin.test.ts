@@ -172,7 +172,7 @@ describe("API startup (#2333)", () => {
     // around ensureDefaultAdmin / ensureAnonymousUser in the entry point's source.
     const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
     const start = source.indexOf("await ensureDefaultTeam();");
-    const end = source.indexOf("async function ensureInstanceId()", start);
+    const end = source.indexOf("await setSentryInstanceTag(", start);
     const block = source.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
