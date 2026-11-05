@@ -13,6 +13,7 @@ import {
   resolveSource,
   runBootImport,
 } from "../../../apps/api/src/db/sqlite-import.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
 
 async function truncateMigratedTables(): Promise<void> {
@@ -136,10 +137,14 @@ describe("runBootImport", () => {
     }
 
     const logs: string[] = [];
-    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    const logSpy = vi.spyOn(logger, "info").mockImplementation((...args: unknown[]) => {
       logs.push(args.map(String).join(" "));
     });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warns: string[] = [];
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation((...args: unknown[]) => {
+      warns.push(args.map(String).join(" "));
+    });
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const state = await runBootImport({
         SQLITE_MIGRATE_PATH: dbPath,
@@ -147,10 +152,15 @@ describe("runBootImport", () => {
         FILES_STORAGE_PATH: filesDir,
       });
       expect(state).toBe("import");
+      // The per-identity warnings come from migrateFromSqlite; on boot they go
+      // to the logger (and so the support bundle), not the console.
+      expect(consoleWarn).not.toHaveBeenCalled();
     } finally {
       logSpy.mockRestore();
       warnSpy.mockRestore();
+      consoleWarn.mockRestore();
     }
+    expect(warns.filter((w) => w.includes("u-twin-a") || w.includes("u-twin-c"))).toHaveLength(2);
 
     const marker = await getImportMarker();
     expect(marker?.status).toBe("completed");
@@ -197,10 +207,10 @@ describe("runBootImport", () => {
     }
 
     const logs: string[] = [];
-    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    const logSpy = vi.spyOn(logger, "info").mockImplementation((...args: unknown[]) => {
       logs.push(args.map(String).join(" "));
     });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       await runBootImport({
         SQLITE_MIGRATE_PATH: dbPath,
@@ -226,7 +236,7 @@ describe("runBootImport", () => {
     await seedRealistic1xData(dbPath);
 
     const logs: string[] = [];
-    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    const logSpy = vi.spyOn(logger, "info").mockImplementation((...args: unknown[]) => {
       logs.push(args.map(String).join(" "));
     });
     try {
