@@ -17,6 +17,7 @@ import { batchAliasTarget } from "../jobs/batch-alias.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
 import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { logger } from "../lib/logger.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
 
@@ -469,12 +470,12 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
         .catch((err) => {
-          console.error("terminal replay key write failed", payload.jobId, err);
+          logger.error({ err, jobId: payload.jobId }, "terminal replay key write failed");
         })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
   void Promise.resolve(publishPromise).catch((err) => {
-    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+    if (isTerminal) logger.error({ err, jobId: payload.jobId }, "terminal progress publish failed");
   });
 }
 
@@ -876,12 +877,12 @@ export function publishEphemeral(
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
         .catch((err) => {
-          console.error("terminal replay key write failed", payload.jobId, err);
+          logger.error({ err, jobId: payload.jobId }, "terminal replay key write failed");
         })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
   void Promise.resolve(announce).catch((err) => {
-    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+    if (isTerminal) logger.error({ err, jobId: payload.jobId }, "terminal progress publish failed");
   });
 }
 
@@ -893,14 +894,12 @@ let sseSubscriber: ReturnType<typeof createRedisSubscriberConnection> | null = n
 
 function ensureSubscriber(): void {
   if (sseSubscriber) return;
+  // ioredis auto-resubscribes after reconnects. Connection errors are logged
+  // by the listener createRedisSubscriberConnection attaches; another one here
+  // would write every reconnect attempt to the log twice.
   sseSubscriber = createRedisSubscriberConnection();
-  // ioredis auto-resubscribes after reconnects; the handler keeps connection
-  // errors observable without crashing (ioredis silentEmits, but be explicit).
-  sseSubscriber.on("error", (err) => {
-    console.error("SSE progress subscriber error", err);
-  });
   void sseSubscriber.subscribe(progressChannel()).catch((err) => {
-    console.error("SSE progress subscribe failed", err);
+    logger.error({ err }, "SSE progress subscribe failed");
   });
   sseSubscriber.on("message", (_channel: string, message: string) => {
     try {
