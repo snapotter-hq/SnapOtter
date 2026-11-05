@@ -88,9 +88,9 @@ const envSchema = z
           message: `HOST must be an IP address such as 0.0.0.0 or 127.0.0.1, not '${value}'. If you never set HOST, unset it (tcsh sets it to the machine name).`,
         }),
       ),
-    // Lets whatever launches the server choose the instance id before the
-    // first boot, so events it sends before the server is up share that id.
-    // Used only while the settings row doesn't exist; see lib/instance-id.ts.
+    // Lets a provisioning tool pick the instance id before first boot, so its
+    // records match the instance's events. Used only while the settings row
+    // doesn't exist; see lib/instance-id.ts.
     SNAPOTTER_INSTANCE_ID: z
       .string()
       .default("")

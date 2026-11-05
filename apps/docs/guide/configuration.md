@@ -79,7 +79,7 @@ Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own Po
 
 Upgrading from 1.x: put your old `snapotter.db` at `/data/snapotter.db` in the volume and embedded mode imports it into the embedded PostgreSQL on first boot. The import runs once; later boots skip it.
 
-Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, or use the in-app admin opt-out, to disable it.
+Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, set `SNAPOTTER_ANALYTICS_DEFAULT=off` before the first boot, or use the in-app admin opt-out, to disable it.
 
 ### Processing limits {#processing-limits}
 

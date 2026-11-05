@@ -137,18 +137,31 @@ describe("fail closed", () => {
 });
 
 describe("primeAnalyticsGate", () => {
+  it.each([false, true, undefined])(
+    "primes the gate when the reader answers %s",
+    async (stored) => {
+      __setReaderForTests(async () => stored);
+      await expect(primeAnalyticsGate()).resolves.toBeUndefined();
+      expect(gatePrimed()).toBe(true);
+    },
+  );
+
   it("rejects when the first read fails, so the boot stops instead of trusting the default-on guess", async () => {
+    const readError = new Error("db down at boot");
     __setReaderForTests(async () => {
-      throw new Error("db down at boot");
+      throw readError;
     });
-    await expect(primeAnalyticsGate()).rejects.toThrow(
-      "Could not read the analyticsEnabled setting at startup",
-    );
+    const priming = primeAnalyticsGate();
+    await expect(priming).rejects.toThrow("Could not read the analyticsEnabled setting at startup");
+    await expect(priming).rejects.toHaveProperty("cause", readError);
     expect(gatePrimed()).toBe(false);
   });
 
-  it("resolves once the stored opt-out is read", async () => {
-    __setReaderForTests(async () => false);
+  it("resolves after a failed read when the bake is off, because analytics can't come on", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "off";
+    __setReaderForTests(async () => {
+      throw new Error("db down at boot");
+    });
     await expect(primeAnalyticsGate()).resolves.toBeUndefined();
     expect(analyticsEnabled()).toBe(false);
   });

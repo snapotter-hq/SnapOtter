@@ -267,7 +267,13 @@ if (!env.COOKIE_SECRET) {
 
 await initAnalytics();
 const { primeAnalyticsGate } = await import("./lib/analytics-gate.js");
-await primeAnalyticsGate();
+try {
+  await primeAnalyticsGate();
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
+  process.exit(1);
+}
 // ignoreSampleRate: this once-per-boot census must not be thinned by the
 // volume sample rate that exists to throttle high-frequency usage events.
 await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, { ...gatherSystemProperties() }, undefined, {
