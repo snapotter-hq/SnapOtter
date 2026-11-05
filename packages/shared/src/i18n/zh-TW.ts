@@ -3848,6 +3848,8 @@ export const zhTW: TranslationKeys = {
     generatePreview: "產生預覽",
     previewFailed: "預覽產生失敗",
     previewEncoderMissing: "此伺服器的 ffmpeg 缺少 {encoder} 編碼器，無法產生預覽。請聯絡管理員。",
+    previewEngineUnavailable:
+      "此伺服器未安裝 ffmpeg，無法產生預覽。請聯絡管理員安裝 ffmpeg 或設定 FFMPEG_PATH。",
     previewProgressMessages: [
       "水獺正在暖身...",
       "正在嚼碎像素...",

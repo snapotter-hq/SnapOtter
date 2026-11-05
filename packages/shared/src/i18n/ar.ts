@@ -4096,6 +4096,8 @@ export const ar: TranslationKeys = {
     previewFailed: "فشل إنشاء المعاينة",
     previewEncoderMissing:
       "لا يحتوي ffmpeg على هذا الخادم على المرمِّز {encoder}، لذا لا يمكن إنشاء المعاينة. تواصل مع المسؤول.",
+    previewEngineUnavailable:
+      "ffmpeg غير مثبَّت على هذا الخادم، لذا لا يمكن إنشاء المعاينة. اطلب من المسؤول تثبيت ffmpeg أو تعيين FFMPEG_PATH.",
     previewProgressMessages: [
       "ثعلب الماء يستعد...",
       "نطحن البكسلات...",

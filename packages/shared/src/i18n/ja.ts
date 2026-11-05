@@ -4078,6 +4078,8 @@ export const ja: TranslationKeys = {
     previewFailed: "プレビューの生成に失敗しました",
     previewEncoderMissing:
       "このサーバーの ffmpeg に {encoder} エンコーダーがないため、プレビューを生成できません。管理者にお問い合わせください。",
+    previewEngineUnavailable:
+      "このサーバーに ffmpeg がインストールされていないため、プレビューを生成できません。ffmpeg のインストールまたは FFMPEG_PATH の設定を管理者に依頼してください。",
     previewProgressMessages: [
       "カワウソが準備運動中...",
       "ピクセルを噛み砕いています...",
