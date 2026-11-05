@@ -430,7 +430,7 @@ Apply a generic batch-enabled tool to multiple files at once. Returns a ZIP arch
 
 The `ocr-pdf` tool supports this generic `/batch` route.
 
-```bash
+```bash example
 curl -X POST http://localhost:1349/api/v1/tools/image/compress/batch \
   -H "Authorization: Bearer <token>" \
   -F "files=@a.jpg" \
@@ -445,7 +445,7 @@ Concurrency is controlled by `CONCURRENT_JOBS` (default: auto-detected from CPU 
 
 ### Execute a pipeline {#execute-a-pipeline}
 
-```bash
+```bash example
 # Single file
 curl -X POST http://localhost:1349/api/v1/pipeline/execute \
   -H "Authorization: Bearer <token>" \
