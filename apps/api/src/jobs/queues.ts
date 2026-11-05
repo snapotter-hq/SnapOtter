@@ -5,6 +5,7 @@
  * default job options (retry policy, TTL-based cleanup).
  */
 import { Queue } from "bullmq";
+import { logger } from "../lib/logger.js";
 import { createBullMQConnection } from "./connection.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 
@@ -24,7 +25,7 @@ export function getQueue(pool: Pool): Queue<ToolJobData, ToolJobResult> {
       },
     });
     q.on("error", (err) => {
-      console.error(`[queue] ${queueName(pool)} error`, err);
+      logger.error({ err }, `[queue] ${queueName(pool)} error`);
     });
     queues.set(pool, q);
   }

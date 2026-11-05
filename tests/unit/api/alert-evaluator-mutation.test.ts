@@ -627,7 +627,6 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("passes maxRetries: 1 to every webhook delivery", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStrictMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -644,7 +643,9 @@ describe("alert-evaluator.ts mutation coverage", () => {
         { maxRetries: 1 },
       );
       expect(loggerMock.error).not.toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
+      expect(loggerMock.info).toHaveBeenCalledWith(
+        "Alert evaluation complete: 1 alert(s) delivered",
+      );
     });
 
     it("decrypts an encrypted auth header before delivery", async () => {
@@ -703,7 +704,6 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("logs, reports an operational error, and skips delivery when decryptSetting resolves null", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStrictMock
         .mockResolvedValueOnce(
@@ -741,12 +741,11 @@ describe("alert-evaluator.ts mutation coverage", () => {
         pool: "system",
         subsystem: "alert-evaluator",
       });
-      expect(logSpy).not.toHaveBeenCalled();
+      expect(loggerMock.info).not.toHaveBeenCalled();
     });
 
     it("logs error details and does not log completion when deliverWebhook returns success: false", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStrictMock
         .mockResolvedValueOnce(
@@ -775,7 +774,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
         "alert-evaluator: webhook delivery failed",
       );
       expect(reportErrorMock).not.toHaveBeenCalled();
-      expect(logSpy).not.toHaveBeenCalled();
+      expect(loggerMock.info).not.toHaveBeenCalled();
     });
 
     it("logs a warning and still delivers to all destinations when key-rotation writeback throws (#3398)", async () => {

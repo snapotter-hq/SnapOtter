@@ -288,7 +288,7 @@ try {
   if (result.valid && result.license) {
     enterpriseLicense = result.license;
   } else if (env.SNAPOTTER_LICENSE_KEY) {
-    console.warn("[WARN] Invalid or expired enterprise license key");
+    logger.warn("Invalid or expired enterprise license key");
   }
 } catch {
   // Enterprise package not available
@@ -333,9 +333,7 @@ startInterruptedInstallRecovery({
         }
         return true;
       } catch (error) {
-        console.warn(
-          `[ocr-runtime] Startup reconciliation failed; retrying: ${(error as Error).message}`,
-        );
+        logger.warn({ err: error }, "[ocr-runtime] Startup reconciliation failed; retrying");
         return false;
       } finally {
         releaseInstallLock();
@@ -769,19 +767,21 @@ try {
 
   const dispatcherResult = await initDispatcher();
   const gpuLine = gpuBootLine(dispatcherResult, gatherSystemProperties().gpu_present);
-  console.log(
-    [
-      `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
-      gpuLine,
-      `[INFO] Rate limit: ${env.RATE_LIMIT_PER_MIN > 0 ? `${env.RATE_LIMIT_PER_MIN}/min` : "disabled"}`,
-      `[INFO] Upload limit: ${env.MAX_UPLOAD_SIZE_MB > 0 ? `${env.MAX_UPLOAD_SIZE_MB} MB` : "unlimited"}`,
-      `[INFO] Trust proxy: ${env.TRUST_PROXY}`,
-      `[INFO] Storage: ${env.STORAGE_MODE}${env.STORAGE_MODE === "s3" ? ` (${env.S3_BUCKET})` : ""}`,
-      enterpriseLicense
-        ? `[INFO] Enterprise license: ${enterpriseLicense.org} (${enterpriseLicense.plan})`
-        : "[INFO] Edition: Community",
-    ].join("\n"),
-  );
+  // One entry per line: pino escapes newlines, so a joined banner would print
+  // as a single unreadable JSON string.
+  for (const line of [
+    `SnapOtter v${APP_VERSION} running on port ${env.PORT}`,
+    gpuLine,
+    `[INFO] Rate limit: ${env.RATE_LIMIT_PER_MIN > 0 ? `${env.RATE_LIMIT_PER_MIN}/min` : "disabled"}`,
+    `[INFO] Upload limit: ${env.MAX_UPLOAD_SIZE_MB > 0 ? `${env.MAX_UPLOAD_SIZE_MB} MB` : "unlimited"}`,
+    `[INFO] Trust proxy: ${env.TRUST_PROXY}`,
+    `[INFO] Storage: ${env.STORAGE_MODE}${env.STORAGE_MODE === "s3" ? ` (${env.S3_BUCKET})` : ""}`,
+    enterpriseLicense
+      ? `[INFO] Enterprise license: ${enterpriseLicense.org} (${enterpriseLicense.plan})`
+      : "[INFO] Edition: Community",
+  ]) {
+    logger.info(line);
+  }
 } catch (err) {
   app.log.error(err);
   process.exit(1);
@@ -794,19 +794,19 @@ async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   stopInterruptedInstallRecovery();
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down gracefully...`);
 
   const forceExit = setTimeout(() => {
-    console.error("Shutdown timed out, forcing exit");
+    logger.error("Shutdown timed out, forcing exit");
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
   forceExit.unref();
 
   try {
     await app.close();
-    console.log("HTTP server closed");
+    logger.info("HTTP server closed");
   } catch (err) {
-    console.error("Error closing HTTP server:", err);
+    logger.error({ err }, "Error closing HTTP server");
   }
 
   // Stop accepting queued work and let active jobs finish before tearing down
@@ -814,7 +814,7 @@ async function shutdown(signal: string) {
   try {
     await closeWorkers();
   } catch (err) {
-    console.error("Error closing workers:", err);
+    logger.error({ err }, "Error closing workers");
   }
 
   try {
@@ -823,7 +823,7 @@ async function shutdown(signal: string) {
     );
     shutdownDispatcher();
     await Promise.all([shutdownDocsDispatcher(), shutdownOcrDispatcher()]);
-    console.log("Python dispatchers shut down");
+    logger.info("Python dispatchers shut down");
   } catch {
     // AI package may not be available
   }
@@ -831,14 +831,14 @@ async function shutdown(signal: string) {
   try {
     const { shutdownBrowser } = await import("./lib/browser-service.js");
     await shutdownBrowser();
-    console.log("Browser service shut down");
+    logger.info("Browser service shut down");
   } catch {
     // Browser service may not have been initialized
   }
 
   try {
     await shutdownAnalytics();
-    console.log("Analytics flushed");
+    logger.info("Analytics flushed");
   } catch {
     // analytics shutdown is best-effort
   }
@@ -857,16 +857,16 @@ async function shutdown(signal: string) {
     const { stopAnalyticsGateListener } = await import("./lib/analytics-gate.js");
     await stopAnalyticsGateListener();
     await closeRedis();
-    console.log("Redis connections closed");
+    logger.info("Redis connections closed");
   } catch (err) {
-    console.error("Error closing Redis connections:", err);
+    logger.error({ err }, "Error closing Redis connections");
   }
 
   try {
     await closeDb();
-    console.log("Database connection closed");
+    logger.info("Database connection closed");
   } catch (err) {
-    console.error("Error closing database:", err);
+    logger.error({ err }, "Error closing database");
   }
 
   clearTimeout(forceExit);

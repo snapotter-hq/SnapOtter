@@ -9,6 +9,9 @@ const store = vi.hoisted(() => ({
   users: [] as unknown[],
   values: vi.fn(),
 }));
+const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
@@ -41,7 +44,7 @@ beforeEach(() => {
   store.values.mockClear();
   env.DEFAULT_PASSWORD = originalPassword;
   env.DEFAULT_USERNAME = originalUsername;
-  vi.spyOn(console, "log").mockImplementation(() => {});
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 });
 
 describe("ensureDefaultAdmin", () => {
@@ -133,6 +136,14 @@ describe("ensureDefaultAdmin", () => {
     await ensureDefaultAdmin();
 
     expect(store.values).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces the new admin through the logger so the line reaches LOG_DIR (#4178)", async () => {
+    await ensureDefaultAdmin();
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      `Default admin user '${env.DEFAULT_USERNAME}' created - password change required on first login`,
+    );
   });
 
   it("leaves an established install alone, whatever DEFAULT_PASSWORD holds", async () => {

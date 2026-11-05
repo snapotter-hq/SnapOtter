@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import { env } from "../config.js";
+import { logger } from "../lib/logger.js";
 import { redactUrl } from "../lib/redact-url.js";
 import {
   ensureRuntimeRole,
@@ -96,7 +97,7 @@ export async function runMigrations(): Promise<void> {
 
   if (!split.active) {
     if (split.reason === "same-role") {
-      console.warn(
+      logger.warn(
         "DATABASE_MIGRATION_URL names the same role as DATABASE_URL, so the privilege split is NOT active. Running single-role.",
       );
     }
@@ -129,7 +130,7 @@ export async function runMigrations(): Promise<void> {
   // warning_privilege_not_granted, since the text is localized by lc_messages.
   client.on("notice", (note) => {
     if (note.code === "01007") {
-      console.warn(`Postgres: ${note.message}`);
+      logger.warn(`Postgres: ${note.message}`);
     }
   });
 
@@ -140,7 +141,7 @@ export async function runMigrations(): Promise<void> {
     try {
       const created = await ensureRuntimeRole(client, split.runtimeRole, split.runtimePassword);
       if (created) {
-        console.log(`Created least-privilege runtime role "${split.runtimeRole}".`);
+        logger.info(`Created least-privilege runtime role "${split.runtimeRole}".`);
       }
       // Order is not load-bearing: the sweep after migrate() covers whatever this
       // boot creates. See grantRuntimePrivileges() for what the default

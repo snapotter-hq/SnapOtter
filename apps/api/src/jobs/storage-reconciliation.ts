@@ -7,6 +7,7 @@
  */
 import { and, eq, notInArray, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 
 export async function storageReconciliationJob(): Promise<void> {
   // Sum actual file sizes per user
@@ -53,5 +54,5 @@ export async function storageReconciliationJob(): Promise<void> {
   updated += zeroChanged;
   const checked = usersWithFiles.length + zeroChanged;
 
-  console.log(`Storage reconciliation complete: ${checked} users checked, ${updated} corrected`);
+  logger.info(`Storage reconciliation complete: ${checked} users checked, ${updated} corrected`);
 }
