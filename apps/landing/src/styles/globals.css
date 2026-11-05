@@ -101,8 +101,12 @@ code, pre, kbd {
 .section-dark h1, .section-dark h2, .section-dark h3, .section-dark h4 {
   color: var(--color-dark-fg);
 }
-.section-dark p, .section-dark span {
-  color: var(--color-dark-muted);
+/* Layered on purpose: an unlayered rule beats Tailwind's utilities layer, which made
+   text-primary-light and text-dark-fg on spans render muted (#4297). */
+@layer base {
+  .section-dark p, .section-dark span {
+    color: var(--color-dark-muted);
+  }
 }
 .section-dark .text-foreground {
   color: var(--color-dark-fg);
