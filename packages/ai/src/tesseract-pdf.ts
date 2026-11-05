@@ -401,7 +401,7 @@ export async function preparePdfOcrPages(
   }
 
   const deadline = performance.now() + timeoutMs;
-  const executable = options.ghostscriptPath ?? process.env.GS_PATH ?? "gs";
+  const executable = options.ghostscriptPath ?? (process.env.GS_PATH || "gs");
   const resolvedInputPath = await realpath(inputPath);
   await mkdir(scratchDir, { recursive: true });
   const jobScratchDir = await mkdtemp(join(scratchDir, "ocr-pdf-pages-"));
@@ -501,7 +501,7 @@ export async function runTesseractPdf(
   }
 
   const deadline = performance.now() + timeoutMs;
-  const executable = options.ghostscriptPath ?? process.env.GS_PATH ?? "gs";
+  const executable = options.ghostscriptPath ?? (process.env.GS_PATH || "gs");
   const resolvedInputPath = await realpath(inputPath);
   await mkdir(scratchDir, { recursive: true });
   const jobScratchDir = await mkdtemp(join(scratchDir, "ocr-pdf-"));

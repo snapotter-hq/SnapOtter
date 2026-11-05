@@ -108,11 +108,15 @@ SnapOtter looks up each processing binary on `$PATH` inside the container, so th
 | `QPDF_PATH` | (empty) | Path to `qpdf`, used by the PDF tools and to check uploaded PDFs. |
 | `SOFFICE_PATH` | (empty) | Path to LibreOffice's `soffice`, used for office document conversions. |
 | `PDFCPU_PATH` | (empty) | Path to `pdfcpu`, used by some PDF tools. |
+| `GS_PATH` | (empty) | Path to Ghostscript's `gs`, used by the PDF tools and PDF OCR. |
+| `PANDOC_PATH` | (empty) | Path to `pandoc`, used by document conversions. |
+| `SNAPOTTER_FONT_FILE` | (empty) | Font file for text drawn onto video (burn subtitles, video watermark). Empty uses the first font the image finds. |
+| `SNAPOTTER_FONT_FAMILY` | (empty) | Family name of `SNAPOTTER_FONT_FILE`. Empty means `Sans`. |
 | `SNAPOTTER_HW_ACCEL` | (empty) | Hardware video encoder family, `nvenc` or `vaapi`. Empty encodes in software. |
 
 `SNAPOTTER_HW_ACCEL` needs an ffmpeg built with that encoder family, and the ffmpeg in the image has neither. With the image's own binary the setting falls back to software encoding and says so in the startup log. To use it, mount your own ffmpeg build, point `FFMPEG_PATH` and `FFPROBE_PATH` at it, and give the container the GPU device. For `nvenc`, also set `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: the image asks for `compute,utility` only, and without `video` the NVIDIA runtime doesn't mount the encode library, so the encoder is listed but every encode fails. A path override that doesn't exist or isn't executable is also named in the startup log, and every job that needs that binary fails until you fix the path or unset it.
 
-The published Compose files pass all six through from `.env`, so setting them there is enough.
+The published Compose files pass all of them through from `.env`, so setting them there is enough.
 
 ### Cleanup {#cleanup}
 

@@ -22,7 +22,7 @@ const CANDIDATES: FontRef[] = [
 export function resolveFontFile(): FontRef | null {
   const file = process.env.SNAPOTTER_FONT_FILE;
   if (file) {
-    return { file, family: process.env.SNAPOTTER_FONT_FAMILY ?? "Sans" };
+    return { file, family: process.env.SNAPOTTER_FONT_FAMILY || "Sans" };
   }
   for (const c of CANDIDATES) {
     if (existsSync(c.file)) return c;
