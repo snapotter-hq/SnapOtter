@@ -133,6 +133,14 @@ const restartEmbeddedContainer = () => {
   docker(["restart", NAME]);
   resolveContainerPort();
 };
+// `docker restart` keeps the old environment, so booting the same volume with
+// different settings takes a new container.
+const replaceEmbeddedContainer = (extraArgs = []) => {
+  if (!containerIsOwned()) throw new Error(`Refusing to replace unowned container ${NAME}`);
+  docker(["stop", NAME]);
+  docker(["rm", NAME]);
+  runEmbeddedContainer(extraArgs);
+};
 
 async function waitHealthy(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -481,9 +489,20 @@ async function main() {
   ]).trim() === "PONG"
     ? ok("Redis answers with the per-install password")
     : bad("Redis rejected its own password");
-  spawnSync("docker", ["exec", NAME, "pg_isready", "-h", "127.0.0.1", "-p", "5432"]).status !== 0
+  // pg_isready exits 2 when nothing answers, and 1 for a server that answers
+  // but rejects connections, which would still mean something listens there.
+  const defaultPort = spawnSync("docker", [
+    "exec",
+    NAME,
+    "pg_isready",
+    "-h",
+    "127.0.0.1",
+    "-p",
+    "5432",
+  ]).status;
+  defaultPort === 2
     ? ok("nothing listens on the default Postgres port")
-    : bad("Postgres still listens on 5432");
+    : bad(`pg_isready on port 5432 exited ${defaultPort}, not 2 (no response)`);
   // The passwords may live in files and in the services' environment, never in
   // a log line or an argv, which every local user can read in /proc.
   const secretValues = quiet([
@@ -538,6 +557,88 @@ async function main() {
   quiet(["exec", NAME, "sh", "-c", "cat /data/.secrets/*"]) === secretsBefore
     ? ok("passwords survive a restart")
     : bad("passwords changed across a restart");
+  cleanup();
+
+  // 10. An existing volume turns the passwords on and keeps them: unsetting the
+  //     variable changes nothing, a deleted secret comes back, and a directory
+  //     handed to the app user, as booting with external databases does, is
+  //     taken back.
+  console.log("\n[10] an existing volume turns the passwords on and keeps them");
+  cleanup();
+  createVolume();
+  runEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("unsecured container reached healthy")
+    : bad("unsecured container never became healthy");
+  // Reaching healthy already proves the app's own passwords work: the boot stops
+  // unless Postgres takes them and Redis answers PONG. These prove TCP and Redis
+  // turn away a client without them.
+  const expectSecured = (when) => {
+    const fixed = spawnSync(
+      "docker",
+      [
+        "exec",
+        "-e",
+        "PGPASSWORD=snapotter_app",
+        NAME,
+        "psql",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "snapotter_app",
+        "-d",
+        "snapotter",
+        "-c",
+        "select 1",
+      ],
+      { encoding: "utf-8" },
+    );
+    fixed.status !== 0 && /password authentication failed/.test(fixed.stderr)
+      ? ok(`${when}: TCP refuses the fixed app password`)
+      : bad(`${when}: TCP did not refuse the fixed app password: ${fixed.stderr}`);
+    combined(["exec", NAME, "redis-cli", "ping"]).includes("NOAUTH")
+      ? ok(`${when}: Redis refuses unauthenticated clients`)
+      : bad(`${when}: Redis answered without a password`);
+  };
+  replaceEmbeddedContainer(["-e", "EMBEDDED_DB_PASSWORDS=1"]);
+  (await waitHealthy(300000))
+    ? ok("healthy after turning the passwords on")
+    : bad("unhealthy after turning the passwords on");
+  expectSecured("turned on");
+  replaceEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("healthy with the variable unset again")
+    : bad("unhealthy with the variable unset again");
+  expectSecured("variable unset");
+  const appSecret = quiet(["exec", NAME, "cat", "/data/.secrets/pg-app"]);
+  quiet(["exec", NAME, "rm", "/data/.secrets/pg-app"]);
+  quiet(["exec", NAME, "chown", "-R", "snapotter:snapotter", "/data/.secrets"]);
+  restartEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("healthy after a secret was deleted")
+    : bad("unhealthy after a secret was deleted");
+  const newAppSecret = quiet(["exec", NAME, "cat", "/data/.secrets/pg-app"]);
+  /^[0-9a-f]{64}$/.test(newAppSecret) && newAppSecret !== appSecret
+    ? ok("the deleted secret was generated again")
+    : bad("the deleted secret was not generated again");
+  expectSecured("secret regenerated");
+  const owners = quiet([
+    "exec",
+    NAME,
+    "stat",
+    "-c",
+    "%a %U:%G",
+    "/data/.secrets",
+    "/data/.secrets/pg-owner",
+    "/data/.secrets/pg-app",
+    "/data/.secrets/redis",
+  ])
+    .trim()
+    .split("\n")
+    .join("|");
+  owners === "700 root:root|600 root:root|600 root:root|600 root:root"
+    ? ok("the boot took the secrets back from the app user")
+    : bad(`unexpected secret owners: ${owners}`);
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);
