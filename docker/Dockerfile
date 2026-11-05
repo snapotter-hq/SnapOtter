@@ -822,7 +822,7 @@ WORKDIR /app/apps/api
 EXPOSE 1349
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
-    CMD curl -sf --max-time 5 http://localhost:1349/api/v1/health || exit 1
+    CMD curl -sf --max-time 5 "http://localhost:${PORT:-1349}/api/v1/health" || exit 1
 
 # entrypoint.sh runs as PID 1 and re-execs the right init: `tini` for external
 # mode (zombie reaping + signal forwarding for the gosu-dropped app, same end
