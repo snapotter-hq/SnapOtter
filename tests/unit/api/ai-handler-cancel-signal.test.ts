@@ -22,6 +22,7 @@ vi.mock("@snapotter/ai", () => mocks);
 vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/feature-status.js")>()),
   isToolInstalled: () => true,
+  isFeatureInstalled: () => true,
 }));
 
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";

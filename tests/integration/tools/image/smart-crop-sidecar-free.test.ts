@@ -1,9 +1,10 @@
 /**
  * Sidecar-free smart-crop route coverage.
  *
- * Smart crop is feature-gated as an AI tool, but its subject and trim paths
- * are pure Sharp. These tests force only the smart-crop gate open and mock face
- * detection so the route exercises real processing without Python sidecars.
+ * Smart crop's subject and trim paths are pure Sharp, so they run with no
+ * feature bundle installed (#4303). Only face mode needs face-detection. These
+ * tests mock that bundle's presence and face detection itself so the route
+ * exercises real processing without Python sidecars.
  */
 
 import { eq } from "drizzle-orm";
@@ -22,6 +23,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   detectFaces: vi.fn(),
+  faceBundleInstalled: { value: true },
 }));
 
 vi.mock("@snapotter/ai", async (importOriginal) => {
@@ -37,8 +39,10 @@ vi.mock("../../../../apps/api/src/lib/feature-status.js", async (importOriginal)
     await importOriginal<typeof import("../../../../apps/api/src/lib/feature-status.js")>();
   return {
     ...actual,
-    isToolInstalled: (toolId: string) =>
-      toolId === "smart-crop" ? true : actual.isToolInstalled(toolId),
+    isFeatureInstalled: (bundleId: string) =>
+      bundleId === "face-detection"
+        ? mocks.faceBundleInstalled.value
+        : actual.isFeatureInstalled(bundleId),
   };
 });
 
@@ -59,6 +63,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  mocks.faceBundleInstalled.value = true;
   mocks.detectFaces.mockReset();
   mocks.detectFaces.mockResolvedValue({ facesDetected: 0, faces: [] });
 });
@@ -104,6 +109,36 @@ async function outputUrlFor(response: Awaited<ReturnType<typeof postSmartCrop>>)
   }
   return `/api/v1/download/${body.jobId}/${encodeURIComponent(result.filename)}`;
 }
+
+describe("smart-crop without the face-detection bundle (#4303)", () => {
+  beforeEach(() => {
+    mocks.faceBundleInstalled.value = false;
+  });
+
+  it.each([
+    ["subject", { mode: "subject", width: 64, height: 64 }],
+    ["entropy subject", { mode: "subject", strategy: "entropy", width: 64, height: 64 }],
+    ["trim", { mode: "trim" }],
+    ["legacy attention", { mode: "attention", width: 64, height: 64 }],
+    ["legacy content", { mode: "content" }],
+  ])("runs %s mode", async (_label, settings) => {
+    const res = await postSmartCrop(settings);
+    expect(res.statusCode).not.toBe(501);
+    await expect(outputUrlFor(res)).resolves.toContain("_smartcrop.");
+    expect(mocks.detectFaces).not.toHaveBeenCalled();
+  });
+
+  it("answers face mode with 501 naming the bundle, before any job", async () => {
+    const res = await postSmartCrop({ mode: "face", width: 64, height: 64 });
+    expect(res.statusCode).toBe(501);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "FEATURE_NOT_INSTALLED",
+      feature: "face-detection",
+      featureName: "Face Detection",
+    });
+    expect(mocks.detectFaces).not.toHaveBeenCalled();
+  });
+});
 
 describe("smart-crop sidecar-free processing", () => {
   it("runs subject mode and returns the requested output dimensions", async () => {

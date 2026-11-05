@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 7de86d39db90
+i18n_output_hash: 137fbdc154c9
 i18n_hash_version: 2
 ---
 # Kontoåterställning {#account-recovery}
@@ -82,8 +82,8 @@ Som en sista utväg på vilken version som helst kan du sätta policyn i databas
 allt-i-ett-avbildningen körs Postgres inuti containern:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 I upplägget med flera containrar pekar du `psql` mot din egen `DATABASE_URL` i stället.

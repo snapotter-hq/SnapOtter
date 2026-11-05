@@ -52,7 +52,7 @@ export function toolIdFromRoute(
 /**
  * Enforce tool access for every per-tool endpoint from one place.
  *
- * createToolRoute gates the tools it builds, but the 45 hand-written routes
+ * createToolRoute gates the tools it builds, but the hand-written routes
  * each had to remember the same call and none of them did, so a role without
  * `tools:use` could run image-to-pdf, svg-to-raster, erase-object, favicon and
  * the rest (issue #645). Per-route calls are exactly what drifted, so the

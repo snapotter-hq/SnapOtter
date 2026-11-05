@@ -580,7 +580,7 @@ test("embedded lifecycle tests use exact labeled resources and dynamic loopback 
   expect(source).toContain(".finally(cleanup)");
   expect(source).toContain("process.exitCode = exitCode");
   expect(source).toContain("const restartEmbeddedContainer = () =>");
-  expect(source.match(/restartEmbeddedContainer\(\);/g)).toHaveLength(2);
+  expect(source.match(/restartEmbeddedContainer\(\);/g)).toHaveLength(4);
 });
 
 describe("Docker analytics Playwright isolation", () => {

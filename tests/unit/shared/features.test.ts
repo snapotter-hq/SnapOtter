@@ -65,6 +65,18 @@ describe("Feature bundles", () => {
   });
 });
 
+describe("smart-crop bundle (#4303)", () => {
+  it("is not gated as a whole: face-detection is only its optional pack", () => {
+    expect(TOOL_BUNDLE_MAP["smart-crop"]).toBeUndefined();
+    expect(getRequiredBundlesForTool("smart-crop")).toEqual([]);
+    expect(TOOL_OPTIONAL_BUNDLE_MAP["smart-crop"]).toBe("face-detection");
+  });
+
+  it("still lists smart-crop under face-detection so the bundle page names it", () => {
+    expect(getToolsForBundle("face-detection")).toContain("smart-crop");
+  });
+});
+
 describe("Feature bundle edge cases", () => {
   it("no tool appears in two non-optional bundles (an optional pack may re-list its tool)", () => {
     const firstBundle = new Map<string, string>();

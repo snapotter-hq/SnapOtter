@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { apiGet, failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { apiGet, failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
@@ -306,7 +306,7 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       // The import's reasons are specific and technical (a bad signature, a
       // missing file in the archive) and carry no code to translate, so the
       // detail stays inside the translated sentence.
-      const msg = err instanceof Error ? err.message : t.errors.generic;
+      const msg = userErrorMessage(t, err, t.errors.generic);
       setFeedback({
         type: "error",
         message: format(t.settings.aiFeatures.importError, { error: msg }),
@@ -470,7 +470,7 @@ function BundleCard({
       setNow(Date.now());
     }, 3000);
     return () => clearInterval(interval);
-  }, [isInstalling]);
+  }, [isInstalling, t]);
 
   const eta = (() => {
     if (!progress || !startTime || progress.percent <= 2) return null;

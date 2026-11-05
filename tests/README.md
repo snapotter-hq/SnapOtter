@@ -4,7 +4,7 @@
 
 ```
 tests/
-  unit/                    # Vitest unit tests (~185 files)
+  unit/                    # Vitest unit tests
     ai/                    # AI sidecar bridge + bundle tests
     api/                   # API route/config/middleware tests
     doc-engine/            # doc-engine package tests
@@ -15,7 +15,7 @@ tests/
     security/              # Security-focused unit tests
     shared/                # Shared constants/i18n/permissions tests
     web/                   # React component tests (tsx)
-  integration/             # Full-API integration tests (~250 files)
+  integration/             # Full-API integration tests
     fixtures/              # Fixture integrity tests (decode through Sharp/ffprobe/qpdf)
     generated/             # Generated test matrices (format x tool, pairwise settings)
     platform/              # Platform tests (jobs, pipelines, batch, auth, OIDC)
@@ -27,12 +27,15 @@ tests/
   e2e-docs/                # VitePress docs site e2e specs
   e2e-editor/              # Konva image editor e2e specs
   e2e-landing/             # Astro landing site e2e specs
+  e2e-noauth/              # Playwright specs for a server running with AUTH_ENABLED=false
+  e2e-demo/                # Playwright specs for the apps/demo mock-API build
   fixtures/                # Shared test fixtures (see below)
   helpers/                 # Test utilities (pairwise, zod-pict, tool defaults)
   setup/                   # Vitest setup (per-fork DB clone, BullMQ prefix isolation)
   baseline/                # Phase 0 baseline snapshots for parity verification
   benchmark/               # Performance benchmarks
   qa/                      # QA checklists and manual test plans
+  types/                   # Ambient type declarations shared by the test projects
 ```
 
 ## Fixtures
@@ -170,11 +173,13 @@ pnpm test:e2e                # Main app (chromium + serial + visual projects)
 pnpm test:e2e:landing        # Landing site
 pnpm test:e2e:docs           # VitePress docs
 pnpm test:e2e:analytics      # Local analytics flows (starts local dev servers)
+pnpm test:e2e:noauth         # No-auth server (AUTH_ENABLED=false)
 pnpm test:e2e:external       # Complete browser suite against a running external server
 pnpm test:docker             # Compose-backed tests (starts the test infrastructure)
 
-# Editor e2e (no root alias)
+# Editor and demo e2e (no root alias)
 pnpm playwright test --config playwright.editor.config.ts
+pnpm playwright test --config playwright.demo.config.ts
 
 # Single e2e spec
 pnpm playwright test tests/e2e/my-test.spec.ts

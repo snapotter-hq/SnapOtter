@@ -17,6 +17,7 @@
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
+import { batchAliasTarget } from "../jobs/batch-alias.js";
 import { requestCancel } from "../jobs/cancel.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { hasEffectivePermission } from "../permissions.js";
@@ -37,17 +38,28 @@ export function registerJobRoutes(app: FastifyInstance): void {
 
       const { jobId } = request.params;
 
-      const [job] = await db
-        .select({
-          userId: schema.jobs.userId,
-          settings: schema.jobs.settings,
-          status: schema.jobs.status,
-          progress: schema.jobs.progress,
-          error: schema.jobs.error,
-          createdAt: schema.jobs.createdAt,
-        })
-        .from(schema.jobs)
-        .where(eq(schema.jobs.id, jobId));
+      const readJob = async (id: string) => {
+        const [row] = await db
+          .select({
+            userId: schema.jobs.userId,
+            type: schema.jobs.type,
+            settings: schema.jobs.settings,
+            status: schema.jobs.status,
+            progress: schema.jobs.progress,
+            error: schema.jobs.error,
+            createdAt: schema.jobs.createdAt,
+          })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, id));
+        return row;
+      };
+
+      // A batch started with a clientJobId runs under a server id; the client
+      // polls by its own id, which lands on the alias row. Status and
+      // ownership come from the batch it points at.
+      let job = await readJob(jobId);
+      const aliasTarget = job ? batchAliasTarget(job) : null;
+      if (aliasTarget && aliasTarget !== jobId) job = await readJob(aliasTarget);
 
       if (!job || !(await canReadJob(job, user))) {
         return reply.status(404).send({ error: "Job not found" });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { quietImport } from "@/lib/chunk-reload";
 import { format } from "@/lib/format";
@@ -252,7 +252,7 @@ export function SplitSettings() {
     } catch (err) {
       revokePreviewTiles();
       if (isCanceled() || (err instanceof DOMException && err.name === "AbortError")) return;
-      setError(err instanceof Error ? err.message : t.toolSettings.split.splitFailed);
+      setError(userErrorMessage(t, err, t.toolSettings.split.splitFailed));
     } finally {
       unsubscribeFiles();
       run.end();

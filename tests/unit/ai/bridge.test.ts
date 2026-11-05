@@ -3143,7 +3143,7 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     await expect(p2).rejects.toThrow("Python script exited with code 2");
   });
 
-  it("preserves unrecognized JSON and malformed-JSON stderr lines without polluting stderr with {info} or {warning} (issue #3096)", async () => {
+  it("preserves unrecognized JSON and malformed-JSON stderr lines without polluting stderr with {info} (issue #3096)", async () => {
     const mock = await setupReadyDispatcher();
 
     const { setAiLogger } = await import("../../../packages/ai/src/log.js");
@@ -3172,7 +3172,7 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     const result = await promise;
     expect(result.stdout).toBe('{"ok": true}');
     expect(result.stderr).toBe(
-      '[model] Loading weights...\n{"status": "loading"}\n{malformed json\nnull',
+      '{"warning": "low vram"}\n[model] Loading weights...\n{"status": "loading"}\n{malformed json\nnull',
     );
     expect(sink.info.mock.calls.map((call) => call[0])).toEqual([
       "[python] cached",
@@ -3988,7 +3988,9 @@ describe("bridge - per-request fallback edge cases", () => {
 
     const result = await promise;
     expect(result.stdout).toBe('{"ok": true}');
-    expect(result.stderr).toBe("[model] Loading weights...");
+    expect(result.stderr).toBe(
+      '{"warning": "low memory"}\n[model] Loading weights...\n{"warning": "trailing notice"}',
+    );
     expect(sink.info.mock.calls.map((call) => call[0])).toEqual([
       "[python] model cached",
       "[python] [model] Loading weights...",
@@ -4672,6 +4674,29 @@ describe("bridge - pre-dispatch sidecar memory floor (issue #1162)", () => {
       process.env.CUDA_VISIBLE_DEVICES = val;
       expect(isNvidiaDevicePresent(() => true)).toBe(false);
     }
+  });
+
+  it("counts a WSL2 NVIDIA GPU before the first probe (#4449)", async () => {
+    const { isNvidiaDevicePresent } = await import("../../../packages/ai/src/bridge.js");
+    const savedGpu = process.env.SNAPOTTER_GPU;
+    const savedVisible = process.env.CUDA_VISIBLE_DEVICES;
+    onTestFinished(() => {
+      if (savedGpu === undefined) delete process.env.SNAPOTTER_GPU;
+      else process.env.SNAPOTTER_GPU = savedGpu;
+      if (savedVisible === undefined) delete process.env.CUDA_VISIBLE_DEVICES;
+      else process.env.CUDA_VISIBLE_DEVICES = savedVisible;
+    });
+    delete process.env.SNAPOTTER_GPU;
+    delete process.env.CUDA_VISIBLE_DEVICES;
+
+    // Docker on WSL2 through the toolkit's legacy hook: /dev/dxg and no /dev/nvidia*.
+    const wslDocker = (p: string) =>
+      p === "/dev/dxg" || p === "/usr/lib/x86_64-linux-gnu/libcuda.so.1";
+    expect(isNvidiaDevicePresent(wslDocker)).toBe(true);
+    expect(isNvidiaDevicePresent((p) => p === "/dev/dxg")).toBe(false);
+
+    process.env.SNAPOTTER_GPU = "0";
+    expect(isNvidiaDevicePresent(wslDocker)).toBe(false);
   });
 
   it("uses probed dispatcher GPU state when ready and falls back to deviceExists on cold start", async () => {
@@ -5378,5 +5403,99 @@ describe("bridge - dispatcherRun onAbort timeout vs cancel crash accounting (iss
     mockBackoffFallback.emitEvent("close", 0, null);
     await expect(duringBackoffRun).resolves.toMatchObject({ stdout: '{"ok": true}' });
     expect(vi.mocked(spawn).mock.calls.length - spawnCallsBefore).toBe(1);
+  });
+});
+
+describe("bridge - warning lines reach the failure buffer (issue #4163)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("recycles the dispatcher when a CUDA failure is reported only as a {warning} line", async () => {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const ready = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await ready;
+
+    const run = runPythonWithProgress("test.py", []);
+    const settled = run.catch((e: unknown) => e);
+    await vi.waitFor(() => expect(mock.stdinWrites.join("")).toContain("\n"));
+    const { id } = JSON.parse(mock.stdinWrites.join("").split("\n").filter(Boolean)[0]);
+
+    mock.stderr.emit("data", Buffer.from('{"warning": "CUDA failure 999: unknown error"}\n'));
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+    await settled;
+
+    expect(getDispatcherStatus().lastRecycleReason).toBe("cuda_error");
+    expect(mock.process.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(sink.warn.mock.calls.map((call) => call[0])).toContain(
+      "[python] CUDA failure 999: unknown error",
+    );
+  });
+
+  async function failWithStderr(stderrLine: string, stdout: string) {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const ready = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await ready;
+
+    const settled = runPythonWithProgress("test.py", []).catch((e: unknown) => e as Error);
+    await vi.waitFor(() => expect(mock.stdinWrites.join("")).toContain("\n"));
+    const { id } = JSON.parse(mock.stdinWrites.join("").split("\n").filter(Boolean)[0]);
+    mock.stderr.emit("data", Buffer.from(stderrLine));
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout })}\n`));
+    return { err: (await settled) as Error, status: getDispatcherStatus(), mock };
+  }
+
+  it("does not recycle the dispatcher for a failure that only has a benign {warning}", async () => {
+    const { err, status, mock } = await failWithStderr(
+      '{"warning": "low memory, retrying"}\n',
+      '{"error": "bad input"}',
+    );
+    expect(err.message).toContain("bad input");
+    expect(status.lastRecycleReason).toBeNull();
+    expect(mock.process.kill).not.toHaveBeenCalled();
+  });
+
+  it("keeps the extracted error message free of {warning} text", async () => {
+    const { err } = await failWithStderr(
+      '{"warning": "fallback engaged"}\n',
+      '{"error": "bad input"}',
+    );
+    expect(err.message).toContain("bad input");
+    expect(err.message).not.toContain("fallback engaged");
+  });
+
+  it("keeps a {warning} line in the per-request stderr buffer", async () => {
+    const { runPythonWithProgress } = await import("../../../packages/ai/src/bridge.js");
+    const mockPerReq = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mockPerReq.process);
+
+    const promise = runPythonWithProgress("test.py", []);
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+    mockPerReq.stderr.emit("data", Buffer.from('{"warning": "CUDA error: out of sync"}\n'));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stderr).toBe('{"warning": "CUDA error: out of sync"}');
   });
 });

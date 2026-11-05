@@ -25,7 +25,7 @@ import {
   isDisabledRole,
   requirePermission,
 } from "../permissions.js";
-import { createSessionToken, requireAuth } from "./auth.js";
+import { AUTH_BODY_LIMIT_BYTES, createSessionToken, requireAuth } from "./auth.js";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -616,7 +616,10 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   // POST /api/auth/mfa/enroll -- start MFA enrollment
   app.post(
     "/api/auth/mfa/enroll",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;
@@ -679,6 +682,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/mfa/verify",
     {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
       config: { rateLimit: { max: 15, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -753,6 +757,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/mfa/complete",
     {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
       config: { rateLimit: { max: 15, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1099,6 +1104,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/mfa/enroll-complete",
     {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
       config: { rateLimit: { max: 15, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1394,6 +1400,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/auth/mfa/disable",
     {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
       config: { rateLimit: { max: 15, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1455,6 +1462,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
   // POST /api/auth/users/:id/mfa/reset -- admin reset
   app.post(
     "/api/auth/users/:id/mfa/reset",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;

@@ -1,6 +1,8 @@
 import { SafeError } from "@snapotter/shared";
 import { captureHandledError } from "@/lib/analytics";
+import { translatedCodeMessage } from "@/lib/api";
 import { resolveServerUrls } from "@/lib/app-url";
+import { currentTranslations } from "@/lib/current-translations";
 
 /** A parsed `/api/v1/jobs/:id/progress` SSE frame: the fields handlers read. */
 export interface ProgressFrame {
@@ -172,11 +174,16 @@ export type JobFailure =
  * the error, the same way an HTTP error body reads (#1432): without it, a job
  * that failed because qpdf or ffprobe couldn't start said nothing actionable.
  */
-export function frameFailure(error: unknown, details?: unknown, code?: unknown): JobFailure {
+export function frameFailure(error: unknown, _details?: unknown, code?: unknown): JobFailure {
   if (code === "CANCELED" || error === "Canceled") return { reason: "canceled" };
-  if (typeof error !== "string" || !error.trim()) return { reason: "noDetail" };
-  const hint = typeof details === "string" && details.trim() ? details : "";
-  return { message: hint ? `${error}: ${hint}` : error };
+  // The server's English error and hint stay out of the UI (#4285). A coded
+  // failure shows its translation; any other failure falls to the caller's text.
+  const mapped = translatedCodeMessage(
+    currentTranslations(),
+    typeof code === "string" ? code : undefined,
+    0,
+  );
+  return mapped ? { message: mapped } : { reason: "noDetail" };
 }
 
 /**

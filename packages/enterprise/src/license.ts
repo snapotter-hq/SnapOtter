@@ -8,7 +8,6 @@ export const ENTERPRISE_FEATURES = [
   "saml_sso",
   "s3_storage",
   "scim",
-  "multi_tenancy",
   "webhooks",
   "audit_export",
   "mfa",
@@ -32,12 +31,12 @@ export const PLAN_FEATURES: Record<string, readonly EnterpriseFeature[]> = {
   team: [
     "saml_sso",
     "s3_storage",
-    "multi_tenancy",
     "audit_export",
     "siem_forwarding",
     "sso_enforcement",
     "upgrade_management",
     "admin_alerts",
+    "webhooks",
   ],
   enterprise: ENTERPRISE_FEATURES,
 };

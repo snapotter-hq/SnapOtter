@@ -144,15 +144,15 @@ describe("useHtmlToImageStore", () => {
     expect(JSON.parse(options.body as string)).not.toHaveProperty("url");
   });
 
-  it("prefers details then error then fallback text for failed captures", async () => {
+  it("shows the capture fallback for failed captures and keeps the server reason out of the UI", async () => {
     state().setUrl("https://example.com");
     fetchMock.mockResolvedValueOnce(await failJson({ details: "Invalid URL" }));
     await state().capture();
-    expect(state().error).toBe("Invalid URL");
+    expect(state().error).toBe("Capture failed");
 
     fetchMock.mockResolvedValueOnce(await failJson({ error: "Timed out" }));
     await state().capture();
-    expect(state().error).toBe("Timed out");
+    expect(state().error).toBe("Capture failed");
 
     fetchMock.mockResolvedValueOnce(await failJson({}));
     await state().capture();

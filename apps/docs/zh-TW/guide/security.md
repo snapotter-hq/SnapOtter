@@ -1,61 +1,61 @@
 ---
-description: "SnapOtter 的安全強化指南。容器安全、網路隔離、Docker secrets、Kubernetes 部署與合規產出物。"
-i18n_source_hash: f37bcb6cc1c5
+description: "SnapOtter 安全性強化指南。涵蓋容器安全、網路隔離、Docker secrets、Kubernetes 部署，以及合規文件。"
+i18n_source_hash: 5cf773ddb4c0
 i18n_provenance: machine
-i18n_output_hash: 0ec192d6b1ef
+i18n_output_hash: 7b23763c311d
 i18n_hash_version: 2
 ---
 
-# 安全與強化 {#security-hardening}
+# 安全性與強化 {#security-hardening}
 
-SnapOtter 完全在你的基礎架構上處理檔案。它預設會傳送匿名、不含內容的產品分析與當機報告，以協助改善這個專案。它絕不會傳送你的檔案、檔案名稱、檔案內容、OCR 輸出、影像中繼資料或文件文字。選用的意見回饋只在使用者提交後、且僅在分析啟用時才會傳送，聯絡欄位也只在明確同意聯絡時才會包含。管理員可在 Settings > System > Privacy 底下一鍵關閉分析與意見回饋擷取，無需重新建置。檔案處理始終留在你的容器內。
+SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進專案，它預設會傳送匿名且不含內容的產品分析與當機報告，但絕不會傳送您的檔案、檔名、檔案內容、OCR 輸出、圖片中繼資料或文件文字。選用的意見回饋只會在使用者提交後傳送，且僅在啟用分析時才會傳送，聯絡欄位也只有在使用者明確同意提供聯絡方式時才會包含。管理員可以在「設定 > 系統 > 隱私權」下一鍵關閉分析與意見回饋的收集，無須重新建置。檔案處理一律在您的容器內進行。
 
-容器以專屬的非 root 使用者（`snapotter`）執行，並卸除除最低必需集之外的所有 Linux capabilities。完整的漏洞揭露政策與安全架構，請參閱 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
+容器以專用的非 root 使用者（`snapotter`）執行，並捨棄除最低必要集合之外的所有 Linux capabilities。完整的弱點揭露政策與安全架構，請參閱 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
 
-## 容器硬化 {#container-hardening}
+## 容器強化 {#container-hardening}
 
-規範的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 和 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose 檔案是事實來源。不要將縮寫範例複製到生產中；從您驗證的發布標籤部署檔案。
+標準的 [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 與 [GPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose-gpu.yml) Compose 檔案是唯一的依據。請勿將簡化的範例複製到正式環境，而應部署您驗證過的發行標籤中的檔案。
 
-兩個堆疊都應用以下控制：
+兩種堆疊都套用下列控制措施：
 
-- 記憶體、交換、CPU 和 PID 限制包含失控的本機處理。
-- 每個服務都會放棄所有 Linux 功能。該應用程式僅添加回 `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` 來實現卷所有權、單向 `gosu` 身份刪除以及優雅的信號轉發。 PostgreSQL 和 Redis 僅接收其官方入口點所需的子集。
-- `security_opt: [no-new-privileges:true]` 防止應用程式、PostgreSQL 和 Redis 容器中的進程獲得額外權限。這仍然與 `gosu` 相容：入口點以 root 身份開始，準備卷，並且僅下降到專用的 `snapotter` 用戶。
-- PostgreSQL 和 Redis 影像輸入由摘要固定。應用程式同樣應該固定到經過驗證的發布標籤或摘要，而不是 `latest`。
-- 健康檢查、有界 JSON 日誌輪替、持久的 Redis AOF 和重啟策略在規範文件中集中定義。
+- 記憶體、swap、CPU 與 PID 限制，用來遏止失控的原生處理程序。
+- 每個服務都捨棄所有 Linux capabilities。應用程式僅加回 `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL`，用於磁碟區擁有者設定、單向的 `gosu` 身分降權，以及訊號的正常轉送。PostgreSQL 與 Redis 只取得其官方 entrypoint 所需的子集。
+- `security_opt: [no-new-privileges:true]` 可防止應用程式、PostgreSQL 與 Redis 容器中的處理程序取得額外權限。這與 `gosu` 相容：entrypoint 以 root 開始，準備好磁碟區後，才降權為專用的 `snapotter` 使用者。
+- PostgreSQL 與 Redis 的映像檔輸入以摘要固定。應用程式同樣應固定在經過驗證的發行標籤或摘要，而不是 `latest`。
+- 健康檢查、有上限的 JSON 日誌輪替、持久化的 Redis AOF，以及重新啟動原則，都集中定義在標準檔案中。
 
-對於面向網際網路的部署，將連接埠 1349 綁定到環回並在維護的反向代理處終止 TLS。產生唯一的 PostgreSQL 和 Redis 憑證，將機密儲存在受保護的檔案或機密管理器中，並立即變更初始管理員密碼。
+對於面向網際網路的部署，請將連接埠 1349 綁定到 loopback，並在持續維護的反向代理處終止 TLS。請產生獨一無二的 PostgreSQL 與 Redis 憑證，將機密存放在受保護的檔案或機密管理工具中，並立即變更初始的管理員密碼。
 
-### 為什麼 `read_only` 沒有設定 {#why-read-only-is-not-set}
+### 為什麼未設定 `read_only` {#why-read-only-is-not-set}
 
-未設定 `read_only: true`，因為 PUID/PGID 重新映射在啟動時寫入 `/etc/passwd` 和 `/etc/group`。如果您使用 Docker 的 `--user` 標誌或 Kubernetes `runAsUser` 而不是 PUID/PGID，則可以安全地啟用只讀根檔案系統。
+未設定 `read_only: true`，是因為 PUID/PGID 重新對應會在啟動時寫入 `/etc/passwd` 與 `/etc/group`。如果您改用 Docker 的 `--user` 旗標或 Kubernetes 的 `runAsUser`，而不使用 PUID/PGID，就可以安全地啟用唯讀的根檔案系統。
 
-## 網路隔離{#network-isolation}
+## 網路隔離 {#network-isolation}
 
-文件處理是本地的，但預設安裝**不是無出口系統**。啟用遙測功能時，匿名產品分析使用 PostHog，崩潰報告使用 Sentry。設定 `SNAPOTTER_TELEMETRY=0`（或在「設定」>「系統」>「隱私權」下停用分析）以關閉兩者。 SnapOtter 絕不會在這些事件中包含上傳的檔案、檔案名稱、OCR 輸出、文件文字或其他文件內容。
+檔案處理在本機進行，但預設安裝**並不是一個沒有對外連線的系統**。啟用遙測時，匿名產品分析使用 PostHog，當機報告使用 Sentry。設定 `SNAPOTTER_TELEMETRY=0`（或在「設定 > 系統 > 隱私權」下停用分析）即可同時關閉兩者。SnapOtter 絕不會在這些事件中包含上傳的檔案、檔名、OCR 輸出、文件文字或其他檔案內容。
 
-其他出站流量是功能驅動的：AI 捆綁包/模型安裝下載簽名發布輸入； URL導入獲取用戶請求的公共URL；並明確配置的 OIDC、SAML、OpenTelemetry、webhooks、S3 兼容存儲或類似集成會聯繫管理員選擇的目標。執行階段模型下載預設為停用。只有在明確選擇啟用自動備援下載時，才設定 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`。[離線捆綁導入](/zh-TW/guide/deployment) 可以在沒有運行時模型出口的情況下提供 AI 功能。
+其他對外流量取決於所用的功能：AI 套件組合與模型的安裝會下載經過簽署的發行輸入；URL 匯入會擷取使用者要求的公開 URL；而明確設定的 OIDC、SAML、OpenTelemetry、webhook、相容 S3 的儲存空間或類似整合，則會連線到管理員所選擇的目的地。執行階段的模型下載預設為停用。只有在明確選擇啟用自動備援下載時，才需設定 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`。[離線套件組合匯入](/zh-TW/guide/deployment)可以在沒有執行階段模型對外連線的情況下提供 AI 功能。
 
 **防火牆建議：**
 
-|設想|出站規則|
+| 情境 | 對外規則 |
 |---|---|
-|氣隙|設定`SNAPOTTER_TELEMETRY=0`和`SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`，使用離線AI捆綁導入，停用URL導入和外部集成，然後阻止出口|
-|預設遙測|允許瀏覽器/網頁日誌列出的 PostHog 和 Sentry 端點；如果策略不允許，則停用遙測|
-|需要 AI 捆綁包|安裝過程中，允許HTTPS到`huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`；然後阻止這些主機|
-|外部集成|僅允許管理員準確配置的 OIDC/SAML/OTLP/webhook/物件儲存目標|
+| 隔離網路（air-gapped） | 設定 `SNAPOTTER_TELEMETRY=0` 與 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0`，使用離線 AI 套件組合匯入，停用 URL 匯入與外部整合，然後封鎖對外連線 |
+| 預設遙測 | 允許您的瀏覽器或網路日誌中列出的 PostHog 與 Sentry 端點；如果原則不允許，請停用遙測 |
+| 需要 AI 套件組合 | 安裝期間，允許以 HTTPS 連線到 `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`；之後封鎖這些主機 |
+| 外部整合 | 僅允許管理員所設定的 OIDC/SAML/OTLP/webhook/物件儲存空間的確切目的地 |
 
-捆綁包檔案由 Hugging Face 的 Xet 儲存空間提供，該儲存透過 `*.xethub.hf.co` 端點並行傳輸，這使得多 GB 捆綁包下載速度更快。如果您的防火牆允許 `huggingface.co` 但阻止 `*.xethub.hf.co`，安裝仍然會成功，但會回退到較慢的單流下載，因此將 Xet 主機列入白名單以保持快速路徑。完全離線安裝可以跳過所有這些並使用[離線捆綁導入](/zh-TW/guide/deployment)。
+套件組合封存檔是從 Hugging Face 的 Xet 儲存空間提供，它會透過 `*.xethub.hf.co` 端點平行傳輸，這也是數 GB 的套件組合能快速下載的原因。如果您的防火牆允許 `huggingface.co` 但封鎖 `*.xethub.hf.co`，安裝仍會成功，但會退回到較慢的單一串流下載，因此請將 Xet 主機加入允許清單，以維持在快速路徑上。完全離線的安裝可以略過上述所有設定，改用[離線套件組合匯入](/zh-TW/guide/deployment)。
 
-有關反向代理配置（Nginx、Traefik、Caddy、Cloudflare Tunnels），請參閱[部署指南](/zh-TW/guide/deployment#reverse-proxy)。
+反向代理設定（Nginx、Traefik、Caddy、Cloudflare Tunnels）請參閱[部署指南](/zh-TW/guide/deployment#reverse-proxy)。
 
 ## Docker Secrets {#docker-secrets}
 
-就正式環境部署而言，請避免將 secrets 以純文字環境變數傳遞。進入點支援 Docker 的 `_FILE` 慣例：將 secret 掛載為檔案，並將對應的 `_FILE` 變數設為其路徑。
+在正式環境部署中，請避免以純文字環境變數傳遞機密。entrypoint 支援 Docker 的 `_FILE` 慣例：將機密掛載為檔案，並將對應的 `_FILE` 變數設為該檔案的路徑。
 
-**支援的 secrets：**
+**支援的機密：**
 
-| 變數 | `_FILE` 對應 |
+| 變數 | `_FILE` 對應項 |
 |---|---|
 | `DEFAULT_PASSWORD` | `DEFAULT_PASSWORD_FILE` |
 | `COOKIE_SECRET` | `COOKIE_SECRET_FILE` |
@@ -92,7 +92,7 @@ Docker Compose secrets（不使用 Swarm）需要 Compose v2.23 或更新版本�
 
 ## Kubernetes 部署 {#kubernetes-deployment}
 
-進入點會偵測容器是否已以非 root 執行（例如透過 Kubernetes `runAsUser`），並自動略過 gosu 降權。在此情況下它無法自行 chown 已掛載的磁碟區，因此它會驗證它們是否可寫入，若否則提早退出並提供可行動的指引，請參閱 [儲存權限](/zh-TW/guide/deployment#storage-permissions) 以了解 `fsGroup` 與外來 UID 設定（TrueNAS、OpenShift）。
+當容器已經以非 root 身分執行時（例如透過 Kubernetes 的 `runAsUser`），entrypoint 會偵測到並自動略過 gosu 權限降級。在這種情況下，它無法自行對掛載的磁碟區執行 chown，因此會確認這些磁碟區可寫入，若不可寫入，則提早結束並提供可據以處理的指引，請參閱[儲存空間權限](/zh-TW/guide/deployment#storage-permissions)，了解 `fsGroup` 與外部 UID 的設定（TrueNAS、OpenShift）。
 
 **建議的 Pod SecurityContext：**
 
@@ -161,26 +161,26 @@ spec:
             sizeLimit: 2Gi
 ```
 
-由於 `runAsUser: 999` 是在 pod 層級設定的，進入點會完全略過 gosu。這讓 `allowPrivilegeEscalation: false` 和 `drop: [ALL]` capabilities 可以無衝突地使用。
+由於 `runAsUser: 999` 是在 Pod 層級設定，entrypoint 會完全略過 gosu。這讓 `allowPrivilegeEscalation: false` 與 `drop: [ALL]` capabilities 可以共存而不衝突。
 
-關於資源規模，請參閱 [硬體需求](/zh-TW/guide/deployment#hardware-requirements)。
+資源規劃請參閱[硬體需求](/zh-TW/guide/deployment#hardware-requirements)。
 
-## 備份與還原 {#backup-and-recovery}
+## 備份與復原 {#backup-and-recovery}
 
-生產 Compose 堆疊定義了四個磁碟區。在進行協調備份之前停止入口並讓活動作業完成，以便 PostgreSQL、Redis 和檔案狀態描述相同的時間點。
+正式環境的 Compose 堆疊定義了四個磁碟區。在進行協調一致的備份之前，請先停止對外入口並讓執行中的工作完成，這樣 PostgreSQL、Redis 與檔案狀態才會對應到同一個時間點。
 
-|體積|內容|復健治療|
+| 磁碟區 | 內容 | 復原處理方式 |
 |---|---|---|
-|`SnapOtter-pgdata`|PostgreSQL 使用者、設定、管道、作業、文件元資料和審核日誌|批判的;使用快速故障邏輯轉儲進行可移植恢復|
-|`SnapOtter-data`|保存的庫物件、日誌和 AI 狀態 (`/data/files, /data/logs, /data/ai, /data/ai/venv`)|備份整個磁碟區；為了節省空間，故意省略所有 AI 狀態並重新安裝其捆綁包|
-|`SnapOtter-redisdata`|Redis AOF 用於持久的 BullMQ 隊列狀態|暫停應用程式並強制`SAVE`後備份；需要準確地恢復排隊的工作|
-|`SnapOtter-workspace`|暫存物件儲存鍵 (`/tmp/workspace/uploads, /tmp/workspace/outputs`)|所有作業清空或取消後不要進行備份；當工作處於活動狀態時切勿丟棄它|
+| `SnapOtter-pgdata` | PostgreSQL 的使用者、設定、管線、工作、檔案中繼資料與稽核日誌 | 關鍵資料；請使用快速失敗的邏輯傾印，以便跨環境復原 |
+| `SnapOtter-data` | 儲存的檔案庫物件、日誌與 AI 狀態（`/data/files, /data/logs, /data/ai, /data/ai/venv`） | 備份整個磁碟區；若要節省空間，可刻意省略所有 AI 狀態並重新安裝其套件組合 |
+| `SnapOtter-redisdata` | 用於持久化 BullMQ 佇列狀態的 Redis AOF | 在暫停應用程式並強制執行 `SAVE` 之後備份；若要精確恢復佇列中的工作，則必須備份 |
+| `SnapOtter-workspace` | 暫時性的物件儲存空間金鑰（`/tmp/workspace/uploads, /tmp/workspace/outputs`） | 所有工作都已清空或取消後不需備份；工作仍在執行時，切勿丟棄 |
 
-Compose 通常在磁碟區名稱前加上項目名稱作為前綴。從已安裝的容器中解析真實的來源卷，而不是假設顯示名稱（例如 `SnapOtter-data`）是 Docker 磁碟區名稱。
+Compose 通常會在磁碟區名稱前加上專案名稱。請從已掛載的容器解析實際的來源磁碟區，而不要假設 `SnapOtter-data` 這類顯示名稱就是 Docker 磁碟區名稱。
 
-### 資料庫備份{#database-backup}
+### 資料庫備份 {#database-backup}
 
-使用 PostgreSQL 的自訂存檔格式並在將備份視為完整之前驗證存檔：
+請使用 PostgreSQL 的自訂封存格式，並在將備份視為完成之前先驗證封存檔：
 
 ```bash
 docker exec SnapOtter-postgres \
@@ -194,13 +194,13 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-透過將每個備份還原到隔離堆疊、檢查資料庫記錄和檔案校驗和以及啟動應用程式來測試每個備份。儲存庫的 `tests/qa/backup-restore-drill.sh` 會針對明確 `QA_IMAGE` 自動執行該發佈閘。
+請將每份備份還原到隔離的堆疊中進行測試，檢查資料庫記錄與檔案總和檢查碼，並啟動應用程式。儲存庫中的 `tests/qa/backup-restore-drill.sh` 會針對明確指定的 `QA_IMAGE`，自動執行該發行關卡。
 
-如果您的平台採用崩潰一致的磁碟區快照，請先停止整個堆疊，並將所有關鍵磁碟區快照為一組。來自正在運行的容器的原始 PostgreSQL 資料目錄副本不是受支援的邏輯備份。
+如果您的平台改為建立當機一致性的磁碟區快照，請先停止整個堆疊，並將所有關鍵磁碟區作為一組一併建立快照。從執行中的容器直接複製 PostgreSQL 資料目錄，並不是受支援的邏輯備份。
 
 ### 檔案與佇列備份 {#file-and-queue-backup}
 
-在捕獲文件和隊列卷之前暫停應用程式。使用 `docker inspect` 解析實際磁碟區名稱，強制 Redis 保留其目前狀態，並在保留所有權和權限的情況下進行歸檔：
+在擷取檔案與佇列磁碟區之前，請先暫停應用程式。使用 `docker inspect` 解析實際的磁碟區名稱，強制 Redis 保存其目前狀態，並在保留擁有者與權限的情況下封存：
 
 ```bash
 docker stop SnapOtter
@@ -218,28 +218,28 @@ docker run --rm -v "$REDIS_VOLUME:/source:ro" -v "$PWD/backup:/backup" \
 sha256sum backup/snapotter-*.tar.gz > backup/SHA256SUMS
 ```
 
-應用前重啟Redis。如果您有意排除 `/data/ai`，請刪除整個 AI 子樹，而不是保留不含模型或虛擬環境的 `installed.json` 記錄。保持備份檔案加密、存取受控，並與執行 SnapOtter 的主機分開。
+請先重新啟動 Redis，再重新啟動應用程式。如果您刻意排除 `/data/ai`，請移除整個 AI 子樹，而不要保留沒有模型或虛擬環境的 `installed.json` 記錄。備份檔案請加密、限制存取，並與執行 SnapOtter 的主機分開存放。
 
-## 合規工件 {#compliance-artifacts}
+## 合規文件 {#compliance-artifacts}
 
-每個 SnapOtter 版本都包含以下安全工件：
+每個 SnapOtter 發行版本都包含下列安全性文件：
 
-| 人工製品 | 格式 | 在哪裡可以找到它 |
+| 文件 | 格式 | 取得位置 |
 |---|---|---|
-| 釋放主體綁定 | 規範 JSON + GitHub 證明 | [GitHub發布](https://github.com/snapotter-hq/SnapOtter/releases)資產：`snapotter-v{version}-release-subjects.json` |
-| 歸檔 SBOM | CycloneDX 和 SPDX JSON | 釋放資產：`snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
-| 圖片 SBOM | CycloneDX 和 SPDX JSON | 釋放資產：`snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
-| 漏洞掃描 | Trivy JSON | 發布具有匹配 `archive-linux-{arch}` 或 `image-linux-{arch}` 前綴的資產 |
-| 漏洞掃描 | SARIF | [GitHub 安全性](https://github.com/snapotter-hq/SnapOtter/security) 選項卡 |
-| 靜態分析 | CodeQL (JS/TS + Python) | [GitHub 安全](https://github.com/snapotter-hq/SnapOtter/security) 選項卡，每週運行 + 每個 PR |
-| 依賴性審查 | GitHub 本機 | 按 PR 檢查，高嚴重性添加失敗 |
-| Python依賴審計 | pip-audit | CI 在每次推送時執行日誌 |
-| 安全政策 | Markdown | 儲存庫中的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
-| 依賴項更新 | Dependabot | npm、pip、Docker、Actions 的自動每週 PR |
+| 發行主體繫結 | 標準 JSON + GitHub 證明 | [GitHub Release](https://github.com/snapotter-hq/SnapOtter/releases) 資產：`snapotter-v{version}-release-subjects.json` |
+| 封存檔 SBOM | CycloneDX 與 SPDX JSON | 發行資產：`snapotter-v{version}-archive-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 映像檔 SBOM | CycloneDX 與 SPDX JSON | 發行資產：`snapotter-v{version}-image-linux-{arch}-sbom.{cdx,spdx}.json` |
+| 弱點掃描 | Trivy JSON | 前綴為 `archive-linux-{arch}` 或 `image-linux-{arch}` 的對應發行資產 |
+| 弱點掃描 | SARIF | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) 分頁 |
+| 靜態分析 | CodeQL（JS/TS + Python） | [GitHub Security](https://github.com/snapotter-hq/SnapOtter/security) 分頁，每週執行並於每個 PR 執行 |
+| 相依性審查 | GitHub 原生功能 | 每個 PR 的檢查，新增高嚴重性相依項時會失敗 |
+| Python 相依性稽核 | pip-audit | 每次推送的 CI 執行日誌 |
+| 安全性政策 | Markdown | 儲存庫中的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) |
+| 相依性更新 | Dependabot | 針對 npm、pip、Docker、Actions 每週自動產生 PR |
 
-**執行您自己的掃描:**
+**自行執行掃描：**
 
-下載發布主題清單並驗證它是否已由發布工作流程證明：
+下載發行主體清單，並驗證它是由發行工作流程所證明：
 
 ```bash
 gh attestation verify snapotter-v2.3.0-release-subjects.json \
@@ -247,9 +247,9 @@ gh attestation verify snapotter-v2.3.0-release-subjects.json \
   --signer-workflow snapotter-hq/SnapOtter/.github/workflows/release.yml
 ```
 
-清單中分別記錄了 `releaseTag`、`releaseCommit` 和 `workflowTriggerCommit`。驗證 `releaseCommit` 是否為從不可變標記中剝離的提交，然後驗證存檔、映像、SBOM 的 SHA-256 摘要，或根據 `subjects` 中的條目進行掃描。這種區別是有意為之的：簽出新建立的發布提交不會更改工作流程的 OIDC 憑證中的提交標識。
+清單分別記錄 `releaseTag`、`releaseCommit` 與 `workflowTriggerCommit`。請驗證 `releaseCommit` 是從不可變標籤解出的提交，然後根據 `subjects` 中的項目，驗證您所使用的封存檔、映像檔、SBOM 或掃描結果的 SHA-256 摘要。這項區別是刻意設計的：簽出新建立的發行提交，並不會改變工作流程 OIDC 憑證中的提交身分。
 
-您也可以直接掃描下載的 SBOM 或影像：
+您也可以直接掃描下載的 SBOM 或映像檔：
 
 ```bash
 # Scan with Grype using the CycloneDX SBOM
@@ -262,6 +262,6 @@ trivy sbom snapotter-v2.3.0-image-linux-amd64-sbom.spdx.json
 trivy image snapotter/snapotter:2.3.0
 ```
 
-::: info
-影像 SBOMs 和掃描反映了針對該版本發布的具體架構特定影像。檔案 SBOMs 和掃描分別描述預建存檔。部署後安裝的 AI 模型包不包含在這些 SBOMs 中，因為它們是在執行時下載的。
+::: info 
+映像檔 SBOM 與掃描結果反映的是該發行版本所發布、特定於架構的確切映像檔。封存檔 SBOM 與掃描結果則另外描述預先建置的封存檔。部署後安裝的 AI 模型套件組合因為是在執行階段下載，所以不包含在這些 SBOM 中。
 :::

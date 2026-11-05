@@ -85,15 +85,14 @@ PostgreSQL 17 via Drizzle ORM (pg-core). Local dev requires Postgres and Redis r
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-This gives you Postgres on port 5432 and Redis on port 6379. Then generate and apply migrations:
+This gives you Postgres on port 5432 and Redis on port 6379. The API applies pending migrations itself at boot, so starting the dev servers is all you need. After changing the schema, generate a migration and the next boot applies it, with no manual migrate step:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Schema is defined in `apps/api/src/db/schema.ts`. Tables: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Schema is defined in `apps/api/src/db/schema.ts`, which is the current list of tables.
 
 ## Adding a new tool {#adding-a-new-tool}
 

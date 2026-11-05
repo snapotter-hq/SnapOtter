@@ -200,8 +200,9 @@ export async function insertToolJobAlias(args: {
  * first (ownerless), so ownerless rows are claimed; a row another user
  * owns is left alone so a reused id cannot transfer it or strip their
  * cancel authorization; and only type "single" rows are claimable, so a
- * colliding batch parent or pipeline row keeps its own cancel metadata
- * (batch parent ids ARE client-supplied, so that collision is reachable).
+ * colliding batch alias, batch parent or pipeline row keeps its own cancel
+ * metadata (a batch's clientJobId names its alias row, so that collision is
+ * reachable).
  *
  * When the stored pointer differs from this run's jobId (a new run reusing
  * an old channel), the row's status resets to "queued" so a stale terminal

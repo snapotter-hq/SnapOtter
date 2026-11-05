@@ -40,6 +40,7 @@ import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js
 import { buildBatchReplayEvent } from "../../../apps/api/src/routes/progress.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { resolveBatchJobId } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -199,7 +200,10 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     ]);
     expect(res.statusCode, res.body).toBe(503);
 
-    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [row] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
     const replayed = buildBatchReplayEvent({
       jobId: clientJobId,
       status: row.status,
@@ -419,7 +423,8 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
   }
 
   async function parentRow(id: string) {
-    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
+    const rowId = await resolveBatchJobId(id);
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, rowId));
     return row;
   }
 
@@ -1494,7 +1499,10 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         error: "No ImageMagick found.",
       });
       expect(calls).toBe(1);
-      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const [aliasRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(aliasRow?.error).toMatchObject({
         code: "ENGINE_UNAVAILABLE",
         httpStatus: 503,
@@ -1601,7 +1609,10 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       expect(res.body).not.toContain("/usr/bin/qpdf");
       expect(calls).toBe(1);
 
-      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const [aliasRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(aliasRow?.error).toEqual({
         code: "ENGINE_UNAVAILABLE",
         httpStatus: 503,

@@ -355,7 +355,7 @@ describe("apiUploadUserFiles", () => {
     await expect(promise).rejects.toThrow("Storage quota exceeded");
   });
 
-  it("parses JSON error details on non-413 failures and masks Internal server error", async () => {
+  it("shows the translated fallback for non-413 failures whatever the server details say", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
 
     const p1 = apiUploadUserFiles([file]);
@@ -365,7 +365,7 @@ describe("apiUploadUserFiles", () => {
       details: "corrupt header",
     });
     (xhrInstances[0].onload as () => void)();
-    await expect(p1).rejects.toThrow("Unsupported file: corrupt header");
+    await expect(p1).rejects.toThrow("We couldn't complete that request. Please try again.");
 
     const p2 = apiUploadUserFiles([file]);
     xhrInstances[1].status = 500;
@@ -444,7 +444,7 @@ describe("throwWithMessage error extraction", () => {
     storageMap.clear();
   });
 
-  it("extracts error field from response JSON", async () => {
+  it("shows the generic message and keeps the server error field in the body", async () => {
     const { apiGet } = await import("@/lib/api");
     fetchMock.mockReturnValueOnce(
       Promise.resolve({
@@ -453,10 +453,10 @@ describe("throwWithMessage error extraction", () => {
         json: () => Promise.resolve({ error: "Bad request" }),
       }),
     );
-    await expect(apiGet("/v1/test")).rejects.toThrow("Bad request");
+    await expect(apiGet("/v1/test")).rejects.toThrow("An error occurred");
   });
 
-  it("extracts message field when error is absent", async () => {
+  it("shows the generic message when the body only has a message field", async () => {
     const { apiGet } = await import("@/lib/api");
     fetchMock.mockReturnValueOnce(
       Promise.resolve({
@@ -465,10 +465,10 @@ describe("throwWithMessage error extraction", () => {
         json: () => Promise.resolve({ message: "Not found" }),
       }),
     );
-    await expect(apiGet("/v1/test")).rejects.toThrow("Not found");
+    await expect(apiGet("/v1/test")).rejects.toThrow("An error occurred");
   });
 
-  it("falls back to status code when JSON parsing fails", async () => {
+  it("shows the generic message when JSON parsing fails", async () => {
     const { apiGet } = await import("@/lib/api");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     fetchMock.mockReturnValueOnce(
@@ -479,7 +479,7 @@ describe("throwWithMessage error extraction", () => {
       }),
     );
     try {
-      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+      await expect(apiGet("/v1/test")).rejects.toThrow("An error occurred");
     } finally {
       warn.mockRestore();
     }
@@ -498,7 +498,7 @@ describe("throwWithMessage error extraction", () => {
     );
 
     try {
-      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+      await expect(apiGet("/v1/test")).rejects.toThrow("An error occurred");
       expect(warn).toHaveBeenCalledWith(
         "Failed to parse non-2xx API response (status: 502):",
         parseError,

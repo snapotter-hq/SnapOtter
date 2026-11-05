@@ -55,9 +55,10 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(503);
-    expect(JSON.parse(res.body)).toMatchObject({
+    expect(JSON.parse(res.body)).toEqual({
       error: "Workspace storage limit reached",
       code: "workspace-cap",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -68,7 +69,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(503);
-    expect(JSON.parse(res.body)).toMatchObject({ error: "Insufficient disk space for processing" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Insufficient disk space for processing",
+      code: "SERVICE_UNAVAILABLE",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -80,7 +85,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body)).toMatchObject({ error: "Internal server error" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -90,10 +99,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(415);
-    expect(JSON.parse(res.body)).toMatchObject({
+    expect(JSON.parse(res.body)).toEqual({
       error: "Unsupported input",
       details: "Unsupported input",
       code: "unsupported",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -102,7 +112,11 @@ describe("registerErrorHandler", () => {
     const app = await appThrowing(() => new Error("ENOENT: /srv/data/secret.bin"));
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body)).toMatchObject({ error: "Internal server error" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -112,9 +126,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body)).toMatchObject({
+    expect(JSON.parse(res.body)).toEqual({
       error: "Malformed JSON in request body",
       details: "Malformed JSON in request body",
+      code: "BAD_REQUEST",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -133,9 +149,10 @@ describe("a storage fault reaching the handler", () => {
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(503);
-    expect(JSON.parse(res.body)).toMatchObject({
+    expect(JSON.parse(res.body)).toEqual({
       error: "The server's storage is full.",
       code: "storage-full",
+      requestId: expect.any(String),
     });
     expect(reportError).toHaveBeenCalledTimes(1);
     expect(reportError).toHaveBeenCalledWith(
@@ -175,7 +192,11 @@ describe("an over-limit multipart file reaching the handler", () => {
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toMatchObject({ error: "File exceeds the 5 MB upload limit" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "File exceeds the 5 MB upload limit",
+      code: "PAYLOAD_TOO_LARGE",
+      requestId: expect.any(String),
+    });
     expect(reportError).not.toHaveBeenCalled();
     await app.close();
   });
@@ -199,7 +220,12 @@ describe("an over-limit multipart file reaching the handler", () => {
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toMatchObject({ error: message, details: message });
+    expect(JSON.parse(res.body)).toEqual({
+      error: message,
+      details: message,
+      code: "PAYLOAD_TOO_LARGE",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -260,7 +286,11 @@ describe("an over-limit multipart file reaching the handler", () => {
       }, 4096);
 
       expect(res.statusCode).toBe(413);
-      expect(JSON.parse(res.body)).toMatchObject({ error: "File exceeds the 1 KB upload limit" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "File exceeds the 1 KB upload limit",
+        code: "PAYLOAD_TOO_LARGE",
+        requestId: expect.any(String),
+      });
       expect(reportError).not.toHaveBeenCalled();
     });
 
@@ -273,7 +303,11 @@ describe("an over-limit multipart file reaching the handler", () => {
       );
 
       expect(res.statusCode).toBe(413);
-      expect(JSON.parse(res.body)).toMatchObject({ error: "File exceeds the 10 MB upload limit" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "File exceeds the 10 MB upload limit",
+        code: "PAYLOAD_TOO_LARGE",
+        requestId: expect.any(String),
+      });
     });
 
     it("names no number for request.file() on an unlimited instance", async () => {
@@ -289,7 +323,11 @@ describe("an over-limit multipart file reaching the handler", () => {
         });
 
         expect(res.statusCode).toBe(413);
-        expect(JSON.parse(res.body)).toMatchObject({ error: "File exceeds the upload limit" });
+        expect(JSON.parse(res.body)).toEqual({
+          error: "File exceeds the upload limit",
+          code: "PAYLOAD_TOO_LARGE",
+          requestId: expect.any(String),
+        });
       } finally {
         env.MAX_UPLOAD_SIZE_MB = configured;
       }
@@ -321,7 +359,7 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "GET", url: "/api/v1/scim/v2/Users" });
 
       expect(res.statusCode).toBe(500);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 500,
         detail: "Internal server error",
@@ -348,7 +386,7 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "POST", url: "/api/v1/scim/v2/Groups" });
 
       expect(res.statusCode).toBe(503);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 503,
         detail: "Insufficient disk space on [internal]",
@@ -366,7 +404,7 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "GET", url: "/api/v1/scim/v2/Groups" });
 
       expect(res.statusCode).toBe(500);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 500,
         detail: "Internal server error",
@@ -385,7 +423,7 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "POST", url: "/api/v1/scim/v2/Users" });
 
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 400,
         detail: "Malformed JSON in request body",
@@ -402,7 +440,11 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "POST", url: "/api/v1/enterprise/scim/token" });
 
       expect(res.statusCode).toBe(500);
-      expect(JSON.parse(res.body)).toMatchObject({ error: "Internal server error" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
       expect(reportError).toHaveBeenCalledTimes(1);
     } finally {
       await app.close();
@@ -426,7 +468,7 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       });
 
       expect(res.statusCode).toBe(500);
-      expect(JSON.parse(res.body)).toMatchObject({
+      expect(JSON.parse(res.body)).toEqual({
         schemas: [SCIM_ERROR_SCHEMA],
         status: 500,
         detail: "Internal server error",

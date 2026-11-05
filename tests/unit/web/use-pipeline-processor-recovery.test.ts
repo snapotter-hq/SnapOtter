@@ -34,6 +34,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     formatHeaders: () => new Map<string, string>(),
+    translatedCodeMessage: () => undefined,
     parseApiError: (body: Record<string, unknown>, status: number, fallback?: string) => {
       const parsed = actual.parseApiError(body, status, fallback);
       if (typeof parsed === "object" || parsed === fallback) return parsed;
@@ -587,7 +588,7 @@ describe("usePipelineProcessor single-run recovery (#766)", () => {
     unmount();
   });
 
-  it("settles a failed frame with its step error", () => {
+  it("settles a failed frame with the fallback and keeps the step error out of the UI", () => {
     const { unmount } = startSingleRun();
 
     act(() => {
@@ -599,7 +600,7 @@ describe("usePipelineProcessor single-run recovery (#766)", () => {
       sendSingleFrame({ phase: "failed", percent: 0, error: "Step 2: kaboom" });
     });
 
-    expect(useFileStore.getState().error).toBe("Step 2: kaboom");
+    expect(useFileStore.getState().error).toBe("Processing failed");
     expect(useFileStore.getState().processing).toBe(false);
 
     unmount();
@@ -1171,7 +1172,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     });
   }
 
-  it("fails the entry on a failed frame", () => {
+  it("fails the entry on a failed frame with the fallback, not the server text", () => {
     const { unmount } = startSingleRun();
     act(() => {
       xhrs[0].upload.onload?.();
@@ -1184,11 +1185,11 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       sendSingleFrame({ phase: "failed", percent: 0, error: "Step 2: kaboom" });
     });
 
-    expectEntryFailed("Step 2: kaboom");
+    expectEntryFailed("Processing failed");
     unmount();
   });
 
-  it("shows the operator hint a failed frame carries (#2544)", () => {
+  it("shows the fallback, not the server text or operator hint, for a failed frame whose code has no translation (#2544)", () => {
     const { unmount } = startSingleRun();
     act(() => {
       xhrs[0].upload.onload?.();
@@ -1207,10 +1208,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       });
     });
 
-    expectEntryFailed(
-      "PDF processing is unavailable on this server because qpdf could not be started.: " +
-        "Check QPDF_PATH: it must point at an executable qpdf binary.",
-    );
+    expectEntryFailed("Processing failed");
     unmount();
   });
 
@@ -1552,7 +1550,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       xhrs[0].onerror?.();
     });
 
-    expectEntryFailed("Step 2: kaboom");
+    expectEntryFailed("Processing failed");
     unmount();
   });
 
@@ -3125,17 +3123,17 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
       unmount();
     });
 
-    it("ends on a failed frame and keeps the server's message", () => {
+    it("ends on a failed frame and shows the fallback", () => {
       const { unmount } = startSingleRun();
       breakJobClear();
 
       // The run ended before the throw reached the frame handler's catch, so
-      // its #1287 fallback leaves the server's message alone.
+      // its #1287 fallback leaves the shown fallback alone.
       expect(() =>
         act(() => sendSingleFrame({ phase: "failed", error: "server said no" })),
       ).toThrow("teardown broke");
 
-      expectRunEnded("server said no");
+      expectRunEnded("Processing failed");
       unmount();
     });
 
@@ -3789,7 +3787,7 @@ describe("usePipelineProcessor entry-identity settle (#944)", () => {
     expect(useFileStore.getState().entries[0].status).toBe("pending");
     expect(useFileStore.getState().entries[1]).toMatchObject({
       status: "failed",
-      error: "Step 1: boom",
+      error: "Processing failed",
     });
     unmount();
   });
@@ -4249,6 +4247,68 @@ describe("usePipelineProcessor slow-upload SSE close recovery (#3923)", () => {
       phase: "processing",
       stage: "Processing second.jpg (1/2)",
     });
+
+    unmount();
+  });
+});
+
+// #1374: a pipeline batch settles each file with the notes its steps reported,
+// so a compress-pdf step that missed its target is marked like a single run.
+describe("usePipelineProcessor batch result notes (#1374)", () => {
+  const MISSED = { targetKb: 100, targetMet: false };
+
+  it("marks the files named in X-File-Notes on the sync path", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) => {
+        if (name === "X-File-Results") return encodedFileResults();
+        if (name === "X-File-Notes") return encodeURIComponent(JSON.stringify({ "1": MISSED }));
+        return null;
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    const [first, second] = useFileStore.getState().entries;
+    expect(first.resultNotes).toBeNull();
+    expect(second.resultNotes).toEqual(MISSED);
+
+    unmount();
+  });
+
+  it("applies a note shared by every file on the durable-ZIP path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+      ),
+    );
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      const terminal = completedBatchTerminal();
+      sendBatchFrame({
+        ...terminal,
+        result: { ...terminal.result, fileNotes: { "*": MISSED } },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry.resultNotes).toEqual(MISSED);
+    }
 
     unmount();
   });

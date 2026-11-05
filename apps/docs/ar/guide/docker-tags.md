@@ -1,61 +1,61 @@
 ---
-description: "علامات صورة SnapOtter على Docker، ومقاييس أداء GPU، وتثبيت الإصدارات، ودعم المنصات المتعددة لـ AMD64 وARM64."
-i18n_source_hash: 7a040f010e63
-i18n_provenance: human
-i18n_output_hash: 869e3732ed43
+description: "وسوم صور Docker لـ SnapOtter، ومقاييس أداء GPU، وتثبيت الإصدارات، ودعم المنصات المتعددة لمعماريتي AMD64 وARM64."
+i18n_source_hash: a5871d76250c
+i18n_provenance: machine
+i18n_output_hash: d58f3c7623fa
 i18n_hash_version: 2
 ---
 
-# صورة Docker {#docker-image}
+# وسوم صورة Docker {#docker-image}
 
-تُشحن SnapOtter كصورة Docker واحدة. شغّلها بمفردها فتبدأ تشغيل PostgreSQL 17 وRedis المضمَّنين على واجهة loopback (الوضع المضمَّن)؛ وللإنتاج، شغّلها إلى جانب حاويتَي PostgreSQL 17 وRedis 8 المنفصلتين باستخدام Compose. تعمل صورة التطبيق على جميع المنصات.
+يُشحن SnapOtter كصورة Docker واحدة. عند تشغيلها بمفردها تبدأ PostgreSQL 17 وRedis مضمَّنتين على واجهة loopback (الوضع المضمَّن)، أما في بيئة الإنتاج فشغّلها إلى جانب حاويتين منفصلتين لـ PostgreSQL 17 وRedis 8 باستخدام Compose. تعمل صورة التطبيق على جميع المنصات.
 
-## بداية سريعة {#quick-start}
+## البدء السريع {#quick-start}
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-من دون ضبط `DATABASE_URL`، يعمل هذا في الوضع المضمَّن: يبدأ PostgreSQL وRedis داخل الحاوية على loopback، مع بقاء جميع البيانات ضمن وحدة التخزين `SnapOtter-data`. اضبط `DATABASE_URL` و`REDIS_URL` (كما تفعل حزمة [Compose](#docker-compose)) لاستخدام خدمات خارجية بدلاً من ذلك. راجع [الإعداد](/ar/guide/configuration#embedded-mode).
+عند عدم ضبط `DATABASE_URL`، يعمل هذا في الوضع المضمَّن: تبدأ PostgreSQL وRedis داخل الحاوية على loopback، مع وجود جميع البيانات ضمن وحدة التخزين `SnapOtter-data`. اضبط `DATABASE_URL` و`REDIS_URL` (كما تفعل حزمة [Compose](#docker-compose)) لاستخدام خدمات خارجية بدلاً من ذلك. راجع [الإعدادات](/ar/guide/configuration#embedded-mode).
 
 ## تسريع NVIDIA CUDA {#nvidia-cuda-acceleration}
 
-تتضمن الصورة دعم NVIDIA CUDA على amd64. إذا كان لديك معالج رسومات NVIDIA مع [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) مثبَّتًا، أضف `--gpus all`:
+تتضمن الصورة دعم NVIDIA CUDA على amd64. إذا كان لديك وحدة معالجة رسومية من NVIDIA مع تثبيت [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)، فأضف `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-تكتشف الصورة CUDA تلقائيًا في وقت التشغيل. من دون `--gpus all`، أو عندما تكون CUDA غير متاحة، تعمل أدوات الذكاء الاصطناعي على وحدة المعالجة المركزية. الصورة نفسها في كلتا الحالتين.
+تكتشف الصورة CUDA تلقائياً أثناء التشغيل. بدون `--gpus all`، أو عند عدم توفر CUDA، تعمل أدوات الذكاء الاصطناعي على وحدة المعالجة المركزية. الصورة نفسها في الحالتين.
 
-تسريع معالج الرسومات المدمج من Intel/AMD عبر VA-API أو Quick Sync أو OpenCL غير مدعوم لاستدلال الذكاء الاصطناعي في SnapOtter حاليًا. قد يؤدي تعيين `/dev/dri` داخل الحاوية إلى كشف جهاز التصيير، لكن وقت تشغيل الذكاء الاصطناعي سيظل يستخدم وحدة المعالجة المركزية ما لم تكن CUDA متاحة.
+تسريع وحدات iGPU من Intel/AMD عبر VA-API أو Quick Sync أو OpenCL غير مدعوم حالياً في استدلال الذكاء الاصطناعي في SnapOtter. قد يؤدي ربط `/dev/dri` داخل الحاوية إلى إتاحة جهاز العرض، لكن بيئة تشغيل الذكاء الاصطناعي ستظل تستخدم وحدة المعالجة المركزية ما لم يتوفر CUDA.
 
 ### مقاييس الأداء {#benchmarks}
 
-اختُبرت على معالج رسومات NVIDIA RTX 4070 (ذاكرة رسومات سعة 12 غيغابايت) مع صورة شخصية JPEG بأبعاد 572x1024.
+أُجريت الاختبارات على NVIDIA RTX 4070 (ذاكرة VRAM بسعة 12 GB) مع صورة JPEG بورتريه بأبعاد 572x1024.
 
-#### الأداء بعد الإحماء {#warm-performance}
+#### الأداء بعد التسخين {#warm-performance}
 
-| الأداة | وحدة المعالجة المركزية | معالج الرسومات | نسبة التسريع |
+| الأداة | CPU | GPU | التسريع |
 |------|-----|-----|---------|
 | إزالة الخلفية (u2net) | 2,415ms | 879ms | 2.7x |
 | إزالة الخلفية (isnet) | 2,457ms | 1,137ms | 2.2x |
 | تكبير 2x | 350ms | 309ms | 1.1x |
 | تكبير 4x | 910ms | 310ms | 2.9x |
-| تمويه الوجه | 139ms | 122ms | 1.1x |
+| تمويه الوجوه | 139ms | 122ms | 1.1x |
 
-#### البدء البارد (أول طلب بعد تشغيل الحاوية) {#cold-start-first-request-after-container-start}
+#### البدء البارد (أول طلب بعد بدء الحاوية) {#cold-start-first-request-after-container-start}
 
-| الأداة | وحدة المعالجة المركزية | معالج الرسومات | نسبة التسريع |
+| الأداة | CPU | GPU | التسريع |
 |------|-----|-----|---------|
 | إزالة الخلفية | 22,286ms | 4,792ms | 4.7x |
 | تكبير 2x | 3,957ms | 2,318ms | 1.7x |
 
-لم يتم تضمين OCR في مقارنة CUDA. تستخدم كل من طبقة Tesseract المضمنة وطبقات RapidOCR/ONNX الاختيارية CPU، بما في ذلك عندما تتمتع الحاوية بإمكانية الوصول إلى NVIDIA GPU.
+لا يشمل مقارنة CUDA التعرف الضوئي على الحروف (OCR). تستخدم كل من طبقة Tesseract المدمجة وطبقات RapidOCR/ONNX الاختيارية وحدة المعالجة المركزية، بما في ذلك عندما تملك الحاوية صلاحية الوصول إلى GPU من NVIDIA.
 
 ### فحص سلامة CUDA {#cuda-health-check}
 
-بعد أول طلب للذكاء الاصطناعي، تبلّغ نقطة نهاية سلامة المسؤول عن حالة معالج رسومات CUDA:
+بعد أول طلب للذكاء الاصطناعي، تُبلغ نقطة نهاية الصحة الخاصة بالمسؤول عن حالة CUDA GPU:
 
 ```
 GET /api/v1/admin/health
@@ -64,7 +64,7 @@ GET /api/v1/admin/health
 
 ## Docker Compose {#docker-compose}
 
-تتضمن حزمة Compose الكاملة التطبيق وPostgreSQL 17 وRedis 8. راجع [النشر](/ar/guide/deployment) للحصول على `docker-compose.yml` الكامل. مثال مبسّط:
+تتضمن حزمة Compose الكاملة التطبيق وPostgreSQL 17 وRedis 8. راجع [النشر](/ar/guide/deployment) للاطلاع على `docker-compose.yml` الكامل. مثال مبسط:
 
 ```yaml
 services:
@@ -76,7 +76,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -93,14 +95,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # قم بتغيير هذا لعمليات النشر غير المحلية
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -136,24 +138,24 @@ volumes:
               capabilities: [gpu]
 ```
 
-## تثبيت الإصدارات {#version-pinning}
+## تثبيت الإصدار {#version-pinning}
 
-| العلامة | الوصف |
+| الوسم | الوصف |
 |-----|------------|
 | `latest` | أحدث إصدار |
-| `2.2.0` | إصدار محدد |
+| `2.2.0` | إصدار محدد بدقة |
 | `2.2` | أحدث تصحيح في 2.2.x |
 | `2` | أحدث إصدار فرعي في 2.x |
 
 ## المنصات {#platforms}
 
-| البنية | دعم معالج الرسومات | ملاحظات |
+| المعمارية | دعم GPU | ملاحظات |
 |---|---|---|
 | linux/amd64 | NVIDIA CUDA | تسريع CUDA كامل لأدوات الذكاء الاصطناعي |
-| linux/arm64 | وحدة المعالجة المركزية فقط | Raspberry Pi 4/5، وApple Silicon عبر Docker Desktop |
+| linux/arm64 | CPU فقط | Raspberry Pi 4/5، وApple Silicon عبر Docker Desktop |
 
-## الترحيل من العلامات السابقة {#migration-from-previous-tags}
+## الانتقال من الوسوم السابقة {#migration-from-previous-tags}
 
-إذا كنت تستخدم العلامة `:cuda`، فانتقل إلى `:latest` واحتفظ بـ `--gpus all`. دعم معالج الرسومات نفسه، وصورة موحّدة.
+إذا كنت تستخدم الوسم `:cuda`، فانتقل إلى `:latest` واحتفظ بـ `--gpus all`. الدعم نفسه لـ GPU، في صورة موحدة.
 
 تُحفظ بياناتك وإعداداتك في وحدات التخزين.

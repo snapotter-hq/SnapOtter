@@ -1387,26 +1387,38 @@ test.describe("Buttons Accessible - Additional Pages", () => {
     await page.goto("/automate");
     await page.waitForLoadState("networkidle");
 
-    const buttons = page.getByRole("button");
-    const count = await buttons.count();
+    // Read every button in one in-page pass. Per-button locator calls cost
+    // several round-trips each and overran the 30s budget on a loaded runner
+    // (#1026); a single evaluate also can't wait on an index that a re-render
+    // dropped mid-walk.
+    const result = await page.evaluate(() => {
+      const isVisible = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          getComputedStyle(el).visibility !== "hidden" &&
+          !el.closest('[aria-hidden="true"]')
+        );
+      };
+      const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+      const unnamed = buttons
+        .filter(isVisible)
+        .filter(
+          (b) =>
+            !b.textContent?.trim() &&
+            !b.getAttribute("aria-label")?.trim() &&
+            !b.getAttribute("title")?.trim(),
+        )
+        .map((b) => b.outerHTML.slice(0, 200));
+      return { total: buttons.length, unnamed };
+    });
 
-    for (let i = 0; i < count; i++) {
-      const button = buttons.nth(i);
-      if (!(await button.isVisible().catch(() => false))) continue;
-
-      const name = await button.getAttribute("aria-label");
-      const title = await button.getAttribute("title");
-      const text = await button.textContent();
-
-      const hasAccessibleName =
-        (text && text.trim().length > 0) ||
-        (name && name.trim().length > 0) ||
-        (title && title.trim().length > 0);
-      expect(
-        hasAccessibleName,
-        `Button at index ${i} on automate page has no accessible name.`,
-      ).toBeTruthy();
-    }
+    expect(result.total).toBeGreaterThan(0);
+    expect(
+      result.unnamed,
+      "visible buttons on the automate page without an accessible name",
+    ).toEqual([]);
   });
 });
 

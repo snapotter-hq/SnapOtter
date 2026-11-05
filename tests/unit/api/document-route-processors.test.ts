@@ -112,6 +112,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { getObjectBuffer } from "../../../apps/api/src/lib/object-storage.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerBookletPdf } from "../../../apps/api/src/routes/tools/booklet-pdf.js";
@@ -960,7 +961,7 @@ describe("compress-pdf route processor (#1373)", () => {
       await writeFile(outPath, Buffer.from("partial"));
       throw new Error("PyMuPDF not installed");
     });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     registerCompressPdf(createMockApp());
     const config = getToolConfig("compress-pdf");
@@ -977,7 +978,8 @@ describe("compress-pdf route processor (#1373)", () => {
         expect((await readFile(outPath)).equals(candidate)).toBe(true);
         await expect(readFile(`${outPath}.scrub.pdf`)).rejects.toThrow();
         expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining("[pdf-scrub] keeping original metadata: PyMuPDF not installed"),
+          { err: expect.objectContaining({ message: "PyMuPDF not installed" }) },
+          "[pdf-scrub] keeping original metadata",
         );
       });
     } finally {

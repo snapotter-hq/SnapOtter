@@ -9,6 +9,9 @@ const store = vi.hoisted(() => ({
   users: [] as unknown[],
   values: vi.fn(),
 }));
+const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
@@ -41,7 +44,7 @@ beforeEach(() => {
   store.values.mockClear();
   env.DEFAULT_PASSWORD = originalPassword;
   env.DEFAULT_USERNAME = originalUsername;
-  vi.spyOn(console, "log").mockImplementation(() => {});
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 });
 
 describe("ensureDefaultAdmin", () => {
@@ -135,6 +138,14 @@ describe("ensureDefaultAdmin", () => {
     expect(store.values).toHaveBeenCalledTimes(1);
   });
 
+  it("announces the new admin through the logger so the line reaches LOG_DIR (#4178)", async () => {
+    await ensureDefaultAdmin();
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      `Default admin user '${env.DEFAULT_USERNAME}' created - password change required on first login`,
+    );
+  });
+
   it("leaves an established install alone, whatever DEFAULT_PASSWORD holds", async () => {
     store.users = [{ id: "existing-admin" }];
     env.DEFAULT_PASSWORD = `stale-value\n${"a".repeat(PASSWORD_MAX_LENGTH)}`;
@@ -172,13 +183,28 @@ describe("API startup (#2333)", () => {
     // around ensureDefaultAdmin / ensureAnonymousUser in the entry point's source.
     const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
     const start = source.indexOf("await ensureDefaultTeam();");
-    const end = source.indexOf("async function ensureInstanceId()", start);
+    const end = source.indexOf("await setSentryInstanceTag(", start);
     const block = source.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(block).toMatch(
       /try\s*\{\s*if\s*\(env\.AUTH_ENABLED\)\s*\{\s*await ensureDefaultAdmin\(\);\s*\}\s*else\s*\{\s*await ensureAnonymousUser\(\);\s*\}\s*\}\s*catch\s*\(err\)\s*\{\s*console\.error\(`FATAL: \$\{\(err as Error\)\.message\}`\);\s*console\.error\(err\);\s*process\.exit\(1\);\s*\}/,
+    );
+  });
+
+  it("catches a failed analytics gate read, prints a FATAL line, and exits 1 (#4498)", () => {
+    // A bare top-level await would print only a raw stack, and would exit only
+    // while Sentry's handler is the sole uncaughtException listener.
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    const start = source.indexOf("await initAnalytics();");
+    const end = source.indexOf("await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED", start);
+    const block = source.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toMatch(
+      /try\s*\{\s*await primeAnalyticsGate\(\);\s*\}\s*catch\s*\(err\)\s*\{\s*console\.error\(`FATAL: \$\{\(err as Error\)\.message\}`\);\s*console\.error\(err\);\s*process\.exit\(1\);\s*\}/,
     );
   });
 });

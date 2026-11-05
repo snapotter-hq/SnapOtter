@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { expandAiBundlesScripts } from "../../helpers/ai-bundles-workflow.js";
 
 const root = process.cwd();
 const verifierPath = path.resolve(root, "docker/verify-bundle.sh");
@@ -13,6 +14,11 @@ function readRequired(file: string): string {
   return readFileSync(file, "utf8");
 }
 
+/** ai-bundles.yml with its moved step scripts expanded back inline. */
+function readWorkflow(): string {
+  return expandAiBundlesScripts(readRequired(workflowPath), root);
+}
+
 function job(workflow: string, name: string): string {
   const start = workflow.indexOf(`  ${name}:\n`);
   expect(start, `job ${name} is missing`).toBeGreaterThanOrEqual(0);
@@ -21,7 +27,7 @@ function job(workflow: string, name: string): string {
 
 describe("legacy bundle release workflow", () => {
   it("keeps immutable v2 legacy bundles out of each OCR release", () => {
-    const workflow = readRequired(workflowPath);
+    const workflow = readWorkflow();
     const manifest = JSON.parse(readRequired(manifestPath));
 
     expect(workflow).not.toContain("  build-legacy:\n");
@@ -34,6 +40,26 @@ describe("legacy bundle release workflow", () => {
         expect(archive.file).toMatch(/^v2\.0\.0\//);
       }
     }
+  });
+
+  it("covers every manifest bundle except ocr and reads the id list from the manifest (#4317)", () => {
+    const verifier = readRequired(verifierPath);
+    const manifest = JSON.parse(readRequired(manifestPath));
+    const header = verifier.split("\n").slice(0, 25).join("\n");
+
+    // The usage text must not carry its own copy of the ids.
+    expect(header).not.toMatch(/background-removal|face-detection|upscale-enhance/);
+    expect(verifier).toContain("/app/docker/feature-manifest.json");
+
+    for (const bundleId of Object.keys(manifest.bundles)) {
+      if (bundleId === "ocr") continue;
+      // Phase 3 (import check) names every non-OCR bundle.
+      expect(verifier, `${bundleId} has no import-check case`).toMatch(
+        new RegExp(`^  ${bundleId}\\)`, "m"),
+      );
+    }
+    // OCR is routed to its own verifier rather than silently unsupported.
+    expect(verifier).toContain("verify-ocr-runtime.sh");
   });
 
   it("derives the verification purelib directory from the image interpreter", () => {
@@ -93,7 +119,7 @@ describe("legacy bundle release workflow", () => {
   });
 
   it("rejects a manifestless version prefix that already contains remote objects", () => {
-    const publish = job(readRequired(workflowPath), "publish");
+    const publish = job(readWorkflow(), "publish");
     const manifestMissing = publish.indexOf("if not api.file_exists");
     const prefixListing = publish.indexOf("api.list_repo_files", manifestMissing);
     const prefixGuard = publish.indexOf("if existing_version_files:", prefixListing);

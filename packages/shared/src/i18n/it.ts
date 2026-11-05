@@ -769,7 +769,7 @@ export const it: TranslationKeys = {
     },
     collage: {
       name: "Collage e griglia",
-      description: "Combina immagini in bellissimi collage con oltre 25 modelli",
+      description: "Combina immagini in bellissimi collage con molti modelli",
     },
     stitch: {
       name: "Unisci immagini",
@@ -861,7 +861,7 @@ export const it: TranslationKeys = {
     },
     "convert-video": {
       name: "Converti Video",
-      description: "Converte video tra MP4, MOV e WebM",
+      description: "Converte video tra MP4, MOV, WebM, AVI e MKV",
     },
     "compress-video": {
       name: "Comprimi Video",
@@ -1633,6 +1633,7 @@ export const it: TranslationKeys = {
       separatePdfMode: "PDF separati, uno per immagine",
       combineAllImages: "Combina tutte le immagini in un PDF",
       pageSize: "Dimensione pagina",
+      pageSizeLetter: "Letter (US)",
       orientation: "Orientamento",
       portrait: "Verticale",
       landscape: "Orizzontale",
@@ -2865,6 +2866,7 @@ export const it: TranslationKeys = {
       stretchMode: "Allunga",
       cropMode: "Ritaglia",
       alignment: "Allineamento",
+      allCaps: "Tutto maiuscolo",
       start: "Inizio",
       center: "Centro",
       end: "Fine",
@@ -4070,6 +4072,8 @@ export const it: TranslationKeys = {
     cancelButton: "Annulla",
     readyCount: "{count} pronti",
     failedStatus: "Non riuscito",
+    fetchFailed: "Impossibile recuperare questo URL (errore {status}).",
+    downloadFailed: "Impossibile scaricare questo file (errore {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Il mio file](https://example.com/recording.mp3)",
   },
@@ -5660,6 +5664,55 @@ export const it: TranslationKeys = {
     uninstallFailed: "Disinstallazione non riuscita",
     resetFailed: "Reimpostazione non riuscita",
     codes: {
+      MFA_ENROLLMENT_REQUIRED:
+        "L’amministratore richiede l’accesso a due fattori. Configuralo per continuare.",
+      ANALYSIS_EXPIRED: "Questa analisi è scaduta. Ricomincia.",
+      BACKGROUND_REMOVAL_EXPIRED: "Questa rimozione dello sfondo è scaduta. Ricomincia.",
+      BROWSER_CRASHED: "Il browser si è arrestato durante il rendering. Riprova.",
+      BROWSER_NOT_AVAILABLE:
+        "Il browser richiesto da questo strumento non è disponibile al momento.",
+      DEPENDENCY_VALIDATION_FAILED:
+        "Questa impostazione dipende da un'altra impostazione non valida.",
+      FEATURE_INCOMPATIBLE: "Questa funzione non può essere eseguita con le impostazioni attuali.",
+      FST_REQ_FILE_TOO_LARGE: "Questo file è troppo grande per essere caricato.",
+      IDLE_TIMEOUT: "Sei stato disconnesso per inattività. Accedi di nuovo.",
+      INPUT_MISSING: "Manca un file o un'impostazione necessaria a questo passaggio.",
+      INVALID_CIDR: "Questo intervallo di indirizzi IP non è valido.",
+      INVALID_CODE: "Questo codice non è valido. Riprova.",
+      INVALID_PASSWORD: "Questa password non è corretta.",
+      INVALID_STORED_NAME: "Questo nome di file salvato non è valido.",
+      LOGIN_THROTTLED: "Troppi tentativi di accesso. Attendi qualche minuto e riprova.",
+      MFA_ALREADY_ENABLED: "L'accesso a due fattori è già attivo per questo account.",
+      MFA_ATTEMPTS_EXHAUSTED: "Troppi codici errati. Ricomincia l'accesso.",
+      MFA_NOT_CONFIGURED: "L'accesso a due fattori non è configurato per questo account.",
+      MFA_NOT_ENABLED: "L'accesso a due fattori non è attivo per questo account.",
+      MFA_POLICY_UNAVAILABLE: "Non è stato possibile verificare la policy a due fattori. Riprova.",
+      MUST_CHANGE_PASSWORD: "Devi cambiare la password prima di continuare.",
+      NOT_ANIMATED: "Questo file non è una GIF animata.",
+      NO_PENDING_ENROLLMENT: "Nessuna configurazione a due fattori in corso. Ricominciala.",
+      OIDC_DISCOVERY_FAILED: "Impossibile raggiungere il provider di accesso singolo.",
+      OIDC_DISCOVERY_TIMEOUT: "Il provider di accesso singolo non ha risposto in tempo.",
+      OIDC_END_SESSION_INVALID: "L'indirizzo di disconnessione dell'accesso singolo non è valido.",
+      OIDC_END_SESSION_SCHEME:
+        "L'indirizzo di disconnessione dell'accesso singolo deve usare HTTPS.",
+      OIDC_ISSUER_SCHEME_MISMATCH:
+        "L'indirizzo dell'emittente dell'accesso singolo non corrisponde al suo schema.",
+      OIDC_NO_PASSWORD: "Questo account accede con l'accesso singolo, quindi non ha una password.",
+      PASSWORD_CHANGED: "La tua password è stata cambiata. Accedi di nuovo.",
+      READONLY_SETTING: "Questa impostazione è di sola lettura.",
+      SELF_DELETE: "Non puoi eliminare il tuo account.",
+      SELF_DEMOTE: "Non puoi rimuovere il tuo ruolo di amministratore.",
+      SELF_LOCKOUT: "Questa modifica ti bloccherebbe l'accesso.",
+      SETTING_DECRYPTION_FAILED:
+        "Non è stato possibile leggere questa impostazione. Inseriscila di nuovo.",
+      STAGED_DISCARD_FAILED: "Non è stato possibile scartare il file in sospeso.",
+      UNKNOWN_ROLE: "Questo ruolo non esiste.",
+      UNKNOWN_SETTING: "Questa impostazione non esiste.",
+      UNKNOWN_TEAM: "Questo team non esiste.",
+      USERNAME_RACE_EXHAUSTED: "Questo nome utente è già in uso. Scegline un altro.",
+      USER_LIMIT_REACHED: "Questa istanza ha raggiunto il limite di utenti.",
+      WEBHOOK_DECRYPTION_FAILED:
+        "Non è stato possibile leggere il segreto del webhook. Inseriscilo di nuovo.",
       FEATURE_NOT_INSTALLED: "Questa funzione non è ancora installata.",
       FEATURE_NOT_LICENSED: "Questa funzione richiede una licenza.",
       ESCALATION_DENIED: "Non puoi concedere più accessi di quelli che hai.",

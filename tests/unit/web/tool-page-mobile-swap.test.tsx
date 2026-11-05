@@ -840,18 +840,18 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
     fireEvent.click(await screen.findByTestId("remove-background-format-webp"));
     fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
 
-    expect(await screen.findByText("Effects compositing failed")).toBeVisible();
+    expect(await screen.findByText("Effects failed: 500")).toBeVisible();
 
     // Resize below 768px (desktop -> mobile) and open the mobile settings sheet.
     setMobileViewport(true);
     fireEvent.click(screen.getByRole("button", { name: "Process" }));
 
     expect(await screen.findByTestId("remove-background-download-effects")).toBeVisible();
-    expect(screen.getByText("Effects compositing failed")).toBeVisible();
+    expect(screen.getByText("Effects failed: 500")).toBeVisible();
 
     // Resize back above 768px (mobile -> desktop): error remains visible.
     setMobileViewport(false);
     expect(screen.getByTestId("remove-background-download-effects")).toBeVisible();
-    expect(screen.getByText("Effects compositing failed")).toBeVisible();
+    expect(screen.getByText("Effects failed: 500")).toBeVisible();
   });
 });

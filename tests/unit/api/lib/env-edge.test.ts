@@ -792,3 +792,77 @@ describe("configRoutes GET /api/v1/config/locale (#3958)", () => {
     },
   );
 });
+
+describe("loadEnv HOST", () => {
+  it("defaults to 0.0.0.0 so the container's published port keeps working", () => {
+    restoreEnv();
+    expect(loadEnv({ ...process.env, HOST: undefined }).HOST).toBe("0.0.0.0");
+  });
+
+  it.each(["127.0.0.1", "0.0.0.0", "::1", "::"])("accepts the IP address %j", (host) => {
+    restoreEnv();
+    expect(loadEnv({ ...process.env, HOST: host }).HOST).toBe(host);
+  });
+
+  // An empty HOST must not fall back to 0.0.0.0, which would put the API on
+  // the network. A hostname is what a stray HOST usually holds.
+  it.each(["localhost", "MacBook-Pro.local", "", " 127.0.0.1"])(
+    "rejects %j, because the API binds an address",
+    (host) => {
+      expectLoadEnvError(
+        { HOST: host },
+        "HOST must be an IP address such as 0.0.0.0 or 127.0.0.1",
+        ["HOST"],
+      );
+    },
+  );
+
+  it("names the rejected value, so a HOST set by something else is easy to spot", () => {
+    expectLoadEnvError({ HOST: "MacBook-Pro.local" }, "not 'MacBook-Pro.local'", ["HOST"]);
+  });
+});
+
+describe("loadEnv instance and analytics seeds", () => {
+  const SEED_ID = "3f2c1a9e-8b7d-4c6e-9a5f-1e2d3c4b5a69";
+
+  it("accepts a lowercase v4 instance id and defaults analytics to on", () => {
+    restoreEnv();
+    const parsed = loadEnv({
+      ...process.env,
+      SNAPOTTER_INSTANCE_ID: SEED_ID,
+      SNAPOTTER_ANALYTICS_DEFAULT: undefined,
+    });
+    expect(parsed.SNAPOTTER_INSTANCE_ID).toBe(SEED_ID);
+    expect(parsed.SNAPOTTER_ANALYTICS_DEFAULT).toBe("on");
+  });
+
+  it("defaults the instance id to empty, which tells ensureInstanceId to generate one", () => {
+    restoreEnv();
+    const parsed = loadEnv({ ...process.env, SNAPOTTER_INSTANCE_ID: undefined });
+    expect(parsed.SNAPOTTER_INSTANCE_ID).toBe("");
+  });
+
+  // Each case breaks one rule a loose UUID check would let through.
+  it.each([
+    ["a hostname", "alice-laptop"],
+    ["uppercase hex", SEED_ID.toUpperCase()],
+    ["version 1", "3f2c1a9e-8b7d-1c6e-9a5f-1e2d3c4b5a69"],
+    ["a variant nibble outside 8 to b", "3f2c1a9e-8b7d-4c6e-7a5f-1e2d3c4b5a69"],
+    ["the nil UUID", "00000000-0000-0000-0000-000000000000"],
+    ["a trailing space", `${SEED_ID} `],
+    ["braces", `{${SEED_ID}}`],
+    ["no hyphens", SEED_ID.replaceAll("-", "")],
+  ])("rejects an instance id with %s", (_rule, id) => {
+    expectLoadEnvError(
+      { SNAPOTTER_INSTANCE_ID: id },
+      "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
+      ["SNAPOTTER_INSTANCE_ID"],
+    );
+  });
+
+  it.each(["false", "OFF", "0"])("rejects the analytics default %j", (value) => {
+    expectLoadEnvError({ SNAPOTTER_ANALYTICS_DEFAULT: value }, "Invalid enum value", [
+      "SNAPOTTER_ANALYTICS_DEFAULT",
+    ]);
+  });
+});

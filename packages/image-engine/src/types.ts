@@ -35,6 +35,9 @@ export type OutputFormat =
   | "jp2"
   | "qoi";
 
+/** The formats processImage can encode: OutputFormat minus the ones FORMAT_MAP lacks. */
+export type ProcessImageFormat = Exclude<OutputFormat, "heic" | "bmp" | "ico" | "jp2" | "qoi">;
+
 export interface ResizeOptions {
   width?: number;
   height?: number;
@@ -95,18 +98,6 @@ export interface EditMetadataOptions {
   dateTimeOriginal?: string;
   clearGps?: boolean;
   fieldsToRemove?: string[];
-  gpsLatitude?: number;
-  gpsLongitude?: number;
-  gpsAltitude?: number;
-  keywords?: string[];
-  keywordsMode?: "add" | "set";
-  dateShift?: string;
-  setAllDates?: string;
-  iptcTitle?: string;
-  iptcHeadline?: string;
-  iptcCity?: string;
-  iptcState?: string;
-  iptcCountry?: string;
 }
 
 export interface BrightnessOptions {

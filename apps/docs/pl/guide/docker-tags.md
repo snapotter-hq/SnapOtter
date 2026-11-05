@@ -1,14 +1,14 @@
 ---
-description: "Tagi obrazów Docker SnapOtter, testy wydajności GPU, przypinanie wersji i obsługa wielu platform dla AMD64 oraz ARM64."
-i18n_source_hash: 7a040f010e63
-i18n_provenance: human
-i18n_output_hash: d6e0033d1b88
+description: "Tagi obrazów Docker SnapOtter, testy wydajności GPU, przypinanie wersji i obsługa wielu platform dla AMD64 i ARM64."
+i18n_source_hash: a5871d76250c
+i18n_provenance: machine
+i18n_output_hash: 572812ca3874
 i18n_hash_version: 2
 ---
 
-# Obraz Docker {#docker-image}
+# Tagi obrazów Docker {#docker-image}
 
-SnapOtter jest dostarczany jako pojedynczy obraz Docker. Uruchom go samodzielnie, a wystartuje wbudowany PostgreSQL 17 oraz Redis na interfejsie pętli zwrotnej (tryb wbudowany); na produkcji uruchamiaj go obok osobnych kontenerów PostgreSQL 17 i Redis 8 za pomocą Compose. Obraz aplikacji działa na wszystkich platformach.
+SnapOtter jest dostarczany jako pojedynczy obraz Docker. Uruchomiony samodzielnie, startuje wbudowane PostgreSQL 17 i Redis na interfejsie loopback (tryb wbudowany). W środowisku produkcyjnym należy uruchomić go razem z osobnymi kontenerami PostgreSQL 17 i Redis 8 za pomocą Compose. Obraz aplikacji działa na wszystkich platformach.
 
 ## Szybki start {#quick-start}
 
@@ -16,46 +16,46 @@ SnapOtter jest dostarczany jako pojedynczy obraz Docker. Uruchom go samodzielnie
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Bez ustawionego `DATABASE_URL` działa to w trybie wbudowanym: PostgreSQL i Redis startują wewnątrz kontenera na pętli zwrotnej, a wszystkie dane trafiają do woluminu `SnapOtter-data`. Ustaw `DATABASE_URL` i `REDIS_URL` (tak jak robi to stos [Compose](#docker-compose)), aby zamiast tego korzystać z usług zewnętrznych. Zobacz [Konfiguracja](/pl/guide/configuration#embedded-mode).
+Bez ustawionego `DATABASE_URL` aplikacja działa w trybie wbudowanym: PostgreSQL i Redis startują wewnątrz kontenera na loopback, a wszystkie dane trafiają do woluminu `SnapOtter-data`. Aby zamiast tego użyć usług zewnętrznych, należy ustawić `DATABASE_URL` i `REDIS_URL` (tak jak robi to stos [Compose](#docker-compose)). Zobacz [Konfiguracja](/pl/guide/configuration#embedded-mode).
 
 ## Akceleracja NVIDIA CUDA {#nvidia-cuda-acceleration}
 
-Obraz zawiera obsługę NVIDIA CUDA na amd64. Jeśli masz kartę GPU NVIDIA z zainstalowanym [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), dodaj `--gpus all`:
+Obraz zawiera obsługę NVIDIA CUDA na amd64. Jeśli dostępna jest karta NVIDIA z zainstalowanym [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), należy dodać `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Obraz automatycznie wykrywa CUDA w czasie działania. Bez `--gpus all` lub gdy CUDA jest niedostępne, narzędzia AI działają na CPU. To ten sam obraz w obu przypadkach.
+Obraz automatycznie wykrywa CUDA w czasie działania. Bez `--gpus all` lub gdy CUDA jest niedostępne, narzędzia AI działają na CPU. W obu przypadkach używany jest ten sam obraz.
 
-Akceleracja iGPU Intel/AMD przez VA-API, Quick Sync lub OpenCL nie jest obecnie obsługiwana dla wnioskowania AI w SnapOtter. Zmapowanie `/dev/dri` do kontenera może udostępnić urządzenie renderujące, ale środowisko uruchomieniowe AI i tak będzie korzystać z CPU, o ile CUDA nie jest dostępne.
+Akceleracja zintegrowanych procesorów graficznych Intel/AMD przez VA-API, Quick Sync lub OpenCL nie jest obecnie obsługiwana dla wnioskowania AI w SnapOtter. Zamapowanie `/dev/dri` do kontenera może udostępnić urządzenie renderujące, ale środowisko AI nadal będzie używać CPU, o ile CUDA nie jest dostępne.
 
 ### Testy wydajności {#benchmarks}
 
-Testowane na NVIDIA RTX 4070 (12 GB VRAM) na portretowym pliku JPEG 572x1024.
+Testy wykonano na NVIDIA RTX 4070 (12 GB VRAM) z portretem JPEG o rozmiarze 572x1024.
 
 #### Wydajność po rozgrzaniu {#warm-performance}
 
 | Narzędzie | CPU | GPU | Przyspieszenie |
 |------|-----|-----|---------|
-| Usuwanie tła (u2net) | 2 415 ms | 879 ms | 2,7x |
-| Usuwanie tła (isnet) | 2 457 ms | 1 137 ms | 2,2x |
-| Powiększanie 2x | 350 ms | 309 ms | 1,1x |
-| Powiększanie 4x | 910 ms | 310 ms | 2,9x |
-| Rozmycie twarzy | 139 ms | 122 ms | 1,1x |
+| Usuwanie tła (u2net) | 2,415ms | 879ms | 2.7x |
+| Usuwanie tła (isnet) | 2,457ms | 1,137ms | 2.2x |
+| Powiększanie 2x | 350ms | 309ms | 1.1x |
+| Powiększanie 4x | 910ms | 310ms | 2.9x |
+| Rozmycie twarzy | 139ms | 122ms | 1.1x |
 
 #### Zimny start (pierwsze żądanie po uruchomieniu kontenera) {#cold-start-first-request-after-container-start}
 
 | Narzędzie | CPU | GPU | Przyspieszenie |
 |------|-----|-----|---------|
-| Usuwanie tła | 22 286 ms | 4 792 ms | 4,7x |
-| Powiększanie 2x | 3 957 ms | 2 318 ms | 1,7x |
+| Usuwanie tła | 22,286ms | 4,792ms | 4.7x |
+| Powiększanie 2x | 3,957ms | 2,318ms | 1.7x |
 
-OCR nie jest uwzględniony w porównaniu CUDA. Zarówno wbudowana warstwa Tesseract, jak i opcjonalna warstwa RapidOCR/ONNX korzystają z CPU, także wtedy, gdy kontener ma dostęp NVIDIA GPU.
+OCR nie jest uwzględniony w porównaniu CUDA. Zarówno wbudowany poziom Tesseract, jak i opcjonalne poziomy RapidOCR/ONNX korzystają z CPU, także wtedy, gdy kontener ma dostęp do GPU NVIDIA.
 
 ### Kontrola stanu CUDA {#cuda-health-check}
 
-Po pierwszym żądaniu AI administracyjny punkt końcowy stanu zdrowia raportuje status GPU CUDA:
+Po pierwszym żądaniu AI punkt końcowy kontroli stanu dla administratora zgłasza status GPU CUDA:
 
 ```
 GET /api/v1/admin/health
@@ -64,7 +64,7 @@ GET /api/v1/admin/health
 
 ## Docker Compose {#docker-compose}
 
-Pełny stos Compose obejmuje aplikację, PostgreSQL 17 oraz Redis 8. Zobacz [Wdrożenie](/pl/guide/deployment), aby poznać kompletny `docker-compose.yml`. Minimalny przykład:
+Pełny stos Compose obejmuje aplikację, PostgreSQL 17 i Redis 8. Pełny plik `docker-compose.yml` znajduje się w sekcji [Wdrażanie](/pl/guide/deployment). Minimalny przykład:
 
 ```yaml
 services:
@@ -76,7 +76,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -93,14 +95,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Zmień to w przypadku wdrożeń nielokalnych
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -124,7 +126,7 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-Dla akceleracji NVIDIA CUDA przez Docker Compose dodaj sekcję deploy do usługi SnapOtter:
+Aby włączyć akcelerację NVIDIA CUDA przez Docker Compose, należy dodać sekcję deploy do usługi SnapOtter:
 
 ```yaml
     deploy:
@@ -142,7 +144,7 @@ Dla akceleracji NVIDIA CUDA przez Docker Compose dodaj sekcję deploy do usługi
 |-----|------------|
 | `latest` | Najnowsze wydanie |
 | `2.2.0` | Dokładna wersja |
-| `2.2` | Najnowsza łatka w 2.2.x |
+| `2.2` | Najnowsza poprawka w 2.2.x |
 | `2` | Najnowsza wersja podrzędna w 2.x |
 
 ## Platformy {#platforms}
@@ -154,6 +156,6 @@ Dla akceleracji NVIDIA CUDA przez Docker Compose dodaj sekcję deploy do usługi
 
 ## Migracja z poprzednich tagów {#migration-from-previous-tags}
 
-Jeśli używałeś taga `:cuda`, przejdź na `:latest` i zachowaj `--gpus all`. Taka sama obsługa GPU, ujednolicony obraz.
+Jeśli używany był tag `:cuda`, należy przejść na `:latest` i zachować `--gpus all`. Obsługa GPU jest taka sama, obraz jest ujednolicony.
 
-Twoje dane i ustawienia są zachowywane w woluminach.
+Dane i ustawienia są zachowane w woluminach.

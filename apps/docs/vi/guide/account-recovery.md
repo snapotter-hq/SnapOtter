@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: f3010aa11a7a
+i18n_output_hash: 48e08ae4f8b6
 i18n_hash_version: 2
 ---
 # Khôi phục tài khoản {#account-recovery}
@@ -82,8 +82,8 @@ Như một phương án cuối cùng trên bất kỳ phiên bản nào, hãy đ
 ảnh tất cả trong một, Postgres chạy bên trong container:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 Trên thiết lập nhiều container, hãy trỏ `psql` đến `DATABASE_URL` của riêng bạn.

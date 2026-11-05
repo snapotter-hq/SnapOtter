@@ -1,165 +1,165 @@
 ---
-description: "Esquema de la base de datos PostgreSQL, tablas, migraciones y procedimientos de copia de seguridad de SnapOtter."
-i18n_source_hash: 331b11cd21d1
+description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur backup untuk SnapOtter."
+i18n_source_hash: 2150213f21da
 i18n_provenance: machine
-i18n_output_hash: 98e6d1aeab16
+i18n_output_hash: bbb570fb5980
 i18n_hash_version: 2
 ---
 
-# Base de datos {#database}
+# Database {#database}
 
-SnapOtter usa PostgreSQL 17 con [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) para la persistencia de datos. El esquema se define en `apps/api/src/db/schema.ts`.
+SnapOtter memakai PostgreSQL 17 dengan [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) untuk persistensi data. Skemanya didefinisikan di `apps/api/src/db/schema.ts`.
 
-La conexión se configura mediante la variable de entorno `DATABASE_URL` (por defecto `postgres://snapotter:snapotter@postgres:5432/snapotter`). En Docker Compose, el contenedor de Postgres almacena sus datos en el volumen con nombre `SnapOtter-pgdata`. Las solicitudes se atienden con un rol que solo puede leer y escribir filas, algo que se detalla más abajo en [Roles de privilegio mínimo](#least-privilege-roles).
+Koneksi dikonfigurasi lewat environment variable `DATABASE_URL` (default `postgres://snapotter:snapotter@postgres:5432/snapotter`). Di Docker Compose, container Postgres menyimpan datanya di named volume `SnapOtter-pgdata`. Permintaan dilayani dengan role yang hanya dapat membaca dan menulis baris, yang dibahas di bawah [Least-privilege roles](#least-privilege-roles).
 
-## Tablas {#tables}
+## Tables {#tables}
 
 ### users {#users}
 
-Almacena las cuentas de usuario. Se crea automáticamente en el primer arranque a partir de `DEFAULT_USERNAME` y `DEFAULT_PASSWORD`.
+Menyimpan akun pengguna. Dibuat otomatis pada proses pertama dari `DEFAULT_USERNAME` dan `DEFAULT_PASSWORD`.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `username` | varchar | Único, obligatorio |
-| `passwordHash` | varchar | hash scrypt |
-| `role` | varchar | `admin`, `editor` o `user` |
-| `mustChangePassword` | boolean | Indicador de restablecimiento de contraseña forzado |
-| `createdAt` | timestamp | Momento de creación |
-| `updatedAt` | timestamp | Momento de última actualización |
+| `id` | uuid | Primary key |
+| `username` | varchar | Unik, wajib |
+| `passwordHash` | varchar | Hash scrypt |
+| `role` | varchar | `admin`, `editor`, atau `user` |
+| `mustChangePassword` | boolean | Flag reset password paksa |
+| `createdAt` | timestamp | Waktu pembuatan |
+| `updatedAt` | timestamp | Waktu pembaruan terakhir |
 
 ### sessions {#sessions}
 
-Sesiones de inicio de sesión activas. Cada fila vincula un token de sesión a un usuario.
+Sesi login yang aktif. Setiap baris mengaitkan token sesi dengan seorang pengguna.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | varchar | Clave primaria (token de sesión) |
-| `userId` | uuid | Clave foránea a `users.id` |
-| `expiresAt` | timestamp | Momento de expiración |
-| `createdAt` | timestamp | Momento de creación |
+| `id` | varchar | Primary key (token sesi) |
+| `userId` | uuid | Foreign key ke `users.id` |
+| `expiresAt` | timestamp | Waktu kedaluwarsa |
+| `createdAt` | timestamp | Waktu pembuatan |
 
 ### teams {#teams}
 
-Grupos para organizar usuarios. Los administradores pueden asignar usuarios a equipos.
+Grup untuk mengorganisasi pengguna. Admin dapat menetapkan pengguna ke team.
 
-| Columna | Tipo | Descripción |
+| Column | Type | Description |
 |--------|------|-------------|
-| `id` | uuid | Clave primaria |
-| `name` | varchar (único, máx. 50 caracteres) | Nombre del equipo |
-| `createdAt` | timestamp | Momento de creación |
+| `id` | uuid | Primary key |
+| `name` | varchar (unik, maks 50 karakter) | Nama team |
+| `createdAt` | timestamp | Waktu pembuatan |
 
 ### api_keys {#api-keys}
 
-Claves de API para acceso programático. La clave sin procesar se muestra una sola vez al crearla; solo se almacena el hash.
+API key untuk akses terprogram. Key mentah ditampilkan sekali saat pembuatan; hanya hash-nya yang disimpan.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `userId` | uuid | Clave foránea a `users.id` |
-| `keyHash` | varchar | hash scrypt de la clave |
-| `name` | varchar | Etiqueta proporcionada por el usuario |
-| `createdAt` | timestamp | Momento de creación |
-| `lastUsedAt` | timestamp | Actualizado en cada solicitud autenticada |
+| `id` | uuid | Primary key |
+| `userId` | uuid | Foreign key ke `users.id` |
+| `keyHash` | varchar | Hash scrypt dari key |
+| `name` | varchar | Label yang diberikan pengguna |
+| `createdAt` | timestamp | Waktu pembuatan |
+| `lastUsedAt` | timestamp | Diperbarui pada setiap permintaan terautentikasi |
 
-Las claves llevan el prefijo `si_` seguido de 96 caracteres hexadecimales (48 bytes aleatorios).
+Key diawali dengan `si_` diikuti 96 karakter hex (48 byte acak).
 
 ### pipelines {#pipelines}
 
-Cadenas de herramientas guardadas que los usuarios crean en la interfaz.
+Rantai tool tersimpan yang dibuat pengguna di UI.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `name` | varchar | Nombre del pipeline |
-| `description` | varchar | Descripción opcional |
-| `steps` | jsonb | Array de objetos `{ toolId, settings }` |
-| `createdAt` | timestamp | Momento de creación |
+| `id` | uuid | Primary key |
+| `name` | varchar | Nama pipeline |
+| `description` | varchar | Deskripsi opsional |
+| `steps` | jsonb | Array objek `{ toolId, settings }` |
+| `createdAt` | timestamp | Waktu pembuatan |
 
 ### user_files {#user-files}
 
-Biblioteca de archivos persistente. Una edición guardada se inserta de forma predeterminada como una fila raíz independiente ("guardar como nuevo": `version` 1, `parentId` null, de modo que el original sigue listado), o como una versión enlazada a su padre cuando sobrescribes el original (`parentId` establecido, `version` incrementado, reemplazándolo). La columna `toolChain` registra las herramientas aplicadas.
+Library file yang persisten. Hasil edit yang disimpan disisipkan sebagai baris root independen secara default ("save as new": `version` 1, `parentId` null, sehingga yang asli tetap terdaftar), atau sebagai versi yang tertaut ke parent saat Anda menimpa yang asli (`parentId` diatur, `version` ditambah, menggantikannya). Kolom `toolChain` mencatat tool yang diterapkan.
 
-| Columna | Tipo | Descripción |
+| Column | Type | Description |
 |--------|------|-------------|
-| `id` | uuid | Clave primaria |
-| `userId` | uuid | FK a users (CASCADE DELETE) |
-| `originalName` | varchar | Nombre de archivo original de la subida |
-| `storedName` | varchar | Nombre de archivo en disco |
-| `mimeType` | varchar | Tipo MIME |
-| `size` | integer | Tamaño del archivo en bytes |
-| `width` | integer | Ancho de la imagen en px |
-| `height` | integer | Alto de la imagen en px |
-| `version` | integer | Número de versión (1 = original) |
-| `parentId` | uuid o null | FK a user_files (versión padre) |
-| `toolChain` | jsonb | IDs de las herramientas aplicadas en orden para producir esta versión |
-| `createdAt` | timestamp | Momento de creación |
+| `id` | uuid | Primary key |
+| `userId` | uuid | FK ke users (CASCADE DELETE) |
+| `originalName` | varchar | Nama file unggahan asli |
+| `storedName` | varchar | Nama file di disk |
+| `mimeType` | varchar | Tipe MIME |
+| `size` | integer | Ukuran file dalam byte |
+| `width` | integer | Lebar gambar dalam px |
+| `height` | integer | Tinggi gambar dalam px |
+| `version` | integer | Nomor versi (1 = asli) |
+| `parentId` | uuid atau null | FK ke user_files (versi parent) |
+| `toolChain` | jsonb | Tool ID yang diterapkan secara berurutan untuk menghasilkan versi ini |
+| `createdAt` | timestamp | Waktu pembuatan |
 
 ### jobs {#jobs}
 
-Realiza el seguimiento de los trabajos de procesamiento para el reporte de progreso y la limpieza.
+Melacak job pemrosesan untuk pelaporan progres dan pembersihan.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `type` | varchar | Identificador de la herramienta o el pipeline |
-| `status` | varchar | `queued`, `processing`, `completed` o `failed` |
-| `progress` | real | Fracción de 0.0 a 1.0 |
-| `inputFiles` | jsonb | Array de rutas de archivos de entrada |
-| `outputPath` | varchar | Ruta al archivo de resultado |
-| `settings` | jsonb | Ajustes de la herramienta utilizados |
-| `error` | varchar | Mensaje de error si falló |
-| `createdAt` | timestamp | Momento de creación |
-| `completedAt` | timestamp | Momento de finalización |
+| `id` | uuid | Primary key |
+| `type` | varchar | Pengidentifikasi tool atau pipeline |
+| `status` | varchar | `queued`, `processing`, `completed`, atau `failed` |
+| `progress` | real | Pecahan 0.0-1.0 |
+| `inputFiles` | jsonb | Array path file input |
+| `outputPath` | varchar | Path ke file hasil |
+| `settings` | jsonb | Setting tool yang dipakai |
+| `error` | varchar | Pesan error jika gagal |
+| `createdAt` | timestamp | Waktu pembuatan |
+| `completedAt` | timestamp | Waktu selesai |
 
 ### settings {#settings}
 
-Almacén clave-valor para ajustes de todo el servidor que los administradores pueden cambiar desde la interfaz.
+Key-value store untuk setting seluruh server yang dapat diubah admin dari UI.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `key` | varchar | Clave primaria |
-| `value` | varchar | Valor del ajuste |
-| `updatedAt` | timestamp | Momento de última actualización |
+| `key` | varchar | Primary key |
+| `value` | varchar | Nilai setting |
+| `updatedAt` | timestamp | Waktu pembaruan terakhir |
 
 ### roles {#roles}
 
-Roles personalizados con permisos granulares.
+Custom role dengan izin yang granular.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `name` | varchar | Nombre de rol único |
-| `description` | varchar | Descripción opcional |
-| `permissions` | jsonb | Array de cadenas de permisos |
-| `createdAt` | timestamp | Momento de creación |
+| `id` | uuid | Primary key |
+| `name` | varchar | Nama role yang unik |
+| `description` | varchar | Deskripsi opsional |
+| `permissions` | jsonb | Array string izin |
+| `createdAt` | timestamp | Waktu pembuatan |
 
 ### audit_log {#audit-log}
 
-Registro de acciones relevantes para la seguridad.
+Log aksi yang relevan dengan keamanan.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | uuid | Clave primaria |
-| `userId` | uuid | FK a users |
-| `action` | varchar | Tipo de acción |
-| `details` | jsonb | Datos específicos de la acción |
-| `createdAt` | timestamp | Momento de la acción |
+| `id` | uuid | Primary key |
+| `userId` | uuid | FK ke users |
+| `action` | varchar | Tipe aksi |
+| `details` | jsonb | Data spesifik aksi |
+| `createdAt` | timestamp | Waktu aksi |
 
 ### user_preferences {#user-preferences}
 
-Estado de la interfaz por usuario, indexado por nombre de preferencia. Almacena las herramientas fijadas de la página de inicio, que se escriben a través de `PUT /api/v1/preferences`.
+State UI per pengguna, dengan key berupa nama preferensi. Mendukung tool yang disematkan di dashboard lewat `PUT /api/v1/preferences`.
 
-| Columna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `userId` | text | FK a users, con borrado en cascada. Clave primaria junto con `key` |
-| `key` | text | Nombre de la preferencia. Clave primaria junto con `userId` |
-| `value` | jsonb | Contenido de la preferencia |
-| `updatedAt` | timestamp | Última escritura |
+| `userId` | text | FK ke users, cascade saat delete. Primary key bersama `key` |
+| `key` | text | Nama preferensi. Primary key bersama `userId` |
+| `value` | jsonb | Payload preferensi |
+| `updatedAt` | timestamp | Penulisan terakhir |
 
-## Migraciones {#migrations}
+## Migrations {#migrations}
 
-Drizzle gestiona las migraciones del esquema. Los archivos de migración están en `apps/api/drizzle/`. Durante el desarrollo:
+Drizzle menangani migrasi skema. File migrasi berada di `apps/api/drizzle/`. Selama pengembangan:
 
 ```bash
 cd apps/api
@@ -167,53 +167,55 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-En producción, las migraciones pendientes se aplican automáticamente al arrancar.
+Di produksi, migrasi yang tertunda diterapkan otomatis saat startup.
 
-## Roles de privilegio mínimo {#least-privilege-roles}
+## Least-privilege roles {#least-privilege-roles}
 
-Dos roles, dos tareas. `DATABASE_URL` atiende las solicitudes y tiene `SELECT`, `INSERT`, `UPDATE`, `DELETE` sobre las tablas de la aplicación, además de `USAGE` y `SELECT` sobre sus secuencias. Esa es toda la lista. No puede crear ni eliminar una tabla, instalar una extensión, hacer `TRUNCATE`, leer `pg_authid`, crear una base de datos, modificar un rol ni tocar el esquema `drizzle`, donde reside el historial de migraciones.
+Dua role, dua tugas. `DATABASE_URL` melayani permintaan dan memegang `SELECT`, `INSERT`, `UPDATE`, `DELETE` pada tabel aplikasi plus `USAGE` dan `SELECT` pada sequence-nya. Hanya itu daftarnya. Ia tidak dapat membuat atau menghapus tabel, memasang extension, `TRUNCATE`, membaca `pg_authid`, membuat database, mengubah role, atau menyentuh schema `drizzle` tempat riwayat migrasi berada.
 
-`DATABASE_MIGRATION_URL` es el privilegiado. Ejecuta las migraciones y otorga los permisos al rol de ejecución durante el arranque, y luego se cierra antes de que se atienda una sola solicitud.
+`DATABASE_MIGRATION_URL` adalah yang istimewa. Ia menjalankan migrasi dan memberi grant ke role runtime saat boot, lalu ditutup sebelum satu permintaan pun dilayani.
 
-Compose y la imagen todo en uno ya vienen configurados así, incluidas las instalaciones existentes. Al arrancar, SnapOtter crea el rol de ejecución si falta, le otorga los permisos, migra y después extiende esos permisos a las tablas que ya estaban. Actualizar no requiere ningún SQL manual.
+Pemisahan ini dirilis di SnapOtter 2.3.0. Mulai rilis itu file Compose di dalam repo dan image all-in-one dikabelkan seperti ini, termasuk instalasi yang sudah ada: saat boot SnapOtter membuat role runtime jika belum ada, memberinya grant, menjalankan migrasi, lalu menyapu grant ke tabel yang sudah ada sebelumnya. Upgrade tidak memerlukan SQL manual.
 
-Si dejas `DATABASE_MIGRATION_URL` vacío, se ejecuta con un solo rol y `DATABASE_URL` hace ambas tareas igual que antes de la separación. Es una configuración admitida, no una obsoleta. Es la respuesta correcta en Postgres gestionado, donde a menudo crear roles no está en tus manos.
+Image 2.2.0 hanya membaca connection string runtime dan tidak pernah membuat role kedua, jadi jika Anda memberinya pemisahan ini ia tidak pernah naik: log aplikasi menunjukkan autentikasi password gagal untuk role itu, dan log Postgres menyatakan role tidak ada. Upgrade image ke 2.3.0 atau yang lebih baru sebelum Anda mengalihkan file Compose ke pemisahan ini.
 
-### Postgres externo y gestionado {#external-and-managed-postgres}
+Membiarkan `DATABASE_MIGRATION_URL` kosong menjalankan satu role, dengan `DATABASE_URL` mengerjakan kedua tugas persis seperti sebelum pemisahan. Itu adalah konfigurasi yang didukung, bukan yang usang. Itu jawaban yang tepat pada Postgres terkelola, tempat pembuatan role sering bukan wewenang Anda.
 
-En RDS, Supabase, Cloud SQL o cualquier clúster que administres tú mismo, la separación es opcional. Crea el rol de ejecución una sola vez:
+### External and managed Postgres {#external-and-managed-postgres}
+
+Di RDS, Supabase, Cloud SQL, atau cluster apa pun yang Anda jalankan sendiri, pemisahan ini bersifat opt-in. Buat role runtime sekali:
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
 
-Después pasa a SnapOtter ambas cadenas de conexión, apuntando al mismo host, puerto y base de datos:
+Lalu berikan kedua connection string kepada SnapOtter, menunjuk ke host, port, dan database yang sama:
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-Ahí termina el trabajo. SnapOtter aplica los permisos por su cuenta y los vuelve a aplicar después de cada migración, así que una tabla que añada una versión futura queda cubierta sin que nadie ejecute SQL para ello.
+Cukup sampai di situ. SnapOtter menerapkan grant sendiri dan menerapkannya ulang setelah setiap migrasi, sehingga tabel yang ditambahkan rilis mendatang tercakup tanpa ada yang menjalankan SQL untuknya.
 
-El rol de `DATABASE_MIGRATION_URL` tiene que ser el propietario de las tablas de SnapOtter, porque solo el propietario de una tabla puede otorgar permisos sobre ella. En una instalación existente eso significa el rol con el que has venido ejecutando SnapOtter, no uno nuevo creado para la ocasión. Si lo apuntas a un rol nuevo que no posee nada, el arranque falla con un error que dice exactamente esto. También necesita `CREATEROLE` para crear y mantener el rol de ejecución, y el derecho a crear el esquema `drizzle`.
+Role di `DATABASE_MIGRATION_URL` harus memiliki tabel SnapOtter, karena hanya pemilik tabel yang dapat memberi grant padanya. Pada instalasi yang sudah ada itu berarti role yang selama ini Anda pakai untuk menjalankan SnapOtter, bukan yang baru dibuat untuk keperluan ini. Arahkan ke role baru yang tidak memiliki apa pun dan boot gagal dengan error yang menyatakan persis hal ini. Role itu juga memerlukan `CREATEROLE` untuk membuat dan memelihara role runtime, dan hak untuk membuat schema `drizzle`.
 
-Si nombras el mismo rol en ambas URL, la separación queda desactivada, y SnapOtter lo dice en el registro en lugar de fingir lo contrario. Si tu proveedor no te da ningún rol que pueda a la vez ser propietario de las tablas y tener `CREATEROLE`, ejecuta con un solo rol.
+Sebut role yang sama di kedua URL dan pemisahan dimatikan, dan SnapOtter menyatakannya di log alih-alih berpura-pura sebaliknya. Jika penyedia Anda tidak memberi role yang dapat sekaligus memiliki tabel dan memegang `CREATEROLE`, jalankan satu role.
 
-### Por qué no se toca el bit de superusuario {#why-the-superuser-bit-is-left-alone}
+### Why the superuser bit is left alone {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter nunca quita `SUPERUSER` de un rol por su cuenta. En una instalación creada antes de la separación, `snapotter` es el único superusuario del clúster, y degradarlo dejaría al clúster sin ninguno, algo recuperable solo mediante el modo monousuario con el servidor detenido. Lo que aporta la protección es mover la conexión de larga duración al rol restringido. El superusuario está en la línea durante los pocos segundos del arranque y luego desaparece.
+SnapOtter tidak pernah mencabut `SUPERUSER` dari sebuah role dengan sendirinya. Pada instalasi yang dibuat sebelum pemisahan, `snapotter` adalah satu-satunya superuser cluster, dan menurunkannya akan membuat cluster tanpa superuser, yang hanya dapat dipulihkan lewat single-user mode dengan server dihentikan. Memindahkan koneksi berumur panjang ke role terbatas itulah yang memberi perlindungan. Superuser berada di jalur koneksi hanya selama beberapa detik saat boot lalu hilang.
 
-Las instalaciones todo en uno nuevas nunca tienen ese problema. Reciben tres roles: `postgres` (superusuario de arranque, ausente de todas las cadenas de conexión que usa SnapOtter), `snapotter` (`NOSUPERUSER`, es propietario de los datos, se conecta solo al arrancar) y `snapotter_app` (solo filas, atiende las solicitudes).
+Instalasi all-in-one yang baru tidak pernah mengalami masalah itu. Mereka mendapat tiga role: `postgres` (superuser bootstrap, tidak ada di connection string mana pun yang dipakai SnapOtter), `snapotter` (`NOSUPERUSER`, memiliki data, terhubung hanya saat boot), dan `snapotter_app` (hanya baris, melayani permintaan).
 
-Para degradar de todos modos un `snapotter` antiguo, crea primero un segundo superusuario e inicia sesión con él para confirmar que funciona. Después, `ALTER ROLE snapotter NOSUPERUSER`.
+Untuk tetap menurunkan `snapotter` yang lebih lama, buat superuser kedua terlebih dahulu dan login sebagai dia untuk memastikan berfungsi. Lalu `ALTER ROLE snapotter NOSUPERUSER`.
 
-## Copia de seguridad y restauración {#backup-and-restore}
+## Backup and restore {#backup-and-restore}
 
-La base de datos relacional reside en el volumen `SnapOtter-pgdata` del contenedor de Postgres, no en el volumen `/data` de la aplicación.
+Database relasional berada di volume `SnapOtter-pgdata` milik container Postgres, bukan volume `/data` milik aplikasi.
 
-**Copia de seguridad lógica con validación (recomendado)**
+**Backup logis dengan validasi (disarankan)**
 
 ```bash
 # Dump into PostgreSQL's portable custom archive format
@@ -228,11 +230,11 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Ambos comandos se conectan como `snapotter`, el propietario, y deberían seguir haciéndolo. El rol de ejecución no puede ver el esquema `drizzle`, así que un volcado tomado con ese rol saldría incompleto. `--no-owner` deja los objetos restaurados en manos de quien ejecute la restauración, de modo que hacerlo como propietario deja la propiedad donde los permisos la esperan. Un detalle en un clúster nuevo: `pg_dump` lleva los permisos pero no los roles a los que nombran, así que crea `snapotter_app` antes de restaurar o `--exit-on-error` se detendrá en el primer `GRANT`. SnapOtter vuelve a aplicar los permisos en su siguiente arranque de todos modos.
+Kedua perintah terhubung sebagai `snapotter`, sang pemilik, dan sebaiknya tetap begitu. Role runtime tidak dapat melihat schema `drizzle`, sehingga dump yang diambil sebagai role itu akan tidak lengkap. `--no-owner` membiarkan objek yang dipulihkan dimiliki oleh siapa pun yang menjalankan restore, jadi menjalankannya sebagai pemilik menempatkan kepemilikan sesuai harapan grant. Satu hal pada cluster baru: `pg_dump` membawa grant tetapi tidak role yang disebutnya, jadi buat `snapotter_app` sebelum restore atau `--exit-on-error` berhenti pada `GRANT` pertama. SnapOtter menerapkan ulang grant pada boot berikutnya apa pun yang terjadi.
 
-Este volcado de base de datos no contiene objetos de biblioteca guardados en `/data/files` ni en estado BullMQ duradero en Redis. Realice una copia de seguridad y restaure aquellos con el procedimiento coordinado en [Seguridad y refuerzo](/es/guide/security#backup-and-recovery).
+Dump database ini tidak berisi objek library tersimpan di `/data/files` atau state BullMQ yang tahan lama di Redis. Cadangkan dan pulihkan keduanya dengan prosedur terkoordinasi di [Security & Hardening](/es/guide/security#backup-and-recovery).
 
-**Instantánea del volumen frío**
+**Snapshot volume dingin**
 
 ```bash
 # Stop every service first, then use your storage platform to snapshot the
@@ -240,8 +242,8 @@ Este volcado de base de datos no contiene objetos de biblioteca guardados en `/d
 docker compose -f docker/docker-compose.yml stop
 ```
 
-No copie un directorio de datos de PostgreSQL activo con `tar`. Redacte los nombres de los volúmenes con prefijos por proyecto, de modo que resuelva los ID de los volúmenes montados desde `docker inspect` o su plataforma de almacenamiento en lugar de asumir la etiqueta literal `SnapOtter-pgdata`.
+Jangan menyalin direktori data PostgreSQL yang sedang berjalan dengan `tar`. Compose memberi prefix project pada nama volume, jadi tentukan ID volume yang ter-mount dari `docker inspect` atau platform storage Anda alih-alih mengasumsikan label literal `SnapOtter-pgdata`.
 
-### Migrar desde 1.x (SQLite) {#migrating-from-1-x-sqlite}
+### Migrating from 1.x (SQLite) {#migrating-from-1-x-sqlite}
 
-Actualizar desde SnapOtter 1.x tiene su propia guía: consulta [Actualizar de 1.x a 2.0](./upgrading). En resumen, reutiliza tu volumen `/data` existente y 2.0 detecta e importa automáticamente `/data/snapotter.db` en el primer arranque (o define `SQLITE_MIGRATE_PATH` para apuntar a él explícitamente). Haz primero una copia de seguridad de todo el volumen `/data`, no solo de `snapotter.db`: 1.x usa el modo WAL de SQLite, por lo que un contenedor detenido suele dejar la mayor parte de sus datos en `snapotter.db-wal` junto a un `snapotter.db` casi vacío.
+Upgrade dari SnapOtter 1.x punya panduan tersendiri: lihat [Upgrading from 1.x to 2.0](./upgrading). Singkatnya, pakai ulang volume `/data` Anda yang ada dan 2.0 mendeteksi otomatis dan mengimpor `/data/snapotter.db` saat first boot (atau atur `SQLITE_MIGRATE_PATH` untuk menunjuknya secara eksplisit). Cadangkan seluruh volume `/data` terlebih dahulu, bukan hanya `snapotter.db`: 1.x memakai mode WAL SQLite, jadi container yang dihentikan sering meninggalkan sebagian besar datanya di `snapotter.db-wal` di samping `snapotter.db` yang hampir kosong.

@@ -29,8 +29,11 @@ import { dirname, join, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
+  buildInstallerEnv,
+  buildOfflineInstallerEnv,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
+  resolveAiVenvPath,
   selectOcrRuntimeTarget,
 } from "@snapotter/ai";
 import type { FeatureBundleState, FeatureStatus } from "@snapotter/shared";
@@ -179,11 +182,11 @@ const BAKED_BASE_VENV = "/opt/venv";
 const RESEED_SCRIPT = "/usr/local/bin/reseed-ai-venv.sh";
 
 /**
- * True where AI bundles are installed on demand into a shared venv we manage:
- * the official image, and native installs (bare metal, the community-scripts
- * LXC) that point FEATURE_MANIFEST_PATH at a manifest. False on a plain dev
- * checkout, where the developer's own venv already has the ML packages and
- * every bundle reports as installed.
+ * True in a container, or wherever a feature manifest exists. The default
+ * manifest path is docker/feature-manifest.json, which every checkout has, so
+ * this is true on a dev checkout too; only a FEATURE_MANIFEST_PATH pointing at
+ * a missing file makes it false. Bundle status and the tool gates both read
+ * installed.json regardless, so this only decides whether ensureAiDirs() runs.
  */
 export function isManagedAiEnvironment(): boolean {
   return existsSync("/.dockerenv") || existsSync(MANIFEST_PATH);
@@ -198,7 +201,7 @@ export function isManagedAiEnvironment(): boolean {
  * configured manifest as proof of a baked base is what left native installs
  * with an empty venv after a reset (issue #796). The script has to be checked
  * too, because /opt/venv is also where a native install puts its own venv when
- * PYTHON_VENV_PATH is unset (see venvPath in routes/features.ts).
+ * PYTHON_VENV_PATH is unset (see resolveAiVenvPath in @snapotter/ai).
  */
 function canReseedFromBakedBase(): boolean {
   return existsSync(RESEED_SCRIPT) && existsSync(BAKED_BASE_VENV);
@@ -206,7 +209,7 @@ function canReseedFromBakedBase(): boolean {
 
 /** The venv bundle installs write into, and the dispatcher runs python from. */
 function sharedVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || join(AI_DIR, "venv");
+  return resolveAiVenvPath();
 }
 
 // ── installed.json cache ────────────────────────────────────────────────
@@ -382,6 +385,7 @@ function acquireKernelInstallLock(fd: number): boolean {
         {
           stdio,
           timeout: 5_000,
+          env: buildInstallerEnv(),
         },
       )
     : spawnSync(
@@ -394,7 +398,7 @@ try:
 except BlockingIOError:
     sys.exit(${LOCK_BUSY_EXIT_CODE})`,
         ],
-        { stdio, timeout: 5_000 },
+        { stdio, timeout: 5_000, env: buildInstallerEnv() },
       );
 
   if (result.error) throw result.error;
@@ -1927,6 +1931,7 @@ export async function importBundleArchive(
               stdio: ["ignore", "pipe", "pipe", installLockFd],
               timeout: 30_000,
               encoding: "utf-8",
+              env: buildOfflineInstallerEnv(),
             },
           );
           if (uninst.error || uninst.status !== 0) {
@@ -2042,7 +2047,12 @@ function resolveVenvSitePackages(venvPath: string): string {
   const result = spawnSync(
     join(venvPath, "bin", "python3"),
     ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
-    { stdio: ["ignore", "pipe", "pipe"], timeout: 10_000, encoding: "utf-8" },
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10_000,
+      encoding: "utf-8",
+      env: buildOfflineInstallerEnv(),
+    },
   );
   if (result.error || result.status !== 0 || !result.stdout?.trim()) {
     const detail =
@@ -2145,6 +2155,7 @@ function installFixupWheel(
       stdio: ["ignore", "pipe", "pipe", installLockFd],
       timeout: 30_000,
       encoding: "utf-8",
+      env: buildOfflineInstallerEnv({ PIP_NO_INDEX: "1" }),
     },
   );
   if (result.error || result.status !== 0) {
@@ -2181,13 +2192,14 @@ function verifyBundleSmokeImports(
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 60_000,
       encoding: "utf-8",
-      env: {
-        ...process.env,
+      // The imported archive is user-supplied and its code runs here (and via
+      // any .pth it ships, in every later venv child), so never hand it process.env.
+      env: buildOfflineInstallerEnv({
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONNOUSERSITE: "1",
         HF_HUB_OFFLINE: "1",
         TRANSFORMERS_OFFLINE: "1",
-      },
+      }),
     });
     if (result.error || result.status !== 0) {
       const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";

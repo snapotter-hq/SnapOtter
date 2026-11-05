@@ -1,24 +1,18 @@
 ---
-description: "Deploy SnapOtter ke produksi dengan Docker. Persyaratan perangkat keras, penyiapan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 4cae787c775e
-i18n_provenance: human
-i18n_output_hash: 37d1789c3f28
+description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
+i18n_source_hash: 3821f105f4ba
+i18n_provenance: machine
+i18n_output_hash: 793e62190df2
 i18n_hash_version: 2
 ---
 
 # Deployment {#deployment}
 
-SnapOtter diterapkan sebagai stack Docker Compose 3 kontainer: image aplikasi SnapOtter, PostgreSQL 17, dan Redis 8. Image aplikasi mendukung **linux/amd64** (dengan NVIDIA CUDA untuk akselerasi AI) dan **linux/arm64** (CPU), sehingga berjalan secara native di server Intel/AMD, Mac Apple Silicon, dan perangkat ARM seperti Raspberry Pi 4/5. Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI.
+SnapOtter di-deploy sebagai stack Docker Compose dengan 3 kontainer: image aplikasi SnapOtter, PostgreSQL 17, dan Redis 8. Image aplikasi mendukung **linux/amd64** (dengan NVIDIA CUDA untuk akselerasi AI) dan **linux/arm64** (CPU), sehingga berjalan secara native di server Intel/AMD, Mac Apple Silicon, dan perangkat ARM seperti Raspberry Pi 4/5. Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI.
 
-Lihat [Docker Image](./docker-tags) untuk penyiapan GPU, contoh Docker Compose, dan penyematan versi.
+Lihat [Image Docker](./docker-tags) untuk pengaturan GPU, contoh Docker Compose, dan penyematan versi.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Kompatibilitas OCR bahasa Korea
-OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) maupun bahasa Arab (`ar`). Keduanya memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea atau Arab dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
-## Quick Start (CPU) {#quick-start-cpu}
+## Mulai Cepat (CPU) {#quick-start-cpu}
 
 ```yaml
 # docker-compose.yml - Copy this file and run: docker compose up -d
@@ -38,7 +32,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -53,6 +51,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -116,11 +125,13 @@ docker compose up -d
 
 Aplikasi kemudian tersedia di `http://localhost:1349`.
 
-> **Terkena batas laju Docker Hub?** Ganti `snapotter/snapotter:latest` dengan `ghcr.io/snapotter-hq/snapotter:latest` untuk menarik dari GitHub Container Registry sebagai gantinya. Kedua registry menerima image yang sama pada setiap rilis.
+Stack di atas terhubung sebagai pemilik database. Mulai SnapOtter 2.3.0, Anda dapat melayani permintaan dengan role yang hanya membaca dan menulis baris; lihat [Role dengan hak akses minimum](./database#least-privilege-roles).
 
-## Quick Start (NVIDIA CUDA) {#quick-start-nvidia-cuda}
+> **Terkena batas laju Docker Hub?** Ganti `snapotter/snapotter:latest` dengan `ghcr.io/snapotter-hq/snapotter:latest` untuk mengunduh dari GitHub Container Registry. Kedua registry menerima image yang sama pada setiap rilis.
 
-Untuk akselerasi NVIDIA CUDA pada alat AI yang didukung (penghapusan latar belakang, peningkatan skala, penyempurnaan wajah):
+## Mulai Cepat (NVIDIA CUDA) {#quick-start-nvidia-cuda}
+
+Untuk akselerasi NVIDIA CUDA pada alat AI yang didukung (penghapusan latar belakang, upscaling, peningkatan wajah):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -138,8 +149,18 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,14 +191,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -217,36 +241,36 @@ docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-Jika alat AI berjalan di CPU meskipun `--gpus all` dan NVIDIA Container Toolkit telah dikonfigurasi dengan benar, instal ulang bundel yang terpengaruh (misalnya Penghapusan Latar Belakang) dari **Pengaturan → Fitur AI**. Penginstal memulihkan build GPU ONNX Runtime, yang mana build khusus CPU yang ditarik oleh bundel lain (seperti transkripsi) dapat membayangi lingkungan AI bersama. Jika menginstal ulang dari UI tidak memulihkan GPU pada image lama, lihat perbaikan manual di [masalah #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
+Jika alat AI berjalan di CPU padahal `--gpus all` dan NVIDIA Container Toolkit sudah diatur dengan benar, instal ulang bundel yang terdampak (misalnya Background Removal) dari **Settings → AI Features**. Penginstal memulihkan build GPU dari ONNX Runtime, yang bisa tertutup oleh build khusus CPU yang dibawa bundel lain (seperti transkripsi) di lingkungan AI bersama. Jika instal ulang dari UI tidak memulihkan GPU pada image yang lebih lama, lihat perbaikan manual di [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
-## Persyaratan Perangkat Keras {#hardware-requirements}
+## Kebutuhan Perangkat Keras {#hardware-requirements}
 
-Angka-angka ini berasal dari benchmark di berbagai sistem, mulai dari workstation amd64 modern dengan NVIDIA RTX 4070 hingga Raspberry Pi, menjalankan seluruh katalog perkakas pada masing-masing dan menyapu batas sumber daya Docker untuk menemukan batas bawah yang sebenarnya.
+Angka-angka ini berasal dari benchmark pada berbagai sistem, mulai dari workstation amd64 modern dengan NVIDIA RTX 4070 hingga Raspberry Pi, dengan menjalankan seluruh katalog alat pada masing-masing sistem dan menyapu batas sumber daya Docker untuk menemukan batas bawah yang sebenarnya.
 
-Berjalan di ujung kecil tingkatan ini (Pi, laptop lama, VPS 2 GB)? [Penyiapan Sumber Daya Rendah](/id/guide/low-resource) mengubah angka-angka ini menjadi panduan konkret dengan batas yang sudah disetel.
+Menjalankan di ujung bawah tier ini (Pi, laptop lama, VPS 2 GB)? [Pengaturan Sumber Daya Rendah](/id/guide/low-resource) mengubah angka-angka ini menjadi panduan konkret dengan batas yang sudah disetel.
 
-### Referensi Singkat {#quick-reference}
+### Referensi Cepat {#quick-reference}
 
-| Tingkat | Kasus Penggunaan | CPU | RAM | GPU | Penyimpanan |
+| Tier | Kasus Penggunaan | CPU | RAM | GPU | Penyimpanan |
 |------|----------|-----|-----|-----|---------|
-| Minimum | Perkakas gambar, file, dan PDF ringan; satu pengguna; batch kecil | 2 core | 2 GB | Tidak ada | ~7 GB |
-| Direkomendasikan | Kelima modalitas termasuk video, PDF, dan AI di CPU; batch; beberapa pengguna | 4 core | 4 GB | Tidak ada | ~25 GB |
-| Penuh | Semuanya dengan kecepatan termasuk AI GPU; batch besar; banyak pengguna | 6-8 core | 8 GB | NVIDIA 8 GB+ VRAM (12 GB nyaman) | ~35 GB |
+| Minimum | Alat non-AI (gambar, file, PDF ringan) ditambah Fast OCR bawaan dan deteksi wajah; satu pengguna; batch kecil | 2 core | 2 GB | Tidak ada | ~7 GB |
+| Direkomendasikan | Kelima modalitas termasuk video, PDF, dan bundel AI standar di CPU; batch; beberapa pengguna | 4 core | 4 GB (8 GB untuk inpainting HQ) | Tidak ada | ~25 GB |
+| Penuh | Semuanya dengan cepat termasuk AI GPU; batch besar; banyak pengguna | 6-8 core | 8 GB | NVIDIA VRAM 8 GB+ (12 GB nyaman) | ~35 GB |
 
-**Arsitektur: hanya 64-bit** (`linux/amd64` atau `linux/arm64`). SnapOtter berjalan secara native di server Intel/AMD, Mac Apple Silicon, dan board ARM 64-bit termasuk **Raspberry Pi 4 dan 5** (4-8 GB). SnapOtter **tidak** berjalan di ARM 32-bit (`armv7`/`armhf`), tidak ada image yang dibuat untuknya, maupun di board kelas 512 MB seperti Pi Zero, yang berada di bawah batas bawah memori (lihat di bawah).
+**Arsitektur: hanya 64-bit** (`linux/amd64` atau `linux/arm64`). SnapOtter berjalan secara native di server Intel/AMD, Mac Apple Silicon, dan board ARM 64-bit termasuk **Raspberry Pi 4 dan 5** (4-8 GB). SnapOtter **tidak** berjalan di ARM 32-bit (`armv7`/`armhf`), karena tidak ada image yang dibuat untuknya, dan juga tidak di board kelas 512 MB seperti Pi Zero, yang berada di bawah batas memori (lihat di bawah).
 
-### Minimum (perkakas gambar, file, dan PDF ringan; tanpa AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
+### Minimum (alat gambar, file, dan PDF ringan; tanpa AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
-| Sumber Daya | Persyaratan |
+| Sumber daya | Kebutuhan |
 |---|---|
 | CPU | 2 core |
 | RAM | 2 GB |
-| Disk | ~5.5 GB (image) + volume data |
+| Disk | ~5,5 GB (image) + volume data |
 | GPU | Tidak diperlukan |
 
-Semua 222 perkakas katalog non-AI, yaitu gambar (resize, crop, convert, compress, adjust, watermark), video (trim, mute, remux), audio (convert, normalize, trim), PDF (merge, split, compress, rotate, protect), konversi file, dan preset konversi khusus, berjalan pada perangkat keras sederhana. Sebagian besar operasi selesai jauh di bawah satu detik bahkan pada file besar: gambar 2.7 MB diubah ukurannya dalam ~0.05 d dan dikodekan ulang ke WebP dalam ~2 d.
+Seluruh 222 alat katalog non-AI - gambar (ubah ukuran, pangkas, konversi, kompres, sesuaikan, watermark), video (potong, bisukan, remux), audio (konversi, normalisasi, potong), PDF (gabung, pisah, kompres, putar, lindungi), konversi file, dan preset konversi khusus - berjalan pada perangkat keras sederhana. Sebagian besar operasi selesai dalam waktu kurang dari satu detik bahkan pada file besar: gambar 2,7 MB diubah ukurannya dalam ~0,05 dtk dan di-encode ulang ke WebP dalam ~2 dtk.
 
-Batas bawah memori itu nyata, dari penyapuan batas sumber daya Docker: **512 MB tidak dapat memulai stack** (bahkan satu resize gambar pun dihentikan), **1 GB** menangani operasi satu file tetapi batch multi-file kehabisan memori, dan **2 GB / 2 core** adalah konfigurasi terkecil yang menangani batch dengan nyaman.
+Batas bawah memori ini nyata, berdasarkan penyapuan batas sumber daya Docker: **512 MB tidak dapat menjalankan stack** (bahkan satu perubahan ukuran gambar pun dihentikan), **1 GB** menangani operasi satu file tetapi batch multi-file kehabisan memori, dan **2 GB / 2 core** adalah konfigurasi terkecil yang menangani batch non-AI dengan nyaman. Fast OCR bawaan dan bundel `face-detection` juga muat dalam 2 GB, sedangkan bundel AI yang lebih besar (Whisper, LaMa/DDColor, rembg, RealESRGAN, restorasi foto, dan inpainting HQ SD1.5) membutuhkan RAM 4 hingga 8 GB dan langsung ditolak jika memori bebas di bawah batas bawah per bundel.
 
 ```yaml
 deploy:
@@ -256,52 +280,53 @@ deploy:
       memory: 2G
 ```
 
-**Satu-satunya pengecualian yang berat CPU adalah pengkodean ulang video.** Operasi stream-copy (trim, mute, remux kontainer) instan, tetapi transcoding ke codec berbeda bergantung pada CPU. Klip 1080p / 45 detik yang dikodekan ulang ke VP9 (WebM) memakan waktu kira-kira **~40 d** pada CPU modern yang cepat, ~45 d di Apple Silicon, ~80 d pada 4-core mobile lama, dan **~130 d** pada server 4-core lama. Jika beban kerja Anda banyak video, prioritaskan core CPU dan kecepatan clock, atau naikkan batas `cpus:` kontainer. Compose yang disertakan membatasi aplikasi pada 4 core secara default (8 pada compose GPU).
+**Satu-satunya pengecualian yang berat di CPU adalah encoding ulang video.** Operasi stream-copy (potong, bisukan, remux kontainer) berlangsung instan, tetapi transcoding ke codec lain bergantung pada CPU. Klip 1080p / 45 detik yang di-encode ulang ke VP9 (WebM) memakan waktu sekitar **~40 dtk** pada CPU modern yang cepat, ~45 dtk pada Apple Silicon, ~80 dtk pada 4-core mobile yang lebih lama, dan **~130 dtk** pada server 4-core yang lebih lama. Jika beban kerja Anda banyak melibatkan video, prioritaskan jumlah core dan kecepatan clock CPU, atau naikkan batas `cpus:` kontainer, karena compose bawaan membatasi aplikasi pada 4 core secara default (8 pada compose GPU).
 
-### Direkomendasikan (perkakas AI di CPU) {#recommended-ai-tools-on-cpu}
+### Direkomendasikan (alat AI di CPU) {#recommended-ai-tools-on-cpu}
 
-| Sumber Daya | Persyaratan |
+| Sumber daya | Kebutuhan |
 |---|---|
 | CPU | 4 core |
 | RAM | 4 GB |
-| Disk | 3 GB (gambar) + sekitar 20 GB (semua paket AI opsional) + ruang kerja |
-| GPU | Tidak diperlukan (fallback CPU) |
+| Disk | 3 GB (image) + sekitar 20 GB (semua paket AI opsional) + workspace |
+| GPU | Tidak diperlukan (fallback ke CPU) |
 
-**Menginstal dan menjalankan paket AI yang lebih besar mendorong rekomendasi RAM menjadi 4 GB.** Tanpa paket opsional yang diinstal, aplikasi menganggur sekitar 360 MB. Alat Python yang lama berbagi sidecar, sedangkan OCR yang akurat menggunakan dispatcher khusus yang berumur panjang yang disematkan pada generasi aktif yang tidak dapat diubah. Sebelum aktivasi, penginstal menjalankan smoke test pada kandidat. Kemudian secara atom beralih ke dispatcher baru dan menguras dispatcher sebelumnya sebelum garbage collection. Setiap artefak OCR akurat resmi harus melewati release suite kasus terburuknya di dalam 4 GiB cgroup, sedangkan rekomendasi host 4 GB memberikan ruang utama untuk aplikasi Node.js, Postgres, Redis, antrean, dan pekerjaan bersamaan.
+**Menginstal dan menjalankan bundel AI yang lebih besar adalah alasan rekomendasi naik ke RAM 4 GB.** Tanpa paket opsional terpasang, aplikasi idle di sekitar 360 MB. Alat Python lama berbagi satu sidecar, sedangkan OCR akurat menggunakan dispatcher berumur panjang khusus yang disematkan pada generasi immutable yang aktif. Sebelum aktivasi, penginstal menjalankan smoke test pada kandidat. Kemudian penginstal beralih secara atomik ke dispatcher baru dan menguras dispatcher sebelumnya sebelum garbage collection. Setiap artefak OCR akurat resmi harus lulus suite rilis kasus terburuknya di dalam cgroup 4 GiB, sedangkan rekomendasi host 4 GB menyisakan ruang untuk aplikasi Node.js, Postgres, Redis, antrean, dan pekerjaan konkuren.
 
-Sebagian besar perkakas AI sepenuhnya dapat digunakan di CPU; beberapa benar-benar menginginkan GPU. Diukur pada CPU 4-core modern:
+Sebagian besar alat AI sangat layak digunakan di CPU; beberapa benar-benar membutuhkan GPU. Diukur pada CPU 4-core modern:
 
-| Perkakas AI | Waktu CPU | Dapat digunakan di CPU? |
+| Alat AI | Waktu CPU | Layak di CPU? |
 |---|---|---|
-| Deteksi wajah (blur-faces, smart-crop, red-eye), noise-removal | di bawah 1 d | Ya |
-| OCR, transkripsi, subtitle | 1-3 d | Ya |
-| Colorize, penyempurnaan wajah | ~10 d | Ya |
-| Penghapusan / penggantian / blur latar belakang | ~29 d | Ya (Anda akan menunggu) |
-| AI upscale (RealESRGAN) | ~33 d kecil; menit pada gambar besar | Marginal, GPU sangat direkomendasikan |
-| Restorasi foto (pipeline penuh) | beberapa menit | Tidak, butuh GPU atau CPU banyak-core yang cepat |
+| Deteksi wajah (blur-faces, smart-crop, red-eye), noise-removal | di bawah 1 dtk | Ya |
+| OCR, transkripsi, subtitle | 1-3 dtk | Ya |
+| Colorize, peningkatan wajah | ~10 dtk | Ya |
+| Penghapusan / penggantian / blur latar belakang | ~29 dtk | Ya (Anda harus menunggu) |
+| Upscale AI (RealESRGAN) | ~33 dtk untuk gambar kecil; beberapa menit untuk gambar besar | Kurang memadai, GPU sangat disarankan |
+| Restorasi foto (pipeline penuh) | beberapa menit | Tidak, butuh GPU atau CPU many-core yang cepat |
 
-SnapOtter sengaja tidak memasukkan unduhan model ini ke dalam image Docker. Bundle AI ditarik hanya ketika admin mengaktifkan perkakas terkait, disimpan di volume `/data/ai` yang persisten, dan dibagi oleh setiap perkakas yang bergantung pada stack model yang sama. Ini menjaga image kontainer akhir tetap kecil sekaligus tetap memungkinkan instalasi AI penuh mencapai angka penyimpanan yang lebih besar di bawah.
+SnapOtter sengaja tidak menyertakan unduhan model ini di dalam image Docker. Bundel AI hanya diunduh ketika admin mengaktifkan alat terkait, disimpan di volume `/data/ai` yang persisten, dan dibagikan oleh setiap alat yang bergantung pada tumpukan model yang sama. Ini menjaga ukuran image kontainer akhir tetap kecil sambil tetap memungkinkan instalasi AI penuh mencapai angka penyimpanan yang lebih besar di bawah.
 
-Beberapa perkakas bergantung pada lebih dari satu bundle bersama. Misalnya, Passport Photo membutuhkan `background-removal` dan `face-detection`; jika `background-removal` sudah terpasang, mengaktifkan Passport Photo hanya mengunduh bundle `face-detection` yang hilang. Penggunaan ulang yang sama berlaku di semua perkakas AI.
+Beberapa alat bergantung pada lebih dari satu bundel bersama. Misalnya, Passport Photo membutuhkan `background-removal` dan `face-detection`; jika `background-removal` sudah terpasang, mengaktifkan Passport Photo hanya mengunduh bundel `face-detection` yang belum ada. Penggunaan ulang yang sama berlaku untuk semua alat AI.
 
-Perkiraan penyimpanan paket AI opsional:
+Penyimpanan paket AI opsional dan batas bawah memori CPU (SnapOtter memeriksa memori yang tersedia sebelum mengirim ke sidecar Python dan langsung menolak proses di bawah batas memori bebas bundel):
 
-| Bundle | Ukuran Disk |
-|---|---|
-| Penghapusan latar belakang | 4-5 GB |
-| Upscale + Penyempurnaan wajah + Penghapusan noise | 5-6 GB |
-| Deteksi wajah | 200-300 MB |
-| Object eraser + Colorize | 1-2 GB |
-| OCR yang akurat (`balanced`/`best`) | ~208-234 unduhan MiB / ~409-488 MiB terpasang |
-| Restorasi foto | 4-5 GB |
-| Transkripsi | ~600 MB |
-| **Semua paket** | **~20 GB terpasang** |
+| Bundel | Ukuran Disk | Batas Bawah Memori CPU |
+|---|---|---|
+| Deteksi wajah | 200-300 MB | RAM host 2 GB (~0,5 GB bebas) |
+| Transkripsi | ~600 MB | RAM host 4 GB (~2 GB bebas) |
+| Object eraser + Colorize | 1-2 GB | RAM host 4 GB (~2 GB bebas) |
+| OCR akurat (`balanced`/`best`) | unduhan ~208-234 MiB / terpasang ~409-488 MiB | Memori efektif terkonfigurasi 4 GiB (`fast` berjalan di 2 GB) |
+| Penghapusan latar belakang | 4-5 GB | RAM host 4 GB (~2,5 GB bebas) |
+| Upscale + Peningkatan wajah + Penghilangan noise | 5-6 GB | RAM host 4 GB (~2,5 GB bebas) |
+| Restorasi foto | 4-5 GB | RAM host 4 GB (~3 GB bebas) |
+| Inpainting Kualitas Tinggi (`inpaint-hq`) | 5-7 GB | RAM host 8 GB (~6 GB bebas) |
+| **Semua bundel** | **~25 GB terpasang** | **4 GB (8 GB dengan `inpaint-hq`)** |
 
-OCR yang cepat dimasukkan ke dalam gambar melalui Tesseract, menambahkan sekitar 25 MiB, dan tidak memerlukan paket OCR opsional atau persyaratan memori 4 GiB. Paket akurat tersedia dalam wadah resmi Linux amd64 dan arm64 dan menjalankan ONNX Runtime di CPU. Host NVIDIA menggunakan runtime CPU OCR yang sama, sehingga OCR tidak bergantung pada versi CUDA atau arsitektur GPU. Runtime yang akurat memerlukan setidaknya 4 GiB memori efektif: batas cgroup kontainer yang dikonfigurasi, jika tidak, memori host. SnapOtter menolak sistem di bawah minimum kompatibilitas yang ditandatangani sebelum mengunduh paket. Instalasi paket akurat juga ditolak pada arsip bare-metal/prebuilt yang libc dan Python ABI tidak dapat dijamin.
+Fast OCR sudah tertanam di image melalui Tesseract, menambah sekitar 25 MiB, dan tidak memerlukan paket OCR opsional maupun kebutuhan memori 4 GiB-nya. Fast mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) atau Arab (`ar`). Keduanya menggunakan `balanced` atau `best` sehingga memerlukan paket akurat. Paket akurat tersedia di kontainer Linux amd64 dan arm64 resmi dan menjalankan ONNX Runtime di CPU. Host NVIDIA menggunakan runtime OCR CPU yang sama, sehingga OCR tidak bergantung pada versi CUDA atau arsitektur GPU. Runtime akurat membutuhkan memori efektif minimal 4 GiB: batas cgroup kontainer yang dikonfigurasi, atau jika tidak ada, memori host. SnapOtter menolak sistem di bawah minimum kompatibilitas bertanda tangan tersebut sebelum mengunduh paket. Instalasi paket akurat juga ditolak pada arsip bare-metal/prebuilt yang libc dan ABI Python-nya tidak dapat dijamin. Pada host yang tidak didukung itu, OCR Korea dan Arab mengembalikan error inkompatibilitas yang eksplisit dan tidak pernah diam-diam beralih ke Fast. Permintaan Fast eksplisit untuk bahasa Korea mengembalikan `FEATURE_INCOMPATIBLE` dengan alasan `fast-korean-unsupported` sebelum job diantrekan.
 
-Replika yang berbagi `DATA_DIR` yang sama harus menggunakan arsitektur CPU yang sama; sematkan deployment multi-replika ke node yang kompatibel dengan node affinity. Replika campuran amd64/arm64 memerlukan volume data terpisah dan deployment SnapOtter yang independen.
+Replika yang berbagi `DATA_DIR` yang sama harus menggunakan arsitektur CPU yang sama; sematkan deployment multi-replika dengan node affinity. Replika amd64/arm64 campuran memerlukan volume data terpisah dan deployment SnapOtter yang independen.
 
-Runtime yang akurat menjaga satu generasi tetap aktif dan membersihkan cache unduhannya setelah aktivasi. Untuk rilis ini, instalasi pertama untuk sementara memerlukan sekitar 620-720 MiB untuk arsip ditambah staging, dan peningkatan dapat mencapai puncaknya mendekati 1,2 GiB sementara generasi lama tetap aktif. Penginstal menghitung persyaratan yang tepat dari indeks yang ditandatangani dan generasi saat ini sebelum mengunduh atau mengekstraksi, dan gagal lebih awal jika volume data terlalu kecil.
+Runtime akurat hanya mempertahankan satu generasi aktif dan membersihkan cache unduhannya setelah aktivasi. Untuk rilis ini, instalasi pertama sementara membutuhkan sekitar 620-720 MiB untuk arsip ditambah staging, dan peningkatan versi dapat mencapai puncak mendekati 1,2 GiB selama generasi lama masih aktif. Penginstal menghitung kebutuhan tepatnya dari indeks bertanda tangan dan generasi saat ini sebelum mengunduh atau mengekstrak, dan gagal lebih awal jika volume data terlalu kecil.
 
 ```yaml
 deploy:
@@ -311,32 +336,32 @@ deploy:
       memory: 4G
 ```
 
-### Penuh (perkakas AI di NVIDIA CUDA) {#full-ai-tools-on-nvidia-cuda}
+### Penuh (alat AI di NVIDIA CUDA) {#full-ai-tools-on-nvidia-cuda}
 
-| Sumber Daya | Persyaratan |
+| Sumber daya | Kebutuhan |
 |---|---|
-| CPU | 6-8 core (persiapan video + konkurensi berjalan di CPU bahkan dengan AI GPU) |
+| CPU | 6-8 core (persiapan video + konkurensi berjalan di CPU meskipun AI memakai GPU) |
 | RAM | 8 GB |
-| GPU | NVIDIA dengan 8+ GB VRAM (12 GB direkomendasikan) |
+| GPU | NVIDIA dengan VRAM 8+ GB (12 GB direkomendasikan) |
 | Disk | ~35 GB total |
 
-GPU NVIDIA (CUDA) secara dramatis mempercepat model AI yang berat. Diukur pada RTX 4070 vs CPU modern:
+GPU NVIDIA (CUDA) mempercepat model AI yang berat secara dramatis. Diukur pada RTX 4070 dibandingkan CPU modern:
 
-| Perkakas AI | Peningkatan kecepatan dengan GPU | Catatan |
+| Alat AI | Percepatan dengan GPU | Catatan |
 |---|---|---|
-| AI upscale (RealESRGAN 2×) | **~47×** | Kemenangan terbesar, di bawah satu detik vs ~33 d (menit pada gambar besar) |
-| Penyempurnaan wajah (CodeFormer) | **~12×** | ~0.9 d vs ~11 d |
-| Transkripsi (Whisper) | ~4.5× | |
-| Penghapusan / penggantian / blur latar belakang | ~4× | ~7 d di GPU vs ~29 d di CPU |
-| Colorize | ~1.8× | |
+| Upscale AI (RealESRGAN 2×) | **~47×** | Keuntungan terbesar, di bawah satu detik dibandingkan ~33 dtk (beberapa menit pada gambar besar) |
+| Peningkatan wajah (CodeFormer) | **~12×** | ~0,9 dtk dibandingkan ~11 dtk |
+| Transkripsi (Whisper) | ~4,5× | |
+| Penghapusan / penggantian / blur latar belakang | ~4× | ~7 dtk di GPU dibandingkan ~29 dtk di CPU |
+| Colorize | ~1,8× | |
 | OCR, deteksi wajah, red-eye, noise-removal | ~1× | Sudah cepat di CPU, GPU tidak membantu |
-| Restorasi foto | tidak ada | Bergantung CPU bahkan di GPU (0% utilisasi GPU); CPU cepat lebih penting daripada GPU di sini |
+| Restorasi foto | tidak ada | Terikat CPU bahkan pada GPU (pemanfaatan GPU 0%); CPU yang cepat lebih penting daripada GPU di sini |
 
-Perkakas yang layak menggunakan GPU adalah **upscale, penyempurnaan wajah, transkripsi, dan penghapusan latar belakang**. Deteksi wajah, OCR, dan red-eye bergantung CPU dan sudah cepat, jadi GPU tidak menambah apa pun.
+Alat yang layak memakai GPU adalah **upscale, peningkatan wajah, transkripsi, dan penghapusan latar belakang**. Deteksi wajah, OCR, dan red-eye terikat CPU dan sudah cepat, sehingga GPU tidak menambah apa pun.
 
-Penggunaan VRAM puncak mencapai 7.5 GB selama upscale dengan penyempurnaan wajah. GPU NVIDIA 6 GB bekerja untuk sebagian besar perkakas AI secara individual tetapi akan gagal pada upscale. VRAM 8-12 GB menangani semuanya.
+Penggunaan VRAM puncak mencapai 7,5 GB selama upscale dengan peningkatan wajah. GPU NVIDIA 6 GB bekerja untuk sebagian besar alat AI secara individual tetapi akan gagal pada upscale. VRAM 8-12 GB menangani semuanya.
 
-Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI. Memetakan `/dev/dri` ke dalam kontainer tidak mengaktifkan akselerasi AI GPU; SnapOtter akan menjalankan perkakas AI di CPU kecuali NVIDIA CUDA tersedia.
+Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI. Memetakan `/dev/dri` ke dalam kontainer tidak mengaktifkan akselerasi GPU AI; SnapOtter akan menjalankan alat AI di CPU kecuali NVIDIA CUDA tersedia.
 
 ```yaml
 deploy:
@@ -351,49 +376,49 @@ deploy:
           capabilities: [gpu]
 ```
 
-### Pengguna Bersamaan {#concurrent-users}
+### Pengguna Konkuren {#concurrent-users}
 
-Permintaan resize gambar paralel terhadap kontainer aplikasi yang dibatasi 4-core secara default:
+Permintaan ubah ukuran gambar paralel terhadap kontainer aplikasi bawaan yang dibatasi 4 core:
 
-| Permintaan Bersamaan | Rata-rata Waktu Respons | Kesalahan |
+| Permintaan Konkuren | Rata-rata Waktu Respons | Error |
 |---|---|---|
-| 1 | 0.4d | 0 |
-| 5 | 1.2d | 0 |
-| 10 | 2.1d | 0 |
+| 1 | 0,4 dtk | 0 |
+| 5 | 1,2 dtk | 0 |
+| 10 | 2,1 dtk | 0 |
 
-Waktu respons menurun secara sub-linear tanpa kesalahan saat pool worker menjadi jenuh. Menaikkan batas `cpus:` kontainer aplikasi (atau menggunakan host dengan lebih banyak core) mengangkat batas atas. Perhatikan bahwa job berat (transcode video, AI CPU) menahan satu worker selama durasi penuhnya, jadi ukur CPU sesuai jumlah job berat bersamaan yang Anda harapkan, bukan hanya jumlah permintaan.
+Waktu respons menurun secara sub-linear tanpa error saat pool worker jenuh. Menaikkan batas `cpus:` kontainer aplikasi (atau memakai host dengan lebih banyak core) meningkatkan batas atasnya. Perhatikan bahwa job berat (transcode video, AI di CPU) menahan satu worker selama seluruh durasinya, jadi sesuaikan CPU dengan jumlah job berat konkuren yang Anda harapkan, bukan hanya jumlah permintaan.
 
 ### Format Gambar yang Didukung {#supported-image-formats}
 
-SnapOtter mendukung **55+ format input** dan **14 format output**, termasuk file RAW dari 20+ merek kamera, format profesional (PSD, EPS, OpenEXR, HDR), codec modern (JPEG XL, AVIF, HEIC, QOI), dan format ilmiah/gaming (FITS, DDS).
+SnapOtter mendukung **55+ format input** dan **14 format output**, termasuk file RAW dari 20+ merek kamera, format profesional (PSD, EPS, OpenEXR, HDR), codec modern (JPEG XL, AVIF, HEIC, QOI), dan format ilmiah/game (FITS, DDS).
 
 Lihat [daftar format lengkap](/id/guide/supported-formats) untuk detail setiap format yang didukung, decoder yang digunakan, dan kontrol kualitas yang tersedia.
 
-### Batasan yang Diketahui {#known-limitations}
+### Keterbatasan yang Diketahui {#known-limitations}
 
-- **Content-aware resize** crash pada gambar besar (>5 MP) karena batasan pada binary caire. Bekerja baik dengan gambar yang lebih kecil.
-- **HEIF decode** memakan 13-23 detik. HEIC (varian Apple) jauh lebih cepat pada 0.3-0.9 detik.
-- **Upscale** kehabisan waktu di CPU untuk apa pun di luar gambar kecil. GPU diperlukan untuk penggunaan praktis.
-- **CodeFormer** penyempurnaan wajah jauh lebih lambat daripada GFPGAN (53d vs 2d di GPU). GFPGAN direkomendasikan untuk sebagian besar kasus penggunaan.
+- **Content-aware resize** crash pada gambar besar (>5 MP) karena keterbatasan pada binary caire. Berfungsi baik dengan gambar yang lebih kecil.
+- **Decode HEIF** memakan waktu 13-23 detik. HEIC (varian Apple) jauh lebih cepat, yaitu 0,3-0,9 detik.
+- **Upscale** mengalami timeout di CPU untuk gambar yang lebih dari kecil. GPU diperlukan untuk penggunaan praktis.
+- Peningkatan wajah **CodeFormer** jauh lebih lambat daripada GFPGAN (53 dtk vs 2 dtk di GPU). GFPGAN direkomendasikan untuk sebagian besar kasus penggunaan.
 
 ## Volume {#volumes}
 
-| Mount / Volume | Tujuan | Diperlukan? |
+| Mount / Volume | Tujuan | Wajib? |
 |---|---|---|
-| `/data` (app) | Model AI, venv Python, file pengguna | **Ya**, kehilangan file tanpanya |
+| `/data` (app) | Model AI, venv Python, file pengguna | **Ya** - file hilang tanpa ini |
 | `/tmp/workspace` (app) | File pemrosesan sementara (dibersihkan otomatis) | Direkomendasikan |
-| `SnapOtter-pgdata` (postgres) | Direktori data PostgreSQL (pengguna, pengaturan, pipeline, job) | **Ya**, kehilangan data tanpanya |
-| `SnapOtter-redisdata` (redis) | File append-only Redis untuk antrean job yang durable | Direkomendasikan |
+| `SnapOtter-pgdata` (postgres) | Direktori data PostgreSQL (pengguna, pengaturan, pipeline, job) | **Ya** - data hilang tanpa ini |
+| `SnapOtter-redisdata` (redis) | File append-only Redis untuk antrean job yang tahan lama | Direkomendasikan |
 
 ### Bind mount vs. named volume {#bind-mounts-vs-named-volumes}
 
-**Named volume** (direkomendasikan), Docker mengelola izin secara otomatis:
+**Named volume** (direkomendasikan) - Docker mengelola izin secara otomatis:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount**, Anda mengelola izin. Atur `PUID`/`PGID` agar cocok dengan pengguna host Anda:
+**Bind mount** - Anda yang mengelola izin. Atur `PUID`/`PGID` agar sesuai dengan pengguna host Anda:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -404,13 +429,13 @@ environment:
 
 ### Izin penyimpanan {#storage-permissions}
 
-SnapOtter menulis ke dua lokasi saat runtime: `/data` (file pengguna, log, model AI dan venv Python) dan `/tmp/workspace` (scratch pemrosesan sementara). Keduanya harus dapat ditulis oleh pengguna tempat kontainer berjalan. Jika salah satunya tidak, kontainer **gagal cepat saat startup** dengan pesan yang menyebutkan direktori, UID/GID yang berjalan, dan cara memperbaikinya, alih-alih boot "healthy" lalu gagal pada unggahan pertama dengan kesalahan samar.
+SnapOtter menulis ke dua lokasi saat runtime: `/data` (file pengguna, log, model AI dan venv Python) dan `/tmp/workspace` (scratch pemrosesan sementara). Keduanya harus dapat ditulis oleh pengguna yang menjalankan kontainer. Jika salah satunya tidak, kontainer **langsung gagal saat startup** dengan pesan yang menyebutkan direktori, UID/GID yang berjalan, dan cara memperbaikinya, alih-alih tampak "healthy" lalu gagal pada unggahan pertama dengan error yang membingungkan. Direktori log (`LOG_DIR`, `/data/logs` di image) diperiksa dengan cara yang sama, di setiap mode penyimpanan, karena log tetap lokal meskipun file berada di S3.
 
-Bagaimana izin ditangani bergantung pada cara kontainer diluncurkan:
+Cara izin ditangani bergantung pada bagaimana kontainer dijalankan:
 
-**Default (mulai sebagai root, turun ke `snapotter`)**, entrypoint mulai sebagai root, memperbaiki kepemilikan volume yang di-mount, lalu turun ke pengguna `snapotter` yang tidak berhak istimewa melalui `gosu`. Named volume bekerja tanpa konfigurasi. Untuk bind mount, atur `PUID`/`PGID` ke pengguna host Anda (di atas) agar file yang ditulisnya dimiliki oleh Anda.
+**Default (dimulai sebagai root, turun ke `snapotter`)** - entrypoint dimulai sebagai root, memperbaiki kepemilikan volume yang di-mount, lalu turun ke pengguna `snapotter` tanpa hak istimewa melalui `gosu`. Named volume bekerja tanpa konfigurasi. Untuk bind mount, atur `PUID`/`PGID` ke pengguna host Anda (di atas) agar file yang ditulisnya dimiliki oleh Anda.
 
-**Kubernetes / OpenShift (non-root melalui `runAsUser`)**, diluncurkan langsung sebagai pengguna non-root, kontainer tidak dapat chown volume sendiri, jadi orkestrator harus membuatnya dapat ditulis. Atur `fsGroup`:
+**Kubernetes / OpenShift (non-root melalui `runAsUser`)** - dijalankan langsung sebagai pengguna non-root, kontainer tidak dapat melakukan chown pada volume sendiri, sehingga orkestrator harus membuatnya dapat ditulis. Atur `fsGroup`:
 
 ```yaml
 securityContext:
@@ -419,45 +444,45 @@ securityContext:
   fsGroup: 999        # makes mounted volumes writable by the pod
 ```
 
-Direktori yang dapat ditulis pada image dimiliki oleh grup GID 0 dan dapat ditulis grup, sehingga pod yang berjalan dengan **UID sembarang** ditambah grup suplementer root (default OpenShift) dapat menulis tanpa `chown`.
+Direktori yang dapat ditulis pada image dimiliki grup GID 0 dan dapat ditulis oleh grup, sehingga pod yang berjalan dengan **UID sembarang** plus grup suplementer root (default OpenShift) dapat menulis tanpa `chown`.
 
-**TrueNAS Scale (dan penyiapan "UID asing" lainnya)**, TrueNAS menjalankan aplikasi sebagai pengguna non-root (sering `568:568`) dan me-mount dataset host yang dimiliki oleh pengguna berbeda, sehingga baik entrypoint maupun `fsGroup` tidak membuatnya dapat ditulis dengan sendirinya. Pilih salah satu:
+**TrueNAS Scale (dan setup "UID asing" lainnya)** - TrueNAS menjalankan aplikasi sebagai pengguna non-root (sering `568:568`) dan me-mount dataset host yang dimiliki pengguna lain, sehingga baik entrypoint maupun `fsGroup` tidak dapat membuatnya dapat ditulis dengan sendirinya. Pilih salah satu:
 
-- **Jalankan aplikasi sebagai root** (direkomendasikan), biarkan pengguna aplikasi tidak diatur atau atur ke `0`, dan biarkan entrypoint default memperbaiki izin dan turun ke `snapotter`.
-- **Jalankan sebagai UID `999`**, atur pengguna/grup aplikasi ke `999:999` (pengguna `snapotter` bawaan SnapOtter) agar cocok dengan kepemilikan image.
-- **`chown` dataset host** ke UID tempat kontainer berjalan, dari shell TrueNAS:
+- **Jalankan aplikasi sebagai root** (direkomendasikan) - biarkan pengguna aplikasi tidak diatur atau atur ke `0`, dan biarkan entrypoint default memperbaiki izin lalu turun ke `snapotter`.
+- **Jalankan sebagai UID `999`** - atur pengguna/grup aplikasi ke `999:999` (pengguna `snapotter` bawaan SnapOtter) agar sesuai dengan kepemilikan image.
+- **`chown` dataset host** ke UID yang digunakan kontainer, dari shell TrueNAS:
 
   ```bash
-  # Gunakan UID dari kesalahan startup (atau jalankan `id` di dalam kontainer)
+  # Use the UID from the startup error (or run `id` inside the container)
   chown -R 568:568 /mnt/<pool>/<dataset>
   ```
 
-Kesalahan startup menyebutkan UID persis yang harus digunakan, jadi jalur tercepat adalah memulai aplikasi sekali, membaca pesannya, lalu `chown` (atau menyesuaikan pengguna) sesuai kebutuhan.
+Error startup menyebutkan UID yang tepat untuk digunakan, jadi cara tercepat adalah menjalankan aplikasi sekali, membaca pesannya, lalu `chown` (atau menyesuaikan pengguna) sesuai kebutuhan.
 
 ## Variabel Lingkungan {#environment-variables}
 
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Aktifkan/nonaktifkan persyaratan login |
+| `AUTH_ENABLED` | `true` | Aktifkan/nonaktifkan kewajiban login |
 | `DEFAULT_USERNAME` | `admin` | Username admin awal |
-| `DEFAULT_PASSWORD` | `admin` | Kata sandi admin awal (dipaksa ganti saat login pertama) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (tak terbatas) | Batas unggahan per file dalam MB. Image dikirim dengan `0`; build dari kode sumber mulai dari 100 |
-| `MAX_BATCH_SIZE` | `0` (tak terbatas) | Maksimum file per permintaan batch. Image dikirim dengan `0`; build dari kode sumber mulai dari 100 |
+| `DEFAULT_PASSWORD` | `admin` | Kata sandi admin awal (wajib diganti saat login pertama) |
+| `MAX_UPLOAD_SIZE_MB` | `0` (tanpa batas) | Batas unggah per file dalam MB. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
+| `MAX_BATCH_SIZE` | `0` (tanpa batas) | Maksimum file per permintaan batch. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
 | `RATE_LIMIT_PER_MIN` | `1000` | Permintaan API per menit per IP (atur 0 untuk menonaktifkan) |
-| `MAX_USERS` | `0` (tak terbatas) | Maksimum akun pengguna |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien lewat `X-Forwarded-For`. Hanya jaringan privat secara default |
+| `MAX_USERS` | `0` (tanpa batas) | Jumlah maksimum akun pengguna |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien melalui `X-Forwarded-For`. Secara default hanya jaringan privat |
 | `PUID` | `999` | Jalankan sebagai UID ini (untuk izin bind mount) |
 | `PGID` | `999` | Jalankan sebagai GID ini (untuk izin bind mount) |
-| `LOG_LEVEL` | `info` | Verbositas log: fatal, error, warn, info, debug, trace |
+| `LOG_LEVEL` | `info` | Tingkat detail log: fatal, error, warn, info, debug, trace |
 | `CONCURRENT_JOBS` | `0` (otomatis) | Maksimum job pemrosesan AI paralel |
 | `SESSION_DURATION_HOURS` | `168` | Masa berlaku sesi login (7 hari) |
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma, atau kosong untuk same-origin |
 
-### Proksi keluar dan CA {#outbound-proxy-and-private-ca} pribadi
+### Proxy keluar dan CA privat {#outbound-proxy-and-private-ca}
 
-Kontainer resmi mengaktifkan dukungan proxy lingkungan Node. Jika SnapOtter harus mencapai repositori runtime OCR atau layanan HTTPS lainnya melalui proksi perusahaan, atur `HTTPS_PROXY` (dan `HTTP_PROXY` bila diperlukan). Setel `NO_PROXY` ke daftar host yang dipisahkan koma yang harus dijangkau secara langsung, seperti Postgres, Redis, dan penyimpanan objek internal.
+Kontainer resmi mengaktifkan dukungan environment-proxy Node. Jika SnapOtter harus menjangkau repositori runtime OCR atau layanan HTTPS lain melalui proxy perusahaan, atur `HTTPS_PROXY` (dan `HTTP_PROXY` bila diperlukan). Atur `NO_PROXY` ke daftar host yang dipisahkan koma yang harus dijangkau secara langsung, seperti Postgres, Redis, dan penyimpanan objek internal.
 
-Jika proksi atau layanan internal ditandatangani oleh otoritas sertifikat swasta, pasang sertifikat CA hanya-baca dan arahkan `NODE_EXTRA_CA_CERTS` ke sana. File tersebut harus ada ketika proses Node dimulai:
+Jika proxy atau layanan internal ditandatangani oleh certificate authority privat, mount sertifikat CA secara read-only dan arahkan `NODE_EXTRA_CA_CERTS` ke sertifikat tersebut. File harus sudah ada saat proses Node dimulai:
 
 ```yaml
 services:
@@ -471,7 +496,7 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-Simpan kredensial proxy di luar file Compose (misalnya di file atau rahasia `.env` yang dilindungi). Jangan nonaktifkan verifikasi TLS: indeks OCR yang ditandatangani mengautentikasi metadata rilis, sementara validasi TLS normal masih melindungi transportasi dan setiap permintaan keluar lainnya.
+Simpan kredensial proxy di luar file Compose (misalnya dalam file atau secret `.env` yang terlindungi). Jangan menonaktifkan verifikasi TLS: indeks OCR bertanda tangan mengautentikasi metadata rilis, sedangkan validasi TLS normal tetap melindungi transport dan setiap permintaan keluar lainnya.
 
 ## Health Check {#health-check}
 
@@ -488,24 +513,23 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-`TRUST_PROXY` secara default bernilai `loopback,linklocal,uniquelocal`, jadi SnapOtter hanya memercayai `X-Forwarded-For` dari peer di jaringan privat. Reverse proxy di host yang sama, di jaringan Docker, atau di LAN Anda langsung dipercaya, sehingga pembatasan laju, pembatas brute force pada login, log audit, dan daftar IP yang diizinkan di edisi enterprise semuanya melihat IP klien yang sebenarnya tanpa konfigurasi apa pun.
+`TRUST_PROXY` secara default bernilai `loopback,linklocal,uniquelocal`, sehingga SnapOtter hanya mempercayai `X-Forwarded-For` dari peer di jaringan privat. Reverse proxy pada host yang sama, pada jaringan Docker, atau pada LAN Anda dipercaya secara bawaan, yang berarti pembatasan laju, pembatas brute-force login, log audit, dan allowlist IP enterprise semuanya melihat IP klien yang sebenarnya tanpa konfigurasi.
 
-Setel `TRUST_PROXY=true` hanya jika proxy di depan menjangkau SnapOtter dari alamat **publik**, misalnya load balancer cloud di jaringan lain. Pada instance yang terekspos langsung, nilai itu membuat `request.ip` dikendalikan penyerang, karena pemanggil yang terus mengganti header mendapat penghitung batas laju baru di setiap permintaan.
+Atur `TRUST_PROXY=true` hanya ketika proxy di depan menjangkau SnapOtter dari alamat **publik**, misalnya load balancer cloud pada jaringan yang berbeda. Pada instance yang terekspos langsung, nilai tersebut membuat `request.ip` dapat dikendalikan penyerang, karena pemanggil yang mengganti-ganti header mendapat bucket batas laju baru untuk setiap permintaan.
 
-Ada dua hal yang perlu diketahui sebelum Anda mulai mengukur IP klien. Docker Desktop di macOS dan Windows menyajikan port yang dipublikasikan lewat proxy di ruang pengguna yang menulis ulang setiap alamat sumber menjadi gateway VM `192.168.65.1`, jadi di sana tidak ada nilai `TRUST_PROXY` yang bisa mengembalikan klien aslinya; terapkan di Linux untuk apa pun yang menghadap internet. Dan di platform mana pun, mencapai port yang dipublikasikan lewat `localhost` terlihat sebagai gateway bridge, bukan sebagai klien Anda, sehingga uji coba lewat localhost tidak memberi tahu apa pun tentang cara klien sungguhan diatribusikan. Tabel lengkap nilai `TRUST_PROXY` dan catatan tentang Docker Desktop ada di [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
+Dua hal yang perlu diketahui sebelum Anda mengukur IP klien. Docker Desktop di macOS dan Windows melayani port yang dipublikasikan melalui proxy userland yang menulis ulang setiap alamat sumber menjadi gateway VM `192.168.65.1`, sehingga tidak ada nilai `TRUST_PROXY` yang dapat memulihkan klien sebenarnya di sana; deploy di Linux untuk apa pun yang menghadap internet. Dan pada platform mana pun, mengakses port yang dipublikasikan melalui `localhost` teramati sebagai gateway bridge, bukan sebagai klien Anda, sehingga uji localhost tidak memberi tahu apa pun tentang bagaimana klien sebenarnya diatribusikan. Tabel lengkap nilai `TRUST_PROXY` dan catatan Docker Desktop ada di [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
-Ada dua hal yang penting untuk setiap proxy di bawah ini: izinkan badan permintaan yang besar (unggahan), dan jangan melakukan buffering terhadap tanggapan. Proksi buffering respons menghentikan kemajuan SSE dan, yang lebih terlihat, membuat pengunduhan file besar "mulai tetapi tidak pernah selesai", karena proksi menyimpan seluruh file sebelum meneruskannya. SnapOtter mengirimkan `X-Accel-Buffering: no` pada unduhan sehingga nginx mengalirkannya meskipun buffering dibiarkan di tempat lain, namun proxy selain nginx memerlukan buffering respons yang dinonaktifkan secara eksplisit (ditunjukkan pada setiap konfigurasi di bawah). Jika pengunduhan terhenti di tengah jalan, proxy buffering di depan adalah hal pertama yang harus diperiksa.
+Dua hal penting untuk setiap proxy di bawah: izinkan isi permintaan yang besar (unggahan), dan jangan buffer respons. Proxy yang mem-buffer respons merusak progres SSE dan, yang lebih terlihat, membuat unduhan file besar "dimulai tetapi tidak pernah selesai", karena proxy menahan seluruh file sebelum meneruskannya. SnapOtter mengirim `X-Accel-Buffering: no` pada unduhan sehingga nginx melakukan streaming meskipun buffering dibiarkan aktif di tempat lain, tetapi proxy selain nginx perlu menonaktifkan buffering respons secara eksplisit (ditunjukkan di setiap konfigurasi di bawah). Jika unduhan berhenti di tengah jalan, proxy yang mem-buffer di depan adalah hal pertama yang perlu diperiksa.
 
-Catatan tentang HSTS: API mengirim `Strict-Transport-Security` pada setiap respons dengan sendirinya, jadi proxy yang meneruskan header respons apa adanya (semua konfigurasi di bawah ini melakukannya) tidak memerlukan penyiapan HSTS sendiri. Hanya jika proxy Anda dikonfigurasi untuk menghapus atau menimpa header respons upstream, Anda perlu mempertahankan header tersebut atau menambahkannya kembali di edge.
+Catatan tentang HSTS: API mengirim `Strict-Transport-Security` pada setiap respons itu sendiri, sehingga proxy yang meneruskan header respons (semua konfigurasi di bawah melakukannya) tidak memerlukan pengaturan HSTS sendiri. Hanya jika proxy Anda dikonfigurasi untuk menghapus atau menimpa header respons upstream, Anda perlu mempertahankan header tersebut atau menambahkannya kembali di edge.
 
 ### Nginx {#nginx}
 
 ```nginx
 server {
-    # HTTP biasa ditampilkan agar ringkas. Lakukan terminasi TLS di blok
-    # server `listen 443 ssl` Anda sendiri; header Strict-Transport-Security
-    # yang dikirim API diteruskan pada setiap respons yang diproksikan, jadi
-    # tidak perlu add_header di sana.
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -522,20 +546,26 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Respons streaming alih-alih buffering: diperlukan untuk kemajuan SSE (batch, AI, pemasangan fitur) dan untuk download file besar.
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
 }
 ```
 
-### Men-deploy di bawah subpath {#subpath}
+### Deployment di bawah subpath {#subpath}
 
-Untuk menyajikan `https://example.com/snapotter`, setel `BASE_PATH=/snapotter` di lingkungan kontainer SnapOtter lalu mulai ulang. File Compose CPU dan GPU resmi juga menerima `BASE_PATH` dari shell Anda atau file `.env` Compose. Image yang sama berfungsi di jalur mana pun; tidak perlu membangun ulang frontend.
+Untuk melayani `https://example.com/snapotter`, atur `BASE_PATH=/snapotter` di environment
+kontainer SnapOtter dan mulai ulang. File Compose CPU dan GPU resmi
+juga menerima `BASE_PATH` dari shell Anda atau file `.env` Compose. Image yang sama
+bekerja di path mana pun; tidak perlu rebuild frontend.
 
-`BASE_PATH` menerima segmen yang dipisahkan garis miring berisi huruf, angka, `_`, atau `-`, termasuk jalur bertingkat seperti `/apps/snapotter`. Garis miring di akhir bersifat opsional. Biarkan kosong (default), atau setel `/`, untuk deployment di root.
+`BASE_PATH` menerima segmen yang dipisahkan garis miring berisi huruf, angka, `_`, atau
+`-`, termasuk path bersarang seperti `/apps/snapotter`. Garis miring di akhir
+bersifat opsional. Biarkan kosong (default), atau atur `/`, untuk deployment root.
 
-Di blok server HTTPS Nginx yang sudah ada, gunakan:
+Pada blok server HTTPS Nginx Anda yang ada, gunakan:
 
 ```nginx
 location = /snapotter {
@@ -554,11 +584,23 @@ location /snapotter/ {
 }
 ```
 
-Contoh ini mempertahankan prefiks. Proxy yang menghapus `/snapotter` sebelum meneruskan juga didukung. Pemeriksaan kesehatan internal dapat tetap menggunakan `/api/v1/health`. Untuk OIDC atau SAML, setel juga `EXTERNAL_URL=https://example.com/snapotter` dan perbarui URL callback penyedia identitas agar menyertakan `/snapotter/api/auth/oidc/callback` atau `/snapotter/api/auth/saml/callback`.
+Contoh ini mempertahankan prefiks. Proxy yang menghapus `/snapotter` sebelum
+meneruskan juga didukung. Health check internal tetap dapat menggunakan
+`/api/v1/health`. Untuk OIDC atau SAML, atur juga
+`EXTERNAL_URL=https://example.com/snapotter` dan perbarui URL callback identity provider agar menyertakan `/snapotter/api/auth/oidc/callback` atau
+`/snapotter/api/auth/saml/callback` secara berurutan.
 
-Skrip API tetap berfungsi tanpa perubahan: URL dalam respons API, seperti `downloadUrl` milik sebuah tool, dimulai dengan `/api/` apa pun nilai `BASE_PATH`. Tambahkan URL tersebut ke URL dasar instance Anda (`https://example.com/snapotter` + `/api/v1/download/...`) alih-alih me-resolve-nya terhadap root domain.
+Skrip API tetap bekerja tanpa perubahan: URL dalam respons API, seperti
+`downloadUrl` sebuah alat, diawali dengan `/api/` apa pun nilai `BASE_PATH`. Tambahkan ke
+URL dasar instance Anda (`https://example.com/snapotter` + `/api/v1/download/...`)
+alih-alih menyelesaikannya terhadap root domain.
 
-Buka UI melalui URL berprefiks (`https://example.com/snapotter`). Browser yang datang tanpa prefiks akan diarahkan ke sana secara otomatis; hanya permintaan API yang diperkirakan mencapai aplikasi tanpa prefiks. Jika log mengatakan `Requests arrive under /snapotter/ but BASE_PATH is empty`, proxy Anda meneruskan prefiks yang tidak dideklarasikan `BASE_PATH`: setel `BASE_PATH` ke prefiks tersebut, atau hapus prefiks di proxy.
+Buka UI melalui URL berprefiks (`https://example.com/snapotter`). Browser
+yang datang tanpa prefiks akan diarahkan ke sana secara otomatis; hanya permintaan
+API yang diharapkan mencapai aplikasi tanpa prefiks. Jika log menyebutkan
+`Requests arrive under /snapotter/ but BASE_PATH is empty`, proxy Anda
+meneruskan prefiks yang tidak dideklarasikan oleh `BASE_PATH`: atur `BASE_PATH` ke prefiks itu,
+atau hapus prefiks di proxy.
 
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
@@ -568,7 +610,7 @@ Buka UI melalui URL berprefiks (`https://example.com/snapotter`). Browser yang d
 4. Aktifkan dukungan WebSocket
 5. Di bawah Advanced, tambahkan: `client_max_body_size 500M;` dan `proxy_buffering off;`
 
-Header `Strict-Transport-Security` dari API diteruskan oleh NPM apa adanya; toggle HSTS di tab SSL bersifat opsional di atasnya.
+Header `Strict-Transport-Security` dari API diteruskan melalui NPM apa adanya; toggle HSTS pada tab SSL bersifat opsional sebagai tambahan.
 
 ### Traefik {#traefik}
 
@@ -585,7 +627,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-Traefik meneruskan header respons upstream tanpa perubahan, sehingga header `Strict-Transport-Security` dari API mencapai browser tanpa middleware `headers`. Jika Anda sudah menjalankan middleware yang menulis ulang header respons, pastikan middleware tersebut membiarkan header itu tetap utuh.
+Traefik meneruskan header respons upstream tanpa perubahan, sehingga header `Strict-Transport-Security` dari API sampai ke browser tanpa middleware `headers`. Jika Anda sudah menjalankan middleware yang menulis ulang header respons, pastikan middleware itu membiarkan header tersebut utuh.
 
 ### Caddy {#caddy}
 
@@ -601,7 +643,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` menonaktifkan buffering respons, yang diperlukan untuk peristiwa kemajuan SSE (pemrosesan batch, alat AI, pemasangan fitur) dan untuk pengunduhan file besar agar dapat dilakukan streaming alih-alih terhenti. Batas waktu yang diperpanjang memungkinkan pengunggahan file besar selesai tanpa Caddy menutup koneksi lebih awal. Caddy juga meneruskan header `Strict-Transport-Security` dari API tanpa diubah, jadi tidak ada direktif `header` yang diperlukan untuk HSTS.
+`flush_interval -1` menonaktifkan buffering respons, yang diperlukan agar event progres SSE (pemrosesan batch, alat AI, instalasi fitur) dan unduhan file besar mengalir melalui streaming alih-alih macet. Timeout yang diperpanjang memungkinkan unggahan file besar selesai tanpa Caddy menutup koneksi lebih awal. Caddy juga meneruskan header `Strict-Transport-Security` dari API tanpa diubah, sehingga tidak diperlukan direktif `header` untuk HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -609,23 +651,23 @@ images.example.com {
 cloudflared tunnel --url http://localhost:1349
 ```
 
-Catatan: Cloudflare memiliki batas unggahan 100 MB pada paket gratis. Atur `MAX_UPLOAD_SIZE_MB=100` agar cocok.
+Catatan: Cloudflare memiliki batas unggahan 100 MB pada paket gratis. Atur `MAX_UPLOAD_SIZE_MB=100` agar sesuai.
 
-Tunnel meneruskan header respons API, termasuk `Strict-Transport-Security`, jadi tidak diperlukan konfigurasi HSTS di dasbor (pengaturan HSTS edge milik Cloudflare sendiri bersifat opsional di atasnya).
+Tunnel meneruskan header respons API, termasuk `Strict-Transport-Security`, sehingga tidak diperlukan konfigurasi HSTS di dashboard (pengaturan HSTS edge milik Cloudflare bersifat opsional sebagai tambahan).
 
-## Pemecahan masalah {#troubleshooting}
+## Pemecahan Masalah {#troubleshooting}
 
 ### "Postgres not reachable: EAI_AGAIN" tepat setelah start pertama yang gagal {#eai-again-after-failed-first-start}
 
-Jika `docker compose up -d` yang pertama gagal di tengah jalan (port yang sudah digunakan adalah penyebab umumnya), percobaan ulang `up -d` biasa dapat memulai kontainer aplikasi tanpa melampirkannya ke jaringan compose. Aplikasi lalu mengalami crash-loop dengan:
+Jika `docker compose up -d` yang pertama gagal di tengah jalan (port yang sudah dipakai adalah penyebab yang umum), percobaan ulang `up -d` biasa dapat memulai kontainer aplikasi tanpa menyambungkannya ke jaringan compose. Aplikasi kemudian crash-loop dengan:
 
 ```
 Postgres not reachable: EAI_AGAIN
 ```
 
-sementara `docker ps` menunjukkan postgres sehat. Error itu nyata tetapi menunjuk kontainer yang salah: tanpa jaringan, DNS untuk hostname `postgres` tidak dapat di-resolve sama sekali, dan kebijakan restart mengulang kegagalan yang sama terus-menerus.
+sementara `docker ps` menunjukkan postgres healthy. Error tersebut nyata tetapi menunjuk kontainer yang salah: tanpa jaringan, DNS untuk hostname `postgres` sama sekali tidak dapat di-resolve, dan kebijakan restart mengulang kegagalan yang sama tanpa henti.
 
-Perbaiki apa pun yang membuat start pertama gagal (biasanya: bebaskan port), lalu paksa kontainer aplikasi dibuat ulang agar terhubung kembali ke jaringan:
+Perbaiki apa pun yang merusak start pertama (biasanya: bebaskan port), lalu paksa kontainer aplikasi dibuat ulang agar tersambung kembali ke jaringan:
 
 ```bash
 docker compose up -d --force-recreate SnapOtter
@@ -633,17 +675,17 @@ docker compose up -d --force-recreate SnapOtter
 
 ### Windows: dapat dijangkau dari perangkat lain, tetapi tidak dari PC itu sendiri {#windows-wsl2-loopback}
 
-Dengan Docker yang berjalan di dalam WSL2 (pengaturan Windows yang umum), stack dapat dijangkau dari setiap mesin lain di jaringan Anda sementara `http://localhost:1349` timeout di host Windows itu sendiri, bahkan dengan mode jaringan mirror WSL diaktifkan. Port tersebut tidak pernah muncul di `netstat` Windows, dan tidak ada yang salah dengan kontainer.
+Dengan Docker berjalan di dalam WSL2 (setup Windows yang umum), stack dapat dijangkau dari setiap mesin lain di jaringan Anda sementara `http://localhost:1349` mengalami timeout pada host Windows itu sendiri, bahkan dengan mode jaringan mirrored WSL diaktifkan. Port tersebut tidak pernah muncul di `netstat` Windows, dan tidak ada yang salah dengan kontainernya.
 
-Buka aplikasi dari perangkat lain, atau dari dalam distro menggunakan alamatnya sendiri (`hostname -I` di shell WSL). Jika penerusan localhost kebetulan berfungsi pada versi WSL Anda, anggap itu sebagai bonus, bukan sesuatu yang diandalkan.
+Buka aplikasi dari perangkat lain, atau dari dalam distro menggunakan alamatnya sendiri (`hostname -I` di shell WSL). Jika penerusan localhost kebetulan bekerja pada versi WSL Anda, anggap itu sebagai bonus dan bukan sesuatu yang diandalkan.
 
 ## CI/CD {#ci-cd}
 
 Repositori GitHub memiliki tiga workflow:
 
-- **ci.yml**, Berjalan otomatis pada setiap push dan PR. Melakukan lint, typecheck, test, build, dan memvalidasi image Docker (tanpa push).
-- **release.yml**, Dipicu secara manual melalui `workflow_dispatch`. Menjalankan semantic-release untuk membuat tag versi dan rilis GitHub, lalu membangun image Docker multi-arch (amd64 + arm64) dan mendorong ke Docker Hub (`snapotter/snapotter`) dan GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
-- **deploy-docs.yml**, Membangun situs dokumentasi ini dan menerapkannya ke Cloudflare Pages saat push ke `main`.
+- **ci.yml** - Berjalan otomatis pada setiap push dan PR. Melakukan lint, typecheck, test, build, dan memvalidasi image Docker (tanpa push).
+- **release.yml** - Dipicu secara manual melalui `workflow_dispatch`. Menjalankan semantic-release untuk membuat tag versi dan rilis GitHub, lalu membangun image Docker multi-arsitektur (amd64 + arm64) dan mem-push ke Docker Hub (`snapotter/snapotter`) dan GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
+- **deploy-docs.yml** - Membangun situs dokumentasi ini dan men-deploy-nya ke Cloudflare Pages saat push ke `main`.
 
 Untuk membuat rilis, buka **Actions > Release > Run workflow** di UI GitHub, atau jalankan:
 
@@ -655,13 +697,13 @@ Semantic-release menentukan versi dari riwayat commit. Tag Docker `latest` selal
 
 ## Analitik {#analytics}
 
-SnapOtter menyertakan analitik produk anonim (pola penggunaan perkakas, laporan kesalahan) untuk membantu menangkap bug dan meningkatkan fitur. Ini aktif secara default. File Anda, nama file, dan data pribadi tidak pernah menjadi bagian dari ini. SnapOtter bekerja normal dengan analitik dinonaktifkan.
+SnapOtter menyertakan analitik produk anonim (pola penggunaan alat, laporan error) untuk membantu menemukan bug dan meningkatkan fitur. Analitik ini aktif secara default. File, nama file, dan data pribadi Anda tidak pernah menjadi bagian darinya. SnapOtter bekerja normal dengan analitik dinonaktifkan.
 
 ### Menonaktifkan analitik {#disabling-analytics}
 
-Opt-out runtime adalah toggle admin satu klik. Buka Settings > System > Privacy dan matikan Anonymous Product Analytics. Analitik berhenti segera untuk seluruh instance, tanpa rebuild diperlukan.
+Opt-out saat runtime berupa toggle admin satu klik. Buka Settings > System > Privacy dan matikan Anonymous Product Analytics. Analitik berhenti seketika untuk seluruh instance, tanpa perlu rebuild.
 
-Untuk image yang tidak akan pernah memancarkan analitik, atur hard-off build-time dengan mengkloning repositori dan membangun ulang:
+Untuk image yang tidak pernah dapat mengirim analitik, atur hard-off saat build dengan meng-clone repositori dan melakukan rebuild:
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -681,3 +723,4 @@ services:
       args:
         SNAPOTTER_ANALYTICS: "off"
 ```
+

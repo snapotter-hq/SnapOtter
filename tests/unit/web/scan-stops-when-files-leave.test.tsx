@@ -110,6 +110,8 @@ interface Panel {
   submitTestId: string;
   goodBody: unknown;
   stopMessage: string;
+  /** What the panel shows for a 500 whose body names no code. */
+  failedMessage: string;
   toolId: string;
   /** Whatever the panel shows once a scan has ended with results. */
   shownResult: () => HTMLElement | null;
@@ -124,6 +126,7 @@ const panels: Panel[] = [
     submitTestId: "barcode-read-submit",
     goodBody: { filename: "one.png", barcodes: [], annotatedUrl: ANNOTATED_URL },
     stopMessage: "Stopping a barcode scan whose files left failed",
+    failedMessage: "We couldn't complete that request. Please try again.",
     toolId: "barcode-read",
     shownResult: () =>
       screen.queryAllByText(en.toolSettings["barcode-read"].noBarcodesFound)[0] ?? null,
@@ -135,6 +138,7 @@ const panels: Panel[] = [
     submitTestId: "ocr-submit",
     goodBody: { text: "hello" },
     stopMessage: "Stopping an OCR scan whose files left failed",
+    failedMessage: "Failed: 500",
     toolId: "ocr",
     shownResult: () => screen.queryByTestId("ocr-result-text"),
     writesEntries: false,
@@ -499,7 +503,7 @@ describe.each(panels)("$name: the scan stops once its files leave the store (#19
     await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
 
     expect(useFileStore.getState().error).toContain("two.png:");
-    expect(useFileStore.getState().error).toContain("Scan failed on two");
+    expect(useFileStore.getState().error).toContain(panel.failedMessage);
 
     // 2. Removing entry 1 while queued, succeeding on entry 0, and failing on entry 2 formats filesFailed against processedCount (2, not 3).
     FakeXhr.instances = [];

@@ -125,7 +125,8 @@ describe("pdf-to-image panel: a failed preview", () => {
     await settle();
 
     expect(asked).toEqual(["doc.pdf"]);
-    expect(screen.getByText("Bad PDF")).toBeInTheDocument();
+    expect(screen.getByText("Failed: 422")).toBeInTheDocument();
+    expect(screen.queryByText("Bad PDF")).not.toBeInTheDocument();
     expect(screen.getByText("doc.pdf")).toBeInTheDocument();
     expect(usePdfToImageStore.getState().loadingPreview).toBe(false);
     expect(screen.getByTestId("pdf-to-image-submit")).toBeDisabled();
@@ -143,7 +144,8 @@ describe("pdf-to-image panel: a failed preview", () => {
     await settle();
 
     expect(asked).toEqual(["first.pdf", "second.pdf"]);
-    expect(screen.getByText("Bad PDF")).toBeInTheDocument();
+    expect(screen.getByText("Failed: 422")).toBeInTheDocument();
+    expect(screen.queryByText("Bad PDF")).not.toBeInTheDocument();
   });
 
   it("asks again when the store is reset under the panel, as a tool switch does", async () => {

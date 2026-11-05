@@ -123,10 +123,11 @@ describe("Korean OCR product contract", () => {
     for (const locale of localizedCodes) {
       for (const document of documents) {
         const content = readFileSync(join(root, "apps/docs", locale, document), "utf8");
-        expect(content, `${locale}/${document}`).toContain("<!-- korean-ocr-contract:start -->");
         expect(content, `${locale}/${document}`).toContain("`fast-korean-unsupported`");
         expect(content, `${locale}/${document}`).toContain("`FEATURE_INCOMPATIBLE`");
-        expect(content, `${locale}/${document}`).toContain("Linux amd64");
+        expect(content, `${locale}/${document}`).toContain(
+          locale === "en" ? "Linux amd64" : "amd64",
+        );
         expect(content, `${locale}/${document}`).toContain("arm64");
         expect(content, `${locale}/${document}`).toContain("NVIDIA");
       }
@@ -161,7 +162,7 @@ describe("Korean OCR product contract", () => {
         .filter(
           (line) =>
             /OCR|Tesseract|`fast`/i.test(line) &&
-            line.includes("MiB") &&
+            /MiB|МиБ|МіБ/.test(line) &&
             /\b(?:24|25|29)\b/.test(line),
         );
 

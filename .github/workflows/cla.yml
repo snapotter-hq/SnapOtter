@@ -5,6 +5,9 @@ on:
     types: [created]
   pull_request_target:
     types: [opened, synchronize, reopened]
+  # `cla` is a required check, so it has to report on merge-queue runs too.
+  # A PR only enters the queue after `cla` passed on the PR itself.
+  merge_group:
 
 permissions: {}
 
@@ -14,6 +17,7 @@ jobs:
     # "Recheck", "recheck\r\n", or the sign phrase with a trailing period or
     # a greeting in front all get through. The action does the real check.
     if: |
+      github.event_name == 'merge_group' ||
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
@@ -29,7 +33,11 @@ jobs:
       pull-requests: write
       statuses: write
     steps:
+      - name: CLA already checked on the pull request
+        if: github.event_name == 'merge_group'
+        run: echo "Signatures were checked before this PR was queued."
       - name: CLA Assistant
+        if: github.event_name != 'merge_group'
         uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

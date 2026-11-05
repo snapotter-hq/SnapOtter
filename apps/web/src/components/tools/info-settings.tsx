@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -161,7 +161,7 @@ export function InfoSettings() {
         }
         const state = useFileStore.getState();
         if (state.entries[state.selectedIndex]?.id === entryId) {
-          setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
+          setError(userErrorMessage(t, err, t.toolSettings.info.failedToRead));
         }
       } finally {
         if (abortRef.current === controller) {

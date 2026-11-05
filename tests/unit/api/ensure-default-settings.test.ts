@@ -54,6 +54,7 @@ import { ensureDefaultSettings } from "../../../apps/api/src/lib/settings-helper
 const originalTheme = env.DEFAULT_THEME;
 const originalLocale = env.DEFAULT_LOCALE;
 const originalToolView = env.DEFAULT_TOOL_VIEW;
+const originalAnalyticsDefault = env.SNAPOTTER_ANALYTICS_DEFAULT;
 
 beforeEach(() => {
   store.rows.clear();
@@ -62,6 +63,7 @@ beforeEach(() => {
   env.DEFAULT_THEME = originalTheme;
   env.DEFAULT_LOCALE = originalLocale;
   env.DEFAULT_TOOL_VIEW = originalToolView;
+  env.SNAPOTTER_ANALYTICS_DEFAULT = originalAnalyticsDefault;
 });
 
 describe("ensureDefaultSettings (#3964)", () => {
@@ -150,5 +152,39 @@ describe("ensureDefaultSettings (#3964)", () => {
     );
     expect(source).toContain("await ensureDefaultSettings();");
     expect(source).not.toContain("async function ensureDefaultSettings");
+  });
+});
+
+describe("ensureDefaultSettings analytics default", () => {
+  it("seeds analyticsEnabled=false when SNAPOTTER_ANALYTICS_DEFAULT is off and nothing is set", async () => {
+    env.SNAPOTTER_ANALYTICS_DEFAULT = "off";
+    await ensureDefaultSettings();
+    expect(store.rows.get("analyticsEnabled")).toBe("false");
+  });
+
+  it("leaves an admin's existing choice alone", async () => {
+    env.SNAPOTTER_ANALYTICS_DEFAULT = "off";
+    store.rows.set("analyticsEnabled", "true");
+    await ensureDefaultSettings();
+    expect(store.rows.get("analyticsEnabled")).toBe("true");
+  });
+
+  it("seeds nothing by default, because absent already means on", async () => {
+    env.SNAPOTTER_ANALYTICS_DEFAULT = "on";
+    await ensureDefaultSettings();
+    expect(store.rows.has("analyticsEnabled")).toBe(false);
+  });
+
+  it("runs at boot before analytics starts, so an instance seeded off never sends instance_started", () => {
+    // index.ts boots the whole service on import, so pin the order in its source.
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    const steps = [
+      "await ensureDefaultSettings();",
+      "await initAnalytics();",
+      "await primeAnalyticsGate();",
+      "await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED",
+    ].map((step) => source.indexOf(step));
+    expect(steps.every((at) => at > -1)).toBe(true);
+    expect([...steps].sort((a, b) => a - b)).toEqual(steps);
   });
 });

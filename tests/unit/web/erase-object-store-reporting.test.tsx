@@ -635,14 +635,16 @@ describe("erase-object single file: a store write that throws while the run ends
 });
 
 describe("erase-object single file: every other way the request ends", () => {
-  it("fails the file with the server's error text", async () => {
+  it("fails the file with the translated fallback and not the server's error text", async () => {
     renderPanel();
 
     (await submit()).respond(422, { error: "Object erasing failed" });
 
     expect(entry().status).toBe("failed");
-    expect(entry().error).toBe("Object erasing failed");
-    expect(screen.getByText("Object erasing failed")).toBeInTheDocument();
+    expect(entry().error).toBe("We couldn't complete that request. Please try again.");
+    expect(
+      screen.getByText("We couldn't complete that request. Please try again."),
+    ).toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
@@ -681,7 +683,7 @@ describe("erase-object single file: every other way the request ends", () => {
     expect(useFileStore.getState().processing).toBe(false);
   });
 
-  it("keeps the server's text and ends the run when showing it throws", async () => {
+  it("keeps the translated fallback and ends the run when showing it throws", async () => {
     renderPanel();
     const xhr = await submit();
     const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
@@ -699,7 +701,9 @@ describe("erase-object single file: every other way the request ends", () => {
       // The throw is ours, not the server's: it surfaces instead of being read
       // as an unparseable body (#2109).
       expect(() => xhr.respond(422, { error: "Object erasing failed" })).toThrow("store broke");
-      expect(useFileStore.getState().error).toBe("Object erasing failed");
+      expect(useFileStore.getState().error).toBe(
+        "We couldn't complete that request. Please try again.",
+      );
       // The UI teardown still ran: the elapsed counter stops.
       expect(clearIntervalSpy).toHaveBeenCalled();
     } finally {
@@ -708,12 +712,14 @@ describe("erase-object single file: every other way the request ends", () => {
     }
   });
 
-  it("falls back to the details when there is no error text", async () => {
+  it("shows the translated fallback and not the details when there is no error text", async () => {
     renderPanel();
 
     (await submit()).respond(422, { details: "Not enough memory" });
 
-    expect(screen.getByText("Not enough memory")).toBeInTheDocument();
+    expect(
+      screen.getByText("We couldn't complete that request. Please try again."),
+    ).toBeInTheDocument();
   });
 
   it("names the status when a failed request's body does not parse", async () => {
@@ -886,7 +892,7 @@ describe("erase-object single file: every other way the request ends", () => {
     [
       "a failed 422",
       (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
-      "Object erasing failed",
+      "We couldn't complete that request. Please try again.",
       0,
     ],
   ])(
@@ -1251,7 +1257,7 @@ describe("erase-object batch: a completed frame with nothing to download (#1830)
     [
       "a failed 422",
       (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
-      "Object erasing failed",
+      "We couldn't complete that request. Please try again.",
       0,
     ],
   ])(
@@ -1312,7 +1318,7 @@ describe("erase-object batch: a completed frame with nothing to download (#1830)
     expect(entry(1).processedUrl).toBe("/api/v1/download/job-1/one.png");
     expect(entry(0).file.name).toBe("two.png");
     expect(entry(0).status).toBe("failed");
-    expect(entry(0).error).toBe("Second failed");
+    expect(entry(0).error).toBe("We couldn't complete that request. Please try again.");
   });
 });
 
@@ -1329,11 +1335,11 @@ describe("erase-object batch: every other way a file's request ends", () => {
     await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
   }
 
-  it("fails the file with the server's error text", async () => {
+  it("fails the file with the translated fallback and not the server's error text", async () => {
     await runFirstThenFinish((xhr) => xhr.respond(422, { error: "Object erasing failed" }));
 
     expect(entry(0).status).toBe("failed");
-    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(0).error).toBe("We couldn't complete that request. Please try again.");
     expect(entry(1).status).toBe("completed");
   });
 
@@ -1763,7 +1769,7 @@ describe("erase-object batch: a file the progress stream gave up on (#1893)", ()
     );
 
     expect(entry(0).status).toBe("failed");
-    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(0).error).toBe(en.errors.processingFailedNoDetail);
     expect(entry(0).processedUrl).toBeNull();
     expect(first.aborted).toBe(true);
     expect(entry(1).status).toBe("completed");
@@ -1833,7 +1839,7 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
 
     xhr.respond(200, GOOD_BODY);
 
-    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().error).toBe(en.errors.processingFailedNoDetail);
     expect(entry().status).not.toBe("completed");
     expect(entry().processedUrl).toBeNull();
     expect(xhr.aborted).toBe(true);
@@ -1918,7 +1924,7 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
 
     act(() => xhr.onerror?.());
 
-    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().error).toBe(en.errors.processingFailedNoDetail);
   });
 
   it("ignores a late timeout on the abandoned request", async () => {
@@ -1930,7 +1936,7 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
 
     act(() => xhr.ontimeout?.());
 
-    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().error).toBe(en.errors.processingFailedNoDetail);
   });
 
   it("ignores a late error answer on the abandoned request", async () => {
@@ -2117,7 +2123,7 @@ describe("erase-object cancels a job the client gave up on (#1960)", () => {
     ).toThrow("abort broke");
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().error).toBe(en.errors.processingFailedNoDetail);
     expect(useFileStore.getState().processing).toBe(false);
   });
 
@@ -2141,7 +2147,7 @@ describe("erase-object cancels a job the client gave up on (#1960)", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(entry(0).status).toBe("failed");
-    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(0).error).toBe(en.errors.processingFailedNoDetail);
     expect(entry(1).status).toBe("completed");
   });
 
@@ -3271,7 +3277,9 @@ describe("erase-object re-runs clear stale processed fields (#3281)", () => {
     expect(useFileStore.getState().processedUrl).toBeNull();
     expect(useFileStore.getState().processedPreviewUrl).toBeNull();
     expect(useFileStore.getState().processedSize).toBeNull();
-    expect(screen.getByText("Second erase failed")).toBeInTheDocument();
+    expect(
+      screen.getByText("We couldn't complete that request. Please try again."),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("erase-object-download")).not.toBeInTheDocument();
     expect(screen.queryByText("Processed: 1.0 KB")).not.toBeInTheDocument();
   });
@@ -3409,7 +3417,7 @@ describe("erase-object re-runs clear stale processed fields (#3281)", () => {
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
 
     expect(entry(0).status).toBe("failed");
-    expect(entry(0).error).toBe("Batch file 1 failed");
+    expect(entry(0).error).toBe("We couldn't complete that request. Please try again.");
     expect(entry(0).processedUrl).toBeNull();
     expect(entry(0).processedPreviewUrl).toBeNull();
     expect(entry(0).processedFilename).toBeNull();
