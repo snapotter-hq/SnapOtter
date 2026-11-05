@@ -72,6 +72,8 @@ Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own Po
 |---|---|---|
 | `EMBEDDED` | `auto` | Auto-enabled when both `DATABASE_URL` and `REDIS_URL` are unset. Set to `0` to disable it (the app then fails fast if no external `DATABASE_URL`/`REDIS_URL` is set, rather than silently starting an in-container database). |
 | `REDIS_MAXMEMORY` | `512mb` | Memory cap for the embedded Redis (embedded mode only). Lower it on memory-constrained hosts such as a Raspberry Pi. |
+| `EMBEDDED_PG_PORT` | `5432` | Loopback port for the embedded PostgreSQL (embedded mode only). Change it only when the container shares a network where 5432 is taken, such as `--network host`. It must differ from `EMBEDDED_REDIS_PORT`. |
+| `EMBEDDED_REDIS_PORT` | `6379` | Same, for the embedded Redis. |
 | `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Seconds the boot waits for the embedded Redis to answer `PING` before giving up. On timeout the container stops and logs why, instead of hanging. Whole seconds from 1 to 999999; there is no unlimited value, because waiting forever is the failure this bound exists to prevent. Raise it only if a slow host trips it. |
 | `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Same, for the embedded PostgreSQL. The clock starts after first-boot `initdb` finishes, so it covers server start and crash recovery rather than the initial database creation. |
 

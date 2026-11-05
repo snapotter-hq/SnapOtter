@@ -137,6 +137,78 @@ describe("embedded-lib.sh check_pg_version", () => {
   });
 });
 
+describe("embedded-lib.sh embedded_port", () => {
+  it.each(["1", "5432", "65535"])("accepts %s", (port) => {
+    const r = runLib(`embedded_port EMBEDDED_PG_PORT ${port}`);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe(port);
+  });
+
+  it.each(["", "0", "65536", "99999999", "05432", "54x", "-1", " 5432"])(
+    "refuses %j and names the variable",
+    (port) => {
+      const r = runLib(`embedded_port EMBEDDED_PG_PORT '${port}'`);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain("EMBEDDED_PG_PORT must be a port number from 1 to 65535");
+    },
+  );
+});
+
+describe("embedded-lib.sh export_embedded_db_env", () => {
+  const printEnv =
+    'printf "%s\\n" "$EMBEDDED_PG_PORT" "$EMBEDDED_REDIS_PORT" "$DATABASE_URL" "$DATABASE_MIGRATION_URL" "$REDIS_URL"';
+
+  it("uses the container's ports when the variables are unset or empty", () => {
+    const unsetOrEmpty: Array<Record<string, string>> = [
+      {},
+      { EMBEDDED_PG_PORT: "", EMBEDDED_REDIS_PORT: "" },
+    ];
+    for (const env of unsetOrEmpty) {
+      const r = runLib(`export_embedded_db_env && ${printEnv}`, env);
+      expect(r.status).toBe(0);
+      expect(r.stdout.split("\n")).toEqual([
+        "5432",
+        "6379",
+        "postgres://snapotter_app:snapotter_app@127.0.0.1:5432/snapotter",
+        "postgres://snapotter:snapotter@127.0.0.1:5432/snapotter",
+        "redis://127.0.0.1:6379",
+      ]);
+    }
+  });
+
+  it("puts the configured ports in every URL", () => {
+    const r = runLib(`export_embedded_db_env && ${printEnv}`, {
+      EMBEDDED_PG_PORT: "15432",
+      EMBEDDED_REDIS_PORT: "16379",
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout.split("\n")).toEqual([
+      "15432",
+      "16379",
+      "postgres://snapotter_app:snapotter_app@127.0.0.1:15432/snapotter",
+      "postgres://snapotter:snapotter@127.0.0.1:15432/snapotter",
+      "redis://127.0.0.1:16379",
+    ]);
+  });
+
+  it("stops on a bad port instead of building URLs around it", () => {
+    const r = runLib("export_embedded_db_env", { EMBEDDED_REDIS_PORT: "6379x" });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("EMBEDDED_REDIS_PORT must be a port number from 1 to 65535");
+  });
+
+  it("refuses one port for both databases", () => {
+    // Redis would take it first, and Postgres would retry the bind until its
+    // readiness timeout ran out, ten minutes by default.
+    const r = runLib("export_embedded_db_env", {
+      EMBEDDED_PG_PORT: "16379",
+      EMBEDDED_REDIS_PORT: "16379",
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both 16379");
+  });
+});
+
 // Probe stubs live in a temp dir prepended to PATH: the readiness helpers call
 // redis-cli / pg_isready by name, and neither exists on a dev machine. The
 // `sleep` stub records each call and then really sleeps, because the wait loop's
@@ -305,6 +377,26 @@ describe("embedded-lib.sh readiness gates", () => {
     const args = join(bin.dir, "argv");
     bin.write(probe, `printf '%s' "$*" > "${args}"; echo PONG`);
     expect(bin.run(gate).status).toBe(0);
+    expect(readFileSync(args, "utf8")).toBe(argv);
+  });
+
+  it.each([
+    [
+      "redis_ready",
+      "redis-cli",
+      { EMBEDDED_REDIS_PORT: "16379" },
+      "-t 2 -h 127.0.0.1 -p 16379 ping",
+    ],
+    [
+      "postgres_ready",
+      "pg_isready",
+      { EMBEDDED_PG_PORT: "15432" },
+      "-t 2 -h 127.0.0.1 -p 15432 -U snapotter -d snapotter",
+    ],
+  ])("%s probes the configured port", (gate, probe, portEnv, argv) => {
+    const args = join(bin.dir, "argv");
+    bin.write(probe, `printf '%s' "$*" > "${args}"; echo PONG`);
+    expect(bin.run(gate, portEnv).status).toBe(0);
     expect(readFileSync(args, "utf8")).toBe(argv);
   });
 });

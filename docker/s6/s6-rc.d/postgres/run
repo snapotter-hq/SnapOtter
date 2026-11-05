@@ -1,2 +1,3 @@
 #!/command/with-contenv sh
-exec s6-setuidgid postgres /usr/lib/postgresql/17/bin/postgres -D /data/postgres
+exec s6-setuidgid postgres /usr/lib/postgresql/17/bin/postgres -D /data/postgres \
+  -p "${EMBEDDED_PG_PORT:-5432}"

@@ -1,4 +1,13 @@
 #!/bin/sh
 # Offline account and MFA recovery CLI for locked-out operators.
 # Docs: https://docs.snapotter.com/guide/account-recovery
+# A `docker exec` shell never sees what the entrypoint exported, so on the
+# all-in-one image this derives the embedded database URLs the same way. The
+# check keeps a checkout without the image's lib (a native install) working.
+if [ -r /usr/local/bin/embedded-lib.sh ]; then
+  . /usr/local/bin/embedded-lib.sh
+  if [ "$(decide_run_mode 2>/dev/null)" = "embedded" ]; then
+    export_embedded_db_env || exit 1
+  fi
+fi
 cd /app/apps/api && exec ./node_modules/.bin/tsx src/scripts/admin-recovery.ts "$@"

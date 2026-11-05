@@ -86,6 +86,54 @@ check_pg_version() {
   return 1
 }
 
+# embedded_port <name> <value>
+# Echoes <value> when it is a whole number from 1 to 65535, otherwise prints a
+# fatal message naming <name> and returns 1. The embedded database ports are
+# configurable for a container on the host network, where 5432 or 6379 may
+# already be taken; the defaults stay 5432 and 6379.
+embedded_port() {
+  _ep_name="$1"
+  _ep_value="$2"
+  case "$_ep_value" in
+    "" | *[!0-9]* | 0*) _ep_ok=no ;;
+    *) _ep_ok=yes ;;
+  esac
+  if [ "$_ep_ok" = yes ] && { [ "${#_ep_value}" -gt 5 ] || [ "$_ep_value" -gt 65535 ]; }; then
+    _ep_ok=no
+  fi
+  if [ "$_ep_ok" = no ]; then
+    printf 'FATAL: %s must be a port number from 1 to 65535, not "%s".\n' \
+      "$_ep_name" "$_ep_value" >&2
+    return 1
+  fi
+  printf '%s\n' "$_ep_value"
+}
+
+# export_embedded_db_env
+# Validates EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT (unset or empty means 5432
+# and 6379) and exports them, with the URLs the app reaches the embedded
+# databases through. The entrypoint calls it before s6 starts. snapotter-admin
+# calls it too, because a `docker exec` shell never sees the entrypoint's exports.
+export_embedded_db_env() {
+  EMBEDDED_PG_PORT="$(embedded_port EMBEDDED_PG_PORT "${EMBEDDED_PG_PORT:-5432}")" || return 1
+  EMBEDDED_REDIS_PORT="$(embedded_port EMBEDDED_REDIS_PORT "${EMBEDDED_REDIS_PORT:-6379}")" || return 1
+  # Otherwise Redis takes the port first and Postgres retries the bind until its
+  # readiness timeout runs out, ten minutes by default, before the boot fails.
+  if [ "$EMBEDDED_PG_PORT" = "$EMBEDDED_REDIS_PORT" ]; then
+    printf 'FATAL: EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both %s; they need different ports.\n' \
+      "$EMBEDDED_PG_PORT" >&2
+    return 1
+  fi
+  export EMBEDDED_PG_PORT EMBEDDED_REDIS_PORT
+  # Same split as the Compose stack: requests are served by the DML-only
+  # snapotter_app role, and only the short-lived boot connection uses the
+  # database owner. Both roles are created by the first-boot bootstrap; on a
+  # data dir from before the split the app creates snapotter_app itself at boot.
+  export DATABASE_URL="postgres://snapotter_app:snapotter_app@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
+  export DATABASE_MIGRATION_URL="postgres://snapotter:snapotter@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
+  export REDIS_URL="redis://127.0.0.1:${EMBEDDED_REDIS_PORT}"
+}
+
 # wait_for_service <label> <timeout_seconds> <expect> <probe> [args...]
 # Polls <probe> once a second until it exits 0 and, when <expect> is non-empty,
 # its output contains that string. Returns 0 the moment that holds. On timeout it
@@ -166,14 +214,14 @@ wait_for_service() {
 # all, which would swallow the deadline entirely.
 redis_ready() {
   wait_for_service Redis "${EMBEDDED_REDIS_TIMEOUT_S:-180}" PONG \
-    redis-cli -t 2 -h 127.0.0.1 -p 6379 ping && return 0
+    redis-cli -t 2 -h 127.0.0.1 -p "${EMBEDDED_REDIS_PORT:-6379}" ping && return 0
   printf 'Set EMBEDDED_REDIS_TIMEOUT_S (whole seconds) higher if the host is only slow.\n' >&2
   return 1
 }
 
 postgres_ready() {
   wait_for_service PostgreSQL "${EMBEDDED_POSTGRES_TIMEOUT_S:-600}" "" \
-    pg_isready -t 2 -h 127.0.0.1 -p 5432 -U snapotter -d snapotter && return 0
+    pg_isready -t 2 -h 127.0.0.1 -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter && return 0
   printf 'Set EMBEDDED_POSTGRES_TIMEOUT_S (whole seconds) higher if the host is only slow.\n' >&2
   return 1
 }
