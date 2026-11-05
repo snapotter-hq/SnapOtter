@@ -822,7 +822,7 @@ export const ja: TranslationKeys = {
     },
     "convert-video": {
       name: "動画変換",
-      description: "MP4、MOV、WebM 間で動画を変換",
+      description: "MP4、MOV、WebM、AVI、MKV 間で動画を変換",
     },
     "compress-video": {
       name: "動画圧縮",

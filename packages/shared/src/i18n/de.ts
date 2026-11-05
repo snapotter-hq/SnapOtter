@@ -862,7 +862,7 @@ export const de: TranslationKeys = {
     },
     "convert-video": {
       name: "Video konvertieren",
-      description: "Videos zwischen MP4, MOV und WebM konvertieren",
+      description: "Videos zwischen MP4, MOV, WebM, AVI und MKV konvertieren",
     },
     "compress-video": {
       name: "Video komprimieren",

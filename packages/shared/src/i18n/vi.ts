@@ -860,7 +860,7 @@ export const vi: TranslationKeys = {
     },
     "convert-video": {
       name: "Chuyển đổi video",
-      description: "Chuyển đổi video giữa các định dạng MP4, MOV và WebM",
+      description: "Chuyển đổi video giữa các định dạng MP4, MOV, WebM, AVI và MKV",
     },
     "compress-video": {
       name: "Nén video",

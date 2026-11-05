@@ -848,7 +848,7 @@ export const th: TranslationKeys = {
     },
     "convert-video": {
       name: "แปลงวิดีโอ",
-      description: "แปลงวิดีโอระหว่าง MP4, MOV และ WebM",
+      description: "แปลงวิดีโอระหว่าง MP4, MOV, WebM, AVI และ MKV",
     },
     "compress-video": {
       name: "บีบอัดวิดีโอ",

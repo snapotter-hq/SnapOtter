@@ -860,7 +860,7 @@ export const ptBR: TranslationKeys = {
     },
     "convert-video": {
       name: "Converter Vídeo",
-      description: "Converta vídeos entre MP4, MOV e WebM",
+      description: "Converta vídeos entre MP4, MOV, WebM, AVI e MKV",
     },
     "compress-video": {
       name: "Comprimir Vídeo",

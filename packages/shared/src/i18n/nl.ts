@@ -861,7 +861,7 @@ export const nl: TranslationKeys = {
     },
     "convert-video": {
       name: "Video converteren",
-      description: "Converteer video's tussen MP4, MOV en WebM",
+      description: "Converteer video's tussen MP4, MOV, WebM, AVI en MKV",
     },
     "compress-video": {
       name: "Video comprimeren",

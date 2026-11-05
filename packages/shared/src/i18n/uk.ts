@@ -860,7 +860,7 @@ export const uk: TranslationKeys = {
     },
     "convert-video": {
       name: "Конвертація відео",
-      description: "Конвертувати відео між форматами MP4, MOV та WebM",
+      description: "Конвертувати відео між форматами MP4, MOV, WebM, AVI та MKV",
     },
     "compress-video": {
       name: "Стиснення відео",

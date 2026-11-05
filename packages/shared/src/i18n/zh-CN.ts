@@ -638,7 +638,7 @@ export const zhCN: TranslationKeys = {
     },
     "convert-video": {
       name: "转换视频",
-      description: "在 MP4、MOV 和 WebM 格式之间转换视频",
+      description: "在 MP4、MOV、WebM、AVI 和 MKV 格式之间转换视频",
     },
     "compress-video": {
       name: "压缩视频",

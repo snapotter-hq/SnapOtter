@@ -859,7 +859,7 @@ export const id: TranslationKeys = {
     },
     "convert-video": {
       name: "Konversi Video",
-      description: "Konversi video antara format MP4, MOV, dan WebM",
+      description: "Konversi video antara format MP4, MOV, WebM, AVI, dan MKV",
     },
     "compress-video": {
       name: "Kompres Video",

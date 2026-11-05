@@ -860,7 +860,7 @@ export const tr: TranslationKeys = {
     },
     "convert-video": {
       name: "Video Dönüştür",
-      description: "Videoları MP4, MOV ve WebM arasında dönüştür",
+      description: "Videoları MP4, MOV, WebM, AVI ve MKV arasında dönüştür",
     },
     "compress-video": {
       name: "Video Sıkıştır",

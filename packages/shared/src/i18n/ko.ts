@@ -807,7 +807,7 @@ export const ko: TranslationKeys = {
     },
     "convert-video": {
       name: "동영상 변환",
-      description: "MP4, MOV, WebM 간 동영상 변환",
+      description: "MP4, MOV, WebM, AVI, MKV 간 동영상 변환",
     },
     "compress-video": {
       name: "동영상 압축",
