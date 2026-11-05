@@ -110,29 +110,138 @@ embedded_port() {
   printf '%s\n' "$_ep_value"
 }
 
-# export_embedded_db_env
-# Validates EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT (unset or empty means 5432
-# and 6379) and exports them, with the URLs the app reaches the embedded
-# databases through. The entrypoint calls it before s6 starts. snapotter-admin
-# calls it too, because a `docker exec` shell never sees the entrypoint's exports.
-export_embedded_db_env() {
-  EMBEDDED_PG_PORT="$(embedded_port EMBEDDED_PG_PORT "${EMBEDDED_PG_PORT:-5432}")" || return 1
-  EMBEDDED_REDIS_PORT="$(embedded_port EMBEDDED_REDIS_PORT "${EMBEDDED_REDIS_PORT:-6379}")" || return 1
-  # Otherwise Redis takes the port first and Postgres retries the bind until its
-  # readiness timeout runs out, ten minutes by default, before the boot fails.
-  if [ "$EMBEDDED_PG_PORT" = "$EMBEDDED_REDIS_PORT" ]; then
-    printf 'FATAL: EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both %s; they need different ports.\n' \
-      "$EMBEDDED_PG_PORT" >&2
+# Per-install database passwords (EMBEDDED_DB_PASSWORDS=1). Without a private
+# network namespace, such as with --network host, other local programs can
+# reach 127.0.0.1, so the fixed passwords and trust auth that are safe behind
+# Docker's network namespace are not. Once these files exist they are used on
+# every boot, even if the variable is later unset, so a secured install never
+# falls back to trust.
+EMBEDDED_DB_SECRET_NAMES="pg-owner pg-app redis"
+
+# embedded_db_secured <dir>: returns 0 when every secret file exists.
+embedded_db_secured() {
+  for _eds_name in $EMBEDDED_DB_SECRET_NAMES; do
+    [ -f "$1/$_eds_name" ] || return 1
+  done
+  return 0
+}
+
+# ensure_embedded_db_secrets <dir>: creates whichever secrets are missing, as 64
+# hex characters from /dev/urandom. Hex needs no quoting in a URL or in SQL.
+# g-s as well as 700: a directory made under the image's setgid /data inherits
+# the bit, and GNU chmod keeps a directory's setgid bit through `chmod 700`.
+ensure_embedded_db_secrets() {
+  _ees_dir="$1"
+  if ! mkdir -p "$_ees_dir" || ! chmod 700 "$_ees_dir" || ! chmod g-s "$_ees_dir"; then
+    printf 'FATAL: could not create %s for the embedded database passwords.\n' "$_ees_dir" >&2
     return 1
   fi
-  export EMBEDDED_PG_PORT EMBEDDED_REDIS_PORT
+  for _ees_name in $EMBEDDED_DB_SECRET_NAMES; do
+    [ -f "$_ees_dir/$_ees_name" ] && continue
+    _ees_tmp="$_ees_dir/.$_ees_name.tmp"
+    if ! (umask 077 && od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$_ees_tmp") ||
+      ! mv "$_ees_tmp" "$_ees_dir/$_ees_name"; then
+      rm -f "$_ees_tmp"
+      printf 'FATAL: could not write the embedded %s password in %s.\n' "$_ees_name" "$_ees_dir" >&2
+      return 1
+    fi
+  done
+  return 0
+}
+
+# read_embedded_secret <dir> <name>: echoes the secret. Anything other than
+# exactly 64 lowercase hex characters is refused, because the value is spliced
+# into SQL and connection URLs.
+read_embedded_secret() {
+  _res_value="$(cat "$1/$2" 2>/dev/null)" || _res_value=""
+  case "$_res_value" in
+    "" | *[!0-9a-f]*) _res_ok=no ;;
+    *) _res_ok=yes ;;
+  esac
+  if [ "$_res_ok" = no ] || [ "${#_res_value}" -ne 64 ]; then
+    printf 'FATAL: %s/%s is not a valid embedded database password.\n' "$1" "$2" >&2
+    return 1
+  fi
+  printf '%s\n' "$_res_value"
+}
+
+# write_embedded_pg_hba <pgdata>: replaces pg_hba.conf with the secured rules.
+# Local socket connections stay trusted, because the socket is only reachable
+# from inside the container. TCP takes the two app roles with scram-sha-256 and
+# nothing else. On a data dir created by 2.3.0 or later the superuser is
+# `postgres`, which has no password, so it cannot log in over TCP at all. On an
+# older one `snapotter` is the bootstrap superuser, and its per-install password
+# is what guards that login.
+write_embedded_pg_hba() {
+  _wph_tmp="$1/pg_hba.conf.tmp"
+  if ! printf '%s\n' \
+    "# Managed by SnapOtter (EMBEDDED_DB_PASSWORDS). Rewritten on every boot." \
+    "local all all trust" \
+    "host snapotter snapotter,snapotter_app 127.0.0.1/32 scram-sha-256" \
+    > "$_wph_tmp" || ! mv "$_wph_tmp" "$1/pg_hba.conf"; then
+    rm -f "$_wph_tmp"
+    printf 'FATAL: could not write %s/pg_hba.conf.\n' "$1" >&2
+    return 1
+  fi
+}
+
+# write_embedded_redis_conf <file> <secrets_dir>: the config file redis-server
+# reads first. A secured install gets requirepass here, not on the command line,
+# because /proc/<pid>/cmdline is readable by every local user.
+write_embedded_redis_conf() {
+  if embedded_db_secured "$2"; then
+    _wrc_pw="$(read_embedded_secret "$2" redis)" || return 1
+    (umask 077 && printf 'requirepass %s\n' "$_wrc_pw" > "$1") || return 1
+  else
+    (umask 077 && printf '' > "$1") || return 1
+  fi
+}
+
+# export_embedded_db_env <secrets_dir>
+# Validates EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT (unset or empty means 5432
+# and 6379) and exports them, with the URLs the app reaches the embedded
+# databases through. A secured install (every secret present in <secrets_dir>)
+# gets its per-install passwords. The entrypoint calls it before s6 starts.
+# snapotter-admin calls it too, because a `docker exec` shell never sees the
+# entrypoint's exports. Nothing is set until everything has passed, so a
+# refusal leaves the caller's variables as they were.
+export_embedded_db_env() {
+  _eede_pg_port="$(embedded_port EMBEDDED_PG_PORT "${EMBEDDED_PG_PORT:-5432}")" || return 1
+  _eede_redis_port="$(embedded_port EMBEDDED_REDIS_PORT "${EMBEDDED_REDIS_PORT:-6379}")" || return 1
+  # Otherwise Redis takes the port first and Postgres retries the bind until its
+  # readiness timeout runs out, ten minutes by default, before the boot fails.
+  if [ "$_eede_pg_port" = "$_eede_redis_port" ]; then
+    printf 'FATAL: EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both %s; they need different ports.\n' \
+      "$_eede_pg_port" >&2
+    return 1
+  fi
+  if embedded_db_secured "$1"; then
+    _eede_owner="$(read_embedded_secret "$1" pg-owner)" || return 1
+    _eede_app="$(read_embedded_secret "$1" pg-app)" || return 1
+    _eede_redis="$(read_embedded_secret "$1" redis)" || return 1
+  else
+    # The fixed passwords the bootstrap gives both roles, which trust auth never
+    # checks, and no Redis password.
+    _eede_owner=snapotter
+    _eede_app=snapotter_app
+    _eede_redis=""
+  fi
+  export EMBEDDED_PG_PORT="$_eede_pg_port" EMBEDDED_REDIS_PORT="$_eede_redis_port"
   # Same split as the Compose stack: requests are served by the DML-only
   # snapotter_app role, and only the short-lived boot connection uses the
   # database owner. Both roles are created by the first-boot bootstrap; on a
   # data dir from before the split the app creates snapotter_app itself at boot.
-  export DATABASE_URL="postgres://snapotter_app:snapotter_app@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
-  export DATABASE_MIGRATION_URL="postgres://snapotter:snapotter@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
-  export REDIS_URL="redis://127.0.0.1:${EMBEDDED_REDIS_PORT}"
+  export DATABASE_URL="postgres://snapotter_app:${_eede_app}@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
+  export DATABASE_MIGRATION_URL="postgres://snapotter:${_eede_owner}@127.0.0.1:${EMBEDDED_PG_PORT}/snapotter"
+  if [ -n "$_eede_redis" ]; then
+    export REDIS_URL="redis://:${_eede_redis}@127.0.0.1:${EMBEDDED_REDIS_PORT}"
+    # redis-cli reads REDISCLI_AUTH, so the readiness probe authenticates
+    # without -a, which would put the password on its command line.
+    export REDISCLI_AUTH="$_eede_redis"
+  else
+    export REDIS_URL="redis://127.0.0.1:${EMBEDDED_REDIS_PORT}"
+  fi
+  unset _eede_pg_port _eede_redis_port _eede_owner _eede_app _eede_redis
 }
 
 # wait_for_service <label> <timeout_seconds> <expect> <probe> [args...]

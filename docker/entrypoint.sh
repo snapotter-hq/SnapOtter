@@ -10,8 +10,8 @@ umask 0007
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
 # Embedded-mode helpers (decide_run_mode, embedded_requires_root,
-# export_embedded_db_env, sqlite_autodetect_path, check_pg_version). Same
-# no-side-effects contract.
+# ensure_embedded_db_secrets, export_embedded_db_env, sqlite_autodetect_path,
+# check_pg_version). Same no-side-effects contract.
 . /usr/local/bin/embedded-lib.sh
 
 # --- Docker secret file convention (_FILE suffix) ---
@@ -66,7 +66,15 @@ if [ "$RUN_MODE" = "embedded" ]; then
   embedded_requires_root "$(id -u)" || exit 1
   EMBEDDED_MODE=1
   export EMBEDDED_MODE
-  export_embedded_db_env || exit 1
+  # Per-install passwords (see embedded-lib.sh): generated when asked for, then
+  # used on every boot while /data/.secrets exists. A secret missing from that
+  # directory is generated again, so Redis can't come up open while Postgres
+  # still demands the old passwords.
+  EMBEDDED_SECRETS=/data/.secrets
+  if [ "${EMBEDDED_DB_PASSWORDS:-0}" = "1" ] || [ -d "$EMBEDDED_SECRETS" ]; then
+    ensure_embedded_db_secrets "$EMBEDDED_SECRETS" || exit 1
+  fi
+  export_embedded_db_env "$EMBEDDED_SECRETS" || exit 1
   # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
   # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
   SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")"
@@ -233,7 +241,7 @@ if [ "$(id -u)" = "0" ]; then
   # (Postgres refuses a foreign-owned PGDATA), so exclude it from the snapotter
   # sweep and chown it separately when it already exists.
   if [ -n "${EMBEDDED_MODE:-}" ]; then
-    find /data -mindepth 1 -maxdepth 1 ! -name postgres -exec chown -R snapotter:snapotter {} + 2>&1 || \
+    find /data -mindepth 1 -maxdepth 1 ! -name postgres ! -name .secrets -exec chown -R snapotter:snapotter {} + 2>&1 || \
       echo "WARNING: Could not fix /data permissions. Use named volumes to avoid this. See docs." >&2
     chown snapotter:snapotter /data 2>/dev/null || true
     chown -R snapotter:snapotter /tmp/workspace 2>&1 || true

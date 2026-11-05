@@ -7,7 +7,7 @@
 if [ -r /usr/local/bin/embedded-lib.sh ]; then
   . /usr/local/bin/embedded-lib.sh
   if [ "$(decide_run_mode 2>/dev/null)" = "embedded" ]; then
-    export_embedded_db_env || exit 1
+    export_embedded_db_env /data/.secrets || exit 1
   fi
 fi
 cd /app/apps/api && exec ./node_modules/.bin/tsx src/scripts/admin-recovery.ts "$@"

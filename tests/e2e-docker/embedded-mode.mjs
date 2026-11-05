@@ -104,7 +104,7 @@ const resolveContainerPort = () => {
   if (!match) throw new Error(`Invalid Docker port binding: ${binding}`);
   PORT = match[1];
 };
-const runEmbeddedContainer = () => {
+const runEmbeddedContainer = (extraArgs = []) => {
   if (quiet(["inspect", NAME])) {
     throw new Error(`Unique container name collision: ${NAME}`);
   }
@@ -121,6 +121,7 @@ const runEmbeddedContainer = () => {
     `${VOL}:/data`,
     "-e",
     "SNAPOTTER_TELEMETRY=0",
+    ...extraArgs,
     IMAGE,
   ]);
   if (!containerIsOwned()) {
@@ -404,6 +405,125 @@ async function main() {
   countMatches(badEnvLogs, /ZodError:/g) === 1
     ? ok("API ran once and did not respawn")
     : bad("API respawned more than once before halting");
+  cleanup();
+
+  // 9. A host-network setup: custom loopback ports and per-install passwords.
+  console.log("\n[9] custom ports and per-install database passwords");
+  cleanup();
+  createVolume();
+  runEmbeddedContainer([
+    "-e",
+    "EMBEDDED_PG_PORT=15432",
+    "-e",
+    "EMBEDDED_REDIS_PORT=16379",
+    "-e",
+    "EMBEDDED_DB_PASSWORDS=1",
+  ]);
+  (await waitHealthy(300000))
+    ? ok("secured container reached healthy")
+    : bad("secured container never became healthy");
+  const modes = quiet([
+    "exec",
+    NAME,
+    "stat",
+    "-c",
+    "%a %U",
+    "/data/.secrets",
+    "/data/.secrets/pg-owner",
+    "/data/.secrets/pg-app",
+    "/data/.secrets/redis",
+  ])
+    .trim()
+    .split("\n")
+    .join("|");
+  modes === "700 root|600 root|600 root|600 root"
+    ? ok("secrets are root-only")
+    : bad(`unexpected secret modes: ${modes}`);
+  const psql = (user, password) =>
+    spawnSync(
+      "docker",
+      [
+        "exec",
+        "-e",
+        `PGPASSWORD=${password}`,
+        NAME,
+        "psql",
+        "-h",
+        "127.0.0.1",
+        "-p",
+        "15432",
+        "-U",
+        user,
+        "-d",
+        "snapotter",
+        "-c",
+        "select 1",
+      ],
+      { encoding: "utf-8" },
+    );
+  const superuser = psql("postgres", "");
+  superuser.status !== 0 && /no pg_hba\.conf entry/.test(superuser.stderr)
+    ? ok("the superuser cannot log in over TCP")
+    : bad(`superuser TCP login was not refused: ${superuser.stderr}`);
+  const oldPassword = psql("snapotter_app", "snapotter_app");
+  oldPassword.status !== 0 && /password authentication failed/.test(oldPassword.stderr)
+    ? ok("the old fixed app password is refused")
+    : bad(`the old app password still works: ${oldPassword.stderr}`);
+  combined(["exec", NAME, "redis-cli", "-p", "16379", "ping"]).includes("NOAUTH")
+    ? ok("Redis refuses unauthenticated clients")
+    : bad("Redis answered without a password");
+  quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'REDISCLI_AUTH="$(cat /data/.secrets/redis)" redis-cli -p 16379 ping',
+  ]).trim() === "PONG"
+    ? ok("Redis answers with the per-install password")
+    : bad("Redis rejected its own password");
+  spawnSync("docker", ["exec", NAME, "pg_isready", "-h", "127.0.0.1", "-p", "5432"]).status !== 0
+    ? ok("nothing listens on the default Postgres port")
+    : bad("Postgres still listens on 5432");
+  // The passwords may live in files and in the services' environment, never in
+  // a log line or an argv, which every local user can read in /proc.
+  const secretValues = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'for f in /data/.secrets/*; do cat "$f"; echo; done',
+  ])
+    .trim()
+    .split("\n");
+  const commandLines = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    "for f in /proc/[0-9]*/cmdline; do tr '\\0' ' ' < \"$f\"; echo; done",
+  ]);
+  const logs9 = dockerLogs(NAME);
+  secretValues.length === 3 &&
+  secretValues.every((secret) => /^[0-9a-f]{64}$/.test(secret)) &&
+  !secretValues.some((secret) => logs9.includes(secret) || commandLines.includes(secret))
+    ? ok("no password in the logs or on a command line")
+    : bad("a per-install password reached the logs or a command line");
+  // docker exec starts without the entrypoint's exports, so this proves
+  // snapotter-admin finds both databases on its own: Postgres for the user
+  // lookup, Redis for the throttle key.
+  combined(["exec", NAME, "snapotter-admin", "unlock-user", "admin"]).includes(
+    'User "admin" is not locked out',
+  )
+    ? ok("snapotter-admin reaches both databases under docker exec")
+    : bad("snapotter-admin could not reach the embedded databases");
+  const secretsBefore = quiet(["exec", NAME, "sh", "-c", "cat /data/.secrets/*"]);
+  restartEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("secured container healthy after a restart")
+    : bad("secured container unhealthy after a restart");
+  quiet(["exec", NAME, "sh", "-c", "cat /data/.secrets/*"]) === secretsBefore
+    ? ok("passwords survive a restart")
+    : bad("passwords changed across a restart");
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);

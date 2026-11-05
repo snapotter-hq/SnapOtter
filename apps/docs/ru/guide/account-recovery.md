@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: c49281c499a8
+i18n_output_hash: 31930fecf9e1
 i18n_hash_version: 2
 ---
 # Восстановление доступа к аккаунту {#account-recovery}
@@ -82,8 +82,8 @@ docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
 all-in-one Postgres работает внутри контейнера:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 В конфигурации с несколькими контейнерами укажите `psql` на свой собственный `DATABASE_URL`.

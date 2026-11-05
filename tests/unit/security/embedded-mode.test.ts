@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -206,6 +214,129 @@ describe("embedded-lib.sh export_embedded_db_env", () => {
     });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("EMBEDDED_PG_PORT and EMBEDDED_REDIS_PORT are both 16379");
+  });
+});
+
+describe("embedded-lib.sh per-install database secrets", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "db-secrets-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const secrets = () => join(dir, "secrets");
+  const mode = (path: string) => statSync(path).mode & 0o777;
+
+  it("creates three 64-hex secrets, root-only, and keeps them on the next call", () => {
+    expect(runLib(`ensure_embedded_db_secrets "${secrets()}"`).status).toBe(0);
+    expect(mode(secrets())).toBe(0o700);
+    const first: Record<string, string> = {};
+    for (const name of ["pg-owner", "pg-app", "redis"]) {
+      const file = join(secrets(), name);
+      expect(mode(file)).toBe(0o600);
+      first[name] = readFileSync(file, "utf8");
+      expect(first[name]).toMatch(/^[0-9a-f]{64}$/);
+    }
+    expect(new Set(Object.values(first)).size).toBe(3);
+    expect(runLib(`ensure_embedded_db_secrets "${secrets()}"`).status).toBe(0);
+    for (const name of ["pg-owner", "pg-app", "redis"]) {
+      expect(readFileSync(join(secrets(), name), "utf8")).toBe(first[name]);
+    }
+  });
+
+  it("clears the setgid bit a new directory inherits under the image's /data", () => {
+    // The image makes /data setgid, a directory created there inherits the bit,
+    // and GNU chmod keeps it through `chmod 700`.
+    chmodSync(dir, 0o2775);
+    expect(runLib(`ensure_embedded_db_secrets "${secrets()}"`).status).toBe(0);
+    expect(statSync(secrets()).mode & 0o7777).toBe(0o700);
+  });
+
+  it("counts an install as secured only when every secret exists", () => {
+    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(1);
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(0);
+    rmSync(join(secrets(), "redis"));
+    expect(runLib(`embedded_db_secured "${secrets()}"`).status).toBe(1);
+  });
+
+  it("reads a valid secret and refuses one that could break out of SQL or a URL", () => {
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    const ok = runLib(`read_embedded_secret "${secrets()}" pg-app`);
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/^[0-9a-f]{64}$/);
+    for (const bad of ["x'; DROP ROLE snapotter; --", "abc", `${"a".repeat(64)}0`, ""]) {
+      writeFileSync(join(secrets(), "pg-app"), bad);
+      const r = runLib(`read_embedded_secret "${secrets()}" pg-app`);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain("is not a valid embedded database password");
+    }
+  });
+
+  it("exports the per-install passwords once every secret exists", () => {
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    const secret = (name: string) => readFileSync(join(secrets(), name), "utf8");
+    const r = runLib(
+      `export_embedded_db_env "${secrets()}" && printf "%s\\n" "$DATABASE_URL" "$DATABASE_MIGRATION_URL" "$REDIS_URL" "$REDISCLI_AUTH"`,
+      { EMBEDDED_PG_PORT: "15432", EMBEDDED_REDIS_PORT: "16379" },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout.split("\n")).toEqual([
+      `postgres://snapotter_app:${secret("pg-app")}@127.0.0.1:15432/snapotter`,
+      `postgres://snapotter:${secret("pg-owner")}@127.0.0.1:15432/snapotter`,
+      `redis://:${secret("redis")}@127.0.0.1:16379`,
+      secret("redis"),
+    ]);
+  });
+
+  it("stops on a tampered secret instead of falling back to the fixed passwords", () => {
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    writeFileSync(join(secrets(), "pg-owner"), "not-hex");
+    const r = runLib(`export_embedded_db_env "${secrets()}"`);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("pg-owner is not a valid embedded database password");
+  });
+
+  it("leaves the caller's port variables as they were when it refuses", () => {
+    // Every consumer falls back to 5432 or 6379 when a port is empty or unset, so
+    // a caller that carried on after a refusal would quietly use the defaults.
+    const stateAfter = (env: Record<string, string>) =>
+      runLib(
+        `export_embedded_db_env "${secrets()}"\nprintf '%s|%s|%s' "$?" "\${EMBEDDED_PG_PORT-unset}" "\${EMBEDDED_REDIS_PORT-unset}"`,
+        env,
+      ).stdout;
+    expect(stateAfter({ EMBEDDED_PG_PORT: "abc" })).toBe("1|abc|unset");
+    expect(stateAfter({ EMBEDDED_REDIS_PORT: "6379x" })).toBe("1|unset|6379x");
+    expect(stateAfter({ EMBEDDED_PG_PORT: "6379" })).toBe("1|6379|unset");
+    // Good ports and a bad secret: the ports still wait for the secrets to pass.
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    writeFileSync(join(secrets(), "pg-owner"), "not-hex");
+    expect(stateAfter({ EMBEDDED_REDIS_PORT: "16379" })).toBe("1|unset|16379");
+  });
+
+  it("writes a pg_hba.conf that allows only the app roles over TCP", () => {
+    expect(runLib(`write_embedded_pg_hba "${dir}"`).status).toBe(0);
+    expect(readFileSync(join(dir, "pg_hba.conf"), "utf8")).toBe(
+      [
+        "# Managed by SnapOtter (EMBEDDED_DB_PASSWORDS). Rewritten on every boot.",
+        "local all all trust",
+        "host snapotter snapotter,snapotter_app 127.0.0.1/32 scram-sha-256",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("puts requirepass in the Redis config only on a secured install", () => {
+    const conf = join(dir, "redis.conf");
+    expect(runLib(`write_embedded_redis_conf "${conf}" "${secrets()}"`).status).toBe(0);
+    expect(readFileSync(conf, "utf8")).toBe("");
+    runLib(`ensure_embedded_db_secrets "${secrets()}"`);
+    expect(runLib(`write_embedded_redis_conf "${conf}" "${secrets()}"`).status).toBe(0);
+    const password = readFileSync(join(secrets(), "redis"), "utf8");
+    expect(readFileSync(conf, "utf8")).toBe(`requirepass ${password}\n`);
+    expect(mode(conf)).toBe(0o600);
   });
 });
 
