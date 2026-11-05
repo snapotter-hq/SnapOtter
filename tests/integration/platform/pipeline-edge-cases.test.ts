@@ -379,6 +379,29 @@ describe("Save pipeline edge cases", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects saving a step whose settings fail the tool's schema, naming the step (#2283)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/save",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: {
+        name: "bad-settings-pipeline",
+        steps: [
+          { toolId: "resize", settings: { width: 100 } },
+          { toolId: "compress", settings: { quality: "abc" } },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Step 2 (compress): Invalid settings");
+    expect(json.details).toEqual([expect.objectContaining({ path: "quality" })]);
+  });
+
   it("saves and lists a valid pipeline", async () => {
     const saveRes = await app.inject({
       method: "POST",
