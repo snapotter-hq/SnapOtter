@@ -24,6 +24,7 @@ import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
 import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
+import { logger } from "../lib/logger.js";
 import {
   checkLoginThrottle,
   clearLoginFailures,
@@ -512,7 +513,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
     .onConflictDoNothing();
 
   if (result.rowCount && result.rowCount > 0) {
-    console.log(
+    logger.info(
       mustChange
         ? `Default admin user '${env.DEFAULT_USERNAME}' created - password change required on first login`
         : `Default admin user '${env.DEFAULT_USERNAME}' created (password change skipped via env)`,

@@ -163,8 +163,11 @@ const CHANNEL = async () => {
 /** Subscribe so a setting change on any replica refreshes this process's cache. */
 export async function startAnalyticsGateListener(): Promise<void> {
   const { createRedisSubscriberConnection } = await import("../jobs/connection.js");
+  // Imported here, not at the top: instrument.ts loads this module before
+  // config.js, and the logger reads config.
+  const { logger } = await import("./logger.js");
   gateSubscriber = createRedisSubscriberConnection();
-  gateSubscriber.on("error", (err) => console.error("Analytics gate subscriber error", err));
+  gateSubscriber.on("error", (err) => logger.error({ err }, "Analytics gate subscriber error"));
   await gateSubscriber.subscribe(await CHANNEL());
   gateSubscriber.on("message", () => {
     void refreshAnalyticsGate();

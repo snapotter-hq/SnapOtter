@@ -3,6 +3,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 const thisDir = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(
   resolve(thisDir, "../../../apps/api/src/jobs/storage-reconciliation.ts"),
@@ -115,6 +122,9 @@ describe("storage-reconciliation behavior", () => {
       },
     }));
 
+    vi.doMock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+    for (const fn of Object.values(loggerMock)) fn.mockClear();
+
     const mod = await import("../../../apps/api/src/jobs/storage-reconciliation.js");
     return {
       storageReconciliationJob: mod.storageReconciliationJob,
@@ -128,13 +138,12 @@ describe("storage-reconciliation behavior", () => {
       [{ userId: null, totalSize: 999 }],
       [2],
     );
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await storageReconciliationJob();
 
     expect(setPayloads).toEqual([{ storageUsed: 0 }]);
     expect(whereCalls).toEqual(["users.storageUsed != 0"]);
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(loggerMock.info).toHaveBeenCalledWith(
       "Storage reconciliation complete: 2 users checked, 2 corrected",
     );
   });
@@ -148,7 +157,6 @@ describe("storage-reconciliation behavior", () => {
       ],
       [1, 0, 3],
     );
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await storageReconciliationJob();
 
@@ -157,27 +165,25 @@ describe("storage-reconciliation behavior", () => {
       op: "and",
       args: ["users.storageUsed != 0", { op: "notInArray", col: "users.id", vals: ["u-1", "u-2"] }],
     });
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(loggerMock.info).toHaveBeenCalledWith(
       "Storage reconciliation complete: 5 users checked, 4 corrected",
     );
   });
 
   it("treats undefined rowCount from zero-out updates as 0 corrections in both branches", async () => {
     const elseRun = await setupMockedReconciliation([], [undefined]);
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await elseRun.storageReconciliationJob();
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(loggerMock.info).toHaveBeenCalledWith(
       "Storage reconciliation complete: 0 users checked, 0 corrected",
     );
 
-    logSpy.mockClear();
     const notInArrayRun = await setupMockedReconciliation(
       [{ userId: "u-1", totalSize: 400 }],
       [0, undefined],
     );
     await notInArrayRun.storageReconciliationJob();
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(loggerMock.info).toHaveBeenCalledWith(
       "Storage reconciliation complete: 1 users checked, 0 corrected",
     );
   });
