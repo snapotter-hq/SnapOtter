@@ -5,7 +5,7 @@
  * base-path.test.ts covers the sync tool envelope, but a 202 client settles
  * from the terminal frame, whose URLs the worker builds: the legacy result
  * payload for single-file tools and the batch ZIP finalize. per-fork-env
- * floors SYNC_WAIT_MS at 30s, so no fast tool takes this path on its own.
+ * defaults SYNC_WAIT_MS to 30s (an explicit value overrides it), so no fast tool takes this path on its own.
  * waitForJob is swapped for a pool-keyed passthrough (the #766 pattern) that
  * degrades the route to 202 while the real worker still runs and publishes
  * the terminal frame.
