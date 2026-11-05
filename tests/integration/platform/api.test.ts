@@ -3460,8 +3460,8 @@ describe("Batch processing", () => {
 // SMART CROP FORMAT PRESERVATION
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Smart crop format preservation", () => {
-  // Helper: smart-crop requires the face-detection AI bundle.
-  // When it's not installed, the API returns 501 — skip assertions on the body.
+  // Subject and trim modes need no bundle (#4303), so these always run. Smart
+  // crop is a long tool: it answers 202 and the file name comes from the job.
   const smartCropRequest = async (
     file: { name: string; filename: string; contentType: string; content: Buffer },
     settings: Record<string, unknown>,
@@ -3481,14 +3481,20 @@ describe("Smart crop format preservation", () => {
     });
   };
 
+  const outputName = async (res: { statusCode: number; body: string }): Promise<string> => {
+    expect([200, 202]).toContain(res.statusCode);
+    const body = JSON.parse(res.body);
+    if (res.statusCode === 200) return body.downloadUrl as string;
+    const result = await waitForAcceptedJobOrCancel(body.jobId, "ai", 25_000);
+    return result.filename;
+  };
+
   it("preserves JPEG format for JPEG input in content mode", async () => {
     const res = await smartCropRequest(
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { mode: "content", threshold: 30 },
     );
-    if (res.statusCode === 501) return; // feature not installed
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.jpg/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.jpg/);
   });
 
   it("preserves PNG format for PNG input", async () => {
@@ -3496,9 +3502,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "image.png", contentType: "image/png", content: PNG_200x150 },
       { mode: "content", threshold: 30 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.png/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.png/);
   });
 
   it("preserves WebP format for WebP input", async () => {
@@ -3506,9 +3510,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "image.webp", contentType: "image/webp", content: WEBP_50x50 },
       { mode: "content", threshold: 30 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.webp/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.webp/);
   });
 
   it("preserves JPEG format in attention mode", async () => {
@@ -3516,9 +3518,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { mode: "attention", width: 50, height: 50 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.jpg/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.jpg/);
   });
 
   it("accepts quality setting without error", async () => {
@@ -3526,8 +3526,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { mode: "content", threshold: 30, quality: 50 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
+    await outputName(res);
   });
 
   it("subject mode with entropy strategy", async () => {
@@ -3535,9 +3534,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { mode: "subject", strategy: "entropy", width: 50, height: 50 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.jpg/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.jpg/);
   });
 
   it("subject mode with padding", async () => {
@@ -3545,9 +3542,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { mode: "subject", width: 50, height: 50, padding: 10 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.jpg/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.jpg/);
   });
 
   it("trim mode with new mode name", async () => {
@@ -3555,9 +3550,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.png", contentType: "image/png", content: PNG_200x150 },
       { mode: "trim", threshold: 30 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.png/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.png/);
   });
 
   it("defaults to subject mode when no mode specified", async () => {
@@ -3565,9 +3558,7 @@ describe("Smart crop format preservation", () => {
       { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG_100x100 },
       { width: 50, height: 50 },
     );
-    if (res.statusCode === 501) return;
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).downloadUrl).toMatch(/_smartcrop\.jpg/);
+    expect(await outputName(res)).toMatch(/_smartcrop\.jpg/);
   });
 });
 
