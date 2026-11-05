@@ -75,7 +75,7 @@ export const en = {
     searchMissContext: "You searched for: {query}",
     searchMissDiscussionsFallback: "We couldn't record that. Open a request in Discussions.",
     offlineDescription:
-      "This instance has analytics turned off, so feedback isn't recorded here. You can still reach the SnapOtter team directly.",
+      "This instance can't record feedback right now. You can still reach the SnapOtter team directly.",
     offlinePublicNote: "GitHub issues are public.",
     offlineGithubButton: "Open a GitHub issue",
     offlineEmailButton: "Email us",

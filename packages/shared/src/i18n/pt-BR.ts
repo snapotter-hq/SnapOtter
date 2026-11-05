@@ -79,7 +79,7 @@ export const ptBR: TranslationKeys = {
     searchMissDiscussionsFallback:
       "Não conseguimos registrar. Abra uma solicitação no Discussions.",
     offlineDescription:
-      "Esta instância está com a análise desativada, então o feedback não é registrado aqui. Mesmo assim, você pode falar diretamente com a equipe do SnapOtter.",
+      "Esta instância não pode registrar feedback no momento. Mesmo assim, você pode falar diretamente com a equipe do SnapOtter.",
     offlinePublicNote: "As issues do GitHub são públicas.",
     offlineGithubButton: "Abrir uma issue no GitHub",
     offlineEmailButton: "Envie um e-mail",

@@ -80,7 +80,7 @@ export const fr: TranslationKeys = {
     searchMissDiscussionsFallback:
       "Nous n'avons pas pu l'enregistrer. Ouvrez une demande dans Discussions.",
     offlineDescription:
-      "Cette instance a l'analytique désactivée, donc les commentaires ne sont pas enregistrés ici. Vous pouvez tout de même contacter directement l'équipe SnapOtter.",
+      "Cette instance ne peut pas enregistrer de commentaires pour le moment. Vous pouvez tout de même contacter directement l'équipe SnapOtter.",
     offlinePublicNote: "Les tickets GitHub sont publics.",
     offlineGithubButton: "Ouvrir un ticket GitHub",
     offlineEmailButton: "Écrivez-nous",

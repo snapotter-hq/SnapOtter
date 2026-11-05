@@ -77,7 +77,7 @@ export const hi: TranslationKeys = {
     searchMissContext: "आपने खोजा: {query}",
     searchMissDiscussionsFallback: "हम इसे रिकॉर्ड नहीं कर सके. Discussions में अनुरोध खोलें.",
     offlineDescription:
-      "इस इंस्टेंस पर एनालिटिक्स बंद है, इसलिए प्रतिक्रिया यहाँ रिकॉर्ड नहीं होती. फिर भी आप SnapOtter टीम से सीधे संपर्क कर सकते हैं.",
+      "यह इंस्टेंस अभी प्रतिक्रिया रिकॉर्ड नहीं कर सकता. फिर भी आप SnapOtter टीम से सीधे संपर्क कर सकते हैं.",
     offlinePublicNote: "GitHub issue सार्वजनिक होते हैं.",
     offlineGithubButton: "GitHub issue खोलें",
     offlineEmailButton: "हमें ईमेल करें",

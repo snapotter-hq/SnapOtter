@@ -78,7 +78,7 @@ export const id: TranslationKeys = {
     searchMissContext: "Anda mencari: {query}",
     searchMissDiscussionsFallback: "Kami tidak dapat mencatatnya. Buka permintaan di Discussions.",
     offlineDescription:
-      "Instance ini menonaktifkan analitik, jadi masukan tidak dicatat di sini. Anda tetap bisa menghubungi tim SnapOtter secara langsung.",
+      "Instance ini tidak dapat mencatat masukan saat ini. Anda tetap bisa menghubungi tim SnapOtter secara langsung.",
     offlinePublicNote: "Issue GitHub bersifat publik.",
     offlineGithubButton: "Buka issue GitHub",
     offlineEmailButton: "Kirim email ke kami",
