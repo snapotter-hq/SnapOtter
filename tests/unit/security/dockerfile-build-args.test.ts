@@ -384,6 +384,25 @@ describe("Dockerfile build args", () => {
     }
   });
 
+  it("only gives snapotter-admin the embedded URLs when the container runs embedded", () => {
+    // Compose passes the app container its own DATABASE_URL and REDIS_URL, and a
+    // `docker exec` shell sees them. Without the mode check, every recovery
+    // command there would swap them for 127.0.0.1:5432 inside the app
+    // container, where no database listens.
+    const admin = readFileSync(resolve(root, "docker/snapotter-admin"), "utf8");
+    const guard = admin.match(
+      /^([ \t]*)if \[ "\$\(decide_run_mode\b[^)]*\)" = "embedded" \]; then\n([\s\S]*?)^\1fi$/m,
+    );
+    expect(guard, "snapotter-admin must check decide_run_mode for embedded").not.toBeNull();
+    expect(guard?.[2], "the export must sit inside the embedded-mode check").toMatch(
+      /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+    );
+    expect(
+      admin.replace(guard?.[0] ?? "", ""),
+      "snapotter-admin must not call export_embedded_db_env outside that check",
+    ).not.toMatch(/^[^#\n]*\bexport_embedded_db_env\b/m);
+  });
+
   it("documents the readiness timeouts the lib actually ships", () => {
     const docs = readFileSync(resolve(root, "apps/docs/guide/configuration.md"), "utf8");
     for (const knob of ["EMBEDDED_REDIS_TIMEOUT_S", "EMBEDDED_POSTGRES_TIMEOUT_S"]) {

@@ -1,7 +1,8 @@
 #!/bin/sh
 # Shared helpers for SnapOtter embedded mode (in-container Postgres + Redis).
-# Sourced by docker/entrypoint.sh and the s6 service scripts. Kept in its own
-# file so the decision logic can be unit-tested directly
+# Sourced by docker/entrypoint.sh, docker/snapotter-admin,
+# docker/embedded/postgres-bootstrap.sh and the s6 service scripts. Kept in its
+# own file so the decision logic can be unit-tested directly
 # (tests/unit/security/embedded-mode.test.ts) rather than mirrored. Sourcing has
 # no side effects, only function definitions. POSIX sh only (no bashisms).
 #

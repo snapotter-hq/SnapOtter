@@ -10,7 +10,8 @@ umask 0007
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
 # Embedded-mode helpers (decide_run_mode, embedded_requires_root,
-# sqlite_autodetect_path, check_pg_version). Same no-side-effects contract.
+# export_embedded_db_env, sqlite_autodetect_path, check_pg_version). Same
+# no-side-effects contract.
 . /usr/local/bin/embedded-lib.sh
 
 # --- Docker secret file convention (_FILE suffix) ---
