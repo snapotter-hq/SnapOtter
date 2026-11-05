@@ -5,7 +5,7 @@ import type { Job } from "bullmq";
 import { and, eq, notInArray } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { type BatchFileNotes, pickBatchFileNotes } from "../lib/batch-file-notes.js";
+import { type BatchFileNotes, pickChildFileNotes } from "../lib/batch-file-notes.js";
 import { allFailedFault, allFailedInputCode, type BatchFault } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
@@ -406,7 +406,7 @@ export async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJ
 
     if (row.status === "completed" && row.outputRefs?.[0]) {
       const outFilename = row.outputRefs[0].split("/").pop() ?? "output";
-      const notes = pickBatchFileNotes(
+      const notes = pickChildFileNotes(
         (row.progress as { result?: Record<string, unknown> } | null)?.result,
       );
       manifest.push({

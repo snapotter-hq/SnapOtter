@@ -6,8 +6,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { qpdfAvailable } from "@snapotter/doc-engine";
+import { gsAvailable, qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import { FILE_NOTES_ALL_FILES } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -1608,4 +1609,23 @@ describe("Pipeline batch size limit", () => {
     // route's own "too many files" check, so accept either rejection message.
     expect(JSON.parse(res.body).error).toMatch(/too many files|failed to parse multipart/i);
   });
+});
+
+// #1374: a pipeline batch reports what each file's steps said, so a
+// compress-pdf step that misses its target isn't finished silently.
+describe.skipIf(!gsAvailable())("Pipeline batch step notes", () => {
+  it("sends X-File-Notes for a compress-pdf step that missed its target", async () => {
+    const res = await executeBatch(
+      [
+        { filename: "scan.pdf", content: readFixture(fixtures.document.pdfScanned) },
+        { filename: "text.pdf", content: readFixture(fixtures.document.pdf3) },
+      ],
+      { steps: [{ toolId: "compress-pdf", settings: { mode: "targetSize", targetSizeKb: 1 } }] },
+    );
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    // 1 KB is out of reach for both, and a note every file shares goes out once.
+    expect(notes).toEqual({ [FILE_NOTES_ALL_FILES]: { targetMet: false, targetKb: 1 } });
+  }, 180_000);
 });
