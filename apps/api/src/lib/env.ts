@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { availableParallelism } from "node:os";
 import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
@@ -69,6 +70,20 @@ function normalizeExternalUrl(raw: string): string {
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
+    // The address the API binds. Containers keep 0.0.0.0 so published ports
+    // work. Outside a container the API shares the machine's network, and
+    // 127.0.0.1 keeps it off the LAN. Anything but an IP stops the boot, so an
+    // empty or mistyped value never quietly widens the bind to 0.0.0.0. tcsh
+    // sets HOST to the machine name, so the message shows the value it got.
+    HOST: z
+      .string()
+      .default("0.0.0.0")
+      .refine(
+        (value) => isIP(value) !== 0,
+        (value) => ({
+          message: `HOST must be an IP address such as 0.0.0.0 or 127.0.0.1, not '${value}'. If you never set HOST, unset it (tcsh sets it to the machine name).`,
+        }),
+      ),
     BASE_PATH: z
       .string()
       .default("")

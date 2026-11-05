@@ -792,3 +792,32 @@ describe("configRoutes GET /api/v1/config/locale (#3958)", () => {
     },
   );
 });
+
+describe("loadEnv HOST", () => {
+  it("defaults to 0.0.0.0 so the container's published port keeps working", () => {
+    restoreEnv();
+    expect(loadEnv({ ...process.env, HOST: undefined }).HOST).toBe("0.0.0.0");
+  });
+
+  it.each(["127.0.0.1", "0.0.0.0", "::1", "::"])("accepts the IP address %j", (host) => {
+    restoreEnv();
+    expect(loadEnv({ ...process.env, HOST: host }).HOST).toBe(host);
+  });
+
+  // An empty HOST must not fall back to 0.0.0.0, which would put the API on
+  // the network. A hostname is what a stray HOST usually holds.
+  it.each(["localhost", "MacBook-Pro.local", "", " 127.0.0.1"])(
+    "rejects %j, because the API binds an address",
+    (host) => {
+      expectLoadEnvError(
+        { HOST: host },
+        "HOST must be an IP address such as 0.0.0.0 or 127.0.0.1",
+        ["HOST"],
+      );
+    },
+  );
+
+  it("names the rejected value, so a HOST set by something else is easy to spot", () => {
+    expectLoadEnvError({ HOST: "MacBook-Pro.local" }, "not 'MacBook-Pro.local'", ["HOST"]);
+  });
+});

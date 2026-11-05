@@ -769,7 +769,7 @@ void warmQueueEvents().catch((err) => {
 
 // Start
 try {
-  await app.listen({ port: env.PORT, host: "0.0.0.0" });
+  await app.listen({ port: env.PORT, host: env.HOST });
 
   const dispatcherResult = await initDispatcher();
   const gpuLine = gpuBootLine(dispatcherResult, gatherSystemProperties().gpu_present);

@@ -13,6 +13,7 @@ All configuration is done through environment variables. Every variable has a se
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `1349` | Port the server listens on. |
+| `HOST` | `0.0.0.0` | IP address the server listens on. Keep `0.0.0.0` in a container, or published ports stop working. On a native install, `127.0.0.1` keeps the API off the network; put a reverse proxy in front for remote access. In the all-in-one image use `0.0.0.0`, `::` or `127.0.0.1`: its startup check calls `127.0.0.1`, so with any other address, `::1` included, the container never counts as started, and a later crash stops it instead of restarting the server. Anything that isn't an IP address, `localhost` included, stops the server at startup. |
 | `BASE_PATH` | (empty) | Public deployment path, e.g. `/snapotter`. Empty or `/` serves at the domain root. Applied at runtime; no image rebuild required. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
