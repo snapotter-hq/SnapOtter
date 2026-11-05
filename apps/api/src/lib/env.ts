@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { availableParallelism } from "node:os";
 import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
@@ -66,9 +67,40 @@ function normalizeExternalUrl(raw: string): string {
   return trimmed;
 }
 
+// Lowercase only, so one instance never shows up in analytics under two spellings.
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
+    // The address the API binds. Containers keep 0.0.0.0 so published ports
+    // work. Outside a container, or in one on the host network, the API shares
+    // the machine's network, and 127.0.0.1 keeps it off the LAN. Anything but
+    // an IP stops the boot, so an empty or mistyped value never quietly widens
+    // the bind to 0.0.0.0. tcsh sets HOST to the machine name, so the message
+    // shows the value it got.
+    HOST: z
+      .string()
+      .default("0.0.0.0")
+      .refine(
+        (value) => isIP(value) !== 0,
+        (value) => ({
+          message: `HOST must be an IP address such as 0.0.0.0 or 127.0.0.1, not '${value}'. If you never set HOST, unset it (tcsh sets it to the machine name).`,
+        }),
+      ),
+    // Lets a provisioning tool pick the instance id before first boot, so its
+    // records match the instance's events. Used only while the settings row
+    // doesn't exist; see lib/instance-id.ts.
+    SNAPOTTER_INSTANCE_ID: z
+      .string()
+      .default("")
+      .refine((value) => value === "" || UUID_V4.test(value), {
+        message: "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
+      }),
+    // "off" starts a new instance with analytics switched off, for any
+    // deployment that wants opt-in. It only seeds a missing setting, so an
+    // admin's later choice always stands.
+    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).default("on"),
     BASE_PATH: z
       .string()
       .default("")

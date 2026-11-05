@@ -76,8 +76,12 @@ export function onAnalyticsDisabled(listener: () => void): () => void {
   return () => disabledListeners.delete(listener);
 }
 
-/** Read the toggle and update the cache. Fails closed on read error. */
-export async function refreshAnalyticsGate(): Promise<void> {
+/**
+ * Read the toggle into the cache, failing closed on a read error. Resolves to
+ * the failure when this read threw, otherwise null. The error sits inside an
+ * object so a reader that throws undefined still counts as a failure.
+ */
+async function readIntoCache(): Promise<{ error: unknown } | null> {
   try {
     const v = await reader();
     const on = v === undefined ? true : v;
@@ -95,17 +99,38 @@ export async function refreshAnalyticsGate(): Promise<void> {
         }
       }
     }
-  } catch {
+    return null;
+  } catch (error) {
     // DB read failed. If we ever positively saw "disabled", keep serving disabled
     // rather than reverting to the ON default. Otherwise keep the last value.
     if (knownDisabled) cachedEnabled = false;
     fetchedAt = Date.now(); // do not hammer the DB on repeated errors
+    return { error };
   }
 }
 
-/** Warm the cache at boot before traffic is served. */
+/** Read the toggle and update the cache. Fails closed on read error. */
+export async function refreshAnalyticsGate(): Promise<void> {
+  await readIntoCache();
+}
+
+/**
+ * Warm the cache at boot before traffic is served. Rejects when this read
+ * fails while the bake allows analytics, which stops the boot: the cache would
+ * otherwise keep its default-on guess, and instance_started, GET
+ * /api/v1/config/analytics and the PostHog proxy would all act on it for an
+ * instance that opted out. With the bake off analytics can never come on, so
+ * a failed read doesn't stop the boot. Sentry already waits for a successful
+ * read (instrument.ts).
+ */
 export async function primeAnalyticsGate(): Promise<void> {
-  await refreshAnalyticsGate();
+  const failure = await readIntoCache();
+  if (failure && bakedEnabled()) {
+    throw new Error(
+      "Could not read the analyticsEnabled setting at startup, so analytics can't be confirmed off. Check the database connection.",
+      { cause: failure.error },
+    );
+  }
 }
 
 /**

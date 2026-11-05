@@ -172,13 +172,28 @@ describe("API startup (#2333)", () => {
     // around ensureDefaultAdmin / ensureAnonymousUser in the entry point's source.
     const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
     const start = source.indexOf("await ensureDefaultTeam();");
-    const end = source.indexOf("async function ensureInstanceId()", start);
+    const end = source.indexOf("await setSentryInstanceTag(", start);
     const block = source.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(block).toMatch(
       /try\s*\{\s*if\s*\(env\.AUTH_ENABLED\)\s*\{\s*await ensureDefaultAdmin\(\);\s*\}\s*else\s*\{\s*await ensureAnonymousUser\(\);\s*\}\s*\}\s*catch\s*\(err\)\s*\{\s*console\.error\(`FATAL: \$\{\(err as Error\)\.message\}`\);\s*console\.error\(err\);\s*process\.exit\(1\);\s*\}/,
+    );
+  });
+
+  it("catches a failed analytics gate read, prints a FATAL line, and exits 1 (#4498)", () => {
+    // A bare top-level await would print only a raw stack, and would exit only
+    // while Sentry's handler is the sole uncaughtException listener.
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    const start = source.indexOf("await initAnalytics();");
+    const end = source.indexOf("await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED", start);
+    const block = source.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toMatch(
+      /try\s*\{\s*await primeAnalyticsGate\(\);\s*\}\s*catch\s*\(err\)\s*\{\s*console\.error\(`FATAL: \$\{\(err as Error\)\.message\}`\);\s*console\.error\(err\);\s*process\.exit\(1\);\s*\}/,
     );
   });
 });

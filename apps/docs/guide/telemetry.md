@@ -30,3 +30,5 @@ While analytics is on, the server asks PostHog every few hours which SnapOtter r
 ## Turning it off {#turning-it-off}
 
 Admins: Settings > System > Privacy, flip "Anonymous Product Analytics" off. It stops immediately, instance-wide. To build an image that can never emit, set the `SNAPOTTER_ANALYTICS=off` build arg.
+
+To start a new instance with analytics already off, add `SNAPOTTER_ANALYTICS_DEFAULT=off` to the server's environment before its first boot. With Docker Compose, put it under the app service's `environment:`, because setting it in `.env` alone doesn't reach the container.

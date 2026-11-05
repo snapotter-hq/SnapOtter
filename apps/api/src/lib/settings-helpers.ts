@@ -104,7 +104,8 @@ export async function getSettingStrict(key: string): Promise<string | undefined>
 /**
  * Seed defaultTheme, defaultLocale, and defaultToolView from env when absent,
  * and repair any existing row whose stored value fails its setting policy
- * schema (#3964).
+ * schema (#3964). With SNAPOTTER_ANALYTICS_DEFAULT=off, also seed
+ * analyticsEnabled=false when no row exists.
  */
 export async function ensureDefaultSettings(): Promise<void> {
   const defaults: Record<string, string> = {
@@ -125,5 +126,11 @@ export async function ensureDefaultSettings(): Promise<void> {
       );
       await upsertSetting(key, value);
     }
+  }
+  // index.ts runs this before analytics starts (ensure-default-settings.test.ts
+  // pins the order), so an instance seeded off never sends a first event. Only
+  // a missing row is filled, so an admin's later choice always stands.
+  if (env.SNAPOTTER_ANALYTICS_DEFAULT === "off") {
+    await setSettingIfAbsent("analyticsEnabled", "false");
   }
 }

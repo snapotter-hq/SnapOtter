@@ -47,6 +47,7 @@ import {
   stopInterruptedInstallRecovery,
 } from "./lib/feature-status.js";
 import { gpuBootLine } from "./lib/gpu-boot-line.js";
+import { ensureInstanceId } from "./lib/instance-id.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
@@ -243,21 +244,10 @@ try {
   process.exit(1);
 }
 
-async function ensureInstanceId(): Promise<string> {
-  const [existing] = await db
-    .select()
-    .from(schema.settings)
-    .where(eq(schema.settings.key, "instance_id"));
-  if (existing) return existing.value;
-  const value = randomUUID();
-  await db.insert(schema.settings).values({ key: "instance_id", value });
-  return value;
-}
-
 // Tag every Sentry event with the anonymized instance id so triage can tell one
 // broken install from the whole fleet, and cross-reference an event to the same
 // instance_id used by the PostHog server-side stream.
-await setSentryInstanceTag(await ensureInstanceId());
+await setSentryInstanceTag(await ensureInstanceId(env.SNAPOTTER_INSTANCE_ID));
 
 await ensureDefaultSettings();
 
@@ -277,7 +267,13 @@ if (!env.COOKIE_SECRET) {
 
 await initAnalytics();
 const { primeAnalyticsGate } = await import("./lib/analytics-gate.js");
-await primeAnalyticsGate();
+try {
+  await primeAnalyticsGate();
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
+  process.exit(1);
+}
 // ignoreSampleRate: this once-per-boot census must not be thinned by the
 // volume sample rate that exists to throttle high-frequency usage events.
 await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, { ...gatherSystemProperties() }, undefined, {
@@ -769,7 +765,7 @@ void warmQueueEvents().catch((err) => {
 
 // Start
 try {
-  await app.listen({ port: env.PORT, host: "0.0.0.0" });
+  await app.listen({ port: env.PORT, host: env.HOST });
 
   const dispatcherResult = await initDispatcher();
   const gpuLine = gpuBootLine(dispatcherResult, gatherSystemProperties().gpu_present);
