@@ -14,6 +14,7 @@ import {
 } from "./feature-gate.js";
 import { aiLog, describeUnexpectedExit } from "./log.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
+import { resolveAiVenvPath } from "./venv-path.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PYTHON_DIR = resolve(__dirname, "../python");
@@ -145,21 +146,13 @@ export function buildInstallerEnv(extra: Record<string, string> = {}): Record<st
       env[key] = process.env[key] as string;
     }
   }
+  // Always name the venv: install_feature.py would otherwise pick its own default.
+  env.PYTHON_VENV_PATH = resolveAiVenvPath();
   return { ...env, ...extra };
 }
 
-/** Venv the AI sidecar runs from. Bundle installs write into it. */
-function aiVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || resolve(__dirname, "../../../.venv");
-}
-
-/** Venv bundle installs write into; mirrors the install route's default. */
-function installVenvPath(): string {
-  return process.env.PYTHON_VENV_PATH || "/opt/venv";
-}
-
 /** Try the given venv first, then system python. */
-function getPythonPath(venvPath: string = aiVenvPath()): string {
+function getPythonPath(venvPath: string = resolveAiVenvPath()): string {
   const path = process.platform === "win32" ? win32 : posix;
   const venvPython = path.join(
     venvPath,
@@ -177,7 +170,7 @@ function getPythonPath(venvPath: string = aiVenvPath()): string {
 function docsDispatcherOptions(): { venvPath?: string; takesVenvLock: boolean } {
   const docsVenv = process.env.DOCS_PYTHON_VENV_PATH;
   if (!docsVenv) return { takesVenvLock: true };
-  const sharesInstallVenv = resolve(docsVenv) === resolve(installVenvPath());
+  const sharesInstallVenv = resolve(docsVenv) === resolve(resolveAiVenvPath());
   return { venvPath: docsVenv, takesVenvLock: sharesInstallVenv };
 }
 

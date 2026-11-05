@@ -31,6 +31,7 @@ import {
   getOcrRuntimeEffectiveMemoryBytes,
   handoffOcrDispatcher,
   probeOcrDispatcher,
+  resolveAiVenvPath,
   rotateOcrDispatcher,
   selectOcrRuntimeTarget,
   shutdownDispatcher,
@@ -106,8 +107,7 @@ import {
   updateSingleFileProgress,
 } from "./progress.js";
 
-const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
-const pythonPath = `${venvPath}/bin/python3`;
+const pythonPath = `${resolveAiVenvPath()}/bin/python3`;
 
 async function handoffInstalledOcrRuntime(
   installResult: Record<string, unknown>,
