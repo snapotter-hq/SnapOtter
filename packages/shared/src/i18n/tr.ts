@@ -78,7 +78,7 @@ export const tr: TranslationKeys = {
     searchMissContext: "Şunu aradın: {query}",
     searchMissDiscussionsFallback: "Bunu kaydedemedik. Discussions'ta bir istek aç.",
     offlineDescription:
-      "Bu örnekte analiz kapalı, bu yüzden geri bildirim burada kaydedilmez. Yine de SnapOtter ekibine doğrudan ulaşabilirsin.",
+      "Bu örnek şu anda geri bildirim kaydedemiyor. Yine de SnapOtter ekibine doğrudan ulaşabilirsin.",
     offlinePublicNote: "GitHub issue'ları herkese açıktır.",
     offlineGithubButton: "GitHub'da issue aç",
     offlineEmailButton: "Bize e-posta gönder",

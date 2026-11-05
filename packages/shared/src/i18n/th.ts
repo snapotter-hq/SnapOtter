@@ -76,8 +76,7 @@ export const th: TranslationKeys = {
     searchMissTitle: "ขอเครื่องมือ",
     searchMissContext: "คุณค้นหา: {query}",
     searchMissDiscussionsFallback: "เราบันทึกไม่ได้ เปิดคำขอใน Discussions",
-    offlineDescription:
-      "อินสแตนซ์นี้ปิดการวิเคราะห์ไว้ ความคิดเห็นจึงไม่ถูกบันทึกที่นี่ คุณยังสามารถติดต่อทีม SnapOtter ได้โดยตรง",
+    offlineDescription: "อินสแตนซ์นี้ไม่สามารถบันทึกความคิดเห็นได้ในขณะนี้ คุณยังสามารถติดต่อทีม SnapOtter ได้โดยตรง",
     offlinePublicNote: "Issue บน GitHub เป็นสาธารณะ",
     offlineGithubButton: "เปิด Issue บน GitHub",
     offlineEmailButton: "ส่งอีเมลถึงเรา",

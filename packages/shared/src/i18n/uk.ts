@@ -78,7 +78,7 @@ export const uk: TranslationKeys = {
     searchMissContext: "Ви шукали: {query}",
     searchMissDiscussionsFallback: "Не вдалося записати. Відкрийте запит у Discussions.",
     offlineDescription:
-      "У цьому екземплярі аналітику вимкнено, тому відгуки тут не записуються. Ви все одно можете напряму звернутися до команди SnapOtter.",
+      "Цей екземпляр зараз не може записувати відгуки. Ви все одно можете напряму звернутися до команди SnapOtter.",
     offlinePublicNote: "Issue на GitHub є публічними.",
     offlineGithubButton: "Відкрити issue на GitHub",
     offlineEmailButton: "Напишіть нам",
