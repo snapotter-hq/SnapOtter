@@ -24,6 +24,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type Redis from "ioredis";
 import { db, schema } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 import { cancelSingleJobGuarded } from "../routes/progress.js";
 import { batchAliasTarget } from "./batch-alias.js";
 import { markBatchCanceled } from "./batch-progress.js";
@@ -125,10 +126,8 @@ const CANCEL_CHANNEL = () => `${bullPrefix()}:cancel`;
 let subscriber: Redis | null = null;
 
 export async function startCancelListener(): Promise<void> {
+  // createRedisSubscriberConnection already logs connection errors.
   subscriber = createRedisSubscriberConnection();
-  subscriber.on("error", (err) => {
-    console.error("Cancel listener subscriber error", err);
-  });
   await subscriber.subscribe(CANCEL_CHANNEL());
   subscriber.on("message", (_channel: string, message: string) => {
     const ac = cancelables.get(message);
@@ -170,7 +169,7 @@ async function publishCancel(id: string): Promise<void> {
   await sharedRedis()
     .publish(CANCEL_CHANNEL(), id)
     .catch((err) => {
-      console.error("cancel publish failed", id, err);
+      logger.warn({ err, jobId: id }, "cancel publish failed");
     });
 }
 
@@ -384,7 +383,7 @@ export async function requestCancel(jobId: string): Promise<boolean> {
         await cancelSingleJobGuarded({ jobId: alias.id, expectedArtifactJobId: jobId });
       }
     } catch (err) {
-      console.error("reverse alias settle failed", jobId, err);
+      logger.warn({ err, jobId }, "reverse alias settle failed");
     }
   }
   return outcome === "removed" || outcome === "signaled";
