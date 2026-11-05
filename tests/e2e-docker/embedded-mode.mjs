@@ -104,7 +104,7 @@ const resolveContainerPort = () => {
   if (!match) throw new Error(`Invalid Docker port binding: ${binding}`);
   PORT = match[1];
 };
-const runEmbeddedContainer = () => {
+const runEmbeddedContainer = (extraArgs = []) => {
   if (quiet(["inspect", NAME])) {
     throw new Error(`Unique container name collision: ${NAME}`);
   }
@@ -121,6 +121,7 @@ const runEmbeddedContainer = () => {
     `${VOL}:/data`,
     "-e",
     "SNAPOTTER_TELEMETRY=0",
+    ...extraArgs,
     IMAGE,
   ]);
   if (!containerIsOwned()) {
@@ -131,6 +132,14 @@ const runEmbeddedContainer = () => {
 const restartEmbeddedContainer = () => {
   docker(["restart", NAME]);
   resolveContainerPort();
+};
+// `docker restart` keeps the old environment, so booting the same volume with
+// different settings takes a new container.
+const replaceEmbeddedContainer = (extraArgs = []) => {
+  if (!containerIsOwned()) throw new Error(`Refusing to replace unowned container ${NAME}`);
+  docker(["stop", NAME]);
+  docker(["rm", NAME]);
+  runEmbeddedContainer(extraArgs);
 };
 
 async function waitHealthy(timeoutMs) {
@@ -404,6 +413,232 @@ async function main() {
   countMatches(badEnvLogs, /ZodError:/g) === 1
     ? ok("API ran once and did not respawn")
     : bad("API respawned more than once before halting");
+  cleanup();
+
+  // 9. A host-network setup: custom loopback ports and per-install passwords.
+  console.log("\n[9] custom ports and per-install database passwords");
+  cleanup();
+  createVolume();
+  runEmbeddedContainer([
+    "-e",
+    "EMBEDDED_PG_PORT=15432",
+    "-e",
+    "EMBEDDED_REDIS_PORT=16379",
+    "-e",
+    "EMBEDDED_DB_PASSWORDS=1",
+  ]);
+  (await waitHealthy(300000))
+    ? ok("secured container reached healthy")
+    : bad("secured container never became healthy");
+  const modes = quiet([
+    "exec",
+    NAME,
+    "stat",
+    "-c",
+    "%a %U",
+    "/data/.embedded-db-secrets",
+    "/data/.embedded-db-secrets/pg-owner",
+    "/data/.embedded-db-secrets/pg-app",
+    "/data/.embedded-db-secrets/redis",
+  ])
+    .trim()
+    .split("\n")
+    .join("|");
+  modes === "700 root|600 root|600 root|600 root"
+    ? ok("secrets are root-only")
+    : bad(`unexpected secret modes: ${modes}`);
+  const psql = (user, password) =>
+    spawnSync(
+      "docker",
+      [
+        "exec",
+        "-e",
+        `PGPASSWORD=${password}`,
+        NAME,
+        "psql",
+        "-h",
+        "127.0.0.1",
+        "-p",
+        "15432",
+        "-U",
+        user,
+        "-d",
+        "snapotter",
+        "-c",
+        "select 1",
+      ],
+      { encoding: "utf-8" },
+    );
+  const superuser = psql("postgres", "");
+  superuser.status !== 0 && /no pg_hba\.conf entry/.test(superuser.stderr)
+    ? ok("the superuser cannot log in over TCP")
+    : bad(`superuser TCP login was not refused: ${superuser.stderr}`);
+  const staleLogin = psql("snapotter_app", "snapotter_app");
+  staleLogin.status !== 0 && /password authentication failed/.test(staleLogin.stderr)
+    ? ok("the old fixed app password is refused")
+    : bad(`the old app password still works: ${staleLogin.stderr}`);
+  combined(["exec", NAME, "redis-cli", "-p", "16379", "ping"]).includes("NOAUTH")
+    ? ok("Redis refuses unauthenticated clients")
+    : bad("Redis answered without a password");
+  quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'REDISCLI_AUTH="$(cat /data/.embedded-db-secrets/redis)" redis-cli -p 16379 ping',
+  ]).trim() === "PONG"
+    ? ok("Redis answers with the per-install password")
+    : bad("Redis rejected its own password");
+  // pg_isready exits 2 when nothing answers, and 1 for a server that answers
+  // but rejects connections, which would still mean something listens there.
+  const defaultPort = spawnSync("docker", [
+    "exec",
+    NAME,
+    "pg_isready",
+    "-h",
+    "127.0.0.1",
+    "-p",
+    "5432",
+  ]).status;
+  defaultPort === 2
+    ? ok("nothing listens on the default Postgres port")
+    : bad(`pg_isready on port 5432 exited ${defaultPort}, not 2 (no response)`);
+  // The passwords may live in files and in the services' environment, never in
+  // a log line or an argv, which every local user can read in /proc.
+  const secretValues = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'for f in /data/.embedded-db-secrets/*; do cat "$f"; echo; done',
+  ])
+    .trim()
+    .split("\n");
+  const commandLines = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    "for f in /proc/[0-9]*/cmdline; do tr '\\0' ' ' < \"$f\"; echo; done",
+  ]);
+  const logs9 = dockerLogs(NAME);
+  secretValues.length === 3 &&
+  secretValues.every((secret) => /^[0-9a-f]{64}$/.test(secret)) &&
+  !secretValues.some((secret) => logs9.includes(secret) || commandLines.includes(secret))
+    ? ok("no password in the logs or on a command line")
+    : bad("a per-install password reached the logs or a command line");
+  // Nor in the database servers' environment, which any account with the
+  // server's UID can read in /proc. The app itself needs its URLs.
+  const serverEnvs = quiet([
+    "exec",
+    NAME,
+    "sh",
+    "-c",
+    'for d in /proc/[0-9]*; do c="$(cat "$d/comm" 2>/dev/null)"; case "$c" in postgres|redis-server) echo "== $c"; tr "\\0" "\\n" < "$d/environ";; esac; done',
+  ]);
+  serverEnvs.includes("== postgres") &&
+  serverEnvs.includes("== redis-server") &&
+  !/^(DATABASE_URL|DATABASE_MIGRATION_URL|REDIS_URL|REDISCLI_AUTH)=/m.test(serverEnvs)
+    ? ok("the database servers run without the connection URLs")
+    : bad("a database server's environment carries a connection URL");
+  // docker exec starts without the entrypoint's exports, so this proves
+  // snapotter-admin finds both databases on its own: Postgres for the user
+  // lookup, Redis for the throttle key.
+  combined(["exec", NAME, "snapotter-admin", "unlock-user", "admin"]).includes(
+    'User "admin" is not locked out',
+  )
+    ? ok("snapotter-admin reaches both databases under docker exec")
+    : bad("snapotter-admin could not reach the embedded databases");
+  const secretsBefore = quiet(["exec", NAME, "sh", "-c", "cat /data/.embedded-db-secrets/*"]);
+  restartEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("secured container healthy after a restart")
+    : bad("secured container unhealthy after a restart");
+  quiet(["exec", NAME, "sh", "-c", "cat /data/.embedded-db-secrets/*"]) === secretsBefore
+    ? ok("passwords survive a restart")
+    : bad("passwords changed across a restart");
+  cleanup();
+
+  // 10. An existing volume turns the passwords on and keeps them: unsetting the
+  //     variable changes nothing, a deleted secret comes back, and a directory
+  //     handed to the app user, as booting with external databases does, is
+  //     taken back.
+  console.log("\n[10] an existing volume turns the passwords on and keeps them");
+  cleanup();
+  createVolume();
+  runEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("unsecured container reached healthy")
+    : bad("unsecured container never became healthy");
+  // Reaching healthy already proves the app's own passwords work: the boot stops
+  // unless Postgres takes them and Redis answers PONG. These prove TCP and Redis
+  // turn away a client without them.
+  const expectSecured = (when) => {
+    const fixed = spawnSync(
+      "docker",
+      [
+        "exec",
+        "-e",
+        "PGPASSWORD=snapotter_app",
+        NAME,
+        "psql",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "snapotter_app",
+        "-d",
+        "snapotter",
+        "-c",
+        "select 1",
+      ],
+      { encoding: "utf-8" },
+    );
+    fixed.status !== 0 && /password authentication failed/.test(fixed.stderr)
+      ? ok(`${when}: TCP refuses the fixed app password`)
+      : bad(`${when}: TCP did not refuse the fixed app password: ${fixed.stderr}`);
+    combined(["exec", NAME, "redis-cli", "ping"]).includes("NOAUTH")
+      ? ok(`${when}: Redis refuses unauthenticated clients`)
+      : bad(`${when}: Redis answered without a password`);
+  };
+  replaceEmbeddedContainer(["-e", "EMBEDDED_DB_PASSWORDS=1"]);
+  (await waitHealthy(300000))
+    ? ok("healthy after turning the passwords on")
+    : bad("unhealthy after turning the passwords on");
+  expectSecured("turned on");
+  replaceEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("healthy with the variable unset again")
+    : bad("unhealthy with the variable unset again");
+  expectSecured("variable unset");
+  const appSecret = quiet(["exec", NAME, "cat", "/data/.embedded-db-secrets/pg-app"]);
+  quiet(["exec", NAME, "rm", "/data/.embedded-db-secrets/pg-app"]);
+  quiet(["exec", NAME, "chown", "-R", "snapotter:snapotter", "/data/.embedded-db-secrets"]);
+  restartEmbeddedContainer();
+  (await waitHealthy(300000))
+    ? ok("healthy after a secret was deleted")
+    : bad("unhealthy after a secret was deleted");
+  const newAppSecret = quiet(["exec", NAME, "cat", "/data/.embedded-db-secrets/pg-app"]);
+  /^[0-9a-f]{64}$/.test(newAppSecret) && newAppSecret !== appSecret
+    ? ok("the deleted secret was generated again")
+    : bad("the deleted secret was not generated again");
+  expectSecured("secret regenerated");
+  const owners = quiet([
+    "exec",
+    NAME,
+    "stat",
+    "-c",
+    "%a %U:%G",
+    "/data/.embedded-db-secrets",
+    "/data/.embedded-db-secrets/pg-owner",
+    "/data/.embedded-db-secrets/pg-app",
+    "/data/.embedded-db-secrets/redis",
+  ])
+    .trim()
+    .split("\n")
+    .join("|");
+  owners === "700 root:root|600 root:root|600 root:root|600 root:root"
+    ? ok("the boot took the secrets back from the app user")
+    : bad(`unexpected secret owners: ${owners}`);
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);

@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: d14b1dfe08e8
+i18n_output_hash: 4d865235c685
 i18n_hash_version: 2
 ---
 # 账户恢复 {#account-recovery}
@@ -82,8 +82,8 @@ docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
 一体化镜像中，Postgres 运行在容器内部：
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 在多容器部署中，请改为将 `psql` 指向你自己的 `DATABASE_URL`。

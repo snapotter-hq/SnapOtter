@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 425756d5eabf
+i18n_output_hash: 2f5df8cd1b5e
 i18n_hash_version: 2
 ---
 # Récupération de compte {#account-recovery}
@@ -82,8 +82,8 @@ En dernier recours sur n'importe quelle version, définissez la politique dans l
 l'image tout-en-un, Postgres tourne à l'intérieur du conteneur :
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 Sur une configuration multi-conteneurs, faites plutôt pointer `psql` vers votre propre `DATABASE_URL`.

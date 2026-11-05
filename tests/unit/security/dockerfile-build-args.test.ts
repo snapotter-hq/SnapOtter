@@ -369,6 +369,40 @@ describe("Dockerfile build args", () => {
     );
   });
 
+  it("gives snapotter-admin the embedded database URLs the entrypoint exports", () => {
+    // `docker exec` never sees what the entrypoint exported. Without this the
+    // recovery CLI falls back to the schema default, localhost:5432 with the
+    // fixed owner password, which fails once either embedded port moves.
+    const dest = dockerfile.match(/^COPY docker\/embedded-lib\.sh (\S+)$/m)?.[1];
+    expect(dest).toBeDefined();
+    for (const script of ["docker/entrypoint.sh", "docker/snapotter-admin"]) {
+      const source = readFileSync(resolve(root, script), "utf8");
+      expect(source, `${script} must source ${dest}`).toContain(`. ${dest}`);
+      expect(source, `${script} must call export_embedded_db_env`).toMatch(
+        /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+      );
+    }
+  });
+
+  it("only gives snapotter-admin the embedded URLs when the container runs embedded", () => {
+    // Compose passes the app container its own DATABASE_URL and REDIS_URL, and a
+    // `docker exec` shell sees them. Without the mode check, every recovery
+    // command there would swap them for 127.0.0.1:5432 inside the app
+    // container, where no database listens.
+    const admin = readFileSync(resolve(root, "docker/snapotter-admin"), "utf8");
+    const guard = admin.match(
+      /^([ \t]*)if \[ "\$\(decide_run_mode\b[^)]*\)" = "embedded" \]; then\n([\s\S]*?)^\1fi$/m,
+    );
+    expect(guard, "snapotter-admin must check decide_run_mode for embedded").not.toBeNull();
+    expect(guard?.[2], "the export must sit inside the embedded-mode check").toMatch(
+      /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+    );
+    expect(
+      admin.replace(guard?.[0] ?? "", ""),
+      "snapotter-admin must not call export_embedded_db_env outside that check",
+    ).not.toMatch(/^[^#\n]*\bexport_embedded_db_env\b/m);
+  });
+
   it("documents the readiness timeouts the lib actually ships", () => {
     const docs = readFileSync(resolve(root, "apps/docs/guide/configuration.md"), "utf8");
     for (const knob of ["EMBEDDED_REDIS_TIMEOUT_S", "EMBEDDED_POSTGRES_TIMEOUT_S"]) {

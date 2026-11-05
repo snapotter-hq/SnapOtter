@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 4e425f53ee15
+i18n_output_hash: fbdcb2c5d81c
 i18n_hash_version: 2
 ---
 # アカウントの復旧 {#account-recovery}
@@ -74,8 +74,8 @@ docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
 どのバージョンでも最後の手段として、データベースでポリシーを設定します。オールインワンイメージでは、Postgres はコンテナ内部で動作します。
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 複数コンテナ構成では、代わりに `psql` を自分の `DATABASE_URL` に向けてください。
