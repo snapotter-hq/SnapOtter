@@ -7,6 +7,8 @@ describe("pool routing", () => {
   });
   it("ai tools route to the ai pool regardless of modality", () => {
     expect(resolveToolPool("remove-background")).toBe("ai");
+    // smart-crop has only an optional bundle (face mode) and keeps its pool.
+    expect(resolveToolPool("smart-crop")).toBe("ai");
   });
   it("unknown tools default to system", () => {
     expect(resolveToolPool("not-a-tool")).toBe("system");
