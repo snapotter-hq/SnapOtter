@@ -24,8 +24,11 @@ const ASSIGNMENT =
   /\b(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key)\b["']?\s*[:=]\s*["']?([^\s"'`$(){}]+)/gi;
 const MEMBER_ACCESS = /^[A-Za-z_$][\w$]*(\.[\w$]+)+$/;
 
+// The capture class keeps `,` and `;` because a real password can contain them,
+// so a reference such as `env.API_KEY,` arrives with its terminator. Trim it for
+// the reference test only; the length rules still see the raw capture.
 function looksLikeCredentialValue(value) {
-  if (value.length < 16 || MEMBER_ACCESS.test(value)) return false;
+  if (value.length < 16 || MEMBER_ACCESS.test(value.replace(/[,;]+$/, ""))) return false;
   return /\d/.test(value) || value.length >= 24;
 }
 
