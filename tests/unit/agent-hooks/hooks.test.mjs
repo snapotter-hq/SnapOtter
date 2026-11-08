@@ -154,6 +154,27 @@ describe("credential content guard", () => {
     expect(findCredential('token: "${TOKEN}"')).toBeNull();
   });
 
+  it("does not flag a variable reference that ends in a comma or semicolon", () => {
+    // Assembled from pieces, like FAKE_PASSWORD, so the unfixed guard in the
+    // main checkout does not deny this file at commit time.
+    const refs = ["env.SOME_PROVIDER_API_KEY", "process.env.SOME_PROVIDER_API_KEY"];
+    for (const ref of refs) {
+      for (const end of [",", ";"]) {
+        expect(findCredential(["apiKey: ", ref, end].join(""))).toBeNull();
+        expect(findCredential(["const token = ", ref, end].join(""))).toBeNull();
+      }
+    }
+  });
+
+  it("still flags a literal secret that ends in a comma or semicolon", () => {
+    for (const end of [",", ";"]) {
+      expect(findCredential([FAKE_PASSWORD, end].join(""))).toMatch(/credential assignment/);
+      expect(findCredential(["secret: ", "correct-horse-battery-9", end].join(""))).toMatch(
+        /credential assignment/,
+      );
+    }
+  });
+
   it("denies a token pasted into a command", () => {
     expect(secretContentVerdict(`echo ${FAKE_GH_TOKEN}`, scratch)?.level).toBe("deny");
   });
