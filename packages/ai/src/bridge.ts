@@ -1448,7 +1448,10 @@ export class PythonDispatcher {
     if (!this.takesVenvLock) return runWithSpan();
     const release = tryAcquireVenvRead();
     if (release) return runWithSpan().finally(release);
-    return acquireVenvRead().then((r) => runWithSpan().finally(r));
+    return acquireVenvRead(options.signal).then(
+      (r) => runWithSpan().finally(r),
+      () => Promise.reject(pythonAbortError()),
+    );
   }
 }
 
