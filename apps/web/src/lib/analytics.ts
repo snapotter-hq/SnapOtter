@@ -3,6 +3,7 @@ import {
   APP_VERSION,
   httpStatusTag,
   isSafeMessageError,
+  POSTHOG_IP_PLACEHOLDER,
   resolvePostHogClientHosts,
   SafeError,
 } from "@snapotter/shared";
@@ -213,7 +214,6 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           capture_pageview: "history_change",
           capture_pageleave: true,
           disable_session_recording: true,
-          ip: false,
           persistence: "localStorage",
           person_profiles: "identified_only",
           // Last-line PII boundary at the SDK, independent of track()'s per-call
@@ -238,6 +238,11 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
                 if (key in props) props[key] = strip(props[key]);
               }
               removeCampaignProperties(props);
+              // Without the proxy the connection IP is the visitor's own, and
+              // PostHog stores it whenever the project keeps client IPs. Through
+              // /ingest it's the instance's IP, left alone so the project's
+              // discard setting can still geolocate the event first (#4583).
+              if (!config.posthogProxyPath) props.$ip = POSTHOG_IP_PLACEHOLDER;
               // $web_vitals_*_event objects nest their own $current_url, which
               // skips the top-level strip above, so walk them too (#1022).
               for (const key of Object.keys(props)) {
