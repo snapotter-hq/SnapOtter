@@ -1,6 +1,8 @@
-import { readFileSync, realpathSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The support bundle zips LOG_DIR, and console.* never writes there (#4178).
@@ -38,6 +40,8 @@ afterEach(() => {
     "drizzle-orm/node-postgres/migrator",
     "../../../apps/api/src/config.js",
     "../../../apps/api/src/db/index.js",
+    "../../../apps/api/src/db/migrate-from-sqlite.js",
+    "../../../apps/api/src/lib/settings-helpers.js",
   ]) {
     vi.doUnmock(mod);
   }
@@ -164,5 +168,110 @@ describe("db/migrate.ts single-role warning", () => {
     expect(loggerMock.warn).toHaveBeenCalledWith(
       "DATABASE_MIGRATION_URL names the same role as DATABASE_URL, so the privilege split is NOT active. Running single-role.",
     );
+  });
+});
+
+describe("db/sqlite-import.ts boot import", () => {
+  const migrate = vi.hoisted(() => {
+    class TargetNonEmptyError extends Error {}
+    return { migrateFromSqlite: vi.fn(), TargetNonEmptyError };
+  });
+
+  async function loadBootImport(opts: { usersCount: number; marker?: object }) {
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: { execute: vi.fn().mockResolvedValue({ rows: [{ n: opts.usersCount }] }) },
+    }));
+    vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
+      getSettingString: vi.fn().mockResolvedValue(opts.marker ? JSON.stringify(opts.marker) : ""),
+      upsertSetting: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock("../../../apps/api/src/db/migrate-from-sqlite.js", () => ({
+      MIGRATED_TABLES: [],
+      migrateFromSqlite: migrate.migrateFromSqlite,
+      TargetNonEmptyError: migrate.TargetNonEmptyError,
+    }));
+    const { runBootImport } = await import("../../../apps/api/src/db/sqlite-import.js");
+    return runBootImport;
+  }
+
+  function emptySqliteFile(): string {
+    const path = join(mkdtempSync(join(tmpdir(), "boot-import-log-")), "snapotter.db");
+    new Database(path).close();
+    return path;
+  }
+
+  function bootEnv(source: string) {
+    return { SQLITE_MIGRATE_PATH: source, DATA_DIR: dirname(source), FILES_STORAGE_PATH: "/nope" };
+  }
+
+  beforeEach(() => {
+    migrate.migrateFromSqlite.mockReset();
+  });
+
+  it("logs a completed import, and routes the import's own warnings, through the logger", async () => {
+    migrate.migrateFromSqlite.mockImplementation(
+      async (_path: string, opts: { warn?: (message: string) => void }) => {
+        opts.warn?.("detached u-twin-a");
+        return { tables: { users: 2 }, detached: [{}] };
+      },
+    );
+    const consoleSpies = ["log", "warn", "error"].map((m) =>
+      vi.spyOn(console, m as "log").mockImplementation(() => {}),
+    );
+    const runBootImport = await loadBootImport({ usersCount: 0 });
+
+    expect(await runBootImport(bootEnv(emptySqliteFile()))).toBe("import");
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      'Imported 1.x SQLite database: {"tables":{"users":2},"blobs":{"present":0,"missing":0}}; 1 user imported without their SSO identity',
+    );
+    expect(loggerMock.warn).toHaveBeenCalledWith("detached u-twin-a");
+    for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("logs a lost import race through the logger", async () => {
+    migrate.migrateFromSqlite.mockRejectedValue(new migrate.TargetNonEmptyError("non-empty"));
+    const runBootImport = await loadBootImport({ usersCount: 0 });
+
+    expect(await runBootImport(bootEnv("/data/snapotter.db"))).toBe("leftover");
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      "1.x import skipped: another instance populated the database first.",
+    );
+  });
+
+  it("warns through the logger when the instance already has data", async () => {
+    const runBootImport = await loadBootImport({ usersCount: 3 });
+
+    expect(await runBootImport(bootEnv("/data/snapotter.db"))).toBe("locked");
+
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.stringContaining("a 1.x database was found at /data/snapotter.db"),
+    );
+    expect(migrate.migrateFromSqlite).not.toHaveBeenCalled();
+  });
+
+  it("logs a leftover source through the logger", async () => {
+    const runBootImport = await loadBootImport({ usersCount: 3, marker: { status: "completed" } });
+
+    expect(await runBootImport(bootEnv("/data/snapotter.db"))).toBe("leftover");
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      "1.x import already applied; you may delete /data/snapotter.db.",
+    );
+  });
+
+  it("keeps the FATAL line on the console before exiting", async () => {
+    migrate.migrateFromSqlite.mockRejectedValue(new Error("disk on fire"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    const runBootImport = await loadBootImport({ usersCount: 0 });
+
+    await runBootImport(bootEnv("/data/snapotter.db"));
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "FATAL: 1.x SQLite import failed from /data/snapotter.db: disk on fire. No partial data was written.",
+    );
+    expect(exit).toHaveBeenCalledWith(1);
   });
 });
