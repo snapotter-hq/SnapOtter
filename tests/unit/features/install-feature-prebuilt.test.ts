@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -2819,5 +2819,97 @@ assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v1.0.0"
         models: ["testmodel"],
       });
     }
+  });
+});
+
+// #4201: the API holds the venv writer lock only while the installer writes the
+// venv. The installer asks for it on stderr right before its first venv write
+// and waits for "granted" on stdin, so the download and extract run unlocked.
+describe("venv writer lock handshake (#4201)", () => {
+  interface HandshakeRun {
+    code: number | null;
+    /** Progress stages seen before the installer asked for the lock. */
+    stagesBeforeRequest: string[];
+    /** Whether site-packages already held the bundle's package when it asked. */
+    packageWrittenBeforeRequest: boolean | null;
+    stderr: string;
+  }
+
+  function runWithHandshake(answer: "granted" | "close"): Promise<HandshakeRun> {
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+    const child = spawn("python3", [scriptPath, "face-detection", manifestPath, modelsDir], {
+      env: {
+        ...process.env,
+        DATA_DIR: tempDir,
+        PYTHON_VENV_PATH: venvDir,
+        SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+        SNAPOTTER_VENV_LOCK_HANDSHAKE: "1",
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const killTimer = setTimeout(() => child.kill("SIGKILL"), 30_000);
+    const stages: string[] = [];
+    let stagesBeforeRequest: string[] = [];
+    let packageWrittenBeforeRequest: boolean | null = null;
+    let stderr = "";
+    let pending = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+      pending += chunk.toString();
+      const lines = pending.split("\n");
+      pending = lines.pop() ?? "";
+      for (const line of lines) {
+        let parsed: { progress?: number; stage?: string; venvLock?: string };
+        try {
+          parsed = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (typeof parsed.progress === "number") stages.push(parsed.stage ?? "");
+        if (parsed.venvLock === "acquire") {
+          stagesBeforeRequest = [...stages];
+          packageWrittenBeforeRequest = existsSync(join(sitePackagesDir, "testpkg"));
+          if (answer === "granted") child.stdin.write("granted\n");
+          else child.stdin.end();
+        }
+      }
+    });
+    return new Promise((resolve) => {
+      child.on("close", (code) => {
+        clearTimeout(killTimer);
+        resolve({ code, stagesBeforeRequest, packageWrittenBeforeRequest, stderr });
+      });
+    });
+  }
+
+  it("asks for the lock after extracting and before writing site-packages", async () => {
+    const run = await runWithHandshake("granted");
+
+    expect(run.code, `stderr: ${run.stderr}`).toBe(0);
+    expect(run.stagesBeforeRequest).toContain("Extracting packages and models...");
+    expect(run.stagesBeforeRequest).not.toContain("Installing packages...");
+    expect(run.packageWrittenBeforeRequest).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "testpkg", "__init__.py"))).toBe(true);
+  });
+
+  it("fails without touching the venv when the server never grants the lock", async () => {
+    const run = await runWithHandshake("close");
+
+    expect(run.code).not.toBe(0);
+    expect(run.packageWrittenBeforeRequest).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "testpkg"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+  });
+
+  it("never asks for the lock when run outside the server", () => {
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+    const result = installBundle("face-detection", tarPath);
+
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+    expect(result.stderr?.toString()).not.toContain('"venvLock"');
   });
 });

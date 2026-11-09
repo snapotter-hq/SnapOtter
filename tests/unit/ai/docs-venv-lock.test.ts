@@ -109,6 +109,29 @@ describe("document jobs and the AI venv lock", () => {
     await expect(pending).rejects.toThrow();
   });
 
+  it("rejects a job cancelled while it waits for the install (#4201)", async () => {
+    const { runDocsScript } = await import("../../../packages/ai/src/bridge.js");
+    const { acquireVenvLock } = await import("../../../packages/ai/src/venv-lock.js");
+
+    const releaseInstall = await acquireVenvLock();
+    const controller = new AbortController();
+    const pending = runDocsScript(
+      "doc_html_pdf",
+      { path: "in.html", out: "out.pdf", mode: "html" },
+      { signal: controller.signal },
+    );
+
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError", code: "canceled" });
+    expect(spawn).not.toHaveBeenCalled();
+
+    releaseInstall();
+    // The cancelled job left no reader behind, so a second install is not held up.
+    const releaseNext = await acquireVenvLock();
+    releaseNext();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("keeps the lock when the docs venv is the install target", async () => {
     process.env.DOCS_PYTHON_VENV_PATH = "/data/ai/venv";
     const { runDocsScript } = await import("../../../packages/ai/src/bridge.js");
