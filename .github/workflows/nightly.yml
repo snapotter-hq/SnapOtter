@@ -25,6 +25,8 @@ jobs:
   e2e-full:
     name: E2E Full (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-full-${{ matrix.shard }}
     timeout-minutes: 60
     services:
       postgres:
@@ -79,12 +81,14 @@ jobs:
         if: failure()
         with:
           name: e2e-full-report-shard-${{ matrix.shard }}
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-full-${{ matrix.shard }}/playwright-report/
           retention-days: 7
 
   e2e-serial:
     name: E2E Serial Bucket
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-serial
     timeout-minutes: 60
     services:
       postgres:
@@ -138,7 +142,7 @@ jobs:
         if: failure()
         with:
           name: e2e-serial-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-serial/playwright-report/
           retention-days: 7
 
   # The editor, the analytics opt-out flow and the AUTH_ENABLED=false mode each
@@ -148,6 +152,8 @@ jobs:
   e2e-surfaces:
     name: E2E Editor + Analytics Opt-Out + No-Auth
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-surfaces
     # The editor suite is 174 tests pinned to workers: 1 by its own config and
     # took 23.4 minutes on a loaded dev machine, so leave real headroom for it
     # plus the apt install, the browser download and the two smaller suites.
@@ -214,12 +220,17 @@ jobs:
         if: failure()
         with:
           name: e2e-surfaces-report
-          path: playwright-report/
+          path: |
+            test-results/e2e-runs/e2e-surfaces/editor/playwright-report/
+            test-results/e2e-runs/e2e-surfaces/noauth/playwright-report/
+            test-results/e2e-analytics-runs/e2e-surfaces/playwright-report/
           retention-days: 7
 
   e2e-cross-browser:
     name: E2E Cross-Browser (Firefox + WebKit)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-cross-browser
     timeout-minutes: 30
     services:
       postgres:
@@ -268,12 +279,14 @@ jobs:
         if: failure()
         with:
           name: e2e-cross-browser-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-cross-browser/playwright-report/
           retention-days: 7
 
   e2e-device-matrix:
     name: E2E Device Matrix (mobile + tablet)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-device-matrix
     timeout-minutes: 30
     services:
       postgres:
@@ -326,7 +339,7 @@ jobs:
         if: failure()
         with:
           name: e2e-device-matrix-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-device-matrix/playwright-report/
           retention-days: 7
 
   # Compares every maintained screenshot against its committed linux baseline.

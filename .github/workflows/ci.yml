@@ -309,6 +309,8 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -363,12 +365,14 @@ jobs:
         if: failure()
         with:
           name: e2e-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-mobile-smoke:
     name: E2E Mobile Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-mobile-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -419,12 +423,14 @@ jobs:
         if: failure()
         with:
           name: e2e-mobile-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-mobile-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-landing:
     name: E2E Landing (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-landing
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -457,12 +463,14 @@ jobs:
         if: failure()
         with:
           name: e2e-landing-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-landing/landing/playwright-report/
           retention-days: 7
 
   test-e2e-docs:
     name: E2E Docs (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-docs
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
     # which the config allows up to 10 minutes for on a loaded machine. The
     # extra 10 is degraded-apt-mirror headroom (#876).
@@ -496,7 +504,7 @@ jobs:
         if: failure()
         with:
           name: e2e-docs-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-docs/docs/playwright-report/
           retention-days: 7
 
   pip-audit:
