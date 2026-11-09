@@ -307,7 +307,6 @@ describe("trackEvent", () => {
     expect(mockCapture.mock.calls[0][0].properties).toEqual({ $ip: "0.0.0.0" });
   });
 
-
   it("pins $ip to the placeholder so PostHog never stores the instance's IP (#4583)", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
