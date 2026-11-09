@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -7322,5 +7323,107 @@ describe("Worker error burst backoff wiring (#4530)", () => {
     for (const worker of workers.values()) worker.isPaused.mockReturnValue(true);
     vi.advanceTimersByTime(5_000);
     for (const worker of workers.values()) expect(worker.resume).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("per-attempt job scratch dir (#4217)", () => {
+  it("gives a stalled job's second attempt its own scratch dir, so neither removes the other's", async () => {
+    const processV2Mock = vi.fn();
+    const rmMock = vi.fn().mockResolvedValue(undefined);
+    const mkdirMock = vi.fn().mockResolvedValue(undefined);
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: mkdirMock,
+        readFile: vi.fn(),
+        rm: rmMock,
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    // BullMQ re-runs a stalled job under the same id while the first attempt
+    // may still be running, so both attempts are live at once.
+    const makeJob = (attemptsMade: number) => ({
+      id: "job-stalled",
+      attemptsMade,
+      opts: { attempts: 2 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId: "job-stalled",
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/job-stalled/in.jpg"],
+        filename: "in.jpg",
+        settings: {},
+        kind: "tool",
+      },
+    });
+    const output = { buffer: Buffer.from("out"), filename: "out.jpg", contentType: "image/jpeg" };
+
+    let releaseFirst: (value: typeof output) => void = () => {};
+    processV2Mock
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+      .mockResolvedValueOnce(output);
+
+    const first = processor(makeJob(0));
+    await vi.waitFor(() => expect(processV2Mock).toHaveBeenCalledTimes(1));
+    await processor(makeJob(1));
+
+    const firstDir = (processV2Mock.mock.calls[0][0] as { scratchDir: string }).scratchDir;
+    const secondDir = (processV2Mock.mock.calls[1][0] as { scratchDir: string }).scratchDir;
+    expect(firstDir).not.toBe(secondDir);
+    for (const dir of [firstDir, secondDir]) {
+      expect(dir.startsWith(`${join(tmpdir(), "snapotter-scratch", "job-stalled")}-`)).toBe(true);
+    }
+    // The second attempt finished first and cleaned up only its own dir.
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir]);
+
+    releaseFirst(output);
+    await first;
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir, firstDir]);
+    expect(mkdirMock.mock.calls.map(([dir]) => dir)).toEqual([firstDir, secondDir]);
   });
 });
