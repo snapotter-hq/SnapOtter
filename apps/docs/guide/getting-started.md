@@ -16,6 +16,16 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 This single container runs everything it needs: with no `DATABASE_URL` set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It is the fastest way to try SnapOtter or self-host on a homelab. For production, use the [canonical Docker Compose stack](#docker-compose), which keeps PostgreSQL and Redis in their own containers. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`.
 
+::: warning Job output is not stored in `/data`
+Processing results live under `/tmp/workspace`, which is container filesystem unless you mount it. With only `-v SnapOtter-data:/data`, your settings, users, and files persist, but results from earlier jobs are gone once the container is replaced (for example on an image upgrade), and their download links return 404. If you need results to survive a replacement, mount the workspace too:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+The Compose stack already mounts it.
+:::
+
 Installing on a Raspberry Pi, an old laptop, or a small VPS? See [Low-Resource Setups](/guide/low-resource) for a tuned walkthrough and what to expect from constrained hardware.
 
 You will be asked to change your password on first login.

@@ -410,7 +410,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 | Mount / Volume | Purpose | Required? |
 |---|---|---|
 | `/data` (app) | AI models, Python venv, user files | **Yes** - file loss without it |
-| `/tmp/workspace` (app) | Temporary processing files (auto-cleaned) | Recommended |
+| `/tmp/workspace` (app) | Temporary processing files and job output (auto-cleaned). Not stored under `/data`, so results are lost when the container is replaced unless this is mounted | Recommended |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL data directory (users, settings, pipelines, jobs) | **Yes** - data loss without it |
 | `SnapOtter-redisdata` (redis) | Redis append-only file for durable job queues | Recommended |
 
