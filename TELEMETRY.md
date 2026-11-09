@@ -29,7 +29,7 @@ Not an event: a read. While `analyticsEnabled()` is true, the API evaluates the 
 
 ## Server events
 
-Emitted from `apps/api` through `trackEvent()`; properties are filtered by `analytics-allowlist.ts`.
+Emitted from `apps/api` through `trackEvent()`; properties are filtered by `analytics-allowlist.ts`. `trackEvent()` also adds `app_version` (the build's version) to every event below, so failures and installs can be split by release. It is added after the opt-out gate, so an opted-out instance sends nothing.
 
 | Event | Fires when | Key properties |
 | --- | --- | --- |

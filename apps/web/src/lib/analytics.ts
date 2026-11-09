@@ -1,5 +1,6 @@
 import {
   type AnalyticsConfig,
+  APP_VERSION,
   httpStatusTag,
   isSafeMessageError,
   resolvePostHogClientHosts,
@@ -228,6 +229,10 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
             if (!enabled) return null;
             const props = event?.properties;
             if (props) {
+              // Stamped here, not only as a super property: register() runs
+              // after an await, and a $pageview captured before it carried no
+              // version (#4215).
+              props.app_version = APP_VERSION;
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
               for (const key of URL_PROPERTIES) {
                 if (key in props) props[key] = strip(props[key]);
@@ -276,7 +281,7 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     // uniq(). Omitted when empty so we never register a blank value.
     try {
       const superProps: Record<string, string> = {
-        app_version: (await import("@snapotter/shared")).APP_VERSION,
+        app_version: APP_VERSION,
       };
       if (config.instanceId) superProps.instance_id = config.instanceId;
       // Registered even if an opt-out landed meanwhile: it only stores them
