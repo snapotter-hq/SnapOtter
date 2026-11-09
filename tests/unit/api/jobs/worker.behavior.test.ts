@@ -77,6 +77,9 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     Worker: vi.fn(() => ({
       on: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
+      isPaused: vi.fn(() => false),
+      pause: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
     })),
   }));
 
@@ -7200,5 +7203,72 @@ describe("Worker error log throttle (#4360)", () => {
 
     system(misconf());
     expect(logsWith(loggerError, "Worker error")).toHaveLength(2);
+  });
+});
+
+describe("Worker error burst backoff wiring (#4530)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  interface MockedWorker {
+    on: { mock: { calls: unknown[][] } };
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
+    isPaused: ReturnType<typeof vi.fn>;
+  }
+
+  /** Start the workers against mocks and return each queue's worker mock. */
+  async function startedWorkers(): Promise<Map<string, MockedWorker>> {
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: MockedWorker }[] };
+    };
+    return new Map(
+      workerMock.mock.calls.map((call, i) => [call[0] as string, workerMock.mock.results[i].value]),
+    );
+  }
+
+  function emitError(worker: MockedWorker, err: Error): void {
+    for (const [event, listener] of worker.on.mock.calls) {
+      if (event === "error") (listener as (e: Error) => void)(err);
+    }
+  }
+
+  it("pauses every pool's worker on a burst of Redis reply errors and resumes it later", async () => {
+    vi.useFakeTimers();
+    const workers = await startedWorkers();
+    expect(workers.size).toBe(POOLS.length);
+
+    for (const worker of workers.values()) {
+      for (let i = 0; i < 1_000; i++) {
+        emitError(
+          worker,
+          Object.assign(new Error("MISCONF Errors writing to the AOF file"), {
+            name: "ReplyError",
+          }),
+        );
+      }
+      expect(worker.pause).toHaveBeenCalledExactlyOnceWith(true);
+    }
+
+    for (const worker of workers.values()) worker.isPaused.mockReturnValue(true);
+    vi.advanceTimersByTime(5_000);
+    for (const worker of workers.values()) expect(worker.resume).toHaveBeenCalledTimes(1);
   });
 });

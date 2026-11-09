@@ -42,6 +42,7 @@ import { createBullMQConnection } from "./connection.js";
 import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import { POOLS, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 import { processBatchChild, processBatchFinalize } from "./worker-batch.js";
+import { createWorkerErrorBackoff } from "./worker-error-backoff.js";
 import { createWorkerErrorLogger } from "./worker-error-log.js";
 import {
   isCanceledPipelineFlow,
@@ -94,6 +95,7 @@ export function startWorkers(): void {
       });
 
       worker.on("error", createWorkerErrorLogger(pool));
+      worker.on("error", createWorkerErrorBackoff(worker, pool));
 
       worker.on("failed", (job, err) => {
         if (!job) return;
@@ -198,6 +200,7 @@ export function startWorkers(): void {
     });
 
     worker.on("error", createWorkerErrorLogger(pool));
+    worker.on("error", createWorkerErrorBackoff(worker, pool));
 
     worker.on("failed", (job, err) => {
       if (!job) return;
