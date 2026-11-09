@@ -578,6 +578,41 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(hoisted.acquireVenvLockMock).not.toHaveBeenCalled();
   });
 
+  it("logs a failed OCR download-cache purge through the logger and still completes (#4176)", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const { purgeOcrRuntimeDownloads } = await import(
+      "../../../apps/api/src/lib/ocr-runtime-install.js"
+    );
+    const { db, schema } = await import("../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    const warnSpy = vi.spyOn(logger, "warn");
+    const consoleSpy = vi.spyOn(console, "warn");
+    const purgeError = new Error("download cache busy");
+    vi.mocked(purgeOcrRuntimeDownloads).mockRejectedValueOnce(purgeError);
+
+    try {
+      const res = await postInstall("ocr");
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          { err: purgeError, bundleId: "ocr", jobId },
+          "[ocr-runtime] Unable to purge verified download cache",
+        );
+      });
+      await waitFor(() => queue.getActiveBundleId() === null);
+      await vi.waitFor(async () => {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        expect(row?.status).toBe("completed");
+      });
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+      consoleSpy.mockRestore();
+    }
+  });
+
   it("shares one monotonic deadline across OCR download and activation", async () => {
     const originalMaxMs = env.INSTALL_MAX_MS;
     const wallClock = vi.spyOn(Date, "now").mockReturnValue(1_000_000);

@@ -250,7 +250,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
       try {
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
       } catch (error) {
-        console.warn("[ocr-runtime] Unable to purge verified download cache:", error);
+        logger.warn(
+          { err: error, bundleId, jobId },
+          "[ocr-runtime] Unable to purge verified download cache",
+        );
       }
       if (!finalize()) return;
       invalidateCache();
@@ -633,7 +636,10 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     try {
       acquired = acquireInstallLock("__ocr_gc__");
     } catch (error) {
-      console.warn("[ocr-runtime] Deferred generation cleanup could not acquire its lease:", error);
+      logger.warn(
+        { err: error },
+        "[ocr-runtime] Deferred generation cleanup could not acquire its lease",
+      );
       scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       return;
     }
@@ -644,7 +650,7 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     const installLockFd = getInstallLockFdForChild();
     void runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd })
       .catch((error) => {
-        console.warn("[ocr-runtime] Deferred generation cleanup failed:", error);
+        logger.warn({ err: error }, "[ocr-runtime] Deferred generation cleanup failed");
         scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       })
       .finally(() => {

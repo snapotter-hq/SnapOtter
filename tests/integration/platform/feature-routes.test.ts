@@ -743,6 +743,10 @@ describe("feature bundle route contracts", () => {
       },
     );
 
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const warnSpy = vi.spyOn(logger, "warn");
+    const consoleSpy = vi.spyOn(console, "warn");
+
     try {
       const res = await postUninstall("ocr");
       expect(res.statusCode).toBe(200);
@@ -764,6 +768,10 @@ describe("feature bundle route contracts", () => {
       captured[1].handler();
       expect(captured).toHaveLength(3);
       expect(captured[2].ms).toBe(360_000);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: expect.any(Error) },
+        "[ocr-runtime] Deferred generation cleanup could not acquire its lease",
+      );
       mkdirSync(modelsDir, { recursive: true });
       writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
       invalidateCache();
@@ -773,10 +781,15 @@ describe("feature bundle route contracts", () => {
         hoisted.runOcrRuntimeMaintenanceMock.mock.calls.filter(([action]) => action === "gc")
           .length;
       const gcCallsBefore = gcCalls();
-      hoisted.runOcrRuntimeMaintenanceMock.mockRejectedValueOnce(new Error("gc failed"));
+      const gcError = new Error("gc failed");
+      hoisted.runOcrRuntimeMaintenanceMock.mockRejectedValueOnce(gcError);
       captured[2].handler();
       expect(gcCalls()).toBe(gcCallsBefore + 1);
       await waitFor(() => captured.length === 4);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: gcError },
+        "[ocr-runtime] Deferred generation cleanup failed",
+      );
       await waitForLeaseFree();
 
       // Sweep 4: maintenance succeeds; the lease frees and no retry remains.
@@ -784,8 +797,11 @@ describe("feature bundle route contracts", () => {
       await waitFor(() => gcCalls() === gcCallsBefore + 2);
       await waitForLeaseFree();
       expect(captured).toHaveLength(4);
+      expect(consoleSpy).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
+      warnSpy.mockRestore();
+      consoleSpy.mockRestore();
     }
   });
 });
