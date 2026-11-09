@@ -8819,7 +8819,7 @@ paths:
       description: Gibt die neueste veröffentlichte Version zurück, wenn sie neuer ist als die laufende Version, andernfalls null. Erfordert settings:write.
       responses:
         '200':
-          description: Neueste Version, oder null, wenn diese Instanz aktuell ist
+          description: Die neuere Version, oder null, wenn keine neuere Version veröffentlicht ist oder Analytics auf dieser Instanz deaktiviert ist (dann findet keine Abfrage statt)
           content:
             application/json:
               schema:
@@ -8828,10 +8828,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Fehlende oder ungültige Anmeldedaten
           content:
@@ -30834,9 +30848,9 @@ x-i18n:
       provenance: machine
       outputHash: 4d566db337a9
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: f911a700a849
+      outputHash: a860340595ba
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

@@ -8823,7 +8823,7 @@ paths:
       description: Yayımlanan en yeni sürüm, çalışan sürümden daha yeniyse onu, değilse null döndürür. settings:write gerektirir.
       responses:
         '200':
-          description: Son sürüm. Bu örnek güncelse null
+          description: Daha yeni sürüm veya yayımlanmış daha yeni bir sürüm yoksa ya da bu örnekte analitik kapalıysa null (bu durumda sorgu yapılmaz)
           content:
             application/json:
               schema:
@@ -8832,10 +8832,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Kimlik doğrulama bilgisi eksik veya geçersiz
           content:
@@ -30837,9 +30851,9 @@ x-i18n:
       provenance: machine
       outputHash: 753e98906b34
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 1b9bea076630
+      outputHash: a61722a0f8f2
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

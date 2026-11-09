@@ -8823,7 +8823,7 @@ paths:
       description: Renvoie la dernière version publiée lorsqu'elle est plus récente que la version en cours d'exécution, ou null. Nécessite settings:write.
       responses:
         '200':
-          description: Dernière version, ou null lorsque cette instance est à jour
+          description: La version plus récente, ou null quand aucune version plus récente n'est publiée ou que l'analytique est désactivée sur cette instance (aucune consultation n'est alors faite)
           content:
             application/json:
               schema:
@@ -8832,10 +8832,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Identifiants absents ou invalides
           content:
@@ -30812,9 +30826,9 @@ x-i18n:
       provenance: machine
       outputHash: dc5d1ba83afa
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: ecf8f2147110
+      outputHash: 2cc143744abf
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

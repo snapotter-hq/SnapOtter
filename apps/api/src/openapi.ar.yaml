@@ -8825,7 +8825,7 @@ paths:
       description: يُرجع أحدث إصدار منشور عندما يكون أحدث من الإصدار المشغَّل، أو null. يتطلب settings:write.
       responses:
         '200':
-          description: أحدث إصدار، أو null إذا كان هذا المثيل محدّثًا
+          description: الإصدار الأحدث، أو null عندما لا يوجد إصدار أحدث منشور أو عندما تكون التحليلات معطلة على هذه النسخة (لا يتم أي استعلام حينها)
           content:
             application/json:
               schema:
@@ -8834,10 +8834,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: بيانات اعتماد مفقودة أو غير صالحة
           content:
@@ -30840,9 +30854,9 @@ x-i18n:
       provenance: machine
       outputHash: 4af06428d3ee
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: e42c7ff7bae4
+      outputHash: c10e569cf865
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

@@ -8822,7 +8822,7 @@ paths:
       description: Returnerar den senast publicerade utgåvan när den är nyare än den körande versionen, annars null. Kräver settings:write.
       responses:
         '200':
-          description: Senaste release, eller null när den här instansen är aktuell
+          description: Den nyare utgåvan, eller null när ingen nyare utgåva är publicerad eller analys är avstängd på den här instansen (då görs ingen uppslagning)
           content:
             application/json:
               schema:
@@ -8831,10 +8831,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Inloggningsuppgifter saknas eller är ogiltiga
           content:
@@ -30833,9 +30847,9 @@ x-i18n:
       provenance: machine
       outputHash: 9d129c8f0a8a
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 4b1c1cfffe53
+      outputHash: 25993d69f4c2
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

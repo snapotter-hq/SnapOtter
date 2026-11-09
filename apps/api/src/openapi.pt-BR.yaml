@@ -8823,7 +8823,7 @@ paths:
       description: Retorna a versão publicada mais recente, quando ela for mais nova que a versão em execução, ou null. Requer settings:write.
       responses:
         '200':
-          description: Última versão, ou null quando esta instância já está atualizada
+          description: A versão mais recente, ou null quando não há versão mais nova publicada ou a análise está desativada nesta instância (nesse caso nenhuma consulta é feita)
           content:
             application/json:
               schema:
@@ -8832,10 +8832,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Credenciais ausentes ou inválidas
           content:
@@ -30838,9 +30852,9 @@ x-i18n:
       provenance: machine
       outputHash: 7eb4c0e00539
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 19d40ac52f6d
+      outputHash: b26426cea3ee
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

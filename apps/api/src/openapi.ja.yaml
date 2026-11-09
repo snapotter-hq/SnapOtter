@@ -8783,7 +8783,7 @@ paths:
       description: 公開済みの最新リリースが実行中のバージョンより新しい場合はそのリリースを返し、そうでない場合は null を返します。settings:write が必要です。
       responses:
         '200':
-          description: 最新リリースです。このインスタンスが最新の場合は null です。
+          description: より新しいリリース。新しいリリースが公開されていない場合、またはこのインスタンスでアナリティクスが無効な場合は null（その場合は検索を行いません）
           content:
             application/json:
               schema:
@@ -8792,10 +8792,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: 認証情報がないか無効です
           content:
@@ -30767,9 +30781,9 @@ x-i18n:
       provenance: machine
       outputHash: a3dc3df40fe3
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 5889fd269d83
+      outputHash: c7fbdeb25937
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

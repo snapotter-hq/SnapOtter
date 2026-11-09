@@ -8664,7 +8664,7 @@ paths:
       description: Returns the newest published release when it is newer than the running version, or null. Requires settings:write.
       responses:
         "200":
-          description: Latest release, or null when this instance is current
+          description: The newer release, or null when no newer release is published or analytics is off on this instance (no lookup is made then)
           content:
             application/json:
               schema:
@@ -8672,10 +8672,20 @@ paths:
                 required: [latest]
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type: [object, "null"]
+                    required: [version, url]
+                    properties:
+                      version:
+                        type: string
+                        example: "2.3.0"
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: "2.3.0"
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         "401":
           description: Missing or invalid credentials
           content:

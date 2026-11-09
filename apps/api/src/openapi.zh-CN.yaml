@@ -8782,7 +8782,7 @@ paths:
       description: 当最新已发布版本高于当前运行版本时返回该版本，否则返回 null。需要 settings:write。
       responses:
         '200':
-          description: 最新版本；若此实例已是最新版本，则返回 null
+          description: 较新的版本；当没有发布更新的版本，或此实例已关闭分析时为 null（此时不会进行查询）
           content:
             application/json:
               schema:
@@ -8791,10 +8791,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: 缺少或无效的凭据
           content:
@@ -30761,9 +30775,9 @@ x-i18n:
       provenance: machine
       outputHash: b5719f0f7a64
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 97da4c37c282
+      outputHash: 60fb092605f0
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
