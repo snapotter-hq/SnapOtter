@@ -15,8 +15,8 @@
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
     "@snapotter/shared": "workspace:*",
-    "astro": "7.4.2",
-    "lucide": "^1.61.0"
+    "astro": "7.4.4",
+    "lucide": "^1.66.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
