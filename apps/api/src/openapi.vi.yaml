@@ -8822,7 +8822,7 @@ paths:
       description: Trả về bản phát hành mới nhất đã công bố khi nó mới hơn phiên bản đang chạy, hoặc null. Yêu cầu settings:write.
       responses:
         '200':
-          description: Bản phát hành mới nhất, hoặc null khi máy chủ này đã ở bản mới nhất.
+          description: Bản phát hành mới hơn, hoặc null khi chưa có bản mới hơn được phát hành hoặc phân tích đang tắt trên phiên bản này (khi đó không có tra cứu nào được thực hiện)
           content:
             application/json:
               schema:
@@ -8831,10 +8831,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Thiếu hoặc sai thông tin xác thực
           content:
@@ -30836,9 +30850,9 @@ x-i18n:
       provenance: machine
       outputHash: a64fdd8d03c7
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 960dee880b6c
+      outputHash: a58b732d2318
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

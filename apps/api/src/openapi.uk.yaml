@@ -8823,7 +8823,7 @@ paths:
       description: Повертає найновіший опублікований випуск, якщо він новіший за запущену версію, або null. Потребує settings:write.
       responses:
         '200':
-          description: Остання версія або null, якщо цей екземпляр актуальний
+          description: Новіший реліз або null, якщо новішого релізу немає або аналітику вимкнено на цьому екземплярі (тоді запит не виконується)
           content:
             application/json:
               schema:
@@ -8832,10 +8832,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Відсутні або недійсні облікові дані
           content:
@@ -30838,9 +30852,9 @@ x-i18n:
       provenance: machine
       outputHash: cfd5f229e756
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 76fc8ac9a47d
+      outputHash: 134b3e07b0e0
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

@@ -8823,7 +8823,7 @@ paths:
       description: Zwraca najnowsze opublikowane wydanie, jeśli jest nowsze niż uruchomiona wersja, albo null. Wymaga uprawnienia settings:write.
       responses:
         '200':
-          description: Najnowsze wydanie albo null, gdy ta instancja jest aktualna
+          description: Nowsze wydanie lub null, gdy nie opublikowano nowszego wydania albo analityka jest wyłączona w tej instancji (wtedy nie jest wykonywane żadne zapytanie)
           content:
             application/json:
               schema:
@@ -8832,10 +8832,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Brak danych uwierzytelniających lub są nieprawidłowe
           content:
@@ -30838,9 +30852,9 @@ x-i18n:
       provenance: machine
       outputHash: 23b4f8ba4dd6
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 565ff8b593da
+      outputHash: 2583d8497a05
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

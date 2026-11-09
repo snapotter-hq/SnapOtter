@@ -8825,7 +8825,7 @@ paths:
       description: Возвращает последний опубликованный релиз, если он новее запущенной версии, или null. Требует settings:write.
       responses:
         '200':
-          description: Последний релиз или null, если этот экземпляр актуален
+          description: Более новый релиз или null, если более нового релиза нет или аналитика отключена на этом экземпляре (в этом случае запрос не выполняется)
           content:
             application/json:
               schema:
@@ -8834,10 +8834,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Отсутствуют или недействительны учётные данные
           content:
@@ -30840,9 +30854,9 @@ x-i18n:
       provenance: machine
       outputHash: 10a4016f97ac
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: c8561f7db2cf
+      outputHash: 77633faf1592
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

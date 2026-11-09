@@ -8783,7 +8783,7 @@ paths:
       description: Geeft de nieuwste gepubliceerde release terug wanneer die nieuwer is dan de draaiende versie, anders null. Vereist settings:write.
       responses:
         '200':
-          description: Nieuwste release, of null wanneer deze instantie al actueel is.
+          description: De nieuwere release, of null wanneer er geen nieuwere release is gepubliceerd of analytics op deze instantie is uitgeschakeld (er wordt dan niets opgezocht)
           content:
             application/json:
               schema:
@@ -8792,10 +8792,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Ontbrekende of ongeldige inloggegevens
           content:
@@ -30766,9 +30780,9 @@ x-i18n:
       provenance: machine
       outputHash: e07665a35d47
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 1827b3c85d47
+      outputHash: b72afd94ccaf
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine

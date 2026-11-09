@@ -8821,7 +8821,7 @@ paths:
       description: 게시된 최신 릴리스가 실행 중인 버전보다 새로울 때 해당 릴리스를, 그렇지 않으면 null을 반환합니다. settings:write 권한이 필요합니다.
       responses:
         '200':
-          description: 최신 릴리스입니다. 이 인스턴스가 최신이면 null입니다.
+          description: 더 새로운 릴리스입니다. 더 새로운 릴리스가 게시되지 않았거나 이 인스턴스에서 분석이 꺼져 있으면 null입니다(이 경우 조회하지 않습니다)
           content:
             application/json:
               schema:
@@ -8830,10 +8830,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: 인증 정보가 없거나 잘못되었습니다.
           content:
@@ -30832,9 +30846,9 @@ x-i18n:
       provenance: machine
       outputHash: 772fb6bb90b8
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: de2587f2bd46
+      outputHash: bef06a208738
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
