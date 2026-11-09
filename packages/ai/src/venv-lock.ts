@@ -14,8 +14,11 @@
  * not starved by a steady stream of jobs.
  *
  * Both sides live in the same Node process (the Fastify route spawns the
- * installer; in-process BullMQ workers run the jobs), so a module-level lock
- * shared via Node's module cache is sufficient.
+ * installer; in-process BullMQ workers run the jobs), so the lock is module
+ * state shared via Node's module cache. It does not reach a second API
+ * replica on the same data volume: that replica's dispatcher keeps the old
+ * libraries mapped while this one rewrites the venv. The deployment guide
+ * tells operators to drain other replicas before changing AI bundles (#4309).
  *
  * Readers have a synchronous fast path (tryAcquireVenvRead) so a job's work
  * begins in the same tick when no install is active or pending -- exactly as

@@ -405,6 +405,10 @@ See the [complete format list](/guide/supported-formats) for details on every su
 - **Upscale** times out on CPU for anything beyond small images. GPU required for practical use.
 - **CodeFormer** face enhancement is significantly slower than GFPGAN (53s vs 2s on GPU). GFPGAN is recommended for most use cases.
 
+### AI bundle installs with several replicas {#ai-bundle-installs-with-several-replicas}
+
+Change AI bundles with only one replica running. Installing, uninstalling, resetting, or importing a bundle rewrites the shared Python environment in `/data/ai/venv`. The replica doing the work waits for its own AI jobs and restarts its own sidecar afterwards, but it can't see AI jobs on the other replicas. Their sidecars keep torch and ONNX Runtime loaded from that directory while it's rewritten, and can crash mid-job. Scale the deployment down to one replica (or stop the others), make the change, then scale back up.
+
 ## Volumes {#volumes}
 
 | Mount / Volume | Purpose | Required? |
