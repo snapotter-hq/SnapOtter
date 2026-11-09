@@ -24,7 +24,10 @@ const ASSIGNMENT =
   /\b(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key)\b["']?\s*[:=]\s*["']?([^\s"'`$(){}]+)/gi;
 const MEMBER_ACCESS = /^[A-Za-z_$][\w$]*(\.[\w$]+)+$/;
 
-function looksLikeCredentialValue(value) {
+function looksLikeCredentialValue(raw) {
+  // The capture swallows statement punctuation (`token: env.X,`), which would
+  // defeat MEMBER_ACCESS. A real credential still counts once it is trimmed.
+  const value = raw.replace(/[,;]+$/, "");
   if (value.length < 16 || MEMBER_ACCESS.test(value)) return false;
   return /\d/.test(value) || value.length >= 24;
 }

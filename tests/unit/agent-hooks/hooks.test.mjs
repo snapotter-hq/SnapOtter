@@ -154,6 +154,21 @@ describe("credential content guard", () => {
     expect(findCredential('token: "${TOKEN}"')).toBeNull();
   });
 
+  it("does not flag a variable reference followed by a comma or semicolon", () => {
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN,")).toBeNull();
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN;")).toBeNull();
+    expect(findCredential("const token = process.env.SNAPOTTER_X_TOKEN;")).toBeNull();
+  });
+
+  it("still flags a real credential followed by a comma or semicolon", () => {
+    const value = "correct-horse-battery-9";
+    expect(findCredential(["password: ", '"', value, '",'].join(""))).toMatch(
+      /credential assignment/,
+    );
+    expect(findCredential(["token=", value, ","].join(""))).toMatch(/credential assignment/);
+    expect(findCredential(["secret=", value, ";"].join(""))).toMatch(/credential assignment/);
+  });
+
   it("denies a token pasted into a command", () => {
     expect(secretContentVerdict(`echo ${FAKE_GH_TOKEN}`, scratch)?.level).toBe("deny");
   });
