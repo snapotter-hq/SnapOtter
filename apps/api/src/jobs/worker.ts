@@ -178,6 +178,10 @@ export function startWorkers(): void {
           pool,
           toolId: data?.toolId ?? (job.name === SYSTEM_JOBS.gdprExport ? "gdpr-export" : undefined),
           jobId: job.id,
+          // Scheduler ticks repeat the same environmental fault forever; a GDPR
+          // export is a one-off a user asked for, so it keeps the hourly rule.
+          periodic: job.name !== SYSTEM_JOBS.gdprExport,
+          job: job.name,
         });
       });
 

@@ -5,6 +5,8 @@
  *  - expected: user input / client aborts / cancels. Never sent.
  *  - operational: someone's environment is broken (db down, disk full).
  *    Sent once per signature per hour, level=warning, fingerprinted per class.
+ *    A scheduled system job (`periodic`) fails the same way on every tick, so
+ *    it gets one event per job and error code per day instead (#4213).
  *  - bug: our fault. Sent up to 10 per signature per hour.
  *
  * State is per-process, so a crash-looping instance always reports its first
@@ -15,6 +17,7 @@ import {
   connectivityClass,
   extractErrorCode,
   isClientAbort,
+  isEmptyPgClientError,
   isEnvironmentalDbError,
   isSafeMessageError,
   isToolInputError,
@@ -25,6 +28,7 @@ import { isBinarySpawnFailure } from "./binary-overrides.js";
 export type ErrorClass = "expected" | "operational" | "bug";
 
 const HOUR_MS = 3600_000;
+const PERIODIC_WINDOW_MS = 24 * HOUR_MS;
 const LIMITS: Record<Exclude<ErrorClass, "expected">, number> = { operational: 1, bug: 10 };
 export const STORAGE_FULL_CODES = new Set(["ENOSPC", "EDQUOT"]);
 export const STORAGE_NOT_WRITABLE_CODES = new Set(["EACCES", "EPERM", "EROFS"]);
@@ -106,6 +110,14 @@ export interface ReportContext {
    * children's run time. Tagged as a coarse bucket (#1414).
    */
   jobAgeMs?: number;
+  /**
+   * The error comes from a scheduled system job that re-runs on a timer. A
+   * broken environment then repeats the same fault on every tick, so operational
+   * events are throttled per `job` and error code over a day (#4213).
+   */
+  periodic?: boolean;
+  /** Scheduler job name (a SYSTEM_JOBS value); the throttle key for `periodic`. */
+  job?: string;
 }
 
 /**
@@ -216,7 +228,11 @@ export function isUpstreamError(err: unknown): boolean {
   return err instanceof Error && (err as { isUpstreamError?: unknown }).isUpstreamError === true;
 }
 
-export function classifyError(rawErr: unknown, source?: ReportContext["source"]): ErrorClass {
+export function classifyError(
+  rawErr: unknown,
+  source?: ReportContext["source"],
+  opts?: { periodic?: boolean },
+): ErrorClass {
   const err = unwrapUnrecoverable(rawErr);
   if (isToolInputError(err)) return "expected";
   const e = err as { name?: string; message?: string; code?: string } | null;
@@ -260,6 +276,9 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   if (isBullMqStallError(e)) return "operational";
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
+  // NODE-58: a scheduled job's pg error that arrives with no message and no
+  // SQLSTATE can only be told apart by where it came from (#4213).
+  if (opts?.periodic && isEmptyPgClientError(err)) return "operational";
   if (isOperationalErrno(err)) return "operational";
   if (isBinarySpawnFailure(err)) return "operational";
   if (
@@ -278,15 +297,27 @@ export function shouldReport(
   cls: Exclude<ErrorClass, "expected">,
   signature: string,
   now = Date.now(),
+  windowMs = HOUR_MS,
 ): boolean {
   const key = `${cls}:${signature}`;
   const entry = seen.get(key);
-  if (!entry || now - entry.windowStart > HOUR_MS) {
+  if (!entry || now - entry.windowStart > windowMs) {
     seen.set(key, { count: 1, windowStart: now });
     return true;
   }
   entry.count++;
   return entry.count <= LIMITS[cls];
+}
+
+/**
+ * Throttle key for a scheduled job's operational fault. Job name plus error
+ * code only, so call sites do not multiply the slots. Never message text: it
+ * can carry hostnames, paths or credentials.
+ */
+function periodicKey(err: unknown, job: string | undefined): string {
+  const name = (err as { name?: unknown } | null)?.name;
+  const code = extractErrorCode(err) ?? (typeof name === "string" ? name : "op");
+  return `periodic:${job ?? "unknown"}:${code}`;
 }
 
 export function resetThrottleForTests(): void {
@@ -362,9 +393,15 @@ export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<
   try {
     if (!analyticsEnabled()) return;
     const err = unwrapUnrecoverable(rawErr);
-    const cls = classifyError(rawErr, ctx.source);
+    const cls = classifyError(rawErr, ctx.source, { periodic: ctx.periodic });
     if (cls === "expected") return;
-    if (!sentryDiagnostic() && !shouldReport(cls, errorSignature(err))) return;
+    if (!sentryDiagnostic()) {
+      const send =
+        ctx.periodic && cls === "operational"
+          ? shouldReport(cls, periodicKey(err, ctx.job), Date.now(), PERIODIC_WINDOW_MS)
+          : shouldReport(cls, errorSignature(err));
+      if (!send) return;
+    }
 
     const Sentry = await import("@sentry/node");
     const net = connectivityClass(err);

@@ -2537,6 +2537,46 @@ describe("worker failure reports carry the job age (#1414)", () => {
     expect(ctx.jobAgeMs).toBeUndefined();
   });
 
+  it("marks scheduler ticks on the system pool as periodic, with the job name (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "sys-2", name: "system:storage-ttl", data: { kind: "other" } };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ pool: "system", periodic: true, job: "system:storage-ttl" }),
+    );
+  });
+
+  it("does not mark a user-requested GDPR export as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = {
+      id: "sys-3",
+      name: "system:gdpr-export",
+      data: { kind: "other" },
+      attemptsMade: 1,
+      opts: { attempts: 3 },
+    };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ periodic: false }),
+    );
+  });
+
+  it("never marks a tool pool as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "img-1", name: "resize", data: { toolId: "resize" } };
+
+    listenerFor(listeners, "image")(job, new Error("boom"));
+
+    const ctx = reportErrorMock.mock.calls[0][1] as { periodic?: boolean };
+    expect(ctx.periodic).toBeUndefined();
+  });
+
   it("leaves the wait unset when the job never became active", async () => {
     const listeners = await failedListeners();
     const job = { id: "job-2", data: { toolId: "resize" }, timestamp: 1_000 };
