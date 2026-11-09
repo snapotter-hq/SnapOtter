@@ -233,7 +233,7 @@ describe("trackEvent", () => {
     expect(mockCapture).toHaveBeenCalledWith({
       distinctId: "did-boot",
       event: "instance_started",
-      properties: { arch: "arm64", app_version: APP_VERSION },
+      properties: { arch: "arm64", app_version: APP_VERSION, $ip: "0.0.0.0" },
     });
   });
 
@@ -252,7 +252,12 @@ describe("trackEvent", () => {
       distinctId: "unknown",
       event: "tool_used",
       // error_message is free-text and never allow-listed.
-      properties: { tool_id: "resize", status: "completed", app_version: APP_VERSION },
+      properties: {
+        tool_id: "resize",
+        status: "completed",
+        app_version: APP_VERSION,
+        $ip: "0.0.0.0",
+      },
     });
   });
 
@@ -293,13 +298,26 @@ describe("trackEvent", () => {
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
-  it("adds no properties to an event that is not allow-listed", async () => {
+  it("adds only the IP placeholder to an event that is not allow-listed", async () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
     await mod.initAnalytics();
 
     await mod.trackEvent("totally_new_event", { x: 1 });
-    expect(mockCapture.mock.calls[0][0].properties).toEqual({});
+    expect(mockCapture.mock.calls[0][0].properties).toEqual({ $ip: "0.0.0.0" });
+  });
+
+
+  it("pins $ip to the placeholder so PostHog never stores the instance's IP (#4583)", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    bakedConfig.posthogSampleRate = 1.0;
+    await mod.initAnalytics();
+
+    // A caller-supplied $ip is not allow-listed, so it can't replace the placeholder.
+    await mod.trackEvent("tool_used", { tool_id: "resize", $ip: "203.0.113.7" });
+    const properties = mockCapture.mock.calls.at(-1)?.[0].properties;
+    expect(properties.$ip).toBe("0.0.0.0");
   });
 
   it("uses provided distinctId when given", async () => {
@@ -406,6 +424,22 @@ describe("captureFeedback", () => {
         error_category: "processing_error",
       }),
     });
+  });
+
+  it("pins $ip to the placeholder on feedback, which can carry a consented email (#4583)", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    await mod.captureFeedback({
+      source: "global",
+      contact_ok: true,
+      contact_email: "admin@example.com",
+      message: "A message",
+    });
+
+    const properties = mockCapture.mock.calls.at(-1)?.[0].properties;
+    expect(properties.$ip).toBe("0.0.0.0");
   });
 
   it("routes an onboarding survey to its own event, not feedback_submitted", async () => {
