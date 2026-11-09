@@ -463,6 +463,40 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(child.spawnOptions.env?.SNAPOTTER_VENV_LOCK_HANDSHAKE).toBe("1");
   });
 
+  it("hands the venv lock back when the installer releases it early (#4201)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementation(realVenvLock.acquireVenvLock);
+    try {
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+
+      // A drifted venv gets its download client pip-installed under the lock.
+      emitInstallerLine(child, { venvLock: "acquire" });
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await waitFor(() => child.stdin.writes.length === 1);
+      await tick();
+      expect(child.stdin.writes).toEqual(["granted\n"]);
+      expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+      // The download that follows runs with jobs, then the merge locks again.
+      emitInstallerLine(child, { venvLock: "release" });
+      const jobDuringDownload = realVenvLock.tryAcquireVenvRead();
+      expect(jobDuringDownload).not.toBeNull();
+      jobDuringDownload?.();
+
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await waitFor(() => child.stdin.writes.length === 2);
+      expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+      child.emit("close", 0);
+      const jobAfterInstall = realVenvLock.tryAcquireVenvRead();
+      expect(jobAfterInstall).not.toBeNull();
+      jobAfterInstall?.();
+    } finally {
+      hoisted.acquireVenvLockMock.mockImplementation(async () => () => {});
+    }
+  });
+
   it("frees the venv lock when the installer exits while it waits for it (#4201)", async () => {
     hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
     await postInstall("transcription");

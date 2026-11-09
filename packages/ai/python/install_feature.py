@@ -83,7 +83,7 @@ def acquire_venv_write_lock() -> bool:
     for the whole install, so a multi-minute download stalled every AI job
     (#4201). Instead this asks for it right before the first venv write: a
     {"venvLock": "acquire"} line on stderr, answered by "granted" on stdin once
-    running jobs finish. The lock is then held until this process exits.
+    running jobs finish. It is held until release_venv_write_lock() or exit.
 
     Only the server sets SNAPOTTER_VENV_LOCK_HANDSHAKE; run by hand or from a
     build script, there is no lock to ask for and this returns at once.
@@ -91,9 +91,9 @@ def acquire_venv_write_lock() -> bool:
     """
     if _venv_lock_held[0] or os.environ.get("SNAPOTTER_VENV_LOCK_HANDSHAKE") != "1":
         return True
-    sys.stderr.write(json.dumps({"venvLock": "acquire"}) + "\n")
-    sys.stderr.flush()
     try:
+        sys.stderr.write(json.dumps({"venvLock": "acquire"}) + "\n")
+        sys.stderr.flush()
         answer = sys.stdin.readline()
     except OSError:
         answer = ""
@@ -101,6 +101,17 @@ def acquire_venv_write_lock() -> bool:
         return False
     _venv_lock_held[0] = True
     return True
+
+
+def release_venv_write_lock() -> None:
+    """Hand the writer lock back early, so a long phase that leaves the venv
+    alone (the bundle download) does not hold AI jobs off."""
+    if not _venv_lock_held[0]:
+        return
+    _venv_lock_held[0] = False
+    with contextlib.suppress(OSError):
+        sys.stderr.write(json.dumps({"venvLock": "release"}) + "\n")
+        sys.stderr.flush()
 
 
 # -- Architecture detection --
@@ -574,6 +585,8 @@ def ensure_hf_hub(venv_path: str) -> None:
         emit_progress(1, f"Accelerated client unavailable (pip failed: {err_msg}); using resumable download.")
     except Exception as e:
         emit_progress(1, f"Accelerated client unavailable ({e}); using resumable download.")
+    finally:
+        release_venv_write_lock()
 
 
 def download_with_hf_hub(

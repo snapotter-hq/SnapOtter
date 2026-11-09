@@ -2906,6 +2906,40 @@ describe("venv writer lock handshake (#4201)", () => {
     expect(installed.bundles["face-detection"]).toBeUndefined();
   });
 
+  it("releases the lock after pip-installing the download client into a drifted venv", () => {
+    // Stub the import so ensure_hf_hub sees a venv without huggingface_hub, and
+    // stub pip so nothing is installed for real.
+    const probe = [
+      "import importlib.util, json, subprocess, sys",
+      "spec = importlib.util.spec_from_file_location('install_feature', sys.argv[1])",
+      "mod = importlib.util.module_from_spec(spec)",
+      "spec.loader.exec_module(mod)",
+      "sys.modules['huggingface_hub'] = None",
+      "calls = []",
+      "subprocess.run = lambda *a, **k: calls.append(a[0])",
+      "mod.subprocess = subprocess",
+      "mod.ensure_hf_hub(sys.argv[2])",
+      "print(json.dumps({'pipCalls': len(calls), 'held': mod._venv_lock_held[0]}))",
+    ].join("\n");
+    const result = spawnSync("python3", ["-c", probe, scriptPath, venvDir], {
+      env: { ...process.env, SNAPOTTER_VENV_LOCK_HANDSHAKE: "1" },
+      input: "granted\n",
+      timeout: 30_000,
+    });
+
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+    expect(JSON.parse(result.stdout.toString().trim())).toEqual({ pipCalls: 1, held: false });
+    const lockFrames = (result.stderr?.toString() ?? "").split("\n").flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line) as { venvLock?: string };
+        return parsed.venvLock ? [parsed.venvLock] : [];
+      } catch {
+        return [];
+      }
+    });
+    expect(lockFrames).toEqual(["acquire", "release"]);
+  });
+
   it("never asks for the lock when run outside the server", () => {
     const { tarPath, sha256 } = createTestTar("face-detection");
     writeManifest("face-detection", tarPath, sha256);

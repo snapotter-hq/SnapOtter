@@ -342,7 +342,8 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // not before spawning, lets AI jobs keep running through the download and
     // extract, which can take minutes; only the phase that rewrites the native
     // libs they load has to exclude them (that overlap segfaults the sidecar).
-    // Once granted, the lock is held until the installer exits (#4201).
+    // Once granted, the lock is held until the installer sends "release" or
+    // exits (#4201).
     let releaseVenv: (() => void) | null = null;
     let venvLockRequested = false;
     let waitingForVenvLock = false;
@@ -485,6 +486,15 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
           };
           if (parsed.venvLock === "acquire") {
             grantVenvLock();
+            continue;
+          }
+          if (parsed.venvLock === "release") {
+            // The installer blocks until granted, so a release mid-wait is not
+            // a real one; honouring it would let a second acquire leak the lock.
+            if (!waitingForVenvLock) {
+              releaseVenvOnce();
+              venvLockRequested = false;
+            }
             continue;
           }
           if (typeof parsed.progress === "number") {
