@@ -46,6 +46,14 @@ const listen = (s: Server) =>
   new Promise<void>((resolve) => s.listen(0, "127.0.0.1", () => resolve()));
 const close = (s: Server) => new Promise<void>((resolve) => s.close(() => resolve()));
 
+// An upstream that refuses every connect. A port freed after listen(0) is not
+// safe: the OS can hand it straight back to the next listen(0), including the
+// real-socket test's own app, which then proxies to itself and answers 404
+// (#4594). Port 1 sits below every ephemeral range, so no listen(0) in any fork
+// can take it. 127.0.0.1 (not localhost) keeps it to one address family, so
+// undici surfaces a plain ECONNREFUSED instead of an AggregateError.
+const DEAD_UPSTREAM = "http://127.0.0.1:1";
+
 describe("PostHog first-party proxy (/ingest)", () => {
   let testApp: TestApp;
   const api = fakeUpstream();
@@ -171,18 +179,10 @@ describe("PostHog proxy upstream failure observability (#788)", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeAll(async () => {
-    // Reserve an ephemeral port, then close the listener so connects to it are
-    // refused. 127.0.0.1 (not localhost) keeps it to one address family, so
-    // undici surfaces a plain ECONNREFUSED instead of an AggregateError.
-    const placeholder = createServer();
-    await listen(placeholder);
-    const deadPort = (placeholder.address() as AddressInfo).port;
-    await close(placeholder);
-
     for (const k of envKeys) savedEnv[k] = process.env[k];
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    process.env.SNAPOTTER_POSTHOG_UPSTREAM = `http://127.0.0.1:${deadPort}`;
-    process.env.SNAPOTTER_POSTHOG_ASSETS_UPSTREAM = `http://127.0.0.1:${deadPort}`;
+    process.env.SNAPOTTER_POSTHOG_UPSTREAM = DEAD_UPSTREAM;
+    process.env.SNAPOTTER_POSTHOG_ASSETS_UPSTREAM = DEAD_UPSTREAM;
     deadApp = await buildTestApp();
   });
 
@@ -270,13 +270,8 @@ describe("PostHog proxy registration", () => {
     const savedEnv: Record<string, string | undefined> = {};
     for (const k of envKeys) savedEnv[k] = process.env[k];
 
-    const placeholder = createServer();
-    await listen(placeholder);
-    const deadPort = (placeholder.address() as AddressInfo).port;
-    await close(placeholder);
-
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    process.env.SNAPOTTER_POSTHOG_UPSTREAM = `http://127.0.0.1:${deadPort}`;
+    process.env.SNAPOTTER_POSTHOG_UPSTREAM = DEAD_UPSTREAM;
     const app = Fastify();
     let errorHandlerHits = 0;
     app.setErrorHandler((_error, _request, reply) => {
