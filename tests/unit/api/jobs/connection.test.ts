@@ -357,6 +357,40 @@ describe("Redis connection factory", () => {
     );
   });
 
+  it("labels connection errors with the connection name it was given (#4552)", async () => {
+    const { createRedisConnection, createRedisSubscriberConnection } = await freshModule();
+
+    const command = createRedisConnection("login-throttle") as unknown as RedisStub;
+    const subscriber = createRedisSubscriberConnection("cancel") as unknown as RedisStub;
+    const err = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+    command.emitOn("error", err);
+    subscriber.emitOn("error", err);
+
+    // Every connection logs the same message, so the label is the only way a
+    // support bundle can tell which one is reconnecting.
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "login-throttle" },
+      "[redis] connection error",
+    );
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "cancel" },
+      "[redis] connection error",
+    );
+  });
+
+  it("labels the shared command connection as shared", async () => {
+    const { sharedRedis } = await freshModule();
+
+    const conn = sharedRedis() as unknown as RedisStub;
+    const err = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+    conn.emitOn("error", err);
+
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "shared" },
+      "[redis] connection error",
+    );
+  });
+
   it("sharedRedis memoizes a single connection across calls", async () => {
     const { sharedRedis } = await freshModule();
 

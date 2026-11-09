@@ -1256,6 +1256,11 @@ describe("progress fault logging (#4177)", () => {
     // createRedisSubscriberConnection already logs every connection error
     // through the logger; a second listener here would double each line.
     expect(subscriberMocks.on.mock.calls.map(([event]) => event)).not.toContain("error");
+    // The shared listener labels its lines with this name (#4552).
+    const { createRedisSubscriberConnection } = await import(
+      "../../../apps/api/src/jobs/connection.js"
+    );
+    expect(createRedisSubscriberConnection).toHaveBeenCalledWith("sse-progress");
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 });

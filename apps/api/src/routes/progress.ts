@@ -897,7 +897,7 @@ function ensureSubscriber(): void {
   // ioredis auto-resubscribes after reconnects. Connection errors are logged
   // by the listener createRedisSubscriberConnection attaches; another one here
   // would write every reconnect attempt to the log twice.
-  sseSubscriber = createRedisSubscriberConnection();
+  sseSubscriber = createRedisSubscriberConnection("sse-progress");
   void sseSubscriber.subscribe(progressChannel()).catch((err) => {
     logger.error({ err }, "SSE progress subscribe failed");
   });
