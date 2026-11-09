@@ -337,17 +337,19 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // attempt of this bundle, so a retry never shows the old failure.
     setInstallProgress(bundleId, { percent: 0, stage: "" }, null);
 
-    // Hold the venv lock across the whole install so no AI tool job loads
-    // native libs from the venv while pip is rewriting them (that segfaults
-    // the sidecar). This awaits any in-flight AI job before the installer
-    // starts; the lock is released when the installer process exits.
-    const releaseVenv = await acquireVenvLock();
-    let venvReleased = false;
+    // The installer asks for the venv writer lock on stderr when it reaches
+    // its first venv write and waits for "granted" on stdin. Taking it then,
+    // not before spawning, lets AI jobs keep running through the download and
+    // extract, which can take minutes; only the phase that rewrites the native
+    // libs they load has to exclude them (that overlap segfaults the sidecar).
+    // Once granted, the lock is held until the installer exits (#4201).
+    let releaseVenv: (() => void) | null = null;
+    let venvLockRequested = false;
+    let waitingForVenvLock = false;
     const releaseVenvOnce = () => {
-      if (!venvReleased) {
-        venvReleased = true;
-        releaseVenv();
-      }
+      const release = releaseVenv;
+      releaseVenv = null;
+      release?.();
     };
 
     // A failed spawn fires BOTH "error" and "close", so both handlers funnel
@@ -388,17 +390,40 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     };
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
-      stdio: ["ignore", "pipe", "pipe", installLockFd],
+      stdio: ["pipe", "pipe", "pipe", installLockFd],
       env: buildInstallerEnv({
         BUNDLE_ID: bundleId,
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
+        SNAPOTTER_VENV_LOCK_HANDSHAKE: "1",
       }),
     });
+    // A write to an installer that already exited fails with EPIPE; its close
+    // handler does the teardown, so the stream error has nothing left to do.
+    child.stdin?.on("error", () => {});
+
+    const grantVenvLock = () => {
+      if (venvLockRequested) return;
+      venvLockRequested = true;
+      waitingForVenvLock = true;
+      void acquireVenvLock().then((release) => {
+        waitingForVenvLock = false;
+        lastProgressAt = Date.now();
+        // The installer died while waiting; nothing will write the venv.
+        if (finalized) {
+          release();
+          return;
+        }
+        releaseVenv = release;
+        child.stdin?.write("granted\n");
+      });
+    };
 
     const stallMs = env.INSTALL_STALL_MS;
     const maxMs = env.INSTALL_MAX_MS;
     if (stallMs > 0 || maxMs > 0) {
       watchdog = setInterval(() => {
+        // Waiting on running AI jobs is not a stall: the installer is idle by design.
+        if (waitingForVenvLock) lastProgressAt = Date.now();
         const verdict = evaluateInstallWatchdog(
           Date.now(),
           lastProgressAt,
@@ -453,7 +478,15 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
         if (lastStderrLines.length > 20) lastStderrLines.shift();
 
         try {
-          const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
+          const parsed = JSON.parse(trimmed) as {
+            progress?: number;
+            stage?: string;
+            venvLock?: string;
+          };
+          if (parsed.venvLock === "acquire") {
+            grantVenvLock();
+            continue;
+          }
           if (typeof parsed.progress === "number") {
             lastProgressAt = Date.now();
             setInstallProgress(

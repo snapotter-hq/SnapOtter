@@ -2900,6 +2900,8 @@ describe("venv writer lock handshake (#4201)", () => {
     expect(run.packageWrittenBeforeRequest).toBe(false);
     expect(existsSync(join(sitePackagesDir, "testpkg"))).toBe(false);
     expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+    expect(run.stderr).toContain("stopped answering");
     const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
     expect(installed.bundles["face-detection"]).toBeUndefined();
   });

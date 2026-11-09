@@ -66,6 +66,43 @@ def fail(message: str) -> None:
     sys.exit(1)
 
 
+_venv_lock_held = [False]
+
+
+VENV_LOCK_REFUSED = (
+    "The server stopped answering before the install could update the AI environment. "
+    "Retry the install."
+)
+
+
+def acquire_venv_write_lock() -> bool:
+    """Block until the server grants the shared venv's writer lock.
+
+    AI jobs load native libraries from the venv, and loading one while it is
+    being overwritten segfaults the sidecar. The server used to hold the lock
+    for the whole install, so a multi-minute download stalled every AI job
+    (#4201). Instead this asks for it right before the first venv write: a
+    {"venvLock": "acquire"} line on stderr, answered by "granted" on stdin once
+    running jobs finish. The lock is then held until this process exits.
+
+    Only the server sets SNAPOTTER_VENV_LOCK_HANDSHAKE; run by hand or from a
+    build script, there is no lock to ask for and this returns at once.
+    Returns False when the server closed stdin without granting it.
+    """
+    if _venv_lock_held[0] or os.environ.get("SNAPOTTER_VENV_LOCK_HANDSHAKE") != "1":
+        return True
+    sys.stderr.write(json.dumps({"venvLock": "acquire"}) + "\n")
+    sys.stderr.flush()
+    try:
+        answer = sys.stdin.readline()
+    except OSError:
+        answer = ""
+    if answer.strip() != "granted":
+        return False
+    _venv_lock_held[0] = True
+    return True
+
+
 # -- Architecture detection --
 
 def detect_arch() -> str:
@@ -518,6 +555,8 @@ def ensure_hf_hub(venv_path: str) -> None:
     if not os.path.exists(python_path):
         return
 
+    if not acquire_venv_write_lock():
+        fail(VENV_LOCK_REFUSED)
     emit_progress(1, "Preparing accelerated download client...")
     try:
         subprocess.run(
@@ -2410,6 +2449,12 @@ def _install() -> None:
     check_disk_space(ai_dir, disk_floor)
 
     # -- Move site-packages --
+    # Everything from here on can write the venv: the site-packages merge,
+    # fixups, fallback pip installs, rollback, and the smoke imports that load
+    # what was just placed.
+    if not acquire_venv_write_lock():
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        fail(VENV_LOCK_REFUSED)
     emit_progress(92, "Installing packages...")
     has_staging_sp = os.path.isdir(staging_sp)
     smoke_imports = bundle.get("smokeImports") or []

@@ -439,7 +439,6 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(res.statusCode).toBe(202);
     await waitFor(() => hoisted.spawnCalls.length === 1);
     const child = hoisted.spawnCalls[0];
-    expect(child.spawnOptions.env?.SNAPOTTER_VENV_LOCK_HANDSHAKE).toBe("1");
 
     // The download and extract leave the venv alone, so jobs keep running.
     emitInstallerLine(child, { progress: 40, stage: "Downloading... 1.0 GB" });
@@ -461,6 +460,7 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     const jobAfterInstall = realVenvLock.tryAcquireVenvRead();
     expect(jobAfterInstall).not.toBeNull();
     jobAfterInstall?.();
+    expect(child.spawnOptions.env?.SNAPOTTER_VENV_LOCK_HANDSHAKE).toBe("1");
   });
 
   it("frees the venv lock when the installer exits while it waits for it (#4201)", async () => {

@@ -44,14 +44,10 @@ describe("venv lock reader cancellation (#4201)", () => {
 
     const releaseKept = await kept;
     // A ghost reader left by the cancelled waiter would keep the next install waiting.
-    let nextInstall: (() => void) | null = null;
-    const installPending = lock.acquireVenvLock().then((release) => {
-      nextInstall = release;
-    });
+    const installPending = lock.acquireVenvLock();
     releaseKept();
-    await installPending;
-    expect(nextInstall).not.toBeNull();
-    nextInstall?.();
+    const releaseNextInstall = await installPending;
+    releaseNextInstall();
     expect(lock.tryAcquireVenvRead()).not.toBeNull();
   });
 
