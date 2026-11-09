@@ -62,3 +62,17 @@ describe("TopNav language dropdown", () => {
     expect(screen.getByText("Deutsch")).toBeDefined();
   });
 });
+
+/**
+ * The Beta badge must use the logical start margin (ms-), not ml-. A physical
+ * left margin lands on the wrong side in RTL locales such as Arabic. A revert
+ * to ml-1.5 fails this test.
+ */
+describe("TopNav badge direction", () => {
+  it("uses a logical start margin on the Beta badge", () => {
+    renderNav();
+    const badge = screen.getByText("Beta");
+    expect(badge.className).toContain("ms-1.5");
+    expect(badge.className).not.toMatch(/(^|\s)ml-1\.5(\s|$)/);
+  });
+});
