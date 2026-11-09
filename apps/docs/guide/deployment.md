@@ -414,6 +414,16 @@ See the [complete format list](/guide/supported-formats) for details on every su
 | `SnapOtter-pgdata` (postgres) | PostgreSQL data directory (users, settings, pipelines, jobs) | **Yes** - data loss without it |
 | `SnapOtter-redisdata` (redis) | Redis append-only file for durable job queues | Recommended |
 
+### Keeping job output with `docker run` {#keeping-job-output}
+
+Job results live under `/tmp/workspace`, which is container filesystem unless you mount it. With only `-v SnapOtter-data:/data`, your users, settings, and files persist, but results from earlier jobs are gone once the container is replaced, and their download links return 404. To keep them, mount the workspace as well:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+The Compose stacks already mount `SnapOtter-workspace`.
+
 ### Bind mounts vs. named volumes {#bind-mounts-vs-named-volumes}
 
 **Named volumes** (recommended) — Docker manages permissions automatically:
