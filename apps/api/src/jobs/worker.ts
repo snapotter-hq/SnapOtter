@@ -70,6 +70,17 @@ export {
 
 const workers: Worker[] = [];
 
+const ON_DEMAND_SYSTEM_JOBS: ReadonlySet<string> = new Set([SYSTEM_JOBS.gdprExport]);
+const SCHEDULED_SYSTEM_JOBS: ReadonlySet<string> = new Set(
+  Object.values(SYSTEM_JOBS).filter((name) => !ON_DEMAND_SYSTEM_JOBS.has(name)),
+);
+
+// An allowlist, not "everything but the exports": the system pool also carries
+// user-triggered batch-finalize and pipeline-finalize jobs (#4213).
+function isScheduledSystemJob(name: string | undefined): boolean {
+  return name !== undefined && SCHEDULED_SYSTEM_JOBS.has(name);
+}
+
 export function startWorkers(): void {
   const workerThreads = resolveWorkerThreads(env);
   sharp.concurrency(workerThreads);
@@ -178,6 +189,11 @@ export function startWorkers(): void {
           pool,
           toolId: data?.toolId ?? (job.name === SYSTEM_JOBS.gdprExport ? "gdpr-export" : undefined),
           jobId: job.id,
+          // Scheduler ticks repeat the same environmental fault forever. The
+          // system pool also runs on-demand jobs a user triggered (a GDPR export,
+          // batch and pipeline finalizes), which keep the hourly rule.
+          periodic: isScheduledSystemJob(job.name),
+          job: job.name,
         });
       });
 
