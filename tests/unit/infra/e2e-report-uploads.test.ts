@@ -110,4 +110,31 @@ describe("e2e report uploads (#1025)", () => {
       }
     }
   });
+
+  it("the expected directories still match what each Playwright config writes", () => {
+    const read = (f: string) => readFileSync(path.join(root, f), "utf8");
+    // Scoped configs go through resolvePlaywrightRun(__dirname, <scope>).
+    const scopes: Record<string, string> = {
+      "playwright.landing.config.ts": "landing",
+      "playwright.docs.config.ts": "docs",
+      "playwright.editor.config.ts": "editor",
+      "playwright.noauth.config.ts": "noauth",
+    };
+    for (const [file, scope] of Object.entries(scopes)) {
+      expect(read(file), file).toContain(`resolvePlaywrightRun(__dirname, "${scope}")`);
+    }
+    expect(read("tests/playwright-run.ts")).toContain('"test-results", "e2e-runs", runId, scope');
+    // The main and analytics configs build their own roots.
+    expect(read("playwright.config.ts")).toContain('"test-results", "e2e-runs", runId');
+    expect(read("playwright.analytics-local.config.ts")).toContain(
+      '"test-results", "e2e-analytics-runs", runId',
+    );
+    for (const f of [
+      "playwright.config.ts",
+      "playwright.analytics-local.config.ts",
+      ...Object.keys(scopes),
+    ]) {
+      expect(read(f), f).toContain('outputFolder: path.join(runRoot, "playwright-report")');
+    }
+  });
 });
