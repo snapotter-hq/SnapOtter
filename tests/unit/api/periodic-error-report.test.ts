@@ -109,6 +109,16 @@ describe("periodic system-job reporting (#4213)", () => {
     expect(h.captureException).toHaveBeenCalledTimes(3);
   });
 
+  it("does not mute a different code-less operational fault behind the first one", async () => {
+    const stall = Object.assign(new Error("Missing lock for job 1. moveToFinished"), {
+      name: "UnrecoverableError",
+    });
+    const pgCause = Object.assign(new Error("x"), { name: "DatabaseError" });
+    await reportError(stall, periodic("system:storage-ttl"));
+    await reportError(new Error("", { cause: pgCause }), periodic("system:storage-ttl"));
+    expect(h.captureException).toHaveBeenCalledTimes(2);
+  });
+
   it("reports again after the window rolls over", async () => {
     await reportError(pgFault("28P01", "a.ts"), periodic("system:storage-ttl"));
     vi.advanceTimersByTime(23 * HOUR);

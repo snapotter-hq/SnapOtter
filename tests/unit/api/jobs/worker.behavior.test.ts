@@ -2567,6 +2567,18 @@ describe("worker failure reports carry the job age (#1414)", () => {
     );
   });
 
+  it("does not mark a user's batch or pipeline finalize as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    for (const kind of ["batch-finalize", "pipeline-finalize"]) {
+      reportErrorMock.mockClear();
+      // A parentId and a non-finalize kind keep the safety nets out of this case.
+      const job = { id: `fin-${kind}`, name: kind, data: { kind: "other", parentId: "p" } };
+      listenerFor(listeners, "system")(job, new Error("boom"));
+      const ctx = reportErrorMock.mock.calls.at(-1)?.[1] as { periodic?: boolean };
+      expect(ctx.periodic).toBe(false);
+    }
+  });
+
   it("never marks a tool pool as periodic (#4213)", async () => {
     const listeners = await failedListeners();
     const job = { id: "img-1", name: "resize", data: { toolId: "resize" } };

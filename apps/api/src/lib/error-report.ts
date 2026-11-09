@@ -315,8 +315,9 @@ export function shouldReport(
  * can carry hostnames, paths or credentials.
  */
 function periodicKey(err: unknown, job: string | undefined): string {
-  const name = (err as { name?: unknown } | null)?.name;
-  const code = extractErrorCode(err) ?? (typeof name === "string" ? name : "op");
+  // Errors with no code (stall, spawn failure, the empty pg wrapper) fall back to
+  // the full signature so unrelated kinds don't share one muted slot.
+  const code = extractErrorCode(err) ?? errorSignature(err);
   return `periodic:${job ?? "unknown"}:${code}`;
 }
 
