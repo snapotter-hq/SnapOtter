@@ -407,7 +407,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 
 ### AI bundle installs with several replicas {#ai-bundle-installs-with-several-replicas}
 
-Change AI bundles with only one replica running. Installing, uninstalling, resetting, or importing a bundle rewrites the shared Python environment in `/data/ai/venv`. The replica doing the work waits for its own AI jobs and restarts its own sidecar afterwards, but it can't see AI jobs on the other replicas. Their sidecars keep torch and ONNX Runtime loaded from that directory while it's rewritten, and can crash mid-job. Scale the deployment down to one replica (or stop the others), make the change, then scale back up.
+Change AI bundles with only one replica running. Installing a bundle, importing one offline, or resetting the AI environment rewrites the shared Python environment in `/data/ai/venv`. An install waits for AI jobs on its own replica and every one of these restarts that replica's sidecar afterwards, but none of them can see AI jobs on the other replicas. Their sidecars keep torch and ONNX Runtime loaded from that directory while it's rewritten, and can crash mid-job. Scale the deployment down to one replica (or stop the others), make the change, then scale back up.
 
 ## Volumes {#volumes}
 
