@@ -29,6 +29,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
+  acquireVenvLock,
   buildInstallerEnv,
   buildOfflineInstallerEnv,
   getOcrRuntimeCapability,
@@ -1821,6 +1822,11 @@ export async function importBundleArchive(
     const sitePackagesDir = touchesVenv ? resolveVenvSitePackages(venvPath) : "";
     const venvPython = join(venvPath, "bin", "python3");
 
+    // Everything below rewrites files running AI jobs load (site-packages,
+    // fixup wheels, model weights), so it waits for those jobs and holds new
+    // ones off until the import and any rollback are done, like an install's
+    // venv write (#4615). Extraction above runs alongside jobs.
+    const releaseVenv = await acquireVenvLock();
     const venvRollbackActions: Array<() => void> = [];
     const modelsRollbackActions: Array<() => void> = [];
     const installedFixupPackages: string[] = [];
@@ -2007,6 +2013,8 @@ export async function importBundleArchive(
         err.message = `${err.message} (rollback warnings: ${rollbackErrors.join("; ")})`;
       }
       throw err;
+    } finally {
+      releaseVenv();
     }
 
     markInstalled(descriptor.bundleId, descriptor.version, descriptor.models);

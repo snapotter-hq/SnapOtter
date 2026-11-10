@@ -54,6 +54,15 @@ const {
   ImportValidationError,
 } = await import("../../../apps/api/src/lib/feature-status.js");
 
+const venvLock = await import("../../../packages/ai/src/venv-lock.js");
+
+/** True once a venv writer is active or queued, which a reader's fast path refuses. */
+function venvWriterPending(): boolean {
+  const probe = venvLock.tryAcquireVenvRead();
+  probe?.();
+  return probe === null;
+}
+
 // Test helpers from test-server
 const { createMultipartPayload, loginAsAdmin } = await import("../test-server.js");
 
@@ -485,6 +494,63 @@ describe("site-packages import", () => {
       { encoding: "utf-8" },
     );
     expect(imported).toContain("site-packages");
+  }, 30_000);
+
+  it("waits for running AI jobs before moving site-packages into the venv (#4615)", async () => {
+    const venvPath = join(aiDir, `venv-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+    const sitePackagesDir = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    const tarPath = await buildSitePackagesArchive();
+
+    const runningJob = venvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+    invalidateCache();
+    let settled = false;
+    const imported = importBundleArchive(createReadStream(tarPath)).finally(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => expect(settled || venvWriterPending()).toBe(true), {
+        timeout: 20_000,
+      });
+      expect(settled).toBe(false);
+      expect(existsSync(join(sitePackagesDir, "fakepkg"))).toBe(false);
+      expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    } finally {
+      runningJob?.();
+    }
+
+    const result = await imported;
+    expect(result.bundleId).toBe(testBundleId);
+    expect(existsSync(join(sitePackagesDir, "fakepkg", "__init__.py"))).toBe(true);
+    expect(venvWriterPending()).toBe(false);
+  }, 30_000);
+
+  it("releases the venv writer lock when an import fails after taking it (#4615)", async () => {
+    const venvPath = join(aiDir, `venv-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+    const tarPath = await createBundleTarWithSitePackages(
+      testBundleId,
+      testVersion,
+      { "mediapipe/face.tflite": "model-data" },
+      { "fakepkg/__init__.py": "# fake package" },
+    );
+
+    invalidateCache();
+    // No mediapipe in site-packages, so the bundle's smoke import fails after
+    // the move and the import rolls back.
+    await expect(importBundleArchive(createReadStream(tarPath))).rejects.toThrow();
+    expect(venvWriterPending()).toBe(false);
   }, 30_000);
 
   it("fails the import instead of reporting success when the venv has no interpreter to ask (#1139)", async () => {

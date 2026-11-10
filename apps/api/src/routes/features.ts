@@ -1242,10 +1242,18 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         await drainOcrDispatcher();
         await runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd });
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
-        ({ venvReseeded } = resetAiEnvironment({
-          installLockHeld: true,
-          mutationEpochAdvanced: true,
-        }));
+        // Running AI jobs load native libs from the venv and weights from the
+        // models dir, so the wipe and reseed wait for them to finish, and new
+        // jobs wait for the reset, the same as an install's venv write (#4615).
+        const releaseVenv = await acquireVenvLock();
+        try {
+          ({ venvReseeded } = resetAiEnvironment({
+            installLockHeld: true,
+            mutationEpochAdvanced: true,
+          }));
+        } finally {
+          releaseVenv();
+        }
       } catch (err) {
         return reply.status(409).send({
           error: err instanceof Error ? err.message : "Reset failed",

@@ -79,6 +79,14 @@ const {
   getAiMutationEpoch,
 } = await import("../../../apps/api/src/lib/feature-status.js");
 const { loginAsAdmin } = await import("../test-server.js");
+const venvLock = await import("../../../packages/ai/src/venv-lock.js");
+
+/** True once a venv writer is active or queued, which a reader's fast path refuses. */
+function venvWriterPending(): boolean {
+  const probe = venvLock.tryAcquireVenvRead();
+  probe?.();
+  return probe === null;
+}
 
 describe("POST /api/v1/admin/features/reset", () => {
   let app: FastifyInstance;
@@ -256,6 +264,30 @@ describe("POST /api/v1/admin/features/reset", () => {
     expect(response.statusCode).toBe(200);
     expect(getAiMutationEpoch()).not.toBe(epochBefore);
     expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("waits for running AI jobs before wiping models or reseeding the venv (#4615)", async () => {
+    writeFileSync(join(modelsDir, "in-use.onnx"), "weights a running job is reading");
+    const runningJob = venvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+
+    let settled = false;
+    const reset = postReset().finally(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => expect(settled || venvWriterPending()).toBe(true));
+      expect(settled).toBe(false);
+      expect(existsSync(join(modelsDir, "in-use.onnx"))).toBe(true);
+    } finally {
+      runningJob?.();
+    }
+
+    const res = await reset;
+    expect(res.statusCode).toBe(200);
+    expect(existsSync(join(modelsDir, "in-use.onnx"))).toBe(false);
+    // The reset released the writer lock, so the next AI job starts at once.
+    expect(venvWriterPending()).toBe(false);
   });
 
   it("returns 409 instead of tearing anything down when a bundle install is in progress", async () => {
