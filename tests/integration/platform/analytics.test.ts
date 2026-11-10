@@ -186,7 +186,7 @@ describe("PUT /api/v1/settings { analyticsEnabled }", () => {
 
 describe("PUT /api/v1/user/analytics (removed)", () => {
   it("returns 404 (endpoint no longer exists)", async () => {
-    // Authenticate first: the global auth preHandler answers unauthenticated
+    // Authenticate first: the global auth hook answers unauthenticated
     // requests with 401 before routing, so only an authenticated request can
     // reach Fastify's not-found handler and prove the route is gone.
     const token = await loginAsAdmin(testApp.app);

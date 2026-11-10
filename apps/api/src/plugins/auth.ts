@@ -2126,7 +2126,12 @@ async function shouldAuditApiKeyAuthFailure(prefix: string, ip: string): Promise
 }
 
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
-  app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
+  // onRequest, not preHandler: Fastify reads and parses the body between the
+  // two, so a later hook would let an anonymous caller make any protected JSON
+  // route buffer up to the upload-sized bodyLimit before the 401 (#4543).
+  // Cookies are already parsed here because @fastify/cookie runs on onRequest
+  // and is registered first.
+  app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip the session DB lookup for bundle assets: they are served on every
     // page load and an unreachable DB must not 500 them (Sentry NODE-1D).
     if (isStaticAssetRequest(request.method, request.url)) return;
