@@ -549,8 +549,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         reportProgress(15, "Preparing...");
 
         // Parse and validate settings
-        if (settingsRaw && settingsRaw.length > 65536) {
-          return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
+        const settingsLimitKb = env.MAX_SETTINGS_PAYLOAD_KB;
+        if (
+          settingsRaw &&
+          settingsLimitKb > 0 &&
+          Buffer.byteLength(settingsRaw, "utf8") > settingsLimitKb * 1024
+        ) {
+          return reply
+            .status(400)
+            .send({ error: `Settings payload too large (max ${settingsLimitKb}KB)` });
         }
         let settings: T;
         try {
