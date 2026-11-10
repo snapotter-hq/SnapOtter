@@ -131,7 +131,7 @@ function ResultWarning({ notes }: { notes: ResultNotes | null | undefined }) {
   return (
     <span
       data-testid="result-warning"
-      className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400"
+      className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-amber-700 dark:text-amber-400"
     >
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {notes?.targetMet === false ? t.a11y.resultMissedTarget : t.a11y.resultResizedToFit}

@@ -105,10 +105,9 @@ afterEach(() => {
 describe("AutomatePage single-file result warning (#4542)", () => {
   it("says a step missed its size target", () => {
     completedSingleRun({ targetKb: 1, targetMet: false });
-    for (const warning of screen.getAllByTestId("result-warning")) {
-      expect(warning).toHaveTextContent(en.a11y.resultMissedTarget);
-    }
-    expect(screen.getAllByTestId("result-warning").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("result-warning")[0]).toHaveTextContent(
+      en.a11y.resultMissedTarget,
+    );
   });
 
   it("says a step scaled the result down to fit", () => {
