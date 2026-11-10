@@ -43,12 +43,15 @@ vi.mock("../../../apps/api/src/lib/audit.js", () => ({
   auditFromRequest: () => vi.fn(),
 }));
 
+import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { authMiddleware, getAuthUser } from "../../../apps/api/src/plugins/auth.js";
 
-async function buildApp() {
+async function buildApp(opts: { rateLimitMax?: number } = {}) {
   const parse = vi.fn();
   const app = Fastify({ logger: false });
+  if (opts.rateLimitMax)
+    await app.register(rateLimit, { max: opts.rateLimitMax, timeWindow: "1 minute" });
   app.removeContentTypeParser("application/json");
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
     parse();
@@ -129,5 +132,24 @@ describe("auth hook ordering (#4543)", () => {
     expect(parse).toHaveBeenCalledOnce();
     expect(JSON.parse(res.body).body).toEqual({ a: 1 });
     expect(user()?.username).toBe("anonymous");
+  });
+
+  it("still counts anonymous 401s against the global rate limit", async () => {
+    // @fastify/rate-limit runs as a route-level onRequest hook, so an auth
+    // hook on instance-level onRequest would answer first and skip it.
+    const { app } = await buildApp({ rateLimitMax: 2 });
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { "content-type": "application/json" },
+        payload: "{}",
+      });
+      statuses.push(res.statusCode);
+    }
+    await app.close();
+
+    expect(statuses).toEqual([401, 401, 429]);
   });
 });
