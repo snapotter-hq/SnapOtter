@@ -35,7 +35,7 @@ export async function validateStagedMedia(opts: {
   }
 
   // Same "-prep" suffix as the factory: the worker's scratch dir is
-  // <scratchRoot>/<jobId>, and this one is removed as soon as we answer.
+  // <scratchRoot>/<jobId>-<attempt uuid>, and this one is removed as soon as we answer.
   const scratchDir = join(tmpdir(), "snapotter-scratch", `${opts.jobId}-prep`);
   await mkdir(scratchDir, { recursive: true });
   try {

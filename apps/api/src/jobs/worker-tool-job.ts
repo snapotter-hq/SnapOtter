@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -205,8 +206,11 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
     const timeoutHandle =
       timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
 
-    // Per-job scratch directory
-    const scratchDir = join(scratchRoot(), jobId);
+    // Per-attempt scratch directory. BullMQ re-runs a stalled job under the
+    // same id while the first attempt may still be running, so a dir keyed on
+    // the id alone was shared, and whichever attempt finished first removed it
+    // from under the other mid-sidecar (#4217).
+    const scratchDir = join(scratchRoot(), `${jobId}-${randomUUID()}`);
 
     // Read by the catch below (#2144): once the handler has returned, the
     // deadline can't be the cause of a later error.

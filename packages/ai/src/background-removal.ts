@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -10,6 +10,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface RemoveBackgroundOptions {
   model?: string;
@@ -70,7 +71,7 @@ export async function removeBackground(
     });
   }
   const pngBuffer = await pipeline.png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("remove-bg", inputPath, pngBuffer);
 
   try {
     const megapixels = (origW * origH) / 1_000_000;
@@ -130,7 +131,7 @@ async function runAndParse(
     if (!result.success) {
       throw toBgRemovalError(result.error || "Background removal failed");
     }
-    return await readFile(outputPath);
+    return await readScratchOutput("remove-bg", outputPath);
   } catch (err) {
     const isOom = isMemoryAllocError(err);
     const fallbackModel = oomFallbackModel === undefined ? OOM_FALLBACK_MODEL : oomFallbackModel;
@@ -150,7 +151,7 @@ async function runAndParse(
       if (!result.success) {
         throw toBgRemovalError(result.error || "Background removal failed");
       }
-      return await readFile(outputPath);
+      return await readScratchOutput("remove-bg", outputPath);
     } catch (fallbackErr) {
       throw toBgRemovalError(fallbackErr);
     }

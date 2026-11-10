@@ -369,11 +369,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Per-request scratch dir for input handlers that need temp files during
       // validation. MUST stay distinct from the worker's job scratch dir
-      // (worker.ts scratchRoot()/<jobId>): for "long" tools the factory returns
-      // 202 below and the `finally` rm's this dir immediately, which would race
-      // and delete the worker's input mid-job whenever SCRATCH_PATH is unset
-      // (both otherwise default to tmpdir()/snapotter-scratch/<jobId>). The
-      // "-prep" suffix keeps the two from colliding.
+      // (worker-tool-job.ts scratchRoot()/<jobId>-<attempt uuid>): for "long"
+      // tools the factory returns 202 below and the `finally` rm's this dir
+      // immediately, which would race and delete the worker's input mid-job if
+      // the two ever shared a path. The "-prep" suffix keeps them apart.
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
       try {
         await mkdir(scratchDir, { recursive: true });

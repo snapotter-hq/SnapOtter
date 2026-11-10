@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 /**
  * Inpainting backend. "fast" is the always-available LaMa ONNX path
@@ -31,8 +31,8 @@ export async function inpaint(
 
   const pngInput = await sharp(inputBuffer).png().toBuffer();
   const pngMask = await sharp(maskBuffer).png().toBuffer();
-  await writeFile(inputPath, pngInput);
-  await writeFile(maskPath, pngMask);
+  await writeScratchInput("inpaint", inputPath, pngInput);
+  await writeScratchInput("inpaint", maskPath, pngMask);
 
   const script = quality === "hq" ? "inpaint_hq.py" : "inpaint.py";
   const { stdout } = await runPythonWithProgress(script, [inputPath, maskPath, outputPath], {
@@ -45,5 +45,5 @@ export async function inpaint(
     throw toSidecarError(result.error, "Inpainting failed");
   }
 
-  return readFile(outputPath);
+  return readScratchOutput("inpaint", outputPath);
 }

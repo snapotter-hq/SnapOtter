@@ -6,7 +6,7 @@
  * system jobs are routed to the system-jobs module.
  *
  * Each tool job gets:
- *   - A per-job scratch directory (cleaned up in finally)
+ *   - A per-attempt scratch directory (cleaned up in finally)
  *   - An AbortController registered for cooperative cancellation
  *   - A timeout guard that aborts the signal with reason "timeout"
  *   - Durable DB row updates at each lifecycle stage
