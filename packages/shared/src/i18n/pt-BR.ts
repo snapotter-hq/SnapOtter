@@ -5791,6 +5791,7 @@ export const ptBR: TranslationKeys = {
     grid: "Grade",
     automate: "Automatizar",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Arquivos",
     help: "Ajuda",
     settings: "Configurações",

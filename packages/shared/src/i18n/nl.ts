@@ -5796,6 +5796,7 @@ export const nl: TranslationKeys = {
     grid: "Raster",
     automate: "Automatiseren",
     editor: "Editor",
+    editorBadge: "Bèta",
     files: "Bestanden",
     help: "Help",
     settings: "Instellingen",

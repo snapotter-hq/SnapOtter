@@ -5442,6 +5442,7 @@ export const zhTW: TranslationKeys = {
     grid: "格線",
     automate: "自動化",
     editor: "編輯器",
+    editorBadge: "Beta",
     files: "檔案",
     help: "說明",
     settings: "設定",

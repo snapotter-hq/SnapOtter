@@ -5768,6 +5768,7 @@ export const id: TranslationKeys = {
     grid: "Kisi",
     automate: "Otomasi",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "File",
     help: "Bantuan",
     settings: "Pengaturan",

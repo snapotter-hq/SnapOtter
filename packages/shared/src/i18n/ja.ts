@@ -5722,6 +5722,7 @@ export const ja: TranslationKeys = {
     grid: "グリッド",
     automate: "自動化",
     editor: "エディター",
+    editorBadge: "ベータ",
     files: "ファイル",
     help: "ヘルプ",
     settings: "設定",

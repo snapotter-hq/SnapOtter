@@ -5688,6 +5688,7 @@ export const en = {
     grid: "Grid",
     automate: "Automate",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Files",
     sponsor: "Support us",
     help: "Help",

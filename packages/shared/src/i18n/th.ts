@@ -5666,6 +5666,7 @@ export const th: TranslationKeys = {
     grid: "กริด",
     automate: "อัตโนมัติ",
     editor: "แก้ไข",
+    editorBadge: "เบต้า",
     files: "ไฟล์",
     help: "ช่วยเหลือ",
     settings: "ตั้งค่า",

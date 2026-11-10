@@ -5779,6 +5779,7 @@ export const uk: TranslationKeys = {
     grid: "Сітка",
     automate: "Автоматизація",
     editor: "Редактор",
+    editorBadge: "Бета",
     files: "Файли",
     help: "Довідка",
     settings: "Налаштування",

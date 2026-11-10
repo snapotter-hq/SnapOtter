@@ -5774,6 +5774,7 @@ export const tr: TranslationKeys = {
     grid: "Izgara",
     automate: "Otomatikleştir",
     editor: "Düzenleyici",
+    editorBadge: "Beta",
     files: "Dosyalar",
     help: "Yardım",
     settings: "Ayarlar",
