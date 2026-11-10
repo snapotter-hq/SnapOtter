@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type ProgressCallback,
@@ -7,6 +7,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export type GifBgFormat = "webp" | "gif" | "apng";
 
@@ -95,7 +96,7 @@ export async function removeBackgroundAnimated(
   const inExt = (options.inputExt || "gif").replace(/^\./, "").toLowerCase();
   const inputPath = join(outputDir, `gifbg_in_${id}.${inExt}`);
   const outputPath = join(outputDir, `gifbg_out_${id}.${FORMAT_EXT[format]}`);
-  await writeFile(inputPath, inputBuffer);
+  await writeScratchInput("remove-bg-anim", inputPath, inputBuffer);
 
   const timeout = animatedTimeoutMs(options.frames ?? 0, options.model);
 
@@ -110,7 +111,7 @@ export async function removeBackgroundAnimated(
       if (result.error === "canceled") throw new AnimatedRemovalCanceledError();
       throw toSidecarError(result.error, "Animated background removal failed");
     }
-    const buffer = await readFile(outputPath);
+    const buffer = await readScratchOutput("remove-bg-anim", outputPath);
     return { buffer, format, contentType: FORMAT_CONTENT_TYPE[format], ext: FORMAT_EXT[format] };
   } finally {
     await unlink(inputPath).catch(() => {});

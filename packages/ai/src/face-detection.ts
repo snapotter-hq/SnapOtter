@@ -1,4 +1,4 @@
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -8,6 +8,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface BlurFacesOptions {
   blurRadius?: number;
@@ -51,7 +52,7 @@ export async function blurFaces(
   const outputPath = join(outputDir, "output_faces.png");
 
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("blur-faces", inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "detect_faces.py",
     [inputPath, outputPath, JSON.stringify(sidecarOptions)],
@@ -63,7 +64,7 @@ export async function blurFaces(
     throw toSidecarError(result.error, "Face detection failed");
   }
 
-  const buffer = await readFile(outputPath);
+  const buffer = await readScratchOutput("blur-faces", outputPath);
   return {
     buffer,
     facesDetected: result.facesDetected,
@@ -81,7 +82,7 @@ export async function detectFaces(
 
   try {
     const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-    await writeFile(inputPath, pngBuffer);
+    await writeScratchInput("detect-faces", inputPath, pngBuffer);
     const { stdout } = await runPythonWithProgress(
       "detect_faces.py",
       [inputPath, "unused", JSON.stringify({ ...sidecarOptions, detectOnly: true })],
