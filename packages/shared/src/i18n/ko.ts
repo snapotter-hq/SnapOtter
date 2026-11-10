@@ -5674,6 +5674,7 @@ export const ko: TranslationKeys = {
     grid: "그리드",
     automate: "자동화",
     editor: "에디터",
+    editorBadge: "베타",
     files: "파일",
     help: "도움말",
     settings: "설정",

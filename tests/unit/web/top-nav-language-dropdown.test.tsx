@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TopNav } from "@/components/layout/top-nav";
+import { I18nProvider } from "@/contexts/i18n-context";
 
 // Same minimal stub as tool-feedback-prompt.test.tsx: this jsdom setup ships
 // no working localStorage, and TopNav's theme/locale hooks read it on render.
@@ -74,5 +75,20 @@ describe("TopNav badge direction", () => {
     const badge = screen.getByText("Beta");
     expect(badge.className).toContain("ms-1.5");
     expect(badge.className).not.toMatch(/(^|\s)ml-1\.5(\s|$)/);
+  });
+});
+
+describe("TopNav badge translation", () => {
+  it("reads the badge text from the active locale", async () => {
+    storageMap.set("snapotter-locale", "fr");
+    render(
+      <MemoryRouter>
+        <I18nProvider>
+          <TopNav onHelpClick={() => {}} onFeedbackClick={() => {}} onSettingsClick={() => {}} />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText("Bêta")).toBeDefined());
+    expect(screen.queryByText("Beta")).toBeNull();
   });
 });

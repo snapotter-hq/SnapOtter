@@ -5766,6 +5766,7 @@ export const sv: TranslationKeys = {
     grid: "Rutnät",
     automate: "Automatisera",
     editor: "Redigerare",
+    editorBadge: "Beta",
     files: "Filer",
     help: "Hjälp",
     settings: "Inställningar",

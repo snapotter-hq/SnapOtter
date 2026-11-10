@@ -5748,6 +5748,7 @@ export const vi: TranslationKeys = {
     grid: "Lưới",
     automate: "Tự động hóa",
     editor: "Chỉnh sửa",
+    editorBadge: "Beta",
     files: "Tệp",
     help: "Trợ giúp",
     settings: "Cài đặt",

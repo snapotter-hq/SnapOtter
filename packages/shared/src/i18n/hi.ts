@@ -5539,6 +5539,7 @@ export const hi: TranslationKeys = {
     grid: "ग्रिड",
     automate: "ऑटोमेट",
     editor: "एडिटर",
+    editorBadge: "बीटा",
     files: "फाइलें",
     help: "सहायता",
     settings: "सेटिंग्स",

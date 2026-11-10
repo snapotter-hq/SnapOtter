@@ -5712,6 +5712,7 @@ export const ar: TranslationKeys = {
     grid: "شبكة",
     automate: "أتمتة",
     editor: "المحرر",
+    editorBadge: "تجريبي",
     files: "الملفات",
     help: "المساعدة",
     settings: "الإعدادات",

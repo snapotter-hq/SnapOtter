@@ -5815,6 +5815,7 @@ export const fr: TranslationKeys = {
     grid: "Grille",
     automate: "Automatiser",
     editor: "Éditeur",
+    editorBadge: "Bêta",
     files: "Fichiers",
     help: "Aide",
     settings: "Paramètres",

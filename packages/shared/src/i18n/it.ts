@@ -5794,6 +5794,7 @@ export const it: TranslationKeys = {
     grid: "Griglia",
     automate: "Automatizza",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "File",
     help: "Guida",
     settings: "Impostazioni",

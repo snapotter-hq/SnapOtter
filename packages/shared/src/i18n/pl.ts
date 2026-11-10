@@ -5794,6 +5794,7 @@ export const pl: TranslationKeys = {
     grid: "Siatka",
     automate: "Automatyzacja",
     editor: "Edytor",
+    editorBadge: "Beta",
     files: "Pliki",
     help: "Pomoc",
     settings: "Ustawienia",

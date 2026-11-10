@@ -5440,6 +5440,7 @@ export const zhCN: TranslationKeys = {
     grid: "网格",
     automate: "自动化",
     editor: "编辑器",
+    editorBadge: "测试版",
     files: "文件",
     help: "帮助",
     settings: "设置",

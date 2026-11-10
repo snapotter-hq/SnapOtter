@@ -43,7 +43,7 @@ function useNavLinks(): NavLinkItem[] {
   return [
     { label: t.sidebar.tools, href: "/", icon: LayoutGrid },
     { label: t.sidebar.automate, href: "/automate", icon: Workflow },
-    { label: t.sidebar.editor, href: "/editor", icon: ImageEditIcon, badge: "Beta" },
+    { label: t.sidebar.editor, href: "/editor", icon: ImageEditIcon, badge: t.sidebar.editorBadge },
     { label: t.sidebar.files, href: "/files", icon: FolderOpen },
   ];
 }

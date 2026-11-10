@@ -5780,6 +5780,7 @@ export const ru: TranslationKeys = {
     grid: "Сетка",
     automate: "Автоматизация",
     editor: "Редактор",
+    editorBadge: "Бета",
     files: "Файлы",
     help: "Справка",
     settings: "Настройки",
