@@ -527,8 +527,9 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(runningJob).not.toBeNull();
     emitInstallerLine(child, { venvLock: "acquire" });
     await waitFor(() => realVenvLock.tryAcquireVenvRead() === null);
+    // The close handler runs synchronously inside emit, so its teardown is
+    // done by the next line.
     child.emit("close", 1);
-    await tick();
 
     try {
       // The running job still holds its read; a new job must not queue behind
