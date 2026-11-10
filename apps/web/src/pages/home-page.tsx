@@ -1,5 +1,12 @@
 import type { Tool } from "@snapotter/shared";
-import { ANALYTICS_EVENTS, CATEGORIES, SECTIONS, TOOLS, toolSection } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  CATEGORIES,
+  isToolDisabled,
+  SECTIONS,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import { ChevronDown, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
@@ -116,7 +123,7 @@ export function HomePage() {
     if (!loaded) return [];
     return TOOLS.filter((tool) => {
       if (tool.disabled) return false;
-      if (disabledTools.includes(tool.id)) return false;
+      if (isToolDisabled(tool.id, disabledTools)) return false;
       if (tool.experimental && !experimentalEnabled) return false;
       return true;
     });
