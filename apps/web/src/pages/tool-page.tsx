@@ -2,6 +2,7 @@ import {
   ANALYTICS_EVENTS,
   COMPRESS_PRESET_BY_ID,
   getRequiredBundlesForTool,
+  isToolDisabled,
   PYTHON_SIDECAR_TOOLS,
   SECTIONS,
   TOOLS,
@@ -795,12 +796,12 @@ function ToolPageContent({
   );
 
   // Document-level paste handler (only when an active, installed tool workspace with a dropzone is rendered)
-  const isToolDisabled = Boolean(tool && disabledTools.includes(tool.id));
+  const disabledByAdmin = Boolean(tool && isToolDisabled(tool.id, disabledTools));
   const canAcceptPaste = Boolean(
     tool &&
       registryEntry &&
       registryEntry.displayMode !== "no-dropzone" &&
-      !isToolDisabled &&
+      !disabledByAdmin &&
       (!isAiTool || (featuresLoaded && (toolInstalled || !featureBundle))),
   );
   useEffect(() => {
@@ -856,7 +857,7 @@ function ToolPageContent({
     useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename, toolId]);
 
-  if (isToolDisabled) {
+  if (disabledByAdmin) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">

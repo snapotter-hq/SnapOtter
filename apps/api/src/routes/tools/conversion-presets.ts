@@ -1,4 +1,9 @@
-import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
+import {
+  BASE_CONFIG,
+  COMPRESS_PRESETS,
+  CONVERSION_PRESETS,
+  isToolDisabled,
+} from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute, getToolConfig } from "../tool-factory.js";
@@ -41,8 +46,7 @@ export function registerConversionPresets(
 ): { registered: number; skippedByPolicy: number } {
   let skipped = 0;
   let skippedByPolicy = 0;
-  const isSkipped = (preset: { id: string; base: string }) =>
-    skipTools.has(preset.id) || skipTools.has(preset.base);
+  const isSkipped = (preset: { id: string }) => isToolDisabled(preset.id, skipTools);
   for (const preset of CONVERSION_PRESETS) {
     if (isSkipped(preset)) {
       skippedByPolicy++;
