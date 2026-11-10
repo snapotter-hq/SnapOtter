@@ -3,6 +3,7 @@ import {
   asNotesMap,
   hasResultWarning,
   parseFileNotesHeader,
+  pickPipelineResultNotes,
   pickResultNotes,
 } from "@/lib/result-notes";
 
@@ -105,5 +106,66 @@ describe("asNotesMap", () => {
     expect(asNotesMap(undefined)).toEqual({});
     expect(asNotesMap([])).toEqual({});
     expect(asNotesMap("x")).toEqual({});
+  });
+});
+
+// #4542: a single-file pipeline's notes ride each step record, merged the way
+// the server merges a pipeline batch child's (#1374).
+describe("pickPipelineResultNotes", () => {
+  it("picks a step's missed target", () => {
+    expect(
+      pickPipelineResultNotes({
+        steps: [
+          { step: 1, toolId: "compress-pdf", size: 9, notes: { targetKb: 1, targetMet: false } },
+        ],
+      }),
+    ).toEqual({ targetKb: 1, targetMet: false });
+  });
+
+  it("lets a later step's target verdict replace an earlier one", () => {
+    expect(
+      pickPipelineResultNotes({
+        steps: [
+          { step: 1, notes: { targetKb: 1, targetMet: false } },
+          { step: 2, notes: { targetKb: 50, resizedTo: { width: 10, height: 20 } } },
+        ],
+      }),
+    ).toEqual({ targetKb: 50, resizedTo: { width: 10, height: 20 } });
+  });
+
+  it("keeps an earlier step's other notes when a later one has a target", () => {
+    expect(
+      pickPipelineResultNotes({
+        steps: [
+          { step: 1, notes: { deepEnhanceSkipped: "unavailable" } },
+          { step: 2, notes: { targetKb: 5, targetMet: false } },
+        ],
+      }),
+    ).toEqual({ deepEnhanceSkipped: "unavailable", targetKb: 5, targetMet: false });
+  });
+
+  it("keeps a missed target when a later step has nothing to say", () => {
+    expect(
+      pickPipelineResultNotes({
+        steps: [{ step: 1, notes: { targetKb: 1, targetMet: false } }, { step: 2 }],
+      }),
+    ).toEqual({ targetKb: 1, targetMet: false });
+  });
+
+  it.each([
+    ["no steps", { jobId: "x" }],
+    ["steps without notes", { steps: [{ step: 1 }, null, "resize"] }],
+    [
+      "malformed notes",
+      {
+        steps: [
+          { step: 1, notes: "late" },
+          { step: 2, notes: { targetMet: "no" } },
+        ],
+      },
+    ],
+    ["a non-object", null],
+  ])("is null for %s", (_label, result) => {
+    expect(pickPipelineResultNotes(result)).toBeNull();
   });
 });

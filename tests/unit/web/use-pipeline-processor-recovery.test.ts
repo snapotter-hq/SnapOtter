@@ -1622,6 +1622,66 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
   });
 });
 
+// #4542: a single-file run's step notes reach the entry, on the sync answer
+// and on the completed frame alike, the way a multi-file run's do (#1374).
+describe("usePipelineProcessor single-run step notes (#4542)", () => {
+  const MISSED_RESULT = {
+    ...SINGLE_RESULT,
+    steps: [
+      { step: 1, toolId: "compress-pdf", size: 32, notes: { targetKb: 1, targetMet: false } },
+    ],
+  };
+
+  it("puts a step's missed target on the entry from the sync answer", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(MISSED_RESULT);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      resultNotes: { targetKb: 1, targetMet: false },
+    });
+    unmount();
+  });
+
+  it("puts a step's missed target on the entry from the completed frame", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: MISSED_RESULT });
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      resultNotes: { targetKb: 1, targetMet: false },
+    });
+    unmount();
+  });
+
+  it("clears an earlier run's notes when the steps report none", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      useFileStore.getState().updateEntry(0, { resultNotes: { targetKb: 1, targetMet: false } });
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      resultNotes: null,
+    });
+    unmount();
+  });
+});
+
 /**
  * #1354: the sync response path parsed the body and wrote the result under
  * one catch, so a throw from our own store write on a good 200 read as
