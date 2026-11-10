@@ -348,6 +348,9 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // Once granted, the lock is held until the installer sends "release" or
     // exits (#4201).
     let releaseVenv: (() => void) | null = null;
+    // Aborted on teardown so a dead installer's queued request leaves the
+    // lock queue instead of holding new AI jobs off (#4608).
+    const venvLockRequest = new AbortController();
     let venvLockRequested = false;
     let waitingForVenvLock = false;
     const releaseVenvOnce = () => {
@@ -387,6 +390,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       if (finalized) return false;
       finalized = true;
       clearWatchdog();
+      venvLockRequest.abort();
       releaseVenvOnce();
       releaseInstallLock();
       clearActive();
@@ -409,17 +413,23 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       if (venvLockRequested) return;
       venvLockRequested = true;
       waitingForVenvLock = true;
-      void acquireVenvLock().then((release) => {
-        waitingForVenvLock = false;
-        lastProgressAt = Date.now();
-        // The installer died while waiting; nothing will write the venv.
-        if (finalized) {
-          release();
-          return;
-        }
-        releaseVenv = release;
-        child.stdin?.write("granted\n");
-      });
+      acquireVenvLock(venvLockRequest.signal).then(
+        (release) => {
+          waitingForVenvLock = false;
+          lastProgressAt = Date.now();
+          // The installer died while waiting; nothing will write the venv.
+          if (finalized) {
+            release();
+            return;
+          }
+          releaseVenv = release;
+          child.stdin?.write("granted\n");
+        },
+        () => {
+          // Only finalizeOnce aborts the request, so the installer is gone.
+          waitingForVenvLock = false;
+        },
+      );
     };
 
     const stallMs = env.INSTALL_STALL_MS;
