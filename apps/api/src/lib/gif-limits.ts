@@ -5,6 +5,94 @@ import { ToolInputError } from "@snapotter/shared";
 export const MAX_GIF_FRAMES = 500;
 export const MAX_GIF_TOTAL_PIXELS = MAX_RESIZE_OUTPUT_PIXELS;
 
+/**
+ * Ceiling on the canvas Pillow builds for a GIF. The remove-gif-background
+ * sidecar mirrors these numbers in gif_remove_bg.py; keep the two in sync.
+ */
+export const MAX_GIF_CANVAS_PIXELS = MAX_RESIZE_OUTPUT_PIXELS;
+export const MAX_GIF_CANVAS_SIDE = MAX_RESIZE_OUTPUT_DIMENSION;
+
+/**
+ * libvips (libnsgif) ignores a logical screen wider or taller than this and
+ * sizes the image to its frames, so past it the size sharp reports says
+ * nothing about the screen the header declares.
+ */
+const LIBVIPS_GIF_SCREEN_LIMIT = 2048;
+
+function colorTableBytes(packed: number): number {
+  return packed & 0x80 ? 3 * 2 ** ((packed & 0x07) + 1) : 0;
+}
+
+/** Skip a run of GIF data sub-blocks; returns the offset after the terminator, or -1. */
+function skipSubBlocks(buffer: Buffer, offset: number): number {
+  let pos = offset;
+  while (pos < buffer.length) {
+    const size = buffer[pos];
+    pos += 1;
+    if (size === 0) return pos;
+    pos += size;
+  }
+  return -1;
+}
+
+/**
+ * The canvas Pillow allocates for a GIF: the logical screen from the header,
+ * grown to fit any frame that sits past its edge. Sharp sizes the same file by
+ * different rules, so a header claiming 13000 x 13000 over 2 x 2 frames reads
+ * as 2 x 2 to sharp while Pillow builds 169 MP per frame. Returns null when the
+ * buffer is not a GIF. A truncated block list stops the walk with what it has.
+ */
+export function readGifCanvasSize(buffer: Buffer): { width: number; height: number } | null {
+  if (buffer.length < 13 || buffer.toString("latin1", 0, 3) !== "GIF") return null;
+  let width = buffer.readUInt16LE(6);
+  let height = buffer.readUInt16LE(8);
+  let pos = 13 + colorTableBytes(buffer[10] ?? 0);
+
+  while (pos < buffer.length) {
+    const marker = buffer[pos];
+    if (marker === 0x21) {
+      pos = skipSubBlocks(buffer, pos + 2);
+    } else if (marker === 0x2c) {
+      if (pos + 10 > buffer.length) break;
+      const left = buffer.readUInt16LE(pos + 1);
+      const top = buffer.readUInt16LE(pos + 3);
+      width = Math.max(width, left + buffer.readUInt16LE(pos + 5));
+      height = Math.max(height, top + buffer.readUInt16LE(pos + 7));
+      // Descriptor, local color table, then the LZW minimum code size byte.
+      pos = skipSubBlocks(buffer, pos + 10 + colorTableBytes(buffer[pos + 9] ?? 0) + 1);
+    } else {
+      break;
+    }
+    if (pos < 0) break;
+  }
+  return { width, height };
+}
+
+/**
+ * Why a GIF's canvas is refused, or null when it is fine. The canvas may run
+ * past what sharp decodes only inside the range libvips itself honours, so
+ * Pillow never builds a canvas bigger than a GIF sharp would have accepted.
+ */
+export function gifCanvasRejection(
+  canvas: { width: number; height: number },
+  decodedWidth: number,
+  decodedHeight: number,
+): string | null {
+  const { width, height } = canvas;
+  const pixels = width * height;
+  if (
+    width > MAX_GIF_CANVAS_SIDE ||
+    height > MAX_GIF_CANVAS_SIDE ||
+    pixels > MAX_GIF_CANVAS_PIXELS
+  ) {
+    return `GIF canvas ${width} x ${height} is over the ${MAX_GIF_CANVAS_PIXELS.toLocaleString("en-US")} pixel limit`;
+  }
+  if (pixels > Math.max(decodedWidth * decodedHeight, LIBVIPS_GIF_SCREEN_LIMIT ** 2)) {
+    return `GIF canvas ${width} x ${height} is larger than its ${decodedWidth} x ${decodedHeight} frames`;
+  }
+  return null;
+}
+
 export interface GifMetadataLike {
   width?: number;
   height?: number;

@@ -16,6 +16,14 @@ import sys
 _HEX_COLOR_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 MAX_REMBG_PX = int(os.environ.get("MAX_REMBG_PX", "2048"))
+# Pillow sizes every coalesced frame to the GIF's logical screen (grown to fit
+# any frame placed past it), not to the frames, so a tiny file can declare a
+# 65535 x 65535 canvas and cost gigabytes per frame. Mirrors MAX_GIF_CANVAS_PIXELS
+# and MAX_GIF_CANVAS_SIDE in apps/api/src/lib/gif-limits.ts, which the API checks
+# at upload; this is the backstop for anything that reaches the sidecar anyway.
+MAX_CANVAS_PIXELS = 67_108_864
+MAX_CANVAS_SIDE = 16383
+CANVAS_TOO_LARGE = "CANVAS_TOO_LARGE"
 _OOM_MARKERS = (
     "out of memory",
     "not enough memory",
@@ -88,6 +96,18 @@ def _is_model_load_error(err):
     return any(s in m for s in _MODEL_LOAD_ERROR_MARKERS)
 
 
+class CanvasTooLargeError(ValueError):
+    """The animation's canvas is over the pixel cap. The bridge maps it to a 400."""
+
+
+def _check_canvas_size(size):
+    w, h = size
+    if w > MAX_CANVAS_SIDE or h > MAX_CANVAS_SIDE or w * h > MAX_CANVAS_PIXELS:
+        raise CanvasTooLargeError(
+            f"Animation canvas {w} x {h} is over the {MAX_CANVAS_PIXELS:,} pixel limit"
+        )
+
+
 def _read_frames(path):
     """Disposal-aware coalescing. Returns (frames[RGBA], durations[ms], loop).
 
@@ -111,6 +131,9 @@ def _read_frames(path):
         except (TypeError, ValueError):
             dur = 100
         disposal = frame.info.get("disposal", 0)
+        # Checked per frame: seek() grows the canvas to fit a frame placed past
+        # the logical screen, and convert() is where that canvas gets allocated.
+        _check_canvas_size(frame.size)
         rgba = frame.convert("RGBA")
         if canvas is None:
             canvas = rgba.copy()
@@ -487,6 +510,8 @@ def main():
             result = json.dumps(
                 {"success": True, "model": model, "device": device, "frames": n, "format": fmt}
             )
+    except CanvasTooLargeError as e:
+        result = json.dumps({"success": False, "error": str(e), "code": CANVAS_TOO_LARGE})
     except ImportError as e:
         detail = str(e).strip() or type(e).__name__
         print(json.dumps({"warning": f"[gif-remove-bg] Import failed: {detail}"}), file=sys.stderr, flush=True)

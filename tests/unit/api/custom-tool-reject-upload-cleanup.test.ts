@@ -1115,3 +1115,24 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
     jobRows.error = null;
   });
 });
+
+describe("remove-gif-background GIF canvas check", () => {
+  it("rejects a GIF whose logical screen is far over its frames with a 400 and discards the upload", async () => {
+    const bomb = Buffer.from(GIF);
+    bomb.writeUInt16LE(13_000, 6);
+    bomb.writeUInt16LE(13_000, 8);
+    mocks.getObjectBuffer.mockResolvedValue(bomb);
+    const req = makeRequest(validPartsFor("remove-gif-background"));
+    const reply = makeReply();
+
+    await handlers["/api/v1/tools/image/remove-gif-background"](req, reply);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: "Invalid image: GIF canvas 13000 x 13000 is over the 67,108,864 pixel limit",
+    });
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+    expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+  });
+});
