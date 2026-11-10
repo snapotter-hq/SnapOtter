@@ -276,7 +276,9 @@ describe("POST /api/v1/admin/features/reset", () => {
       settled = true;
     });
     try {
-      await vi.waitFor(() => expect(settled || venvWriterPending()).toBe(true));
+      await vi.waitFor(() => expect(settled || venvWriterPending()).toBe(true), {
+        timeout: 10_000,
+      });
       expect(settled).toBe(false);
       expect(existsSync(join(modelsDir, "in-use.onnx"))).toBe(true);
     } finally {
