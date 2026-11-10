@@ -10,7 +10,15 @@ export type ScratchWrapper =
   | "denoise"
   | "face-enhance"
   | "inpaint"
-  | "remove-bg";
+  | "remove-bg"
+  | "colorize"
+  | "outpaint"
+  | "red-eye"
+  | "seam-carve"
+  | "blur-faces"
+  | "detect-faces"
+  | "face-landmarks"
+  | "remove-bg-anim";
 
 type ScratchStep = "write-input" | "read-output";
 

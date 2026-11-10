@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface OutpaintOptions {
   extendTop: number;
@@ -27,7 +27,7 @@ export async function outpaint(
   const outputPath = join(outputDir, "output_outpaint.png");
 
   const pngInput = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngInput);
+  await writeScratchInput("outpaint", inputPath, pngInput);
 
   const { stdout } = await runPythonWithProgress(
     "outpaint.py",
@@ -48,5 +48,5 @@ export async function outpaint(
     throw toSidecarError(result.error, "Outpainting failed");
   }
 
-  return readFile(outputPath);
+  return readScratchOutput("outpaint", outputPath);
 }
