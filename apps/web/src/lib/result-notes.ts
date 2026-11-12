@@ -28,6 +28,29 @@ export function pickResultNotes(source: unknown): ResultNotes | null {
   return Object.keys(notes).length > 0 ? notes : null;
 }
 
+/**
+ * The notes of a single-file pipeline result, whose steps each carry their own
+ * under `steps[k].notes` (#4542). Merged in order the way the server merges a
+ * pipeline batch child's (pickChildFileNotes, #1374): a later step overrides an
+ * earlier one's field, and a later target verdict replaces the earlier one
+ * whole, so a met target doesn't inherit an earlier `targetMet: false`.
+ */
+export function pickPipelineResultNotes(result: unknown): ResultNotes | null {
+  const steps = (result as { steps?: unknown } | null)?.steps;
+  if (!Array.isArray(steps)) return null;
+  let merged: ResultNotes = {};
+  for (const step of steps) {
+    const notes = pickResultNotes((step as { notes?: unknown } | null)?.notes);
+    if (!notes) continue;
+    if (notes.targetKb !== undefined) {
+      const { targetKb: _kb, targetMet: _met, ...rest } = merged;
+      merged = rest;
+    }
+    Object.assign(merged, notes);
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 /** A batch's notes map, or an empty one when the value isn't a plain object. */
 export function asNotesMap(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
