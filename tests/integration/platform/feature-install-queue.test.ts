@@ -517,6 +517,33 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     nextJob?.();
   });
 
+  it("drops a dead installer's queued venv lock request before running jobs finish (#4608)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    const runningJob = realVenvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+    emitInstallerLine(child, { venvLock: "acquire" });
+    await waitFor(() => realVenvLock.tryAcquireVenvRead() === null);
+    // The close handler runs synchronously inside emit, so its teardown is
+    // done by the next line.
+    child.emit("close", 1);
+
+    try {
+      // The running job still holds its read; a new job must not queue behind
+      // the dead installer's request.
+      const nextJob = realVenvLock.tryAcquireVenvRead();
+      expect(nextJob).not.toBeNull();
+      nextJob?.();
+    } finally {
+      runningJob?.();
+    }
+    await tick();
+    expect(child.stdin.writes).toEqual([]);
+  });
+
   it("spawns the installer with an allowlisted env, not the API's secrets (#4311)", async () => {
     const secrets: Record<string, string> = {
       DATABASE_URL: "postgres://user:hunter2@db/snapotter",

@@ -96,13 +96,34 @@ export function acquireVenvRead(signal?: AbortSignal): Promise<Release> {
   });
 }
 
-/** Bundle-install (writer) exclusive acquire; waits for in-flight AI jobs. */
-export function acquireVenvLock(): Promise<Release> {
+/**
+ * Bundle-install (writer) exclusive acquire; waits for in-flight AI jobs.
+ * Aborting `signal` while waiting drops the request and rejects at once. If
+ * it was the last queued writer, jobs that were held off behind it start
+ * right away instead of waiting for the running ones to finish (#4608).
+ */
+export function acquireVenvLock(signal?: AbortSignal): Promise<Release> {
+  if (signal?.aborted) return Promise.reject(abortError());
   if (!writerActive && readers === 0 && writeWaiters.length === 0) {
     writerActive = true;
     return Promise.resolve(writeRelease());
   }
-  return new Promise<Release>((resolve) => {
-    writeWaiters.push(() => resolve(writeRelease()));
+  return new Promise<Release>((resolve, reject) => {
+    const onAbort = () => {
+      // Splice it out rather than flag it: a release grants writeWaiters.shift().
+      const index = writeWaiters.indexOf(grant);
+      if (index !== -1) writeWaiters.splice(index, 1);
+      if (!writerActive && writeWaiters.length === 0) {
+        const granted = readWaiters.splice(0);
+        for (const grantRead of granted) grantRead();
+      }
+      reject(abortError());
+    };
+    const grant = () => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(writeRelease());
+    };
+    writeWaiters.push(grant);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
