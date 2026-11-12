@@ -129,13 +129,23 @@ describe("authenticated and public bodies are still parsed", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("leaves SCIM to its own bearer check, after the body is parsed", async () => {
+  it("checks the SCIM bearer token before parsing the body (#4632)", async () => {
     const res = await testApp.app.inject({
       method: "POST",
       url: "/api/v1/scim/v2/Users",
       headers: { ...json, authorization: "Bearer scim-token-not-a-session" },
       payload: malformed,
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("checks auth on POST /api/v1/jobs/:jobId/cancel before parsing the body (#4632)", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/jobs/some-job-id/cancel",
+      headers: json,
+      payload: malformed,
+    });
+    expect(res.statusCode).toBe(401);
   });
 });
