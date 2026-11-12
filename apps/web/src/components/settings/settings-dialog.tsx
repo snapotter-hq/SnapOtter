@@ -7,6 +7,7 @@ import {
   isValidUsername,
   normalizeRoleName,
   type Permission,
+  presetBaseOf,
   SafeError,
   SUPPORTED_LOCALES,
   TEAM_NAME_MAX_LENGTH,
@@ -4272,7 +4273,13 @@ export function ToolsSection() {
             </h4>
             <div className="space-y-1">
               {groupedTools.get(category.id)?.map((tool) => {
-                const isDisabled = disabledTools.includes(tool.id);
+                // A disabled base tool takes its presets' routes down with it
+                // (#4288), so the preset reads off and locked here. Its own
+                // entry stays as stored, and comes back when the base does.
+                const base = presetBaseOf(tool.id);
+                const lockedByBase = base !== undefined && disabledTools.includes(base);
+                const isDisabled = lockedByBase || disabledTools.includes(tool.id);
+                const hintId = `tool-locked-hint-${tool.id}`;
                 return (
                   <div
                     key={tool.id}
@@ -4285,15 +4292,28 @@ export function ToolsSection() {
                       <p className="text-xs text-muted-foreground truncate">
                         {getToolDescription(t, tool.id, tool.description)}
                       </p>
+                      {lockedByBase && (
+                        <p id={hintId} className="text-xs text-muted-foreground mt-0.5">
+                          {format(t.settings.tools.offWithBase, {
+                            base: getToolName(
+                              t,
+                              base,
+                              TOOLS.find((candidate) => candidate.id === base)?.name ?? base,
+                            ),
+                          })}
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={!isDisabled}
                       aria-label={getToolName(t, tool.id, tool.name)}
+                      aria-describedby={lockedByBase ? hintId : undefined}
+                      disabled={lockedByBase}
                       onClick={() => toggleTool(tool.id)}
                       className={cn(
-                        "w-11 h-6 rounded-full transition-colors relative shrink-0 ms-3",
+                        "w-11 h-6 rounded-full transition-colors relative shrink-0 ms-3 disabled:cursor-not-allowed disabled:opacity-50",
                         !isDisabled ? "bg-primary" : "bg-muted-foreground/30",
                       )}
                     >

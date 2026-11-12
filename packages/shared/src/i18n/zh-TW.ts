@@ -4903,6 +4903,7 @@ export const zhTW: TranslationKeys = {
       disabledCount: "{count}個工具已停用",
       disabledCountOne: "{count}個工具已停用",
       disabledCountOther: "{count}個工具已停用",
+      offWithBase: "已停用，因為{base}已停用。",
     },
     experimental: {
       label: "啟用實驗性工具",

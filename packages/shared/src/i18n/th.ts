@@ -5125,6 +5125,7 @@ export const th: TranslationKeys = {
       disabledCount: "ปิดการใช้งาน {count} เครื่องมือ",
       disabledCountOne: "ปิดการใช้งาน {count} เครื่องมือ",
       disabledCountOther: "ปิดการใช้งาน {count} เครื่องมือ",
+      offWithBase: "ปิดอยู่เนื่องจากเครื่องมือ {base} ถูกปิดใช้งาน",
     },
     experimental: {
       label: "เปิดใช้เครื่องมือทดลอง",

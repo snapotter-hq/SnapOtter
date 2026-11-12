@@ -5219,6 +5219,7 @@ export const pl: TranslationKeys = {
       disabledCount: "Wyłączono {count} narzędzi",
       disabledCountOne: "Wyłączono {count} narzędzie",
       disabledCountOther: "Wyłączono {count} narzędzi",
+      offWithBase: "Wyłączone, ponieważ narzędzie {base} jest wyłączone.",
     },
     experimental: {
       label: "Włącz eksperymentalne narzędzia",

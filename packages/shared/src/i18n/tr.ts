@@ -5210,6 +5210,7 @@ export const tr: TranslationKeys = {
       disabledCount: "{count} araç devre dışı",
       disabledCountOne: "{count} araç devre dışı",
       disabledCountOther: "{count} araç devre dışı",
+      offWithBase: "{base} aracı devre dışı olduğu için kapalı.",
     },
     experimental: {
       label: "Deneysel Araçları Etkinleştir",

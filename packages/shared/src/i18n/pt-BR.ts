@@ -5215,6 +5215,7 @@ export const ptBR: TranslationKeys = {
       disabledCount: "{count} ferramenta(s) desativada(s)",
       disabledCountOne: "{count} ferramenta desativada",
       disabledCountOther: "{count} ferramentas desativadas",
+      offWithBase: "Desativada porque a ferramenta {base} está desativada.",
     },
     experimental: {
       label: "Ativar ferramentas experimentais",

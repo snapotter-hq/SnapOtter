@@ -5190,6 +5190,7 @@ export const vi: TranslationKeys = {
       disabledCount: "{count} công cụ bị tắt",
       disabledCountOne: "{count} công cụ bị tắt",
       disabledCountOther: "{count} công cụ bị tắt",
+      offWithBase: "Đang tắt vì công cụ {base} bị tắt.",
     },
     experimental: {
       label: "Bật công cụ thử nghiệm",

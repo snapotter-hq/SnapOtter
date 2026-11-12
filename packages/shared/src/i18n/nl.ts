@@ -5222,6 +5222,7 @@ export const nl: TranslationKeys = {
       disabledCount: "{count} tool(s) uitgeschakeld",
       disabledCountOne: "{count} tool uitgeschakeld",
       disabledCountOther: "{count} tools uitgeschakeld",
+      offWithBase: "Uitgeschakeld omdat {base} is uitgeschakeld.",
     },
     experimental: {
       label: "Experimentele tools inschakelen",

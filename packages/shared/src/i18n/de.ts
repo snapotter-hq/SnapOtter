@@ -5241,6 +5241,7 @@ export const de: TranslationKeys = {
       disabledCount: "{count} Werkzeug(e) deaktiviert",
       disabledCountOne: "{count} Werkzeug deaktiviert",
       disabledCountOther: "{count} Werkzeuge deaktiviert",
+      offWithBase: "Deaktiviert, weil {base} deaktiviert ist.",
     },
     experimental: {
       label: "Experimentelle Werkzeuge aktivieren",

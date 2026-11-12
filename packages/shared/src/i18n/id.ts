@@ -5202,6 +5202,7 @@ export const id: TranslationKeys = {
       disabledCount: "{count} alat dinonaktifkan",
       disabledCountOne: "{count} alat dinonaktifkan",
       disabledCountOther: "{count} alat dinonaktifkan",
+      offWithBase: "Nonaktif karena {base} dinonaktifkan.",
     },
     experimental: {
       label: "Aktifkan Alat Eksperimental",

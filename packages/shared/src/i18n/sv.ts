@@ -5200,6 +5200,7 @@ export const sv: TranslationKeys = {
       disabledCount: "{count} verktyg inaktiverade",
       disabledCountOne: "{count} verktyg inaktiverat",
       disabledCountOther: "{count} verktyg inaktiverade",
+      offWithBase: "Inaktiverat eftersom verktyget {base} är inaktiverat.",
     },
     experimental: {
       label: "Aktivera experimentella verktyg",
