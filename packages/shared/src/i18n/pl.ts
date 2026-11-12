@@ -4134,6 +4134,8 @@ export const pl: TranslationKeys = {
     previewFailed: "Generowanie podglądu nie powiodło się",
     previewEncoderMissing:
       "W ffmpeg na tym serwerze brakuje kodera {encoder}, więc nie można wygenerować podglądu. Skontaktuj się z administratorem.",
+    previewEngineUnavailable:
+      "Na tym serwerze nie zainstalowano ffmpeg, więc nie można wygenerować podglądu. Poproś administratora o zainstalowanie ffmpeg lub ustawienie FFMPEG_PATH.",
     previewProgressMessages: [
       "Wydra się rozgrzewa...",
       "Mielimy piksele...",

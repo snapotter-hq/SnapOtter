@@ -3923,6 +3923,8 @@ export const hi: TranslationKeys = {
     previewFailed: "प्रीव्यू बनाना विफल रहा",
     previewEncoderMissing:
       "इस सर्वर के ffmpeg में {encoder} एनकोडर नहीं है, इसलिए प्रीव्यू नहीं बन सकता। अपने एडमिनिस्ट्रेटर से संपर्क करें।",
+    previewEngineUnavailable:
+      "इस सर्वर पर ffmpeg इंस्टॉल नहीं है, इसलिए प्रीव्यू नहीं बन सकता। अपने एडमिनिस्ट्रेटर से ffmpeg इंस्टॉल करने या FFMPEG_PATH सेट करने को कहें।",
     previewProgressMessages: [
       "ऊदबिलाव वॉर्म-अप कर रहा है...",
       "पिक्सेल पीसे जा रहे हैं...",

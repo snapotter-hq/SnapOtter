@@ -4053,6 +4053,8 @@ export const ko: TranslationKeys = {
     previewFailed: "미리보기 생성 실패",
     previewEncoderMissing:
       "이 서버의 ffmpeg에 {encoder} 인코더가 없어 미리보기를 생성할 수 없습니다. 관리자에게 문의하세요.",
+    previewEngineUnavailable:
+      "이 서버에 ffmpeg가 설치되어 있지 않아 미리보기를 생성할 수 없습니다. 관리자에게 ffmpeg 설치 또는 FFMPEG_PATH 설정을 요청하세요.",
     previewProgressMessages: [
       "수달이 몸을 푸는 중...",
       "픽셀을 씹어 먹는 중...",

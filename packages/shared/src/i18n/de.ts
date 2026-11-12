@@ -4153,6 +4153,8 @@ export const de: TranslationKeys = {
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
     previewEncoderMissing:
       "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
+    previewEngineUnavailable:
+      "Auf diesem Server ist ffmpeg nicht installiert, daher kann keine Vorschau erzeugt werden. Bitten Sie Ihren Administrator, ffmpeg zu installieren oder FFMPEG_PATH zu setzen.",
     previewProgressMessages: [
       "Der Otter wärmt sich auf...",
       "Pixel werden zerkaut...",

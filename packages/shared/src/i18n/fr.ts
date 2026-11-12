@@ -4145,6 +4145,8 @@ export const fr: TranslationKeys = {
     previewFailed: "Échec de la génération de l'aperçu",
     previewEncoderMissing:
       "Il manque l'encodeur {encoder} au ffmpeg de ce serveur, l'aperçu ne peut donc pas être généré. Contactez votre administrateur.",
+    previewEngineUnavailable:
+      "ffmpeg n'est pas installé sur ce serveur, l'aperçu ne peut donc pas être généré. Demandez à votre administrateur d'installer ffmpeg ou de définir FFMPEG_PATH.",
     previewProgressMessages: [
       "La loutre s'échauffe...",
       "On mouline les pixels...",

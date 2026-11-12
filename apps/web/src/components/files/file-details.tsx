@@ -14,7 +14,11 @@ import {
 } from "@/lib/api";
 import { fileFormatLabel } from "@/lib/file-format-label";
 import { format } from "@/lib/format";
-import { previewFailureEncoder } from "@/lib/preview-error";
+import {
+  type PreviewFailureReason,
+  previewFailureMessage,
+  previewFailureReason,
+} from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { useFilesPageStore } from "@/stores/files-page-store";
@@ -109,9 +113,11 @@ export function FilePreview({
   const [mediaRetry, setMediaRetry] = useState(0);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  // Set when generating a preview failed; `encoder` names what the server's
-  // ffmpeg lacks, when that was the reason (#1290).
-  const [previewError, setPreviewError] = useState<{ encoder: string | null } | null>(null);
+  // Set when generating a preview failed; `reason` says why when the server
+  // named it: a missing encoder (#1290) or no ffmpeg at all (#4149).
+  const [previewError, setPreviewError] = useState<{
+    reason: PreviewFailureReason | null;
+  } | null>(null);
   // Bumped on every file change and request, so a reply for a file that is no
   // longer shown is dropped instead of landing on the current one.
   const previewRequest = useRef(0);
@@ -195,11 +201,11 @@ export function FilePreview({
     const current = () => previewRequest.current === request;
     setPreviewLoading(true);
     setPreviewError(null);
-    let encoder: string | null = null;
+    let reason: PreviewFailureReason | null = null;
     fetch(getFilePreviewUrl(fileId), { headers: formatHeaders(), signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
-          encoder = await previewFailureEncoder(res);
+          reason = await previewFailureReason(res);
           throw new Error("Preview generation failed");
         }
         return res.blob();
@@ -216,7 +222,7 @@ export function FilePreview({
       .catch((err) => {
         if (!current() || controller.signal.aborted) return;
         console.error(`[file-preview] failed to generate preview for file ${fileId}`, err);
-        setPreviewError({ encoder });
+        setPreviewError({ reason });
       })
       .finally(() => {
         if (previewAbortRef.current === controller) {
@@ -226,9 +232,11 @@ export function FilePreview({
       });
   }, [fileId]);
 
-  const previewErrorText = previewError?.encoder
-    ? format(t.toolPage.previewEncoderMissing, { encoder: previewError.encoder })
-    : t.files.details.previewFailedRetry;
+  const previewErrorText = previewFailureMessage(
+    previewError?.reason ?? null,
+    t,
+    t.files.details.previewFailedRetry,
+  );
 
   // PDF files -- render inline in iframe
   if (isPdf) {
