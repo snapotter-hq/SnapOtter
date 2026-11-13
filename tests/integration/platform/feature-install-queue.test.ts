@@ -878,7 +878,10 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
 
     // (4) Check that the OCR install failure is reported
     expect(hoisted.reportErrorMock).toHaveBeenCalledTimes(1);
-    expect(hoisted.reportErrorMock.mock.calls[0][1]).toEqual({ source: "ai-install" });
+    expect(hoisted.reportErrorMock.mock.calls[0][1]).toEqual({
+      source: "ai-install",
+      subsystem: "ocr-runtime",
+    });
   });
 
   it("returns 500 when the offline OCR installer fails after validation", async () => {

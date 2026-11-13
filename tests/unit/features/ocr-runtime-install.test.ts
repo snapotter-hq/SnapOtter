@@ -1,5 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
+  chmodSync,
   closeSync,
   constants,
   existsSync,
@@ -26,6 +27,12 @@ type OpenHandleInterceptor = (
   handle: Awaited<ReturnType<typeof import("node:fs/promises").open>>,
 ) => Awaited<ReturnType<typeof import("node:fs/promises").open>>;
 
+type RenameInterceptor = (
+  oldPath: string,
+  newPath: string,
+  actualRename: typeof import("node:fs/promises").rename,
+) => Promise<void>;
+
 type RmInterceptor = (
   path: string,
   options: Parameters<typeof import("node:fs/promises").rm>[1],
@@ -35,6 +42,7 @@ type RmInterceptor = (
 const fsOpenHoisted = vi.hoisted(() => ({
   interceptor: null as OpenHandleInterceptor | null,
   rmInterceptor: null as RmInterceptor | null,
+  renameInterceptor: null as RenameInterceptor | null,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -58,6 +66,12 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       }
       return fsOpenHoisted.rmInterceptor(String(path), options, actual.rm);
     }) as typeof actual.rm,
+    rename: (async (oldPath: unknown, newPath: unknown) => {
+      const from = oldPath as Parameters<typeof actual.rename>[0];
+      const to = newPath as Parameters<typeof actual.rename>[1];
+      if (!fsOpenHoisted.renameInterceptor) return actual.rename(from, to);
+      return fsOpenHoisted.renameInterceptor(String(from), String(to), actual.rename);
+    }) as typeof actual.rename,
   };
 });
 
@@ -68,9 +82,11 @@ import {
   cleanupDownloadedRuntimeRelease as cleanupDownloadedRuntimeReleaseWithLease,
   downloadVerifiedRuntimeRelease as downloadVerifiedRuntimeReleaseWithLease,
   loadOcrRuntimeTrustKeys,
+  OcrRuntimeCachePermissionError,
   OcrRuntimeImportValidationError,
   OcrRuntimeNotPublishedError,
   type OcrRuntimeTrustKey,
+  OcrRuntimeUnreachableError,
   prepareOfflineRuntimeIndex,
   prepareOfflineRuntimeRelease,
   purgeOcrRuntimeDownloads as purgeOcrRuntimeDownloadsWithLease,
@@ -137,6 +153,7 @@ afterEach(() => {
   // finally, so restore them here or every later test runs on a frozen clock.
   fsOpenHoisted.interceptor = null;
   fsOpenHoisted.rmInterceptor = null;
+  fsOpenHoisted.renameInterceptor = null;
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -890,28 +907,54 @@ describe("downloadVerifiedRuntimeRelease", () => {
     );
     const sleep = vi.fn(async (_delayMs: number) => {});
 
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        retry: {
-          maxAttempts: 3,
-          baseDelayMs: 100,
-          maxDelayMs: 1_000,
-          maxTotalDelayMs: 1_000,
-          random: () => 0,
-          sleep,
-        },
-      }),
-    ).rejects.toThrow(
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [],
+      fetchImpl,
+      retry: {
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        maxDelayMs: 1_000,
+        maxTotalDelayMs: 1_000,
+        random: () => 0,
+        sleep,
+      },
+    }).catch((caught: unknown) => caught);
+
+    // An unreachable host is the operator's network, not a bug: a constant,
+    // actionable operational message, with the attempt detail kept on the
+    // cause for the log (NODE-8P).
+    expect(error).toBeInstanceOf(OcrRuntimeUnreachableError);
+    expect(error).toMatchObject({ kind: "operational", code: "OCR_RUNTIME_UNREACHABLE" });
+    expect((error as Error).message).toContain("huggingface.co");
+    expect((error as Error).message).toContain("HTTPS_PROXY");
+    expect(((error as Error).cause as Error).message).toBe(
       "OCR runtime index download failed after 3 attempts (150ms retry delay): OCR runtime network request failed: socket reset by peer",
     );
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(sleep.mock.calls).toEqual([[50], [100]]);
+  });
+
+  it("does not call a codeless fetch TypeError an unreachable host", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-codeless-type-error-"));
+    temporaryDirectories.push(directory);
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Invalid URL"));
+
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [],
+      fetchImpl,
+      retry: { maxAttempts: 2, baseDelayMs: 0, maxDelayMs: 0, sleep: async () => {} },
+    }).catch((caught: unknown) => caught);
+
+    expect(error).not.toBeInstanceOf(OcrRuntimeUnreachableError);
+    expect((error as Error).message).toContain("failed after 2 attempts");
   });
 
   it("does not mistake a local TypeError for a transient network failure", async () => {
@@ -3545,5 +3588,159 @@ describe("FileHandle close and sync error preservation (#3774)", () => {
       expect(closeCalls).toBe(1);
       expect(existsSync(partPath)).toBe(false);
     }
+  });
+});
+
+describe("OCR runtime cache on volumes that ignore chmod or renumber inodes", () => {
+  function ignoreChmod() {
+    fsOpenHoisted.interceptor = (_path, handle) =>
+      new Proxy(handle, {
+        get(target, prop, receiver) {
+          // SMB/CIFS and some FUSE mounts report chmod success and change nothing.
+          if (prop === "chmod") return async () => {};
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+  }
+
+  it("installs when a no-op chmod leaves a mode without other-write or special bits (NODE-AB)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-noop-chmod-"));
+    temporaryDirectories.push(directory);
+    ignoreChmod();
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    const result = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl,
+    });
+
+    expect(readFileSync(result.archivePath)).toEqual(ARCHIVE_BYTES);
+    expect(statSync(result.archivePath).mode & 0o002).toBe(0);
+  });
+
+  it("refuses a world-writable cache with a clear operational error when chmod does not stick (NODE-AB)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-noop-chmod-0777-"));
+    temporaryDirectories.push(directory);
+    const aiDataDir = join(directory, "ai");
+    mkdirSync(aiDataDir);
+    chmodSync(aiDataDir, 0o777);
+    ignoreChmod();
+    const fetchImpl = vi.fn<typeof fetch>();
+
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl,
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(OcrRuntimeCachePermissionError);
+    expect(error).toMatchObject({ kind: "operational", code: "OCR_CACHE_PERMISSIONS" });
+    expect((error as Error).message).not.toContain(aiDataDir);
+    expect(((error as Error).cause as Error).message).toContain("mode 777");
+    expect(((error as Error).cause as Error).message).toContain(aiDataDir);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("keeps other chmod failures as internal errors rather than a storage hint", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-chmod-eio-"));
+    temporaryDirectories.push(directory);
+    const aiDataDir = join(directory, "ai");
+    mkdirSync(aiDataDir);
+    chmodSync(aiDataDir, 0o755);
+    fsOpenHoisted.interceptor = (_path, handle) =>
+      new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "chmod") {
+            return async () => {
+              throw Object.assign(new Error("EIO: i/o error, fchmod"), { code: "EIO" });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl: vi.fn<typeof fetch>(),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).not.toBeInstanceOf(OcrRuntimeCachePermissionError);
+    expect((error as Error).message).toContain("unsafe permissions");
+    expect(((error as Error).cause as NodeJS.ErrnoException).code).toBe("EIO");
+  });
+
+  function renumberOnPromote(replacement?: Buffer) {
+    fsOpenHoisted.renameInterceptor = async (from, to, actualRename) => {
+      await actualRename(from, to);
+      if (!from.endsWith(".part")) return;
+      // Rewrite the promoted entry as a fresh inode, the way some FUSE and
+      // network filesystems report a new inode number after rename.
+      const bytes = replacement ?? readFileSync(to);
+      const fresh = `${to}.renumbered`;
+      writeFileSync(fresh, bytes, { mode: 0o660 });
+      renameSync(fresh, to);
+    };
+  }
+
+  it("accepts a promoted archive whose inode changed when its bytes still match the signed digest (NODE-AM)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-renumbered-"));
+    temporaryDirectories.push(directory);
+    renumberOnPromote();
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    const result = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl,
+    });
+
+    expect(readFileSync(result.archivePath)).toEqual(ARCHIVE_BYTES);
+  });
+
+  it("still rejects a promoted archive whose bytes changed under a new inode (NODE-AM)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-renumbered-tampered-"));
+    temporaryDirectories.push(directory);
+    const tampered = Buffer.alloc(ARCHIVE_BYTES.length, 0x41);
+    renumberOnPromote(tampered);
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+      }),
+    ).rejects.toThrow("OCR runtime partial archive changed while it was being promoted");
   });
 });
