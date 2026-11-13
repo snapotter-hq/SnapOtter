@@ -11083,7 +11083,7 @@ paths:
       operationId: videoMetadata
       tags: [Video]
       summary: Clean Video Metadata
-      description: Strip metadata from a video and report what was found.
+      description: Strip metadata from a video and report what was found. The `metadata.removed` array lists the names of the format tags that were removed (values are not returned). An empty array means no tags were removed.
       security:
         - bearerAuth: []
       requestBody:
