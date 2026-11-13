@@ -528,7 +528,6 @@ describe("connectivityClass", () => {
   it.each([
     "Connection terminated unexpectedly",
     "Connection terminated due to connection timeout",
-    "timeout exceeded when trying to connect",
   ])("classifies pg's codeless %s under a drizzle wrapper as pg-unavailable (#4653)", (msg) => {
     const wrapped = Object.assign(new Error("Failed query: select 1\nparams: "), {
       cause: new Error(msg),
@@ -538,6 +537,8 @@ describe("connectivityClass", () => {
   });
   it("leaves lookalike connection messages and our own pool shutdown unclassified (#4653)", () => {
     expect(connectivityClass(new Error("Connection terminated"))).toBeNull();
+    // pg-pool says this on pool exhaustion too, with the server healthy.
+    expect(connectivityClass(new Error("timeout exceeded when trying to connect"))).toBeNull();
     expect(
       connectivityClass(new Error("Connection terminated unexpectedly while parsing")),
     ).toBeNull();

@@ -327,6 +327,12 @@ describe("redactMessage drizzle query params (#4653)", () => {
     expect(redactMessage(flat)).toBe("Failed query: select 1");
   });
 
+  it("drops the params tail when a wrapper embeds the drizzle message", () => {
+    expect(redactMessage(`Export failed: Failed query: select 1\nparams: ${sessionId}`)).toBe(
+      "Export failed: Failed query: select 1",
+    );
+  });
+
   it("leaves a message that only mentions params alone", () => {
     expect(redactMessage("invalid params: width")).toBe("invalid params: width");
   });

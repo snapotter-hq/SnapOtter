@@ -22,13 +22,14 @@ interface ErrLike {
 const NODE_CODE = /^E[A-Z0-9_]+$/;
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 const PG_CONNECTIVITY = /^(08|57P0[123])/;
-// pg and pg-pool raise these with no code when the server goes away or never
-// answers (pg lib/client.js, pg-pool index.js). Exact matches only. A bare
-// "Connection terminated" is left out: pg says that when we end the pool.
+// pg and pg-pool raise these with no code when the server drops or never
+// answers the connection (pg lib/client.js, pg-pool index.js). Exact matches
+// only. Left out: a bare "Connection terminated" (pg says that when we end the
+// pool) and "timeout exceeded when trying to connect" (pool exhaustion from a
+// leaked client raises it against a healthy server).
 const PG_CONNECTION_LOSS_MESSAGES = new Set([
   "Connection terminated unexpectedly",
   "Connection terminated due to connection timeout",
-  "timeout exceeded when trying to connect",
 ]);
 const PG_ROUTINE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const REPLY_TOKEN = /^[A-Z][A-Z0-9_]{1,19}$/;
