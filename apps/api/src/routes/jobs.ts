@@ -89,7 +89,15 @@ export function registerJobRoutes(app: FastifyInstance): void {
 
   app.post(
     "/api/v1/jobs/:jobId/cancel",
-    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    {
+      config: { rateLimit: { max: 300, timeWindow: "1 minute" } },
+      // The route takes no body; refuse anonymous requests before Fastify
+      // buffers one up to the upload-sized bodyLimit (#4632). Runs after
+      // the instance-level auth hook, so request.user is already set.
+      preParsing: async (request, reply) => {
+        if (!requireAuth(request, reply)) return reply;
+      },
+    },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
       if (!user) return;

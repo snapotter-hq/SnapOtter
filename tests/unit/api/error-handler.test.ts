@@ -344,7 +344,9 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
   async function scimAppThrowing(makeError: () => Error) {
     const app = Fastify({ logger: false });
     registerErrorHandler(app);
-    app.addHook("preHandler", async () => {
+    // preParsing, not preHandler: the SCIM token check runs in preParsing
+    // (#4632), and the fault has to fire before it answers 401.
+    app.addHook("preParsing", async () => {
       throw makeError();
     });
     await registerScimRoutes(app);
