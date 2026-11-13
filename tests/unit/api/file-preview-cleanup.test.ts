@@ -1001,6 +1001,50 @@ describe("preview encodes on a full disk (#4148)", () => {
     }
   });
 
+  it("answers GET preview for an office document with 503 storage-not-writable when LibreOffice can't create its output, and reports it (#4529)", async () => {
+    previewMocks.convertDocument.mockRejectedValue(
+      Object.assign(new Error("LibreOffice produced no pdf output for input.docx"), {
+        code: "EACCES",
+        syscall: "open",
+        path: "/data/files/.previews/doc-1-x",
+      }),
+    );
+    const app = await routeApp();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toEqual({
+        error: NOT_WRITABLE_MSG,
+        code: "storage-not-writable",
+        requestId: expect.any(String),
+      });
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+      const [reported, ctx] = previewMocks.reportError.mock.calls[0];
+      expect(ctx).toMatchObject({ source: "http", statusCode: 503 });
+      expect(classifyError(reported, ctx.source)).toBe("operational");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps a LibreOffice spawn EACCES a reported 500, not a storage fault", async () => {
+    previewMocks.convertDocument.mockRejectedValue(
+      Object.assign(new Error("spawn /usr/bin/soffice EACCES"), {
+        code: "EACCES",
+        syscall: "spawn /usr/bin/soffice",
+      }),
+    );
+    const app = await routeApp();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toMatchObject({ error: "Could not generate document preview" });
+    } finally {
+      await app.close();
+    }
+  });
+
   it("keeps an ordinary encode failure a 422 and an ordinary write errno a 500", async () => {
     const app = await routeApp();
     try {

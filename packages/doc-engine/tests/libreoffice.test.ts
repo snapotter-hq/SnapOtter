@@ -8,9 +8,11 @@ vi.mock("node:os", () => ({ tmpdir: () => "/tmp" }));
 
 const readdir = vi.fn<(dir: string) => Promise<string[]>>();
 const rm = vi.fn<() => Promise<void>>(async () => {});
+const statfs = vi.fn<(dir: string) => Promise<{ bavail: number; bsize: number }>>();
 vi.mock("node:fs/promises", () => ({
   readdir: (dir: string) => readdir(dir),
   rm: (...a: unknown[]) => rm(...(a as [])),
+  statfs: (dir: string) => statfs(dir),
 }));
 
 const mockSpawn = vi.mocked(spawn);
@@ -420,5 +422,78 @@ describe("convertDocument on a full disk (#4148)", () => {
     expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
     expect((err as NodeJS.ErrnoException).code).toBeUndefined();
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+});
+
+describe("convertDocument when the output can't be created (#4529)", () => {
+  // Captured from LibreOffice 26.2 on macOS: a volume with no free blocks at
+  // all and a read-only output directory both log this line, exit 0, and
+  // write nothing.
+  const ACCESS_STDERR =
+    "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///outdir/report.pdf> failed: 0x507(Error Area:Io Class:Access Code:7))\n";
+
+  async function convertWithAccessError(): Promise<unknown> {
+    nextClose({ stderr: ACCESS_STDERR, code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    return import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+  }
+
+  it("tags ENOSPC when the output volume has no free blocks", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    const err = await convertWithAccessError();
+    expect(statfs).toHaveBeenCalledWith("/outdir");
+    expect(err).toMatchObject({
+      message: "LibreOffice produced no pdf output for report.docx",
+      code: "ENOSPC",
+      syscall: "write",
+    });
+  });
+
+  it("tags ENOSPC when only a few reserved blocks are left", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 8, bsize: 4096 });
+    expect(await convertWithAccessError()).toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("tags EACCES on open when the volume has room, since the directory is not writable", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+    expect(await convertWithAccessError()).toMatchObject({
+      message: "LibreOffice produced no pdf output for report.docx",
+      code: "EACCES",
+      syscall: "open",
+      path: "/outdir",
+    });
+  });
+
+  it("tags a non-zero exit with the access error the same way", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    nextClose({ stderr: ACCESS_STDERR, code: 1 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("leaves the error untagged when the free space can't be read", async () => {
+    statfs.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const err = await convertWithAccessError();
+    expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
+  it("does not check free space for an out-of-space or unrelated store error", async () => {
+    nextClose({ stderr: "Error Area:Io Class:Space Code:9\n", code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch(() => {});
+    nextClose({ stderr: "source file could not be loaded", code: 1 });
+    await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch(() => {});
+    expect(statfs).not.toHaveBeenCalled();
   });
 });
