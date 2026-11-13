@@ -71,6 +71,9 @@ vi.mock("../../../../apps/api/src/jobs/queues.js", () => ({
 const { requestCancel, startCancelListener } = await import(
   "../../../../apps/api/src/jobs/cancel.js"
 );
+const { createRedisSubscriberConnection } = await import(
+  "../../../../apps/api/src/jobs/connection.js"
+);
 
 describe("cancel fault logging (#4177)", () => {
   beforeEach(() => {
@@ -132,5 +135,7 @@ describe("cancel fault logging (#4177)", () => {
     const events = stubs.subscriber.on.mock.calls.map(([event]) => event);
     expect(events).toContain("message");
     expect(events).not.toContain("error");
+    // The shared listener labels its lines with this name (#4552).
+    expect(createRedisSubscriberConnection).toHaveBeenCalledWith("cancel");
   });
 });
