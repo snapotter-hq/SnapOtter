@@ -26,8 +26,15 @@ const aiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@snapotter/ai", () => ({
+  isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: aiMocks.isMemoryAllocError,
   removeBackground: aiMocks.removeBackground,
+}));
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
 }));
 
 // Non-square on purpose, so a swapped width/height in a raw descriptor shows up.

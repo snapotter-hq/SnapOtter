@@ -78,6 +78,12 @@ import { registerVignette } from "../../../apps/api/src/routes/tools/vignette.js
 import { registerWatermarkText } from "../../../apps/api/src/routes/tools/watermark-text.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/feature-status.js")>()),
   // smart-crop's face mode refuses to run without the face-detection bundle.

@@ -37,9 +37,16 @@ const aiMocks = vi.hoisted(() => ({
   upscale: vi.fn(),
 }));
 
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 vi.mock("@snapotter/ai", () => ({
   colorize: aiMocks.colorize,
   enhanceFaces: aiMocks.enhanceFaces,
+  isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: aiMocks.isMemoryAllocError,
   noiseRemoval: aiMocks.noiseRemoval,
   removeBackground: aiMocks.removeBackground,
