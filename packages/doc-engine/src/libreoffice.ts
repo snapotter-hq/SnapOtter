@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { access, constants, readdir, rm, statfs } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -32,15 +32,51 @@ function libreofficeSpawnFailure(
 // LibreOffice reports a store that ran out of room as an Io/Space error code
 // (ERRCODE_IO_OUTOFSPACE) on stderr, then usually exits 0 with no output.
 const OUT_OF_SPACE = /Error Area:Io Class:Space\b/;
+// When the volume has no free blocks at all, it can't even create the output
+// file and logs an Io/Access error instead, the same one a read-only output
+// directory produces (#4529).
+const ACCESS_DENIED = /Error Area:Io Class:Access\b/;
+// A volume that reads as full can still report a few blocks free, reserved
+// for root or filesystem metadata, so "full" is anything under this.
+const FULL_DISK_FREE_BYTES = 1024 * 1024;
+
+async function outputVolumeIsFull(outDir: string): Promise<boolean | undefined> {
+  try {
+    const { bavail, bsize } = await statfs(outDir);
+    return bavail * bsize < FULL_DISK_FREE_BYTES;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The errno a write into outDir is refused with, or undefined when it's writable. */
+async function outputDirWriteRefusal(outDir: string): Promise<string | undefined> {
+  try {
+    await access(outDir, constants.W_OK);
+    return undefined;
+  } catch (e) {
+    const { code } = e as NodeJS.ErrnoException;
+    return code === "EACCES" || code === "EPERM" || code === "EROFS" ? code : undefined;
+  }
+}
 
 /**
- * Gives a failed conversion the ENOSPC a full disk means, shaped like a failed
- * write, so callers answer it as the server's storage fault rather than a
- * document LibreOffice couldn't read (#4148).
+ * Gives a failed conversion the errno its store error means, shaped like a
+ * failed write, so callers answer a full disk (#4148, #4529) or an unwritable
+ * output directory as the server's storage fault rather than a document
+ * LibreOffice couldn't read. An access error is told apart by the output
+ * volume's free space, then by whether the directory refuses writes; when
+ * neither explains it, the error stays untagged.
  */
-function failure(message: string, stderr: string): Error {
+async function failure(message: string, stderr: string, outDir: string): Promise<Error> {
   const err = new Error(message);
-  return OUT_OF_SPACE.test(stderr) ? Object.assign(err, { code: "ENOSPC", syscall: "write" }) : err;
+  if (OUT_OF_SPACE.test(stderr)) return Object.assign(err, { code: "ENOSPC", syscall: "write" });
+  if (!ACCESS_DENIED.test(stderr)) return err;
+  if (await outputVolumeIsFull(outDir)) {
+    return Object.assign(err, { code: "ENOSPC", syscall: "write" });
+  }
+  const refusal = await outputDirWriteRefusal(outDir);
+  return refusal ? Object.assign(err, { code: refusal, syscall: "open", path: outDir }) : err;
 }
 
 /**
@@ -137,14 +173,18 @@ export async function convertDocument(
           reject(libreofficeSpawnFailure(bin, code, signal, err));
           return;
         }
-        reject(failure(`LibreOffice exited ${code}: ${err.slice(-1000)}`, err));
+        void failure(`LibreOffice exited ${code}: ${err.slice(-1000)}`, err, outDir).then(reject);
       });
       opts.signal?.addEventListener("abort", onAbort, { once: true });
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);
     if (!produced)
-      throw failure(`LibreOffice produced no ${ext} output for ${basename(inputPath)}`, err);
+      throw await failure(
+        `LibreOffice produced no ${ext} output for ${basename(inputPath)}`,
+        err,
+        outDir,
+      );
     return join(outDir, produced);
   } finally {
     await rm(profileDir, { recursive: true, force: true }).catch(() => {});

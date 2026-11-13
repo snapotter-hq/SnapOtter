@@ -30,7 +30,11 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
-import { reportError, STORAGE_FULL_CODES } from "../lib/error-report.js";
+import {
+  reportError,
+  STORAGE_FULL_CODES,
+  STORAGE_NOT_WRITABLE_CODES,
+} from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
@@ -235,6 +239,17 @@ function isServerFault(err: unknown): boolean {
 function isStorageFull(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === "string" && STORAGE_FULL_CODES.has(code);
+}
+
+/**
+ * convertDocument tags an output it couldn't create on a volume with room
+ * EACCES on open: the preview directory isn't writable, answered as the 503
+ * storage-not-writable. A spawn EACCES (an unexecutable soffice) is not this
+ * and stays a server fault (#4529).
+ */
+function isUnwritableOutput(err: unknown): boolean {
+  const { code, syscall } = (err ?? {}) as NodeJS.ErrnoException;
+  return typeof code === "string" && STORAGE_NOT_WRITABLE_CODES.has(code) && syscall === "open";
 }
 
 /** Log and report a preview failure that is the server's, not the file's. */
@@ -469,7 +484,9 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch (err) {
           await cleanupTempDir();
-          if (isStorageFull(err)) throw normalizeOperationalWriteError(err);
+          if (isStorageFull(err) || isUnwritableOutput(err)) {
+            throw normalizeOperationalWriteError(err);
+          }
           if (isServerFault(err)) {
             reportPreviewFault(err, request, { fileId: id }, "Document preview could not run");
             return reply.status(500).send({ error: "Could not generate document preview" });
