@@ -323,6 +323,80 @@ exec_without_db_urls() {
   exec env -u DATABASE_URL -u DATABASE_MIGRATION_URL -u REDIS_URL -u REDISCLI_AUTH "$@"
 }
 
+# embedded_setup_db_env
+# Everything embedded mode exports before the services start: EMBEDDED_MODE,
+# the per-install secrets when they are asked for or already in use, the
+# database URLs (export_embedded_db_env) and the 1.x SQLite import path. The
+# entrypoint calls it after its root check; another init that runs the same
+# service graph can call it too. Returns 1 on a refusal, after printing why.
+#
+# Per-install passwords are generated when asked for, then used on every boot
+# while the secrets directory exists. A secret missing from it is generated
+# again, so Redis can't come up open while Postgres still demands the old
+# passwords.
+embedded_setup_db_env() {
+  EMBEDDED_MODE=1
+  export EMBEDDED_MODE
+  _esde_on="$(embedded_db_passwords_requested)" || return 1
+  if [ "$_esde_on" = 1 ] || embedded_db_secured "$EMBEDDED_DB_SECRETS_DIR"; then
+    ensure_embedded_db_secrets "$EMBEDDED_DB_SECRETS_DIR" || return 1
+  fi
+  export_embedded_db_env "$EMBEDDED_DB_SECRETS_DIR" || return 1
+  # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
+  # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
+  SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")"
+  export SQLITE_MIGRATE_PATH
+  unset _esde_on
+}
+
+# bootstrap_ai_venv <base_venv> <ai_dir> <reseed_command>
+# Seeds <ai_dir>/venv from the image's <base_venv> on first run, and again when
+# the image's stamp (<base_venv>/.venv-version, a hash of `pip freeze`) differs
+# from the copy's, so upgraded base packages take effect. Otherwise it repairs
+# the copied venv's paths. <reseed_command> does the copy (reseed-ai-venv.sh
+# in the image). Installed bundles lived in the old venv, so a reseed resets
+# installed.json; models in <ai_dir>/models survive. Needs entrypoint-lib.sh
+# sourced first (rewrite_venv_paths). Returns 1 when the reseed or the path
+# repair fails: a caller's `|| exit 1` turns off set -e inside this function.
+bootstrap_ai_venv() {
+  _bav_base="$1"
+  _bav_venv="$2/venv"
+  _bav_tmp="$2/venv.bootstrapping"
+  if [ -d "$_bav_tmp" ]; then
+    echo "Cleaning up interrupted venv bootstrap..."
+    rm -rf "$_bav_tmp"
+  fi
+  if [ ! -d "$_bav_base" ]; then
+    return 0
+  fi
+  _bav_need=false
+  if [ ! -d "$_bav_venv" ]; then
+    _bav_need=true
+    echo "First run: bootstrapping AI venv from base image..."
+  elif [ -f "$_bav_base/.venv-version" ]; then
+    _bav_image="$(cat "$_bav_base/.venv-version")"
+    _bav_current=""
+    if [ -f "$_bav_venv/.venv-version" ]; then
+      _bav_current="$(cat "$_bav_venv/.venv-version")"
+    fi
+    if [ "$_bav_current" != "$_bav_image" ]; then
+      _bav_need=true
+      echo "Base venv updated (stamp mismatch): refreshing AI venv..."
+    fi
+  fi
+  if [ "$_bav_need" = true ]; then
+    "$3" || return 1
+    if [ -f "$2/installed.json" ]; then
+      echo '{"bundles":{}}' > "$2/installed.json"
+      echo "WARNING: Installed AI feature bundles were reset after base venv upgrade. Reinstall them from the Settings page."
+    fi
+    echo "AI venv ready at $_bav_venv"
+  elif [ -d "$_bav_venv" ]; then
+    rewrite_venv_paths "$_bav_venv" "$_bav_base" "$_bav_venv" || return 1
+  fi
+  unset _bav_base _bav_venv _bav_tmp _bav_need _bav_image _bav_current
+}
+
 # wait_for_service <label> <timeout_seconds> <expect> <probe> [args...]
 # Polls <probe> once a second until it exits 0 and, when <expect> is non-empty,
 # its output contains that string. Returns 0 the moment that holds. On timeout it
