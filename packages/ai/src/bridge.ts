@@ -1424,9 +1424,13 @@ export class PythonDispatcher {
       return this.runPerRequest(scriptName, args, options, timeoutOverride);
     };
 
-    const runWithSpan = (timeoutOverride?: number): Promise<{ stdout: string; stderr: string }> => {
-      if (!span) return doRun(timeoutOverride);
-      return doRun(timeoutOverride).then(
+    // Wraps the call's final promise, so a call rejected while it waits for
+    // the venv lock ends its span too, not only one that reached the script.
+    const endSpan = (
+      call: Promise<{ stdout: string; stderr: string }>,
+    ): Promise<{ stdout: string; stderr: string }> => {
+      if (!span) return call;
+      return call.then(
         (result) => {
           span.end();
           return result;
@@ -1448,10 +1452,10 @@ export class PythonDispatcher {
     // segfaults the sidecar. In the common case the lock is free, so acquire it
     // synchronously and run inline (no microtask deferral, preserving the prior
     // call timing); only when an install holds it do we await.
-    if (!this.takesVenvLock) return runWithSpan();
+    if (!this.takesVenvLock) return endSpan(doRun());
     const release = tryAcquireVenvRead();
-    if (release) return runWithSpan().finally(release);
-    return this.waitForVenvThenRun(options, runWithSpan);
+    if (release) return endSpan(doRun().finally(release));
+    return endSpan(this.waitForVenvThenRun(options, doRun));
   }
 
   /**
@@ -1462,7 +1466,7 @@ export class PythonDispatcher {
    */
   private waitForVenvThenRun(
     options: PythonRunOptions,
-    runWithSpan: (timeoutOverride?: number) => Promise<{ stdout: string; stderr: string }>,
+    doRun: (timeoutOverride?: number) => Promise<{ stdout: string; stderr: string }>,
   ): Promise<{ stdout: string; stderr: string }> {
     if (options.signal?.aborted) return Promise.reject(pythonAbortError());
     const budget = resolvePythonTimeout(options.timeout);
@@ -1487,7 +1491,7 @@ export class PythonDispatcher {
         stopWaiting();
         const remaining =
           budget === undefined ? undefined : Math.max(1, budget - (Date.now() - waitStartedAt));
-        return runWithSpan(remaining).finally(r);
+        return doRun(remaining).finally(r);
       },
       () => {
         stopWaiting();
