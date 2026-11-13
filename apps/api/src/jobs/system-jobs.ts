@@ -308,10 +308,16 @@ const warnedForeignSchedulers = new Set<string>();
  * (or with two versions on one Redis) this worker gets ticks for a system job
  * it doesn't know. That is the deployment's state, not a bug, and failing every
  * tick floods Sentry (NODE-AX, #4655). The scheduler is left alone: in a
- * rolling update the newer instance still owns it.
+ * rolling update the newer instance still owns it, though any tick this worker
+ * picks up during the overlap is skipped rather than run.
  */
 function isForeignSchedulerTick(job: Job): boolean {
-  return typeof job.repeatJobKey === "string" && job.name.startsWith("system:");
+  return (
+    typeof job.repeatJobKey === "string" &&
+    job.name.startsWith("system:") &&
+    // A name of ours that reached the default branch is a missing case: a bug.
+    !(Object.values(SYSTEM_JOBS) as string[]).includes(job.name)
+  );
 }
 
 function skipForeignSchedulerTick(name: string): { skipped: "unknown-system-job" } {
