@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { ToolInputError } from "@snapotter/shared";
 import {
   type ProgressCallback,
   parseStdoutJson,
@@ -109,6 +110,7 @@ export async function removeBackgroundAnimated(
     const result = parseStdoutJson(stdout);
     if (!result.success) {
       if (result.error === "canceled") throw new AnimatedRemovalCanceledError();
+      if (result.code === "CANVAS_TOO_LARGE") throw new ToolInputError(String(result.error));
       throw toSidecarError(result.error, "Animated background removal failed");
     }
     const buffer = await readScratchOutput("remove-bg-anim", outputPath);

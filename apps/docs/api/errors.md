@@ -148,6 +148,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `BACKGROUND_REMOVAL_EXPIRED` | 410 | The background removal result expired before the follow-up step. | Remove the background again. |
 | `NOT_ANIMATED` | 400 | Remove GIF Background received a still image. | Use Remove Background for still images. |
 | `TOO_MANY_FRAMES` | 400 | The animation has more frames than the server allows (`GIF_BG_MAX_FRAMES`). | Send a shorter animation, or ask an administrator to raise the limit. |
+| `TOO_MANY_PIXELS` | 400 | The animation's canvas times its frame count is over 268,402,689 pixels (16383 x 16383), the most Remove GIF Background holds in memory. | Send fewer frames or a smaller animation. |
 
 ## Files {#file-codes}
 

@@ -3,6 +3,7 @@
  * uploads/<jobId>/ whenever a request is rejected before enqueueToolJob writes
  * the durable jobs row (#2599).
  */
+import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -1113,5 +1114,94 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
     );
     expect(reqRedisDb.log.error).not.toHaveBeenCalled();
     jobRows.error = null;
+  });
+});
+
+describe("remove-gif-background GIF canvas check", () => {
+  it("rejects a GIF whose logical screen is far over its frames with a 400 and discards the upload", async () => {
+    const bomb = Buffer.from(GIF);
+    bomb.writeUInt16LE(13_000, 6);
+    bomb.writeUInt16LE(13_000, 8);
+    mocks.getObjectBuffer.mockResolvedValue(bomb);
+    const req = makeRequest(validPartsFor("remove-gif-background"));
+    const reply = makeReply();
+
+    await handlers["/api/v1/tools/image/remove-gif-background"](req, reply);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: "Invalid image: GIF canvas 13000 x 13000 is over the 67,108,864 pixel limit",
+    });
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+    expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+  });
+});
+
+describe("remove-gif-background total pixel budget", () => {
+  async function animation(frameCount: number): Promise<Buffer> {
+    // Alternate colours: the encoder merges identical consecutive frames.
+    const frames = await Promise.all(
+      ["#ff0000", "#00ff00"].map((background) =>
+        sharp({ create: { width: 2, height: 2, channels: 4, background } })
+          .png()
+          .toBuffer(),
+      ),
+    );
+    return Buffer.from(
+      await sharp(
+        Array.from({ length: frameCount }, (_, i) => frames[i % 2]),
+        { join: { animated: true } },
+      )
+        .gif({ loop: 0 })
+        .toBuffer(),
+    );
+  }
+
+  async function post(gif: Buffer) {
+    mocks.getObjectBuffer.mockResolvedValue(gif);
+    const reply = makeReply();
+    await handlers["/api/v1/tools/image/remove-gif-background"](
+      makeRequest(validPartsFor("remove-gif-background")),
+      reply,
+    );
+    return reply;
+  }
+
+  it("refuses an honest animation over the budget with a 400 before enqueue", async () => {
+    // 65 frames on a 2048 x 2048 screen, which sharp honours: 272,629,760 pixels.
+    const gif = await animation(65);
+    gif.writeUInt16LE(2048, 6);
+    gif.writeUInt16LE(2048, 8);
+
+    const reply = await post(gif);
+
+    expect(reply.statusCode).toBe(400);
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+    expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+  });
+
+  it("counts the canvas Pillow builds, which sharp does not see", async () => {
+    // The last frame sits at 1500,1500, so Pillow coalesces 130 frames onto a
+    // 1502 x 1502 canvas (293,280,520 pixels) while sharp sees 2 x 2 frames.
+    const gif = await animation(130);
+    for (let i = gif.length - 10; i >= 13; i--) {
+      if (gif[i] === 0x2c && gif.readUInt16LE(i + 5) === 2 && gif.readUInt16LE(i + 7) === 2) {
+        gif.writeUInt16LE(1500, i + 1);
+        gif.writeUInt16LE(1500, i + 3);
+        break;
+      }
+    }
+
+    const reply = await post(gif);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error:
+        "Animation is 293,280,520 pixels across 130 frames, over the 268,402,689 pixel limit. Use fewer frames or a smaller size.",
+      code: "TOO_MANY_PIXELS",
+    });
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
   });
 });
