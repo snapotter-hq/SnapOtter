@@ -2729,6 +2729,29 @@ describe("worker failure reports carry the job age (#1414)", () => {
 
       expect(failSingleJobGuarded).not.toHaveBeenCalled();
     });
+
+    it("does not overwrite a canceled run's failed event with the stall message (#4622)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const { UnrecoverableError } = await import("bullmq");
+      const job = {
+        id: "job-c1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-c1",
+          clientJobId: "client-c1",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, new UnrecoverableError("Canceled"));
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
   });
 
   describe("GDPR export failure handling on the system pool (#1495)", () => {

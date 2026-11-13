@@ -93,6 +93,14 @@ function isSingleToolJob(data: ToolJobData): boolean {
   return data.kind === "tool" || data.kind === "ai-tool";
 }
 
+// A user cancel ends the run as UnrecoverableError("Canceled") and its own
+// terminal write (or requestCancel's repair path) owns the outcome. The stall
+// net must not replace it, even when the durable alias write faulted and the
+// alias row is still unsettled (#4622).
+function isUserCancelFailure(err: Error): boolean {
+  return err.name === "UnrecoverableError" && err.message === "Canceled";
+}
+
 // BullMQ emits "failed" for every failed attempt, including ones it will retry.
 // Mirrors the gdpr-export listener's finality check.
 function isFinalAttempt(job: Job<ToolJobData>): boolean {
@@ -315,7 +323,7 @@ export function startWorkers(): void {
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
       }
-      if (data && isSingleToolJob(data) && isFinalAttempt(job)) {
+      if (data && isSingleToolJob(data) && isFinalAttempt(job) && !isUserCancelFailure(err)) {
         settleInterruptedSingleJob(data);
       }
       reportToolJobFailure(job, failedErr, pool);
