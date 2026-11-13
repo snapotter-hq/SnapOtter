@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import {
+  animationFramePixels,
+  gifBgWorkloadRejection,
   gifCanvasRejection,
+  MAX_GIF_BG_TOTAL_PIXELS,
   MAX_GIF_CANVAS_PIXELS,
   readGifCanvasSize,
 } from "../../../apps/api/src/lib/gif-limits.js";
@@ -154,5 +157,45 @@ describe("validateImageBuffer GIF canvas checks", () => {
       valid: false,
       reason: "Image exceeds maximum size: 2.3MP (limit: 2MP)",
     });
+  });
+});
+
+describe("gifBgWorkloadRejection", () => {
+  it("is 16383 squared, sharp's default input pixel limit", () => {
+    expect(MAX_GIF_BG_TOTAL_PIXELS).toBe(268_402_689);
+  });
+
+  it("allows a workload exactly at the budget and refuses one pixel more", () => {
+    expect(gifBgWorkloadRejection(16_383, 16_383)).toBeNull();
+    expect(gifBgWorkloadRejection(16_383 * 16_383 + 1, 1)).toMatch(/pixel limit/);
+  });
+
+  it("allows 720p at 150 frames and 1080p at 129", () => {
+    expect(gifBgWorkloadRejection(1280 * 720, 150)).toBeNull();
+    expect(gifBgWorkloadRejection(1920 * 1080, 129)).toBeNull();
+  });
+
+  it("refuses 1080p at 130 frames", () => {
+    expect(gifBgWorkloadRejection(1920 * 1080, 130)).toMatch(/over the 268,402,689 pixel limit/);
+  });
+
+  it("refuses an 8000 x 8000 animation of 150 frames", () => {
+    expect(gifBgWorkloadRejection(8000 * 8000, 150)).toBe(
+      "Animation is 9,600,000,000 pixels across 150 frames, over the 268,402,689 pixel limit. Use fewer frames or a smaller size.",
+    );
+  });
+
+  it("counts a still as one frame", () => {
+    expect(gifBgWorkloadRejection(8192 * 8192, 0)).toBeNull();
+  });
+});
+
+describe("animationFramePixels", () => {
+  it("uses the GIF canvas when it is larger than what sharp decodes", async () => {
+    expect(animationFramePixels(withScreen(await tinyGif(), 300, 200), 2, 2)).toBe(60_000);
+  });
+
+  it("uses the decoded size for a non-GIF", () => {
+    expect(animationFramePixels(Buffer.from("RIFF0000WEBP"), 640, 480)).toBe(307_200);
   });
 });

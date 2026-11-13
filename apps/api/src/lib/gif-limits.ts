@@ -93,6 +93,34 @@ export function gifCanvasRejection(
   return null;
 }
 
+/**
+ * Pixels the animated background-removal sidecar may hold across all frames.
+ * It keeps every coalesced input frame and every output frame as RGBA, so this
+ * is 1,024 MiB of input frames and about 2 GiB with the outputs. 16383 squared
+ * is also sharp's default limitInputPixels, which detectAnimation already hits
+ * for the frames sharp sees; this applies it to the canvas Pillow builds.
+ * gif_remove_bg.py mirrors the number; keep the two in sync.
+ */
+export const MAX_GIF_BG_TOTAL_PIXELS = MAX_RESIZE_OUTPUT_DIMENSION ** 2;
+
+/**
+ * Why an animation is too big for background removal, or null. framePixels is
+ * the canvas each frame is coalesced onto (readGifCanvasSize for a GIF).
+ */
+export function gifBgWorkloadRejection(framePixels: number, frames: number): string | null {
+  const totalPixels = framePixels * Math.max(1, frames);
+  if (!Number.isSafeInteger(totalPixels) || totalPixels > MAX_GIF_BG_TOTAL_PIXELS) {
+    return `Animation is ${totalPixels.toLocaleString("en-US")} pixels across ${frames} frames, over the ${MAX_GIF_BG_TOTAL_PIXELS.toLocaleString("en-US")} pixel limit. Use fewer frames or a smaller size.`;
+  }
+  return null;
+}
+
+/** Pixels per coalesced frame: the larger of what sharp decodes and the GIF canvas. */
+export function animationFramePixels(buffer: Buffer, width: number, height: number): number {
+  const canvas = readGifCanvasSize(buffer);
+  return Math.max(width * height, canvas ? canvas.width * canvas.height : 0);
+}
+
 export interface GifMetadataLike {
   width?: number;
   height?: number;

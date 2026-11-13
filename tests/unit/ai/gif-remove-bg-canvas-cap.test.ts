@@ -38,8 +38,9 @@ const MAKE_GIFS = `
 import os, tempfile
 from PIL import Image
 
-def make_gif(path, screen=None, last_frame_at=None):
-    frames = [Image.new("RGBA", (2, 2), c) for c in [(255, 0, 0, 255), (0, 255, 0, 255)]]
+def make_gif(path, screen=None, last_frame_at=None, count=2):
+    colors = [(255, 0, 0, 255), (0, 255, 0, 255)]
+    frames = [Image.new("RGBA", (2, 2), colors[i % 2]) for i in range(count)]
     frames[0].save(path, format="GIF", save_all=True, append_images=frames[1:], duration=100, loop=0)
     b = bytearray(open(path, "rb").read())
     if screen:
@@ -98,6 +99,61 @@ print("OK")
     expect(res.status, res.stderr).toBe(0);
     expect(res.stdout).toContain("OK");
   });
+
+  it("caps the pixels summed over frames at 16383 squared", () => {
+    const res = runPython(`${PRELUDE}
+assert g.MAX_TOTAL_PIXELS == 268_402_689
+g._check_total_pixels(268_402_689, 129)
+for total, frames in [(268_402_690, 130), (8000 * 8000 * 150, 150)]:
+    try:
+        g._check_total_pixels(total, frames)
+    except g.CanvasTooLargeError as e:
+        assert f"across {frames} frames" in str(e), str(e)
+    else:
+        raise AssertionError(f"{total} should be refused")
+print("OK")
+`);
+    expect(res.stderr).toBe("");
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("OK");
+  });
+
+  it.skipIf(!pythonWith("PIL"))(
+    "refuses an animation over the frame budget before converting any frame",
+    () => {
+      // 65 frames on a 2048 x 2048 screen is 272,629,760 pixels; converting
+      // them would hold over 1 GB of RGBA. The header and frame count refuse it.
+      const res = runPython(`${PRELUDE}${MAKE_GIFS}
+import resource
+path = os.path.join(tmp, "long.gif")
+make_gif(path, screen=(2048, 2048), count=65)
+try:
+    g._read_frames(path)
+except g.CanvasTooLargeError as e:
+    assert "across 65 frames" in str(e), str(e)
+else:
+    raise AssertionError("over-budget animation should be refused")
+rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+rss_mb = rss / (1024 * 1024) if sys.platform == "darwin" else rss / 1024
+assert rss_mb < 300, rss_mb
+
+# Canvas growth partway through is caught by the running sum: 130 frames, the
+# last placed at 1500,1500 on a 2 x 2 screen, so the up-front check passes.
+g.MAX_TOTAL_PIXELS = 2_000_000
+grow = os.path.join(tmp, "grow.gif")
+make_gif(grow, last_frame_at=(1500, 1500), count=130)
+try:
+    g._read_frames(grow)
+except g.CanvasTooLargeError as e:
+    assert "across 130 frames" in str(e), str(e)
+else:
+    raise AssertionError("running sum should refuse the grown canvas")
+print("OK")
+`);
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OK");
+    },
+  );
 
   it.skipIf(!pythonWith("PIL"))("main() reports the refusal with the CANVAS_TOO_LARGE code", () => {
     // main() imports the onnx and rembg helpers before it reads frames; stub

@@ -23,6 +23,10 @@ MAX_REMBG_PX = int(os.environ.get("MAX_REMBG_PX", "2048"))
 # at upload; this is the backstop for anything that reaches the sidecar anyway.
 MAX_CANVAS_PIXELS = 67_108_864
 MAX_CANVAS_SIDE = 16383
+# Every coalesced input frame and every output frame is kept as RGBA, so cap
+# the pixels summed over frames: 1,024 MiB of input frames, about 2 GiB with
+# outputs. Mirrors MAX_GIF_BG_TOTAL_PIXELS in apps/api/src/lib/gif-limits.ts.
+MAX_TOTAL_PIXELS = 16383 * 16383
 CANVAS_TOO_LARGE = "CANVAS_TOO_LARGE"
 _OOM_MARKERS = (
     "out of memory",
@@ -97,7 +101,7 @@ def _is_model_load_error(err):
 
 
 class CanvasTooLargeError(ValueError):
-    """The animation's canvas is over the pixel cap. The bridge maps it to a 400."""
+    """The animation is over a pixel cap. The bridge maps it to a 400."""
 
 
 def _check_canvas_size(size):
@@ -105,6 +109,14 @@ def _check_canvas_size(size):
     if w > MAX_CANVAS_SIDE or h > MAX_CANVAS_SIDE or w * h > MAX_CANVAS_PIXELS:
         raise CanvasTooLargeError(
             f"Animation canvas {w} x {h} is over the {MAX_CANVAS_PIXELS:,} pixel limit"
+        )
+
+
+def _check_total_pixels(total, frames):
+    if total > MAX_TOTAL_PIXELS:
+        raise CanvasTooLargeError(
+            f"Animation needs over {MAX_TOTAL_PIXELS:,} pixels across {frames} frames. "
+            "Use fewer frames or a smaller size."
         )
 
 
@@ -122,8 +134,14 @@ def _read_frames(path):
         loop = int(im.info.get("loop", 0) or 0)
     except (TypeError, ValueError):
         loop = 0
+    # Refuse up front from the header and frame count, then keep a running sum
+    # because seek() can still grow the canvas partway through.
+    n_frames = getattr(im, "n_frames", 1)
+    _check_canvas_size(im.size)
+    _check_total_pixels(im.size[0] * im.size[1] * n_frames, n_frames)
     frames, durations = [], []
     canvas = None
+    total_pixels = 0
     for frame in ImageSequence.Iterator(im):
         raw = frame.info.get("duration", im.info.get("duration", 100))
         try:
@@ -134,6 +152,8 @@ def _read_frames(path):
         # Checked per frame: seek() grows the canvas to fit a frame placed past
         # the logical screen, and convert() is where that canvas gets allocated.
         _check_canvas_size(frame.size)
+        total_pixels += frame.size[0] * frame.size[1]
+        _check_total_pixels(total_pixels, len(frames) + 1)
         rgba = frame.convert("RGBA")
         if canvas is None:
             canvas = rgba.copy()
