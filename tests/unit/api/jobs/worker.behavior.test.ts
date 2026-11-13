@@ -150,6 +150,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),
+    failSingleJobGuarded: vi.fn(async () => undefined),
     updateSingleFileProgressAtomically: vi.fn(
       async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
         const { db } = await import("../../../../apps/api/src/db/index.js");
@@ -2638,6 +2639,119 @@ describe("worker failure reports carry the job age (#1414)", () => {
       stalled,
       expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
     );
+  });
+
+  describe("tool jobs whose worker stopped before finishing (#4509)", () => {
+    const STALL_MESSAGE =
+      "Processing stopped unexpectedly before the job finished. Please try again.";
+    const stallError = () => new Error("job stalled more than allowable limit");
+
+    it("settles a final-attempt stall as failed with a constant message", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        processedOn: 2_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s1" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s1",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("leaves a stall that BullMQ will retry to the next attempt", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s2",
+        attemptsMade: 0,
+        opts: { attempts: 3 },
+        timestamp: 1_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s2" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("writes the terminal frame to the client channel and the row when they differ", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s3",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-s3",
+          clientJobId: "client-s3",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "client-s3",
+        message: STALL_MESSAGE,
+        expectedArtifactJobId: "job-s3",
+      });
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s3",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("does not touch pipeline steps, which report through their finalize", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s4",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: { kind: "pipeline-step", toolId: "resize", jobId: "job-s4", parentId: "flow-1" },
+      };
+
+      listenerFor(listeners, "image")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite a canceled run's failed event with the stall message (#4622)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const { UnrecoverableError } = await import("bullmq");
+      const job = {
+        id: "job-c1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-c1",
+          clientJobId: "client-c1",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, new UnrecoverableError("Canceled"));
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
   });
 
   describe("GDPR export failure handling on the system pool (#1495)", () => {

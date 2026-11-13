@@ -37,7 +37,12 @@ import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
-import { cancelSingleJobGuarded, failBatchJob, failSingleJobGuarded } from "../routes/progress.js";
+import {
+  cancelSingleJobGuarded,
+  type FailSingleJobArgs,
+  failBatchJob,
+  failSingleJobGuarded,
+} from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
 import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import { POOLS, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -79,6 +84,47 @@ const SCHEDULED_SYSTEM_JOBS: ReadonlySet<string> = new Set(
 // user-triggered batch-finalize and pipeline-finalize jobs (#4213).
 function isScheduledSystemJob(name: string | undefined): boolean {
   return name !== undefined && SCHEDULED_SYSTEM_JOBS.has(name);
+}
+
+const INTERRUPTED_JOB_MESSAGE =
+  "Processing stopped unexpectedly before the job finished. Please try again.";
+
+function isSingleToolJob(data: ToolJobData): boolean {
+  return data.kind === "tool" || data.kind === "ai-tool";
+}
+
+// A user cancel ends the run as UnrecoverableError("Canceled") and its own
+// terminal write (or requestCancel's repair path) owns the outcome. The stall
+// net must not replace it, even when the durable alias write faulted and the
+// alias row is still unsettled (#4622).
+function isUserCancelFailure(err: Error): boolean {
+  return err.name === "UnrecoverableError" && err.message === "Canceled";
+}
+
+// BullMQ emits "failed" for every failed attempt, including ones it will retry.
+// Mirrors the gdpr-export listener's finality check.
+function isFinalAttempt(job: Job<ToolJobData>): boolean {
+  return Boolean(job.finishedOn) || (job.attemptsMade ?? 1) >= (job.opts?.attempts ?? 1);
+}
+
+// A tool job whose worker died or lost its lock never reaches its own catch,
+// so nothing writes its terminal row or frame. BullMQ fails it here once the
+// stall limit or the attempts run out (#4509). The guarded write leaves a row
+// the handler already settled alone.
+function settleInterruptedSingleJob(data: ToolJobData): void {
+  const frameId = data.clientJobId ?? data.jobId;
+  const aliased = frameId !== data.jobId;
+  const settle = (args: FailSingleJobArgs) =>
+    failSingleJobGuarded(args).catch((netErr) => {
+      logger.error({ err: netErr, jobId: data.jobId }, "interrupted job safety net failed");
+      void reportError(netErr, { source: "worker", jobId: data.jobId });
+    });
+  void settle({
+    jobId: frameId,
+    message: INTERRUPTED_JOB_MESSAGE,
+    ...(aliased && { expectedArtifactJobId: data.jobId }),
+  });
+  if (aliased) void settle({ jobId: data.jobId, message: INTERRUPTED_JOB_MESSAGE });
 }
 
 export function startWorkers(): void {
@@ -276,6 +322,9 @@ export function startWorkers(): void {
             void netSettle(frameId, frameId !== data.jobId ? data.jobId : undefined);
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
+      }
+      if (data && isSingleToolJob(data) && isFinalAttempt(job) && !isUserCancelFailure(err)) {
+        settleInterruptedSingleJob(data);
       }
       reportToolJobFailure(job, failedErr, pool);
     });
