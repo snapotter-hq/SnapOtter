@@ -519,13 +519,20 @@ test("auth setup proves the web endpoint proxies to the run-owned API", () => {
   expect(preview).toContain("process.env.VITE_API_URL");
 });
 
-test("canonical Docker commands collect the complete app and production release suites", () => {
+test("canonical external-server and production commands collect their complete suites", () => {
   const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8")) as {
     scripts: Record<string, string>;
   };
 
-  expect(packageJson.scripts["test:e2e:docker"]).toBe(
+  expect(packageJson.scripts["test:e2e:external"]).toBe(
     "playwright test --config playwright.analytics.config.ts",
+  );
+  expect(packageJson.scripts).not.toHaveProperty("test:e2e:docker");
+  expect(packageJson.scripts["test:e2e:analytics"]).toBe(
+    "playwright test --config playwright.analytics-local.config.ts",
+  );
+  expect(packageJson.scripts["test:docker"]).toBe(
+    "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
   );
   expect(packageJson.scripts["test:e2e:production"]).toBe(
     "playwright test --config tests/qa/playwright.qa.config.ts",
