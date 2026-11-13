@@ -5,9 +5,12 @@
 // Unlike the Playwright e2e-docker specs (which talk to an already-running
 // container), these drive `docker run`/`stop` directly to exercise the container
 // lifecycle: bare-run boot, restart persistence, clean shutdown, the non-root and
-// partial-config fail-fast guards, and the 1.x SQLite auto-detect upgrade.
+// partial-config fail-fast guards, the 1.x SQLite auto-detect upgrade, and a
+// read-only root with tmpfs on /run and /tmp.
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const IMAGE = process.env.SNAPOTTER_IMAGE || "snapotter:embed-wip";
 const RUN_ID =
@@ -169,6 +172,35 @@ async function waitExited(timeoutMs) {
 }
 
 const countMatches = (haystack, re) => (haystack.match(re) || []).length;
+
+const SAMPLE_PNG = fileURLToPath(new URL("../fixtures/image/formats/sample.png", import.meta.url));
+
+// Resizes the sample PNG and returns the size of the file the API hands back,
+// or 0. A 202 streams progress until the job's terminal frame, which carries
+// the download URL, then the stream closes.
+async function resizedBytes() {
+  const form = new FormData();
+  form.append("file", new Blob([readFileSync(SAMPLE_PNG)], { type: "image/png" }), "sample.png");
+  form.append("settings", JSON.stringify({ width: 64 }));
+  const res = await fetch(`http://localhost:${PORT}/api/v1/tools/image/resize`, {
+    method: "POST",
+    body: form,
+  });
+  let result = await res.json();
+  if (res.status === 202) {
+    const stream = await fetch(`http://localhost:${PORT}/api/v1/jobs/${result.jobId}/progress`);
+    const frames = (await stream.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)));
+    result = frames.findLast((frame) => frame.phase === "complete")?.result ?? {};
+  } else if (res.status !== 200) {
+    return 0;
+  }
+  if (!result.downloadUrl) return 0;
+  const file = await fetch(`http://localhost:${PORT}${result.downloadUrl}`);
+  return file.ok ? (await file.arrayBuffer()).byteLength : 0;
+}
 
 async function main() {
   console.log(`Embedded-mode tests against ${IMAGE}`);
@@ -639,6 +671,48 @@ async function main() {
   owners === "700 root:root|600 root:root|600 root:root|600 root:root"
     ? ok("the boot took the secrets back from the app user")
     : bad(`unexpected secret owners: ${owners}`);
+  cleanup();
+
+  // 11. A read-only root with tmpfs on /run and /tmp, the usual hardening
+  //     recipe. The fresh /run hides the package's /run/postgresql, so the
+  //     bootstrap has to make it on every boot (#4504), and a restart gives
+  //     the container another fresh /run.
+  console.log("\n[11] read-only root with tmpfs on /run and /tmp");
+  cleanup();
+  createVolume();
+  runEmbeddedContainer([
+    "--read-only",
+    "--tmpfs",
+    "/run:rw,exec,size=64m",
+    "--tmpfs",
+    "/tmp:rw,exec,size=2g",
+    "-e",
+    "AUTH_ENABLED=false",
+    "-e",
+    "EMBEDDED_POSTGRES_TIMEOUT_S=60",
+  ]);
+  // The checks after the first boot need a running API, and against a stopped
+  // container they would throw instead of counting as one failure.
+  if (await waitHealthy(300000)) {
+    ok("read-only container reached healthy");
+    const bytes = await resizedBytes();
+    bytes > 0
+      ? ok(`a tool runs on the read-only root (${bytes} bytes back)`)
+      : bad("the resize on the read-only root returned no file");
+    const layer = docker(["diff", NAME]).trim();
+    layer === ""
+      ? ok("nothing was written to the read-only root")
+      : bad(`the container layer changed:\n${layer}`);
+    restartEmbeddedContainer();
+    (await waitHealthy(300000))
+      ? ok("healthy again after a restart's fresh /run")
+      : bad(`unhealthy after a restart:\n${dockerLogs(NAME).slice(-3000)}`);
+    countMatches(dockerLogs(NAME), /existing data dir OK/g) >= 1
+      ? ok("the restart kept the database")
+      : bad("the restart did not reuse the data dir");
+  } else {
+    bad(`read-only container never became healthy:\n${dockerLogs(NAME).slice(-3000)}`);
+  }
   cleanup();
 
   console.log(`\n${failures === 0 ? "ALL PASSED" : `${failures} FAILED`}`);
