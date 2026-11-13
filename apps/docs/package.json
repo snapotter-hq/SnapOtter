@@ -12,14 +12,14 @@
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "esbuild": "0.28.2",
-    "pagefind": "^1.5.2",
+    "pagefind": "^1.6.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsx": "^4.23.15",
     "vite": "6.4.5",
     "vitepress": "^1.1.4",
     "vitepress-plugin-llms": "^1.14.0",
-    "vitepress-plugin-pagefind": "^0.4.25"
+    "vitepress-plugin-pagefind": "^0.4.26"
   },
   "license": "AGPL-3.0"
 }
