@@ -32,6 +32,14 @@ describe("toolSection", () => {
     expect(bySection("files")).toContain("csv-json");
   });
 
+  it("keeps video-* and audio-* categories inside their own section", () => {
+    const strays = TOOLS.filter((t) => {
+      const prefix = t.category.split("-")[0];
+      return (prefix === "video" || prefix === "audio") && toolSection(t) !== prefix;
+    }).map((t) => `${t.id} (${t.category} in ${toolSection(t)})`);
+    expect(strays).toEqual([]);
+  });
+
   it("exposes 5 ordered sections", () => {
     expect(SECTIONS.map((s) => s.id)).toEqual(["image", "video", "audio", "pdf", "files"]);
   });

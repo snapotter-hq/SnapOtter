@@ -11,19 +11,86 @@ function decodeNumericEntities(input: string): string {
     .replace(/&#(\d+);/g, (_m, dec) => String.fromCharCode(Number.parseInt(dec, 10)));
 }
 
+// Most removal steps below are written as scanners rather than single regexes
+// on purpose. A pattern like `<x\b[^>]*>` or `<x\b[\s\S]*?<\/x>` restarts its
+// scan from every candidate opening, so input with many openings and no
+// terminator (`<set<set<set...`) costs O(n^2) or worse. Each scanner below
+// looks at every character a bounded number of times.
+
+/** Hard cap on stripUntilStable passes. Real SVGs settle in one or two. */
+const MAX_STRIP_PASSES = 5;
+
 /**
- * Apply removal regexes repeatedly until the string stops changing, so that
+ * Apply removal steps repeatedly until the string stops changing, so that
  * nested or overlapping dangerous tags (e.g. `<scr<script>ipt>`) cannot survive
- * a single pass.
+ * a single pass. Every step only removes text, so an unchanged length means a
+ * stable string. Input that is still changing after MAX_STRIP_PASSES is
+ * rejected: each pass costs a full scan, and deep re-forming nesting is an
+ * attack shape, not a drawing.
  */
-function stripUntilStable(input: string, ...patterns: RegExp[]): string {
-  let prev: string;
+function stripUntilStable(input: string, ...steps: Array<(s: string) => string>): string {
   let out = input;
-  do {
-    prev = out;
-    for (const pattern of patterns) out = out.replace(pattern, "");
-  } while (out !== prev);
-  return out;
+  for (let pass = 0; pass < MAX_STRIP_PASSES; pass++) {
+    const before = out.length;
+    for (const step of steps) out = step(out);
+    if (out.length === before) return out;
+  }
+  throw svgLimitError("SVG nesting is too deep to sanitize");
+}
+
+/**
+ * Remove every `open ... close` span, matching the earliest close after each
+ * open, the way a global `open[\s\S]*?close` replace would. Both regexes must
+ * carry the `g` flag. Once an open has no close after it, no later open can
+ * have one either, so the scan stops there instead of retrying from each
+ * remaining open.
+ */
+function stripPaired(input: string, open: RegExp, close: RegExp): string {
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    open.lastIndex = pos;
+    const o = open.exec(input);
+    if (!o) break;
+    close.lastIndex = o.index + o[0].length;
+    const c = close.exec(input);
+    if (!c) break;
+    out += input.slice(pos, o.index);
+    pos = c.index + c[0].length;
+  }
+  return out + input.slice(pos);
+}
+
+/**
+ * Remove tags the way a global `start[^>]*>` replace would: in each run from a
+ * `<` to the next `>`, drop the text from the first `start` match through that
+ * `>`, when `when` (if given) also matches from that point. A `<` with no `>`
+ * after it can never close a tag, so the scan ends at the last `>`. Neither
+ * regex may carry the `g` or `y` flag.
+ */
+function stripTags(input: string, start: RegExp, when?: RegExp): string {
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const lt = input.indexOf("<", pos);
+    if (lt === -1) break;
+    const gt = input.indexOf(">", lt + 1);
+    if (gt === -1) break;
+    const tag = input.slice(lt, gt + 1);
+    const m = start.exec(tag);
+    out += input.slice(pos, lt);
+    out += m && (!when || when.test(tag.slice(m.index))) ? tag.slice(0, m.index) : tag;
+    pos = gt + 1;
+  }
+  return out + input.slice(pos);
+}
+
+/** Count matches of a `g` regex, stopping once the count passes `limit`. */
+function countMatches(input: string, pattern: RegExp, limit: number): number {
+  pattern.lastIndex = 0;
+  let n = 0;
+  while (n <= limit && pattern.exec(input)) n++;
+  return n;
 }
 
 /**
@@ -68,14 +135,17 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
 
   // ── Pre-processing: strip CDATA sections and decode numeric entities ──
   // CDATA sections can hide script content from regex-based checks.
-  svg = svg.replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "");
+  svg = stripPaired(svg, /<!\[CDATA\[/gi, /\]\]>/g);
 
-  const elementCount = (svg.match(/<[a-zA-Z][^>]*\/?>/g) || []).length;
-  if (elementCount > MAX_SVG_ELEMENTS) {
-    throw svgLimitError(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
-  }
   // Decode numeric entities so obfuscated URIs (e.g. &#106;avascript:) are visible.
   svg = decodeNumericEntities(svg);
+
+  // Count tag openings after decoding, since `&#60;` decodes to a real `<`.
+  // An opening counts whether or not a `>` ever closes it: unterminated
+  // openings are exactly what makes the later passes expensive.
+  if (countMatches(svg, /<[A-Za-z_]/g, MAX_SVG_ELEMENTS) > MAX_SVG_ELEMENTS) {
+    throw svgLimitError(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
+  }
 
   // ── Pre-processing: normalize whitespace/null bytes inside href values ──
   // Catches obfuscated schemes like "java\nscript:", "java\x00script:", "java\tscript:"
@@ -90,11 +160,18 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // and external-id patterns skip over quoted strings so a '>' or ']' inside
   // a quoted entity value (e.g. `<!ENTITY z "]">`) cannot end the match early
   // and leave the rest of the DOCTYPE, entity declarations included, behind.
-  svg = svg.replace(DOCTYPE_PATTERN, "");
+  // A document has at most one DOCTYPE. Refusing more keeps the regex to a
+  // single start (many unterminated `<!DOCTYPE` would each rescan the rest of
+  // the input), and repeating until stable stops a DOCTYPE that only forms once
+  // an inner one is removed (`<!DOC<!DOCTYPE x>TYPE ...>`).
+  if (countMatches(svg, /<!DOCTYPE\b/gi, 1) > 1) {
+    throw svgLimitError("SVG contains more than one DOCTYPE");
+  }
+  svg = stripUntilStable(svg, (s) => s.replace(DOCTYPE_PATTERN, ""));
   // Remove XML processing instructions except <?xml version...?>
   svg = svg.replace(/<\?(?!xml\s)[^?]*\?>/gi, "");
   // Remove XInclude elements and namespace declarations
-  svg = stripUntilStable(svg, /<[^>]*\bxi:include\b[^>]*\/?>/gi);
+  svg = stripUntilStable(svg, (s) => stripTags(s, /</, /\bxi:include\b/i));
   svg = svg.replace(/xmlns:xi\s*=\s*["'][^"']*["']/gi, "");
 
   // ── Strip dangerous elements ──
@@ -124,11 +201,14 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
     "handler",
     "mpath",
   ]) {
+    const open = new RegExp(`<${NS}${tag}\\b`, "gi");
+    const openTag = new RegExp(`<${NS}${tag}\\b`, "i");
+    const close = new RegExp(`<\\/${NS}${tag}\\s*>`, "gi");
     svg = stripUntilStable(
       svg,
-      new RegExp(`<${NS}${tag}\\b[\\s\\S]*?<\\/${NS}${tag}\\s*>`, "gi"),
-      new RegExp(`<${NS}${tag}\\b[^>]*>`, "gi"),
-      new RegExp(`<\\/${NS}${tag}\\s*>`, "gi"),
+      (s) => stripPaired(s, open, close),
+      (s) => stripTags(s, openTag),
+      (s) => s.replace(close, ""),
     );
   }
 
@@ -138,14 +218,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   svg = svg.replace(/\bon\w+\s*=\s*\S+/gi, 'data-removed=""');
 
   // ── Block <use> with external href (before generic href blocking) ──
-  svg = svg.replace(/<use\b[^>]*href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
-  svg = svg.replace(/<use\b[^>]*xlink:href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
+  // `href` also matches the tail of `xlink:href`.
+  svg = stripTags(svg, /<use\b/i, /href\s*=\s*["']https?:\/\//i);
 
   // ── Block <feImage> with external href (SSRF via SVG filter) ──
-  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
-  svg = svg.replace(/<feImage\b[^>]*xlink:href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?>/gi, "");
-  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']file:[^"']*["'][^>]*\/?>/gi, "");
-  svg = svg.replace(/<feImage\b[^>]*href\s*=\s*["']data:[^"']*["'][^>]*\/?>/gi, "");
+  svg = stripTags(svg, /<feImage\b/i, /href\s*=\s*["'](?:https?:\/\/|file:|data:)/i);
 
   // ── Block dangerous URI schemes in href / xlink:href ──
   // One pass covers javascript:, data:, file:, and http(s): on both `href` and

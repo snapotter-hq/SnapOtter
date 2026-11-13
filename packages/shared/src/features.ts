@@ -103,7 +103,7 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "ocr",
     name: "OCR",
     description: "Extract text from images and PDFs",
-    estimatedSize: "208-234 MiB",
+    estimatedSize: "215-241 MiB",
     enablesTools: ["ocr", "ocr-pdf"],
     smokeImports: ["rapidocr", "onnxruntime"],
   },
@@ -130,6 +130,10 @@ export const TOOL_OPTIONAL_BUNDLE_MAP: Readonly<Record<string, string>> = {
   // required primary. `getRequiredBundlesForTool("erase-object")` is unchanged;
   // HQ availability is a separate, explicit `inpaint-hq` install check.
   "erase-object": "inpaint-hq",
+  // Only mode "face" runs face detection. Subject and trim are pure Sharp, so
+  // the tool is available without the bundle and face mode checks it per
+  // request (see smart-crop.ts).
+  "smart-crop": "face-detection",
 };
 
 export const TOOL_BUNDLE_MAP: Record<string, string> = {};

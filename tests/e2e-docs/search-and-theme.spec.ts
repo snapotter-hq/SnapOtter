@@ -58,9 +58,8 @@ test.describe("Theme Toggle", () => {
 });
 
 test.describe("GitHub Stars Component", () => {
-  // The custom nav cluster (toggle + Fund + GitHub Star) only renders at
-  // >=1440px, where it fits without overflowing the nav. Below that the nav
-  // defers to VitePress's native responsive layout, so pin a wide desktop here.
+  // The Star button renders from 960px and the rest of the custom cluster
+  // (toggle + Fund) from 1440px. Pin a wide desktop so all of it is present.
   test.use({ viewport: { width: 1500, height: 900 } });
 
   test("GitHub star button is visible in navbar", async ({ page }) => {
@@ -75,6 +74,47 @@ test.describe("GitHub Stars Component", () => {
     await expect(starLink).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
     await expect(starLink).toHaveAttribute("target", "_blank");
   });
+});
+
+test.describe("GitHub Star button fit", () => {
+  test("shows on a laptop-width English nav in place of the plain GitHub icon", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/guide/getting-started");
+    await waitForHydration(page);
+    await expect(page.locator(".github-btn-label")).toBeVisible();
+    await expect(
+      page.locator('.VPNavBarSocialLinks a[href="https://github.com/snapotter-hq/snapotter"]'),
+    ).toBeHidden();
+  });
+
+  // Localized navs are fuller than English. The button must shrink or hide
+  // rather than push the nav past the viewport, where the fixed nav clips it.
+  // Spanish at 1440px clipped before the fit logic existed.
+  for (const width of [1100, 1280, 1440]) {
+    test(`never clips the Spanish nav at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/es/guide/getting-started");
+      await waitForHydration(page);
+      await expect(page.locator("html")).toHaveAttribute("data-star-fit", /\S/);
+      const fit = await page.locator("html").getAttribute("data-star-fit");
+      // A visible button must leave the nav fitting. Once it hides, any clipping
+      // left is the stock nav's own (#4522), which font metrics move around.
+      if (fit !== "hidden") {
+        const right = await page
+          .locator(".VPNavBar .content-body")
+          .evaluate((el) => el.getBoundingClientRect().right);
+        expect(right).toBeLessThanOrEqual(width);
+      }
+      // VitePress shows its social icons inline only from 1280px.
+      if (width >= 1280 && fit === "hidden") {
+        await expect(
+          page.locator('.VPNavBarSocialLinks a[href="https://github.com/snapotter-hq/snapotter"]'),
+        ).toBeVisible();
+      }
+    });
+  }
 });
 
 // Regression guard for the nav overflow reported in #556. The custom nav cluster

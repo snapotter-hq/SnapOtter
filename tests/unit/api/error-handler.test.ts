@@ -58,6 +58,7 @@ describe("registerErrorHandler", () => {
     expect(JSON.parse(res.body)).toEqual({
       error: "Workspace storage limit reached",
       code: "workspace-cap",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -68,7 +69,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(503);
-    expect(JSON.parse(res.body)).toEqual({ error: "Insufficient disk space for processing" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Insufficient disk space for processing",
+      code: "SERVICE_UNAVAILABLE",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -80,7 +85,11 @@ describe("registerErrorHandler", () => {
     );
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body)).toEqual({ error: "Internal server error" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -94,6 +103,7 @@ describe("registerErrorHandler", () => {
       error: "Unsupported input",
       details: "Unsupported input",
       code: "unsupported",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -102,7 +112,11 @@ describe("registerErrorHandler", () => {
     const app = await appThrowing(() => new Error("ENOENT: /srv/data/secret.bin"));
     const res = await app.inject({ method: "GET", url: "/boom" });
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body)).toEqual({ error: "Internal server error" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -115,6 +129,8 @@ describe("registerErrorHandler", () => {
     expect(JSON.parse(res.body)).toEqual({
       error: "Malformed JSON in request body",
       details: "Malformed JSON in request body",
+      code: "BAD_REQUEST",
+      requestId: expect.any(String),
     });
     await app.close();
   });
@@ -136,6 +152,7 @@ describe("a storage fault reaching the handler", () => {
     expect(JSON.parse(res.body)).toEqual({
       error: "The server's storage is full.",
       code: "storage-full",
+      requestId: expect.any(String),
     });
     expect(reportError).toHaveBeenCalledTimes(1);
     expect(reportError).toHaveBeenCalledWith(
@@ -175,7 +192,11 @@ describe("an over-limit multipart file reaching the handler", () => {
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 5 MB upload limit" });
+    expect(JSON.parse(res.body)).toEqual({
+      error: "File exceeds the 5 MB upload limit",
+      code: "PAYLOAD_TOO_LARGE",
+      requestId: expect.any(String),
+    });
     expect(reportError).not.toHaveBeenCalled();
     await app.close();
   });
@@ -199,7 +220,12 @@ describe("an over-limit multipart file reaching the handler", () => {
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toEqual({ error: message, details: message });
+    expect(JSON.parse(res.body)).toEqual({
+      error: message,
+      details: message,
+      code: "PAYLOAD_TOO_LARGE",
+      requestId: expect.any(String),
+    });
     await app.close();
   });
 
@@ -260,7 +286,11 @@ describe("an over-limit multipart file reaching the handler", () => {
       }, 4096);
 
       expect(res.statusCode).toBe(413);
-      expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 1 KB upload limit" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "File exceeds the 1 KB upload limit",
+        code: "PAYLOAD_TOO_LARGE",
+        requestId: expect.any(String),
+      });
       expect(reportError).not.toHaveBeenCalled();
     });
 
@@ -273,7 +303,11 @@ describe("an over-limit multipart file reaching the handler", () => {
       );
 
       expect(res.statusCode).toBe(413);
-      expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 10 MB upload limit" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "File exceeds the 10 MB upload limit",
+        code: "PAYLOAD_TOO_LARGE",
+        requestId: expect.any(String),
+      });
     });
 
     it("names no number for request.file() on an unlimited instance", async () => {
@@ -289,7 +323,11 @@ describe("an over-limit multipart file reaching the handler", () => {
         });
 
         expect(res.statusCode).toBe(413);
-        expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the upload limit" });
+        expect(JSON.parse(res.body)).toEqual({
+          error: "File exceeds the upload limit",
+          code: "PAYLOAD_TOO_LARGE",
+          requestId: expect.any(String),
+        });
       } finally {
         env.MAX_UPLOAD_SIZE_MB = configured;
       }
@@ -306,7 +344,9 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
   async function scimAppThrowing(makeError: () => Error) {
     const app = Fastify({ logger: false });
     registerErrorHandler(app);
-    app.addHook("preHandler", async () => {
+    // preParsing, not preHandler: the SCIM token check runs in preParsing
+    // (#4632), and the fault has to fire before it answers 401.
+    app.addHook("preParsing", async () => {
       throw makeError();
     });
     await registerScimRoutes(app);
@@ -402,7 +442,11 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       const res = await app.inject({ method: "POST", url: "/api/v1/enterprise/scim/token" });
 
       expect(res.statusCode).toBe(500);
-      expect(JSON.parse(res.body)).toEqual({ error: "Internal server error" });
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Internal server error",
+        code: "INTERNAL_ERROR",
+        requestId: expect.any(String),
+      });
       expect(reportError).toHaveBeenCalledTimes(1);
     } finally {
       await app.close();

@@ -6,7 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
@@ -426,11 +426,7 @@ export function ImageToPdfSettings() {
       const teardownError = runEndWrites([
         () => {
           if (!storeReset) {
-            setError(
-              err instanceof Error
-                ? err.message
-                : t.toolSettings["image-to-pdf"].networkErrorCreation,
-            );
+            setError(userErrorMessage(t, err, t.toolSettings["image-to-pdf"].networkErrorCreation));
           }
         },
         cleanup,
@@ -485,7 +481,7 @@ export function ImageToPdfSettings() {
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
           <option value="A4">A4</option>
-          <option value="Letter">Letter</option>
+          <option value="Letter">{ts.pageSizeLetter}</option>
           <option value="A3">A3</option>
           <option value="A5">A5</option>
         </select>

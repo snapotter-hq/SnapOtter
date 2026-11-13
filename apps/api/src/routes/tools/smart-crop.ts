@@ -8,6 +8,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { isFeatureInstalled } from "../../lib/feature-status.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -150,11 +151,19 @@ async function processSubject(
   return sharp(inputBuffer).resize(w, h, { fit: "cover", position: strategy }).png().toBuffer();
 }
 
+const FACE_BUNDLE_ID = "face-detection";
+
 async function processFace(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
   signal?: AbortSignal,
 ): Promise<Buffer> {
+  // The route answers 501 first; batch and pipeline runs reach this directly.
+  if (!isFeatureInstalled(FACE_BUNDLE_ID)) {
+    throw new ToolInputError(
+      "Face mode needs the Face Detection feature bundle. Install it, or use another mode.",
+    );
+  }
   const result = await detectFaces(inputBuffer, {
     sensitivity: settings.sensitivity,
     toolId: "smart-crop",
@@ -263,6 +272,8 @@ export function registerSmartCrop(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "smart-crop",
     settingsSchema,
+    missingBundle: (s) =>
+      s.mode === "face" && !isFeatureInstalled(FACE_BUNDLE_ID) ? FACE_BUNDLE_ID : null,
     process: withImageEncodeContext<z.output<typeof settingsSchema>>(
       "Smart crop failed",
       (s) => s?.mode ?? "subject",

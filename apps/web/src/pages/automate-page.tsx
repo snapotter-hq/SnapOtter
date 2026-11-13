@@ -5,6 +5,7 @@ import {
   type TranslationKeys,
 } from "@snapotter/shared";
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -48,10 +49,11 @@ import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import { withAnalytics } from "@/lib/lazy-analytics";
+import { hasResultWarning } from "@/lib/result-notes";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { cn } from "@/lib/utils";
-import { displayStoredError, useFileStore } from "@/stores/file-store";
+import { displayStoredError, type ResultNotes, useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
 
 const MediaPlayerView = lazy(() =>
@@ -115,6 +117,25 @@ function AutomatePageUnmountReset({
       }}
       hidden
     />
+  );
+}
+
+/**
+ * The result's warning when a step scaled it down to fit or missed its size
+ * target (#4542). A multi-file run marks the thumbnail too; a single file has
+ * no strip, so this line is where it shows.
+ */
+function ResultWarning({ notes }: { notes: ResultNotes | null | undefined }) {
+  const { t } = useTranslation();
+  if (!hasResultWarning(notes)) return null;
+  return (
+    <span
+      data-testid="result-warning"
+      className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-amber-700 dark:text-amber-400"
+    >
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {notes?.targetMet === false ? t.a11y.resultMissedTarget : t.a11y.resultResizedToFit}
+    </span>
   );
 }
 
@@ -988,6 +1009,7 @@ function AutomatePageContent({
                 {processedSize != null && (
                   <div className="flex items-center justify-between px-3 py-1.5 border-t border-border text-xs text-muted-foreground">
                     <span className="truncate">{selectedFileName ?? files[0].name}</span>
+                    <ResultWarning notes={currentEntry?.resultNotes} />
                     <span>
                       {formatFileSize(originalSize ?? 0)} &rarr; {formatFileSize(processedSize)}
                     </span>
@@ -1550,8 +1572,11 @@ function AutomatePageContent({
                   {t.automate.preview}
                 </span>
                 {hasFile && hasProcessed && processedSize != null && (
-                  <span className="text-xs text-muted-foreground ms-auto">
-                    {formatFileSize(originalSize ?? 0)} &rarr; {formatFileSize(processedSize)}
+                  <span className="flex items-center gap-3 ms-auto">
+                    <ResultWarning notes={currentEntry?.resultNotes} />
+                    <span className="text-xs text-muted-foreground">
+                      {formatFileSize(originalSize ?? 0)} &rarr; {formatFileSize(processedSize)}
+                    </span>
                   </span>
                 )}
               </button>

@@ -23,7 +23,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
@@ -444,7 +444,7 @@ export function PassportPhotoSettings() {
       } catch (err) {
         if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
         setAnalyzeError(
-          err instanceof Error ? err.message : t.toolSettings["passport-photo"].faceAnalysisFailed,
+          userErrorMessage(t, err, t.toolSettings["passport-photo"].faceAnalysisFailed),
         );
       } finally {
         unsubscribeFiles();
@@ -573,7 +573,7 @@ export function PassportPhotoSettings() {
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       setGenerateError(
-        err instanceof Error ? err.message : t.toolSettings["passport-photo"].photoGenerationFailed,
+        userErrorMessage(t, err, t.toolSettings["passport-photo"].photoGenerationFailed),
       );
     } finally {
       run.end();

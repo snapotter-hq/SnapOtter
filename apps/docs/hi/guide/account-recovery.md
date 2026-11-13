@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 7a862c87bac1
+i18n_output_hash: 58b51c41137b
 i18n_hash_version: 2
 ---
 # खाता पुनर्प्राप्ति {#account-recovery}
@@ -82,8 +82,8 @@ docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
 इमेज पर Postgres कंटेनर के भीतर चलता है:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 मल्टी-कंटेनर सेटअप पर, इसके बजाय `psql` को अपने खुद के `DATABASE_URL` की ओर इंगित करें.

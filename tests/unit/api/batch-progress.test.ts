@@ -16,6 +16,15 @@ const redisMocks = vi.hoisted(() => ({
 
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
 
+const loggerMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
 vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   sharedRedis: () => redisMocks,
 }));
@@ -67,16 +76,45 @@ describe("batch cancel flag helpers (#767, #2739)", () => {
 
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      redisMocks.exists.mockRejectedValueOnce(new Error("redis down"));
+      const err = new Error("redis down");
+      redisMocks.exists.mockRejectedValueOnce(err);
       await expect(isBatchCanceled("parent-123")).resolves.toBe(false);
-      expect(errSpy).toHaveBeenCalledWith(
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err, parentId: "parent-123" },
         "batch cancel flag read failed",
-        "parent-123",
-        expect.any(Error),
       );
+      expect(errSpy).not.toHaveBeenCalled();
     } finally {
       errSpy.mockRestore();
+      // Close the failure burst so later reads start from a healthy state.
+      await isBatchCanceled("parent-123");
     }
+  });
+
+  it("isBatchCanceled logs one line per Redis failure burst, not one per read (#4177)", async () => {
+    // Every queued child and step reads the flag, so an outage would
+    // otherwise write a line per file into the support bundle.
+    redisMocks.exists.mockRejectedValueOnce(new Error("redis down"));
+    redisMocks.exists.mockRejectedValueOnce(new Error("redis down"));
+    redisMocks.exists.mockRejectedValueOnce(new Error("redis down"));
+    await isBatchCanceled("parent-a");
+    await isBatchCanceled("parent-b");
+    await isBatchCanceled("parent-c");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+
+    // A good read ends the burst; the next failure is a new one.
+    redisMocks.exists.mockResolvedValueOnce(0);
+    await expect(isBatchCanceled("parent-a")).resolves.toBe(false);
+    const err = new Error("redis down again");
+    redisMocks.exists.mockRejectedValueOnce(err);
+    await isBatchCanceled("parent-d");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(2);
+    expect(loggerMock.warn).toHaveBeenLastCalledWith(
+      { err, parentId: "parent-d" },
+      "batch cancel flag read failed",
+    );
+
+    await isBatchCanceled("parent-a");
   });
 });
 

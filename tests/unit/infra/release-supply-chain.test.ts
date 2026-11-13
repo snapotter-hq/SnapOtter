@@ -2,9 +2,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readReleaseWorkflowWithScripts } from "../../helpers/release-workflow.js";
 
 const root = process.cwd();
-const releaseWorkflowPath = path.resolve(root, ".github/workflows/release.yml");
 const manualAttestationPath = path.resolve(root, ".github/workflows/attest.yml");
 const releaseConfigPath = path.resolve(root, ".releaserc.json");
 const versionSyncPath = path.resolve(root, "scripts/sync-version.sh");
@@ -37,7 +37,7 @@ describe("release supply-chain closure", () => {
     // starts with a stub and "Ensure exact GitHub draft" writes the real notes.
     expect(githubPlugin?.[1]?.releaseBodyTemplate).not.toContain("nextRelease.notes");
 
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const publish = job(workflow, "publish-release");
     expect(publish).toContain("needs: [release, aliases]");
     expect(publish).toContain("Verify approved release is still a draft");
@@ -62,7 +62,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("recreates and verifies the exact expected draft on a tag-only retry", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const release = job(workflow, "release", "prebuilt");
     const check = release.indexOf("- name: Check for new release");
     const materialize = release.indexOf("- name: Materialize durable release notes");
@@ -96,7 +96,7 @@ describe("release supply-chain closure", () => {
     // ran against the draft semantic-release had just created, so the release job
     // died immediately after pushing the tag. Resolve the numeric id with
     // `gh release view` (which reads drafts) and call /releases/{id} instead.
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const tagLookups = workflow
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("#"))
@@ -109,7 +109,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("keeps unverified archives private and gates the manifest on native archive security", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const prebuilt = job(workflow, "prebuilt", "archive-security");
     const archiveSecurity = job(workflow, "archive-security", "docker");
     const manifest = job(workflow, "manifest", "image-provenance");
@@ -148,7 +148,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("attests only the exact manifest digest emitted by the immutable release job", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const manifest = job(workflow, "manifest", "image-provenance");
     const provenance = job(workflow, "image-provenance", "release-subjects");
     const aliases = job(workflow, "aliases");
@@ -173,7 +173,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("cryptographically binds the generated release commit to every published subject", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const releaseSubjects = job(workflow, "release-subjects", "aliases");
     const aliases = job(workflow, "aliases");
 
@@ -209,7 +209,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("attaches the Compose files from the release commit before binding subjects", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const releaseSubjects = job(workflow, "release-subjects", "aliases");
 
     expect(releaseSubjects).toContain(
@@ -227,7 +227,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("never overwrites an existing immutable release asset", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const archiveSecurity = job(workflow, "archive-security", "docker");
     const scan = job(workflow, "scan", "sbom");
     const sbom = job(workflow, "sbom", "ai-bundles");
@@ -241,7 +241,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("uses disjoint archive and image compliance asset names", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const archiveSecurity = job(workflow, "archive-security", "docker");
     const scan = job(workflow, "scan", "sbom");
     const sbom = job(workflow, "sbom", "ai-bundles");
@@ -252,7 +252,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("does not create a fallible post-tag changelog commit", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const release = job(workflow, "release", "prebuilt");
 
     expect(release).not.toContain("- name: Update docs changelog");
@@ -261,7 +261,7 @@ describe("release supply-chain closure", () => {
   });
 
   it("pins every external action to an immutable commit", () => {
-    const workflow = readRequired(releaseWorkflowPath);
+    const workflow = readReleaseWorkflowWithScripts(root);
     const externalUses = [...workflow.matchAll(/^\s*(?:-\s*)?uses:\s*([^./\s][^\s#]*)/gm)].map(
       (match) => match[1],
     );

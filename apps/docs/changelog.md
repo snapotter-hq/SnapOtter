@@ -4,7 +4,13 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 # Changelog {#changelog}
 
-## v2.3.0
+## Unreleased {#unreleased}
+
+### Deprecated {#unreleased-deprecated}
+
+- **The five image compress-to-size operations are deprecated.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, and `-500kb` are marked deprecated in the OpenAPI spec and will stay for at least one minor release. Send `POST /api/v1/tools/image/compress` with `settings` set to `{"mode":"targetSize","targetSizeKb":20}` (or 50, 100, 200, 500). The output is the same. The PDF preset paths are unchanged.
+
+## v2.3.0 {#v2-3-0}
 
 SnapOtter just passed one million image pulls across Docker Hub and GHCR, and 3,000 stars on GitHub. That's a lot of self-hosted servers, so this release is our thank-you to everyone running them.
 
@@ -15,7 +21,7 @@ Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click c
 > [!IMPORTANT]
 > All six advisories below affect 2.2.0, and some reach back to 2.0.0. If you share an instance with other users or expose it beyond your own network, upgrade.
 
-### Security
+### Security {#v2-3-0-security}
 
 - **SVG uploads could skip sanitization (GHSA-9c7h-xjrp-8gh3, high).** An SVG that the image decoder rejected was stored and served as-is instead of being sanitized. Affected: 2.2.0 and earlier. Reported by @xaferima. (#1211)
 - **The job progress stream didn't check who was asking (GHSA-ff22-w6x2-fm98, medium).** It now requires sign-in and job ownership. Affected: 2.0.0 through 2.2.0. (#1750)
@@ -26,7 +32,7 @@ Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click c
 - **Postgres no longer runs as superuser.** The app now connects with a role that can only read and write data. Migrations use a separate, optional connection. See Upgrade Notes. (#918)
 - **Patched dependencies**: dompurify and handlebars override floors raised to the fixed versions. (#4247)
 
-### New Features
+### New Features {#v2-3-0-new-features}
 
 - **PDF Multi-Tool**: a page editor that reorders, duplicates, rotates, and deletes pages, and pulls pages in from other PDFs. The server assembles the final file. (#1338)
 - **Compress to a target size in one click**: five image presets (20, 50, 100, 200, 500 KB) and five PDF presets (100, 200, 500 KB, 1 MB, 2 MB). (#1250, #1377)
@@ -42,7 +48,7 @@ Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click c
 - **Transparent padding in the editor's Canvas Size dialog.** (#4111)
 - **Update notices for admins**: when a newer SnapOtter is out, admins see a dismissible notice with a link to the release notes. The check runs through the existing analytics connection, so it's off when analytics is off.
 
-### Improvements
+### Improvements {#v2-3-0-improvements}
 
 - **Background removal is faster on repeat runs**: the model stays loaded between requests instead of reloading every time. (#4144)
 - **Batch uploads use much less memory**: each file goes to scratch disk and is processed one at a time instead of sitting in RAM. (#2687)
@@ -58,7 +64,7 @@ Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click c
 - **Dates and plurals follow your language**, and the last hardcoded English strings are translated.
 - **Mobile and editor polish**: slider, Sign PDF, and crop layouts on phones, touch drag, faster pixel brushes, and Levels and Curves in undo and autosave.
 
-### Bug Fixes
+### Bug Fixes {#v2-3-0-bug-fixes}
 
 - **Adjust Colors combined settings wrongly**: temperature, saturation, hue, contrast, and sepia overrode each other instead of stacking. (#3153, #3120, #3469)
 - **Pixelate didn't pixelate**, and PNG output was quietly palette-reduced across image tools. (#709, #716)
@@ -78,7 +84,7 @@ Beyond the fixes, there are new tools: a PDF Multi-Tool page editor, one-click c
 - **Settings number fields couldn't be cleared** while typing. (#1449)
 - **Turning analytics off left queued events to send** about 30 seconds later. They're now dropped when you opt out. (#4270)
 
-### Upgrade Notes
+### Upgrade Notes {#v2-3-0-upgrade-notes}
 
 Migrations run on their own at startup. You don't need to run any SQL.
 
@@ -90,7 +96,7 @@ Migrations run on their own at startup. You don't need to run any SQL.
 - **New optional variables**: `BASE_PATH`, `DATABASE_MIGRATION_URL`, `GDPR_EXPORT_TIMEOUT_MS` (15 minutes by default, `0` disables), `EMBEDDED_REDIS_TIMEOUT_S` (180), and `EMBEDDED_POSTGRES_TIMEOUT_S` (600).
 - **Compose files ship with the release.** `docker-compose.yml` and `docker-compose-gpu.yml` are attached to this release, so you can download them straight from the release page.
 
-### Acknowledgements
+### Acknowledgements {#v2-3-0-acknowledgements}
 
 A million pulls means a lot of people reporting bugs, sending fixes, and telling us what was missing. This release is mostly their work.
 

@@ -451,6 +451,7 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
       expect(docFail.json()).toEqual({
         error: NOT_WRITABLE_MSG,
         code: "storage-not-writable",
+        requestId: expect.any(String),
       });
       expect(previewMocks.convertDocument).not.toHaveBeenCalled();
       expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
@@ -472,6 +473,7 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
       expect(vidFail.json()).toEqual({
         error: FULL_MSG,
         code: "storage-full",
+        requestId: expect.any(String),
       });
       expect(previewMocks.runFfmpeg).not.toHaveBeenCalled();
       expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
@@ -891,5 +893,233 @@ describe("media previews when ffmpeg is missing (#1576)", () => {
       details: ENGINE_HINT,
       code: "ENGINE_UNAVAILABLE",
     });
+  });
+});
+
+describe("preview encodes on a full disk (#4148)", () => {
+  // What runFfmpeg and convertDocument throw once their output says the disk is full.
+  const fullDisk = (code: "ENOSPC" | "EDQUOT", message: string) =>
+    Object.assign(new Error(message), { code, syscall: "write" });
+  const ffmpegFull = (code: "ENOSPC" | "EDQUOT" = "ENOSPC") =>
+    fullDisk(
+      code,
+      "ffmpeg exited 228: [out#0/mp4 @ 0x1] Error writing trailer: No space left on device",
+    );
+
+  beforeEach(async () => {
+    await writeFile(join(testDir, "stored-vid.mp4"), "mp4-bytes");
+    await writeFile(join(testDir, "stored-audio.mp3"), "mp3-bytes");
+    await writeFile(join(testDir, "stored-doc.docx"), "PK-docx");
+    fileRows.set("vid-1", {
+      id: "vid-1",
+      userId: "user-1",
+      originalName: "clip.mp4",
+      storedName: "stored-vid.mp4",
+      mimeType: "video/mp4",
+    });
+    fileRows.set("aud-1", {
+      id: "aud-1",
+      userId: "user-1",
+      originalName: "song.mp3",
+      storedName: "stored-audio.mp3",
+      mimeType: "audio/mpeg",
+    });
+    fileRows.set("doc-1", {
+      id: "doc-1",
+      userId: "user-1",
+      originalName: "report.docx",
+      storedName: "stored-doc.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+  });
+
+  async function routeApp() {
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+    const { registerErrorHandler } = await import("../../../apps/api/src/plugins/error-handler.js");
+    const app = Fastify();
+    registerErrorHandler(app);
+    await filePreviewRoutes(app);
+    await app.ready();
+    return app;
+  }
+
+  async function expectReportedStorageFull() {
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+    expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+    const [reported, ctx] = previewMocks.reportError.mock.calls[0];
+    expect(ctx).toMatchObject({ source: "http", statusCode: 503 });
+    expect(classifyError(reported, ctx.source)).toBe("operational");
+  }
+
+  it.each([
+    ["vid-1", "ENOSPC"],
+    ["aud-1", "ENOSPC"],
+    ["vid-1", "EDQUOT"],
+  ] as const)(
+    "answers GET preview for %s with 503 storage-full when ffmpeg hits %s, and reports it",
+    async (fileId, code) => {
+      previewMocks.runFfmpeg.mockImplementation(async (args: string[]) => {
+        await writeFile(args.at(-1) ?? "", "half-written");
+        throw ffmpegFull(code);
+      });
+      const app = await routeApp();
+      try {
+        const res = await app.inject({ method: "GET", url: `/api/v1/files/${fileId}/preview` });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toEqual({
+          error: FULL_MSG,
+          code: "storage-full",
+          requestId: expect.any(String),
+        });
+        await expectReportedStorageFull();
+        const { readdir } = await import("node:fs/promises");
+        expect((await readdir(previewDir)).filter((n) => n.includes(".part."))).toEqual([]);
+      } finally {
+        await app.close();
+      }
+    },
+  );
+
+  it("answers GET preview for an office document with 503 storage-full when LibreOffice runs out of space, and reports it", async () => {
+    previewMocks.convertDocument.mockRejectedValue(
+      fullDisk("ENOSPC", "LibreOffice produced no pdf output for input.docx"),
+    );
+    const app = await routeApp();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toEqual({
+        error: FULL_MSG,
+        code: "storage-full",
+        requestId: expect.any(String),
+      });
+      await expectReportedStorageFull();
+      const { readdir } = await import("node:fs/promises");
+      expect(await readdir(previewDir)).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each(["EACCES", "EPERM", "EROFS"])(
+    "answers GET preview for an office document with 503 storage-not-writable when LibreOffice can't create its output (%s), and reports it (#4529)",
+    async (code) => {
+      previewMocks.convertDocument.mockRejectedValue(
+        Object.assign(new Error("LibreOffice produced no pdf output for input.docx"), {
+          code,
+          syscall: "open",
+          path: "/data/files/.previews/doc-1-x",
+        }),
+      );
+      const app = await routeApp();
+      try {
+        const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toEqual({
+          error: NOT_WRITABLE_MSG,
+          code: "storage-not-writable",
+          requestId: expect.any(String),
+        });
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+        const [reported, ctx] = previewMocks.reportError.mock.calls[0];
+        expect(ctx).toMatchObject({ source: "http", statusCode: 503 });
+        expect(classifyError(reported, ctx.source)).toBe("operational");
+      } finally {
+        await app.close();
+      }
+    },
+  );
+
+  it("keeps a LibreOffice spawn EACCES a reported 500, not a storage fault", async () => {
+    previewMocks.convertDocument.mockRejectedValue(
+      Object.assign(new Error("spawn /usr/bin/soffice EACCES"), {
+        code: "EACCES",
+        syscall: "spawn /usr/bin/soffice",
+      }),
+    );
+    const app = await routeApp();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toMatchObject({ error: "Could not generate document preview" });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps an ordinary encode failure a 422 and an ordinary write errno a 500", async () => {
+    const app = await routeApp();
+    try {
+      previewMocks.runFfmpeg.mockRejectedValueOnce(new Error("ffmpeg exited 1: bad stream"));
+      const bad = await app.inject({ method: "GET", url: "/api/v1/files/vid-1/preview" });
+      expect(bad.statusCode).toBe(422);
+      expect(bad.json()).toMatchObject({ error: "Could not generate preview" });
+
+      previewMocks.runFfmpeg.mockRejectedValueOnce(
+        Object.assign(new Error("EMFILE: too many open files"), {
+          code: "EMFILE",
+          syscall: "spawn",
+        }),
+      );
+      const busy = await app.inject({ method: "GET", url: "/api/v1/files/vid-1/preview" });
+      expect(busy.statusCode).toBe(500);
+
+      previewMocks.convertDocument.mockRejectedValueOnce(
+        new Error("LibreOffice produced no pdf output for input.docx"),
+      );
+      const doc = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(doc.statusCode).toBe(422);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("rejects POST preview/generate with the 503 storage-full fault when ffmpeg runs out of space", async () => {
+    const { Readable } = await import("node:stream");
+    previewMocks.runFfmpeg.mockRejectedValue(ffmpegFull());
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let generateHandler: RouteHandler | undefined;
+    const fakeApp = {
+      log: loggerMock,
+      get: vi.fn(),
+      post: vi.fn((path: string, _opts: unknown, handler?: RouteHandler) => {
+        if (path === "/api/v1/preview/generate") {
+          generateHandler = (typeof _opts === "function" ? _opts : handler) as RouteHandler;
+        }
+      }),
+    };
+    await filePreviewRoutes(fakeApp as never);
+
+    const reply = {
+      raw: { destroyed: false, writableEnded: false, once: vi.fn(), off: vi.fn() },
+      status: vi.fn().mockReturnThis(),
+      header: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+    };
+    const req = {
+      raw: { destroyed: false, socket: { destroyed: false } },
+      log: loggerMock,
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename: "song.mp3",
+          file: Readable.from([Buffer.from("mp3-bytes")]),
+        };
+      },
+    };
+
+    await expect(generateHandler?.(req, reply)).rejects.toMatchObject({
+      message: FULL_MSG,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-full",
+      statusCode: 503,
+      cause: expect.objectContaining({ code: "ENOSPC" }),
+    });
+    expect(reply.status).not.toHaveBeenCalledWith(422);
   });
 });

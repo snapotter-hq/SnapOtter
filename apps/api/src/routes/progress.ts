@@ -13,9 +13,11 @@
 import { and, eq, notInArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
+import { batchAliasTarget } from "../jobs/batch-alias.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
 import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { logger } from "../lib/logger.js";
 import { hasEffectivePermission } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
 
@@ -468,12 +470,12 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
         .catch((err) => {
-          console.error("terminal replay key write failed", payload.jobId, err);
+          logger.error({ err, jobId: payload.jobId }, "terminal replay key write failed");
         })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
   void Promise.resolve(publishPromise).catch((err) => {
-    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+    if (isTerminal) logger.error({ err, jobId: payload.jobId }, "terminal progress publish failed");
   });
 }
 
@@ -875,12 +877,12 @@ export function publishEphemeral(
     ? sharedRedis()
         .setex(terminalKey(payload.jobId), TERMINAL_TTL_S, json)
         .catch((err) => {
-          console.error("terminal replay key write failed", payload.jobId, err);
+          logger.error({ err, jobId: payload.jobId }, "terminal replay key write failed");
         })
         .then(() => sharedRedis().publish(progressChannel(), json))
     : sharedRedis().publish(progressChannel(), json);
   void Promise.resolve(announce).catch((err) => {
-    if (isTerminal) console.error("terminal progress publish failed", payload.jobId, err);
+    if (isTerminal) logger.error({ err, jobId: payload.jobId }, "terminal progress publish failed");
   });
 }
 
@@ -892,14 +894,12 @@ let sseSubscriber: ReturnType<typeof createRedisSubscriberConnection> | null = n
 
 function ensureSubscriber(): void {
   if (sseSubscriber) return;
-  sseSubscriber = createRedisSubscriberConnection();
-  // ioredis auto-resubscribes after reconnects; the handler keeps connection
-  // errors observable without crashing (ioredis silentEmits, but be explicit).
-  sseSubscriber.on("error", (err) => {
-    console.error("SSE progress subscriber error", err);
-  });
+  // ioredis auto-resubscribes after reconnects. Connection errors are logged
+  // by the listener createRedisSubscriberConnection attaches; another one here
+  // would write every reconnect attempt to the log twice.
+  sseSubscriber = createRedisSubscriberConnection("sse-progress");
   void sseSubscriber.subscribe(progressChannel()).catch((err) => {
-    console.error("SSE progress subscribe failed", err);
+    logger.error({ err }, "SSE progress subscribe failed");
   });
   sseSubscriber.on("message", (_channel: string, message: string) => {
     try {
@@ -940,14 +940,30 @@ async function streamAccess(
   return "denied";
 }
 
+/** Shared by the SSE stream and GET /api/v1/jobs/:jobId so both answer the same question. */
+export async function canReadJob(
+  row: { userId: string | null; settings: unknown },
+  user: AuthUser,
+): Promise<boolean> {
+  return (await streamAccess(row, user)) === "allowed";
+}
+
 async function jobStreamAccess(
   jobId: string,
   user: AuthUser,
-): Promise<{ access: StreamAccess; hasRow: boolean }> {
+): Promise<{ access: StreamAccess; hasRow: boolean; aliasTarget?: string }> {
   const [row] = await db
-    .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
+    .select({
+      userId: schema.jobs.userId,
+      type: schema.jobs.type,
+      settings: schema.jobs.settings,
+    })
     .from(schema.jobs)
     .where(eq(schema.jobs.id, jobId));
+  const aliasTarget = row ? batchAliasTarget(row) : null;
+  if (aliasTarget && aliasTarget !== jobId) {
+    return { ...(await jobStreamAccess(aliasTarget, user)), aliasTarget };
+  }
   if (!row) {
     // files:all may watch any job, so there's no owner to wait for. Some
     // frames never get a row at all (publishEphemeral doesn't persist).
@@ -1046,9 +1062,13 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       const user = requireAuth(request, reply);
       if (!user) return;
 
-      const { jobId } = request.params;
+      const requestedJobId = request.params.jobId;
+      // The stream's id. A batch started with a clientJobId runs and
+      // publishes under a server id, so its alias row redirects the stream.
+      let jobId = requestedJobId;
 
       const initialAccess = await jobStreamAccess(jobId, user);
+      if (initialAccess.aliasTarget) jobId = initialAccess.aliasTarget;
       let access = initialAccess.access;
       let hasJobRow = initialAccess.hasRow;
       if (access === "denied") {
@@ -1196,6 +1216,28 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         }
       };
 
+      // Reads the stream's row. An alias row that only appeared after connect
+      // (the client opens the stream before its upload lands) moves the
+      // stream onto the batch it points at, replaying that batch's cache.
+      const readStreamRow = async () => {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        const target = row && jobId === requestedJobId ? batchAliasTarget(row) : null;
+        if (!target || target === jobId || ended) return row;
+        removeListener();
+        jobId = target;
+        addListener();
+        try {
+          const cached = await sharedRedis().get(terminalKey(jobId));
+          if (ended) return undefined;
+          if (cached) callback(cached);
+        } catch {
+          // Redis may be unavailable; the row read below still replays.
+        }
+        if (ended) return undefined;
+        const [targetRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        return targetRow;
+      };
+
       const scheduleRecheck = () => {
         if (
           ended ||
@@ -1222,7 +1264,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         checking = true;
         const receivedBefore = heldReceived;
         try {
-          const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+          const row = await readStreamRow();
           if (ended) return;
           if (row) {
             if (access === "missing") {
@@ -1307,10 +1349,14 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         }
       }
 
-      if (!sseListeners.has(jobId)) {
-        sseListeners.set(jobId, new Set());
+      function addListener() {
+        if (!sseListeners.has(jobId)) {
+          sseListeners.set(jobId, new Set());
+        }
+        sseListeners.get(jobId)?.add(callback);
       }
-      sseListeners.get(jobId)?.add(callback);
+
+      addListener();
 
       // Clean up on client disconnect
       request.raw.on("close", () => {
@@ -1337,7 +1383,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       // 2. Check the durable DB row for terminal state. The listener remains
       // active throughout, closing both replay/live race windows.
       try {
-        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        const row = await readStreamRow();
         if (ended) return;
         if (row) {
           // The row may have appeared since the connect-time check. Its owner

@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -143,7 +144,7 @@ export async function seamCarve(
     const processBuffer = await sharp(preResizedBuffer).jpeg({ quality: 95 }).toBuffer();
     const cairePath = await findCaire();
 
-    await writeFile(inputPath, processBuffer);
+    await writeScratchInput("seam-carve", inputPath, processBuffer);
 
     const args = ["-in", inputPath, "-out", outputPath, "-preview=false"];
 
@@ -191,7 +192,7 @@ export async function seamCarve(
       throw err;
     }
 
-    const buffer = await readFile(outputPath);
+    const buffer = await readScratchOutput("seam-carve", outputPath);
     const outMeta = await sharp(buffer).metadata();
 
     return {

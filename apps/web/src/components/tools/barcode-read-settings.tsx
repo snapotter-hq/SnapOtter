@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import {
@@ -560,7 +560,7 @@ export function BarcodeReadSettings() {
           if (activeEntryAborted || !isBatchItemPresent(i)) continue;
           const hadLandedResult = allResults.length === processedCount + 1;
           processedCount++;
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = userErrorMessage(t, err, String(err));
           errors.push(`${file.name}: ${msg}`);
           // A throw while landing comes after this file's barcodes went in.
           if (!hadLandedResult) allResults.push({ filename: file.name, barcodes: [] });

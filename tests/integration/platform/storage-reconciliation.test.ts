@@ -12,6 +12,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import { storageReconciliationJob } from "../../../apps/api/src/jobs/storage-reconciliation.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 
 beforeAll(async () => {
   await runMigrations();
@@ -100,7 +101,7 @@ describe("storageReconciliationJob (integration)", () => {
     const userId = await makeUser(1234);
     await addFile(userId, 1234);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();
@@ -123,7 +124,7 @@ describe("storageReconciliationJob (integration)", () => {
     // Orphaned file with no owner: grouped under a null userId and skipped.
     await addFile(null, 999);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await expect(storageReconciliationJob()).resolves.toBeUndefined();
@@ -145,7 +146,7 @@ describe("storageReconciliationJob (integration)", () => {
     const staleNegative = await makeUser(-500);
     const alreadyZero = await makeUser(0);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();
@@ -171,7 +172,7 @@ describe("storageReconciliationJob (integration)", () => {
     const staleNegative = await makeUser(-500);
     const alreadyZero = await makeUser(0);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();
@@ -194,7 +195,7 @@ describe("storageReconciliationJob (integration)", () => {
     const zeroed = await makeUser(0);
 
     // Should be a no-op (WHERE storageUsed != 0 excludes it); still 0 afterwards.
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();
@@ -225,7 +226,7 @@ describe("storageReconciliationJob (integration)", () => {
     const userId = await makeUser(0);
     await addFile(userId, 88);
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();
@@ -266,7 +267,7 @@ describe("storageReconciliationJob (integration)", () => {
 
     // Second run with storageUsed already at 3_000_000_000 (> 2^31 - 1) must
     // match the != guard and report 0 corrections.
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
     let logLines: string[] = [];
     try {
       await storageReconciliationJob();

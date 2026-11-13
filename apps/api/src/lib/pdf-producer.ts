@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DocsScriptOptions, pdfScrubProducerPy } from "@snapotter/doc-engine";
+import { logger } from "./logger.js";
 
 function isAbortError(err: unknown): boolean {
   if (err === "timeout") return true;
@@ -81,9 +82,7 @@ export async function scrubPdfProducerFile(
     await rm(outPath, { force: true }).catch(() => {});
     if (isAbortError(err)) throw err;
     opts?.signal?.throwIfAborted();
-    console.warn(
-      `[pdf-scrub] keeping original metadata: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    logger.warn({ err }, "[pdf-scrub] keeping original metadata");
   }
 }
 
@@ -106,9 +105,7 @@ export async function scrubPdfProducer(buffer: Buffer, opts?: DocsScriptOptions)
   } catch (err) {
     if (isAbortError(err)) throw err;
     opts?.signal?.throwIfAborted();
-    console.warn(
-      `[pdf-scrub] keeping original metadata: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    logger.warn({ err }, "[pdf-scrub] keeping original metadata");
     return buffer;
   } finally {
     if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});

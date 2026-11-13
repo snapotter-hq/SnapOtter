@@ -607,7 +607,6 @@ describe("alert evaluator behavior", () => {
 
   it("logs, reports an operational error, and skips delivery when decryptSetting returns null", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStrictMock
@@ -647,12 +646,11 @@ describe("alert evaluator behavior", () => {
       pool: "system",
       subsystem: "alert-evaluator",
     });
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(loggerMock.info).not.toHaveBeenCalled();
   });
 
   it("logs delivery failure without raw URL and does not log completion when deliverWebhook returns success: false for every destination", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStrictMock
@@ -683,12 +681,11 @@ describe("alert evaluator behavior", () => {
     );
     expect(JSON.stringify(loggerMock.error.mock.calls)).not.toContain("SECRET");
     expect(reportErrorMock).not.toHaveBeenCalled();
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(loggerMock.info).not.toHaveBeenCalled();
   });
 
   it("logs failure for a failing destination while still delivering and logging completion for healthy destinations", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStrictMock
@@ -726,12 +723,11 @@ describe("alert evaluator behavior", () => {
       { name: "Down Hook", statusCode: undefined, error: "fetch failed" },
       "alert-evaluator: webhook delivery failed",
     );
-    expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
+    expect(loggerMock.info).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
   });
 
   it("skips a destination whose authHeader fails to decrypt while still delivering to other destinations", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStrictMock
@@ -773,7 +769,7 @@ describe("alert evaluator behavior", () => {
     );
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
     expect(reportErrorMock).toHaveBeenCalledTimes(1);
-    expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
+    expect(loggerMock.info).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
   });
 
   it("delivers to every enabled alerts destination", async () => {

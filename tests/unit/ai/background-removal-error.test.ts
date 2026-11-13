@@ -8,6 +8,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // `./bridge.js` import receives these stubs.
 const runPythonWithProgress = vi.fn();
 const parseStdoutJson = vi.fn();
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>();
   return {
@@ -200,7 +206,11 @@ describe("removeBackground error surfacing", () => {
 
     expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
     expect(isSafeMessageError(primaryReadCaught)).toBe(true);
-    expect((primaryReadCaught as SafeError).message).toMatch(/ENOENT/);
+    // A missing output while tmpdir() still exists is the sidecar's bug (#4217).
+    expect((primaryReadCaught as SafeError).message).toBe(
+      "AI scratch file missing (read-output rembg_out_<id>.png, scratch dir present)",
+    );
+    expect((primaryReadCaught as SafeError).code).toBe("ENOENT:remove-bg:read-output");
     expect((primaryReadCaught as SafeError).kind).toBe("bug");
 
     runPythonWithProgress.mockReset();
@@ -219,7 +229,11 @@ describe("removeBackground error surfacing", () => {
 
     expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
     expect(isSafeMessageError(readCaught)).toBe(true);
-    expect((readCaught as SafeError).message).toMatch(/ENOENT/);
+    // A missing output while tmpdir() still exists is the sidecar's bug (#4217).
+    expect((readCaught as SafeError).message).toBe(
+      "AI scratch file missing (read-output rembg_out_<id>.png, scratch dir present)",
+    );
+    expect((readCaught as SafeError).code).toBe("ENOENT:remove-bg:read-output");
     expect((readCaught as SafeError).kind).toBe("bug");
 
     // 3. runPythonWithProgress rejects with a plain Error on the fallback attempt

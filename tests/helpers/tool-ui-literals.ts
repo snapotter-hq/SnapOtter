@@ -54,10 +54,15 @@ const MESSAGE_SINK = /^(set\w*(Error|Message)|confirm|alert)$/;
 // key or a mode, not copy; display labels in this app are capitalized.
 const IDENTIFIER_SHAPED = /^[a-z][a-zA-Z0-9]*([-_][a-zA-Z0-9]+)*$/;
 
-// Never user-copy: units, separators, symbols, hex masks, ALL-CAPS format
-// names, HTML entities, template variables, bare domains, ellipsis-only.
-const NEVER_COPY =
-  /^([%×x·.:/()\d\s-]+|px|ms|deg|kbps|Hz|auto|serif|monospace|sans-serif|#[A-Za-z0-9]+|[A-Z0-9 :\-/().]+|&[a-z]+;|\{\{[a-z]+\}\}|[a-z0-9.-]+\.(com|org|net)|\.{3}.*)$/;
+// Never user-copy: units, separators, symbols, hex masks, format-name
+// acronyms, HTML entities, template variables, bare domains, a bare ellipsis.
+// Acronyms are one 2-5 character ALL-CAPS token (PDF, JPEG, OCR, MP4) or such
+// tokens joined by "/" or "-" (JPG/PNG); a spaced or colon-suffixed ALL-CAPS
+// string is shouting copy (NOT FOUND, SAVE CHANGES:) and stays reported (#977).
+const ACRONYM = "[A-Z][A-Z0-9]{1,4}";
+const NEVER_COPY = new RegExp(
+  `^([%×x·.:/()\\d\\s-]+|px|ms|deg|kbps|Hz|auto|serif|monospace|sans-serif|#[A-Za-z0-9]+|${ACRONYM}([/-]${ACRONYM})*|&[a-z]+;|\\{\\{[a-z]+\\}\\}|[a-z0-9.-]+\\.(com|org|net)|\\.{3}|…)$`,
+);
 
 export interface LiteralHit {
   file: string;

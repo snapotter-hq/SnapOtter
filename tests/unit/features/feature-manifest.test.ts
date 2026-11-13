@@ -299,6 +299,18 @@ describe("Feature manifest: enablesTools consistency with shared features", () =
     }
   });
 
+  it("manifest name, description and estimatedSize match features.ts for each bundle (#4306)", async () => {
+    const { FEATURE_BUNDLES } = await import("@snapotter/shared");
+    for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      const shared = FEATURE_BUNDLES[id];
+      for (const field of ["name", "description", "estimatedSize"] as const) {
+        expect(bundle[field], `${id}: manifest ${field} diverges from features.ts`).toBe(
+          shared[field],
+        );
+      }
+    }
+  });
+
   it("manifest smokeImports matches features.ts for each bundle (#1237)", async () => {
     const { FEATURE_BUNDLES } = await import("@snapotter/shared");
     for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {

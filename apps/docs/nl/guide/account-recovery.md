@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: f75ca08bcb71
+i18n_source_hash: bbc369dcb8e5
 i18n_provenance: machine
-i18n_output_hash: 8e8e5779f979
+i18n_output_hash: 426056684d02
 i18n_hash_version: 2
 ---
 # Accountherstel {#account-recovery}
@@ -82,8 +82,8 @@ Als laatste redmiddel op elke versie stel je het beleid in de database in. Op de
 all-in-one-image draait Postgres in de container:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 Bij de opstelling met meerdere containers wijs je `psql` in plaats daarvan naar je eigen `DATABASE_URL`.

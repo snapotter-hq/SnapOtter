@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { availableParallelism } from "node:os";
 import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
@@ -66,9 +67,40 @@ function normalizeExternalUrl(raw: string): string {
   return trimmed;
 }
 
+// Lowercase only, so one instance never shows up in analytics under two spellings.
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
+    // The address the API binds. Containers keep 0.0.0.0 so published ports
+    // work. Outside a container, or in one on the host network, the API shares
+    // the machine's network, and 127.0.0.1 keeps it off the LAN. Anything but
+    // an IP stops the boot, so an empty or mistyped value never quietly widens
+    // the bind to 0.0.0.0. tcsh sets HOST to the machine name, so the message
+    // shows the value it got.
+    HOST: z
+      .string()
+      .default("0.0.0.0")
+      .refine(
+        (value) => isIP(value) !== 0,
+        (value) => ({
+          message: `HOST must be an IP address such as 0.0.0.0 or 127.0.0.1, not '${value}'. If you never set HOST, unset it (tcsh sets it to the machine name).`,
+        }),
+      ),
+    // Lets a provisioning tool pick the instance id before first boot, so its
+    // records match the instance's events. Used only while the settings row
+    // doesn't exist; see lib/instance-id.ts.
+    SNAPOTTER_INSTANCE_ID: z
+      .string()
+      .default("")
+      .refine((value) => value === "" || UUID_V4.test(value), {
+        message: "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
+      }),
+    // "off" starts a new instance with analytics switched off, for any
+    // deployment that wants opt-in. It only seeds a missing setting, so an
+    // admin's later choice always stands.
+    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).default("on"),
     BASE_PATH: z
       .string()
       .default("")
@@ -106,6 +138,10 @@ const envSchema = z
     SNAPOTTER_LICENSE_KEY: z.string().default(""),
     FILE_MAX_AGE_HOURS: z.coerce.number().default(72),
     CLEANUP_INTERVAL_MINUTES: z.coerce.number().default(60),
+    // These two defaults apply only to source and dev runs. docker/Dockerfile and
+    // the published Compose files set both to 0 (unlimited), which is what the
+    // image ships. apps/docs/guide/configuration.md states both values, so change
+    // the docs too if either side moves.
     MAX_UPLOAD_SIZE_MB: z.coerce.number().default(100),
     MAX_BATCH_SIZE: z.coerce.number().default(100),
     CONCURRENT_JOBS: z.coerce.number().default(0),
@@ -139,11 +175,14 @@ const envSchema = z
     MAX_USERS: z.coerce.number().default(0),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     MAX_WORKER_THREADS: z.coerce.number().default(0),
+    // Only the AI sidecar bridge honors this (packages/ai/src/bridge.ts reads it
+    // from process.env). Worker job deadlines are JOB_TIMEOUT_FAST_S/_LONG_S.
     PROCESSING_TIMEOUT_S: z.coerce.number().default(0),
     MAX_PIPELINE_STEPS: z.coerce.number().default(20),
     MAX_PIPELINE_STEP_PIXELS: z.coerce.number().default(67_108_864),
     MAX_CANVAS_PIXELS: z.coerce.number().default(0),
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
+    MAX_SETTINGS_PAYLOAD_KB: z.coerce.number().int().min(0).default(64),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),
@@ -446,6 +485,18 @@ export type Env = z.infer<typeof envSchema>;
 
 export function loadEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
   return envSchema.parse(rawEnv);
+}
+
+/**
+ * The AI bridge reads PROCESSING_TIMEOUT_S straight from process.env, where an
+ * unset value used to mean a 600 s cap while the parsed default here is 0
+ * (unlimited). Write the parsed value back when the variable is unset or blank
+ * so both sides see one default (#4313).
+ */
+export function publishSidecarEnv(parsed: Env, target: NodeJS.ProcessEnv = process.env): void {
+  if (!target.PROCESSING_TIMEOUT_S?.trim()) {
+    target.PROCESSING_TIMEOUT_S = String(parsed.PROCESSING_TIMEOUT_S);
+  }
 }
 
 /**

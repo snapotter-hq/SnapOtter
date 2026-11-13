@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { batchJobIdFor } from "../../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -283,9 +284,10 @@ describe("POST /api/v1/tools/pdf/:toolId/batch (issue #632)", () => {
     // the volume waiting for the 72h storage sweep. Cleanup runs once the
     // response is on the wire, so poll rather than assume it already landed.
     const { objectExists } = await import("../../../../apps/api/src/lib/object-storage.js");
+    const jobId = await batchJobIdFor(clientJobId);
     const gone = async () =>
-      !(await objectExists(`outputs/${clientJobId}-f0/page-1.jpg`)) &&
-      !(await objectExists(`outputs/${clientJobId}-f0/a-pages.zip`));
+      !(await objectExists(`outputs/${jobId}-f0/page-1.jpg`)) &&
+      !(await objectExists(`outputs/${jobId}-f0/a-pages.zip`));
     for (let i = 0; i < 100 && !(await gone()); i++) {
       await new Promise((r) => setTimeout(r, 50));
     }
@@ -473,7 +475,15 @@ describe("pdf-to-image batch reserves its job id (#1554)", () => {
     );
     expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
 
-    const row = await readSettledRow(clientJobId);
+    // The run lives under a server id; the client id is only an alias row,
+    // because the run's id names outputs the public download route serves.
+    const jobId = await batchJobIdFor(clientJobId);
+    expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
+    const alias = await readRow(clientJobId);
+    expect(alias?.type).toBe("batch-alias");
+    expect(alias?.userId).toBe(owner.userId);
+
+    const row = await readSettledRow(jobId);
     expect(row?.userId).toBe(owner.userId);
     expect(row?.type).toBe("batch");
     // A tool id would make reconciliation treat this inline run as queued work.
@@ -530,8 +540,10 @@ describe("pdf-to-image batch reserves its job id (#1554)", () => {
       { clientJobId, token: owner.token },
     );
     expect(first.statusCode, first.body.slice(0, 300)).toBe(200);
-    const settled = await readSettledRow(clientJobId);
+    const jobId = await batchJobIdFor(clientJobId);
+    const settled = await readSettledRow(jobId);
     expect(settled?.status).toBe("completed");
+    const alias = await readRow(clientJobId);
 
     const second = await postBatch(
       "pdf-to-jpg",
@@ -542,6 +554,7 @@ describe("pdf-to-image batch reserves its job id (#1554)", () => {
     expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
 
     await new Promise((r) => setTimeout(r, 200));
-    expect(await readRow(clientJobId)).toEqual(settled);
+    expect(await readRow(jobId)).toEqual(settled);
+    expect(await readRow(clientJobId)).toEqual(alias);
   });
 });

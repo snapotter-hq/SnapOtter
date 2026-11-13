@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { POOLS, queueName } from "../../../../apps/api/src/jobs/types.js";
 import { isBinarySpawnFailure } from "../../../../apps/api/src/lib/binary-overrides.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -76,6 +78,9 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     Worker: vi.fn(() => ({
       on: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
+      isPaused: vi.fn(() => false),
+      pause: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn(),
     })),
   }));
 
@@ -145,6 +150,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),
+    failSingleJobGuarded: vi.fn(async () => undefined),
     updateSingleFileProgressAtomically: vi.fn(
       async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
         const { db } = await import("../../../../apps/api/src/db/index.js");
@@ -2533,6 +2539,58 @@ describe("worker failure reports carry the job age (#1414)", () => {
     expect(ctx.jobAgeMs).toBeUndefined();
   });
 
+  it("marks scheduler ticks on the system pool as periodic, with the job name (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "sys-2", name: "system:storage-ttl", data: { kind: "other" } };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ pool: "system", periodic: true, job: "system:storage-ttl" }),
+    );
+  });
+
+  it("does not mark a user-requested GDPR export as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = {
+      id: "sys-3",
+      name: "system:gdpr-export",
+      data: { kind: "other" },
+      attemptsMade: 1,
+      opts: { attempts: 3 },
+    };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ periodic: false }),
+    );
+  });
+
+  it("does not mark a user's batch or pipeline finalize as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    for (const kind of ["batch-finalize", "pipeline-finalize"]) {
+      reportErrorMock.mockClear();
+      // A parentId and a non-finalize kind keep the safety nets out of this case.
+      const job = { id: `fin-${kind}`, name: kind, data: { kind: "other", parentId: "p" } };
+      listenerFor(listeners, "system")(job, new Error("boom"));
+      const ctx = reportErrorMock.mock.calls.at(-1)?.[1] as { periodic?: boolean };
+      expect(ctx.periodic).toBe(false);
+    }
+  });
+
+  it("never marks a tool pool as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "img-1", name: "resize", data: { toolId: "resize" } };
+
+    listenerFor(listeners, "image")(job, new Error("boom"));
+
+    const ctx = reportErrorMock.mock.calls[0][1] as { periodic?: boolean };
+    expect(ctx.periodic).toBeUndefined();
+  });
+
   it("leaves the wait unset when the job never became active", async () => {
     const listeners = await failedListeners();
     const job = { id: "job-2", data: { toolId: "resize" }, timestamp: 1_000 };
@@ -2581,6 +2639,119 @@ describe("worker failure reports carry the job age (#1414)", () => {
       stalled,
       expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
     );
+  });
+
+  describe("tool jobs whose worker stopped before finishing (#4509)", () => {
+    const STALL_MESSAGE =
+      "Processing stopped unexpectedly before the job finished. Please try again.";
+    const stallError = () => new Error("job stalled more than allowable limit");
+
+    it("settles a final-attempt stall as failed with a constant message", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        processedOn: 2_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s1" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s1",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("leaves a stall that BullMQ will retry to the next attempt", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s2",
+        attemptsMade: 0,
+        opts: { attempts: 3 },
+        timestamp: 1_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s2" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("writes the terminal frame to the client channel and the row when they differ", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s3",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-s3",
+          clientJobId: "client-s3",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "client-s3",
+        message: STALL_MESSAGE,
+        expectedArtifactJobId: "job-s3",
+      });
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s3",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("does not touch pipeline steps, which report through their finalize", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s4",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: { kind: "pipeline-step", toolId: "resize", jobId: "job-s4", parentId: "flow-1" },
+      };
+
+      listenerFor(listeners, "image")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite a canceled run's failed event with the stall message (#4622)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const { UnrecoverableError } = await import("bullmq");
+      const job = {
+        id: "job-c1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-c1",
+          clientJobId: "client-c1",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, new UnrecoverableError("Canceled"));
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
   });
 
   describe("GDPR export failure handling on the system pool (#1495)", () => {
@@ -7116,5 +7287,257 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
     });
     expect(callOrder).toEqual(["recordChildOutcome:Canceled", "db.update:canceled"]);
     expect(jobsTotalIncMock.mock.calls).toEqual([[{ pool: "image", status: "canceled" }]]);
+  });
+});
+
+describe("Worker error log throttle (#4360)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  type ErrorListener = (err: Error) => void;
+
+  /** Start the workers against mocks and return each queue's "error" listener. */
+  async function errorListeners(): Promise<{
+    listeners: Map<string, ErrorListener>;
+    loggerError: ReturnType<typeof vi.fn>;
+  }> {
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    workerMod.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: { on: { mock: { calls: unknown[][] } } } }[] };
+    };
+    const listeners = new Map<string, ErrorListener>();
+    workerMock.mock.calls.forEach((call, i) => {
+      const onError = workerMock.mock.results[i].value.on.mock.calls.find((c) => c[0] === "error");
+      if (onError) listeners.set(call[0] as string, onError[1] as ErrorListener);
+    });
+    return { listeners, loggerError: logger.error as unknown as ReturnType<typeof vi.fn> };
+  }
+
+  function logsWith(loggerError: ReturnType<typeof vi.fn>, msg: string) {
+    return loggerError.mock.calls.filter((c) => c[1] === msg);
+  }
+
+  function misconf(): Error {
+    return Object.assign(
+      new Error("MISCONF Errors writing to the AOF file: No space left on device"),
+      { name: "ReplyError" },
+    );
+  }
+
+  it("logs one line per pool for a burst of Redis errors instead of one per event", async () => {
+    vi.useFakeTimers();
+    const { listeners, loggerError } = await errorListeners();
+    expect(listeners.size).toBe(POOLS.length);
+
+    for (const listener of listeners.values()) {
+      for (let i = 0; i < 1_000; i++) listener(misconf());
+    }
+
+    const logs = logsWith(loggerError, "Worker error");
+    expect(logs.map((c) => (c[0] as { pool: string }).pool).sort()).toEqual([...POOLS].sort());
+  });
+
+  it("reports how many errors it held back once the window closes", async () => {
+    vi.useFakeTimers();
+    const { listeners, loggerError } = await errorListeners();
+    const system = listeners.get(queueName("system"));
+    if (!system) throw new Error("no error listener for the system pool");
+
+    for (let i = 0; i < 250; i++) system(misconf());
+    vi.advanceTimersByTime(30_000);
+
+    expect(logsWith(loggerError, "Worker error")).toHaveLength(1);
+    expect(logsWith(loggerError, "Worker errors suppressed")).toEqual([
+      [expect.objectContaining({ pool: "system", suppressed: 249 }), "Worker errors suppressed"],
+    ]);
+
+    system(misconf());
+    expect(logsWith(loggerError, "Worker error")).toHaveLength(2);
+  });
+});
+
+describe("Worker error burst backoff wiring (#4530)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  interface MockedWorker {
+    on: { mock: { calls: unknown[][] } };
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
+    isPaused: ReturnType<typeof vi.fn>;
+  }
+
+  /** Start the workers against mocks and return each queue's worker mock. */
+  async function startedWorkers(): Promise<Map<string, MockedWorker>> {
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: MockedWorker }[] };
+    };
+    return new Map(
+      workerMock.mock.calls.map((call, i) => [call[0] as string, workerMock.mock.results[i].value]),
+    );
+  }
+
+  function emitError(worker: MockedWorker, err: Error): void {
+    for (const [event, listener] of worker.on.mock.calls) {
+      if (event === "error") (listener as (e: Error) => void)(err);
+    }
+  }
+
+  it("pauses every pool's worker on a burst of Redis reply errors and resumes it later", async () => {
+    vi.useFakeTimers();
+    const workers = await startedWorkers();
+    expect(workers.size).toBe(POOLS.length);
+
+    for (const worker of workers.values()) {
+      for (let i = 0; i < 1_000; i++) {
+        emitError(
+          worker,
+          Object.assign(new Error("MISCONF Errors writing to the AOF file"), {
+            name: "ReplyError",
+          }),
+        );
+      }
+      expect(worker.pause).toHaveBeenCalledExactlyOnceWith(true);
+    }
+
+    for (const worker of workers.values()) worker.isPaused.mockReturnValue(true);
+    vi.advanceTimersByTime(5_000);
+    for (const worker of workers.values()) expect(worker.resume).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("per-attempt job scratch dir (#4217)", () => {
+  it("gives a stalled job's second attempt its own scratch dir, so neither removes the other's", async () => {
+    const processV2Mock = vi.fn();
+    const rmMock = vi.fn().mockResolvedValue(undefined);
+    const mkdirMock = vi.fn().mockResolvedValue(undefined);
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: mkdirMock,
+        readFile: vi.fn(),
+        rm: rmMock,
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    // BullMQ re-runs a stalled job under the same id while the first attempt
+    // may still be running, so both attempts are live at once.
+    const makeJob = (attemptsMade: number) => ({
+      id: "job-stalled",
+      attemptsMade,
+      opts: { attempts: 2 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId: "job-stalled",
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/job-stalled/in.jpg"],
+        filename: "in.jpg",
+        settings: {},
+        kind: "tool",
+      },
+    });
+    const output = { buffer: Buffer.from("out"), filename: "out.jpg", contentType: "image/jpeg" };
+
+    let releaseFirst: (value: typeof output) => void = () => {};
+    processV2Mock
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+      .mockResolvedValueOnce(output);
+
+    const first = processor(makeJob(0));
+    await vi.waitFor(() => expect(processV2Mock).toHaveBeenCalledTimes(1));
+    await processor(makeJob(1));
+
+    const firstDir = (processV2Mock.mock.calls[0][0] as { scratchDir: string }).scratchDir;
+    const secondDir = (processV2Mock.mock.calls[1][0] as { scratchDir: string }).scratchDir;
+    expect(firstDir).not.toBe(secondDir);
+    for (const dir of [firstDir, secondDir]) {
+      expect(dir.startsWith(`${join(tmpdir(), "snapotter-scratch", "job-stalled")}-`)).toBe(true);
+    }
+    // The second attempt finished first and cleaned up only its own dir.
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir]);
+
+    releaseFirst(output);
+    await first;
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir, firstDir]);
+    expect(mkdirMock.mock.calls.map(([dir]) => dir)).toEqual([firstDir, secondDir]);
   });
 });

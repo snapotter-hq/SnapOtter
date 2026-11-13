@@ -37,6 +37,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   };
 });
 
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import {
   SCRUB_PDF_PRODUCER_TOOLS,
   scrubPdfProducer,
@@ -219,7 +220,7 @@ describe("image-to-pdf custom route Producer scrub (#2501)", () => {
 
   it("falls back to the unscrubbed PDFKit buffer when the Producer scrub fails", async () => {
     pdfScrubProducerPy.mockRejectedValueOnce(new Error("PyMuPDF not installed"));
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     const app = await buildApp();
     const png = await makePng();
 
@@ -236,7 +237,8 @@ describe("image-to-pdf custom route Producer scrub (#2501)", () => {
       expect(stored?.subarray(0, 5).toString("ascii")).toBe("%PDF-");
       expect(body.processedSize).toBe(stored?.length);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[pdf-scrub] keeping original metadata: PyMuPDF not installed"),
+        { err: expect.objectContaining({ message: "PyMuPDF not installed" }) },
+        "[pdf-scrub] keeping original metadata",
       );
     } finally {
       warnSpy.mockRestore();
@@ -484,7 +486,7 @@ describe("scrubPdfProducerFile and scrubPdfProducer AbortSignal handling (#3254)
         abortAc.abort(abortErr);
         throw abortErr;
       });
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       try {
         await expect(scrubPdfProducerFile(filePath, { signal: abortAc.signal })).rejects.toBe(
           abortErr,
@@ -549,7 +551,7 @@ describe("scrubPdfProducerFile and scrubPdfProducer AbortSignal handling (#3254)
       throw abortErr;
     });
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     try {
       await expect(scrubPdfProducer(original, { signal: abortAc.signal })).rejects.toBe(abortErr);
       expect(capturedDir).not.toBe("");

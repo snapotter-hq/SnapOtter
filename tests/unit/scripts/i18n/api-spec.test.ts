@@ -62,6 +62,8 @@ describe("api-spec adapter extract", () => {
         "info.description",
         "paths./api/v1/tools/image/resize.post.description",
         "paths./api/v1/tools/image/resize.post.summary",
+        "ptr:/paths/~1api~1v1~1tools~1image~1resize/post/responses/200/description",
+        "ptr:/components/schemas/ToolResponse/properties/jobId/description",
         "tags.Tools.description",
       ].sort(),
     );
@@ -74,13 +76,26 @@ describe("api-spec adapter extract", () => {
     );
   });
 
-  it("does not extract schema, parameter, response, or operationId text", async () => {
+  it("extracts response and schema prose but not operationId, parameter names, or examples", async () => {
     const adapter = makeApiSpecAdapter({ dir });
     const ids = (await adapter.extract()).map((u: Unit) => u.id);
-    expect(ids.some((id: string) => id.includes("responses"))).toBe(false);
-    expect(ids.some((id: string) => id.includes("parameters"))).toBe(false);
-    expect(ids.some((id: string) => id.includes("schemas"))).toBe(false);
+    expect(ids.some((id: string) => id.includes("/responses/"))).toBe(true);
+    expect(ids.some((id: string) => id.includes("/schemas/"))).toBe(true);
     expect(ids.some((id: string) => id.includes("operationId"))).toBe(false);
+    expect(ids.some((id: string) => id.includes("/parameters/"))).toBe(false);
+  });
+
+  it("skips example payloads and vendor extensions", async () => {
+    const spec = structuredClone(FIXTURE) as Record<string, unknown>;
+    spec["x-note"] = { description: "Vendor extension stays English." };
+    (spec.components as Record<string, unknown>).examples = {
+      Sample: { description: "Example stays English." },
+    };
+    writeFileSync(specPath, yaml.dump(spec, { lineWidth: -1 }), "utf8");
+    const adapter = makeApiSpecAdapter({ dir });
+    const sourceTexts = (await adapter.extract()).map((u: Unit) => u.sourceText);
+    expect(sourceTexts).not.toContain("Vendor extension stays English.");
+    expect(sourceTexts).not.toContain("Example stays English.");
   });
 
   it("marks every unit as text kind (spec prose, not markdown structure)", async () => {
@@ -122,6 +137,25 @@ describe("api-spec adapter write/load round-trip", () => {
       "Processed image (stays English).",
     );
     expect(written.paths["/api/v1/tools/image/resize"].post.operationId).toBe("resizeImage");
+  });
+
+  it("writes a translated response description addressed by its pointer id", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const id = "ptr:/paths/~1api~1v1~1tools~1image~1resize/post/responses/200/description";
+    const entry = {
+      text: "Verarbeitetes Bild (übersetzt).",
+      sourceHash: hash("Processed image (stays English)."),
+      provenance: "machine" as const,
+      outputHash: hash("Verarbeitetes Bild (übersetzt)."),
+    };
+    await adapter.write("de", new Map([[id, entry]]));
+
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
+    const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
+    expect(written.paths["/api/v1/tools/image/resize"].post.responses["200"].description).toBe(
+      "Verarbeitetes Bild (übersetzt).",
+    );
+    expect(written["x-i18n"].entries[id].sourceHash).toBe(hash("Processed image (stays English)."));
   });
 
   it("stamps an x-i18n map with the source and output hashes", async () => {

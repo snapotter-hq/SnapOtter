@@ -1,15 +1,15 @@
 ---
-description: "SnapOtter'ı Docker ile tek komutla kurun. Docker Compose kurulumu, kaynaktan derleme ve tam özellik genel bakışı içerir."
-i18n_source_hash: 5bc863dc7351
+description: "SnapOtter'ı Docker ile tek komutta kurun. Docker Compose kurulumunu, kaynak koddan derlemeyi ve özelliklere tam bir genel bakışı içerir."
+i18n_source_hash: aa8428189808
 i18n_provenance: machine
-i18n_output_hash: aea71ee46492
+i18n_output_hash: e4aafd013db2
 i18n_hash_version: 2
 ---
 
-# Başlarken {#getting-started}
+# Başlangıç {#getting-started}
 
 ::: tip Kurmadan önce deneyin
-Tam arayüzü [demo.snapotter.com](https://demo.snapotter.com) adresinde keşfedin - kayıt veya kurulum gerektirmez.
+Tüm arayüzü [demo.snapotter.com](https://demo.snapotter.com) adresinde keşfedin: kayıt veya kurulum gerekmez.
 :::
 
 ## Hızlı Başlangıç {#quick-start}
@@ -18,43 +18,43 @@ Tam arayüzü [demo.snapotter.com](https://demo.snapotter.com) adresinde keşfed
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Bu tek konteyner ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadan, geridöngü arayüzünde (gömülü mod) kendi PostgreSQL ve Redis'ini başlatır ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'yi denemenin veya bir ev laboratuvarında kendi kendine barındırmanın en hızlı yoludur. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [canonical Docker Compose yığınını](#docker-compose) kullanın. Katıştırılmış mod, kök (varsayılan) olarak çalışır ve `DATABASE_URL`'yi ayarladığınız anda otomatik olarak kapanır.
+Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [kanonik Docker Compose yığınını](#docker-compose) kullanın. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır.
 
-Bir Raspberry Pi'ye, eski bir dizüstüne veya küçük bir VPS'e mi kuruyorsunuz? Ayarlanmış adım adım kurulum ve kısıtlı donanımdan neler bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) bölümüne bakın.
+Raspberry Pi, eski bir dizüstü bilgisayar veya küçük bir VPS üzerine mi kuruyorsunuz? Ayarlanmış bir adım adım kurulum ve kısıtlı donanımdan ne bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) sayfasına bakın.
 
-İlk oturum açmada parolanızı değiştirmeniz istenecektir.
+İlk girişte parolanızı değiştirmeniz istenir.
 
 ::: tip Anonim Ürün Analitiği
-SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Settings → System → Privacy** bölümünü açın ve **Anonymous Product Analytics**'i kapatın. Tüm örnek için hemen durur.
+SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
 
-Örnek için tüm telemetriyi yeniden derleme olmadan devre dışı bırakmak için `SNAPOTTER_TELEMETRY=0` ortam değişkenini de ayarlayabilirsiniz (`false` ve `off` da işe yarar).
+Yeniden derleme yapmadan örnekteki tüm telemetriyi devre dışı bırakmak için `SNAPOTTER_TELEMETRY=0` ortam değişkenini de ayarlayabilirsiniz (`false` ve `off` da çalışır).
 
-Hata izleme, açık kaynak programı aracılığıyla SnapOtter'a sponsor olan [Sentry](https://sentry.io) tarafından desteklenmektedir.
+Hata izleme, açık kaynak programı aracılığıyla SnapOtter'a sponsor olan [Sentry](https://sentry.io) tarafından sağlanır.
 
-Nelerin toplandığına ilişkin ayrıntılar için [SnapOtter'ın topladıkları](/tr/guide/telemetry) bölümüne bakın.
+Nelerin toplandığı hakkında ayrıntılar için [SnapOtter'ın topladıkları](/tr/guide/telemetry) sayfasına bakın.
 :::
 
-::: tip NVIDIA CUDA hızlandırması
-NVIDIA CUDA ile hızlandırılmış arka plan kaldırma, ölçeklendirme, yüz geliştirme ve restorasyon için `--gpus all` ekleyin. OCR CPU tabanlı kalır ve GPU erişimi olsun veya olmasın aynı görüntüde çalışır:
+::: tip NVIDIA CUDA hızlandırma
+NVIDIA CUDA ile hızlandırılmış arka plan kaldırma, büyütme, yüz iyileştirme ve restorasyon için `--gpus all` ekleyin. OCR CPU tabanlı kalır ve GPU erişimiyle ya da erişimsiz aynı imajda çalışır:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerektirir. CUDA kullanılamadığında otomatik olarak CPU'ya geri döner. VA-API, Quick Sync veya OpenCL aracılığıyla Intel/AMD iGPU hızlandırma, günümüzde yapay zeka çıkarımı için desteklenmemektedir. Karşılaştırmalar için [Docker Etiketleri](/tr/guide/docker-tags) konusuna bakın. AI araçları `--gpus all`'ye rağmen CPU üzerinde çalışıyorsa, bkz. [GPU hızlandırmasını doğrulama](/tr/guide/deployment#verify-gpu-acceleration).
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerektirir. CUDA kullanılamadığında otomatik olarak CPU'ya döner. VA-API, Quick Sync veya OpenCL üzerinden Intel/AMD iGPU hızlandırma, yapay zeka çıkarımı için şu anda desteklenmemektedir. Kıyaslamalar için [Docker Etiketleri](/tr/guide/docker-tags) sayfasına bakın. `--gpus all` olmasına rağmen yapay zeka araçları CPU üzerinde çalışıyorsa [GPU hızlandırmayı doğrulama](/tr/guide/deployment#verify-gpu-acceleration) bölümüne bakın.
 :::
 
-::: details GHCR'de de mevcut
+::: details GHCR üzerinde de mevcut
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
 ```
 
-Her iki kayıt defteri de her sürümde aynı imajı yayınlar.
+Her iki kayıt defteri de her sürümde aynı imajı yayımlar.
 :::
 
-## Docker Oluşturma {#docker-compose}
+## Docker Compose {#docker-compose}
 
-Bu sayfadaki kısaltılmış bir Oluşturma örneğini kopyalamak yerine, her sürümde bakımı yapılan ve test edilen üretim dosyasını kullanın:
+Bu sayfadaki kısaltılmış bir Compose örneğini kopyalamak yerine, her sürümle birlikte bakımı yapılan ve test edilen üretim dosyasını kullanın:
 
 ```bash
 install -d -m 700 snapotter && cd snapotter
@@ -72,13 +72,13 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Kurallı [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tümünü, durum denetimlerini, kaynak sınırlarını, dayanıklı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek görüntülerini ve geçerli kapsayıcı güçlendirmeyi içerir. İlk girişten hemen sonra varsayılan yönetici şifresini değiştirin. Tekrarlanabilir bir dağıtım için `latest`'yi takip etmek yerine SnapOtter uygulama görüntüsünü doğruladığınız sürüm etiketine veya özete sabitleyin.
+Kanonik [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tamamını, sağlık denetimlerini, kaynak sınırlarını, kalıcı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek imajlarını ve güncel kapsayıcı sıkılaştırmasını içerir. İlk girişten hemen sonra varsayılan yönetici parolasını değiştirin. Tekrarlanabilir bir dağıtım için `latest` etiketini izlemek yerine SnapOtter uygulama imajını doğruladığınız sürüm etiketine veya özetine (digest) sabitleyin.
 
-Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration)'ya ve gizli diziler, ağ politikası ve yedekleme kılavuzu için [Güvenlik ve Güçlendirme](/tr/guide/security)'ye bakın.
+Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration), gizli bilgiler, ağ ilkesi ve yedekleme yönergeleri için [Güvenlik ve Sıkılaştırma](/tr/guide/security) sayfalarına bakın.
 
-## Kaynaktan Derleme {#build-from-source}
+## Kaynak Koddan Derleme {#build-from-source}
 
-**Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.11+ (AI özellikleri için), Git.
+**Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.11+ (yapay zeka özellikleri için), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -89,36 +89,36 @@ pnpm dev
 ```
 
 - Ön yüz: [http://localhost:1351](http://localhost:1351)
-- Arka uç: [http://localhost:13490](http://localhost:13490)
+- Arka yüz: [http://localhost:13490](http://localhost:13490)
 
 ## Neler Yapabilirsiniz {#what-you-can-do}
 
 ### Dosya İşleme (200+ Araç) {#file-processing-200-tools}
 
-| Modalite | Sayı | Örnek Araçlar |
+| Kategori | Sayı | Örnek Araçlar |
 |----------|-------|---------------|
-| **Görsel** | 112 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Ölçek Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, format ön ayarları |
-| **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazılar, Video'dan GIF'e, Yeniden Boyutlandır, Sabitle, format ön ayarları |
-| **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Transkribe Et, Perde Kaydırma, Kısılma, Zil Sesi Oluşturucu, format ön ayarları |
-| **PDF / Belge** | 35 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Sansürle, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
-| **Dosyalar** | 23 | CSV'den JSON'a, JSON'dan XML'e, CSV'leri Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
+| **Görsel** | 112 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, biçim ön ayarları |
+| **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazı, Videodan GIF'e, Yeniden Boyutlandır, Stabilize Et, biçim ön ayarları |
+| **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Yazıya Dök, Perde Değiştir, Solma, Zil Sesi Oluşturucu, biçim ön ayarları |
+| **PDF / Belge** | 35 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Karartma, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
+| **Dosyalar** | 23 | CSV'den JSON'a, JSON'dan XML'e, CSV Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
 
-### Ardışık Düzenler {#pipelines}
+### İş Hatları {#pipelines}
 
-Araçları çok adımlı iş akışlarına zincirleyin ve bunları tek bir görsele veya bütün bir gruba uygulayın:
+Araçları çok adımlı iş akışlarında zincirleyin ve tek bir görsele ya da bir toplu işe uygulayın:
 
 1. Kenar çubuğunda **Pipelines** bölümünü açın.
 2. Adımlar ekleyin (herhangi bir araç, herhangi bir ayar).
-3. Tek bir dosyada veya bir kerede bütün bir grupta çalıştırın.
-4. Daha sonra yeniden kullanmak için ardışık düzeni kaydedin.
+3. Tek bir dosyada ya da tüm toplu işte bir seferde çalıştırın.
+4. İş hattını daha sonra yeniden kullanmak için kaydedin.
 
-Ardışık düzenler varsayılan olarak 20 adıma izin verir. Limiti sınırsız yapmak için `MAX_PIPELINE_STEPS=0` ayarlayın.
+İş hatları varsayılan olarak 20 adıma izin verir. Sınırı kaldırmak için `MAX_PIPELINE_STEPS=0` ayarlayın.
 
 ### Dosya Kitaplığı {#file-library}
 
-İşlediğiniz her dosya **Files** kitaplığınıza kaydedilebilir. SnapOtter tam sürüm geçmişini izler, böylece orijinal yüklemeden son çıktıya kadar her işleme adımını takip edebilirsiniz.
+İşlediğiniz her dosya **Files** kitaplığınıza kaydedilebilir. SnapOtter, ilk yüklemeden son çıktıya kadar her işleme adımını izleyebilmeniz için tüm sürüm geçmişini tutar.
 
-Kaydetme açıktır: kitaplığa kaydettiğiniz sonuçlar siz silene kadar tutulurken, işleyip kaydetmeden bıraktığınız sonuçlar 72 saat sonra otomatik olarak temizlenir (`FILE_MAX_AGE_HOURS` aracılığıyla yapılandırılabilir).
+Kaydetme açıkça yapılır: kitaplığa kaydettiğiniz sonuçlar siz silene kadar saklanır; işleyip kaydetmediğiniz sonuçlar ise 72 saat sonra otomatik olarak temizlenir (`FILE_MAX_AGE_HOURS` ile yapılandırılabilir).
 
 ### REST API ve API Anahtarları {#rest-api-api-keys}
 
@@ -131,28 +131,28 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'
 ```
 
-**Settings → API Keys** altında API anahtarları oluşturun. Tüm uç noktalar için [REST API referansına](/tr/api/rest) bakın veya etkileşimli referans için [http://localhost:1349/api/docs](http://localhost:1349/api/docs) adresini ziyaret edin.
+API anahtarlarını **Ayarlar → API Anahtarları** altında oluşturun. Tüm uç noktalar için [REST API başvurusuna](/tr/api/rest) bakın veya etkileşimli başvuru için [http://localhost:1349/api/docs](http://localhost:1349/api/docs) adresini ziyaret edin.
 
-### Çok Kullanıcı ve Ekipler {#multi-user-teams}
+### Çok Kullanıcılı ve Ekipler {#multi-user-teams}
 
-Rol tabanlı erişim kontrolü ile birden fazla kullanıcıyı etkinleştirin:
+Rol tabanlı erişim denetimiyle birden çok kullanıcıyı etkinleştirin:
 
-- **Yönetici**: tam erişim - kullanıcıları, ekipleri, ayarları, tüm dosyaları/ardışık düzenleri/API anahtarlarını yönetir
-- **Kullanıcı**: araçları kullanır, kendi dosyalarını/ardışık düzenlerini/API anahtarlarını yönetir
+- **Admin**: tam erişim; kullanıcıları, ekipleri, ayarları ve tüm dosyaları/iş hatlarını/API anahtarlarını yönetir
+- **User**: araçları kullanır; kendi dosyalarını/iş hatlarını/API anahtarlarını yönetir
 
-Kullanıcıları gruplamak için **Settings → Teams** altında ekipler oluşturun.
+Kullanıcıları gruplamak için **Ayarlar → Ekipler** altında ekipler oluşturun.
 
-`AUTH_ENABLED=true` ayarlayın (veya oturum açma olmadan tek kullanıcı/kendi kullanımı için `false`).
+`AUTH_ENABLED=true` ayarlayın (oturum açmadan tek kullanıcılı/kişisel kullanım için `false`).
 
 ## Telefonunuzdan Kullanın {#use-it-from-your-phone}
 
-SnapOtter mobil tarayıcılarda çalışır ve uygulama olarak yüklenebilir. Örneğinizi telefonda açın, ardından:
+SnapOtter mobil tarayıcılarda çalışır ve bir uygulama olarak kurulabilir. Örneğinizi telefonda açın, ardından:
 
-- **iPhone / iPad (Safari):** Paylaş'a, ardından **Ana Ekrana Ekle**'ye dokunun.
+- **iPhone / iPad (Safari):** Paylaş'a dokunun, ardından **Ana Ekrana Ekle**'yi seçin.
 - **Android (Chrome):** tarayıcı menüsünü açın ve **Uygulamayı yükle**'ye dokunun.
 
-Yüklenen uygulama kendi penceresinde, doğrudan örneğinizde açılır.
+Kurulan uygulama kendi penceresinde açılır ve doğrudan örneğinize gider.
 
-Tek bir pürüz var: tarayıcılar yükleme seçeneğini yalnızca HTTPS üzerinden sunar. Yerel ağınızdaki düz bir HTTP adresi tarayıcı sekmesinde sorunsuz çalışmaya devam eder; gerçek yükleme için örneği sertifikalı bir ters proxy arkasına alın (bkz. [dağıtım kılavuzu](/tr/guide/deployment)).
+Bir kısıt var: tarayıcılar kurulum istemini yalnızca HTTPS üzerinden sunar. LAN'ınızdaki düz bir HTTP adresi tarayıcı sekmesinde sorunsuz çalışmaya devam eder; gerçek kurulum için örneği sertifikalı bir ters vekil sunucunun (reverse proxy) arkasına alın ([dağıtım rehberine](/tr/guide/deployment) bakın).
 
-Telefon ve tabletlerde görüntü araçları, yükleme düğmesinin yanında bir **Fotoğraf çek** düğmesi gösterir. Bir fişin veya beyaz tahtanın fotoğrafını çekin, görüntü doğrudan araca gelir.
+Telefon ve tabletlerde görsel araçlarında yükleme düğmesinin yanında bir **Fotoğraf çek** düğmesi görünür. Bir fiş ya da beyaz tahta fotoğrafı çekin; doğrudan araca düşer.

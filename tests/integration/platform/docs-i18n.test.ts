@@ -52,7 +52,7 @@ describe("API docs i18n serving", () => {
     expect(res.headers["content-type"]).toContain("text/plain");
     expect(res.body).toContain("## Tools");
     // Tag prose comes from the committed German spec.
-    expect(res.body).toContain("Datei-Verarbeitungstools");
+    expect(res.body).toContain("Bildwerkzeuge");
     // Tool lines come from shared i18n; the Resize tool id is present with a mode.
     expect(res.body).toContain("Bildgröße ändern - Größe nach Pixeln");
     expect(res.body).toContain("(resize, sync)");

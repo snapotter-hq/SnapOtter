@@ -178,6 +178,80 @@ describe("docs-md adapter", () => {
     expect(edited?.outputHash).not.toBe(hash(edited?.text ?? ""));
   });
 
+  it("stored outputHash round-trips through load and an unchanged re-write is byte-identical (#884)", async () => {
+    await seed(
+      "guide/x.md",
+      "---\ndescription: Install: quickly\ntitle: Hi # there\n---\n# X {#x}\n\nSee [Config](/guide/configuration).",
+    );
+    await seed("guide/plain.md", "# Plain {#plain}\n\nNo frontmatter, [link](/tools/a).\n");
+    const adapter = createDocsAdapter({ root });
+    const units = await adapter.extract();
+    const entries = new Map(
+      units.map((u: Unit) => [
+        u.id,
+        {
+          text: u.sourceText.replace("Install: quickly", "Installieren: schnell"),
+          sourceHash: "abc123def456",
+          provenance: "machine" as const,
+          outputHash: "0".repeat(12),
+          stale: false,
+        },
+      ]),
+    );
+    await adapter.write("de", entries);
+    const first = await adapter.load("de");
+    expect(first.size).toBe(2);
+    for (const e of first.values()) {
+      expect(hash(e.text)).toBe(e.outputHash);
+      expect(e.provenance).toBe("machine");
+    }
+    const bytes = async () => ({
+      x: await readFile(join(root, "de/guide/x.md"), "utf8"),
+      plain: await readFile(join(root, "de/guide/plain.md"), "utf8"),
+    });
+    const before = await bytes();
+
+    // Re-import of the loaded map must not rewrite anything.
+    await adapter.write("de", first);
+    expect(await bytes()).toEqual(before);
+
+    // A human edit of the body is still classified human by core's rule.
+    await writeFile(join(root, "de/guide/x.md"), before.x.replace("schnell", "bearbeitet"));
+    const { collectPending } = await import("../../../../scripts/i18n/core.mjs");
+    const { merged } = collectPending(
+      [{ id: "guide/x.md", sourceText: "changed" }],
+      await adapter.load("de"),
+    );
+    expect(merged.get("guide/x.md")?.provenance).toBe("human");
+  });
+
+  it("an import leaves a legacy page alone when its body and stamps already match (#884)", async () => {
+    // A page written before i18n_hash_version existed. Re-stamping it on every
+    // import is the churn #884 describes; only a real change should rewrite it.
+    await seed("guide/legacy.md", "# Legacy {#legacy}\n\nHallo.\n");
+    const legacy = join(root, "de/guide/legacy.md");
+    await mkdir(join(root, "de/guide"), { recursive: true });
+    const stamped =
+      "---\ni18n_source_hash: abc123def456\ni18n_provenance: machine\ni18n_output_hash: 000000000000\n---\n# Legacy {#legacy}\n\nHallo.\n";
+    await writeFile(legacy, stamped, "utf8");
+    const adapter = createDocsAdapter({ root });
+    const units = await adapter.extract();
+    const entries = new Map(
+      units.map((u: Unit) => [
+        u.id,
+        {
+          text: "# Legacy {#legacy}\n\nHallo.\n",
+          sourceHash: "abc123def456",
+          provenance: "machine" as const,
+          outputHash: "0".repeat(12),
+          stale: false,
+        },
+      ]),
+    );
+    await adapter.write("de", entries);
+    expect(await readFile(legacy, "utf8")).toBe(stamped);
+  });
+
   it("migrates legacy machine hashes without misclassifying rendered output as human", async () => {
     await seed("guide/x.md", "# X {#x}\n");
     await seed(

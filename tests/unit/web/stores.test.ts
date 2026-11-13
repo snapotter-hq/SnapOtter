@@ -587,12 +587,12 @@ describe("API lib", () => {
 
     it("throws on non-ok response (e.g., 401)", async () => {
       fetchMock.mockReturnValueOnce(failResponse(401));
-      await expect(apiGet("/v1/secret")).rejects.toThrow("API error: 401");
+      await expect(apiGet("/v1/secret")).rejects.toThrow("An error occurred");
     });
 
     it("throws on non-ok response (e.g., 500)", async () => {
       fetchMock.mockReturnValueOnce(failResponse(500));
-      await expect(apiGet("/v1/broken")).rejects.toThrow("API error: 500");
+      await expect(apiGet("/v1/broken")).rejects.toThrow("An error occurred");
     });
 
     it("throws when fetch itself rejects (network error)", async () => {
@@ -629,7 +629,7 @@ describe("API lib", () => {
 
     it("throws on non-ok response", async () => {
       fetchMock.mockReturnValueOnce(failResponse(422));
-      await expect(apiPost("/v1/items", {})).rejects.toThrow("API error: 422");
+      await expect(apiPost("/v1/items", {})).rejects.toThrow("An error occurred");
     });
   });
 
@@ -653,7 +653,7 @@ describe("API lib", () => {
 
     it("throws on non-ok response", async () => {
       fetchMock.mockReturnValueOnce(failResponse(404));
-      await expect(apiPut("/v1/items/999", {})).rejects.toThrow("API error: 404");
+      await expect(apiPut("/v1/items/999", {})).rejects.toThrow("An error occurred");
     });
   });
 
@@ -676,7 +676,7 @@ describe("API lib", () => {
 
     it("throws on non-ok response", async () => {
       fetchMock.mockReturnValueOnce(failResponse(403));
-      await expect(apiDelete("/v1/items/1")).rejects.toThrow("API error: 403");
+      await expect(apiDelete("/v1/items/1")).rejects.toThrow("An error occurred");
     });
   });
 

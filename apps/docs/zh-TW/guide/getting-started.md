@@ -1,15 +1,15 @@
 ---
-description: "用一道 Docker 指令安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整功能總覽。"
-i18n_source_hash: 5bc863dc7351
+description: "以單一指令透過 Docker 安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整的功能概覽。"
+i18n_source_hash: aa8428189808
 i18n_provenance: machine
-i18n_output_hash: c2b2ed21e05f
+i18n_output_hash: 64dfd1c79f25
 i18n_hash_version: 2
 ---
 
-# 快速上手 {#getting-started}
+# 快速入門 {#getting-started}
 
 ::: tip 安裝前先試用
-在 [demo.snapotter.com](https://demo.snapotter.com) 探索完整 UI，無需註冊或安裝。
+在 [demo.snapotter.com](https://demo.snapotter.com) 探索完整的使用者介面，無須註冊或安裝。
 :::
 
 ## 快速開始 {#quick-start}
@@ -18,43 +18,43 @@ i18n_hash_version: 2
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-這個單一容器運行它所需的一切：在沒有設定 `DATABASE_URL` 的情況下，它在環回介面（嵌入模式）上啟動自己的 PostgreSQL 和 Redis，並將所有資料保存在 `SnapOtter-data` 卷中。這是在家庭實驗室上嘗試 SnapOtter 或自架網站的最快方法。對於生產，請使用[規範的 Docker Compose 堆疊](#docker-compose)，它將 PostgreSQL 和 Redis 保留在自己的容器中。嵌入模式以 root 身份運行（預設），並在您設定 `DATABASE_URL` 後自動關閉。
+這個單一容器包含執行所需的一切：未設定 `DATABASE_URL` 時，它會在 loopback 介面上啟動自己的 PostgreSQL 與 Redis（內嵌模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用伺服器自行架設最快的方式。正式環境請使用[標準 Docker Compose 堆疊](#docker-compose)，它會把 PostgreSQL 與 Redis 放在各自的容器中。內嵌模式以 root 身分執行（預設），一旦設定 `DATABASE_URL` 就會自動關閉。
 
-要安裝在 Raspberry Pi、舊筆電或小型 VPS 上？請參閱[低資源環境部署](/zh-TW/guide/low-resource)，取得調校過的逐步教學，並了解受限硬體能有什麼表現。
+要安裝在 Raspberry Pi、舊筆電或小型 VPS 上嗎？請參閱[低資源環境設定](/zh-TW/guide/low-resource)，了解調校後的操作步驟，以及在受限硬體上的預期表現。
 
-首次登入時會要求你變更密碼。
+首次登入時，系統會要求您變更密碼。
 
 ::: tip 匿名產品分析
-SnapOtter 預設包含匿名產品分析。若要關閉它，請開啟 **Settings → System → Privacy** 並關閉 **Anonymous Product Analytics**。它會立即對整個執行個體停止。
+SnapOtter 預設包含匿名產品分析。若要關閉，請開啟 **設定 → 系統 → 隱私權**，並關閉 **匿名產品分析**。整個執行個體會立即停止收集。
 
-你也可以設定環境變數 `SNAPOTTER_TELEMETRY=0`（`false` 和 `off` 也適用）以停用執行個體的所有遙測，無需重新建置。
+您也可以設定環境變數 `SNAPOTTER_TELEMETRY=0`（`false` 與 `off` 同樣有效），無須重新建置即可停用該執行個體的所有遙測。
 
-錯誤監控由 [Sentry](https://sentry.io) 提供，它透過開源計畫贊助 SnapOtter。
+錯誤監控由 [Sentry](https://sentry.io) 提供，Sentry 透過其開源計畫贊助 SnapOtter。
 
-關於所收集內容的詳細資訊，請參閱 [SnapOtter 收集的內容](/zh-TW/guide/telemetry)。
+關於收集內容的詳細資訊，請參閱 [SnapOtter 收集哪些資料](/zh-TW/guide/telemetry)。
 :::
 
 ::: tip NVIDIA CUDA 加速
-添加 `--gpus all` 以實現 NVIDIA CUDA 加速的背景移除、放大、臉部增強和恢復。 OCR 仍然基於 CPU，並且在有或沒有 GPU 存取的情況下在相同映像中工作：
+加上 `--gpus all`，即可使用 NVIDIA CUDA 加速的去背、放大、臉部增強與修復。OCR 仍然使用 CPU，無論是否有 GPU 存取權，都可在同一個映像檔中運作：
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-需要 [NVIDIA 容器工具包](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。當 CUDA 不可用時自動回退到 CPU。目前，AI 推理不支援透過 VA-API、Quick Sync 或 OpenCL 進行 Intel/AMD iGPU 加速。請參閱 [Docker 標籤](/zh-TW/guide/docker-tags) 以了解基準。如果 AI 工具在 CPU 上運作（儘管 `--gpus all`），請參閱[驗證 GPU 加速](/zh-TW/guide/deployment#verify-gpu-acceleration)。
+需要 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。CUDA 無法使用時會自動退回 CPU。目前 AI 推論不支援透過 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 內顯加速。效能基準請參閱 [Docker 映像檔標籤](/zh-TW/guide/docker-tags)。如果已使用 `--gpus all`，AI 工具卻仍在 CPU 上執行，請參閱[驗證 GPU 加速](/zh-TW/guide/deployment#verify-gpu-acceleration)。
 :::
 
-::: details 也在 GHCR 上
+::: details 也可從 GHCR 取得
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
 ```
 
-兩個登錄檔在每次發行時都會發布相同的映像檔。
+兩個登錄庫在每次發行時都會發布相同的映像檔。
 :::
 
-## Docker 編寫 {#docker-compose}
+## Docker Compose {#docker-compose}
 
-使用每個版本維護和測試的生產文件，而不是從此頁面複製縮寫的 Compose 範例：
+請使用隨每次發行維護並測試過的正式環境檔案，而不要複製本頁中簡化的 Compose 範例：
 
 ```bash
 install -d -m 700 snapotter && cd snapotter
@@ -72,13 +72,13 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-規範的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 包括所有四個運行時卷、運行狀況檢查、資源限制、持久性 Redis 配置、固定資料庫/快取映像以及當前容器強化。首次登入後立即變更預設管理員密碼。對於可重現的部署，請將 SnapOtter 應用程式映像固定到您驗證的發布標籤或摘要，而不是遵循 `latest`。
+標準的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 包含全部四個執行階段磁碟區、健康檢查、資源限制、持久化的 Redis 設定、固定版本的資料庫與快取映像檔，以及目前的容器強化設定。首次登入後請立即變更預設的管理員密碼。若要取得可重現的部署，請將 SnapOtter 應用程式映像檔固定在您驗證過的發行標籤或摘要，而不是追蹤 `latest`。
 
-有關所有環境變量，請參閱[配置](/zh-TW/guide/configuration)；有關機密、網路策略和備份指南，請參閱[安全性和強化](/zh-TW/guide/security)。
+所有環境變數請參閱[設定](/zh-TW/guide/configuration)，機密、網路原則與備份指引請參閱[安全性與強化](/zh-TW/guide/security)。
 
 ## 從原始碼建置 {#build-from-source}
 
-**先決條件：** Node.js 22.22+、pnpm 9+、Docker（用於 Postgres + Redis）、Python 3.11+（用於 AI 功能）、Git。
+**先決條件：** Node.js 22.22+、pnpm 9+、Docker（用於 Postgres 與 Redis）、Python 3.11+（用於 AI 功能）、Git。
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -91,34 +91,34 @@ pnpm dev
 - 前端：[http://localhost:1351](http://localhost:1351)
 - 後端：[http://localhost:13490](http://localhost:13490)
 
-## 你可以做什麼 {#what-you-can-do}
+## 您可以做什麼 {#what-you-can-do}
 
-### 檔案處理（200+ 工具） {#file-processing-200-tools}
+### 檔案處理（200+ 種工具） {#file-processing-200-tools}
 
-| 模態 | 數量 | 範例工具 |
+| 類型 | 數量 | 範例工具 |
 |----------|-------|---------------|
-| **影像** | 112 | 調整大小、裁切、壓縮、轉換、去背、放大、OCR、浮水印、拼貼、上色、GIF 工具、格式預設 |
-| **影片** | 57 | 修剪、裁切、壓縮、轉換、合併、擷取音訊、自動字幕、影片轉 GIF、調整大小、穩定化、格式預設 |
-| **音訊** | 27 | 修剪、合併、轉換、正規化、雜訊抑制、轉錄、音高變換、淡入淡出、鈴聲製作、格式預設 |
-| **PDF / 文件** | 35 | 合併、分割、壓縮、OCR、浮水印、遮蔽、Word 轉 PDF、Excel 轉 PDF、旋轉、保護、修復 |
+| **圖片** | 112 | 調整大小、裁切、壓縮、轉換、去背、放大、OCR、浮水印、拼貼、上色、GIF 工具、格式預設 |
+| **影片** | 57 | 剪輯、裁切、壓縮、轉換、合併、擷取音訊、自動字幕、影片轉 GIF、調整大小、防震、格式預設 |
+| **音訊** | 27 | 剪輯、合併、轉換、正規化、降噪、轉錄、變調、淡入淡出、鈴聲製作、格式預設 |
+| **PDF / 文件** | 35 | 合併、分割、壓縮、OCR、浮水印、塗黑、Word 轉 PDF、Excel 轉 PDF、旋轉、保護、修復 |
 | **檔案** | 23 | CSV 轉 JSON、JSON 轉 XML、合併 CSV、分割 CSV、建立 ZIP、解壓縮 ZIP、圖表製作、YAML/JSON |
 
 ### 管線 {#pipelines}
 
-將工具串連成多步驟工作流程，並套用到一張影像或整個批次：
+將工具串接成多步驟工作流程，並套用到單張圖片或整批檔案：
 
-1. 在側邊欄開啟 **Pipelines**。
-2. 新增步驟（任何工具、任何設定）。
-3. 對單一檔案執行，或一次對整個批次執行。
-4. 儲存管線以供日後重用。
+1. 在側邊欄開啟 **管線**。
+2. 加入步驟（任何工具、任何設定）。
+3. 對單一檔案執行，或一次對整批檔案執行。
+4. 儲存管線以便日後重複使用。
 
-管線預設允許 20 個步驟。設定 `MAX_PIPELINE_STEPS=0` 可讓限制變為無限制。
+管線預設允許 20 個步驟。設定 `MAX_PIPELINE_STEPS=0` 可取消此上限。
 
 ### 檔案庫 {#file-library}
 
-你處理的每個檔案都能儲存到你的 **Files** 檔案庫。SnapOtter 會追蹤完整的版本歷史，讓你能從原始上傳到最終輸出追溯每一個處理步驟。
+您處理過的每個檔案都可以儲存到 **檔案** 庫。SnapOtter 會追蹤完整的版本歷程，讓您能追溯從原始上傳到最終輸出的每個處理步驟。
 
-儲存是明確的：你儲存到檔案庫的結果會保留，直到你刪除它們；而你處理後未儲存的結果會在 72 小時後自動清除（可透過 `FILE_MAX_AGE_HOURS` 設定）。
+儲存是明確的動作：您儲存到檔案庫的結果會保留到您刪除為止，而處理後未儲存的結果會在 72 小時後自動清除（可透過 `FILE_MAX_AGE_HOURS` 設定）。
 
 ### REST API 與 API 金鑰 {#rest-api-api-keys}
 
@@ -131,28 +131,28 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'
 ```
 
-在 **Settings → API Keys** 底下產生 API 金鑰。所有端點請參閱 [REST API 參考](/zh-TW/api/rest)，或造訪 [http://localhost:1349/api/docs](http://localhost:1349/api/docs) 以取得互動式參考。
+請在 **設定 → API 金鑰** 下產生 API 金鑰。所有端點請參閱 [REST API 參考文件](/zh-TW/api/rest)，或造訪 [http://localhost:1349/api/docs](http://localhost:1349/api/docs) 使用互動式參考文件。
 
 ### 多使用者與團隊 {#multi-user-teams}
 
-啟用多位使用者並搭配以角色為基礎的存取控制：
+啟用多位使用者，並搭配角色型存取控制：
 
-- **管理員**：完整存取 — 管理使用者、團隊、設定，以及所有檔案/管線/API 金鑰
-- **使用者**：使用工具、管理自己的檔案/管線/API 金鑰
+- **管理員**：完整存取權，可管理使用者、團隊、設定，以及所有檔案、管線與 API 金鑰
+- **使用者**：使用工具，管理自己的檔案、管線與 API 金鑰
 
-在 **Settings → Teams** 底下建立團隊以將使用者分組。
+在 **設定 → 團隊** 下建立團隊，以將使用者分組。
 
-設定 `AUTH_ENABLED=true`（或 `false` 用於單一使用者/自用而不需登入）。
+設定 `AUTH_ENABLED=true`（或設定 `false`，供單人或自用且無須登入的情境）。
 
 ## 在手機上使用 {#use-it-from-your-phone}
 
-SnapOtter 可以在行動瀏覽器中使用，也可以安裝為應用程式。在手機上打開你的執行個體，然後：
+SnapOtter 可在行動瀏覽器中使用，也可以安裝成應用程式。在手機上開啟您的執行個體，然後：
 
-- **iPhone / iPad（Safari）**：點一下「分享」，再點一下**加入主畫面**。
-- **Android（Chrome）**：打開瀏覽器選單，輕觸**安裝應用程式**。
+- **iPhone / iPad（Safari）：** 點選分享，再點選 **加入主畫面**。
+- **Android（Chrome）：** 開啟瀏覽器選單，點選 **安裝應用程式**。
 
-安裝好的應用程式會在獨立視窗中開啟，直接進入你的執行個體。
+安裝後的應用程式會在獨立視窗中開啟，直接進入您的執行個體。
 
-有一點要注意：瀏覽器只在 HTTPS 下才會提供安裝選項。區域網路裡的一般 HTTP 位址照樣能在瀏覽器分頁中正常使用；想要真正安裝，請把執行個體放到帶有憑證的反向代理後面（參見[部署指南](/zh-TW/guide/deployment)）。
+有一點要注意：瀏覽器只會在 HTTPS 下提供安裝提示。區域網路上的純 HTTP 位址在瀏覽器分頁中仍可正常使用；若要真正安裝，請將執行個體放在附有憑證的反向代理後面（請參閱[部署指南](/zh-TW/guide/deployment)）。
 
-在手機和平板上，影像工具會在上傳按鈕旁邊顯示**拍照**按鈕。拍一張收據或白板，照片就會直接進入工具。
+在手機與平板上，圖片工具會在上傳按鈕旁顯示 **拍照** 按鈕。拍下收據或白板，就會直接送進工具。

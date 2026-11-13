@@ -1,32 +1,32 @@
 ---
-i18n_source_hash: a0e632be0948
+i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 55f9cb206234
+i18n_output_hash: 91eddb85b457
 i18n_hash_version: 2
 ---
 # Düşük Kaynaklı Kurulumlar {#low-resource-setups}
 
-SnapOtter küçük donanımda iyi çalışır: bir Raspberry Pi 4 veya 5, eski bir dizüstü bilgisayar ya da 2 GB'lık bir VPS. Bu sayfa, bu makineler için pratik kılavuzdur: neler beklemeniz gerektiği, makul sınırlarla kopyala-yapıştır bir kurulum ve hangi özelliklerin atlanacağı. Bu sayıların arkasındaki tam kıyaslama verileri [Donanım Gereksinimleri](/tr/guide/deployment#hardware-requirements) bölümündedir.
+SnapOtter küçük donanımlarda iyi çalışır: Raspberry Pi 4 veya 5, eski bir dizüstü bilgisayar ya da 2 GB'lık bir VPS. Bu sayfa bu makineler için pratik bir rehberdir: ne beklemeniz gerektiği, makul sınırlarla kopyala-yapıştır bir kurulum ve hangi özelliklerin atlanacağı. Bu sayıların arkasındaki tam kıyaslama verileri [Donanım Gereksinimleri](/tr/guide/deployment#hardware-requirements) sayfasındadır.
 
 Baştan iki kesin kısıt:
 
-- **Yalnızca 64 bit.** İmaj `linux/amd64` ve `linux/arm64` için oluşturulur. 32 bit ARM (`armv7`/`armhf`) desteklenmez; bu yüzden birinci nesil Pi'ler ve Pi Zero ailesi devre dışıdır.
-- **2 GB bellek alt sınırı.** 512 MB yığını başlatamaz, 1 GB ise çok dosyalı toplu işlerde başarısız olur. Rahat çalışan en küçük yapılandırma 2 çekirdekli 2 GB'dir.
+- **Yalnızca 64 bit.** İmaj `linux/amd64` ve `linux/arm64` için derlenmiştir. 32 bit ARM (`armv7`/`armhf`) desteklenmez; bu nedenle ilk nesil Pi'ler ve Pi Zero ailesi kapsam dışıdır.
+- **2 GB bellek tabanı (yapay zeka dışı araçlar).** 512 MB yığını başlatamaz, 1 GB ise çok dosyalı toplu işlemlerde başarısız olur. 2 çekirdekli 2 GB, yapay zeka dışı araçları rahatça çalıştıran en küçük yapılandırmadır.
 
-## Küçük donanımda neler iyi çalışır {#what-runs-well}
+## Küçük donanımda iyi çalışanlar {#what-runs-well}
 
-AI olmayan her araç 2 GB / 2 çekirdekli bir makinede çalışır: Görsel ve Dosyalar bölümlerinin tamamı, PDF araçları ve stream copy ile yapılan video ve ses işlemleri (kırpma, sesi kapatma, kapsayıcı değişimi). Çoğu bir saniyenin altında tamamlanır.
+Yapay zeka dışındaki her araç 2 GB / 2 çekirdekli bir makinede çalışır: Görsel ve Dosyalar bölümlerinin tamamı, PDF araçları ve akış kopyalamalı video ve ses işlemleri (kırpma, sessize alma, kapsayıcı yeniden paketleme). Çoğu bir saniyenin altında tamamlanır.
 
 İki iş yükü istisnadır:
 
-- **Videoyu yeniden kodlama** (codec'ler arasında dönüştürme) CPU'ya bağlıdır. Hızlı bir masaüstü CPU'sunda ~40 sn süren bir 1080p klip, Pi sınıfı bir CPU'da birkaç dakika sürebilir. Stream copy işlemleri anlık kalır.
-- **AI araçları** RAM (4 GB önerilir) ve disk ister (büyük paketlerin her biri 4-5 GB'dir) ve ağır olanlar (ölçek büyütme, fotoğraf restorasyonu, arka plan kaldırma) Pi sınıfı CPU'larda pratik değildir. Yüz algılama ve OCR gibi hafif AI, belleğiniz yetiyorsa kullanılabilir.
+- **Video yeniden kodlama** (codec'ler arası dönüştürme) CPU'ya bağımlıdır. Hızlı bir masaüstü CPU'da ~40 sn süren 1080p bir klip, Pi sınıfı bir CPU'da birkaç dakika sürebilir. Akış kopyalama işlemleri anlık kalır.
+- **Yapay zeka araçlarının** paket başına CPU bellek tabanları vardır: Yüz Algılama ve yerleşik Hızlı OCR için 2 GB ana makine RAM'i (0,5 GB boş), Doğru OCR için 4 GiB yapılandırılmış etkin bellek, Transkripsiyon, Nesne Silici ve Renklendirme, Arka Plan Kaldırma, Büyütme ve İyileştirme ile Fotoğraf Restorasyonu için 4 GB ana makine RAM'i (2 ila 3 GB boş) ve Yüksek Kaliteli Inpainting için 8 GB ana makine RAM'i (6 GB boş). 2 GB'lık bir makine Whisper, RealESRGAN, rembg veya LaMa'yı bellek yetersizliğiyle sonlandırılmadan çalıştıramaz; bu yüzden SnapOtter, Python yan servisine göndermeden önce boş belleği denetler ve paket tabanının altındaki çalıştırmaları hemen reddeder.
 
-İkisi de siz kullanmadıkça kurulmaz ve çalışmaz: hiçbir AI paketi kurulu değilken uygulama boşta yaklaşık 360 MB kullanır ve AI paketleri yalnızca bir yönetici etkinleştirdiğinde indirilir.
+İkisi de kullanmadığınız sürece ne kurulur ne de çalışır: hiçbir yapay zeka paketi kurulu değilken uygulama yaklaşık 360 MB ile boşta bekler ve yapay zeka paketleri yalnızca bir yönetici etkinleştirdiğinde indirilir.
 
-## Raspberry Pi / eski dizüstü için adım adım kurulum {#walkthrough}
+## Raspberry Pi / eski dizüstü bilgisayar adım adım kurulum {#walkthrough}
 
-Bu, [Başlarken](/tr/guide/getting-started) bölümündeki standart Compose kurulumunun kaynak limitleri ve temkinli sınırlar eklenmiş hâlidir. 64 bit bir işletim sistemi varsayar (bir Pi'de: Raspberry Pi OS 64-bit veya Ubuntu Server arm64).
+Bu, [Başlangıç](/tr/guide/getting-started) sayfasındaki standart Compose kurulumudur; ek olarak kaynak sınırları ve ihtiyatlı üst sınırlar içerir. 64 bit bir işletim sistemi varsayar (Pi'de: 64 bit Raspberry Pi OS veya Ubuntu Server arm64).
 
 ```yaml
 services:
@@ -37,7 +37,8 @@ services:
     volumes:
       - ./snapotter-data:/data
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@db:5432/snapotter
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@db:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@db:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
       # Small-box profile: see the table below for what each cap does.
       - CONCURRENT_JOBS=1
@@ -59,9 +60,9 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      - POSTGRES_USER=snapotter
-      - POSTGRES_PASSWORD=snapotter     # Yerel olmayan dağıtımlar için bunu değiştirin
-      - POSTGRES_DB=snapotter
+      - POSTGRES_USER=${POSTGRES_USER:-snapotter}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      - POSTGRES_DB=${POSTGRES_DB:-snapotter}
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -74,31 +75,31 @@ services:
 
 Pi sınıfı makineler için notlar:
 
-- **SD kart yerine bir USB SSD tercih edin**; veri birimi ve Postgres bunun üzerinde dursun. İş çalışma alanları gerçek disk G/Ç'si yapar ve SD kartlar hem yavaştır hem de çabuk aşınır.
-- **Hepsi bir arada tek konteyner burada da çalışır** (`DATABASE_URL`/`REDIS_URL` ayarlanmadığında gömülü Postgres ve Redis) ve belleği kısıtlı bir ana makinede gömülü Redis sınırını `REDIS_MAXMEMORY` ile düşürmelisiniz (bkz. [Yapılandırma](/tr/guide/configuration)). Compose servis başına daha ince denetim sağlar; bu kılavuzun Compose kullanmasının nedeni de budur.
-- **2 GB'lık cihazlara swap ekleyin.** Bu, ara sıra oluşan bir sıçramanın (büyük bir PDF, sınırlamayı unuttuğunuz bir toplu iş) bellek yetersizliğinden süreç sonlandırmayla bitmesini önler. zram, SD kart dostu seçenektir.
-- arm64 imajı yalnızca CPU içindir; ARM kartlarda CUDA yoktur.
+- Veri birimi ve Postgres için **SD kart yerine USB SSD tercih edin**. İş çalışma alanları gerçek disk G/Ç'si yapar; SD kartlar hem yavaştır hem de çabuk aşınır.
+- **Hepsi bir arada tek kapsayıcı da burada çalışır** (`DATABASE_URL`/`REDIS_URL` ayarlanmadığında gömülü Postgres ve Redis). Bellek kısıtlı bir ana makinede gömülü Redis sınırını `REDIS_MAXMEMORY` ile düşürmelisiniz ([Yapılandırma](/tr/guide/configuration) sayfasına bakın). Compose servis başına daha ince denetim sağlar; bu rehberin onu kullanmasının nedeni budur.
+- **2 GB'lık cihazlarda takas alanı (swap) ekleyin.** Ara sıra görülen ani artışların (büyük bir PDF, sınırlamayı unuttuğunuz bir toplu iş) bellek yetersizliğiyle sonlandırılmasını önler. zram, SD kart dostu seçenektir.
+- arm64 imajı yalnızca CPU içindir; ARM kartlarında CUDA yoktur.
 
-## Ayar düğmeleri {#tuning-knobs}
+## Ayar parametreleri {#tuning-knobs}
 
-Tüm sınırlar ortam değişkenleridir ve [Yapılandırma](/tr/guide/configuration) bölümünde eksiksiz belgelenmiştir. `0` sınırsız veya otomatik anlamına gelir. Küçük donanımda önemli olanlar:
+Tüm sınırlar ortam değişkenleridir ve [Yapılandırma](/tr/guide/configuration) sayfasında ayrıntılı olarak belgelenmiştir. `0` sınırsız veya otomatik anlamına gelir. Küçük donanımda önemli olanlar:
 
 | Değişken | Küçük makine önerisi | Neyi korur |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Kaç işin paralel çalıştığı. Otomatik algılama CPU çekirdek sayısının bir eksiğini kullanır; bu büyük makinelerde iyidir, bellek baskısı altındaki 2 çekirdekli bir makinede ise fazla isteklidir. |
-| `MAX_WORKER_THREADS` | `2` | Görüntü işleme iş parçacığı havuzu. |
-| `MAX_BATCH_SIZE` | `5` | 1-2 GB'lık makinelerin belleği ilk önce toplu işlerde tükenir. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Tek bir devasa dosyanın tüm çalışma alanını kaplamasını önler. |
-| `MAX_MEGAPIXELS` | `50` | 100+ MP bir görseli çözmek, dosya boyutundan bağımsız olarak RAM'e mal olur. |
-| `MAX_VIDEO_DURATION_S` | `300` | Uzun dönüştürmeler küçük bir CPU'yu dakikalarca, hatta saatlerce meşgul eder. |
-| `PROCESSING_TIMEOUT_S` | `600` | Kontrolden çıkan bir işin makineyi eninde sonunda serbest bırakması için kesin tavan. |
+| `CONCURRENT_JOBS` | `1` | Kaç işin paralel çalışacağı. Otomatik algılama CPU çekirdek sayısından bir eksiğini kullanır; bu büyük makinelerde uygundur, bellek baskısı altındaki 2 çekirdekli bir makine için fazla ataktır. |
+| `MAX_WORKER_THREADS` | `2` | Görsel işleme iş parçacığı havuzu. |
+| `MAX_BATCH_SIZE` | `5` | 1-2 GB'lık makinelerde belleğin ilk tükendiği yer toplu işlemlerdir. |
+| `MAX_UPLOAD_SIZE_MB` | `100` | Tek bir dev dosyanın tüm çalışma alanını işgal etmesini önler. |
+| `MAX_MEGAPIXELS` | `50` | 100+ MP'lik bir görseli çözmek, dosya boyutundan bağımsız olarak RAM harcar. |
+| `MAX_VIDEO_DURATION_S` | `300` | Uzun kodlama işlemleri küçük bir CPU'yu dakikalarca ya da saatlerce meşgul eder. |
+| `PROCESSING_TIMEOUT_S` | `600` | Kontrolden çıkan bir işin makineyi eninde sonunda serbest bırakmasını sağlayan kesin üst sınır. |
 
-Bu sınırlar sunucunun neyi kabul ettiğini belirler; bu yüzden onları olabildiğince küçük değil, gerçekten kullandığınız şeye göre ayarlayın. Videoya hiç dokunmuyorsanız bir `MAX_VIDEO_DURATION_S` sınırının maliyeti yoktur; her gün belge tarıyorsanız `MAX_PDF_PAGES` değişkenine sınır koymayın.
+Bu sınırlar sunucunun kabul ettiklerine uygulanır; bu yüzden olabildiğince küçük yapmak yerine gerçekten kullandıklarınıza göre ayarlayın. Hiç video kullanmıyorsanız `MAX_VIDEO_DURATION_S` sınırının size maliyeti yoktur; her gün belge tarıyorsanız `MAX_PDF_PAGES` değerini sınırlamayın.
 
-## Nelerden vazgeçmeli {#what-to-skip}
+## Nelerin atlanacağı {#what-to-skip}
 
-- **Ağır AI paketleri.** Ölçek büyütme, fotoğraf restorasyonu ve arka plan kaldırma bir GPU veya çok çekirdekli hızlı bir CPU ister ve her paket 4-5 GB disk kaplar. Küçük bir makinede bunları kurmamanız yeterlidir; paketi eksik olan araçlar çalışmak yerine bir kurulum istemi gösterir.
-- **Rutin iş yükü olarak video yeniden kodlama.** Ara sıra dönüştürme sorun değildir (yalnızca yavaştır); sürekli bir dönüştürme kuyruğu CPU çekirdeği ister, Pi değil.
-- **Genel olarak kullanılmayan araçlar.** Bir yönetici Settings içinden tek tek araçları kapatabilir; bu, onları arayüzden kaldırır ve API rotalarının kaydını durdurur. Bu tek başına bellek kazandırmaz, ancak paylaşılan küçük bir örneğin donanımın kaldıramayacağı o tek iş yükü için kullanılmasını engeller.
+- **Ağır yapay zeka paketleri.** Büyütme, fotoğraf restorasyonu ve arka plan kaldırma bir GPU ya da hızlı, çok çekirdekli bir CPU ister; her paket 4-5 GB disk kaplar. Küçük bir makinede bunları kurmayın; paketi eksik olan araçlar çalışmak yerine bir kurulum istemi gösterir.
+- **Rutin iş yükü olarak video yeniden kodlama.** Ara sıra yapılan kodlamalar sorun değildir (yalnızca yavaştır); sürekli bir kodlama kuyruğu Pi'ye değil CPU çekirdeklerine ihtiyaç duyar.
+- **Genel olarak kullanılmayan araçlar.** Bir yönetici Ayarlar'dan tek tek araçları kapatabilir; bu, onları arayüzden kaldırır ve API rotalarının kaydedilmesini durdurur. Bu tek başına bellek tasarrufu sağlamaz, ancak paylaşılan küçük bir örneğin donanımın kaldıramayacağı iş yükü için kullanılmasını engeller.
 
-Örneği daha sonra daha büyük bir donanıma taşırsanız sınırları kaldırın (`0` değerine geri alın); aynı veri birimi olduğu gibi taşınır.
+Örneği daha sonra daha güçlü bir donanıma taşırsanız sınırları kaldırın (`0` değerine geri alın); aynı veri birimi olduğu gibi taşınır.

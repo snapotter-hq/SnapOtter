@@ -252,6 +252,6 @@ export async function evaluateAlerts(): Promise<void> {
   }
 
   if (delivered > 0) {
-    console.log(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
+    logger.info(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
   }
 }

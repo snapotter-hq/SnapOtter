@@ -2,6 +2,7 @@ import type { SupportedLocale, TranslationKeys } from "@snapotter/shared";
 import { en, SafeError, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { appUrl } from "@/lib/app-url";
+import { setCurrentTranslations } from "@/lib/current-translations";
 
 export type LocaleModule = Record<string, TranslationKeys>;
 
@@ -197,6 +198,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [locale]);
+
+  useEffect(() => {
+    setCurrentTranslations(translations);
+  }, [translations]);
 
   useEffect(() => {
     document.documentElement.lang = effectiveLocale;

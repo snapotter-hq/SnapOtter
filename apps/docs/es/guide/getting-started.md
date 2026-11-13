@@ -1,15 +1,15 @@
 ---
-description: "Instala SnapOtter con Docker en un solo comando. Incluye la configuración de Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
-i18n_source_hash: 5bc863dc7351
+description: "Instale SnapOtter con Docker en un solo comando. Incluye la configuración con Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
+i18n_source_hash: aa8428189808
 i18n_provenance: machine
-i18n_output_hash: 5d9ea3a3420e
+i18n_output_hash: a185348bc23d
 i18n_hash_version: 2
 ---
 
 # Primeros pasos {#getting-started}
 
-::: tip Pruébalo antes de instalar
-Explora la interfaz completa en [demo.snapotter.com](https://demo.snapotter.com), sin necesidad de registro ni instalación.
+::: tip Pruébelo antes de instalarlo
+Explore la interfaz completa en [demo.snapotter.com](https://demo.snapotter.com), sin registro ni instalación.
 :::
 
 ## Inicio rápido {#quick-start}
@@ -18,30 +18,30 @@ Explora la interfaz completa en [demo.snapotter.com](https://demo.snapotter.com)
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` configurado, inicia su propio PostgreSQL y Redis en la interfaz loopback (modo integrado) y mantiene todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o autohospedarse en un laboratorio doméstico. Para producción, utilice la [pila canónica de Docker Compose](#docker-compose), que mantiene PostgreSQL y Redis en sus propios contenedores. El modo integrado se ejecuta como root (el valor predeterminado) y se apaga automáticamente tan pronto como configura `DATABASE_URL`.
+Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` definido, inicia su propio PostgreSQL y Redis en la interfaz loopback (modo integrado) y guarda todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o de alojarlo usted mismo en un homelab. Para producción, utilice el [stack canónico de Docker Compose](#docker-compose), que mantiene PostgreSQL y Redis en sus propios contenedores. El modo integrado se ejecuta como root (el valor predeterminado) y se desactiva automáticamente en cuanto define `DATABASE_URL`.
 
-¿Vas a instalar en una Raspberry Pi, un portátil viejo o un VPS pequeño? Consulta [Configuraciones con recursos limitados](/es/guide/low-resource) para una guía paso a paso ajustada y para saber qué esperar de un hardware limitado.
+¿Va a instalarlo en una Raspberry Pi, un portátil antiguo o un VPS pequeño? Consulte [Configuraciones de bajos recursos](/es/guide/low-resource) para una guía ajustada y lo que cabe esperar de un hardware limitado.
 
-Se te pedirá que cambies tu contraseña en el primer inicio de sesión.
+Se le pedirá que cambie su contraseña en el primer inicio de sesión.
 
-::: tip Analítica Anónima de Producto
-SnapOtter incluye analítica de producto anónima por defecto. Para desactivarla, abre **Ajustes → Sistema → Privacidad** y desactiva **Analítica Anónima de Producto**. Se detiene de inmediato para toda la instancia.
+::: tip Analítica de producto anónima
+SnapOtter incluye analítica de producto anónima de forma predeterminada. Para desactivarla, abra **Settings → System → Privacy** y desactive **Anonymous Product Analytics**. Se detiene de inmediato para toda la instancia.
 
-También puedes establecer la variable de entorno `SNAPOTTER_TELEMETRY=0` (`false` y `off` también funcionan) para deshabilitar toda la telemetría de la instancia sin recompilar.
+También puede definir la variable de entorno `SNAPOTTER_TELEMETRY=0` (`false` y `off` también funcionan) para desactivar toda la telemetría de la instancia sin necesidad de recompilar.
 
-La monitorización de errores funciona con [Sentry](https://sentry.io), que patrocina a SnapOtter a través de su programa de código abierto.
+La supervisión de errores la proporciona [Sentry](https://sentry.io), que patrocina SnapOtter a través de su programa de código abierto.
 
-Para más detalles sobre qué se recopila, consulta [Qué recopila SnapOtter](/es/guide/telemetry).
+Para obtener detalles sobre lo que se recopila, consulte [Qué recopila SnapOtter](/es/guide/telemetry).
 :::
 
-::: tip Aceleración con NVIDIA CUDA
-Agregue `--gpus all` para NVIDIA eliminación de fondo, ampliación, mejora facial y restauración acelerada por CUDA. OCR permanece basado en CPU y funciona en la misma imagen con o sin acceso a GPU:
+::: tip Aceleración NVIDIA CUDA
+Añada `--gpus all` para la eliminación de fondo, la ampliación, la mejora de rostros y la restauración aceleradas con NVIDIA CUDA. El OCR sigue usando la CPU y funciona en la misma imagen con o sin acceso a la GPU:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Vuelve a la CPU automáticamente cuando CUDA no está disponible. La aceleración Intel/AMD iGPU a través de VA-API, Quick Sync u OpenCL no es compatible con la inferencia de IA en la actualidad. Consulte [Etiquetas Docker](/es/guide/docker-tags) para conocer los puntos de referencia. Si las herramientas de IA se ejecutan en la CPU a pesar de `--gpus all`, consulte [Verificar la aceleración de la GPU](/es/guide/deployment#verify-gpu-acceleration).
+Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Recurre a la CPU automáticamente cuando CUDA no está disponible. La aceleración con iGPU de Intel/AMD mediante VA-API, Quick Sync u OpenCL no es compatible actualmente con la inferencia de IA. Consulte [Etiquetas de Docker](/es/guide/docker-tags) para ver los benchmarks. Si las herramientas de IA se ejecutan en la CPU a pesar de `--gpus all`, consulte [Verificar la aceleración por GPU](/es/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details También en GHCR
@@ -52,9 +52,9 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snap
 Ambos registros publican la misma imagen en cada versión.
 :::
 
-## Docker componer {#docker-compose}
+## Docker Compose {#docker-compose}
 
-Utilice el archivo de producción mantenido y probado con cada versión en lugar de copiar un ejemplo de Compose abreviado de esta página:
+Utilice el archivo de producción que se mantiene y prueba con cada versión, en lugar de copiar un ejemplo abreviado de Compose de esta página:
 
 ```bash
 install -d -m 700 snapotter && cd snapotter
@@ -72,13 +72,13 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-El canónico [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) incluye los cuatro volúmenes de tiempo de ejecución, comprobaciones de estado, límites de recursos, configuración duradera de Redis, imágenes de caché/base de datos fijadas y el refuerzo del contenedor actual. Cambie la contraseña de administrador predeterminada inmediatamente después del primer inicio de sesión. Para una implementación reproducible, fije la imagen de la aplicación SnapOtter a la etiqueta de versión o resumen que verificó en lugar de seguir `latest`.
+El [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) canónico incluye los cuatro volúmenes de runtime, comprobaciones de estado, límites de recursos, una configuración de Redis duradera, imágenes de base de datos y caché fijadas y el endurecimiento actual de los contenedores. Cambie la contraseña de administrador predeterminada inmediatamente después del primer inicio de sesión. Para un despliegue reproducible, fije la imagen de la aplicación SnapOtter a la etiqueta de versión o al digest que haya verificado, en lugar de seguir `latest`.
 
-Consulte [Configuración](/es/guide/configuration) para conocer todas las variables de entorno y [Seguridad y refuerzo](/es/guide/security) para conocer secretos, políticas de red y orientación sobre copias de seguridad.
+Consulte [Configuración](/es/guide/configuration) para ver todas las variables de entorno y [Seguridad y endurecimiento](/es/guide/security) para obtener orientación sobre secretos, política de red y copias de seguridad.
 
 ## Compilar desde el código fuente {#build-from-source}
 
-**Requisitos previos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.11+ (para funciones de IA), Git.
+**Requisitos previos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.11+ (para las funciones de IA), Git.
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git
@@ -91,38 +91,38 @@ pnpm dev
 - Frontend: [http://localhost:1351](http://localhost:1351)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
-## Qué puedes hacer {#what-you-can-do}
+## Qué puede hacer {#what-you-can-do}
 
-### Procesamiento de archivos (200+ herramientas) {#file-processing-200-tools}
+### Procesamiento de archivos (más de 200 herramientas) {#file-processing-200-tools}
 
-| Modalidad | Recuento | Herramientas de ejemplo |
+| Modalidad | Cantidad | Herramientas de ejemplo |
 |----------|-------|---------------|
-| **Imagen** | 112 | Redimensionar, Recortar, Comprimir, Convertir, Eliminar fondo, Escalar, OCR, Marca de agua, Collage, Colorizar, Herramientas GIF, ajustes de formato predefinidos |
-| **Vídeo** | 57 | Recortar, Recortar marco, Comprimir, Convertir, Combinar, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, ajustes de formato predefinidos |
-| **Audio** | 27 | Recortar, Combinar, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, ajustes de formato predefinidos |
-| **PDF / Documento** | 35 | Combinar, Dividir, Comprimir, OCR, Marca de agua, Redactar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
-| **Archivos** | 23 | CSV a JSON, JSON a XML, Combinar CSVs, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
+| **Imagen** | 112 | Redimensionar, Recortar, Comprimir, Convertir, Eliminar fondo, Ampliar, OCR, Marca de agua, Collage, Colorear, Herramientas de GIF, preajustes de formato |
+| **Vídeo** | 57 | Cortar, Recortar encuadre, Comprimir, Convertir, Unir, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, preajustes de formato |
+| **Audio** | 27 | Cortar, Unir, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, preajustes de formato |
+| **PDF / Documento** | 35 | Unir, Dividir, Comprimir, OCR, Marca de agua, Censurar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
+| **Archivos** | 23 | CSV a JSON, JSON a XML, Unir CSV, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
 
-### Canalizaciones {#pipelines}
+### Pipelines {#pipelines}
 
-Encadena herramientas en flujos de trabajo de varios pasos y aplícalos a una imagen o a un lote completo:
+Encadene herramientas en flujos de trabajo de varios pasos y aplíquelos a una imagen o a un lote completo:
 
-1. Abre **Canalizaciones** en la barra lateral.
-2. Añade pasos (cualquier herramienta, cualquier configuración).
-3. Ejecuta sobre un solo archivo, o sobre un lote entero a la vez.
-4. Guarda la canalización para reutilizarla más tarde.
+1. Abra **Pipelines** en la barra lateral.
+2. Añada pasos (cualquier herramienta, cualquier ajuste).
+3. Ejecute sobre un solo archivo o sobre un lote completo a la vez.
+4. Guarde el pipeline para reutilizarlo más adelante.
 
-Las canalizaciones permiten 20 pasos por defecto. Establece `MAX_PIPELINE_STEPS=0` para dejar el límite en ilimitado.
+Los pipelines admiten 20 pasos de forma predeterminada. Defina `MAX_PIPELINE_STEPS=0` para que el límite sea ilimitado.
 
 ### Biblioteca de archivos {#file-library}
 
-Cada archivo que proceses puede guardarse en tu biblioteca de **Archivos**. SnapOtter registra el historial de versiones completo para que puedas rastrear cada paso de procesamiento desde la subida original hasta la salida final.
+Cada archivo que procese puede guardarse en su biblioteca de **Files**. SnapOtter registra el historial completo de versiones para que pueda rastrear cada paso de procesamiento, desde la carga original hasta el resultado final.
 
-Guardar es explícito: los resultados que guardas en la biblioteca se conservan hasta que los eliminas, mientras que los resultados que procesas y dejas sin guardar se eliminan automáticamente tras 72 horas (configurable mediante `FILE_MAX_AGE_HOURS`).
+El guardado es explícito: los resultados que guarda en la biblioteca se conservan hasta que los elimine, mientras que los resultados que procesa y deja sin guardar se borran automáticamente tras 72 horas (configurable mediante `FILE_MAX_AGE_HOURS`).
 
-### API REST y claves de API {#rest-api-api-keys}
+### REST API y claves de API {#rest-api-api-keys}
 
-Cada herramienta es accesible mediante HTTP:
+Todas las herramientas son accesibles mediante HTTP:
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/resize \
@@ -131,28 +131,28 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'
 ```
 
-Genera claves de API en **Ajustes → Claves de API**. Consulta la [referencia de la API REST](/es/api/rest) para todos los endpoints, o visita [http://localhost:1349/api/docs](http://localhost:1349/api/docs) para la referencia interactiva.
+Genere claves de API en **Settings → API Keys**. Consulte la [referencia de la REST API](/es/api/rest) para ver todos los endpoints, o visite [http://localhost:1349/api/docs](http://localhost:1349/api/docs) para la referencia interactiva.
 
 ### Multiusuario y equipos {#multi-user-teams}
 
-Habilita varios usuarios con control de acceso basado en roles:
+Habilite varios usuarios con control de acceso basado en roles:
 
-- **Administrador**: acceso completo, gestiona usuarios, equipos, ajustes, todos los archivos/canalizaciones/claves de API
-- **Usuario**: usa herramientas, gestiona sus propios archivos/canalizaciones/claves de API
+- **Admin**: acceso completo; gestiona usuarios, equipos, ajustes y todos los archivos, pipelines y claves de API
+- **User**: usa las herramientas y gestiona sus propios archivos, pipelines y claves de API
 
-Crea equipos en **Ajustes → Equipos** para agrupar usuarios.
+Cree equipos en **Settings → Teams** para agrupar usuarios.
 
-Establece `AUTH_ENABLED=true` (o `false` para un solo usuario/uso propio sin inicio de sesión).
+Defina `AUTH_ENABLED=true` (o `false` para uso individual o personal sin inicio de sesión).
 
-## Úsalo desde el teléfono {#use-it-from-your-phone}
+## Úselo desde su teléfono {#use-it-from-your-phone}
 
-SnapOtter funciona en navegadores móviles y puedes instalarlo como aplicación. Abre tu instancia en el teléfono y luego:
+SnapOtter funciona en navegadores móviles y puede instalarlo como una aplicación. Abra su instancia en el teléfono y después:
 
-- **iPhone / iPad (Safari)**: toca Compartir y luego **Añadir a pantalla de inicio**.
-- **Android (Chrome)**: abre el menú del navegador y toca **Instalar aplicación**.
+- **iPhone / iPad (Safari):** toque Compartir y luego **Añadir a pantalla de inicio**.
+- **Android (Chrome):** abra el menú del navegador y toque **Instalar aplicación**.
 
-La aplicación instalada se abre en su propia ventana, directamente en tu instancia.
+La aplicación instalada se abre en su propia ventana, directamente en su instancia.
 
-Un detalle: los navegadores solo ofrecen la instalación a través de HTTPS. Una dirección HTTP normal en tu red local sigue funcionando bien en una pestaña del navegador; para la instalación real, pon la instancia detrás de un proxy inverso con certificado (consulta la [guía de despliegue](/es/guide/deployment)).
+Una salvedad: los navegadores solo ofrecen la instalación a través de HTTPS. Una dirección HTTP simple en su LAN sigue funcionando bien en una pestaña del navegador; para la instalación real, coloque la instancia detrás de un proxy inverso con un certificado (consulte la [guía de despliegue](/es/guide/deployment)).
 
-En teléfonos y tabletas, las herramientas de imagen muestran un botón **Tomar foto** junto al botón de subida. Fotografía un recibo o una pizarra y llegará directamente a la herramienta.
+En teléfonos y tabletas, las herramientas de imagen muestran un botón **Tomar foto** junto al botón de carga. Fotografíe un recibo o una pizarra y llegará directamente a la herramienta.

@@ -48,6 +48,11 @@ beforeAll(() => {
     "Claude-Session: https://claude.ai/code/session_1\n",
   );
   fs.writeFileSync(path.join(scratch, "body-dash.md"), "Fixes a bug — see below.\n");
+  fs.writeFileSync(path.join(scratch, "body-hyphens.md"), "Fixes a bug -- see below.\n");
+  fs.writeFileSync(
+    path.join(scratch, "body-flags.md"),
+    "Pass `--body-file` and `pnpm test -- x`.\n\n```\nnode a.js -- b\n```\nAlso --flag and a--b are fine.\n",
+  );
   fs.writeFileSync(path.join(scratch, "body-secret.md"), `Uses ${FAKE_GH_TOKEN} for auth.\n`);
 
   repo = path.join(scratch, "repo");
@@ -149,6 +154,21 @@ describe("credential content guard", () => {
     expect(findCredential('token: "${TOKEN}"')).toBeNull();
   });
 
+  it("does not flag a variable reference followed by a comma or semicolon", () => {
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN,")).toBeNull();
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN;")).toBeNull();
+    expect(findCredential("const token = process.env.SNAPOTTER_X_TOKEN;")).toBeNull();
+  });
+
+  it("still flags a real credential followed by a comma or semicolon", () => {
+    const value = "correct-horse-battery-9";
+    expect(findCredential(["password: ", '"', value, '",'].join(""))).toMatch(
+      /credential assignment/,
+    );
+    expect(findCredential(["token=", value, ","].join(""))).toMatch(/credential assignment/);
+    expect(findCredential(["secret=", value, ";"].join(""))).toMatch(/credential assignment/);
+  });
+
   it("denies a token pasted into a command", () => {
     expect(secretContentVerdict(`echo ${FAKE_GH_TOKEN}`, scratch)?.level).toBe("deny");
   });
@@ -229,6 +249,25 @@ describe("publish text guard", () => {
     expect(
       publishTextVerdict("gh pr create --title t --body-file body-dash.md", scratch)?.level,
     ).toBe("ask");
+  });
+
+  it("asks on a spaced double hyphen used as a dash (#4327)", () => {
+    expect(publishTextVerdict(`git commit -m "fix: a -- b"`, scratch)?.level).toBe("ask");
+    expect(publishTextVerdict(`gh pr create --title "a -- b" --body ok`, scratch)?.level).toBe(
+      "ask",
+    );
+    expect(
+      publishTextVerdict("gh pr create --title t --body-file body-hyphens.md", scratch)?.level,
+    ).toBe("ask");
+  });
+
+  it("leaves CLI flags, code spans, and a bare command-line separator alone (#4327)", () => {
+    expect(
+      publishTextVerdict("gh pr create --title t --body-file body-flags.md", scratch),
+    ).toBeNull();
+    expect(
+      publishTextVerdict(`git commit -m "fix: pass --force to x" -- seed.txt`, scratch),
+    ).toBeNull();
   });
 
   it("asks on session links in a -F commit message file", () => {

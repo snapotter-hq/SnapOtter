@@ -20,7 +20,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // tar lives in apps/api/node_modules; resolve via createRequire (same
 // pattern as tests/global-setup.ts for pg/drizzle).
@@ -53,6 +53,15 @@ const {
   ImportLockError,
   ImportValidationError,
 } = await import("../../../apps/api/src/lib/feature-status.js");
+
+const venvLock = await import("../../../packages/ai/src/venv-lock.js");
+
+/** True once a venv writer is active or queued, which a reader's fast path refuses. */
+function venvWriterPending(): boolean {
+  const probe = venvLock.tryAcquireVenvRead();
+  probe?.();
+  return probe === null;
+}
 
 // Test helpers from test-server
 const { createMultipartPayload, loginAsAdmin } = await import("../test-server.js");
@@ -487,6 +496,63 @@ describe("site-packages import", () => {
     expect(imported).toContain("site-packages");
   }, 30_000);
 
+  it("waits for running AI jobs before moving site-packages into the venv (#4615)", async () => {
+    const venvPath = join(aiDir, `venv-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+    const sitePackagesDir = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    const tarPath = await buildSitePackagesArchive();
+
+    const runningJob = venvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+    invalidateCache();
+    let settled = false;
+    const imported = importBundleArchive(createReadStream(tarPath)).finally(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => expect(settled || venvWriterPending()).toBe(true), {
+        timeout: 20_000,
+      });
+      expect(settled).toBe(false);
+      expect(existsSync(join(sitePackagesDir, "fakepkg"))).toBe(false);
+      expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    } finally {
+      runningJob?.();
+    }
+
+    const result = await imported;
+    expect(result.bundleId).toBe(testBundleId);
+    expect(existsSync(join(sitePackagesDir, "fakepkg", "__init__.py"))).toBe(true);
+    expect(venvWriterPending()).toBe(false);
+  }, 30_000);
+
+  it("releases the venv writer lock when an import fails after taking it (#4615)", async () => {
+    const venvPath = join(aiDir, `venv-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+    const tarPath = await createBundleTarWithSitePackages(
+      testBundleId,
+      testVersion,
+      { "mediapipe/face.tflite": "model-data" },
+      { "fakepkg/__init__.py": "# fake package" },
+    );
+
+    invalidateCache();
+    // No mediapipe in site-packages, so the bundle's smoke import fails after
+    // the move and the import rolls back.
+    await expect(importBundleArchive(createReadStream(tarPath))).rejects.toThrow();
+    expect(venvWriterPending()).toBe(false);
+  }, 30_000);
+
   it("fails the import instead of reporting success when the venv has no interpreter to ask (#1139)", async () => {
     // No bin/python3 at all: exactly the layout the old code silently
     // skipped past while still marking the bundle installed.
@@ -619,6 +685,121 @@ describe("site-packages import", () => {
     } finally {
       delete process.env.SNAPOTTER_SKIP_INSTALL_SMOKE;
     }
+  }, 30_000);
+
+  it("runs every venv child of an offline import with an allowlisted env, not the API's secrets (#4472)", async () => {
+    // Imported archives are user-supplied, and a .pth file or module they place
+    // in site-packages runs inside every later interpreter start in the venv.
+    // Record what each child actually sees: a .pth dumps at startup, a fake pip
+    // records install/uninstall, and the bundle's module records the smoke import.
+    const venvPath = join(aiDir, `venv-env-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    const purelib = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    const dumpPath = join(testRoot, `child-env-${randomUUID()}.jsonl`);
+    const dump = (tag: string) =>
+      `open(${JSON.stringify(dumpPath)}, "a").write(json.dumps({"tag": ${JSON.stringify(tag)}, "argv": sys.argv[1:], "env": dict(os.environ)}) + "\\n")`;
+    writeFileSync(join(purelib, "zz_envdump.pth"), `import json, os, sys; ${dump("startup")}\n`);
+    mkdirSync(join(purelib, "pip"), { recursive: true });
+    writeFileSync(join(purelib, "pip", "__init__.py"), "");
+    writeFileSync(
+      join(purelib, "pip", "__main__.py"),
+      [
+        "import json, os, sys, shutil, sysconfig",
+        dump("pip"),
+        'dist = os.path.join(sysconfig.get_paths()["purelib"], "fakefix-1.0.dist-info")',
+        'if sys.argv[1:2] == ["install"]:',
+        "    os.makedirs(dist, exist_ok=True)",
+        "else:",
+        "    shutil.rmtree(dist, ignore_errors=True)",
+        "",
+      ].join("\n"),
+    );
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarDir = join(testRoot, `tar-src-${randomUUID()}`);
+    mkdirSync(join(tarDir, "models", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "site-packages", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "fixups"), { recursive: true });
+    writeFileSync(
+      join(tarDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: testBundleId,
+        version: testVersion,
+        models: ["mediapipe/face.tflite"],
+      }),
+    );
+    writeFileSync(join(tarDir, "models", "mediapipe", "face.tflite"), "model-data");
+    // Fail the smoke import after recording it, so the rollback's pip uninstall runs too.
+    writeFileSync(
+      join(tarDir, "site-packages", "mediapipe", "__init__.py"),
+      `import json, os, sys\n${dump("smoke")}\nraise ImportError("env probe")\n`,
+    );
+    writeFileSync(join(tarDir, "fixups", "fakefix-1.0-py3-none-any.whl"), "placeholder");
+    const tarPath = join(testRoot, `bundle-${randomUUID()}.tar.gz`);
+    await tar.create({ gzip: true, file: tarPath, cwd: tarDir }, ["."]);
+
+    const secrets: Record<string, string> = {
+      SESSION_SECRET: "session-secret-hunter2",
+      S3_SECRET_ACCESS_KEY: "s3-secret-hunter2",
+      SNAPOTTER_API_TOKEN: "api-token-hunter2",
+      HF_TOKEN: "hf-token-hunter2",
+      SENTRY_AUTH_TOKEN: "sentry-token-hunter2",
+      // The import never touches the network, so proxy and index credentials stay out too (#4536).
+      HTTPS_PROXY: "http://user:proxy-hunter2@proxy:3128",
+      http_proxy: "http://user:proxy-lower-hunter2@proxy:3128",
+      ALL_PROXY: "socks5://user:proxy-all-hunter2@proxy:1080",
+      PIP_INDEX_URL: "https://user:index-hunter2@pypi.example/simple",
+      PIP_EXTRA_INDEX_URL: "https://user:extra-index-hunter2@pypi.example/simple",
+      PIP_TRUSTED_HOST: "pypi.example",
+    };
+    vi.stubEnv("PIP_CONFIG_FILE", join(testRoot, "pip-with-credentials.conf"));
+    vi.stubEnv("SSL_CERT_FILE", "/etc/ssl/offline-import-ca.pem");
+    for (const [key, value] of Object.entries(secrets)) vi.stubEnv(key, value);
+    try {
+      await expectRejectedImport(tarPath, /mediapipe.*env probe/s);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const records = readFileSync(dumpPath, "utf-8")
+      .trim()
+      .split("\n")
+      .map(
+        (line) => JSON.parse(line) as { tag: string; argv: string[]; env: Record<string, string> },
+      );
+    const pipInstall = records.find((r) => r.tag === "pip" && r.argv[0] === "install");
+    const pipUninstall = records.find((r) => r.tag === "pip" && r.argv[0] === "uninstall");
+    const smoke = records.find((r) => r.tag === "smoke");
+    // site-packages query, fixup install, smoke import, rollback uninstall
+    expect(records.filter((r) => r.tag === "startup").length).toBeGreaterThanOrEqual(4);
+    expect(pipInstall).toBeDefined();
+    expect(pipUninstall).toBeDefined();
+    expect(smoke).toBeDefined();
+
+    const forbiddenValues = [
+      ...Object.values(secrets),
+      ...[process.env.DATABASE_URL, process.env.REDIS_URL].filter((v): v is string => Boolean(v)),
+    ];
+    for (const record of records) {
+      for (const key of [...Object.keys(secrets), "DATABASE_URL", "REDIS_URL", "PIP_CONFIG_FILE"]) {
+        expect(record.env, `${record.tag} ${record.argv.join(" ")}`).not.toHaveProperty(key);
+      }
+      const values = Object.values(record.env).join("\n");
+      for (const value of forbiddenValues) expect(values).not.toContain(value);
+      expect(record.env.PATH).toBe(process.env.PATH);
+      expect(record.env.SSL_CERT_FILE).toBe("/etc/ssl/offline-import-ca.pem");
+    }
+    expect(pipInstall?.env.PIP_NO_INDEX).toBe("1");
+    expect(smoke?.env.HF_HUB_OFFLINE).toBe("1");
+    expect(smoke?.env.TRANSFORMERS_OFFLINE).toBe("1");
+    expect(smoke?.env.PYTHONNOUSERSITE).toBe("1");
+    expect(existsSync(join(purelib, "fakefix-1.0.dist-info"))).toBe(false);
   }, 30_000);
 });
 

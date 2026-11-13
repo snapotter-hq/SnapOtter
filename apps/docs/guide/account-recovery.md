@@ -81,8 +81,8 @@ As a last resort on any version, set the policy in the database. On the
 all-in-one image Postgres runs inside the container:
 
 ```bash
-docker exec -it snapotter psql -h 127.0.0.1 -U snapotter -d snapotter \
-  -c "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';"
+echo "UPDATE settings SET value = 'optional' WHERE key = 'mfaPolicy';" |
+  docker exec -i snapotter sh -c 'psql -p "${EMBEDDED_PG_PORT:-5432}" -U snapotter -d snapotter'
 ```
 
 On the multi-container setup, point `psql` at your own `DATABASE_URL` instead.

@@ -1,14 +1,14 @@
 ---
-description: "SnapOtter Docker image टैग, GPU बेंचमार्क, वर्शन पिनिंग, और AMD64 तथा ARM64 के लिए मल्टी-प्लेटफ़ॉर्म समर्थन।"
-i18n_source_hash: 7a040f010e63
-i18n_provenance: human
-i18n_output_hash: 44c09e47365d
+description: "SnapOtter Docker image के tags, GPU benchmarks, version pinning, और AMD64 व ARM64 के लिए multi-platform सपोर्ट।"
+i18n_source_hash: a5871d76250c
+i18n_provenance: machine
+i18n_output_hash: 384a68a19498
 i18n_hash_version: 2
 ---
 
 # Docker Image {#docker-image}
 
-SnapOtter एक single Docker image के रूप में उपलब्ध है। इसे अकेले चलाएँ तो यह loopback interface पर एक embedded PostgreSQL 17 और Redis शुरू कर देता है (embedded mode); production के लिए, इसे Compose के साथ अलग PostgreSQL 17 और Redis 8 containers के साथ चलाएँ। app image सभी platforms पर काम करता है।
+SnapOtter एक ही Docker image के रूप में आता है। इसे अकेले चलाने पर यह loopback interface पर एक embedded PostgreSQL 17 और Redis शुरू कर देता है (embedded मोड); production के लिए इसे Compose के साथ अलग PostgreSQL 17 और Redis 8 containers के साथ चलाएँ। यह app image सभी platforms पर काम करती है।
 
 ## Quick start {#quick-start}
 
@@ -16,23 +16,23 @@ SnapOtter एक single Docker image के रूप में उपलब्�
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-कोई `DATABASE_URL` सेट न होने पर, यह embedded mode में चलता है: PostgreSQL और Redis container के भीतर loopback पर शुरू होते हैं, और सारा data `SnapOtter-data` volume के अंतर्गत रहता है। बाहरी services का उपयोग करने के लिए `DATABASE_URL` और `REDIS_URL` सेट करें (जैसा [Compose](#docker-compose) stack करता है)। देखें [Configuration](/hi/guide/configuration#embedded-mode)।
+`DATABASE_URL` सेट न होने पर यह embedded मोड में चलता है: PostgreSQL और Redis container के अंदर loopback पर शुरू होते हैं, और सारा डेटा `SnapOtter-data` volume में रहता है। बाहरी सेवाओं का उपयोग करने के लिए `DATABASE_URL` और `REDIS_URL` सेट करें ([Compose](#docker-compose) stack यही करता है)। देखें [Configuration](/hi/guide/configuration#embedded-mode)।
 
 ## NVIDIA CUDA acceleration {#nvidia-cuda-acceleration}
 
-image में amd64 पर NVIDIA CUDA समर्थन शामिल है। यदि आपके पास [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) स्थापित के साथ एक NVIDIA GPU है, तो `--gpus all` जोड़ें:
+इस image में amd64 पर NVIDIA CUDA सपोर्ट शामिल है। यदि आपके पास NVIDIA GPU है और [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) इंस्टॉल है, तो `--gpus all` जोड़ें:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-image runtime पर CUDA का स्वतः पता लगा लेता है। `--gpus all` के बिना, या जब CUDA अनुपलब्ध हो, AI tools CPU पर चलते हैं। दोनों ही स्थिति में वही image।
+Image runtime पर CUDA का अपने आप पता लगा लेती है। `--gpus all` के बिना, या CUDA उपलब्ध न होने पर, AI tools CPU पर चलते हैं। दोनों स्थितियों में image वही रहती है।
 
-VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGPU acceleration फ़िलहाल SnapOtter AI inference के लिए समर्थित नहीं है। `/dev/dri` को container में map करने से render device उजागर हो सकता है, लेकिन जब तक CUDA उपलब्ध न हो, AI runtime फिर भी CPU का ही उपयोग करेगा।
+VA-API, Quick Sync, या OpenCL के ज़रिए Intel/AMD iGPU acceleration फ़िलहाल SnapOtter AI inference के लिए समर्थित नहीं है। `/dev/dri` को container में map करने से render device दिख सकता है, लेकिन CUDA उपलब्ध न होने पर AI runtime फिर भी CPU का ही उपयोग करेगा।
 
 ### Benchmarks {#benchmarks}
 
-एक NVIDIA RTX 4070 (12 GB VRAM) पर 572x1024 JPEG portrait के साथ परीक्षित।
+NVIDIA RTX 4070 (12 GB VRAM) पर 572x1024 JPEG portrait के साथ परीक्षण किया गया।
 
 #### Warm performance {#warm-performance}
 
@@ -44,18 +44,18 @@ VA-API, Quick Sync, या OpenCL के माध्यम से Intel/AMD iGP
 | Upscale 4x | 910ms | 310ms | 2.9x |
 | Face blur | 139ms | 122ms | 1.1x |
 
-#### Cold start (container start के बाद पहला अनुरोध) {#cold-start-first-request-after-container-start}
+#### Cold start (container शुरू होने के बाद पहला request) {#cold-start-first-request-after-container-start}
 
 | Tool | CPU | GPU | Speedup |
 |------|-----|-----|---------|
 | Background removal | 22,286ms | 4,792ms | 4.7x |
 | Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 
-OCR, CUDA तुलना में शामिल नहीं है। अंतर्निहित Tesseract टियर और वैकल्पिक RapidOCR/ONNX टियर दोनों CPU का उपयोग करते हैं, जिसमें कंटेनर में NVIDIA GPU एक्सेस शामिल है।
+OCR को CUDA तुलना में शामिल नहीं किया गया है। built-in Tesseract tier और वैकल्पिक RapidOCR/ONNX tiers दोनों CPU का उपयोग करते हैं, भले ही container के पास NVIDIA GPU का एक्सेस हो।
 
 ### CUDA health check {#cuda-health-check}
 
-पहले AI अनुरोध के बाद, admin health endpoint CUDA GPU status की रिपोर्ट देता है:
+पहले AI request के बाद, admin health endpoint CUDA GPU की स्थिति बताता है:
 
 ```
 GET /api/v1/admin/health
@@ -64,7 +64,7 @@ GET /api/v1/admin/health
 
 ## Docker Compose {#docker-compose}
 
-पूर्ण Compose stack में app, PostgreSQL 17, और Redis 8 शामिल हैं। पूरे `docker-compose.yml` के लिए [Deployment](/hi/guide/deployment) देखें। एक न्यूनतम उदाहरण:
+पूरे Compose stack में app, PostgreSQL 17, और Redis 8 शामिल हैं। पूरी `docker-compose.yml` के लिए [Deployment](/hi/guide/deployment) देखें। एक न्यूनतम उदाहरण:
 
 ```yaml
 services:
@@ -76,7 +76,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -93,14 +95,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # गैर-स्थानीय तैनाती के लिए इसे बदलें
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -124,7 +126,7 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-Docker Compose के माध्यम से NVIDIA CUDA acceleration के लिए, SnapOtter service में deploy section जोड़ें:
+Docker Compose के ज़रिए NVIDIA CUDA acceleration के लिए, SnapOtter service में deploy section जोड़ें:
 
 ```yaml
     deploy:
@@ -138,7 +140,7 @@ Docker Compose के माध्यम से NVIDIA CUDA acceleration के 
 
 ## Version pinning {#version-pinning}
 
-| Tag | Description |
+| Tag | विवरण |
 |-----|------------|
 | `latest` | नवीनतम release |
 | `2.2.0` | सटीक version |
@@ -147,13 +149,13 @@ Docker Compose के माध्यम से NVIDIA CUDA acceleration के 
 
 ## Platforms {#platforms}
 
-| Architecture | GPU support | Notes |
+| Architecture | GPU सपोर्ट | नोट्स |
 |---|---|---|
 | linux/amd64 | NVIDIA CUDA | AI tools के लिए पूर्ण CUDA acceleration |
-| linux/arm64 | केवल CPU | Raspberry Pi 4/5, Docker Desktop के माध्यम से Apple Silicon |
+| linux/arm64 | केवल CPU | Raspberry Pi 4/5, Docker Desktop के ज़रिए Apple Silicon |
 
-## पिछले टैग से migration {#migration-from-previous-tags}
+## पिछले tags से माइग्रेशन {#migration-from-previous-tags}
 
-यदि आप `:cuda` tag का उपयोग कर रहे थे, तो `:latest` पर स्विच करें और `--gpus all` रखें। वही GPU support, एकीकृत image।
+यदि आप `:cuda` tag का उपयोग कर रहे थे, तो `:latest` पर स्विच करें और `--gpus all` रखें। GPU सपोर्ट वही है, image एकीकृत है।
 
-आपका data और settings volumes में संरक्षित रहते हैं।
+आपका डेटा और सेटिंग्स volumes में सुरक्षित रहती हैं।

@@ -4,7 +4,7 @@
  * settings validation, job enqueue/wait, and error handling without
  * spinning up a real Fastify server or requiring Postgres/Redis.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
@@ -37,6 +37,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
     MAX_MEGAPIXELS: 100,
     MAX_SVG_SIZE_MB: 10,
     MAX_UPLOAD_SIZE_MB: 50,
+    MAX_SETTINGS_PAYLOAD_KB: 64,
   },
 }));
 
@@ -172,6 +173,7 @@ vi.mock("sharp", () => ({
 // ── Imports ─────────────────────────────────────────────────────────────
 
 import { apiToolPath } from "@snapotter/shared";
+import { env } from "../../../apps/api/src/config.js";
 import { db } from "../../../apps/api/src/db/index.js";
 import {
   enqueueToolJob,
@@ -495,6 +497,89 @@ describe("createToolRoute", () => {
       expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
     });
 
+    describe("settings payload cap (MAX_SETTINGS_PAYLOAD_KB)", () => {
+      const originalLimit = env.MAX_SETTINGS_PAYLOAD_KB;
+      const settingsTooLarge = expect.objectContaining({
+        error: expect.stringContaining("Settings payload too large"),
+      });
+
+      afterEach(() => {
+        env.MAX_SETTINGS_PAYLOAD_KB = originalLimit;
+      });
+
+      async function postWithSettings(settings: string) {
+        const app = createMockApp();
+        const id = "resize";
+        createToolRoute(app as never, makeMockConfig(id));
+        const reply = createMockReply();
+        await app.routes[apiToolPath(id)](
+          createMockRequest({ fileBuffer: Buffer.from("png-data"), settings }),
+          reply,
+        );
+        return reply;
+      }
+
+      it("defaults to 64 KB and rejects a 70 KB settings payload with 400", async () => {
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(70_000) }),
+        );
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith({
+          error: "Settings payload too large (max 64KB)",
+        });
+        expect(enqueueToolJob).not.toHaveBeenCalled();
+      });
+
+      it("accepts a settings payload under the default 64 KB", async () => {
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(60_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("counts UTF-8 bytes, so 40,000 two-byte characters (80 KB) are rejected", async () => {
+        const reply = await postWithSettings(JSON.stringify({ text: "é".repeat(40_000) }));
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("raises the limit when MAX_SETTINGS_PAYLOAD_KB is set higher", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 128;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(70_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("reports the configured limit in the 400 message", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 128;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(140_000) }),
+        );
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith({
+          error: "Settings payload too large (max 128KB)",
+        });
+      });
+
+      it("disables the check when MAX_SETTINGS_PAYLOAD_KB is 0", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 0;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(1_000_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
+    });
+
     it("returns 400 when settings fail Zod validation", async () => {
       const app = createMockApp();
       const id = "resize";
@@ -591,6 +676,45 @@ describe("createToolRoute", () => {
       // For real AI tools with a mapping, it would return 501.
       // Since our test tool ID isn't in TOOL_BUNDLE_MAP, process continues.
       // This validates the guard code path exists without false positives.
+    });
+
+    it("answers 501 for a bundle the settings need, and skips the job (#4303)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      const missingBundle = vi.fn((s: unknown) =>
+        (s as { mode?: string }).mode === "face" ? "face-detection" : null,
+      );
+      createToolRoute(app as never, { ...makeMockConfig(id), missingBundle } as never);
+      const handler = app.routes[apiToolPath(id)];
+
+      const faceReply = createMockReply();
+      await handler(
+        createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          settings: JSON.stringify({ mode: "face" }),
+        }),
+        faceReply,
+      );
+      expect(faceReply.status).toHaveBeenCalledWith(501);
+      expect(faceReply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "FEATURE_NOT_INSTALLED",
+          feature: "face-detection",
+          featureName: "Face Detection",
+        }),
+      );
+      expect(enqueueToolJob).not.toHaveBeenCalled();
+
+      const trimReply = createMockReply();
+      await handler(
+        createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          settings: JSON.stringify({ mode: "trim" }),
+        }),
+        trimReply,
+      );
+      expect(trimReply.status).not.toHaveBeenCalledWith(501);
+      expect(enqueueToolJob).toHaveBeenCalledTimes(1);
     });
 
     it("returns 501 naming the first missing extra bundle for multi-bundle AI tools", async () => {
@@ -1142,6 +1266,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1170,6 +1296,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1203,6 +1331,8 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith({
         jobId: artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1234,6 +1364,8 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith({
         jobId: artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 
@@ -1266,6 +1398,8 @@ describe("createToolRoute", () => {
         progressJobId: clientJobId,
         artifactJobId,
         async: true,
+        statusUrl: expect.any(String),
+        progressUrl: expect.any(String),
       });
     });
 

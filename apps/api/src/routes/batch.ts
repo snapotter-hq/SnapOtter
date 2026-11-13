@@ -8,6 +8,7 @@
  * parent assembles the manifest once all children complete.
  * Returns a ZIP file containing all processed images.
  */
+
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
@@ -24,6 +25,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { claimBatchAlias } from "../jobs/batch-alias.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import {
@@ -91,6 +93,7 @@ import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
+import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
 
@@ -363,54 +366,47 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
 
           // ── Create job ID and initial progress ────────────────────────
-          const parentId = clientJobId || randomUUID();
+          // The parent id names the ZIP and every child output, which the
+          // public download route serves by id alone, so it is always ours.
+          // A clientJobId only gets an alias row that SSE and cancel follow.
+          const parentId = randomUUID();
+          const progressJobId = clientJobId ?? parentId;
           const userId = authUser.id;
           const pool: Pool = resolveToolPool(toolId);
 
           // Insert the parent row BEFORE updateJobProgress, because the
           // progress persist layer does a check-then-insert that races
-          // with our explicit insert below. A clientJobId that is already
-          // taken fails on the primary key: that is the client's mistake,
-          // not a server fault, and nothing is staged yet to clean up (#1687).
-          try {
-            await db.insert(schema.jobs).values({
-              id: parentId,
+          // with our explicit insert below.
+          await db.insert(schema.jobs).values({
+            id: parentId,
+            userId,
+            toolId,
+            pool: "system",
+            type: "batch",
+            status: "queued",
+            inputRefs: [],
+            settings: { flowChildCount: 0 },
+          });
+          if (clientJobId) {
+            // The owner resending the same batch (a browser retrying a POST
+            // whose response it gave up on) attaches to the batch already
+            // running. The XHR reports whichever answer arrives, so a 409
+            // here would fail a batch that finishes fine; 202 sends the
+            // client to the SSE, whose terminal frame carries the durable
+            // result (#2015). Another user's id stays a conflict (#1687).
+            const claim = await claimBatchAlias({
+              clientJobId,
+              batchJobId: parentId,
               userId,
               toolId,
-              pool: "system",
-              type: "batch",
-              status: "queued",
-              inputRefs: [],
-              settings: { flowChildCount: 0 },
             });
-          } catch (err) {
-            if (isUniqueViolation(err)) {
-              // The owner resending the same batch (a browser retrying a POST
-              // whose response it gave up on) attaches to the batch already
-              // running. The XHR reports whichever answer arrives, so a 409
-              // here would fail a batch that finishes fine; 202 sends the
-              // client to the SSE, whose terminal frame carries the durable
-              // result (#2015). Another user's id stays a conflict.
-              const [existing] = await db
-                .select({
-                  userId: schema.jobs.userId,
-                  toolId: schema.jobs.toolId,
-                  type: schema.jobs.type,
-                })
-                .from(schema.jobs)
-                .where(eq(schema.jobs.id, parentId))
-                .limit(1);
-              if (
-                existing &&
-                existing.type === "batch" &&
-                existing.toolId === toolId &&
-                existing.userId === userId
-              ) {
-                return reply.status(202).send({ jobId: parentId, async: true });
+            if (claim !== "claimed") {
+              await db.delete(schema.jobs).where(eq(schema.jobs.id, parentId));
+              if (claim === "attach") {
+                return reply.status(202).send(buildAsyncAcceptedPayload(clientJobId));
               }
               return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
             }
-            throw err;
           }
           const preFailures: Array<{
             originalIndex: number;
@@ -898,7 +894,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // it. Answer with the async contract instead of a fake failure:
             // the client rides the SSE to the terminal frame, which carries
             // the durable download URL (#750).
-            return reply.status(202).send({ jobId: parentId, async: true });
+            return reply.status(202).send(buildAsyncAcceptedPayload(progressJobId));
           }
 
           const payload = batchResult.resultPayload as
@@ -980,7 +976,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             "Content-Type": "application/zip",
             "Content-Disposition": `attachment; filename="${zip.filename}"`,
             "Content-Length": String(zip.size),
-            "X-Job-Id": parentId,
+            "X-Job-Id": progressJobId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
             // Per-file notes (resizedTo, targetKb, targetMet, deepEnhanceSkipped),
             // keyed like X-File-Results, so a batch can say what a single run

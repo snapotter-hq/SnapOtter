@@ -263,6 +263,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(res.json()).toEqual({
         error: c.expectedError,
         details: "write failed at [internal] and [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
     } finally {
@@ -289,6 +291,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(res.json()).toEqual({
         error: "Color extraction failed",
         details: "vips raw failed at [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
 
@@ -305,6 +309,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
         expect(badSettingsRes.json()).toEqual({
           error: "Invalid settings",
           details: "bad JSON in [internal]",
+          code: "BAD_REQUEST",
+          requestId: expect.any(String),
         });
       } finally {
         parseSpy.mockRestore();
@@ -340,6 +346,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(res.json()).toEqual({
         error: "Duplicate detection failed",
         details: "hash probe failed at [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
     } finally {
@@ -382,6 +390,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
         expect(res.json()).toEqual({
           error: route.expectedError,
           details: "stream hijack failed at [internal]",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
         expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
       } finally {
@@ -413,6 +423,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(qrRes.json()).toEqual({
         error: "QR code generation failed",
         details: "qr write failed at [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("qr write failed"))).toBe(true);
 
@@ -442,6 +454,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(passRes.json()).toEqual({
         error: "Passport photo generation failed",
         details: "passport write failed at [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("passport write failed"))).toBe(true);
     } finally {
@@ -479,6 +493,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(heicRes.json()).toEqual({
         error: 'Failed to decode HEIC file "photo.heic"',
         details: "Command failed: heif-convert [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("heif-convert"))).toBe(true);
 
@@ -491,6 +507,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(icoRes.json()).toEqual({
         error: 'Failed to decode ICO file "icon.ico"',
         details: "Command failed: magick [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("Command failed: magick"))).toBe(true);
     } finally {
@@ -652,6 +670,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(collageRes.json()).toEqual({
         error: "Collage creation failed",
         details: "cjxl rejected [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("cjxl rejected"))).toBe(true);
 
@@ -667,6 +687,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(svgBatchRes.json()).toEqual({
         error: "All files failed processing",
         errors: [{ filename: "a.svg", error: "cjxl batch failed on [internal]" }],
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("cjxl batch failed"))).toBe(true);
 
@@ -679,6 +701,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(editInspectRes.json()).toEqual({
         error: "Failed to read image metadata",
         details: "exiftool inspect failed on [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("exiftool inspect failed"))).toBe(true);
 
@@ -691,6 +715,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(editRes.json()).toEqual({
         error: "Metadata edit failed",
         details: "exiftool write failed on [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("exiftool write failed"))).toBe(true);
 
@@ -710,6 +736,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
         expect(stripRes1.json()).toEqual({
           error: "Failed to read image metadata",
           details: "strip metadata failed on [internal]",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
         expect(logLines.some((l) => l.includes("strip metadata failed"))).toBe(true);
 
@@ -724,6 +752,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
         expect(stripRes2.json()).toEqual({
           error: "Failed to read image metadata",
           details: "strip outer failed on [internal]",
+          code: "UNPROCESSABLE_ENTITY",
+          requestId: expect.any(String),
         });
         expect(logLines.some((l) => l.includes("strip outer failed"))).toBe(true);
       } finally {
@@ -755,6 +785,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(htmlRes.json()).toEqual({
         error: "URL is not allowed",
         details: "DNS lookup failed via [internal]",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       const webhookRes = await app.inject({
@@ -770,6 +802,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(webhookRes.json()).toEqual({
         error: "Webhook URL must resolve to a public HTTP(S) destination",
         details: "DNS lookup failed via [internal]",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       const siemRes = await app.inject({
@@ -784,6 +818,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(siemRes.json()).toEqual({
         error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
         details: "DNS lookup failed via [internal]",
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
 
       putObject.mockRejectedValueOnce(new Error(`capture write failed at ${sampleTempPath}`));
@@ -796,6 +832,8 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(htmlCaptureRes.json()).toEqual({
         error: "Screenshot capture failed",
         details: "capture write failed at [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("capture write failed"))).toBe(true);
     } finally {
@@ -839,6 +877,8 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(res.body).not.toContain("/tmp/");
       expect(res.json()).toEqual({
         error: 'Invalid file "broken.heic": Command failed: heif-convert [internal] [internal]',
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       // The raw error is still recorded for operators.
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
@@ -929,6 +969,8 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(res.body).not.toContain(tmpdir());
       expect(res.json()).toEqual({
         error: 'Invalid file "broken.svg": SVG sanitize rejected at [internal]',
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
       expect(logLines.some((l) => l.includes("Favicon SVG sanitize failed"))).toBe(true);
@@ -953,6 +995,8 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(res.body).not.toContain(tmpdir());
       expect(res.json()).toEqual({
         error: 'Invalid file "ok.png": vips stats failed at [internal]',
+        code: "BAD_REQUEST",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
       expect(logLines.some((l) => l.includes("Favicon input decode failed"))).toBe(true);
@@ -1016,6 +1060,8 @@ describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
       expect(res.json()).toEqual({
         error: "Failed to decode HEIC/HEIF file",
         details: "Command failed: heif-convert [internal]",
+        code: "UNPROCESSABLE_ENTITY",
+        requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
     } finally {

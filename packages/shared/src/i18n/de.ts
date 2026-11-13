@@ -770,7 +770,7 @@ export const de: TranslationKeys = {
     },
     collage: {
       name: "Collage & Raster",
-      description: "Bilder in Rastercollages mit über 25 Vorlagen zusammenfügen",
+      description: "Bilder in Rastercollages mit vielen Vorlagen zusammenfügen",
     },
     stitch: {
       name: "Bilder zusammenfügen",
@@ -862,7 +862,7 @@ export const de: TranslationKeys = {
     },
     "convert-video": {
       name: "Video konvertieren",
-      description: "Videos zwischen MP4, MOV und WebM konvertieren",
+      description: "Videos zwischen MP4, MOV, WebM, AVI und MKV konvertieren",
     },
     "compress-video": {
       name: "Video komprimieren",
@@ -1598,6 +1598,7 @@ export const de: TranslationKeys = {
       latitude: "Breitengrad",
       longitude: "Längengrad",
       altitudeMeters: "Höhe (Meter)",
+      altitudePlaceholder: "Optional (z. B. 25)",
       removeAllGpsData: "Alle GPS-Daten entfernen",
       keywords: "Schlüsselwörter",
       addKeywordPlaceholder: "Schlüsselwort eingeben und Enter drücken",
@@ -1637,6 +1638,7 @@ export const de: TranslationKeys = {
       separatePdfMode: "separate PDFs, eines pro Bild",
       combineAllImages: "Alle Bilder in ein PDF zusammenfügen",
       pageSize: "Seitengröße",
+      pageSizeLetter: "US Letter",
       orientation: "Ausrichtung",
       portrait: "Hochformat",
       landscape: "Querformat",
@@ -2046,7 +2048,7 @@ export const de: TranslationKeys = {
     },
     "enhance-faces": {
       subtle: "Dezent",
-      maximum: "Maximum",
+      maximum: "Maximal",
       fewerFaces: "Weniger Gesichter",
       moreFaces: "Mehr Gesichter",
       onlyEnhanceMainFace: "Nur Hauptgesicht verbessern",
@@ -2160,7 +2162,7 @@ export const de: TranslationKeys = {
       quick: "Schnell",
       balanced: "Ausgewogen",
       quality: "Qualität",
-      maximum: "Maximum",
+      maximum: "Maximal",
       quickDesc: "Schnell, ressourcenschonend",
       balancedDesc: "Gute Qualität, moderate Geschwindigkeit",
       qualityDesc: "AI-gestützt, langsam",
@@ -2878,6 +2880,7 @@ export const de: TranslationKeys = {
       stretchMode: "Strecken",
       cropMode: "Zuschneiden",
       alignment: "Ausrichtung",
+      allCaps: "Großbuchstaben",
       start: "Anfang",
       center: "Mitte",
       end: "Ende",
@@ -4087,6 +4090,8 @@ export const de: TranslationKeys = {
     cancelButton: "Abbrechen",
     readyCount: "{count} bereit",
     failedStatus: "Fehlgeschlagen",
+    fetchFailed: "Diese URL konnte nicht abgerufen werden (Fehler {status}).",
+    downloadFailed: "Diese Datei konnte nicht heruntergeladen werden (Fehler {status}).",
     textareaPlaceholder:
       "https://example.com/photo.jpg\nhttps://example.com/report.pdf\n- https://example.com/clip.mp4\n[Meine Datei](https://example.com/recording.mp3)",
   },
@@ -4148,6 +4153,8 @@ export const de: TranslationKeys = {
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
     previewEncoderMissing:
       "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
+    previewEngineUnavailable:
+      "Auf diesem Server ist ffmpeg nicht installiert, daher kann keine Vorschau erzeugt werden. Bitten Sie Ihren Administrator, ffmpeg zu installieren oder FFMPEG_PATH zu setzen.",
     previewProgressMessages: [
       "Der Otter wärmt sich auf...",
       "Pixel werden zerkaut...",
@@ -4370,7 +4377,7 @@ export const de: TranslationKeys = {
       fill: "Füllung",
       stroke: "Kontur",
       strokeWidth: "Breite",
-      cornerRadius: "Radius",
+      cornerRadius: "Eckenradius",
       sides: "Seiten",
       points: "Punkte",
       dashStyle: "Strichart",
@@ -4504,7 +4511,7 @@ export const de: TranslationKeys = {
     },
     panels: {
       adjustments: {
-        auto: "Auto",
+        auto: "Automatisch",
         channelRed: "Rot",
         channelGreen: "Grün",
         channelBlue: "Blau",
@@ -5234,6 +5241,7 @@ export const de: TranslationKeys = {
       disabledCount: "{count} Werkzeug(e) deaktiviert",
       disabledCountOne: "{count} Werkzeug deaktiviert",
       disabledCountOther: "{count} Werkzeuge deaktiviert",
+      offWithBase: "Deaktiviert, weil {base} deaktiviert ist.",
     },
     experimental: {
       label: "Experimentelle Werkzeuge aktivieren",
@@ -5679,6 +5687,82 @@ export const de: TranslationKeys = {
     versionLabel: "SnapOtter v{version}",
   },
   errors: {
+    networkFailed: "Netzwerkfehler",
+    loadTemplatesFailed: "Vorlagen konnten nicht geladen werden",
+    memeGenerationFailed: "Meme-Erstellung fehlgeschlagen",
+    loadFilesFailed: "Dateien konnten nicht geladen werden",
+    deleteFailed: "Löschen fehlgeschlagen",
+    readPdfFailed: "PDF konnte nicht gelesen werden",
+    conversionFailed: "Konvertierung fehlgeschlagen",
+    installFailed: "Installation konnte nicht gestartet werden",
+    uninstallFailed: "Deinstallation fehlgeschlagen",
+    resetFailed: "Zurücksetzen fehlgeschlagen",
+    codes: {
+      MFA_ENROLLMENT_REQUIRED:
+        "Ihr Administrator verlangt eine Zwei-Faktor-Anmeldung. Richten Sie sie ein, um fortzufahren.",
+      ANALYSIS_EXPIRED: "Diese Analyse ist abgelaufen. Beginnen Sie von vorn.",
+      BACKGROUND_REMOVAL_EXPIRED:
+        "Diese Hintergrundentfernung ist abgelaufen. Beginnen Sie von vorn.",
+      BROWSER_CRASHED: "Der Browser ist beim Rendern abgestürzt. Versuchen Sie es erneut.",
+      BROWSER_NOT_AVAILABLE:
+        "Der Browser, den dieses Werkzeug benötigt, ist derzeit nicht verfügbar.",
+      DEPENDENCY_VALIDATION_FAILED:
+        "Diese Einstellung hängt von einer anderen Einstellung ab, die nicht gültig ist.",
+      FEATURE_INCOMPATIBLE:
+        "Diese Funktion kann mit den aktuellen Einstellungen nicht ausgeführt werden.",
+      FST_REQ_FILE_TOO_LARGE: "Diese Datei ist zu groß zum Hochladen.",
+      IDLE_TIMEOUT: "Sie wurden wegen Inaktivität abgemeldet. Melden Sie sich erneut an.",
+      INPUT_MISSING: "Eine Datei oder Einstellung, die dieser Schritt benötigt, fehlt.",
+      INVALID_CIDR: "Dieser IP-Adressbereich ist ungültig.",
+      INVALID_CODE: "Dieser Code ist ungültig. Versuchen Sie es erneut.",
+      INVALID_PASSWORD: "Dieses Passwort ist nicht korrekt.",
+      INVALID_STORED_NAME: "Dieser gespeicherte Dateiname ist ungültig.",
+      LOGIN_THROTTLED:
+        "Zu viele Anmeldeversuche. Warten Sie einige Minuten und versuchen Sie es erneut.",
+      MFA_ALREADY_ENABLED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto bereits aktiviert.",
+      MFA_ATTEMPTS_EXHAUSTED: "Zu viele falsche Codes. Starten Sie die Anmeldung neu.",
+      MFA_NOT_CONFIGURED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto nicht eingerichtet.",
+      MFA_NOT_ENABLED: "Die Zwei-Faktor-Anmeldung ist für dieses Konto nicht aktiviert.",
+      MFA_POLICY_UNAVAILABLE:
+        "Die Zwei-Faktor-Richtlinie konnte nicht geprüft werden. Versuchen Sie es erneut.",
+      MUST_CHANGE_PASSWORD: "Sie müssen Ihr Passwort ändern, bevor Sie fortfahren.",
+      NOT_ANIMATED: "Diese Datei ist kein animiertes GIF.",
+      NO_PENDING_ENROLLMENT: "Es läuft keine Zwei-Faktor-Einrichtung. Starten Sie sie erneut.",
+      OIDC_DISCOVERY_FAILED: "Der Single-Sign-on-Anbieter konnte nicht erreicht werden.",
+      OIDC_DISCOVERY_TIMEOUT: "Der Single-Sign-on-Anbieter hat nicht rechtzeitig geantwortet.",
+      OIDC_END_SESSION_INVALID: "Die Abmeldeadresse des Single Sign-on ist ungültig.",
+      OIDC_END_SESSION_SCHEME: "Die Abmeldeadresse des Single Sign-on muss HTTPS verwenden.",
+      OIDC_ISSUER_SCHEME_MISMATCH:
+        "Die Issuer-Adresse des Single Sign-on passt nicht zu ihrem Schema.",
+      OIDC_NO_PASSWORD:
+        "Dieses Konto meldet sich per Single Sign-on an und hat daher kein Passwort.",
+      PASSWORD_CHANGED: "Ihr Passwort wurde geändert. Melden Sie sich erneut an.",
+      READONLY_SETTING: "Diese Einstellung ist schreibgeschützt.",
+      SELF_DELETE: "Sie können Ihr eigenes Konto nicht löschen.",
+      SELF_DEMOTE: "Sie können Ihre eigene Administratorrolle nicht entfernen.",
+      SELF_LOCKOUT: "Diese Änderung würde Sie aussperren.",
+      SETTING_DECRYPTION_FAILED:
+        "Diese Einstellung konnte nicht gelesen werden. Geben Sie sie erneut ein.",
+      STAGED_DISCARD_FAILED: "Die bereitgestellte Datei konnte nicht verworfen werden.",
+      UNKNOWN_ROLE: "Diese Rolle existiert nicht.",
+      UNKNOWN_SETTING: "Diese Einstellung existiert nicht.",
+      UNKNOWN_TEAM: "Dieses Team existiert nicht.",
+      USERNAME_RACE_EXHAUSTED: "Dieser Benutzername ist vergeben. Wählen Sie einen anderen.",
+      USER_LIMIT_REACHED: "Diese Instanz hat ihr Benutzerlimit erreicht.",
+      WEBHOOK_DECRYPTION_FAILED:
+        "Das Webhook-Geheimnis konnte nicht gelesen werden. Geben Sie es erneut ein.",
+      FEATURE_NOT_INSTALLED: "Diese Funktion ist noch nicht installiert.",
+      FEATURE_NOT_LICENSED: "Für diese Funktion ist eine Lizenz erforderlich.",
+      ESCALATION_DENIED: "Sie können nicht mehr Zugriff vergeben, als Sie selbst haben.",
+      LAST_ADMIN: "Mindestens ein Administrator muss erhalten bleiben.",
+      USER_DISABLED: "Dieses Konto ist deaktiviert.",
+      MFA_EXPIRED: "Ihre Bestätigung ist abgelaufen. Beginnen Sie von vorn.",
+      ENGINE_UNAVAILABLE: "Diese Verarbeitungs-Engine ist derzeit nicht verfügbar.",
+      STORAGE_QUOTA_EXCEEDED: "Speicherkontingent überschritten.",
+      TARGET_SIZE_EXCEEDED: "Das Ergebnis kann die Zielgröße nicht erreichen.",
+      TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
+      CANCELED: "Der Vorgang wurde abgebrochen.",
+    },
     generic: "Ein Fehler ist aufgetreten",
     offline: "Sie sind offline",
     reconnecting: "Verbindung zum Server wird wiederhergestellt...",
@@ -5754,6 +5838,7 @@ export const de: TranslationKeys = {
     grid: "Raster",
     automate: "Automatisieren",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Dateien",
     help: "Hilfe",
     settings: "Einstellungen",

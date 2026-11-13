@@ -21,12 +21,12 @@ const tesseractSource = readFileSync(join(root, "packages/ai/src/tesseract.ts"),
 const TARGETS = ["linux-amd64-cpu-py312", "linux-arm64-cpu-py311"] as const;
 const MEASURED_RUNTIME_SIZES = {
   "linux-amd64-cpu-py312": {
-    compressed: 244_622_462,
-    expanded: 510_762_511,
+    compressed: 252_146_577,
+    expanded: 519_457_701,
   },
   "linux-arm64-cpu-py311": {
-    compressed: 218_031_562,
-    expanded: 428_565_655,
+    compressed: 225_588_891,
+    expanded: 435_069_449,
   },
 } as const;
 const MODEL_IDS = [

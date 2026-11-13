@@ -1961,6 +1961,24 @@
     "outputHash": "79071d9e416b",
     "stale": false
   },
+  "home.milestone.cta": {
+    "sourceHash": "4145a3ef0619",
+    "provenance": "machine",
+    "outputHash": "c3fa34b34207",
+    "stale": false
+  },
+  "home.milestone.release": {
+    "sourceHash": "5654e3f7f44c",
+    "provenance": "machine",
+    "outputHash": "3bacf8034f1f",
+    "stale": false
+  },
+  "home.milestone.thanksPullsStars": {
+    "sourceHash": "06635e39eec9",
+    "provenance": "machine",
+    "outputHash": "a7188373af1a",
+    "stale": false
+  },
   "home.openSource.discord": {
     "sourceHash": "62d97f750910",
     "provenance": "machine",
@@ -2697,6 +2715,12 @@
     "sourceHash": "a5380132091d",
     "provenance": "machine",
     "outputHash": "ffab3e9b7526",
+    "stale": false
+  },
+  "nav.star": {
+    "sourceHash": "e357d396871d",
+    "provenance": "machine",
+    "outputHash": "e357d396871d",
     "stale": false
   },
   "nav.talkToHuman": {

@@ -308,6 +308,131 @@ describe("sanitizeSvg: DOCTYPE removal skips quoted strings", () => {
     expect(result).not.toContain("ENTITY");
     expect(result).toContain("<rect/>");
   });
+
+  it("removes a DOCTYPE that only forms once an inner one is removed", () => {
+    const input = Buffer.from(
+      '<!DOC<!DOCTYPE x>TYPE svg [<!ENTITY a SYSTEM "file:///etc/passwd">]>' +
+        '<svg xmlns="http://www.w3.org/2000/svg"><text>&a;</text></svg>',
+    );
+    const result = sanitizeSvg(input).toString("utf-8");
+    expect(result).not.toMatch(/DOCTYPE|ENTITY|passwd/);
+    expect(result).toContain("<text>&a;</text>");
+  });
+
+  it("rejects an SVG with more than one DOCTYPE", () => {
+    const input = Buffer.from(
+      '<!DOCTYPE svg><!DOCTYPE svg><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>',
+    );
+    expect(() => sanitizeSvg(input)).toThrow(
+      expect.objectContaining({ statusCode: 400, message: "SVG contains more than one DOCTYPE" }),
+    );
+  });
+});
+
+// Each case below used to rescan the rest of the input from every opening, so
+// its cost grew with the square of the input size. The time bounds are loose on
+// purpose: the fixed code finishes these in milliseconds, the old code took
+// seconds to minutes.
+describe("sanitizeSvg: bounded work on unterminated markup", () => {
+  const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">';
+
+  function timed(input: string): { ms: number; run: () => string } {
+    const start = performance.now();
+    let out: string | Error;
+    try {
+      out = sanitizeSvg(Buffer.from(input)).toString("utf-8");
+    } catch (err) {
+      out = err as Error;
+    }
+    const ms = performance.now() - start;
+    return {
+      ms,
+      run: () => {
+        if (out instanceof Error) throw out;
+        return out;
+      },
+    };
+  }
+
+  it("rejects 512KB of unterminated <set openings quickly with a 400", () => {
+    const { ms, run } = timed(`${SVG_OPEN}${"<set".repeat(131_072)}</svg>`);
+    expect(run).toThrow(
+      expect.objectContaining({
+        statusCode: 400,
+        message: "SVG exceeds maximum element count of 5000",
+      }),
+    );
+    expect(ms).toBeLessThan(1000);
+  });
+
+  it("counts entity-encoded openings toward the element cap", () => {
+    const { run } = timed(`${SVG_OPEN}${"&#60;set".repeat(6000)}</svg>`);
+    expect(run).toThrow("maximum element count of 5000");
+  });
+
+  it("sanitizes a multi-MB SVG just under the element cap in linear time", () => {
+    // Each run of unterminated openings is followed by a long stretch of text
+    // and then a real tag, so every opening has a distant `>` to scan toward.
+    const pad = `${"a".repeat(600_000)}<rect/>`;
+    const input =
+      SVG_OPEN +
+      ["<set", "<", "<use href='http://", "<xi:include", "<![CDATA["]
+        .map((opening) => opening.repeat(950) + pad)
+        .join("") +
+      "</svg>";
+    const { ms, run } = timed(input);
+    expect(run()).not.toMatch(/<set|<use|xi:include/i);
+    expect(ms).toBeLessThan(2000);
+  });
+
+  it("rejects tags that keep re-forming after removal with a 400", () => {
+    const nested = `${"<se".repeat(6)}<set>${"t>".repeat(6)}`;
+    const { run } = timed(`${SVG_OPEN}${nested}<rect/></svg>`);
+    expect(run).toThrow(
+      expect.objectContaining({ statusCode: 400, message: "SVG nesting is too deep to sanitize" }),
+    );
+  });
+});
+
+describe("sanitizeSvg: paired dangerous-element removal", () => {
+  const strip = (body: string) =>
+    sanitizeSvg(
+      Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg">${body}<rect/></svg>`),
+    ).toString("utf-8");
+
+  it("removes nested <set> elements", () => {
+    const out = strip('<set attributeName="href" to="a"><set to="b"></set></set>');
+    expect(out).not.toMatch(/<\/?set/i);
+    expect(out).toContain("<rect/>");
+  });
+
+  it("removes a prefixed <x:set> with a whitespace-padded end tag", () => {
+    const out = strip('<x:set attributeName="href" to="javascript:alert(1)">body</x:set >');
+    expect(out).not.toMatch(/x:set|body/);
+    expect(out).toContain("<rect/>");
+  });
+
+  it("removes uppercase element names", () => {
+    const out = strip("<SET to='a'>body</SET><SCRIPT>alert(1)</SCRIPT>");
+    expect(out).not.toMatch(/<\/?set|<\/?script|body|alert/i);
+    expect(out).toContain("<rect/>");
+  });
+
+  it("removes an open tag that never gets a close tag", () => {
+    const out = strip('<set attributeName="href" to="javascript:alert(1)">');
+    expect(out).not.toMatch(/<set|javascript/i);
+    expect(out).toContain("<rect/>");
+  });
+
+  it("removes an open tag that runs into the next tag without a >", () => {
+    const out = strip('<set to="javascript:alert(1)"');
+    expect(out).not.toMatch(/<set|javascript/i);
+  });
+
+  it("keeps an element whose name only starts with a dangerous name", () => {
+    const out = strip('<settings id="s"/>');
+    expect(out).toContain('<settings id="s"/>');
+  });
 });
 
 describe("isSvgBuffer: prolog before the root element", () => {

@@ -507,11 +507,11 @@ describe("sign-pdf reports its run to the file store", () => {
     // Failing the second PDF shows its error on entry 1 only.
     FakeXhr.instances = [];
     (await apply()).respond(422, { error: "Processing failed" });
-    expect(screen.getByText("Processing failed")).toBeInTheDocument();
+    expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
 
     // Switching back to entry 0 restores its download link without entry 1's error.
     act(() => useFileStore.getState().setSelectedIndex(0));
-    expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
       "href",
       DOWNLOAD_URL,
@@ -520,7 +520,7 @@ describe("sign-pdf reports its run to the file store", () => {
     // Replacing the file set clears the old entry's download link and error while mounted.
     act(() => useFileStore.getState().setFiles([pdf("fresh.pdf")]));
     expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
-    expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
   });
 
@@ -606,13 +606,13 @@ describe("sign-pdf clears the store's processing flag on every exit path", () =>
 describe("sign-pdf marks its entry failed on every failure path", () => {
   const sp = en.toolSettings["sign-pdf"];
 
-  it("marks it failed with the server's error when the request fails", async () => {
+  it("marks it failed with the translated fallback, not the server's error text, when the request fails", async () => {
     renderPanel();
 
     (await apply()).respond(422, { error: "Processing failed" });
 
     expect(entry().status).toBe("failed");
-    expect(entry().error).toBe("Processing failed");
+    expect(entry().error).toBe(en.errors.failedWithStatus);
     expect(entry().errorCategory).toBeNull();
   });
 
@@ -702,9 +702,9 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
     });
 
     expect(entry().status).toBe("failed");
-    expect(entry().error).toBe("sidecar died");
-    // The server's own text is English and classifies from its words.
-    expect(entry().errorCategory).toBeNull();
+    expect(entry().error).toBe("Processing failed");
+    // The fallback carries no server words to classify, so it gets the generic category.
+    expect(entry().errorCategory).toBe("processing_error");
   });
 
   it("files a streamed result with no download URL under processing_error", async () => {
@@ -831,7 +831,7 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
       expect(() => xhr.respond(422, { error: "Processing failed" })).toThrow("boom");
 
       expect(entry().status).toBe("failed");
-      expect(entry().error).toBe("Processing failed");
+      expect(entry().error).toBe(en.errors.failedWithStatus);
     } finally {
       useFileStore.setState({ setProcessing: realSetProcessing });
     }
@@ -860,10 +860,10 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
       ).toThrow("boom");
       await act(async () => {});
 
-      expect(screen.getByText("PDF is password-protected")).toBeInTheDocument();
+      expect(screen.getByText("Processing failed")).toBeInTheDocument();
       expect(screen.queryByText(en.errors.jobTrackingFailed)).not.toBeInTheDocument();
       expect(entry().status).toBe("failed");
-      expect(entry().error).toBe("PDF is password-protected");
+      expect(entry().error).toBe("Processing failed");
     } finally {
       unsubscribe();
     }
@@ -893,7 +893,7 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
       ).toThrow("teardown broke");
       await act(async () => {});
 
-      expect(screen.getByText("PDF is password-protected")).toBeInTheDocument();
+      expect(screen.getByText("Processing failed")).toBeInTheDocument();
       const reports = vi
         .mocked(captureHandledError)
         .mock.calls.filter(([e]) => e.message === "Failing a Sign PDF run's entry failed");
@@ -942,7 +942,7 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
       xhr.respond(422, { error: "Processing failed" });
 
       expect(useFileStore.getState().processing).toBe(false);
-      expect(screen.getByText("Processing failed")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
       expect(vi.mocked(captureHandledError)).toHaveBeenCalledWith(
         expect.objectContaining({ message: "Failing a Sign PDF run's entry failed" }),
         expect.objectContaining({ tool_id: "sign-pdf" }),
@@ -1260,7 +1260,7 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
       renderPanel();
       (await apply()).respond(422, { error: "Processing failed" });
       expect(entry().status).toBe("failed");
-      expect(entry().error).toBe("Processing failed");
+      expect(entry().error).toBe(en.errors.failedWithStatus);
       expect(entry().errorCategory).toBeNull();
 
       let armed = true;
@@ -1742,7 +1742,7 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     [
       "a failed 422",
       (xhr: FakeXhr) => xhr.respond(422, { error: "Processing failed" }),
-      "Processing failed",
+      en.errors.failedWithStatus,
       0,
     ],
   ])(
@@ -2045,7 +2045,7 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
     xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
 
     expect(xhr.aborted).toBe(true);
-    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    expect(screen.getByText("Processing failed")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
     expect(entry().processedUrl).toBeNull();
   });
@@ -2116,7 +2116,7 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
       });
 
       expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
-      expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
     } finally {
       stalls.restore();
     }
@@ -2147,7 +2147,7 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
 
     act(() => xhr.ontimeout?.());
 
-    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    expect(screen.getByText("Processing failed")).toBeInTheDocument();
     expect(screen.queryByText(en.toolSettings["sign-pdf"].timeout)).not.toBeInTheDocument();
   });
 
@@ -2569,20 +2569,20 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
       });
     });
     expect(entry().status).toBe("failed");
-    expect(entry().error).toBe("sidecar died");
+    expect(entry().error).toBe("Processing failed");
 
     cleanup();
 
-    expect(entry().error).toBe("sidecar died");
+    expect(entry().error).toBe("Processing failed");
     expect(useFileStore.getState().error).toBeNull();
     expect(cancelPosts()).toHaveLength(0);
     // Crossing the 768px breakpoint remounts the panel (#2512): the run's
     // failure message stays visible and clears when a retry starts.
     renderPanel();
-    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    expect(screen.getByText("Processing failed")).toBeInTheDocument();
     FakeXhr.instances = [];
     await apply();
-    expect(screen.queryByText("sidecar died")).not.toBeInTheDocument();
+    expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
   });
 
   it("leaves a panel that never ran alone", () => {

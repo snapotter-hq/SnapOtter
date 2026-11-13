@@ -1,130 +1,130 @@
 ---
-description: "Wszystkie zmienne środowiskowe SnapOtter z wartościami domyślnymi. Skonfiguruj uwierzytelnianie, magazyn, modele AI, analitykę i nie tylko."
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: 3701326736b1
+description: "Wszystkie zmienne środowiskowe SnapOtter wraz z wartościami domyślnymi. Konfiguracja uwierzytelniania, przechowywania danych, modeli AI, analityki i nie tylko."
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: 984925b3e84a
 i18n_hash_version: 2
 ---
 
 # Konfiguracja {#configuration}
 
-Cała konfiguracja odbywa się za pomocą zmiennych środowiskowych. Każda zmienna ma rozsądną wartość domyślną, więc SnapOtter działa od razu po zainstalowaniu bez ustawiania którejkolwiek z nich.
+Cała konfiguracja odbywa się za pomocą zmiennych środowiskowych. Każda zmienna ma rozsądną wartość domyślną, więc SnapOtter działa od razu, bez ustawiania którejkolwiek z nich.
 
 ## Zmienne środowiskowe {#environment-variables}
 
 ### Serwer {#server}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
 | `PORT` | `1349` | Port, na którym nasłuchuje serwer. |
-| `BASE_PATH` | (puste) | Publiczna ścieżka wdrożenia, np. `/snapotter`. Puste lub `/` oznacza serwowanie aplikacji w katalogu głównym domeny. Stosowana w czasie działania; nie wymaga przebudowy obrazu. |
-| `RATE_LIMIT_PER_MIN` | `1000` | Maksymalna liczba żądań na minutę na adres IP. Ustaw na 0, aby wyłączyć ograniczanie liczby żądań. |
-| `CORS_ORIGIN` | (puste) | Rozdzielona przecinkami lista dozwolonych źródeł dla CORS albo puste dla wyłącznie tego samego źródła. |
-| `LOG_LEVEL` | `info` | Szczegółowość logów. Jedno z: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Które węzły mogą ustawiać IP klienta przez nagłówek `X-Forwarded-For`. Wartość domyślna wierzy tylko węzłowi z sieci prywatnej, więc zwrotne proxy w sieci Dockera albo w sieci LAN jest zaufane, a podrobiony nagłówek klienta z publicznego adresu już nie. Ustaw `true` tylko wtedy, gdy z przodu stoi kontrolowane przez ciebie proxy pod publicznym adresem. |
+| `BASE_PATH` | (puste) | Publiczna ścieżka wdrożenia, np. `/snapotter`. Puste lub `/` oznacza obsługę w katalogu głównym domeny. Stosowana w czasie działania; przebudowa obrazu nie jest wymagana. |
+| `RATE_LIMIT_PER_MIN` | `1000` | Maksymalna liczba żądań na minutę z jednego adresu IP. Ustawienie 0 wyłącza ograniczanie liczby żądań. |
+| `CORS_ORIGIN` | (puste) | Dozwolone źródła (origin) dla CORS, oddzielone przecinkami, lub puste, aby dopuścić tylko to samo źródło. |
+| `LOG_LEVEL` | `info` | Szczegółowość logów. Jedna z wartości: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Określa, które węzły mogą ustawiać adres IP klienta przez `X-Forwarded-For`. Wartość domyślna ufa wyłącznie węzłowi z sieci prywatnej, więc zaufany jest reverse proxy w sieci Docker lub w sieci LAN, a sfałszowany nagłówek publicznego klienta nie. Ustawiać `true` tylko wtedy, gdy przed aplikacją stoi kontrolowany przez użytkownika proxy z publicznym adresem. |
 
 ### Uwierzytelnianie {#authentication}
 
-Poniższe dwie wartości logiczne przyjmują tylko `true` i `false`. Cokolwiek innego, `1`, `yes` czy `on`, nie przechodzi walidacji, a serwer kończy działanie, zanim zacznie nasłuchiwać.
+Dwie poniższe zmienne logiczne przyjmują wyłącznie `true` i `false`. Każda inna wartość, `1`, `yes` lub `on`, nie przechodzi walidacji, a serwer kończy działanie, zanim zacznie nasłuchiwać.
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Wymaga logowania. Ustaw na `false`, aby działać zupełnie bez kont, co przyznaje każdemu żądaniu uprawnienia administratora, więc rób tak wyłącznie w zaufanej sieci. |
+| `AUTH_ENABLED` | `true` | Wymaga logowania. Ustawienie `false` uruchamia aplikację bez żadnych kont, co przyznaje każdemu żądaniu uprawnienia administratora, dlatego należy ograniczyć to do zaufanej sieci. |
 | `DEFAULT_USERNAME` | `admin` | Nazwa użytkownika początkowego konta administratora. Używana tylko przy pierwszym uruchomieniu. |
-| `DEFAULT_PASSWORD` | `admin` | Hasło do początkowego konta administratora. Zmień je po pierwszym zalogowaniu. |
-| `MAX_USERS` | `0` (bez ograniczeń) | Maksymalna liczba zarejestrowanych kont użytkowników. Ustaw na 0 dla braku ograniczeń. |
-| `SESSION_DURATION_HOURS` | `168` | Czas życia sesji logowania w godzinach (domyślnie 7 dni). |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ustaw na `true`, aby pominąć wymuszony monit o zmianę hasła przy pierwszym zalogowaniu. |
+| `DEFAULT_PASSWORD` | `admin` | Hasło początkowego konta administratora. Zmienić po pierwszym zalogowaniu. |
+| `MAX_USERS` | `0` (bez limitu) | Maksymalna liczba zarejestrowanych kont użytkowników. Ustawienie 0 oznacza brak limitu. |
+| `SESSION_DURATION_HOURS` | `168` | Czas trwania sesji logowania w godzinach (domyślnie 7 dni). |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ustawienie `true` pomija wymuszony monit o zmianę hasła przy pierwszym logowaniu. |
 
-### Magazyn {#storage}
+### Przechowywanie danych {#storage}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `STORAGE_MODE` | `local` | `local` lub `s3`. S3 i MinIO wymagają licencji z funkcją s3_storage oraz zmiennych `S3_*` opisanych niżej. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Ciąg połączenia PostgreSQL, a zarazem połączenie, na którym obsługiwane jest każde żądanie. W wersji 2.3.0 i nowszych ustaw także `DATABASE_MIGRATION_URL`, a ta zmienna staje się rolą środowiska uruchomieniowego o minimalnych uprawnieniach, mającą wyłącznie DML na tabelach aplikacji. Stos Compose kieruje ją na swoją usługę `postgres`; pozostaw ją nieustawioną (razem z `REDIS_URL`), aby uzyskać tryb wbudowany. |
-| `DATABASE_MIGRATION_URL` | (puste) | Dostępna od wersji 2.3.0; obraz 2.2.0 ją ignoruje i wymaga, aby `DATABASE_URL` wskazywała właściciela bazy danych. Połączenie uprzywilejowane, używane tylko podczas rozruchu do uruchomienia migracji i nadania roli środowiska uruchomieniowego, a następnie zamykane przed pierwszym żądaniem. Pozostaw ją pustą, a SnapOtter będzie działał z jedną rolą, w której `DATABASE_URL` pełni obie funkcje. Zobacz [Role o minimalnych uprawnieniach](/pl/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Ciąg połączenia Redis (używany dla kolejek zadań BullMQ). Compose kieruje go na swoją usługę `redis`. |
+| `STORAGE_MODE` | `local` | `local` lub `s3`. S3 i MinIO wymagają licencji z funkcją s3_storage oraz zmiennych `S3_*` opisanych poniżej. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Ciąg połączenia z PostgreSQL oraz połączenie, przez które obsługiwane jest każde żądanie. W wersji 2.3.0 i nowszych, po ustawieniu także `DATABASE_MIGRATION_URL`, staje się ono rolą uruchomieniową o najmniejszych uprawnieniach, z uprawnieniami DML do tabel aplikacji i niczym więcej. Stos Compose kieruje je na swoją usługę `postgres`; pozostawić bez ustawienia (razem z `REDIS_URL`), aby uzyskać tryb wbudowany. |
+| `DATABASE_MIGRATION_URL` | (puste) | Połączenie uprzywilejowane, używane wyłącznie podczas rozruchu do uruchamiania migracji i nadawania uprawnień roli uruchomieniowej, a następnie zamykane przed pierwszym żądaniem. Pozostawienie pustego powoduje, że SnapOtter działa z jedną rolą, a `DATABASE_URL` pełni obie funkcje. Zobacz [Role o najmniejszych uprawnieniach](/pl/guide/database#least-privilege-roles). |
+| `REDIS_URL` | `redis://localhost:6379` | Ciąg połączenia z Redis (używany do kolejek zadań BullMQ). Compose kieruje go na swoją usługę `redis`. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Katalog na pliki tymczasowe podczas przetwarzania. Czyszczony automatycznie. Obraz ustawia `/tmp/workspace`. |
-| `FILES_STORAGE_PATH` | `./data/files` | Katalog na trwałe pliki użytkownika (przesłane obrazy, zapisane wyniki). Obraz ustawia `/data/files`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Katalog na trwałe pliki użytkowników (przesłane obrazy, zapisane wyniki). Obraz ustawia `/data/files`. |
 
 ### Magazyn obiektów S3 {#s3-object-storage}
 
-Odczytywane tylko wtedy, gdy `STORAGE_MODE=s3`. Jeśli pominiesz którąkolwiek z trzech wymaganych zmiennych, uruchomienie zakończy się niepowodzeniem z nazwą brakującej zmiennej.
+Odczytywane tylko wtedy, gdy `STORAGE_MODE=s3`. Brak którejkolwiek z trzech wymaganych zmiennych powoduje błąd uruchomienia z nazwą pominiętej zmiennej.
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
 | `S3_BUCKET` | (puste) | Bucket przechowujący przesłane pliki i wyniki. Wymagane. |
-| `S3_ACCESS_KEY_ID` | (puste) | Klucz dostępu. Wymagane. W kontenerze możesz zamiast tego zamontować go przez `S3_ACCESS_KEY_ID_FILE`. |
-| `S3_SECRET_ACCESS_KEY` | (puste) | Klucz tajny. Wymagane. Ta sama konwencja plikowa: `S3_SECRET_ACCESS_KEY_FILE`. |
-| `S3_REGION` | `us-east-1` | Region bucketa. |
-| `S3_ENDPOINT` | (puste) | Własny endpoint dla MinIO, R2, Backblaze i innych magazynów zgodnych z S3. Puste oznacza AWS. |
-| `S3_FORCE_PATH_STYLE` | `false` | Ustaw na `true` dla MinIO i wszystkiego innego, co oczekuje `endpoint/bucket/key` zamiast adresowania w stylu wirtualnego hosta. |
-| `S3_PREFIX` | (puste) | Prefiks kluczy, dzięki czemu jeden bucket może obsługiwać kilka instancji. |
+| `S3_ACCESS_KEY_ID` | (puste) | Klucz dostępu. Wymagane. W kontenerze można go zamontować jako plik, za pomocą `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_SECRET_ACCESS_KEY` | (puste) | Klucz tajny. Wymagane. Ta sama konwencja plików: `S3_SECRET_ACCESS_KEY_FILE`. |
+| `S3_REGION` | `us-east-1` | Region bucketu. |
+| `S3_ENDPOINT` | (puste) | Niestandardowy endpoint dla MinIO, R2, Backblaze i innych magazynów zgodnych z S3. Puste oznacza AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Ustawić `true` dla MinIO i wszystkiego, co wymaga `endpoint/bucket/key` zamiast adresowania w stylu virtual-host. |
+| `S3_PREFIX` | (puste) | Prefiks klucza, dzięki któremu jeden bucket może przechowywać kilka instancji. |
 
 ### Szyfrowanie danych w spoczynku {#encryption-at-rest}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `DATA_ENCRYPTION_KEY` | (puste) | 64 znaki szesnastkowe (32 bajty). Szyfruje wrażliwe ustawienia przechowywane w bazie danych. Wszystko, co nie ma 64 znaków szesnastkowych, jest odrzucane przy uruchamianiu. |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (puste) | Klucz, z którego przechodzisz podczas rotacji, w tym samym formacie. Ustaw oba na czas rotacji, aby istniejące wiersze nadal dawały się odszyfrować, a potem usuń ten. |
+| `DATA_ENCRYPTION_KEY` | (puste) | 64 znaki szesnastkowe (32 bajty). Szyfruje wrażliwe ustawienia przechowywane w bazie danych. Wszystko, co nie jest 64 znakami szesnastkowymi, jest odrzucane przy uruchomieniu. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (puste) | Klucz, który jest wymieniany, w tym samym formacie. Ustawić oba podczas rotacji, aby istniejące wiersze nadal się odszyfrowywały, a następnie usunąć ten. |
 
 ### Tryb wbudowany {#embedded-mode}
 
-Uruchom obraz bez `DATABASE_URL` i bez `REDIS_URL`, a wystartuje on własny PostgreSQL 17 i Redis wewnątrz kontenera, powiązane z pętlą zwrotną (loopback), ze wszystkimi danymi na woluminie `/data`. Przywraca to jednopoleceniowe doświadczenie `docker run` na potrzeby szybkiego startu, homelaba i aktualizacji z wersji 1.x. To ścieżka dla wygody, a nie wdrożenie produkcyjne: w środowisku produkcyjnym uruchom 3-kontenerowy stos Compose z osobnymi PostgreSQL i Redis. Tryb wbudowany wymaga uruchomienia kontenera jako root i jest niezgodny ze środowiskami uruchomieniowymi o dowolnym UID (OpenShift, Kubernetes `runAsNonRoot`); tam użyj Compose.
+Uruchomienie obrazu bez `DATABASE_URL` i bez `REDIS_URL` powoduje, że wewnątrz kontenera startują własne PostgreSQL 17 i Redis, powiązane z interfejsem loopback, a wszystkie dane trafiają na wolumen `/data`. Przywraca to wygodę uruchomienia jednym poleceniem `docker run` przy szybkim starcie, w homelabie i przy aktualizacji z wersji 1.x. Jest to ścieżka dla wygody, a nie wdrożenie produkcyjne: w produkcji należy uruchomić stos Compose z 3 kontenerami i osobnymi PostgreSQL i Redis. Tryb wbudowany wymaga uruchomienia kontenera jako root i jest niezgodny ze środowiskami z dowolnym UID (OpenShift, Kubernetes `runAsNonRoot`); tam należy użyć Compose.
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `EMBEDDED` | `auto` | Włączane automatycznie, gdy zarówno `DATABASE_URL`, jak i `REDIS_URL` są nieustawione. Ustaw na `0`, aby to wyłączyć (aplikacja wtedy szybko zakończy działanie, jeśli nie ustawiono zewnętrznego `DATABASE_URL`/`REDIS_URL`, zamiast po cichu uruchamiać bazę danych wewnątrz kontenera). |
-| `REDIS_MAXMEMORY` | `512mb` | Limit pamięci dla wbudowanego Redis (tylko tryb wbudowany). Obniż go na hostach z ograniczoną pamięcią, takich jak Raspberry Pi. |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Liczba sekund, przez którą rozruch czeka, aż wbudowany Redis odpowie na `PING`, zanim się podda. Po przekroczeniu limitu kontener zatrzymuje się i zapisuje przyczynę, zamiast zawieszać się. Całe sekundy od 1 do 999999; nie ma wartości oznaczającej brak limitu, bo czekanie w nieskończoność jest właśnie awarią, której ten limit ma zapobiegać. Podnieś go tylko wtedy, gdy trafi na niego wolny host. |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | To samo dla wbudowanego PostgreSQL. Odliczanie zaczyna się po zakończeniu `initdb` przy pierwszym uruchomieniu, więc obejmuje start serwera i odtwarzanie po awarii, a nie początkowe tworzenie bazy danych. |
+| `EMBEDDED` | `auto` | Włączana automatycznie, gdy `DATABASE_URL` i `REDIS_URL` nie są ustawione. Ustawienie `0` wyłącza ją (aplikacja kończy wtedy działanie od razu, jeśli nie ustawiono zewnętrznego `DATABASE_URL`/`REDIS_URL`, zamiast po cichu uruchamiać bazę danych w kontenerze). |
+| `REDIS_MAXMEMORY` | `512mb` | Limit pamięci wbudowanego Redis (tylko w trybie wbudowanym). Obniżyć na hostach o ograniczonej pamięci, takich jak Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Liczba sekund, przez które rozruch czeka, aż wbudowany Redis odpowie na `PING`, zanim się podda. Po przekroczeniu limitu kontener zatrzymuje się i zapisuje w logu przyczynę, zamiast się zawiesić. Pełne sekundy od 1 do 999999; nie ma wartości nieograniczonej, ponieważ nieskończone oczekiwanie to właśnie awaria, której ten limit ma zapobiegać. Zwiększać tylko wtedy, gdy wolny host go przekracza. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | To samo dla wbudowanego PostgreSQL. Odliczanie zaczyna się po zakończeniu `initdb` przy pierwszym rozruchu, więc obejmuje start serwera i odzyskiwanie po awarii, a nie początkowe tworzenie bazy danych. |
 
-Aktualizacja z wersji 1.x: umieść swój stary plik `snapotter.db` pod `/data/snapotter.db` w woluminie, a tryb wbudowany zaimportuje go do wbudowanego PostgreSQL przy pierwszym uruchomieniu. Import przebiega raz; późniejsze uruchomienia go pomijają.
+Aktualizacja z wersji 1.x: umieścić dawny `snapotter.db` w `/data/snapotter.db` na wolumenie, a tryb wbudowany zaimportuje go do wbudowanego PostgreSQL przy pierwszym rozruchu. Import odbywa się jednorazowo; kolejne rozruchy go pomijają.
 
-Uwaga o telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu jak każda inna konfiguracja. Publikowany obraz jest dostarczany z włączoną analityką; zbuduj z `--build-arg SNAPOTTER_ANALYTICS=off` albo użyj wewnątrzaplikacyjnej rezygnacji dla administratora, aby ją wyłączyć.
+Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu, jak każda inna konfiguracja. Opublikowany obraz jest dostarczany z włączoną analityką; aby ją wyłączyć, należy zbudować obraz z `--build-arg SNAPOTTER_ANALYTICS=off` lub użyć wyłączenia w aplikacji przez administratora.
 
 ### Limity przetwarzania {#processing-limits}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (bez ograniczeń) | Maksymalny rozmiar pliku na jedno przesłanie w megabajtach. Ustaw na 0 dla braku ograniczeń. Publikowany obraz jest dostarczany z `0`; kompilacja ze źródeł zaczyna od 100. |
-| `MAX_BATCH_SIZE` | `0` (bez ograniczeń) | Maksymalna liczba plików w pojedynczym żądaniu wsadowym. Ustaw na 0 dla braku ograniczeń. Publikowany obraz jest dostarczany z `0`; kompilacja ze źródeł zaczyna od 100. |
-| `CONCURRENT_JOBS` | `0` (auto) | Liczba zadań wsadowych uruchamianych równolegle. Ustaw na 0, aby automatycznie wykryć na podstawie dostępnych rdzeni CPU. |
-| `MAX_MEGAPIXELS` | `0` (bez ograniczeń) | Maksymalna dozwolona rozdzielczość obrazu w megapikselach. Ustaw na 0 dla braku ograniczeń. |
-| `MAX_WORKER_THREADS` | `0` (auto) | Maksymalna liczba wątków roboczych do przetwarzania obrazów. Ustaw na 0, aby automatycznie wykryć na podstawie dostępnych rdzeni CPU. |
-| `PROCESSING_TIMEOUT_S` | `0` (bez limitu) | Maksymalny czas przetwarzania na żądanie w sekundach. Ustaw na 0 dla braku limitu czasu. |
-| `MAX_PIPELINE_STEPS` | `20` | Maksymalna liczba kroków w potoku. Ustaw na 0 dla braku limitu. |
-| `MAX_CANVAS_PIXELS` | `0` (bez limitu) | Maksymalny rozmiar płótna w pikselach dla obrazów wyjściowych. Ustaw na 0 dla braku limitu. |
-| `MAX_SVG_SIZE_MB` | `50` | Największy plik SVG akceptowany przed oczyszczaniem, w megabajtach. `0` działa tutaj inaczej niż w sąsiednich wierszach. Całkowicie usuwa limit rozmiaru sprawdzany przed parsowaniem, zamiast go podnosić, więc zostaw tę zmienną ustawioną. |
-| `MAX_PDF_PAGES` | `0` (bez ograniczeń) | Maksymalna liczba stron PDF dla konwersji PDF na obraz. Ustaw na 0 dla braku ograniczeń. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (bez limitu) | Maksymalny rozmiar pliku na jedno przesłanie w megabajtach. Ustawienie 0 oznacza brak limitu. Opublikowany obraz ma `0`; kompilacja ze źródeł zaczyna od 100. |
+| `MAX_BATCH_SIZE` | `0` (bez limitu) | Maksymalna liczba plików w jednym żądaniu wsadowym. Ustawienie 0 oznacza brak limitu. Opublikowany obraz ma `0`; kompilacja ze źródeł zaczyna od 100. |
+| `CONCURRENT_JOBS` | `0` (auto) | Liczba zadań wsadowych uruchamianych równolegle. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
+| `MAX_MEGAPIXELS` | `0` (bez limitu) | Maksymalna dozwolona rozdzielczość obrazu w megapikselach. Ustawienie 0 oznacza brak limitu. |
+| `MAX_WORKER_THREADS` | `0` (auto) | Maksymalna liczba wątków roboczych do przetwarzania obrazów. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
+| `PROCESSING_TIMEOUT_S` | `0` (bez limitu) | Maksymalny czas przetwarzania jednego żądania w sekundach. Ustawienie 0 oznacza brak limitu czasu. |
+| `MAX_PIPELINE_STEPS` | `20` | Maksymalna liczba kroków w potoku. Ustawienie 0 oznacza brak limitu. |
+| `MAX_CANVAS_PIXELS` | `0` (bez limitu) | Maksymalny rozmiar płótna w pikselach dla obrazów wyjściowych. Ustawienie 0 oznacza brak limitu. |
+| `MAX_SVG_SIZE_MB` | `50` | Największy SVG akceptowany przed sanityzacją, w megabajtach. `0` zachowuje się tu inaczej niż w sąsiednich wierszach. Całkowicie usuwa limit rozmiaru przed parsowaniem, zamiast go podnosić, dlatego tę zmienną należy pozostawić ustawioną. |
+| `MAX_PDF_PAGES` | `0` (bez limitu) | Maksymalna liczba stron PDF przy konwersji PDF na obraz. Ustawienie 0 oznacza brak limitu. |
 
 ### Silniki {#engines}
 
-SnapOtter wyszukuje każdy plik binarny do przetwarzania na `$PATH` wewnątrz kontenera, więc te zmienne pozostają puste, chyba że podmontujesz własną kompilację.
+SnapOtter wyszukuje każdy plik wykonywalny przetwarzania w `$PATH` wewnątrz kontenera, więc te zmienne pozostają puste, chyba że zamontowano własną kompilację.
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `FFMPEG_PATH` | (puste) | Ścieżka do pliku binarnego `ffmpeg`, który obsługuje narzędzia wideo i audio. |
-| `FFPROBE_PATH` | (puste) | Ścieżka do `ffprobe`, który odczytuje pliki multimedialne przed ich przetworzeniem. Wskaż tę samą kompilację co w `FFMPEG_PATH`. |
+| `FFMPEG_PATH` | (puste) | Ścieżka do pliku wykonywalnego `ffmpeg` obsługującego narzędzia wideo i audio. |
+| `FFPROBE_PATH` | (puste) | Ścieżka do `ffprobe`, który odczytuje pliki multimedialne przed ich przetworzeniem. Wskazać tę samą kompilację co `FFMPEG_PATH`. |
 | `QPDF_PATH` | (puste) | Ścieżka do `qpdf`, używanego przez narzędzia PDF i do sprawdzania przesłanych plików PDF. |
 | `SOFFICE_PATH` | (puste) | Ścieżka do `soffice` z LibreOffice, używanego do konwersji dokumentów biurowych. |
 | `PDFCPU_PATH` | (puste) | Ścieżka do `pdfcpu`, używanego przez niektóre narzędzia PDF. |
-| `SNAPOTTER_HW_ACCEL` | (puste) | Rodzina sprzętowych enkoderów wideo: `nvenc` lub `vaapi`. Puste oznacza kodowanie programowe. |
+| `SNAPOTTER_HW_ACCEL` | (puste) | Rodzina sprzętowych koderów wideo, `nvenc` lub `vaapi`. Puste oznacza kodowanie programowe. |
 
-`SNAPOTTER_HW_ACCEL` wymaga ffmpeg zbudowanego z obsługą danej rodziny enkoderów, a ffmpeg w obrazie nie ma żadnej z nich. Z plikiem binarnym dostarczonym w obrazie ustawienie przechodzi na kodowanie programowe i informuje o tym w dzienniku startowym. Aby z niego korzystać, podmontuj własną kompilację ffmpeg, wskaż ją w `FFMPEG_PATH` i `FFPROBE_PATH` i udostępnij kontenerowi urządzenie GPU. W przypadku `nvenc` ustaw także `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: obraz prosi tylko o `compute,utility`, a bez `video` środowisko uruchomieniowe NVIDIA nie montuje biblioteki kodera, więc koder jest na liście, ale każde kodowanie kończy się błędem. Ścieżka nadpisania, która nie istnieje lub nie jest wykonywalna, również jest wymieniana w dzienniku startowym, a każde zadanie wymagające tego pliku binarnego kończy się błędem, dopóki nie poprawisz ścieżki albo jej nie wyłączysz.
+`SNAPOTTER_HW_ACCEL` wymaga ffmpeg zbudowanego z tą rodziną koderów, a ffmpeg w obrazie nie ma żadnej z nich. Przy własnym pliku wykonywalnym obrazu ustawienie wraca do kodowania programowego i informuje o tym w logu uruchomienia. Aby z niego skorzystać, należy zamontować własną kompilację ffmpeg, wskazać ją w `FFMPEG_PATH` i `FFPROBE_PATH` oraz udostępnić kontenerowi urządzenie GPU. Dla `nvenc` ustawić także `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: obraz prosi tylko o `compute,utility`, a bez `video` środowisko NVIDIA nie montuje biblioteki kodowania, więc koder jest widoczny na liście, ale każde kodowanie kończy się błędem. Nadpisanie ścieżki, która nie istnieje lub nie jest wykonywalna, również jest zapisywane w logu uruchomienia, a każde zadanie wymagające tego pliku kończy się błędem, dopóki ścieżka nie zostanie poprawiona lub zmienna usunięta.
 
-Publikowane pliki Compose przekazują wszystkie sześć zmiennych z pliku `.env`, więc wystarczy ustawić je właśnie tam.
+Opublikowane pliki Compose przekazują wszystkie sześć zmiennych z `.env`, więc wystarczy ustawić je tam.
 
 ### Czyszczenie {#cleanup}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | Jak długo niezapisane wyniki przetwarzania (surowe przesłania i wyjścia narzędzi) są przechowywane przed automatycznym usunięciem. Pliki, które jawnie zapiszesz w bibliotece Files, nie są objęte tym mechanizmem i pozostają, dopóki ich nie usuniesz. |
+| `FILE_MAX_AGE_HOURS` | `72` | Jak długo niezapisane wyniki przetwarzania (surowe przesłane pliki i wyniki narzędzi) są przechowywane przed automatycznym usunięciem. Pliki jawnie zapisane w bibliotece plików nie są objęte tym ustawieniem i pozostają do czasu ich usunięcia. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Jak często uruchamiane jest zadanie czyszczenia. |
 
 ### Wygląd {#appearance}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
 | `DEFAULT_THEME` | `light` | Domyślny motyw dla nowych sesji. `light`, `dark` lub `system`. |
 | `DEFAULT_LOCALE` | `en` | Domyślny język interfejsu. |
@@ -132,10 +132,10 @@ Publikowane pliki Compose przekazują wszystkie sześć zmiennych z pliku `.env`
 
 ### Uprawnienia Docker {#docker-permissions}
 
-| Zmienna | Wartość domyślna | Opis |
+| Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `PUID` | `999` | Uruchom proces kontenera jako ten UID. Ustaw tak, aby pasował do Twojego użytkownika hosta dla montowań bind (`id -u`). |
-| `PGID` | `999` | Uruchom proces kontenera jako ten GID. Ustaw tak, aby pasował do Twojej grupy hosta dla montowań bind (`id -g`). |
+| `PUID` | `999` | Uruchamia proces kontenera z tym UID. Ustawić zgodnie z użytkownikiem hosta dla bind mountów (`id -u`). |
+| `PGID` | `999` | Uruchamia proces kontenera z tym GID. Ustawić zgodnie z grupą hosta dla bind mountów (`id -g`). |
 
 ## Przykład Docker {#docker-example}
 
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Zmień to w przypadku wdrożeń nielokalnych
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -198,11 +198,11 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-## Woluminy {#volumes}
+## Wolumeny {#volumes}
 
-Stos Docker Compose używa czterech woluminów:
+Stos Docker Compose używa czterech wolumenów:
 
-- `/data` (app) - modele AI, środowisko venv Pythona i pliki użytkownika. Zamontuj to, aby zachować przesłane pliki i zainstalowane pakiety AI między ponownymi uruchomieniami.
-- `/tmp/workspace` (app) - tymczasowy magazyn na pliki będące w trakcie przetwarzania. Może być efemeryczny, ale zamontowanie go pozwala uniknąć zapełnienia zapisywalnej warstwy kontenera.
-- `SnapOtter-pgdata` (postgres) - katalog danych PostgreSQL. Przechowuje wszystkie dane relacyjne (użytkownicy, ustawienia, potoki, zadania, dziennik audytu). Wykonaj kopię zapasową przez `pg_dump` lub migawkę woluminu.
+- `/data` (aplikacja) - modele AI, środowisko Python venv i pliki użytkowników. Zamontować, aby zachować przesłane pliki i zainstalowane pakiety AI po restartach.
+- `/tmp/workspace` (aplikacja) - tymczasowe miejsce na pliki w trakcie przetwarzania. Może być ulotne, ale zamontowanie go zapobiega zapełnieniu zapisywalnej warstwy kontenera.
+- `SnapOtter-pgdata` (postgres) - katalog danych PostgreSQL. Zawiera wszystkie dane relacyjne (użytkownicy, ustawienia, potoki, zadania, dziennik audytu). Kopię zapasową wykonuje się przez `pg_dump` lub migawkę wolumenu.
 - `SnapOtter-redisdata` (redis) - plik append-only Redis dla trwałych kolejek zadań.

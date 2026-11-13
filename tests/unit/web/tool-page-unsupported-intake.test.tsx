@@ -371,6 +371,14 @@ describe("ToolPage document paste readiness gate (#2844)", () => {
     expect(useFileStore.getState().files).toEqual([]);
   });
 
+  it("shows the disabled message on a preset whose base tool is disabled (#4462)", async () => {
+    useSettingsStore.setState({ disabledTools: ["convert"], loaded: true, loadError: false });
+    await act(async () => {
+      renderToolPage("/image/heic-to-jpg");
+    });
+    expect(screen.getByText(en.toolPage.disabledByAdmin)).toBeTruthy();
+  });
+
   it("ignores file pastes while an AI tool is still loading feature bundle state", async () => {
     useFeaturesStore.setState({ bundles: [], loaded: false, loadError: false });
     vi.spyOn(useFeaturesStore.getState(), "fetch").mockResolvedValue(undefined);
@@ -854,7 +862,9 @@ describe("ToolPage partial batch URL import (#3751)", () => {
       expect(screen.getByRole("dialog")).toBe(dialog);
       expect(within(dialog).queryByText("a.png")).toBeNull();
       expect(within(dialog).getByText("b.png")).toBeTruthy();
-      expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+      expect(
+        within(dialog).getByText(en.urlImport.downloadFailed.replace("{status}", "404")),
+      ).toBeTruthy();
       expect(within(dialog).getByText("notes.txt")).toBeTruthy();
       expect(
         within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
@@ -953,7 +963,9 @@ describe("ToolPage partial batch URL import (#3751)", () => {
 
     expect(screen.getByRole("dialog")).toBe(dialog);
     expect(within(dialog).getByText("b.txt")).toBeTruthy();
-    expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+    expect(
+      within(dialog).getByText(en.urlImport.downloadFailed.replace("{status}", "404")),
+    ).toBeTruthy();
 
     fireEvent.click(within(dialog).getByTitle(en.urlImport.retryButton));
     const secondAddBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });

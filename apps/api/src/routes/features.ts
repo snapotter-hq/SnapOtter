@@ -26,11 +26,12 @@ import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import {
   acquireVenvLock,
+  buildInstallerEnv,
   drainOcrDispatcher,
-  getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
   handoffOcrDispatcher,
   probeOcrDispatcher,
+  resolveAiVenvPath,
   rotateOcrDispatcher,
   selectOcrRuntimeTarget,
   shutdownDispatcher,
@@ -71,7 +72,6 @@ import {
   importBundleArchive,
   invalidateCache,
   isFeatureInstalled,
-  isManagedAiEnvironment,
   markUninstalled,
   readManifest,
   releaseInstallLock,
@@ -107,8 +107,7 @@ import {
   updateSingleFileProgress,
 } from "./progress.js";
 
-const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
-const pythonPath = `${venvPath}/bin/python3`;
+const pythonPath = `${resolveAiVenvPath()}/bin/python3`;
 
 async function handoffInstalledOcrRuntime(
   installResult: Record<string, unknown>,
@@ -251,7 +250,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
       try {
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
       } catch (error) {
-        console.warn("[ocr-runtime] Unable to purge verified download cache:", error);
+        logger.warn(
+          { err: error, bundleId, jobId },
+          "[ocr-runtime] Unable to purge verified download cache",
+        );
       }
       if (!finalize()) return;
       invalidateCache();
@@ -338,17 +340,23 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // attempt of this bundle, so a retry never shows the old failure.
     setInstallProgress(bundleId, { percent: 0, stage: "" }, null);
 
-    // Hold the venv lock across the whole install so no AI tool job loads
-    // native libs from the venv while pip is rewriting them (that segfaults
-    // the sidecar). This awaits any in-flight AI job before the installer
-    // starts; the lock is released when the installer process exits.
-    const releaseVenv = await acquireVenvLock();
-    let venvReleased = false;
+    // The installer asks for the venv writer lock on stderr when it reaches
+    // its first venv write and waits for "granted" on stdin. Taking it then,
+    // not before spawning, lets AI jobs keep running through the download and
+    // extract, which can take minutes; only the phase that rewrites the native
+    // libs they load has to exclude them (that overlap segfaults the sidecar).
+    // Once granted, the lock is held until the installer sends "release" or
+    // exits (#4201).
+    let releaseVenv: (() => void) | null = null;
+    // Aborted on teardown so a dead installer's queued request leaves the
+    // lock queue instead of holding new AI jobs off (#4608).
+    const venvLockRequest = new AbortController();
+    let venvLockRequested = false;
+    let waitingForVenvLock = false;
     const releaseVenvOnce = () => {
-      if (!venvReleased) {
-        venvReleased = true;
-        releaseVenv();
-      }
+      const release = releaseVenv;
+      releaseVenv = null;
+      release?.();
     };
 
     // A failed spawn fires BOTH "error" and "close", so both handlers funnel
@@ -382,6 +390,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       if (finalized) return false;
       finalized = true;
       clearWatchdog();
+      venvLockRequest.abort();
       releaseVenvOnce();
       releaseInstallLock();
       clearActive();
@@ -389,18 +398,46 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     };
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
-      stdio: ["ignore", "pipe", "pipe", installLockFd],
-      env: {
-        ...process.env,
+      stdio: ["pipe", "pipe", "pipe", installLockFd],
+      env: buildInstallerEnv({
         BUNDLE_ID: bundleId,
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
-      },
+        SNAPOTTER_VENV_LOCK_HANDSHAKE: "1",
+      }),
     });
+    // A write to an installer that already exited fails with EPIPE; its close
+    // handler does the teardown, so the stream error has nothing left to do.
+    child.stdin?.on("error", () => {});
+
+    const grantVenvLock = () => {
+      if (venvLockRequested) return;
+      venvLockRequested = true;
+      waitingForVenvLock = true;
+      acquireVenvLock(venvLockRequest.signal).then(
+        (release) => {
+          waitingForVenvLock = false;
+          lastProgressAt = Date.now();
+          // The installer died while waiting; nothing will write the venv.
+          if (finalized) {
+            release();
+            return;
+          }
+          releaseVenv = release;
+          child.stdin?.write("granted\n");
+        },
+        () => {
+          // Only finalizeOnce aborts the request, so the installer is gone.
+          waitingForVenvLock = false;
+        },
+      );
+    };
 
     const stallMs = env.INSTALL_STALL_MS;
     const maxMs = env.INSTALL_MAX_MS;
     if (stallMs > 0 || maxMs > 0) {
       watchdog = setInterval(() => {
+        // Waiting on running AI jobs is not a stall: the installer is idle by design.
+        if (waitingForVenvLock) lastProgressAt = Date.now();
         const verdict = evaluateInstallWatchdog(
           Date.now(),
           lastProgressAt,
@@ -455,7 +492,24 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
         if (lastStderrLines.length > 20) lastStderrLines.shift();
 
         try {
-          const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
+          const parsed = JSON.parse(trimmed) as {
+            progress?: number;
+            stage?: string;
+            venvLock?: string;
+          };
+          if (parsed.venvLock === "acquire") {
+            grantVenvLock();
+            continue;
+          }
+          if (parsed.venvLock === "release") {
+            // The installer blocks until granted, so a release mid-wait is not
+            // a real one; honouring it would let a second acquire leak the lock.
+            if (!waitingForVenvLock) {
+              releaseVenvOnce();
+              venvLockRequested = false;
+            }
+            continue;
+          }
           if (typeof parsed.progress === "number") {
             lastProgressAt = Date.now();
             setInstallProgress(
@@ -592,7 +646,10 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     try {
       acquired = acquireInstallLock("__ocr_gc__");
     } catch (error) {
-      console.warn("[ocr-runtime] Deferred generation cleanup could not acquire its lease:", error);
+      logger.warn(
+        { err: error },
+        "[ocr-runtime] Deferred generation cleanup could not acquire its lease",
+      );
       scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       return;
     }
@@ -603,7 +660,7 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     const installLockFd = getInstallLockFdForChild();
     void runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd })
       .catch((error) => {
-        console.warn("[ocr-runtime] Deferred generation cleanup failed:", error);
+        logger.warn({ err: error }, "[ocr-runtime] Deferred generation cleanup failed");
         scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       })
       .finally(() => {
@@ -715,6 +772,18 @@ interface ToolBundleInstallResult {
   jobId?: string;
   queued: boolean;
   skipped?: boolean;
+}
+
+function withJobUrls(bundle: ToolBundleInstallResult): ToolBundleInstallResult & {
+  statusUrl?: string;
+  progressUrl?: string;
+} {
+  if (!bundle.jobId) return bundle;
+  return {
+    ...bundle,
+    statusUrl: `/api/v1/jobs/${bundle.jobId}`,
+    progressUrl: `/api/v1/jobs/${bundle.jobId}/progress`,
+  };
 }
 
 export interface ManifestModel {
@@ -971,68 +1040,6 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       const user = requireAuth(request, reply);
       if (!user) return;
 
-      // Where no venv is managed for us (a dev checkout), the developer's own
-      // environment already has the ML packages, so every bundle is available.
-      if (!isManagedAiEnvironment()) {
-        const ocrCapability = getOcrRuntimeCapability();
-        const selectedOcrTarget = ocrCapability.available
-          ? ocrCapability.descriptor.artifact.target
-          : selectOcrRuntimeTarget();
-        const bundles = Object.values(FEATURE_BUNDLES).map((bundle) => {
-          const base = {
-            id: bundle.id,
-            name: bundle.name,
-            description: bundle.description,
-            status: "installed" as const,
-            installedVersion: null,
-            estimatedSize: bundle.estimatedSize,
-            // Native mode runs legacy models in-process. OCR is different: Fast
-            // is built in, but its optional immutable runtime remains capability-
-            // driven and is unsupported by default outside controlled containers.
-            downloadBytes: null,
-            installedBytes: null,
-            enablesTools: bundle.enablesTools,
-            progress: null,
-            error: null,
-          };
-          if (bundle.id !== "ocr") return base;
-
-          const invalid = !ocrCapability.available && ocrCapability.status === "invalid";
-          const incompatible = !ocrCapability.available && ocrCapability.status === "incompatible";
-          return {
-            ...base,
-            status: ocrCapability.available
-              ? ("installed" as const)
-              : invalid
-                ? ("error" as const)
-                : ("not_installed" as const),
-            installedVersion: ocrCapability.available
-              ? ocrCapability.descriptor.artifact.version
-              : null,
-            compatibility: invalid
-              ? ("invalid" as const)
-              : incompatible
-                ? ("incompatible" as const)
-                : ("compatible" as const),
-            compatibilityReason: ocrCapability.available ? null : ocrCapability.reason,
-            selectedTarget: selectedOcrTarget,
-            missingDownloadBytes: null,
-            healthyGeneration: ocrCapability.available ? ocrCapability.descriptor.generation : null,
-            availableQualities: [
-              "fast" as const,
-              ...(ocrCapability.available ? ocrCapability.qualities : []),
-            ],
-            error:
-              !ocrCapability.available && ocrCapability.reason === "unsupported-host"
-                ? "Accurate OCR is not supported on this host; Fast OCR remains available"
-                : invalid
-                  ? "OCR runtime descriptor is invalid"
-                  : null,
-          };
-        });
-        return reply.send({ bundles });
-      }
-
       return reply.send({ bundles: getFeatureStates() });
     },
   );
@@ -1063,7 +1070,12 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
 
-      return reply.status(202).send({ jobId: result.jobId, queued: result.queued });
+      return reply.status(202).send({
+        jobId: result.jobId,
+        queued: result.queued,
+        statusUrl: `/api/v1/jobs/${result.jobId}`,
+        progressUrl: `/api/v1/jobs/${result.jobId}/progress`,
+      });
     },
   );
 
@@ -1100,7 +1112,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         bundles.push(result ?? { bundleId, queued: false, skipped: true });
       }
 
-      return reply.status(202).send({ bundles });
+      return reply.status(202).send({ bundles: bundles.map(withJobUrls) });
     },
   );
 
@@ -1240,10 +1252,18 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         await drainOcrDispatcher();
         await runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd });
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
-        ({ venvReseeded } = resetAiEnvironment({
-          installLockHeld: true,
-          mutationEpochAdvanced: true,
-        }));
+        // Running AI jobs load native libs from the venv and weights from the
+        // models dir, so the wipe and reseed wait for them to finish, and new
+        // jobs wait for the reset, the same as an install's venv write (#4615).
+        const releaseVenv = await acquireVenvLock();
+        try {
+          ({ venvReseeded } = resetAiEnvironment({
+            installLockHeld: true,
+            mutationEpochAdvanced: true,
+          }));
+        } finally {
+          releaseVenv();
+        }
       } catch (err) {
         return reply.status(409).send({
           error: err instanceof Error ? err.message : "Reset failed",

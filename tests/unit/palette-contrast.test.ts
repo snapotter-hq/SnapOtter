@@ -160,6 +160,24 @@ describe("landing", () => {
     expectPair(landing, "dark-fg", "dark-bg");
   });
 
+  // The dark bands (.section-dark) paint a gradient plus card surfaces, and small
+  // orange accents (badges, feature tags, the mailto link) sit on all of them (#4298).
+  // Vivid orange is exempt from the small-text rule only because it clears AA here.
+  it("vivid orange and muted text pass AA on every dark band surface", () => {
+    const band = extractBlock(LANDING_CSS, /\.section-dark\s*\{/);
+    const stops = [...band.matchAll(/#[0-9a-fA-F]{6}/g)].map((m) => m[0].toUpperCase());
+    expect(stops.length, "gradient stops parsed from .section-dark").toBeGreaterThanOrEqual(3);
+    const surfaces: Record<string, string> = { ...landing };
+    stops.forEach((hex, i) => {
+      surfaces[`band-stop-${i}`] = hex;
+    });
+    for (const bg of ["dark-bg", "dark-surface", ...stops.map((_, i) => `band-stop-${i}`)]) {
+      expectPair(surfaces, "primary-light", bg);
+      expectPair(surfaces, "dark-muted", bg);
+      expectPair(surfaces, "dark-fg", bg);
+    }
+  });
+
   // The footer status dot is a graphic, so WCAG 1.4.11's 3:1 applies rather
   // than AA's 4.5. Note "success" clears 3:1 here but not 4.5, which is why the
   // badge's label stays muted while only the dot takes a state color.

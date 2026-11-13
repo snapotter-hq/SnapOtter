@@ -262,6 +262,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "convert",
       jobId: "job-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
     expect(loggerWarnMock).toHaveBeenCalledWith(
       {
@@ -316,6 +318,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: undefined,
       jobId: "job-only-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
   });
 
@@ -1032,6 +1036,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         pool: "system",
         toolId: "convert",
         jobId,
+        periodic: true,
+        job: "system:job-reconciliation",
       });
       expect(loggerErrorMock).toHaveBeenCalledWith(
         { err: reportedErr, jobId, toolId: "convert" },
@@ -1087,6 +1093,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         pool: "system",
         toolId: "compress",
         jobId,
+        periodic: true,
+        job: "system:job-reconciliation",
       });
       expect(loggerErrorMock).toHaveBeenCalledWith(
         { err: reportedErr, jobId, toolId: "compress" },
@@ -1193,6 +1201,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "rotate",
       jobId: "job-s3-db-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
     expect(classifyError(dbConnErr, "worker")).toBe("operational");
 
@@ -1228,6 +1238,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "compress",
       jobId: "job-local-sidecar-eio",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
   });
 });

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
@@ -10,6 +10,11 @@ const CONFIG_PATH = "../../../apps/api/src/config.js";
 const PARTIAL_ENV = { env: { WORKSPACE_PATH: "/tmp/snapotter-logger-test" } };
 
 let logDir: string | undefined;
+
+/** Waits `n` event-loop turns, without a fixed sleep. */
+async function turns(n: number) {
+  for (let i = 0; i < n; i++) await new Promise((resolve) => setImmediate(resolve));
+}
 
 function stubConfig(env: Record<string, unknown>) {
   vi.doMock(CONFIG_PATH, () => ({ env }));
@@ -80,8 +85,8 @@ describe("logger module load (#1418)", () => {
     app.log.info("logger-lazy-import test line");
     await app.close();
 
-    // The transport is a worker thread that has to load pino-roll before the
-    // first write, so give it room on a loaded host. pino-roll 4 names the
+    // pino-roll opens the file asynchronously, so give it room on a loaded
+    // host. pino-roll 4 names the
     // first file <LOG_DIR>/snapotter.1.log (its own ".log" fallback; it ignores
     // the configured extension, which happens to be the same).
     const dir = logDir as string;
@@ -94,6 +99,100 @@ describe("logger module load (#1418)", () => {
       { timeout: 10_000, interval: 100 },
     );
   });
+
+  it("writes lines logged while the file is still opening, in order (#4203)", async () => {
+    stubConfig(fullEnv());
+    const { logger } = await import(LOGGER_PATH);
+    // Logged before pino-roll has opened the file, so both go through the
+    // pending buffer.
+    logger.info("pending line one");
+    logger.info("pending line two");
+
+    const file = join(logDir as string, "snapotter.1.log");
+    await vi.waitFor(
+      () => {
+        const text = readFileSync(file, "utf8");
+        expect(text).toContain("pending line two");
+        expect(text.indexOf("pending line one")).toBeLessThan(text.indexOf("pending line two"));
+      },
+      { timeout: 10_000, interval: 50 },
+    );
+  });
+
+  it("keeps running when the log file cannot be opened (#4203)", async () => {
+    // A log file fault used to reach an EventEmitter with no "error" listener
+    // and take the whole API down as an uncaught exception (Sentry NODE-4B).
+    // A LOG_DIR that is a file fails the open, portably.
+    const env = fullEnv();
+    const blocked = join(env.LOG_DIR, "not-a-dir");
+    writeFileSync(blocked, "");
+    stubConfig({ ...env, LOG_DIR: blocked });
+
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on("uncaughtException", onUncaught);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { logger } = await import(LOGGER_PATH);
+      logger.info("first line");
+
+      // Wait for whichever way the failure surfaces, a crash or the warning.
+      await vi.waitFor(
+        () => {
+          expect(uncaught.length + errSpy.mock.calls.length).toBeGreaterThan(0);
+        },
+        { timeout: 10_000, interval: 50 },
+      );
+      expect(uncaught).toEqual([]);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*EEXIST/));
+
+      // Writes after the failure never throw, never reach the uncaught path,
+      // and don't repeat the warning.
+      expect(() => logger.error("after the failure")).not.toThrow();
+      await turns(5);
+      expect(uncaught).toEqual([]);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      process.off("uncaughtException", onUncaught);
+      errSpy.mockRestore();
+    }
+  });
+
+  // /dev/full fails every write with ENOSPC, the full-disk case from the field.
+  it.skipIf(!existsSync("/dev/full"))(
+    "keeps running when log file writes fail with ENOSPC (#4203)",
+    async () => {
+      const env = fullEnv();
+      symlinkSync("/dev/full", join(env.LOG_DIR, "snapotter.1.log"));
+      stubConfig(env);
+
+      const uncaught: unknown[] = [];
+      const onUncaught = (err: unknown) => uncaught.push(err);
+      process.on("uncaughtException", onUncaught);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const { logger } = await import(LOGGER_PATH);
+        logger.info("first line");
+
+        await vi.waitFor(
+          () => {
+            expect(uncaught.length + errSpy.mock.calls.length).toBeGreaterThan(0);
+          },
+          { timeout: 10_000, interval: 50 },
+        );
+        // The old transport crashed again from a flush timer queued behind
+        // the failure; give any such timer its turns.
+        for (let i = 0; i < 5; i++) logger.info(`after the failure ${i}`);
+        await turns(5);
+        expect(uncaught).toEqual([]);
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[logger\] log file .*ENOSPC/));
+      } finally {
+        process.off("uncaughtException", onUncaught);
+        errSpy.mockRestore();
+      }
+    },
+  );
 
   it("lets vi.spyOn intercept calls made through the shared export", async () => {
     // The export has to stay a plain object with own, configurable methods:

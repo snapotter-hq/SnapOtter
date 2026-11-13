@@ -226,7 +226,7 @@
     },
     "inpaint-hq": {
       "name": "High-Quality Inpainting",
-      "description": "Diffusion-based object removal for large objects and detailed textures",
+      "description": "Diffusion-based object removal for large objects, detailed textures, and structured backgrounds",
       "estimatedSize": "5-7 GB",
       "archives": {
         "amd64-gpu": {
@@ -276,7 +276,7 @@
     "upscale-enhance": {
       "name": "Upscale & Enhance",
       "description": "AI upscaling, face enhancement, and noise removal",
-      "estimatedSize": "4-5 GB",
+      "estimatedSize": "5-6 GB",
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/upscale-enhance-amd64-gpu-r2.tar.gz",
@@ -400,7 +400,7 @@
     "photo-restoration": {
       "name": "Photo Restoration",
       "description": "Restore old or damaged photos",
-      "estimatedSize": "800 MB - 1 GB",
+      "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/photo-restoration-amd64-gpu-r2.tar.gz",
@@ -513,24 +513,24 @@
     },
     "ocr": {
       "name": "OCR",
-      "description": "High-accuracy local OCR for images and PDFs",
-      "estimatedSize": "208-234 MiB",
+      "description": "Extract text from images and PDFs",
+      "estimatedSize": "215-241 MiB",
       "runtimeFormatVersion": 3,
       "runtimeFamily": "ocr",
       "modelManifest": "docker/ocr-runtime-models.json",
       "targets": {
         "linux-amd64-cpu-py312": {
           "file": "v3/ocr-linux-amd64-cpu-py312.tar.gz",
-          "compressedSizeEstimate": 244622462,
-          "extractedSizeEstimate": 510762511,
+          "compressedSizeEstimate": 252146577,
+          "extractedSizeEstimate": 519457701,
           "sizeKind": "measured-estimate",
           "minimumMemoryBytes": 4294967296,
           "requirements": "docker/ocr-runtime-requirements-amd64.txt"
         },
         "linux-arm64-cpu-py311": {
           "file": "v3/ocr-linux-arm64-cpu-py311.tar.gz",
-          "compressedSizeEstimate": 218031562,
-          "extractedSizeEstimate": 428565655,
+          "compressedSizeEstimate": 225588891,
+          "extractedSizeEstimate": 435069449,
           "sizeKind": "measured-estimate",
           "minimumMemoryBytes": 4294967296,
           "requirements": "docker/ocr-runtime-requirements-arm64.txt"

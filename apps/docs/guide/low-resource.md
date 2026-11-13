@@ -31,7 +31,8 @@ services:
     volumes:
       - ./snapotter-data:/data
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@db:5432/snapotter
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@db:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@db:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
       # Small-box profile: see the table below for what each cap does.
       - CONCURRENT_JOBS=1
@@ -53,9 +54,9 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      - POSTGRES_USER=snapotter
-      - POSTGRES_PASSWORD=snapotter     # Change this for non-local deployments
-      - POSTGRES_DB=snapotter
+      - POSTGRES_USER=${POSTGRES_USER:-snapotter}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      - POSTGRES_DB=${POSTGRES_DB:-snapotter}
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -85,7 +86,7 @@ All caps are environment variables, documented fully in [Configuration](/guide/c
 | `MAX_UPLOAD_SIZE_MB` | `100` | Keeps a single huge file from occupying the whole workspace. |
 | `MAX_MEGAPIXELS` | `50` | Decoding a 100+ MP image costs RAM regardless of file size. |
 | `MAX_VIDEO_DURATION_S` | `300` | Long transcodes monopolize a small CPU for minutes to hours. |
-| `PROCESSING_TIMEOUT_S` | `600` | Hard ceiling so a runaway job frees the box eventually. |
+| `JOB_TIMEOUT_LONG_S` | `3600` | Hard ceiling on AI and media jobs, so a runaway job frees the box eventually. The default is two hours. Image and document jobs already stop at `JOB_TIMEOUT_FAST_S` (120 seconds by default). |
 
 These caps apply to what the server accepts, so set them to match what you actually use rather than as small as possible. If you never touch video, a `MAX_VIDEO_DURATION_S` cap costs nothing; if you scan documents daily, do not cap `MAX_PDF_PAGES`.
 

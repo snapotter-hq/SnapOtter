@@ -90,6 +90,48 @@ describe("webhook management", () => {
     });
   });
 
+  describe("with admin_alerts but without the webhooks feature (#4324)", () => {
+    let testApp: TestApp;
+    let adminToken: string;
+
+    beforeAll(async () => {
+      vi.resetModules();
+      const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
+      mockEnterpriseFeatures(["admin_alerts", "siem_forwarding"]);
+      const testServer = await import("../test-server.js");
+      testApp = await testServer.buildTestApp();
+      adminToken = await testServer.loginAsAdmin(testApp.app);
+    });
+
+    afterAll(async () => {
+      await testApp.cleanup();
+    });
+
+    const routes = [
+      { method: "GET", url: "/api/v1/enterprise/webhooks" },
+      { method: "POST", url: "/api/v1/enterprise/webhooks" },
+      { method: "PUT", url: "/api/v1/enterprise/webhooks/0" },
+      { method: "DELETE", url: "/api/v1/enterprise/webhooks/0" },
+      { method: "POST", url: "/api/v1/enterprise/webhooks/0/test" },
+    ] as const;
+
+    for (const { method, url } of routes) {
+      it(`${method} ${url} returns 403`, async () => {
+        const res = await testApp.app.inject({
+          method,
+          url,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload:
+            method === "POST" || method === "PUT"
+              ? { name: "T", url: "https://example.com/h" }
+              : undefined,
+        });
+        expect(res.statusCode).toBe(403);
+        expect(JSON.parse(res.body).error).toContain("webhooks");
+      });
+    }
+  });
+
   describe("with enterprise license", () => {
     let testApp: TestApp;
     let adminToken: string;

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isMemoryAllocError, removeBackground } from "@snapotter/ai";
+import { isGpuAvailable, isMemoryAllocError, removeBackground } from "@snapotter/ai";
 import {
   getBundleForTool,
   hasServerErrorStatus,
@@ -26,6 +26,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { availableMemoryBytes, hrMattingMemoryRefusal } from "../../lib/hq-memory-gate.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -171,6 +172,10 @@ async function processTransparencyFix(
   onProgress?: (percent: number, stage: string) => void,
   signal?: AbortSignal,
 ): Promise<Buffer> {
+  // Checked here as well as in the route so pipeline and batch runs are guarded.
+  const refusal = hrMattingMemoryRefusal(isGpuAvailable("onnx"), availableMemoryBytes());
+  if (refusal) throw new Error(refusal);
+
   let workingBuffer = inputBuffer;
 
   let resultBuffer: Buffer;
@@ -345,6 +350,18 @@ export function registerTransparencyFixer(app: FastifyInstance) {
           settings = result.data;
         } catch {
           return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        // The HR matting model always takes a 2048x2048 input, so a CPU host short
+        // on memory is SIGKILLed partway through. Refuse before any decode (#4510).
+        const memoryRefusal = hrMattingMemoryRefusal(
+          isGpuAvailable("onnx"),
+          availableMemoryBytes(),
+        );
+        if (memoryRefusal) {
+          return reply
+            .status(422)
+            .send({ error: "Not enough memory for this image", details: memoryRefusal });
         }
 
         try {

@@ -721,11 +721,17 @@ describe("admin user route audit payloads (#3978)", () => {
         ) as RouteHandler;
         postHandlers.set(path, handler);
       }),
-      put: vi.fn((path: string, handler: RouteHandler) => {
-        putHandlers.set(path, handler);
+      put: vi.fn((path: string, optsOrHandler: unknown, maybeHandler?: RouteHandler) => {
+        putHandlers.set(
+          path,
+          (typeof optsOrHandler === "function" ? optsOrHandler : maybeHandler) as RouteHandler,
+        );
       }),
-      delete: vi.fn((path: string, handler: RouteHandler) => {
-        deleteHandlers.set(path, handler);
+      delete: vi.fn((path: string, optsOrHandler: unknown, maybeHandler?: RouteHandler) => {
+        deleteHandlers.set(
+          path,
+          (typeof optsOrHandler === "function" ? optsOrHandler : maybeHandler) as RouteHandler,
+        );
       }),
       register: vi.fn(),
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

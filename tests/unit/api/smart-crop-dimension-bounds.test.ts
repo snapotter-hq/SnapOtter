@@ -24,6 +24,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@snapotter/ai", () => ({ detectFaces: mocks.detectFaces }));
 
+vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
+  isFeatureInstalled: () => true,
+}));
+
 let schema: {
   safeParse: (v: unknown) => { success: boolean; data?: unknown; error?: { message: string } };
 };

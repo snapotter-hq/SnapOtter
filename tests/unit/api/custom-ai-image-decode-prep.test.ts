@@ -47,6 +47,12 @@ const mocks = vi.hoisted(() => ({
   waitForJob: vi.fn(),
 }));
 
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
   reportError: mocks.reportError,

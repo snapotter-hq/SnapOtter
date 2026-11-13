@@ -40,6 +40,27 @@ test.describe("Landing Homepage", () => {
     ).toBeVisible();
   });
 
+  test("hero renders the milestone banner linking to the v2.3.0 release", async ({ page }) => {
+    const banner = page.locator("[data-milestone-banner]");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(/1 million pulls and 3,000 GitHub stars\. Thank you\./);
+    await expect(banner).toContainText("SnapOtter v2.3.0 is our thank-you release.");
+    await expect(banner).toHaveAttribute(
+      "href",
+      "https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0",
+    );
+  });
+
+  test("milestone banner fits a phone viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const banner = page.locator("[data-milestone-banner]");
+    await expect(banner).toBeVisible();
+    const box = await banner.boundingBox();
+    if (!box) throw new Error("milestone banner has no bounding box");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+  });
+
   test("hero renders trust badges", async ({ page }) => {
     for (const badge of ["Self-hosted", "Open source", "Air-gap capable", "Compliance-friendly"]) {
       await expect(page.getByText(badge, { exact: true }).first()).toBeVisible();
@@ -120,7 +141,7 @@ test.describe("Landing Homepage", () => {
 
   test("trust signals show stats", async ({ page }) => {
     await expect(page.getByText("Processing Tools")).toBeVisible();
-    await expect(page.getByText("GitHub Stars")).toBeVisible();
+    await expect(page.getByText("GitHub Stars", { exact: true })).toBeVisible();
     await expect(page.getByText("Image Pulls")).toBeVisible();
     await expect(page.getByText("Languages", { exact: true })).toBeVisible();
   });
@@ -196,7 +217,7 @@ test.describe("Landing Homepage", () => {
 
   test("open-source section renders with GitHub link", async ({ page }) => {
     await expect(page.getByText("Open source. Fully auditable.")).toBeVisible();
-    const ghLink = page.getByRole("link", { name: "Star on GitHub" }).first();
+    const ghLink = page.locator("#open-source").getByRole("link", { name: "Star on GitHub" });
     await expect(ghLink).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
   });
 
@@ -210,5 +231,37 @@ test.describe("Landing Homepage", () => {
   test("footer renders copyright with current year", async ({ page }) => {
     const year = new Date().getFullYear();
     await expect(page.getByText(new RegExp(`${year}.*Chocolate Wafers`))).toBeVisible();
+  });
+});
+
+test.describe("Navbar Star button", () => {
+  test("shows the Star label and count on a wide English nav", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const star = page.locator("[data-star-button]");
+    await expect(star).toHaveAttribute("href", "https://github.com/snapotter-hq/snapotter");
+    await expect(star).not.toHaveAttribute("data-compact");
+    await expect(star.getByText("Star", { exact: true })).toBeVisible();
+    await expect(star).toHaveAccessibleName(/^Star on GitHub \(.+\)$/);
+  });
+
+  // The Ukrainian nav has no room for the label at this width, so it drops to
+  // octocat + count. The row can still overflow without the label (#4521, and
+  // wider on Linux fonts), so assert only that the label is what gives way.
+  test("drops the label when a localized nav would overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/uk/");
+    const star = page.locator("[data-star-button]");
+    await expect(star).toHaveAttribute("data-compact", "");
+    await expect(star.getByText("Зірка", { exact: true })).toBeHidden();
+    const fullOverflow = await page.locator("[data-nav-row]").evaluate((row) => {
+      const button = row.querySelector<HTMLElement>("[data-star-button]");
+      if (!button) return 0;
+      delete button.dataset.compact;
+      const overflow = row.scrollWidth - row.clientWidth;
+      button.dataset.compact = "";
+      return overflow;
+    });
+    expect(fullOverflow).toBeGreaterThan(0);
   });
 });

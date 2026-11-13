@@ -130,6 +130,14 @@ export interface ToolRouteConfig<T> {
    * When absent, the tool's modality drives a single handler as before.
    */
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
+  /**
+   * For a tool whose bundle is needed only by some settings (smart-crop's face
+   * mode): the id of the bundle these settings need but that is not installed,
+   * or null. A bundle id answers with the standard 501 FEATURE_NOT_INSTALLED
+   * before any job is enqueued. Direct processV2 callers (batch, pipelines)
+   * skip it, so the process function must refuse the same case itself.
+   */
+  missingBundle?: (settings: T) => string | null;
   /** Zod schema that validates the settings JSON from the request. */
   settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
@@ -361,11 +369,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Per-request scratch dir for input handlers that need temp files during
       // validation. MUST stay distinct from the worker's job scratch dir
-      // (worker.ts scratchRoot()/<jobId>): for "long" tools the factory returns
-      // 202 below and the `finally` rm's this dir immediately, which would race
-      // and delete the worker's input mid-job whenever SCRATCH_PATH is unset
-      // (both otherwise default to tmpdir()/snapotter-scratch/<jobId>). The
-      // "-prep" suffix keeps the two from colliding.
+      // (worker-tool-job.ts scratchRoot()/<jobId>-<attempt uuid>): for "long"
+      // tools the factory returns 202 below and the `finally` rm's this dir
+      // immediately, which would race and delete the worker's input mid-job if
+      // the two ever shared a path. The "-prep" suffix keeps them apart.
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
       try {
         await mkdir(scratchDir, { recursive: true });
@@ -542,8 +549,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         reportProgress(15, "Preparing...");
 
         // Parse and validate settings
-        if (settingsRaw && settingsRaw.length > 65536) {
-          return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
+        const settingsLimitKb = env.MAX_SETTINGS_PAYLOAD_KB;
+        if (
+          settingsRaw &&
+          settingsLimitKb > 0 &&
+          Buffer.byteLength(settingsRaw, "utf8") > settingsLimitKb * 1024
+        ) {
+          return reply
+            .status(400)
+            .send({ error: `Settings payload too large (max ${settingsLimitKb}KB)` });
         }
         let settings: T;
         try {
@@ -579,6 +593,18 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             }
             throw err;
           }
+        }
+
+        const settingsBundleId = config.missingBundle?.(settings);
+        if (settingsBundleId) {
+          const bundle = FEATURE_BUNDLES[settingsBundleId];
+          return reply.status(501).send({
+            error: "Feature not installed",
+            code: "FEATURE_NOT_INSTALLED",
+            feature: settingsBundleId,
+            featureName: bundle?.name ?? settingsBundleId,
+            estimatedSize: bundle?.estimatedSize ?? "unknown",
+          });
         }
 
         // Guard: check if the tool's AI feature bundle is installed

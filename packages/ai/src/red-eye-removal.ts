@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface RedEyeRemovalOptions {
   sensitivity?: number;
@@ -36,7 +36,7 @@ export async function removeRedEye(
 
   const { signal, ...sidecarOptions } = options;
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("red-eye", inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "red_eye_removal.py",
     [inputPath, outputPath, JSON.stringify(sidecarOptions)],
@@ -49,7 +49,7 @@ export async function removeRedEye(
   }
 
   const actualOutputPath = result.output_path || outputPath;
-  const buffer = await readFile(actualOutputPath);
+  const buffer = await readScratchOutput("red-eye", actualOutputPath);
   return {
     buffer,
     facesDetected: result.facesDetected ?? 0,

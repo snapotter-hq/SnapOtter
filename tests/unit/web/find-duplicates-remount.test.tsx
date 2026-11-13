@@ -116,7 +116,7 @@ describe("find duplicates across a remount (#2314)", () => {
     expect(useDuplicateStore.getState().results).toEqual(RESULT);
   });
 
-  it("shows a scan's failure on the panel that remounted over it", () => {
+  it("shows a scan's failure as the translated fallback on the panel that remounted over it", () => {
     const { unmount } = startScan();
     unmount();
     render(<FindDuplicatesSettings />);
@@ -124,7 +124,7 @@ describe("find duplicates across a remount (#2314)", () => {
     FakeXhr.instances[0].respond(500, { error: "The scan fell over" });
 
     expect(useDuplicateStore.getState().scanning).toBe(false);
-    expect(screen.getByText("The scan fell over")).toBeVisible();
+    expect(screen.getByText("We couldn't complete that request. Please try again.")).toBeVisible();
   });
 
   it("drops the answer when the files were replaced while the scan was out", () => {

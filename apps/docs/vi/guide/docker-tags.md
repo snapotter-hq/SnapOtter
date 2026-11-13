@@ -1,14 +1,14 @@
 ---
-description: "Các thẻ image Docker của SnapOtter, benchmark GPU, ghim phiên bản và hỗ trợ đa nền tảng cho AMD64 và ARM64."
-i18n_source_hash: 7a040f010e63
-i18n_provenance: human
-i18n_output_hash: 912c4849a48b
+description: "Các tag image Docker của SnapOtter, benchmark GPU, cố định phiên bản và hỗ trợ đa nền tảng cho AMD64 và ARM64."
+i18n_source_hash: a5871d76250c
+i18n_provenance: machine
+i18n_output_hash: 034c354ab871
 i18n_hash_version: 2
 ---
 
-# Docker Image {#docker-image}
+# Tag image Docker {#docker-image}
 
-SnapOtter được phân phối dưới dạng một image Docker duy nhất. Chạy image này một mình thì nó sẽ khởi động một PostgreSQL 17 và Redis nhúng trên giao diện loopback (chế độ nhúng); với môi trường production, hãy chạy nó cùng với các container PostgreSQL 17 và Redis 8 riêng biệt qua Compose. Image ứng dụng hoạt động trên mọi nền tảng.
+SnapOtter được phát hành dưới dạng một image Docker duy nhất. Chạy riêng lẻ, image sẽ khởi động PostgreSQL 17 và Redis nhúng sẵn trên giao diện loopback (chế độ nhúng); với môi trường production, hãy chạy cùng các container PostgreSQL 17 và Redis 8 riêng bằng Compose. Image ứng dụng hoạt động trên mọi nền tảng.
 
 ## Bắt đầu nhanh {#quick-start}
 
@@ -16,23 +16,23 @@ SnapOtter được phân phối dưới dạng một image Docker duy nhất. Ch
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Khi không đặt `DATABASE_URL`, image chạy ở chế độ nhúng: PostgreSQL và Redis khởi động bên trong container trên loopback, với toàn bộ dữ liệu nằm dưới volume `SnapOtter-data`. Đặt `DATABASE_URL` và `REDIS_URL` (như stack [Compose](#docker-compose) làm) để dùng các dịch vụ bên ngoài thay thế. Xem [Cấu hình](/vi/guide/configuration#embedded-mode).
+Khi không đặt `DATABASE_URL`, image chạy ở chế độ nhúng: PostgreSQL và Redis khởi động bên trong container trên loopback, toàn bộ dữ liệu nằm trong volume `SnapOtter-data`. Hãy đặt `DATABASE_URL` và `REDIS_URL` (như stack [Compose](#docker-compose) vẫn làm) để dùng các dịch vụ bên ngoài. Xem [Cấu hình](/vi/guide/configuration#embedded-mode).
 
 ## Tăng tốc NVIDIA CUDA {#nvidia-cuda-acceleration}
 
-Image bao gồm hỗ trợ NVIDIA CUDA trên amd64. Nếu bạn có GPU NVIDIA đã cài [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), hãy thêm `--gpus all`:
+Image có hỗ trợ NVIDIA CUDA trên amd64. Nếu bạn có GPU NVIDIA và đã cài [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), hãy thêm `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Image tự động phát hiện CUDA khi chạy. Nếu không có `--gpus all`, hoặc khi CUDA không khả dụng, các công cụ AI chạy trên CPU. Vẫn cùng một image trong cả hai trường hợp.
+Image tự động phát hiện CUDA khi chạy. Nếu không có `--gpus all`, hoặc khi CUDA không khả dụng, các công cụ AI sẽ chạy trên CPU. Cả hai trường hợp đều dùng cùng một image.
 
-Tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL hiện không được hỗ trợ cho suy luận AI của SnapOtter. Việc ánh xạ `/dev/dri` vào container có thể lộ thiết bị render, nhưng runtime AI vẫn sẽ dùng CPU trừ khi có CUDA.
+Hiện tại, SnapOtter không hỗ trợ tăng tốc suy luận AI bằng iGPU Intel/AMD qua VA-API, Quick Sync hoặc OpenCL. Việc ánh xạ `/dev/dri` vào container có thể làm lộ thiết bị render, nhưng runtime AI vẫn dùng CPU trừ khi có CUDA.
 
 ### Benchmark {#benchmarks}
 
-Được kiểm thử trên NVIDIA RTX 4070 (12 GB VRAM) với một ảnh chân dung JPEG 572x1024.
+Thử nghiệm trên NVIDIA RTX 4070 (12 GB VRAM) với ảnh chân dung JPEG 572x1024.
 
 #### Hiệu năng khi đã khởi động {#warm-performance}
 
@@ -40,22 +40,22 @@ Tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL hi�
 |------|-----|-----|---------|
 | Xóa nền (u2net) | 2,415ms | 879ms | 2.7x |
 | Xóa nền (isnet) | 2,457ms | 1,137ms | 2.2x |
-| Phóng đại 2x | 350ms | 309ms | 1.1x |
-| Phóng đại 4x | 910ms | 310ms | 2.9x |
+| Upscale 2x | 350ms | 309ms | 1.1x |
+| Upscale 4x | 910ms | 310ms | 2.9x |
 | Làm mờ khuôn mặt | 139ms | 122ms | 1.1x |
 
-#### Khởi động nguội (yêu cầu đầu tiên sau khi container khởi động) {#cold-start-first-request-after-container-start}
+#### Khởi động lạnh (yêu cầu đầu tiên sau khi container khởi động) {#cold-start-first-request-after-container-start}
 
 | Công cụ | CPU | GPU | Tăng tốc |
 |------|-----|-----|---------|
 | Xóa nền | 22,286ms | 4,792ms | 4.7x |
-| Phóng đại 2x | 3,957ms | 2,318ms | 1.7x |
+| Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 
-OCR không được đưa vào so sánh CUDA. Cả tầng Tesseract tích hợp và tầng RapidOCR/ONNX tùy chọn đều sử dụng CPU, kể cả khi vùng chứa có quyền truy cập NVIDIA GPU.
+OCR không nằm trong phép so sánh CUDA. Cả tầng Tesseract tích hợp sẵn lẫn các tầng RapidOCR/ONNX tùy chọn đều dùng CPU, kể cả khi container có quyền truy cập GPU NVIDIA.
 
 ### Kiểm tra tình trạng CUDA {#cuda-health-check}
 
-Sau yêu cầu AI đầu tiên, endpoint kiểm tra tình trạng của admin sẽ báo cáo trạng thái GPU CUDA:
+Sau yêu cầu AI đầu tiên, endpoint kiểm tra tình trạng dành cho quản trị viên sẽ báo cáo trạng thái GPU CUDA:
 
 ```
 GET /api/v1/admin/health
@@ -64,7 +64,7 @@ GET /api/v1/admin/health
 
 ## Docker Compose {#docker-compose}
 
-Stack Compose đầy đủ bao gồm ứng dụng, PostgreSQL 17 và Redis 8. Xem [Triển khai](/vi/guide/deployment) để có `docker-compose.yml` hoàn chỉnh. Một ví dụ tối giản:
+Stack Compose đầy đủ gồm ứng dụng, PostgreSQL 17 và Redis 8. Xem [Triển khai](/vi/guide/deployment) để lấy `docker-compose.yml` hoàn chỉnh. Một ví dụ tối thiểu:
 
 ```yaml
 services:
@@ -76,7 +76,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -93,14 +95,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -136,9 +138,9 @@ volumes:
               capabilities: [gpu]
 ```
 
-## Ghim phiên bản {#version-pinning}
+## Cố định phiên bản {#version-pinning}
 
-| Thẻ | Mô tả |
+| Tag | Mô tả |
 |-----|------------|
 | `latest` | Bản phát hành mới nhất |
 | `2.2.0` | Phiên bản chính xác |
@@ -152,8 +154,8 @@ volumes:
 | linux/amd64 | NVIDIA CUDA | Tăng tốc CUDA đầy đủ cho các công cụ AI |
 | linux/arm64 | Chỉ CPU | Raspberry Pi 4/5, Apple Silicon qua Docker Desktop |
 
-## Chuyển đổi từ các thẻ trước đó {#migration-from-previous-tags}
+## Chuyển từ các tag trước đây {#migration-from-previous-tags}
 
-Nếu bạn đang dùng thẻ `:cuda`, hãy chuyển sang `:latest` và giữ `--gpus all`. Cùng hỗ trợ GPU, image hợp nhất.
+Nếu bạn từng dùng tag `:cuda`, hãy chuyển sang `:latest` và giữ `--gpus all`. Hỗ trợ GPU như cũ, chỉ còn một image thống nhất.
 
-Dữ liệu và cài đặt của bạn được bảo toàn trong các volume.
+Dữ liệu và cài đặt của bạn được giữ nguyên trong các volume.

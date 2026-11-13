@@ -24,6 +24,7 @@ import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { objectExists } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
+import { batchJobIdFor, resolveBatchJobId } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -69,7 +70,10 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   return {
     ...actual,
     waitForJob: async (...args: Parameters<typeof actual.waitForJob>) => {
-      if (enqueueMock.timeoutParentIds.has(args[1])) return null;
+      // Tests name the batch by its clientJobId; the parent id is the server's.
+      const { clientJobIdForBatch } = await import("../batch-alias.js");
+      const clientJobId = await clientJobIdForBatch(args[1]);
+      if (enqueueMock.timeoutParentIds.has(clientJobId ?? args[1])) return null;
       return actual.waitForJob(...args);
     },
   };
@@ -103,26 +107,34 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   const { SafeError } = await import("@snapotter/shared");
   const capError = (message: string) =>
     new SafeError(message, { kind: "operational", code: "workspace-cap", statusCode: 503 });
+  // Prefixes are written in clientJobId terms; batch keys carry the server id.
+  const clientKey = async (key: string) => {
+    const { toClientKey } = await import("../batch-alias.js");
+    return toClientKey(key);
+  };
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
+      const matchKey = await clientKey(key);
       for (const [prefix, buildErr] of storageMock.putObjectError) {
-        if (key.startsWith(prefix)) throw buildErr();
+        if (matchKey.startsWith(prefix)) throw buildErr();
       }
       for (const [prefix, message] of storageMock.putObjectFail) {
-        if (key.startsWith(prefix)) throw capError(message);
+        if (matchKey.startsWith(prefix)) throw capError(message);
       }
       return actual.putObject(key, data);
     },
     putObjectStream: async (key: string, stream: Parameters<typeof actual.putObjectStream>[1]) => {
+      const matchKey = await clientKey(key);
       for (const [prefix, message] of storageMock.putObjectStreamFail) {
-        if (key.startsWith(prefix)) throw capError(message);
+        if (matchKey.startsWith(prefix)) throw capError(message);
       }
       return actual.putObjectStream(key, stream);
     },
     getObjectStream: async (key: string) => {
+      const matchKey = await clientKey(key);
       for (const [prefix, mode] of storageMock.poison) {
-        if (!key.startsWith(prefix)) continue;
+        if (!matchKey.startsWith(prefix)) continue;
         if (mode === "reject") throw new Error(`test poison: refusing to open ${key}`);
         // Error only once a consumer reads, so the failure surfaces inside
         // archiver (which has error listeners attached) instead of as an
@@ -173,7 +185,7 @@ async function waitForTerminalFrame(
   jobId: string,
   timeoutMs = 30_000,
 ): Promise<Record<string, unknown>> {
-  const key = `${bullPrefix()}:terminal:${jobId}`;
+  const key = `${bullPrefix()}:terminal:${await resolveBatchJobId(jobId)}`;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const raw = await sharedRedis().get(key);
@@ -473,13 +485,24 @@ describe("ClientJobId passthrough", () => {
 
     const first = await post(adminToken);
     expect(first.statusCode).toBe(200);
-    const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [before] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
 
     const second = await post(adminToken);
     expect(second.statusCode, second.body.slice(0, 300)).toBe(202);
-    expect(second.json()).toEqual({ jobId: clientJobId, async: true });
+    expect(second.json()).toEqual({
+      jobId: clientJobId,
+      async: true,
+      statusUrl: `/api/v1/jobs/${clientJobId}`,
+      progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+    });
 
-    const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const [after] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
     expect(after).toEqual(before);
 
     // Someone else's job id stays a conflict: attaching would leak the result.
@@ -489,32 +512,31 @@ describe("ClientJobId passthrough", () => {
     expect(foreign.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
   });
 
-  // A free clientJobId can still collide when the route inserts its per-file
-  // child rows (${parentId}-f${n}). That is still a client id collision:
-  // settle the staged parent, remove any earlier children and uploads from
-  // this request, leave the pre-existing child row and its upload untouched,
-  // and answer 409 instead of 500 (#1724).
-  it("answers 409 when a free clientJobId collides on a child id", async () => {
+  // Child ids used to be ${clientJobId}-f${n}, so a client could aim a batch
+  // at another job's rows and uploads (#1724). Children now hang off the
+  // server parent id, so a row that looks like a child of the client id is
+  // never touched and the batch runs normally.
+  it("leaves a row named like a child of the clientJobId untouched", async () => {
     const clientJobId = `batch-1724-${randomUUID()}`;
-    const collidingChildId = `${clientJobId}-f1`;
-    const collidingUploadKey = `uploads/${collidingChildId}/b.jpg`;
+    const lookalikeChildId = `${clientJobId}-f1`;
+    const lookalikeUploadKey = `uploads/${lookalikeChildId}/b.jpg`;
     const { getObjectBuffer, putObject } = await import(
       "../../../apps/api/src/lib/object-storage.js"
     );
-    await putObject(collidingUploadKey, Buffer.from("existing-child-upload"));
+    await putObject(lookalikeUploadKey, Buffer.from("existing-child-upload"));
     await db.insert(schema.jobs).values({
-      id: collidingChildId,
+      id: lookalikeChildId,
       toolId: "resize",
       pool: "image",
       type: "tool",
       status: "completed",
-      inputRefs: [collidingUploadKey],
+      inputRefs: [lookalikeUploadKey],
       settings: { kept: true },
     });
     const [childBefore] = await db
       .select()
       .from(schema.jobs)
-      .where(eq(schema.jobs.id, collidingChildId));
+      .where(eq(schema.jobs.id, lookalikeChildId));
 
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
@@ -529,29 +551,19 @@ describe("ClientJobId passthrough", () => {
       body,
     });
 
-    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
-    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    expect(new AdmZip(res.rawPayload).getEntries()).toHaveLength(2);
 
     const [childAfter] = await db
       .select()
       .from(schema.jobs)
-      .where(eq(schema.jobs.id, collidingChildId));
+      .where(eq(schema.jobs.id, lookalikeChildId));
     expect(childAfter).toEqual(childBefore);
-    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-child-upload");
+    expect((await getObjectBuffer(lookalikeUploadKey)).toString()).toBe("existing-child-upload");
 
-    const earlierChildRows = await db
-      .select()
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, `${clientJobId}-f0`));
-    expect(earlierChildRows).toHaveLength(0);
-    expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
-
-    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
-    expect(parentRow?.status).toBe("failed");
-    expect(parentRow?.error).toMatchObject({
-      message: "Job ID already in use",
-      code: "CONFLICT",
-    });
+    const parentId = await batchJobIdFor(clientJobId);
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(parentRow?.status).toBe("completed");
   });
 });
 
@@ -851,7 +863,7 @@ describe("Legacy batch SSE wire parity", () => {
     expect(res.statusCode).toBe(200);
 
     // Read the terminal SSE replay frame from Redis
-    const terminalKeyName = `${bullPrefix()}:terminal:${clientJobId}`;
+    const terminalKeyName = `${bullPrefix()}:terminal:${await resolveBatchJobId(clientJobId)}`;
     let frame: string | null = null;
     for (let i = 0; i < 40; i++) {
       frame = await sharedRedis().get(terminalKeyName);
@@ -1180,7 +1192,12 @@ describe("Sync-wait expiry", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
       // The flow does not care about the response: the finalize still
       // persists the ZIP and publishes the terminal frame the client
@@ -1354,9 +1371,14 @@ describe("Workspace storage cap during batch ingress", () => {
       expect(payload.error).toBe("This batch does not fit in the remaining workspace storage");
       expect(payload.details).toMatch(/MAX_WORKSPACE_SIZE_GB/);
 
-      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const rows = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(rows).toHaveLength(0);
-      expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+      expect(await objectExists(`uploads/${await resolveBatchJobId(clientJobId)}-f0/a.png`)).toBe(
+        false,
+      );
     } finally {
       (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = originalCap;
     }
@@ -1389,12 +1411,17 @@ describe("Workspace storage cap during batch ingress", () => {
       // The first file was stored before the second failed. Leaving it
       // behind is what kept a full workspace full until the TTL sweep, so
       // every later request on the instance failed the same way.
-      expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+      expect(await objectExists(`uploads/${await resolveBatchJobId(clientJobId)}-f0/a.png`)).toBe(
+        false,
+      );
 
       // The parent row already existed, so it must settle instead of sitting
       // at "processing" in job history, and the terminal frame must carry
       // the reason for a client that is only watching the SSE.
-      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const [row] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(row?.status).toBe("failed");
       expect((row?.error as { message?: string } | null)?.message).toBe(
         "Injected cap during ingress",
@@ -1435,7 +1462,10 @@ describe("Workspace storage cap during batch ingress", () => {
       expect(res.statusCode).toBe(503);
       expect(res.body).toContain("Injected cap after empty file");
 
-      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const [row] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(row?.status).toBe("failed");
       expect(row?.error).toEqual({
         message: "Injected cap after empty file",
@@ -1479,7 +1509,10 @@ describe("Workspace storage cap during batch ingress", () => {
 
       expect(res.statusCode).toBe(500);
 
-      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      const [row] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, await resolveBatchJobId(clientJobId)));
       expect(row?.status).toBe("failed");
       expect(row?.error).toEqual({
         message: "Internal server error",

@@ -27,7 +27,7 @@ import type {
   EditMetadataOptions,
   FlipOptions,
   OperationResult,
-  OutputFormat,
+  ProcessImageFormat,
   ResizeOptions,
   RotateOptions,
   SaturationOptions,
@@ -247,7 +247,7 @@ async function materializeStage(
 export async function processImage(
   input: Buffer,
   operations: Operation[],
-  outputFormat?: OutputFormat,
+  outputFormat?: ProcessImageFormat,
 ): Promise<OperationResult> {
   let image: Sharp = sharp(input);
   let materialized = false;

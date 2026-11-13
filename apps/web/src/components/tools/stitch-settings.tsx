@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { type FeedbackErrorCategory, feedbackCategoryOf } from "@/lib/feedback";
 import { format as formatMessage } from "@/lib/format";
@@ -303,7 +303,7 @@ export function StitchSettings() {
       if (xhrRef.current === xhr) xhrRef.current = null;
       if (!storeReset) {
         const teardownError = failEntry(
-          err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed,
+          userErrorMessage(t, err, t.toolSettings.stitch.stitchFailed),
           feedbackCategoryOf(err) ?? undefined,
         );
         if (teardownError) throw teardownError.cause;

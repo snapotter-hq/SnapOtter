@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
@@ -218,7 +218,7 @@ export function WatermarkImageSettings() {
         }).catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") throw err;
           throw new FeedbackCategoryError(
-            err instanceof Error ? err.message : t.errors.network,
+            userErrorMessage(t, err, t.errors.network),
             "upload_error",
           );
         });
@@ -279,7 +279,7 @@ export function WatermarkImageSettings() {
           processedFilename: null,
           processedSize: null,
           status: "failed",
-          error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+          error: userErrorMessage(t, err, t.errors.processingFailedNoDetail),
           errorCategory: feedbackCategoryOf(err),
         });
       } finally {
@@ -341,7 +341,7 @@ export function WatermarkImageSettings() {
             }).catch((err: unknown) => {
               if (err instanceof DOMException && err.name === "AbortError") throw err;
               throw new FeedbackCategoryError(
-                err instanceof Error ? err.message : t.errors.network,
+                userErrorMessage(t, err, t.errors.network),
                 "upload_error",
               );
             });
@@ -400,7 +400,7 @@ export function WatermarkImageSettings() {
             }
             store.updateEntryById(entryId, {
               status: "failed",
-              error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+              error: userErrorMessage(t, err, t.errors.processingFailedNoDetail),
               errorCategory: feedbackCategoryOf(err),
             });
           }

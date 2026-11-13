@@ -12,6 +12,7 @@ import {
   probeDatabase,
   runMigrations,
 } from "../../../apps/api/src/db/migrate.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 
 // Covers db/bootstrap-roles.ts and the boot path in db/migrate.ts: role
 // provisioning, the grants, and runMigrations / probeDatabase /
@@ -538,7 +539,7 @@ describe("migration role that does not own the tables", () => {
   });
 
   it("turns a boot in that state into an actionable failure", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
     let failure: (Error & { code?: string; cause?: unknown }) | null;
     let warned: string[] = [];
     try {

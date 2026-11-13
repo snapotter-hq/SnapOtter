@@ -183,7 +183,11 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         jobId,
       });
 
-      return reply.status(202).send({ jobId, message: "Export started" });
+      return reply.status(202).send({
+        jobId,
+        message: "Export started",
+        statusUrl: `/api/v1/enterprise/users/${targetUserId}/export/${jobId}`,
+      });
     },
   );
 

@@ -14,6 +14,7 @@
   "nav.talkToHuman": "Talk to a human",
   "nav.bookDemo": "Book a Demo",
   "nav.getStartedFree": "Get Started Free",
+  "nav.star": "Star",
   "nav.toggleMenu": "Toggle menu",
   "common.skipToContent": "Skip to content",
   "common.home": "Home",
@@ -556,5 +557,8 @@
   "section.video": "Video",
   "section.audio": "Audio",
   "section.pdf": "PDF",
-  "section.files": "Files"
+  "section.files": "Files",
+  "home.milestone.thanksPullsStars": "1 million pulls and 3,000 GitHub stars. Thank you.",
+  "home.milestone.release": "SnapOtter {version} is our thank-you release.",
+  "home.milestone.cta": "See what's new"
 }

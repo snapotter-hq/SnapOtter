@@ -1,16 +1,16 @@
 ---
-description: "PostgreSQL-databasschema, tabeller, migrationer och säkerhetskopieringsprocedurer för SnapOtter."
-i18n_source_hash: 331b11cd21d1
+description: "Databasschema, tabeller, migreringar och säkerhetskopieringsrutiner för PostgreSQL i SnapOtter."
+i18n_source_hash: 2150213f21da
 i18n_provenance: machine
-i18n_output_hash: a6882b6004eb
+i18n_output_hash: 91f79dd431c6
 i18n_hash_version: 2
 ---
 
 # Databas {#database}
 
-SnapOtter använder PostgreSQL 17 med [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) för datapersistens. Schemat definieras i `apps/api/src/db/schema.ts`.
+SnapOtter använder PostgreSQL 17 med [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) för datalagring. Schemat definieras i `apps/api/src/db/schema.ts`.
 
-Anslutningen konfigureras via miljövariabeln `DATABASE_URL` (standard `postgres://snapotter:snapotter@postgres:5432/snapotter`). I Docker Compose lagrar Postgres-containern sina data i den namngivna volymen `SnapOtter-pgdata`. Förfrågningar betjänas via en roll som bara kan läsa och skriva rader, vilket beskrivs under [Roller med minsta möjliga behörighet](#least-privilege-roles) nedan.
+Anslutningen konfigureras via miljövariabeln `DATABASE_URL` (standard `postgres://snapotter:snapotter@postgres:5432/snapotter`). I Docker Compose lagrar Postgres-containern sin data i den namngivna volymen `SnapOtter-pgdata`. Förfrågningar betjänas av en roll som bara kan läsa och skriva rader, vilket beskrivs under [Roller med lägst behörighet](#least-privilege-roles) nedan.
 
 ## Tabeller {#tables}
 
@@ -24,20 +24,20 @@ Lagrar användarkonton. Skapas automatiskt vid första körningen från `DEFAULT
 | `username` | varchar | Unik, obligatorisk |
 | `passwordHash` | varchar | scrypt-hash |
 | `role` | varchar | `admin`, `editor` eller `user` |
-| `mustChangePassword` | boolean | Flagga för framtvingad lösenordsåterställning |
-| `createdAt` | timestamp | Skapandetidpunkt |
-| `updatedAt` | timestamp | Senaste uppdateringstidpunkt |
+| `mustChangePassword` | boolean | Flagga för tvingad lösenordsåterställning |
+| `createdAt` | timestamp | Skapandetid |
+| `updatedAt` | timestamp | Tidpunkt för senaste uppdatering |
 
 ### sessions {#sessions}
 
-Aktiva inloggningssessioner. Varje rad knyter en sessionstoken till en användare.
+Aktiva inloggningssessioner. Varje rad kopplar en sessionstoken till en användare.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
 | `id` | varchar | Primärnyckel (sessionstoken) |
 | `userId` | uuid | Främmande nyckel till `users.id` |
-| `expiresAt` | timestamp | Utgångstidpunkt |
-| `createdAt` | timestamp | Skapandetidpunkt |
+| `expiresAt` | timestamp | Utgångstid |
+| `createdAt` | timestamp | Skapandetid |
 
 ### teams {#teams}
 
@@ -46,85 +46,85 @@ Grupper för att organisera användare. Administratörer kan tilldela användare
 | Kolumn | Typ | Beskrivning |
 |--------|------|-------------|
 | `id` | uuid | Primärnyckel |
-| `name` | varchar (unik, max 50 tecken) | Teamnamn |
-| `createdAt` | timestamp | Skapandetidpunkt |
+| `name` | varchar (unik, högst 50 tecken) | Teamnamn |
+| `createdAt` | timestamp | Skapandetid |
 
 ### api_keys {#api-keys}
 
-API-nycklar för programmatisk åtkomst. Den råa nyckeln visas en gång vid skapandet; endast hashen lagras.
+API-nycklar för programmatisk åtkomst. Den råa nyckeln visas en gång vid skapandet; bara hashen lagras.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
 | `id` | uuid | Primärnyckel |
 | `userId` | uuid | Främmande nyckel till `users.id` |
 | `keyHash` | varchar | scrypt-hash av nyckeln |
-| `name` | varchar | Användarangiven etikett |
-| `createdAt` | timestamp | Skapandetidpunkt |
-| `lastUsedAt` | timestamp | Uppdateras vid varje autentiserad begäran |
+| `name` | varchar | Etikett angiven av användaren |
+| `createdAt` | timestamp | Skapandetid |
+| `lastUsedAt` | timestamp | Uppdateras vid varje autentiserad förfrågan |
 
-Nycklar prefixas med `si_` följt av 96 hex-tecken (48 slumpmässiga byte).
+Nycklar har prefixet `si_` följt av 96 hexadecimala tecken (48 slumpmässiga byte).
 
 ### pipelines {#pipelines}
 
-Sparade verktygskedjor som användare skapar i användargränssnittet.
+Sparade verktygskedjor som användare skapar i gränssnittet.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
 | `id` | uuid | Primärnyckel |
-| `name` | varchar | Pipeline-namn |
+| `name` | varchar | Pipelinens namn |
 | `description` | varchar | Valfri beskrivning |
 | `steps` | jsonb | Array av `{ toolId, settings }`-objekt |
-| `createdAt` | timestamp | Skapandetidpunkt |
+| `createdAt` | timestamp | Skapandetid |
 
 ### user_files {#user-files}
 
-Beständigt filbibliotek. En sparad ändring infogas som standard som en oberoende rotrad ("spara som ny": `version` 1, `parentId` null, så originalet ligger kvar i listan), eller som en förälderlänkad version när du skriver över originalet (`parentId` satt, `version` uppräknad, vilket ersätter det). Kolumnen `toolChain` registrerar vilka verktyg som tillämpades.
+Permanent filbibliotek. En sparad redigering infogas som en oberoende rotrad som standard ("spara som ny": `version` 1, `parentId` null, så originalet förblir listat), eller som en version länkad till föräldern när du skriver över originalet (`parentId` satt, `version` ökat, vilket ersätter det). Kolumnen `toolChain` registrerar vilka verktyg som tillämpats.
 
 | Kolumn | Typ | Beskrivning |
 |--------|------|-------------|
 | `id` | uuid | Primärnyckel |
 | `userId` | uuid | FK till users (CASCADE DELETE) |
-| `originalName` | varchar | Ursprungligt uppladdningsfilnamn |
+| `originalName` | varchar | Ursprungligt filnamn vid uppladdning |
 | `storedName` | varchar | Filnamn på disk |
 | `mimeType` | varchar | MIME-typ |
 | `size` | integer | Filstorlek i byte |
 | `width` | integer | Bildbredd i px |
 | `height` | integer | Bildhöjd i px |
 | `version` | integer | Versionsnummer (1 = original) |
-| `parentId` | uuid eller null | FK till user_files (förälderversion) |
-| `toolChain` | jsonb | Verktygs-ID:n tillämpade i ordning för att producera den här versionen |
-| `createdAt` | timestamp | Skapandetidpunkt |
+| `parentId` | uuid eller null | FK till user_files (föräldraversion) |
+| `toolChain` | jsonb | Verktygs-ID:n som tillämpats i ordning för att skapa denna version |
+| `createdAt` | timestamp | Skapandetid |
 
 ### jobs {#jobs}
 
-Spårar bearbetningsjobb för framstegsrapportering och rensning.
+Spårar bearbetningsjobb för förloppsrapportering och rensning.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
 | `id` | uuid | Primärnyckel |
 | `type` | varchar | Identifierare för verktyg eller pipeline |
 | `status` | varchar | `queued`, `processing`, `completed` eller `failed` |
-| `progress` | real | 0.0-1.0 andel |
+| `progress` | real | Bråkdel 0.0-1.0 |
 | `inputFiles` | jsonb | Array av sökvägar till indatafiler |
 | `outputPath` | varchar | Sökväg till resultatfilen |
-| `settings` | jsonb | Använda verktygsinställningar |
-| `error` | varchar | Felmeddelande om det misslyckades |
-| `createdAt` | timestamp | Skapandetidpunkt |
-| `completedAt` | timestamp | Slutförandetidpunkt |
+| `settings` | jsonb | Verktygsinställningar som användes |
+| `error` | varchar | Felmeddelande om jobbet misslyckades |
+| `createdAt` | timestamp | Skapandetid |
+| `completedAt` | timestamp | Slutförandetid |
 
 ### settings {#settings}
 
-Nyckel-värde-lager för serveromfattande inställningar som administratörer kan ändra från användargränssnittet.
+Nyckel-värde-lager för serverövergripande inställningar som administratörer kan ändra i gränssnittet.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
 | `key` | varchar | Primärnyckel |
-| `value` | varchar | Inställningsvärde |
-| `updatedAt` | timestamp | Senaste uppdateringstidpunkt |
+| `value` | varchar | Inställningens värde |
+| `updatedAt` | timestamp | Tidpunkt för senaste uppdatering |
 
 ### roles {#roles}
 
-Anpassade roller med granulära behörigheter.
+Anpassade roller med detaljerade behörigheter.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
@@ -132,7 +132,7 @@ Anpassade roller med granulära behörigheter.
 | `name` | varchar | Unikt rollnamn |
 | `description` | varchar | Valfri beskrivning |
 | `permissions` | jsonb | Array av behörighetssträngar |
-| `createdAt` | timestamp | Skapandetidpunkt |
+| `createdAt` | timestamp | Skapandetid |
 
 ### audit_log {#audit-log}
 
@@ -143,23 +143,23 @@ Logg över säkerhetsrelevanta åtgärder.
 | `id` | uuid | Primärnyckel |
 | `userId` | uuid | FK till users |
 | `action` | varchar | Åtgärdstyp |
-| `details` | jsonb | Åtgärdsspecifika data |
-| `createdAt` | timestamp | Åtgärdstidpunkt |
+| `details` | jsonb | Åtgärdsspecifik data |
+| `createdAt` | timestamp | Åtgärdens tidpunkt |
 
 ### user_preferences {#user-preferences}
 
-Gränssnittstillstånd per användare, nycklat på inställningens namn. Lagrar startsidans fästa verktyg, som skrivs via `PUT /api/v1/preferences`.
+Gränssnittstillstånd per användare, nyckelat på inställningsnamn. Ligger bakom översiktens fästa verktyg via `PUT /api/v1/preferences`.
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
-| `userId` | text | FK till users, kaskaderande borttagning. Primärnyckel tillsammans med `key` |
-| `key` | text | Inställningens namn. Primärnyckel tillsammans med `userId` |
+| `userId` | text | FK till users, kaskaderar vid radering. Primärnyckel tillsammans med `key` |
+| `key` | text | Inställningsnamn. Primärnyckel tillsammans med `userId` |
 | `value` | jsonb | Inställningens innehåll |
 | `updatedAt` | timestamp | Senaste skrivning |
 
-## Migrationer {#migrations}
+## Migreringar {#migrations}
 
-Drizzle sköter schemamigrationer. Migrationsfiler ligger i `apps/api/drizzle/`. Under utveckling:
+Drizzle hanterar schemamigreringar. Migreringsfiler finns i `apps/api/drizzle/`. Under utveckling:
 
 ```bash
 cd apps/api
@@ -167,53 +167,55 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-I produktion tillämpas väntande migrationer automatiskt vid uppstart.
+I produktion tillämpas väntande migreringar automatiskt vid start.
 
-## Roller med minsta möjliga behörighet {#least-privilege-roles}
+## Roller med lägst behörighet {#least-privilege-roles}
 
-Två roller, två uppgifter. `DATABASE_URL` betjänar förfrågningar och har `SELECT`, `INSERT`, `UPDATE`, `DELETE` på appens tabeller plus `USAGE` och `SELECT` på deras sekvenser. Det är hela listan. Den kan inte skapa eller ta bort en tabell, installera ett tillägg, köra `TRUNCATE`, läsa `pg_authid`, skapa en databas, ändra en roll eller röra schemat `drizzle` där migrationshistoriken ligger.
+Två roller, två uppgifter. `DATABASE_URL` betjänar förfrågningar och har `SELECT`, `INSERT`, `UPDATE`, `DELETE` på appens tabeller samt `USAGE` och `SELECT` på deras sekvenser. Det är hela listan. Den kan inte skapa eller ta bort en tabell, installera ett tillägg, `TRUNCATE`, läsa `pg_authid`, skapa en databas, ändra en roll eller röra schemat `drizzle` där migreringshistoriken finns.
 
-`DATABASE_MIGRATION_URL` är den privilegierade. Den kör migrationer och ger körningsrollen dess behörigheter under uppstarten, och stängs sedan innan en enda förfrågan har betjänats.
+`DATABASE_MIGRATION_URL` är den privilegierade. Den kör migreringar och ger behörigheter till körningsrollen under uppstart, och stängs sedan innan någon enda förfrågan betjänas.
 
-Compose och allt-i-ett-avbildningen är redan kopplade på det här sättet, befintliga installationer inräknade. Vid uppstart skapar SnapOtter körningsrollen om den saknas, ger den behörigheter, migrerar och lägger sedan ut behörigheterna på tabeller som redan fanns. Uppgraderingen kräver ingen manuell SQL.
+Uppdelningen levereras i SnapOtter 2.3.0. Från den versionen är Compose-filerna i repot och all-in-one-avbilden kopplade på det här sättet, även befintliga installationer: vid uppstart skapar SnapOtter körningsrollen om den saknas, ger den behörigheter, migrerar och för sedan över behörigheterna till tabeller som redan fanns. Uppgradering kräver ingen manuell SQL.
 
-Om du lämnar `DATABASE_MIGRATION_URL` tom körs allt med en enda roll, där `DATABASE_URL` sköter båda uppgifterna precis som före uppdelningen. Det är en konfiguration som stöds, inte en föråldrad. Det är rätt svar på hanterad Postgres, där det ofta inte är du som får skapa roller.
+Avbilden 2.2.0 läser bara anslutningssträngen för körning och skapar aldrig den andra rollen, så ger du den uppdelningen kommer den aldrig upp: appens logg visar att lösenordsautentiseringen misslyckas för den rollen, och Postgres-loggen säger att rollen inte finns. Uppgradera avbilden till 2.3.0 eller senare innan du byter en Compose-fil till uppdelningen.
+
+Om du lämnar `DATABASE_MIGRATION_URL` tom körs en enda roll, där `DATABASE_URL` gör båda jobben precis som före uppdelningen. Det är en konfiguration som stöds, inte en föråldrad. Det är rätt svar på hanterad Postgres, där det ofta inte är du som får skapa roller.
 
 ### Extern och hanterad Postgres {#external-and-managed-postgres}
 
-På RDS, Supabase, Cloud SQL eller vilket kluster du än driver själv är uppdelningen frivillig. Skapa körningsrollen en gång:
+På RDS, Supabase, Cloud SQL eller något kluster du kör själv är uppdelningen frivillig. Skapa körningsrollen en gång:
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
 
-Lämna sedan över båda anslutningssträngarna till SnapOtter, riktade mot samma värd, port och databas:
+Ge sedan SnapOtter båda anslutningssträngarna, riktade mot samma värd, port och databas:
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-Stanna där. SnapOtter tillämpar behörigheterna själv och tillämpar dem på nytt efter varje migration, så en tabell som läggs till i en framtida version täcks in utan att någon behöver köra SQL för den.
+Mer behövs inte. SnapOtter tillämpar behörigheterna själv och tillämpar dem på nytt efter varje migrering, så en tabell som läggs till i en framtida version täcks utan att någon kör SQL för den.
 
-Rollen i `DATABASE_MIGRATION_URL` måste äga SnapOtter-tabellerna, eftersom bara en tabells ägare kan ge behörigheter på den. I en befintlig installation betyder det den roll som du hittills har kört SnapOtter som, inte en ny roll skapad för ändamålet. Pekar du den mot en ny roll som inte äger något misslyckas uppstarten med ett fel som säger precis detta. Den behöver också `CREATEROLE` för att skapa och underhålla körningsrollen, samt rätten att skapa schemat `drizzle`.
+Rollen i `DATABASE_MIGRATION_URL` måste äga SnapOtters tabeller, eftersom bara en tabells ägare kan ge behörigheter på den. På en befintlig installation betyder det rollen som du har kört SnapOtter som, inte en ny som skapats för ändamålet. Peka den mot en ny roll som inte äger något och uppstarten misslyckas med ett fel som säger just detta. Den behöver också `CREATEROLE` för att skapa och underhålla körningsrollen, samt rätten att skapa schemat `drizzle`.
 
-Anger du samma roll i båda URL:erna är uppdelningen avstängd, och SnapOtter skriver det i loggen i stället för att låtsas om något annat. Om din leverantör inte ger dig någon roll som både kan äga tabellerna och ha `CREATEROLE`, kör med en enda roll.
+Ange samma roll i båda URL:erna och uppdelningen är av, och SnapOtter säger det i loggen i stället för att låtsas något annat. Om din leverantör inte ger någon roll som både kan äga tabellerna och ha `CREATEROLE`, kör med en enda roll.
 
-### Varför superanvändarflaggan lämnas orörd {#why-the-superuser-bit-is-left-alone}
+### Varför superuser-biten lämnas orörd {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter tar aldrig bort `SUPERUSER` från en roll på egen hand. I en installation som skapades före uppdelningen är `snapotter` klustrets enda superanvändare, och att degradera den skulle lämna klustret helt utan, något som bara går att rädda i enanvändarläge med servern stoppad. Det som ger skyddet i stället är att den långlivade anslutningen flyttas till den begränsade rollen. Superanvändaren är uppkopplad under uppstartens få sekunder och sedan borta.
+SnapOtter tar aldrig själv bort `SUPERUSER` från en roll. På en installation som skapades före uppdelningen är `snapotter` klustrets enda superuser, och att nedgradera den skulle lämna klustret utan någon, återställningsbart bara via enanvändarläge med servern stoppad. Att flytta den långlivade anslutningen till den begränsade rollen är det som ger skyddet i stället. Superusern finns på ledningen under de få sekunderna av uppstarten och är sedan borta.
 
-Nya allt-i-ett-installationer har aldrig det problemet. De får tre roller: `postgres` (superanvändare för bootstrap, saknas i varje anslutningssträng som SnapOtter använder), `snapotter` (`NOSUPERUSER`, äger data, ansluter bara vid uppstart) och `snapotter_app` (bara rader, betjänar förfrågningar).
+Nya all-in-one-installationer har aldrig det problemet. De får tre roller: `postgres` (superuser för bootstrap, frånvarande i varje anslutningssträng som SnapOtter använder), `snapotter` (`NOSUPERUSER`, äger datan, ansluter bara vid uppstart) och `snapotter_app` (bara rader, betjänar förfrågningar).
 
-Vill du ändå degradera en äldre `snapotter`, skapa först en andra superanvändare och logga in som den för att bekräfta att den fungerar. Kör sedan `ALTER ROLE snapotter NOSUPERUSER`.
+För att ändå nedgradera en äldre `snapotter`, skapa först en andra superuser och logga in som den för att bekräfta att den fungerar. Därefter `ALTER ROLE snapotter NOSUPERUSER`.
 
-## Säkerhetskopiera och återställa {#backup-and-restore}
+## Säkerhetskopiering och återställning {#backup-and-restore}
 
-Relationsdatabasen finns i Postgres-behållarens `SnapOtter-pgdata`-volym, inte appens `/data`-volym.
+Relationsdatabasen finns i Postgres-containerns volym `SnapOtter-pgdata`, inte i appens volym `/data`.
 
-**Logisk säkerhetskopiering med validering (rekommenderas)**
+**Logisk säkerhetskopia med validering (rekommenderas)**
 
 ```bash
 # Dump into PostgreSQL's portable custom archive format
@@ -228,11 +230,11 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Båda kommandona ansluter som `snapotter`, ägaren, och bör fortsätta göra det. Körningsrollen kan inte se schemat `drizzle`, så en dump tagen som den rollen blir ofullständig. `--no-owner` gör att återställda objekt ägs av den som kör återställningen, så om du kör den som ägaren hamnar ägarskapet där behörigheterna förväntar sig det. En hake i ett nytt kluster: `pg_dump` tar med behörigheterna men inte rollerna de nämner, så skapa `snapotter_app` innan du återställer, annars stannar `--exit-on-error` vid första `GRANT`. SnapOtter tillämpar behörigheterna på nytt vid nästa uppstart oavsett.
+Båda kommandona ansluter som `snapotter`, ägaren, och bör fortsätta göra det. Körningsrollen kan inte se schemat `drizzle`, så en dump tagen som den rollen skulle bli ofullständig. `--no-owner` lämnar återställda objekt ägda av den som kör återställningen, så att köra den som ägaren lägger ägandet där behörigheterna förväntar sig det. En hake på ett nytt kluster: `pg_dump` innehåller behörigheterna men inte de roller de namnger, så skapa `snapotter_app` före återställningen, annars stoppar `--exit-on-error` vid det första `GRANT`. SnapOtter tillämpar behörigheterna på nytt vid nästa uppstart oavsett.
 
-Denna databasdump innehåller inte sparade biblioteksobjekt i `/data/files` eller hållbart BullMQ-tillstånd i Redis. Säkerhetskopiera och återställ dem med den samordnade proceduren i [Säkerhet och härdning](/sv/guide/security#backup-and-recovery).
+Denna databasdump innehåller inte sparade biblioteksobjekt i `/data/files` eller beständigt BullMQ-tillstånd i Redis. Säkerhetskopiera och återställ dem med den samordnade proceduren i [Säkerhet och härdning](/sv/guide/security#backup-and-recovery).
 
-**Önblicksbild av kall volym**
+**Kall volymögonblicksbild**
 
 ```bash
 # Stop every service first, then use your storage platform to snapshot the
@@ -240,8 +242,8 @@ Denna databasdump innehåller inte sparade biblioteksobjekt i `/data/files` elle
 docker compose -f docker/docker-compose.yml stop
 ```
 
-Kopiera inte en live PostgreSQL-datakatalog med `tar`. Komponera prefix volymnamn efter projekt, så lös de monterade volym-ID:n från `docker inspect` eller din lagringsplattform istället för att anta den bokstavliga etiketten `SnapOtter-pgdata`.
+Kopiera inte en körande PostgreSQL-datakatalog med `tar`. Compose lägger projektprefix på volymnamn, så ta reda på de monterade volym-ID:na från `docker inspect` eller din lagringsplattform i stället för att anta den bokstavliga etiketten `SnapOtter-pgdata`.
 
-### Migrera från 1.x (SQLite) {#migrating-from-1-x-sqlite}
+### Migrering från 1.x (SQLite) {#migrating-from-1-x-sqlite}
 
-Uppgradering från SnapOtter 1.x har sin egen guide: se [Uppgradera från 1.x till 2.0](./upgrading). Kort sagt, återanvänd din befintliga `/data`-volym så upptäcker och importerar 2.0 automatiskt `/data/snapotter.db` vid första uppstarten (eller ställ in `SQLITE_MIGRATE_PATH` för att peka på den explicit). Säkerhetskopiera hela `/data`-volymen först, inte bara `snapotter.db`: 1.x använder SQLite WAL-läge, så en stoppad container lämnar ofta det mesta av sina data i `snapotter.db-wal` bredvid en nästan tom `snapotter.db`.
+Uppgradering från SnapOtter 1.x har en egen guide: se [Uppgradera från 1.x till 2.0](./upgrading). Kort sagt, återanvänd din befintliga volym `/data` så detekterar och importerar 2.0 `/data/snapotter.db` automatiskt vid första uppstarten (eller ange `SQLITE_MIGRATE_PATH` för att peka ut den uttryckligen). Säkerhetskopiera hela volymen `/data` först, inte bara `snapotter.db`: 1.x använder SQLite WAL-läge, så en stoppad container lämnar ofta det mesta av sin data i `snapotter.db-wal` bredvid en nästan tom `snapotter.db`.

@@ -1,8 +1,9 @@
 import type { FeatureBundleState } from "@snapotter/shared";
 import { TOOL_BUNDLE_MAP, TOOL_EXTRA_BUNDLES } from "@snapotter/shared";
 import { create } from "zustand";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, translatedCodeMessage, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { currentTranslations } from "@/lib/current-translations";
 
 /**
  * Every bundle a tool needs: its primary bundle plus any extras. Computed from
@@ -214,6 +215,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         percent: number;
         stage: string;
         error?: string;
+        code?: string;
       };
       try {
         data = JSON.parse(event.data);
@@ -239,7 +241,9 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           es.close();
           if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
-          onInstallSettled(bundleId, data.error ?? "Installation failed");
+          const t = currentTranslations();
+          const code = typeof data.code === "string" ? data.code : undefined;
+          onInstallSettled(bundleId, translatedCodeMessage(t, code, 0) ?? t.errors.installFailed);
           return;
         }
         // First progress frame means the server has started this install for
@@ -412,7 +416,11 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         if (epoch !== resetSeq) return;
         stopTracking(bundleId);
 
-        const message = err instanceof Error ? err.message : "Failed to start installation";
+        const message = userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.installFailed,
+        );
         const isAlreadyInstalled = /already installed/i.test(message);
 
         if (isAlreadyInstalled) {
@@ -488,7 +496,11 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         }
       } catch (err) {
         if (epoch !== resetSeq) return;
-        const message = err instanceof Error ? err.message : "Failed to start installation";
+        const message = userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.installFailed,
+        );
         const nextErrors = { ...get().errors };
 
         for (const bundleId of targets) {
@@ -509,7 +521,11 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         set({
           errors: {
             ...get().errors,
-            [bundleId]: err instanceof Error ? err.message : "Uninstall failed",
+            [bundleId]: userErrorMessage(
+              currentTranslations(),
+              err,
+              currentTranslations().errors.uninstallFailed,
+            ),
           },
         });
       }
@@ -589,7 +605,13 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         });
         await refreshBundles();
       } catch (err) {
-        set({ resetError: err instanceof Error ? err.message : "Reset failed" });
+        set({
+          resetError: userErrorMessage(
+            currentTranslations(),
+            err,
+            currentTranslations().errors.resetFailed,
+          ),
+        });
       }
     },
   };

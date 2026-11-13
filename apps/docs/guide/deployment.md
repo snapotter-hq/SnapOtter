@@ -28,7 +28,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -50,6 +54,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -74,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -138,7 +149,10 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
       # Engines (empty = the image's own binaries, see Configuration)
       - FFMPEG_PATH=${FFMPEG_PATH:-}
@@ -146,6 +160,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -177,14 +195,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -305,7 +326,7 @@ Optional AI pack storage and CPU memory floors (SnapOtter checks available memor
 | High-Quality Inpainting (`inpaint-hq`) | 5-7 GB | 8 GB host RAM (~6 GB free) |
 | **All bundles** | **~25 GB installed** | **4 GB (8 GB with `inpaint-hq`)** |
 
-Fast OCR is built into the image through Tesseract, adds about 25 MiB, and does not require the optional OCR pack or its 4 GiB memory requirement. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`) or Arabic (`ar`). Both use `balanced` or `best` and therefore require the accurate pack. The accurate pack is available in the official Linux amd64 and arm64 containers and runs ONNX Runtime on CPU. NVIDIA hosts use that same CPU OCR runtime, so OCR does not depend on the CUDA version or GPU architecture. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. SnapOtter rejects systems below that signed compatibility minimum before downloading the pack. Accurate-pack installation is also rejected on bare-metal/prebuilt archives whose libc and Python ABI cannot be guaranteed. On those unsupported hosts, Korean and Arabic OCR return an explicit incompatibility error and never silently falls back to Fast.
+Fast OCR is built into the image through Tesseract, adds about 25 MiB, and does not require the optional OCR pack or its 4 GiB memory requirement. Fast supports `auto`, `en`, `de`, `es`, `fr`, `zh`, and `ja`, but not Korean (`ko`) or Arabic (`ar`). Both use `balanced` or `best` and therefore require the accurate pack. The accurate pack is available in the official Linux amd64 and arm64 containers and runs ONNX Runtime on CPU. NVIDIA hosts use that same CPU OCR runtime, so OCR does not depend on the CUDA version or GPU architecture. The accurate runtime requires at least 4 GiB of effective memory: the configured container cgroup limit, otherwise host memory. SnapOtter rejects systems below that signed compatibility minimum before downloading the pack. Accurate-pack installation is also rejected on bare-metal/prebuilt archives whose libc and Python ABI cannot be guaranteed. On those unsupported hosts, Korean and Arabic OCR return an explicit incompatibility error and never silently fall back to Fast. An explicit Fast request for Korean returns `FEATURE_INCOMPATIBLE` with the `fast-korean-unsupported` reason before the job is queued.
 
 Replicas that share the same `DATA_DIR` must use the same CPU architecture; pin multi-replica deployments with node affinity. Mixed amd64/arm64 replicas need separate data volumes and independent SnapOtter deployments.
 
@@ -389,9 +410,19 @@ See the [complete format list](/guide/supported-formats) for details on every su
 | Mount / Volume | Purpose | Required? |
 |---|---|---|
 | `/data` (app) | AI models, Python venv, user files | **Yes** - file loss without it |
-| `/tmp/workspace` (app) | Temporary processing files (auto-cleaned) | Recommended |
+| `/tmp/workspace` (app) | Temporary processing files and job output (auto-cleaned). Not stored under `/data`, so results are lost when the container is replaced unless this is mounted | Recommended |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL data directory (users, settings, pipelines, jobs) | **Yes** - data loss without it |
 | `SnapOtter-redisdata` (redis) | Redis append-only file for durable job queues | Recommended |
+
+### Keeping job output with `docker run` {#keeping-job-output}
+
+Job results live under `/tmp/workspace`, which is container filesystem unless you mount it. With only `-v SnapOtter-data:/data`, your users, settings, and files persist, but results from earlier jobs are gone once the container is replaced, and their download links return 404. To keep them, mount the workspace as well:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+The Compose stacks already mount `SnapOtter-workspace`.
 
 ### Bind mounts vs. named volumes {#bind-mounts-vs-named-volumes}
 

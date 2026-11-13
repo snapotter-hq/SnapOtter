@@ -8,9 +8,14 @@ vi.mock("node:os", () => ({ tmpdir: () => "/tmp" }));
 
 const readdir = vi.fn<(dir: string) => Promise<string[]>>();
 const rm = vi.fn<() => Promise<void>>(async () => {});
+const statfs = vi.fn<(dir: string) => Promise<{ bavail: number; bsize: number }>>();
+const access = vi.fn<(dir: string, mode: number) => Promise<void>>(async () => {});
 vi.mock("node:fs/promises", () => ({
+  constants: { W_OK: 2 },
+  access: (dir: string, mode: number) => access(dir, mode),
   readdir: (dir: string) => readdir(dir),
   rm: (...a: unknown[]) => rm(...(a as [])),
+  statfs: (dir: string) => statfs(dir),
 }));
 
 const mockSpawn = vi.mocked(spawn);
@@ -48,6 +53,7 @@ function lastBin(): string {
 beforeEach(() => {
   vi.clearAllMocks();
   rm.mockResolvedValue(undefined);
+  access.mockResolvedValue(undefined);
   process.env.SOFFICE_PATH = "/usr/bin/soffice";
   delete process.env.SUBPROCESS_MEMORY_LIMIT_MB;
 });
@@ -375,5 +381,148 @@ describe("convertDocument timeout", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("convertDocument on a full disk (#4148)", () => {
+  // Captured from LibreOffice 26.2 converting onto a volume with no room left:
+  // it exits 0 and writes nothing.
+  const SPACE_STDERR =
+    "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///data/files/.previews/x/input.pdf> failed: 0x909(Error Area:Io Class:Space Code:9))\n";
+
+  it("tags a missing output as ENOSPC when LibreOffice reported an out-of-space store", async () => {
+    nextClose({ stderr: SPACE_STDERR, code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice produced no pdf output for report.docx",
+      code: "ENOSPC",
+      syscall: "write",
+    });
+  });
+
+  it("tags a non-zero exit as ENOSPC when LibreOffice reported an out-of-space store", async () => {
+    nextClose({ stderr: SPACE_STDERR, code: 1 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("leaves a missing output without the out-of-space store untagged", async () => {
+    nextClose({
+      stderr:
+        "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///o/input.pdf> failed: 0x81a(Error Area:Io Class:Parameter Code:26))\n",
+      code: 0,
+    });
+    readdir.mockResolvedValueOnce([]);
+    const err = await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+    expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+});
+
+describe("convertDocument when the output can't be created (#4529)", () => {
+  // Captured from LibreOffice 26.2 on macOS: a volume with no free blocks at
+  // all and a read-only output directory both log this line, exit 0, and
+  // write nothing.
+  const ACCESS_STDERR =
+    "Error: Please verify input parameters... (SfxBaseModel::impl_store <file:///outdir/report.pdf> failed: 0x507(Error Area:Io Class:Access Code:7))\n";
+
+  async function convertWithAccessError(): Promise<unknown> {
+    nextClose({ stderr: ACCESS_STDERR, code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    return import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+  }
+
+  it("tags ENOSPC when the output volume has no free blocks", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    const err = await convertWithAccessError();
+    expect(statfs).toHaveBeenCalledWith("/outdir");
+    expect(err).toMatchObject({
+      message: "LibreOffice produced no pdf output for report.docx",
+      code: "ENOSPC",
+      syscall: "write",
+    });
+  });
+
+  it("tags ENOSPC when only a few reserved blocks are left", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 8, bsize: 4096 });
+    expect(await convertWithAccessError()).toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it.each(["EACCES", "EPERM", "EROFS"])(
+    "tags %s on open when the volume has room but the directory refuses writes",
+    async (code) => {
+      statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+      access.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+      expect(await convertWithAccessError()).toMatchObject({
+        message: "LibreOffice produced no pdf output for report.docx",
+        code,
+        syscall: "open",
+        path: "/outdir",
+      });
+      expect(access).toHaveBeenCalledWith("/outdir", 2);
+    },
+  );
+
+  it("leaves the error untagged when the volume has room and the directory is writable", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+    const err = await convertWithAccessError();
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
+  it("leaves the error untagged when the write check fails for another reason", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+    access.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    expect((await convertWithAccessError()) as NodeJS.ErrnoException).not.toHaveProperty("code");
+  });
+
+  it("tags a non-zero exit with the access error the same way", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    nextClose({ stderr: ACCESS_STDERR, code: 1 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
+
+  it("falls back to the write check when the free space can't be read", async () => {
+    statfs.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    access.mockRejectedValueOnce(Object.assign(new Error("EROFS"), { code: "EROFS" }));
+    expect(await convertWithAccessError()).toMatchObject({ code: "EROFS", syscall: "open" });
+  });
+
+  it("leaves the error untagged when the free space can't be read and the directory is writable", async () => {
+    statfs.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const err = await convertWithAccessError();
+    expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
+  it("does not check free space for an out-of-space or unrelated store error", async () => {
+    nextClose({ stderr: "Error Area:Io Class:Space Code:9\n", code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch(() => {});
+    nextClose({ stderr: "source file could not be loaded", code: 1 });
+    await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch(() => {});
+    expect(statfs).not.toHaveBeenCalled();
+    expect(access).not.toHaveBeenCalled();
   });
 });

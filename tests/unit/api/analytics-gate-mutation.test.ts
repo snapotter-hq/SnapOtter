@@ -34,6 +34,7 @@ const redisState = vi.hoisted(() => ({
   sharedPublish: vi.fn().mockResolvedValue(1),
   messageHandler: null as null | (() => void),
   createdSubscribers: 0,
+  subscriberLabels: [] as (string | undefined)[],
 }));
 
 vi.mock("@snapotter/shared", async (importOriginal) => {
@@ -56,13 +57,17 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 
 vi.mock("drizzle-orm", () => ({ eq: () => "mocked-eq" }));
 
+const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
 vi.mock("../../../apps/api/src/jobs/types.js", () => ({
   bullPrefix: () => "test_prefix",
 }));
 
 vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
-  createRedisSubscriberConnection: () => {
+  createRedisSubscriberConnection: (name?: string) => {
     redisState.createdSubscribers += 1;
+    redisState.subscriberLabels.push(name);
     return {
       on: (event: string, handler: () => void) => {
         redisState.subscriberOn(event, handler);
@@ -91,7 +96,9 @@ beforeEach(async () => {
   redisState.subscriberQuit.mockClear();
   redisState.sharedPublish.mockClear();
   redisState.messageHandler = null;
+  loggerMock.error.mockClear();
   redisState.createdSubscribers = 0;
+  redisState.subscriberLabels.length = 0;
 
   process.env.NODE_ENV = "test";
   delete process.env.SNAPOTTER_TELEMETRY;
@@ -346,8 +353,10 @@ describe("Redis gate listener wiring", () => {
     expect(redisState.createdSubscribers).toBe(1);
     // L105/L115: channel name is `${bullPrefix()}:analytics-gate`.
     expect(redisState.subscriberSubscribe).toHaveBeenCalledWith("test_prefix:analytics-gate");
-    // L114: an error handler is registered.
-    expect(redisState.subscriberOn).toHaveBeenCalledWith("error", expect.any(Function));
+    // createRedisSubscriberConnection already logs connection errors under
+    // this name; a second listener here would log every reconnect twice (#4552).
+    expect(redisState.subscriberLabels).toEqual(["analytics-gate"]);
+    expect(redisState.subscriberOn).not.toHaveBeenCalledWith("error", expect.any(Function));
     // L116: a message handler is registered.
     expect(redisState.subscriberOn).toHaveBeenCalledWith("message", expect.any(Function));
 

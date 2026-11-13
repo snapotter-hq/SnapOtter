@@ -336,7 +336,13 @@ function canonicalDisabledScimRole(role: string): string {
 
 // ── SCIM Bearer Token Auth ───────────────────────────────────────
 
+// preParsing verifies the token once per request; handlers re-enter scimAuth
+// after the body is parsed and must not pay for a second verification.
+const scimAuthOk = new WeakSet<FastifyRequest>();
+
 async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  if (scimAuthOk.has(request)) return true;
+
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     reply.status(401).send(scimError(401, "Bearer token required"));
@@ -377,6 +383,7 @@ async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<b
     return false;
   }
 
+  scimAuthOk.add(request);
   return true;
 }
 
@@ -567,6 +574,23 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     const detail =
       statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message);
     reply.status(statusCode).send(scimError(statusCode, detail));
+  });
+
+  // scimAuth otherwise runs as the first line of each handler, after
+  // Fastify has buffered and parsed a body of up to the upload-sized
+  // bodyLimit. Verify the bearer token in preParsing so an anonymous
+  // request is refused before its body is read (#4632). The three
+  // discovery endpoints stay anonymous by design.
+  app.addHook("preParsing", async (request: FastifyRequest, reply: FastifyReply) => {
+    const path = request.url.split("?", 1)[0];
+    if (
+      path === "/api/v1/scim/v2/ServiceProviderConfig" ||
+      path === "/api/v1/scim/v2/ResourceTypes" ||
+      path === "/api/v1/scim/v2/Schemas"
+    ) {
+      return;
+    }
+    if (!(await scimAuth(request, reply))) return reply;
   });
 
   // ── Discovery Endpoints (no auth required) ─────────────────────

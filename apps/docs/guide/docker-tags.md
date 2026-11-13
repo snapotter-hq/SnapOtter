@@ -72,7 +72,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -89,14 +91,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12

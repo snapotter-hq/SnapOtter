@@ -1,143 +1,143 @@
 ---
-description: "Semua variabel lingkungan SnapOtter dengan default-nya. Konfigurasi auth, penyimpanan, model AI, analitik, dan lainnya."
-i18n_source_hash: a694a81ef7e0
-i18n_provenance: human
-i18n_output_hash: 754abaca8330
+description: "Semua environment variable SnapOtter beserta nilai defaultnya. Atur auth, storage, model AI, analytics, dan lainnya."
+i18n_source_hash: caa895c0ba16
+i18n_provenance: machine
+i18n_output_hash: 0bc1f779ff53
 i18n_hash_version: 2
 ---
 
-# Konfigurasi {#configuration}
+# Configuration {#configuration}
 
-Semua konfigurasi dilakukan melalui variabel lingkungan. Setiap variabel memiliki default yang masuk akal, jadi SnapOtter bekerja langsung tanpa mengatur satu pun dari mereka.
+Semua konfigurasi dilakukan melalui environment variable. Setiap variabel punya default yang masuk akal, sehingga SnapOtter langsung berfungsi tanpa mengatur satu pun.
 
-## Variabel lingkungan {#environment-variables}
+## Environment variables {#environment-variables}
 
 ### Server {#server}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
 | `PORT` | `1349` | Port tempat server mendengarkan. |
-| `BASE_PATH` | (kosong) | Jalur deployment publik, mis. `/snapotter`. Kosong atau `/` menyajikan di akar domain. Diterapkan saat runtime; tidak perlu build ulang image. |
-| `RATE_LIMIT_PER_MIN` | `1000` | Permintaan maksimum per menit per IP. Setel ke 0 untuk menonaktifkan pembatasan laju. |
-| `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma untuk CORS, atau kosong untuk hanya same-origin. |
-| `LOG_LEVEL` | `info` | Verbositas log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien lewat `X-Forwarded-For`. Nilai default hanya memercayai peer di jaringan privat, jadi reverse proxy di jaringan Docker atau di LAN dipercaya sedangkan header palsu dari klien publik tidak. Setel `true` hanya jika di depan ada proxy yang Anda kendalikan pada alamat publik. |
+| `BASE_PATH` | (kosong) | Path deployment publik, mis. `/snapotter`. Kosong atau `/` melayani di root domain. Diterapkan saat runtime; tidak perlu membangun ulang image. |
+| `RATE_LIMIT_PER_MIN` | `1000` | Jumlah maksimum permintaan per menit per IP. Atur ke 0 untuk menonaktifkan rate limiting. |
+| `CORS_ORIGIN` | (kosong) | Origin yang diizinkan untuk CORS, dipisahkan koma, atau kosong untuk same-origin saja. |
+| `LOG_LEVEL` | `info` | Tingkat detail log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh mengatur IP klien lewat `X-Forwarded-For`. Defaultnya hanya memercayai peer jaringan privat, sehingga reverse proxy di jaringan Docker atau LAN dipercaya dan header palsu dari klien publik tidak. Atur `true` hanya jika proxy yang Anda kendalikan berada di depan pada alamat publik. |
 
-### Autentikasi {#authentication}
+### Authentication {#authentication}
 
-Dua boolean di bawah ini hanya menerima `true` dan `false`. Apa pun selain itu, `1` atau `yes` atau `on`, gagal validasi dan server keluar sebelum mulai mendengarkan.
+Kedua boolean di bawah hanya menerima `true` dan `false`. Nilai lain apa pun, `1` atau `yes` atau `on`, gagal validasi dan server keluar sebelum mulai mendengarkan.
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Wajibkan login. Setel ke `false` untuk berjalan tanpa akun sama sekali, yang memberi setiap permintaan hak admin, jadi batasi itu pada jaringan tepercaya. |
-| `DEFAULT_USERNAME` | `admin` | Nama pengguna untuk akun admin awal. Hanya digunakan pada run pertama. |
-| `DEFAULT_PASSWORD` | `admin` | Kata sandi untuk akun admin awal. Ubah ini setelah login pertama. |
-| `MAX_USERS` | `0` (tak terbatas) | Jumlah maksimum akun pengguna terdaftar. Setel ke 0 untuk tak terbatas. |
-| `SESSION_DURATION_HOURS` | `168` | Masa hidup sesi login dalam jam (default adalah 7 hari). |
-| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Setel ke `true` untuk melewati prompt ganti-kata-sandi paksa pada login pertama. |
+| `AUTH_ENABLED` | `true` | Wajibkan login. Atur ke `false` untuk berjalan tanpa akun sama sekali, yang memberi setiap permintaan hak admin, jadi batasi hanya untuk jaringan tepercaya. |
+| `DEFAULT_USERNAME` | `admin` | Username untuk akun admin awal. Hanya dipakai pada proses pertama. |
+| `DEFAULT_PASSWORD` | `admin` | Password untuk akun admin awal. Ganti setelah login pertama. |
+| `MAX_USERS` | `0` (tanpa batas) | Jumlah maksimum akun pengguna terdaftar. Atur ke 0 untuk tanpa batas. |
+| `SESSION_DURATION_HOURS` | `168` | Masa berlaku sesi login dalam jam (defaultnya 7 hari). |
+| `SKIP_MUST_CHANGE_PASSWORD` | `false` | Atur ke `true` untuk melewati permintaan ganti password paksa saat login pertama. |
 
-### Penyimpanan {#storage}
+### Storage {#storage}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` atau `s3`. S3 dan MinIO memerlukan lisensi dengan fitur s3_storage plus variabel `S3_*` di bawah. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | String koneksi PostgreSQL, dan koneksi yang melayani setiap permintaan. Pada 2.3.0 dan yang lebih baru, setel juga `DATABASE_MIGRATION_URL` dan ini menjadi peran runtime dengan hak paling rendah, hanya memegang DML pada tabel aplikasi dan tidak lebih. Stack Compose mengarahkannya ke layanan `postgres` miliknya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode tertanam. |
-| `DATABASE_MIGRATION_URL` | (kosong) | Tersedia mulai 2.3.0; image 2.2.0 mengabaikannya dan memerlukan `DATABASE_URL` untuk menamai pemilik basis data. Koneksi dengan hak istimewa, hanya digunakan selama boot untuk menjalankan migrasi dan memberikan peran runtime, lalu ditutup sebelum permintaan pertama. Biarkan kosong dan SnapOtter berjalan dengan satu peran, dengan `DATABASE_URL` melakukan kedua tugas. Lihat [Peran hak akses minimal](/id/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | String koneksi Redis (digunakan untuk antrean job BullMQ). Compose mengarahkan ini ke layanan `redis` miliknya. |
-| `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan secara otomatis. Image menyetelnya ke `/tmp/workspace`. |
-| `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna persisten (gambar yang diunggah, hasil yang disimpan). Image menyetelnya ke `/data/files`. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Connection string PostgreSQL, dan koneksi yang melayani setiap permintaan. Pada 2.3.0 dan yang lebih baru, atur `DATABASE_MIGRATION_URL` juga dan ini menjadi role runtime dengan hak istimewa minimum, yang memegang DML pada tabel aplikasi dan tidak ada yang lain. Stack Compose mengarahkannya ke service `postgres`-nya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode embedded. |
+| `DATABASE_MIGRATION_URL` | (kosong) | Koneksi istimewa, hanya dipakai saat boot untuk menjalankan migrasi dan memberi grant ke role runtime, lalu ditutup sebelum permintaan pertama. Biarkan kosong dan SnapOtter berjalan dengan satu role, dengan `DATABASE_URL` mengerjakan kedua tugas. Lihat [Least-privilege roles](/id/guide/database#least-privilege-roles). |
+| `REDIS_URL` | `redis://localhost:6379` | Connection string Redis (dipakai untuk antrean job BullMQ). Compose mengarahkannya ke service `redis`-nya. |
+| `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan otomatis. Image mengatur `/tmp/workspace`. |
+| `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna yang persisten (gambar yang diunggah, hasil yang disimpan). Image mengatur `/data/files`. |
 
-### Penyimpanan objek S3 {#s3-object-storage}
+### S3 object storage {#s3-object-storage}
 
-Hanya dibaca saat `STORAGE_MODE=s3`. Lewatkan salah satu dari tiga yang wajib dan startup gagal dengan menyebut nama variabel yang Anda tinggalkan.
+Hanya dibaca saat `STORAGE_MODE=s3`. Jika salah satu dari tiga yang wajib tidak ada, startup gagal dengan menyebut nama variabel yang Anda lewatkan.
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `S3_BUCKET` | (kosong) | Bucket yang menyimpan unggahan dan keluaran. Wajib. |
-| `S3_ACCESS_KEY_ID` | (kosong) | Access key. Wajib. Di dalam kontainer Anda bisa memasangnya sebagai file, lewat `S3_ACCESS_KEY_ID_FILE`. |
+| `S3_BUCKET` | (kosong) | Bucket yang menyimpan unggahan dan output. Wajib. |
+| `S3_ACCESS_KEY_ID` | (kosong) | Access key. Wajib. Di dalam container Anda dapat me-mount-nya sebagai gantinya, lewat `S3_ACCESS_KEY_ID_FILE`. |
 | `S3_SECRET_ACCESS_KEY` | (kosong) | Secret key. Wajib. Konvensi file yang sama: `S3_SECRET_ACCESS_KEY_FILE`. |
 | `S3_REGION` | `us-east-1` | Region bucket. |
-| `S3_ENDPOINT` | (kosong) | Endpoint kustom untuk MinIO, R2, Backblaze, dan penyimpanan lain yang kompatibel dengan S3. Kosong berarti AWS. |
-| `S3_FORCE_PATH_STYLE` | `false` | Setel ke `true` untuk MinIO dan apa pun yang menginginkan `endpoint/bucket/key` alih-alih pengalamatan virtual-host. |
-| `S3_PREFIX` | (kosong) | Prefiks key, sehingga satu bucket bisa menampung beberapa instans. |
+| `S3_ENDPOINT` | (kosong) | Endpoint kustom untuk MinIO, R2, Backblaze, dan store lain yang kompatibel dengan S3. Kosong berarti AWS. |
+| `S3_FORCE_PATH_STYLE` | `false` | Atur ke `true` untuk MinIO dan apa pun yang menginginkan `endpoint/bucket/key` alih-alih pengalamatan virtual-host. |
+| `S3_PREFIX` | (kosong) | Prefix key, sehingga satu bucket dapat menampung beberapa instance. |
 
-### Enkripsi saat disimpan {#encryption-at-rest}
+### Encryption at rest {#encryption-at-rest}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `DATA_ENCRYPTION_KEY` | (kosong) | 64 karakter heksadesimal (32 byte). Mengenkripsi pengaturan sensitif yang disimpan di basis data. Apa pun yang bukan 64 karakter heksadesimal ditolak saat startup. |
-| `DATA_ENCRYPTION_KEY_PREVIOUS` | (kosong) | Kunci yang sedang Anda tinggalkan dalam rotasi, format yang sama. Setel keduanya selama rotasi agar baris yang ada tetap bisa didekripsi, lalu hapus yang ini. |
+| `DATA_ENCRYPTION_KEY` | (kosong) | 64 karakter hex (32 byte). Mengenkripsi setting sensitif yang disimpan di database. Apa pun yang bukan 64 karakter hex ditolak saat startup. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | (kosong) | Key yang akan Anda tinggalkan, dengan format yang sama. Atur keduanya selama rotasi agar baris yang ada tetap dapat didekripsi, lalu hapus yang ini. |
 
-### Mode tertanam {#embedded-mode}
+### Embedded mode {#embedded-mode}
 
-Jalankan image tanpa `DATABASE_URL` dan tanpa `REDIS_URL` dan ia memulai PostgreSQL 17 dan Redis-nya sendiri di dalam kontainer, terikat ke loopback, dengan semua data pada volume `/data`. Ini memulihkan pengalaman `docker run` satu perintah untuk quick start, homelab, dan upgrade dari 1.x. Ini adalah jalur kenyamanan, bukan deployment produksi: untuk produksi, jalankan stack Compose 3 kontainer dengan PostgreSQL dan Redis terpisah. Mode tertanam memerlukan menjalankan kontainer sebagai root dan tidak kompatibel dengan runtime UID arbitrer (OpenShift, Kubernetes `runAsNonRoot`); gunakan Compose di sana.
+Jalankan image tanpa `DATABASE_URL` dan tanpa `REDIS_URL` dan ia memulai PostgreSQL 17 dan Redis sendiri di dalam container, terikat ke loopback, dengan semua data di volume `/data`. Ini mengembalikan pengalaman `docker run` satu perintah untuk quick start, homelab, dan upgrade dari 1.x. Ini adalah jalur kemudahan, bukan deployment produksi: untuk produksi, jalankan stack Compose 3 container dengan PostgreSQL dan Redis terpisah. Embedded mode mengharuskan container berjalan sebagai root dan tidak kompatibel dengan runtime UID sembarang (OpenShift, Kubernetes `runAsNonRoot`); gunakan Compose di sana.
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `EMBEDDED` | `auto` | Diaktifkan otomatis saat `DATABASE_URL` dan `REDIS_URL` keduanya tidak diatur. Setel ke `0` untuk menonaktifkannya (aplikasi kemudian gagal cepat jika tidak ada `DATABASE_URL`/`REDIS_URL` eksternal yang diatur, alih-alih diam-diam memulai basis data dalam kontainer). |
-| `REDIS_MAXMEMORY` | `512mb` | Batas memori untuk Redis tertanam (hanya mode tertanam). Turunkan pada host dengan memori terbatas seperti Raspberry Pi. |
-| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Jumlah detik boot menunggu Redis tertanam menjawab `PING` sebelum menyerah. Saat timeout, kontainer berhenti dan mencatat alasannya, bukan menggantung. Bilangan bulat detik dari 1 hingga 999999; tidak ada nilai tak terbatas, karena menunggu selamanya adalah kegagalan yang ingin dicegah oleh batas ini. Naikkan hanya jika host yang lambat memicunya. |
-| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Sama, untuk PostgreSQL tertanam. Hitungan dimulai setelah `initdb` boot pertama selesai, jadi mencakup start server dan pemulihan setelah crash, bukan pembuatan basis data awal. |
+| `EMBEDDED` | `auto` | Aktif otomatis saat `DATABASE_URL` dan `REDIS_URL` sama-sama tidak diatur. Atur ke `0` untuk menonaktifkannya (aplikasi lalu gagal cepat jika tidak ada `DATABASE_URL`/`REDIS_URL` eksternal yang diatur, alih-alih diam-diam memulai database di dalam container). |
+| `REDIS_MAXMEMORY` | `512mb` | Batas memori untuk Redis tertanam (hanya embedded mode). Turunkan pada host dengan memori terbatas seperti Raspberry Pi. |
+| `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Detik yang ditunggu boot agar Redis tertanam menjawab `PING` sebelum menyerah. Saat timeout container berhenti dan mencatat alasannya, bukan menggantung. Detik bulat dari 1 hingga 999999; tidak ada nilai tanpa batas, karena menunggu selamanya adalah kegagalan yang dicegah oleh batas ini. Naikkan hanya jika host yang lambat memicunya. |
+| `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Sama, untuk PostgreSQL tertanam. Jam mulai berjalan setelah `initdb` first-boot selesai, sehingga mencakup server start dan crash recovery, bukan pembuatan database awal. |
 
-Upgrade dari 1.x: letakkan `snapotter.db` lama Anda di `/data/snapotter.db` dalam volume dan mode tertanam mengimpornya ke PostgreSQL tertanam pada boot pertama. Impor berjalan sekali; boot berikutnya melewatinya.
+Upgrade dari 1.x: letakkan `snapotter.db` lama Anda di `/data/snapotter.db` dalam volume dan embedded mode mengimpornya ke PostgreSQL tertanam saat first boot. Impor berjalan sekali; boot berikutnya melewatinya.
 
-Catatan telemetri: mode tertanam mewarisi default analitik image seperti konfigurasi lainnya. Image yang diterbitkan dikirim dengan analitik aktif; build dengan `--build-arg SNAPOTTER_ANALYTICS=off`, atau gunakan opt-out admin dalam aplikasi, untuk menonaktifkannya.
+Catatan telemetri: embedded mode mewarisi default analytics dari image seperti konfigurasi lainnya. Image yang dipublikasikan dikirim dengan analytics aktif; bangun dengan `--build-arg SNAPOTTER_ANALYTICS=off`, atau gunakan opt-out admin di dalam aplikasi, untuk menonaktifkannya.
 
-### Batas pemrosesan {#processing-limits}
+### Processing limits {#processing-limits}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `MAX_UPLOAD_SIZE_MB` | `0` (tak terbatas) | Ukuran file maksimum per unggahan dalam megabyte. Setel ke 0 untuk tak terbatas. Image yang diterbitkan dikirim dengan `0`; build dari sumber dimulai pada 100. |
-| `MAX_BATCH_SIZE` | `0` (tak terbatas) | Jumlah maksimum file dalam satu permintaan batch. Setel ke 0 untuk tak terbatas. Image yang diterbitkan dikirim dengan `0`; build dari sumber dimulai pada 100. |
-| `CONCURRENT_JOBS` | `0` (otomatis) | Jumlah job batch yang berjalan secara paralel. Setel ke 0 untuk deteksi otomatis berdasarkan inti CPU yang tersedia. |
-| `MAX_MEGAPIXELS` | `0` (tak terbatas) | Resolusi gambar maksimum yang diizinkan dalam megapiksel. Setel ke 0 untuk tak terbatas. |
-| `MAX_WORKER_THREADS` | `0` (otomatis) | Thread worker maksimum untuk pemrosesan gambar. Setel ke 0 untuk deteksi otomatis berdasarkan inti CPU yang tersedia. |
-| `PROCESSING_TIMEOUT_S` | `0` (tanpa batas) | Waktu pemrosesan maksimum per permintaan dalam detik. Setel ke 0 untuk tanpa timeout. |
-| `MAX_PIPELINE_STEPS` | `20` | Jumlah maksimum langkah dalam sebuah pipeline. Setel ke 0 untuk tanpa batas. |
-| `MAX_CANVAS_PIXELS` | `0` (tanpa batas) | Ukuran kanvas maksimum dalam piksel untuk gambar keluaran. Setel ke 0 untuk tanpa batas. |
-| `MAX_SVG_SIZE_MB` | `50` | SVG terbesar yang diterima sebelum disanitasi, dalam megabyte. `0` berperilaku berbeda di sini dibanding baris-baris di sekitarnya. Ia menghapus batas ukuran pra-parse sepenuhnya alih-alih menaikkannya, jadi biarkan yang satu ini tetap disetel. |
-| `MAX_PDF_PAGES` | `0` (tak terbatas) | Jumlah maksimum halaman PDF untuk konversi PDF-ke-image. Setel ke 0 untuk tak terbatas. |
+| `MAX_UPLOAD_SIZE_MB` | `0` (tanpa batas) | Ukuran file maksimum per unggahan dalam megabyte. Atur ke 0 untuk tanpa batas. Image yang dipublikasikan dikirim dengan `0`; build dari source dimulai di 100. |
+| `MAX_BATCH_SIZE` | `0` (tanpa batas) | Jumlah file maksimum dalam satu permintaan batch. Atur ke 0 untuk tanpa batas. Image yang dipublikasikan dikirim dengan `0`; build dari source dimulai di 100. |
+| `CONCURRENT_JOBS` | `0` (otomatis) | Jumlah job batch yang berjalan paralel. Atur ke 0 untuk mendeteksi otomatis berdasarkan core CPU yang tersedia. |
+| `MAX_MEGAPIXELS` | `0` (tanpa batas) | Resolusi gambar maksimum yang diizinkan dalam megapiksel. Atur ke 0 untuk tanpa batas. |
+| `MAX_WORKER_THREADS` | `0` (otomatis) | Worker thread maksimum untuk pemrosesan gambar. Atur ke 0 untuk mendeteksi otomatis berdasarkan core CPU yang tersedia. |
+| `PROCESSING_TIMEOUT_S` | `0` (tanpa batas) | Waktu pemrosesan maksimum per permintaan dalam detik. Atur ke 0 untuk tanpa timeout. |
+| `MAX_PIPELINE_STEPS` | `20` | Jumlah langkah maksimum dalam sebuah pipeline. Atur ke 0 untuk tanpa batas. |
+| `MAX_CANVAS_PIXELS` | `0` (tanpa batas) | Ukuran canvas maksimum dalam piksel untuk gambar output. Atur ke 0 untuk tanpa batas. |
+| `MAX_SVG_SIZE_MB` | `50` | SVG terbesar yang diterima sebelum disanitasi, dalam megabyte. `0` berperilaku berbeda di sini dibanding baris-baris di sekitarnya. Nilai itu menghapus batas ukuran pra-parse sepenuhnya, bukan menaikkannya, jadi biarkan yang satu ini tetap diatur. |
+| `MAX_PDF_PAGES` | `0` (tanpa batas) | Jumlah halaman PDF maksimum untuk konversi PDF-ke-gambar. Atur ke 0 untuk tanpa batas. |
 
-### Mesin {#engines}
+### Engines {#engines}
 
-SnapOtter mencari setiap biner pemrosesan di `$PATH` di dalam kontainer, jadi biarkan kosong kecuali Anda memasang build Anda sendiri.
+SnapOtter mencari setiap binary pemrosesan di `$PATH` di dalam container, jadi variabel ini tetap kosong kecuali Anda me-mount build milik Anda sendiri.
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `FFMPEG_PATH` | (kosong) | Jalur ke biner `ffmpeg` di balik alat video dan audio. |
-| `FFPROBE_PATH` | (kosong) | Jalur ke `ffprobe`, yang membaca file media sebelum diproses. Arahkan ke build yang sama dengan `FFMPEG_PATH`. |
-| `QPDF_PATH` | (kosong) | Jalur ke `qpdf`, digunakan oleh alat PDF dan untuk memeriksa PDF yang diunggah. |
-| `SOFFICE_PATH` | (kosong) | Jalur ke `soffice` milik LibreOffice, digunakan untuk konversi dokumen kantor. |
-| `PDFCPU_PATH` | (kosong) | Jalur ke `pdfcpu`, digunakan oleh beberapa alat PDF. |
-| `SNAPOTTER_HW_ACCEL` | (kosong) | Keluarga encoder video perangkat keras, `nvenc` atau `vaapi`. Kosong berarti encoding perangkat lunak. |
+| `FFMPEG_PATH` | (kosong) | Path ke binary `ffmpeg` di balik tool video dan audio. |
+| `FFPROBE_PATH` | (kosong) | Path ke `ffprobe`, yang membaca file media sebelum diproses. Arahkan ke build yang sama dengan `FFMPEG_PATH`. |
+| `QPDF_PATH` | (kosong) | Path ke `qpdf`, dipakai oleh tool PDF dan untuk memeriksa PDF yang diunggah. |
+| `SOFFICE_PATH` | (kosong) | Path ke `soffice` milik LibreOffice, dipakai untuk konversi dokumen office. |
+| `PDFCPU_PATH` | (kosong) | Path ke `pdfcpu`, dipakai oleh beberapa tool PDF. |
+| `SNAPOTTER_HW_ACCEL` | (kosong) | Keluarga encoder video hardware, `nvenc` atau `vaapi`. Kosong berarti encode dengan software. |
 
-`SNAPOTTER_HW_ACCEL` memerlukan ffmpeg yang dibangun dengan keluarga encoder tersebut, dan ffmpeg di dalam image tidak memiliki keduanya. Dengan biner bawaan image, pengaturan ini kembali ke encoding perangkat lunak dan menyatakannya di log startup. Untuk menggunakannya, pasang build ffmpeg Anda sendiri, arahkan `FFMPEG_PATH` dan `FFPROBE_PATH` ke sana, dan berikan perangkat GPU ke kontainer. Untuk `nvenc`, atur juga `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: image hanya meminta `compute,utility`, dan tanpa `video` runtime NVIDIA tidak memasang pustaka encoder, sehingga encoder terdaftar tetapi setiap encode gagal. Penggantian jalur yang tidak ada atau tidak dapat dieksekusi juga disebutkan di log startup, dan setiap job yang membutuhkan biner tersebut gagal hingga Anda memperbaiki jalurnya atau menghapus pengaturannya.
+`SNAPOTTER_HW_ACCEL` memerlukan ffmpeg yang dibangun dengan keluarga encoder tersebut, dan ffmpeg di dalam image tidak memiliki keduanya. Dengan binary bawaan image, pengaturan ini beralih ke software encoding dan menyatakannya di log startup. Untuk memakainya, mount build ffmpeg Anda sendiri, arahkan `FFMPEG_PATH` dan `FFPROBE_PATH` ke sana, dan berikan perangkat GPU ke container. Untuk `nvenc`, atur juga `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: image hanya meminta `compute,utility`, dan tanpa `video` runtime NVIDIA tidak me-mount pustaka encode, sehingga encoder tercantum tetapi setiap encode gagal. Override path yang tidak ada atau tidak dapat dieksekusi juga disebut di log startup, dan setiap job yang memerlukan binary itu gagal sampai Anda memperbaiki path-nya atau membatalkan pengaturannya.
 
-File Compose yang diterbitkan meneruskan keenamnya dari `.env`, jadi mengaturnya di sana sudah cukup.
+File Compose yang dipublikasikan meneruskan keenamnya dari `.env`, jadi mengaturnya di sana sudah cukup.
 
-### Pembersihan {#cleanup}
+### Cleanup {#cleanup}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `FILE_MAX_AGE_HOURS` | `72` | Berapa lama hasil pemrosesan yang tidak disimpan (unggahan mentah dan keluaran tool) disimpan sebelum penghapusan otomatis. File yang Anda simpan secara eksplisit ke pustaka Files tidak terpengaruh dan bertahan hingga Anda menghapusnya. |
+| `FILE_MAX_AGE_HOURS` | `72` | Berapa lama hasil pemrosesan yang belum disimpan (unggahan mentah dan output tool) disimpan sebelum dihapus otomatis. File yang Anda simpan secara eksplisit ke library Files tidak terpengaruh dan bertahan sampai Anda menghapusnya. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Seberapa sering job pembersihan berjalan. |
 
-### Tampilan {#appearance}
+### Appearance {#appearance}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
 | `DEFAULT_THEME` | `light` | Tema default untuk sesi baru. `light`, `dark`, atau `system`. |
 | `DEFAULT_LOCALE` | `en` | Bahasa antarmuka default. |
 | `DEFAULT_TOOL_VIEW` | `sidebar` | Tata letak tool default. `sidebar` atau `fullscreen`. |
 
-### Izin Docker {#docker-permissions}
+### Docker permissions {#docker-permissions}
 
-| Variabel | Default | Deskripsi |
+| Variable | Default | Description |
 |---|---|---|
-| `PUID` | `999` | Jalankan proses kontainer sebagai UID ini. Setel agar cocok dengan pengguna host Anda untuk bind mount (`id -u`). |
-| `PGID` | `999` | Jalankan proses kontainer sebagai GID ini. Setel agar cocok dengan grup host Anda untuk bind mount (`id -g`). |
+| `PUID` | `999` | Jalankan proses container sebagai UID ini. Atur agar sesuai dengan user host Anda untuk bind mount (`id -u`). |
+| `PGID` | `999` | Jalankan proses container sebagai GID ini. Atur agar sesuai dengan grup host Anda untuk bind mount (`id -g`). |
 
-## Contoh Docker {#docker-example}
+## Docker example {#docker-example}
 
 ```yaml
 services:
@@ -168,7 +168,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
@@ -198,11 +198,11 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-## Volume {#volumes}
+## Volumes {#volumes}
 
-Stack Docker Compose menggunakan empat volume:
+Stack Docker Compose memakai empat volume:
 
-- `/data` (app) - Model AI, venv Python, dan file pengguna. Pasang ini untuk menyimpan file yang diunggah dan bundel AI yang terpasang di seluruh restart.
-- `/tmp/workspace` (app) - Penyimpanan sementara untuk file yang sedang diproses. Ini bisa efemeral, tetapi memasangnya menghindari pengisian lapisan writable kontainer.
-- `SnapOtter-pgdata` (postgres) - Direktori data PostgreSQL. Ini menyimpan semua data relasional (pengguna, pengaturan, pipeline, job, log audit). Cadangkan melalui `pg_dump` atau snapshot volume.
+- `/data` (app) - Model AI, Python venv, dan file pengguna. Mount ini untuk mempertahankan file yang diunggah dan AI bundle yang terpasang di antara restart.
+- `/tmp/workspace` (app) - Penyimpanan sementara untuk file yang sedang diproses. Ini boleh bersifat ephemeral, tetapi me-mount-nya mencegah writable layer container terisi penuh.
+- `SnapOtter-pgdata` (postgres) - Direktori data PostgreSQL. Ini menyimpan semua data relasional (pengguna, setting, pipeline, job, audit log). Cadangkan lewat `pg_dump` atau snapshot volume.
 - `SnapOtter-redisdata` (redis) - File append-only Redis untuk antrean job yang tahan lama.

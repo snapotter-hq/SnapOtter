@@ -111,6 +111,43 @@ test("inserts an exact custom-note entry after the published changelog heading o
   }
 });
 
+test("scopes subsection ids to the version so repeated headings stay unique", async () => {
+  const releaseNotes = await import(pathToFileURL(scriptPath).href);
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-release-notes-"));
+  const notes = [
+    "# SnapOtter 3.0.0",
+    "",
+    "## Highlights",
+    "",
+    "Intro.",
+    "",
+    "### New Features",
+    "",
+    "- one",
+    "",
+    "### Bug Fixes {#custom-id}",
+    "",
+    "- two",
+    "",
+  ].join("\n");
+
+  try {
+    mkdirSync(path.join(fixtureRoot, ".release-notes"));
+    writeFileSync(path.join(fixtureRoot, ".release-notes/v3.0.0.md"), notes);
+    writeFileSync(
+      path.join(fixtureRoot, "apps-docs-changelog.md"),
+      "# Changelog {#changelog}\n\n## v2.0.0 {#v2-0-0}\n\n### New features {#new-features}\n",
+    );
+    releaseNotes.syncDocsChangelog(fixtureRoot, "3.0.0", "2.9.0", "apps-docs-changelog.md");
+    const changelog = readFileSync(path.join(fixtureRoot, "apps-docs-changelog.md"), "utf8");
+    expect(changelog).toContain("### New Features {#v3-0-0-new-features}\n");
+    expect(changelog).toContain("### Bug Fixes {#custom-id}\n");
+    expect(changelog).toContain("### New features {#new-features}\n");
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
+});
+
 test("CLI exposes archive, materialize, and changelog preparation for release automation", () => {
   const fixtureRoot = mkdtempSync(path.join(tmpdir(), "snapotter-release-notes-"));
   const notes = "## Highlights\n\nCLI release.\n";

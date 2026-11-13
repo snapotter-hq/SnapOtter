@@ -32,12 +32,23 @@ const authMocks = vi.hoisted(() => ({
   permissionError: null as Error | null,
 }));
 
+const subscriberMocks = vi.hoisted(() => ({
+  on: vi.fn(),
+  subscribe: vi.fn(async () => 1),
+}));
+
+const loggerMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
 vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   sharedRedis: () => redisMocks,
-  createRedisSubscriberConnection: vi.fn(() => ({
-    on: vi.fn(),
-    subscribe: vi.fn(async () => 1),
-  })),
+  createRedisSubscriberConnection: vi.fn(() => subscriberMocks),
 }));
 
 vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
@@ -103,6 +114,7 @@ import {
   cancelSingleJobGuarded,
   clearTerminalReplayKey,
   failSingleJobGuarded,
+  publishEphemeral,
   refreshFeatureInstallStream,
   registerProgressRoutes,
   updateJobProgress,
@@ -1128,5 +1140,127 @@ describe("registerProgressRoutes idle unknown-job stream closure (#3853)", () =>
     expect(stream.end).toHaveBeenCalledTimes(1);
     expect(stream.writes).toHaveLength(1);
     stream.disconnect();
+  });
+});
+
+describe("progress fault logging (#4177)", () => {
+  const terminalFrame = {
+    jobId: "job-terminal",
+    type: "single" as const,
+    phase: "complete" as const,
+    percent: 100,
+  };
+
+  beforeEach(() => {
+    dbMocks.failure = null;
+    dbMocks.existing = [];
+    dbMocks.rowCount = 1;
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    loggerMock.error.mockClear();
+    loggerMock.warn.mockClear();
+  });
+
+  afterEach(() => {
+    redisMocks.setex.mockImplementation(async () => "OK");
+    redisMocks.publish.mockImplementation(async () => 1);
+    vi.restoreAllMocks();
+  });
+
+  it("logs a failed terminal replay key write to the logger with the job id", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new Error("redis setex down");
+    redisMocks.setex.mockRejectedValueOnce(err);
+
+    publishEphemeral(terminalFrame);
+
+    await vi.waitFor(() =>
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { err, jobId: "job-terminal" },
+        "terminal replay key write failed",
+      ),
+    );
+    // The replay cache is best effort: the live frame still goes out.
+    await vi.waitFor(() => expect(redisMocks.publish).toHaveBeenCalledTimes(1));
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed terminal publish to the logger with the job id", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new Error("redis publish down");
+    redisMocks.publish.mockRejectedValueOnce(err);
+
+    publishEphemeral(terminalFrame);
+
+    await vi.waitFor(() =>
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { err, jobId: "job-terminal" },
+        "terminal progress publish failed",
+      ),
+    );
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when a nonterminal frame fails to publish", async () => {
+    redisMocks.publish.mockRejectedValueOnce(new Error("redis publish down"));
+
+    publishEphemeral({ jobId: "job-live", type: "single", phase: "processing", percent: 40 });
+
+    await vi.waitFor(() => expect(redisMocks.publish).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  it("logs both terminal announce faults from a durable batch completion", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const setexErr = new Error("redis setex down");
+    const publishErr = new Error("redis publish down");
+    redisMocks.setex.mockRejectedValueOnce(setexErr);
+    redisMocks.publish.mockRejectedValueOnce(publishErr);
+
+    await updateJobProgress({
+      jobId: "batch-terminal",
+      status: "completed",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 0,
+      errors: [],
+    });
+
+    await vi.waitFor(() => expect(loggerMock.error).toHaveBeenCalledTimes(2));
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err: setexErr, jobId: "batch-terminal" },
+      "terminal replay key write failed",
+    );
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err: publishErr, jobId: "batch-terminal" },
+      "terminal progress publish failed",
+    );
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed SSE channel subscribe and leaves connection errors to the shared Redis listener", async () => {
+    vi.resetModules();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new Error("subscribe refused");
+    subscriberMocks.on.mockClear();
+    subscriberMocks.subscribe.mockRejectedValueOnce(err);
+    const fresh = await import("../../../apps/api/src/routes/progress.js");
+
+    await fresh.registerProgressRoutes({ get: vi.fn() } as never);
+
+    await vi.waitFor(() =>
+      expect(loggerMock.error).toHaveBeenCalledWith({ err }, "SSE progress subscribe failed"),
+    );
+    // createRedisSubscriberConnection already logs every connection error
+    // through the logger; a second listener here would double each line.
+    expect(subscriberMocks.on.mock.calls.map(([event]) => event)).not.toContain("error");
+    // The shared listener labels its lines with this name (#4552).
+    const { createRedisSubscriberConnection } = await import(
+      "../../../apps/api/src/jobs/connection.js"
+    );
+    expect(createRedisSubscriberConnection).toHaveBeenCalledWith("sse-progress");
+    expect(consoleSpy).not.toHaveBeenCalled();
   });
 });

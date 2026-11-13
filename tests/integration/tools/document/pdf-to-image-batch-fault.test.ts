@@ -7,6 +7,10 @@
  * its own status. That rethrow skipped the route's terminal frame, so the row
  * stayed `processing` and the SSE stream never ended; only the boot-time
  * placeholder cleanup ever settled it.
+ *
+ * The run lives under a server id with the client id as an alias row, so the
+ * faults below are written in client-id terms and the storage keys and row
+ * ids are mapped back with the batch-alias helpers.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -15,6 +19,7 @@ import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { resolveBatchJobId, toClientKey } from "../../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -43,6 +48,20 @@ const faults = vi.hoisted(() => ({
   /** When set, reply.raw also emits an error while deletePrefix is awaiting (#2764). */
   replyErrorDuringCleanup: false,
 }));
+
+/** The server row behind faults.retireRowBeforeFault, which tests name by client id. */
+async function retireTarget(): Promise<string | null> {
+  return faults.retireRowBeforeFault ? resolveBatchJobId(faults.retireRowBeforeFault) : null;
+}
+
+async function retireRow(): Promise<void> {
+  const id = await retireTarget();
+  if (!id) return;
+  await db
+    .update(schema.jobs)
+    .set({ status: "canceled", completedAt: new Date() })
+    .where(eq(schema.jobs.id, id));
+}
 
 const warnLogs: Array<{ bindings: unknown; msg: string }> = [];
 let currentReplyRaw: (NodeJS.EventEmitter & { destroy: (err?: Error) => void }) | null = null;
@@ -78,14 +97,10 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
+      const clientKey = await toClientKey(key);
       for (const prefix of faults.poison) {
-        if (key.startsWith(prefix)) {
-          if (faults.retireRowBeforeFault) {
-            await db
-              .update(schema.jobs)
-              .set({ status: "canceled", completedAt: new Date() })
-              .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
-          }
+        if (clientKey.startsWith(prefix)) {
+          await retireRow();
           if (faults.poisonError) {
             throw faults.poisonError();
           }
@@ -99,8 +114,9 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
       return actual.putObject(key, data);
     },
     getObjectStream: async (key: string) => {
+      const clientKey = await toClientKey(key);
       for (const prefix of faults.replyErrorOnStream) {
-        if (key.startsWith(prefix)) {
+        if (clientKey.startsWith(prefix)) {
           return new Readable({
             read() {
               queueMicrotask(() => {
@@ -111,13 +127,8 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
         }
       }
       for (const prefix of faults.streamPoison) {
-        if (key.startsWith(prefix)) {
-          if (faults.retireRowBeforeFault) {
-            await db
-              .update(schema.jobs)
-              .set({ status: "canceled", completedAt: new Date() })
-              .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
-          }
+        if (clientKey.startsWith(prefix)) {
+          await retireRow();
           if (faults.s3StreamPoisonError) {
             const makeErr = faults.s3StreamPoisonError;
             return Readable.from(
@@ -159,20 +170,14 @@ vi.mock("../../../../apps/api/src/routes/progress.js", async (importOriginal) =>
   return {
     ...actual,
     updateJobProgress: async (progress: Parameters<typeof actual.updateJobProgress>[0]) => {
-      if (progress.status === "failed" && faults.retireRowBeforeFault === progress.jobId) {
-        await db
-          .update(schema.jobs)
-          .set({ status: "canceled", completedAt: new Date() })
-          .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+      if (progress.status === "failed" && (await retireTarget()) === progress.jobId) {
+        await retireRow();
       }
       return actual.updateJobProgress(progress);
     },
     failBatchJob: async (...args: Parameters<typeof actual.failBatchJob>) => {
-      if (faults.retireRowBeforeFault === args[0].jobId) {
-        await db
-          .update(schema.jobs)
-          .set({ status: "canceled", completedAt: new Date() })
-          .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+      if ((await retireTarget()) === args[0].jobId) {
+        await retireRow();
       }
       if (faults.replyErrorDuringSettle) {
         faults.replyErrorDuringSettle = false;
@@ -234,14 +239,20 @@ function postBatch(clientJobId: string) {
   });
 }
 
-async function readRow(id: string) {
+async function readRow(clientJobId: string) {
+  const id = await resolveBatchJobId(clientJobId);
   const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
   return row;
 }
 
-async function objectsUnder(prefix: string) {
+/** What is left under one document's output prefix, named by the client id. */
+async function childOutputs(clientJobId: string, index: number) {
   const { listObjects } = await import("../../../../apps/api/src/lib/object-storage.js");
-  return listObjects(prefix);
+  return listObjects(`outputs/${await resolveBatchJobId(clientJobId)}-f${index}/`);
+}
+
+async function cachedTerminal(clientJobId: string) {
+  return sharedRedis().get(`${bullPrefix()}:terminal:${await resolveBatchJobId(clientJobId)}`);
 }
 
 async function waitForReplyDestroy() {
@@ -276,7 +287,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
 
     // Nothing is sent on a fault, so the first document's rendered output is
     // only stranded storage; it's removed before the rethrow.
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("also removes the faulting document's own pages when the fault hits after they were written", async () => {
@@ -288,7 +299,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
 
     expect(res.statusCode).toBe(503);
     expect((await readRow(clientJobId))?.status).toBe("failed");
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("keeps the fault's status and still cleans up when settling the row itself fails", async () => {
@@ -301,7 +312,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     // The settle error is logged, never answered in place of the real fault.
     expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
     expect(res.json()).toMatchObject({ code: "workspace-cap" });
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("settles the progress row as failed and cleans up temporary outputs when the ZIP stream fails (#1555)", async () => {
@@ -323,10 +334,10 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       details: [{ filename: "", error: "Failed to package batch results" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    const cached = await cachedTerminal(clientJobId);
     expect(cached).not.toBeNull();
     expect(JSON.parse(cached as string)).toMatchObject({
-      jobId: clientJobId,
+      jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
       totalFiles: 2,
@@ -335,8 +346,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       errors: [{ filename: "", error: "Failed to package batch results" }],
     });
 
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
+    expect(await childOutputs(clientJobId, 1)).toEqual([]);
   });
 
   it("normalizes S3 mid-stream ERR_STREAM_PREMATURE_CLOSE and EIO during ZIP streaming into storage-unavailable (#3651)", async () => {
@@ -378,10 +389,10 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         details: [{ filename: "", error: "The server's storage service is unavailable." }],
       });
 
-      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+      const cached = await cachedTerminal(clientJobId);
       expect(cached).not.toBeNull();
       expect(JSON.parse(cached as string)).toMatchObject({
-        jobId: clientJobId,
+        jobId: await resolveBatchJobId(clientJobId),
         type: "batch",
         status: "failed",
         totalFiles: 2,
@@ -391,8 +402,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         errors: [{ filename: "", error: "The server's storage service is unavailable." }],
       });
 
-      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+      expect(await childOutputs(clientJobId, 0)).toEqual([]);
+      expect(await childOutputs(clientJobId, 1)).toEqual([]);
     }
   });
 
@@ -432,7 +443,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         { filename: "", error: "Failed to package batch results" },
       ],
     });
-    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 1)).toEqual([]);
   });
 
   it("preserves earlier per-file errors on the failed row and terminal frame when a mid-batch storage fault hits (#2815)", async () => {
@@ -472,10 +483,10 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       ],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    const cached = await cachedTerminal(clientJobId);
     expect(cached).not.toBeNull();
     expect(JSON.parse(cached as string)).toMatchObject({
-      jobId: clientJobId,
+      jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
       totalFiles: 2,
@@ -487,7 +498,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         { filename: "", error: "Workspace storage limit reached" },
       ],
     });
-    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 1)).toEqual([]);
   });
 
   it("logs a warning when failBatchJob matches no live row on a storage fault (#1555)", async () => {
@@ -499,14 +510,15 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
 
     expect(res.statusCode).toBe(503);
     expect((await readRow(clientJobId))?.status).toBe("canceled");
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
+    const serverJobId = await resolveBatchJobId(clientJobId);
     expect(
       warnLogs.some(
         (entry) =>
-          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          (entry.bindings as { jobId?: string })?.jobId === serverJobId &&
           entry.msg.includes("no terminal frame announced"),
       ),
-      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+      `expected warn log for ${serverJobId}, got ${JSON.stringify(warnLogs)}`,
     ).toBe(true);
   });
 
@@ -521,15 +533,16 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     );
 
     expect((await readRow(clientJobId))?.status).toBe("canceled");
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
+    expect(await childOutputs(clientJobId, 1)).toEqual([]);
+    const serverJobId = await resolveBatchJobId(clientJobId);
     expect(
       warnLogs.some(
         (entry) =>
-          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          (entry.bindings as { jobId?: string })?.jobId === serverJobId &&
           entry.msg.includes("no terminal frame announced"),
       ),
-      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+      `expected warn log for ${serverJobId}, got ${JSON.stringify(warnLogs)}`,
     ).toBe(true);
   });
 
@@ -543,8 +556,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       () => null,
     );
     expect(outcome === null || outcome.statusCode === 200).toBe(true);
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
+    expect(await childOutputs(clientJobId, 1)).toEqual([]);
   });
 
   it("settles the progress row as failed and answers 503 on an S3 service fault mid-batch (#1552)", async () => {
@@ -567,7 +580,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       message: "The server's storage service is unavailable.",
       code: "storage-unavailable",
     });
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("settles the progress row as failed and answers 503 on a bare ENOSPC mid-batch (#1552)", async () => {
@@ -588,7 +601,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       message: "The server's storage is full.",
       code: "storage-full",
     });
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("masks non-SafeError 500 messages in the progress row and cached terminal frame (#2786)", async () => {
@@ -610,10 +623,10 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       details: [{ filename: "", error: "Internal server error" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    const cached = await cachedTerminal(clientJobId);
     expect(cached).not.toBeNull();
     expect(JSON.parse(cached as string)).toMatchObject({
-      jobId: clientJobId,
+      jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
       totalFiles: 2,
@@ -621,7 +634,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       failedFiles: 2,
       errors: [{ filename: "", error: "Internal server error" }],
     });
-    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await childOutputs(clientJobId, 0)).toEqual([]);
   });
 
   it("absorbs reply.raw errors during mid-stream failure and socket destroy without an uncaught error (#2764)", async () => {
@@ -645,8 +658,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         message: "Failed to package batch results",
         details: [{ filename: "", error: "Failed to package batch results" }],
       });
-      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+      expect(await childOutputs(clientJobId, 0)).toEqual([]);
+      expect(await childOutputs(clientJobId, 1)).toEqual([]);
     } finally {
       process.off("uncaughtException", uncaught);
     }
@@ -672,8 +685,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       expect(faults.replyErrorDuringCleanup).toBe(false);
       const row = await readRow(clientJobId);
       expect(row?.status).toBe("failed");
-      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+      expect(await childOutputs(clientJobId, 0)).toEqual([]);
+      expect(await childOutputs(clientJobId, 1)).toEqual([]);
     } finally {
       process.off("uncaughtException", uncaught);
     }
@@ -700,8 +713,8 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         message: "Failed to package batch results",
         details: [{ filename: "", error: "Failed to package batch results" }],
       });
-      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
-      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+      expect(await childOutputs(clientJobId, 0)).toEqual([]);
+      expect(await childOutputs(clientJobId, 1)).toEqual([]);
     } finally {
       process.off("uncaughtException", uncaught);
     }
@@ -760,10 +773,10 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       ],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    const cached = await cachedTerminal(clientJobId);
     expect(cached).not.toBeNull();
     expect(JSON.parse(cached as string)).toMatchObject({
-      jobId: clientJobId,
+      jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
       totalFiles: 2,
@@ -799,14 +812,15 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
 
     expect(res.statusCode).toBe(422);
     expect((await readRow(clientJobId))?.status).toBe("canceled");
-    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    expect(await cachedTerminal(clientJobId)).toBeNull();
+    const serverJobId = await resolveBatchJobId(clientJobId);
     expect(
       warnLogs.some(
         (entry) =>
-          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          (entry.bindings as { jobId?: string })?.jobId === serverJobId &&
           entry.msg.includes("no terminal frame announced"),
       ),
-      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+      `expected warn log for ${serverJobId}, got ${JSON.stringify(warnLogs)}`,
     ).toBe(true);
   });
 });

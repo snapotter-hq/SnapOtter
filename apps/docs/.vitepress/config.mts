@@ -637,6 +637,7 @@ function buildBaseTheme() {
         text: "API reference",
         items: [
           { text: "REST API", link: "/api/rest" },
+          { text: "Error codes", link: "/api/errors" },
           { text: "Image engine", link: "/api/image-engine" },
           { text: "AI engine", link: "/api/ai" },
         ],

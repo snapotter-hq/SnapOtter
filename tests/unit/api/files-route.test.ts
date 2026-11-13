@@ -423,6 +423,58 @@ describe("files route logic", () => {
       expect(reply2.payload).toEqual({ error: "Invalid path" });
     });
 
+    // The worker writes outputs/<jobId>/.result-payload.json beside a job's
+    // result for reconciliation (#1389). It lists filenames and errors and is
+    // never a deliverable, so the public route answers it like any other miss.
+    it("answers 404 for the internal result payload without touching storage", async () => {
+      for (const filename of [".result-payload.json", ".RESULT-PAYLOAD.JSON"]) {
+        const reply = makeDownloadReply();
+        await downloadHandler(
+          {
+            params: { jobId: "550e8400-e29b-41d4-a716-446655440000", filename },
+            headers: {},
+            log: { warn: vi.fn(), error: vi.fn() },
+          },
+          reply,
+        );
+        expect(reply.statusCode).toBe(404);
+        expect(reply.payload).toEqual({ error: "File not found" });
+      }
+      expect(mocks.getObjectSize).not.toHaveBeenCalled();
+      expect(mocks.getObjectStream).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 for a job id that starts with a dot", async () => {
+      const reply = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: ".internal", filename: "photo.jpg" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        reply,
+      );
+      expect(reply.statusCode).toBe(404);
+      expect(reply.payload).toEqual({ error: "File not found" });
+      expect(mocks.getObjectSize).not.toHaveBeenCalled();
+    });
+
+    it("still serves a normal output from the same job", async () => {
+      const reply = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "550e8400-e29b-41d4-a716-446655440000", filename: "photo.jpg" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        reply,
+      );
+      expect(reply.statusCode).toBe(200);
+      expect(mocks.getObjectSize).toHaveBeenCalledWith(
+        "outputs/550e8400-e29b-41d4-a716-446655440000/photo.jpg",
+      );
+    });
+
     it("encodes special and unicode characters in Content-Disposition", async () => {
       for (const [filename, expectedEncoded] of [
         ["my photo (1).jpg", "my%20photo%20(1).jpg"],

@@ -1,4 +1,4 @@
-import { CATEGORIES, TOOLS } from "@snapotter/shared";
+import { CATEGORIES, isToolDisabled, TOOLS } from "@snapotter/shared";
 import { FileImage, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SearchBar } from "@/components/common/search-bar";
@@ -40,7 +40,7 @@ export function ToolPalette({ onAddStep, className }: ToolPaletteProps) {
   const preFiltered = useMemo(() => {
     return TOOLS.filter((t) => {
       if (EXCLUDED_TOOLS.has(t.id)) return false;
-      if (disabledTools.includes(t.id)) return false;
+      if (isToolDisabled(t.id, disabledTools)) return false;
       if (t.experimental && !experimentalEnabled) return false;
       if (pipelineToolIds && !pipelineToolIds.includes(t.id)) return false;
       return true;

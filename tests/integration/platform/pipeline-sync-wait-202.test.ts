@@ -17,6 +17,7 @@ import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { batchJobIdFor } from "../batch-alias.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -95,7 +96,12 @@ describe("pipeline sync-wait expiry (#766)", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
       // The flow does not care about the response: the finalize publishes
       // the terminal single frame whose result the client settles from.
@@ -136,9 +142,15 @@ describe("pipeline sync-wait expiry (#766)", () => {
       });
 
       expect(res.statusCode).toBe(202);
-      expect(JSON.parse(res.body)).toEqual({ jobId: clientJobId, async: true });
+      expect(JSON.parse(res.body)).toEqual({
+        jobId: clientJobId,
+        async: true,
+        statusUrl: `/api/v1/jobs/${clientJobId}`,
+        progressUrl: `/api/v1/jobs/${clientJobId}/progress`,
+      });
 
-      const frame = await waitForTerminalFrame(clientJobId);
+      const parentId = await batchJobIdFor(clientJobId);
+      const frame = await waitForTerminalFrame(parentId);
       expect(frame.type).toBe("batch");
       expect(frame.status).toBe("completed");
       const result = frame.result as Record<string, unknown>;
@@ -155,11 +167,11 @@ describe("pipeline sync-wait expiry (#766)", () => {
       // which an in-process test cannot produce, so pin the wiring instead.
       // Steps and per-file finalize roots carry the flag; the batch parent
       // does not (it has no parent to unwedge).
-      const step = await getQueue("image").getJob(`${clientJobId}-f0-s0`);
+      const step = await getQueue("image").getJob(`${parentId}-f0-s0`);
       expect(step?.opts.ignoreDependencyOnFailure).toBe(true);
-      const perFileFinalize = await getQueue("image").getJob(`${clientJobId}-f0`);
+      const perFileFinalize = await getQueue("image").getJob(`${parentId}-f0`);
       expect(perFileFinalize?.opts.ignoreDependencyOnFailure).toBe(true);
-      const batchParent = await getQueue("system").getJob(clientJobId);
+      const batchParent = await getQueue("system").getJob(parentId);
       expect(batchParent?.opts.ignoreDependencyOnFailure ?? false).toBe(false);
     } finally {
       enqueueMock.timeoutPools.delete("system");

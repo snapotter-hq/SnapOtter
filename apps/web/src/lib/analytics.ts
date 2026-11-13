@@ -1,7 +1,9 @@
 import {
   type AnalyticsConfig,
+  APP_VERSION,
   httpStatusTag,
   isSafeMessageError,
+  POSTHOG_IP_PLACEHOLDER,
   resolvePostHogClientHosts,
   SafeError,
 } from "@snapotter/shared";
@@ -212,7 +214,6 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           capture_pageview: "history_change",
           capture_pageleave: true,
           disable_session_recording: true,
-          ip: false,
           persistence: "localStorage",
           person_profiles: "identified_only",
           // Last-line PII boundary at the SDK, independent of track()'s per-call
@@ -228,11 +229,20 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
             if (!enabled) return null;
             const props = event?.properties;
             if (props) {
+              // Stamped here, not only as a super property: register() runs
+              // after an await, and a $pageview captured before it carried no
+              // version (#4215).
+              props.app_version = APP_VERSION;
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
               for (const key of URL_PROPERTIES) {
                 if (key in props) props[key] = strip(props[key]);
               }
               removeCampaignProperties(props);
+              // Without the proxy the connection IP is the visitor's own, and
+              // PostHog stores it whenever the project keeps client IPs. Through
+              // /ingest it's the instance's IP, left alone so the project's
+              // discard setting can still geolocate the event first (#4583).
+              if (!config.posthogProxyPath) props.$ip = POSTHOG_IP_PLACEHOLDER;
               // $web_vitals_*_event objects nest their own $current_url, which
               // skips the top-level strip above, so walk them too (#1022).
               for (const key of Object.keys(props)) {
@@ -276,7 +286,7 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     // uniq(). Omitted when empty so we never register a blank value.
     try {
       const superProps: Record<string, string> = {
-        app_version: (await import("@snapotter/shared")).APP_VERSION,
+        app_version: APP_VERSION,
       };
       if (config.instanceId) superProps.instance_id = config.instanceId;
       // Registered even if an opt-out landed meanwhile: it only stores them
@@ -569,6 +579,40 @@ function gateRequestsOnOptOut(instance: PostHogInstance): void {
       return;
     }
     send(options);
+  };
+  gateRetryQueueOnOptOut(instance);
+}
+
+// From 1.438 the batch sender and the retry queue call a module-level request
+// function, so neither goes through _send_request. A failed batch re-sent after
+// an opt-out would reach the host, so the same gate sits on the retry queue's
+// entry point. Every event send passes it: the first attempt, each retry, and
+// the queue's own flush. Dropping with a 4xx makes the SDK discard the batch
+// instead of enqueueing another retry.
+//
+// The production bundle mangles the private field that holds the queue
+// (_retryQueue), but not the retriableRequest method, so the queue is found by
+// that method. If a future release renames it, the retry egress test fails.
+type RetryQueueLike = {
+  retriableRequest: (options: SendOptions, transportOverride?: unknown) => void;
+};
+type SendOptions = { callback?: (response: { statusCode: number }) => void };
+
+function gateRetryQueueOnOptOut(instance: PostHogInstance): void {
+  const queue = Object.values(instance).find(
+    (value): value is RetryQueueLike =>
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as RetryQueueLike).retriableRequest === "function",
+  );
+  if (!queue) return;
+  const retriable = queue.retriableRequest.bind(queue);
+  queue.retriableRequest = (options, transportOverride) => {
+    if (!enabled) {
+      options.callback?.({ statusCode: 400 });
+      return;
+    }
+    retriable(options, transportOverride);
   };
 }
 

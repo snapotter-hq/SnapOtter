@@ -11,6 +11,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue tests each queued PR on top of main before merging it.
+  # Every required check must also report here, or a queued PR waits forever.
+  merge_group:
 
 # PR branches cancel superseded runs. Main never does: a later merge would
 # otherwise cancel the run on the commit before it, and no commit on main
@@ -52,10 +55,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          QUEUE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
             base="$PR_BASE_SHA"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            base="$QUEUE_BASE_SHA"
           else
             base="$PUSH_BEFORE_SHA"
           fi
@@ -183,7 +189,7 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
-      - run: pnpm vitest run tests/unit/ --reporter=verbose --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run tests/unit/ packages/image-engine/tests packages/media-engine/tests packages/doc-engine/tests --reporter=verbose --shard=${{ matrix.shard }}/2
 
   test-unit-result:
     # Keeps the required "Unit Tests" context stable across shard counts, the
@@ -303,6 +309,8 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -357,12 +365,14 @@ jobs:
         if: failure()
         with:
           name: e2e-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-mobile-smoke:
     name: E2E Mobile Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-mobile-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -413,12 +423,14 @@ jobs:
         if: failure()
         with:
           name: e2e-mobile-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-mobile-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-landing:
     name: E2E Landing (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-landing
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -451,12 +463,14 @@ jobs:
         if: failure()
         with:
           name: e2e-landing-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-landing/landing/playwright-report/
           retention-days: 7
 
   test-e2e-docs:
     name: E2E Docs (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-docs
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
     # which the config allows up to 10 minutes for on a loaded machine. The
     # extra 10 is degraded-apt-mirror headroom (#876).
@@ -490,7 +504,7 @@ jobs:
         if: failure()
         with:
           name: e2e-docs-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-docs/docs/playwright-report/
           retention-days: 7
 
   pip-audit:
@@ -641,25 +655,3 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm build
-
-  # docker:
-  #   name: Docker Build Test
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: docker/setup-buildx-action@v3
-  #     - name: Log in to GHCR (for registry cache)
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.repository_owner }}
-  #         password: ${{ secrets.GHCR_TOKEN }}
-  #     - uses: docker/build-push-action@v6
-  #       with:
-  #         context: .
-  #         file: docker/Dockerfile
-  #         push: false
-  #         tags: snapotter:ci
-  #         build-args: SKIP_MODEL_DOWNLOADS=true
-  #         cache-from: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-linux-amd64
-  #         cache-to: type=registry,ref=ghcr.io/snapotter-hq/snapotter:cache-ci,mode=max

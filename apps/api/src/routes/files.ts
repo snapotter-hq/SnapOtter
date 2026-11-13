@@ -4,6 +4,7 @@ import { pipeline, type Readable, Transform } from "node:stream";
 import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { RESULT_PAYLOAD_FILENAME } from "../jobs/types.js";
 import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
@@ -306,6 +307,16 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // Guard against path traversal
       if (isPathTraversal(jobId) || isPathTraversal(filename)) {
         return reply.status(400).send({ error: "Invalid path" });
+      }
+
+      // The worker's result-payload sidecar sits beside the job's outputs but
+      // is internal bookkeeping (filenames, errors), never a deliverable. No
+      // job id starts with a dot. Compared case-insensitively because the
+      // local backend may sit on a case-insensitive filesystem. Other dotfile
+      // names stay servable: a tool keeps an uploaded ".hidden" stem, so
+      // ".hidden.png" can be a real result.
+      if (jobId.startsWith(".") || filename.toLowerCase() === RESULT_PAYLOAD_FILENAME) {
+        return reply.status(404).send({ error: "File not found" });
       }
 
       // A key that cannot name a stored object (URL-decoded garbage that

@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
@@ -9,6 +8,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 /**
  * Maximum input megapixels accepted for CPU-only upscaling (#2513).
@@ -93,7 +93,7 @@ export async function upscale(
   }
 
   const pngBuffer = await image.png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("upscale", inputPath, pngBuffer);
 
   // CPU inference is ~50-100x slower than GPU; be generous for self-hosted NAS hardware
   const rateMs = gpu ? 30_000 : 180_000;
@@ -112,7 +112,7 @@ export async function upscale(
 
   // Python may write to a different path when the output format changes
   const actualOutputPath = result.output_path || outputPath;
-  const buffer = await readFile(actualOutputPath);
+  const buffer = await readScratchOutput("upscale", actualOutputPath);
   return {
     buffer,
     width: result.width,

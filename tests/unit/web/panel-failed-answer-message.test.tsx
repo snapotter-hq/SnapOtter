@@ -79,6 +79,9 @@ const STATUS = 422;
 describe("parseApiError and failedAnswerMessage", () => {
   const FALLBACK = "Panel fallback";
 
+  // parseApiError still reads the server's reason. failedAnswerMessage is what
+  // panels show, and it never returns the server's English: a body with no
+  // code maps to the caller's fallback (#4285).
   it.each([
     ["a string error", { error: "Bad file" }, "Bad file"],
     ["an object error", { error: { reason: "x" } }, FALLBACK],
@@ -106,9 +109,20 @@ describe("parseApiError and failedAnswerMessage", () => {
     ["a string message", { message: "Not found" }, "Not found"],
     ["an object message", { message: { text: "x" } }, FALLBACK],
     ["an empty object", {}, FALLBACK],
-  ])("reads %s", (_label, body, expected) => {
-    expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(expected);
-    expect(parseApiError(body as Record<string, unknown>, STATUS, FALLBACK)).toBe(expected);
+  ])(
+    "reads %s: parseApiError keeps the reason, failedAnswerMessage answers the fallback",
+    (_label, body, parsed) => {
+      expect(parseApiError(body as Record<string, unknown>, STATUS, FALLBACK)).toBe(parsed);
+      expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(FALLBACK);
+    },
+  );
+
+  it("answers the translated message for a body whose code maps, and not the server's text", () => {
+    const code = Object.keys(en.errors.codes)[0];
+    const body = { error: "Server English", code };
+    expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(
+      (en.errors.codes as Record<string, string>)[code],
+    );
   });
 
   it.each([
@@ -181,7 +195,7 @@ describe("parseApiError and failedAnswerMessage", () => {
       failedAnswerMessage(de, { error: "Batch canceled", canceled: true }, STATUS, FALLBACK),
     ).toBe(de.errors.canceled);
     expect(failedAnswerMessage(de, { error: "Bad file", canceled: false }, STATUS, FALLBACK)).toBe(
-      "Bad file",
+      FALLBACK,
     );
   });
 });
@@ -635,21 +649,27 @@ const PANELS: PanelRow[] = [
   },
 ];
 
-/** Answers a few panel shapes a real server sends, with what the panel should end on. */
-function answers(fallback: string): Array<[string, unknown, string]> {
+/**
+ * A few panel shapes a real server sends. None carries a code, so the panel
+ * ends on its translated fallback and the server's reason (the last item)
+ * stays out of the UI (#4285).
+ */
+function answers(fallback: string): Array<[string, unknown, string, string | undefined]> {
   return [
-    ["an object error", { error: { reason: "x" } }, fallback],
-    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
-    ["array details", { details: ["bad field"] }, "bad field"],
-    ["a string error", { error: "Bad file" }, "Bad file"],
+    ["an object error", { error: { reason: "x" } }, fallback, undefined],
+    ["details alone", { details: "Not enough memory" }, fallback, "Not enough memory"],
+    ["array details", { details: ["bad field"] }, fallback, "bad field"],
+    ["a string error", { error: "Bad file" }, fallback, "Bad file"],
     [
       "error and different details",
       { error: "Invalid settings", details: "x: too big" },
-      "Invalid settings: x: too big",
+      fallback,
+      "x: too big",
     ],
     [
       "the error handler's echo of one message",
       { error: "Bad file", details: "Bad file" },
+      fallback,
       "Bad file",
     ],
   ];
@@ -682,29 +702,33 @@ afterEach(() => {
 });
 
 describe.each(PANELS)("$panel: a failed answer", (row) => {
-  const shapes: Array<[string, unknown, string]> = [
+  const shapes: Array<[string, unknown, string, string | undefined]> = [
     ...answers(row.fallback),
-    ["a body that is not JSON", NOT_JSON, row.nonJsonFallback ?? row.fallback],
+    ["a body that is not JSON", NOT_JSON, row.nonJsonFallback ?? row.fallback, undefined],
   ];
 
-  it.each(shapes)("shows %s as readable text", async (_label, body, message) => {
-    const expected = row.framed ? row.framed(message) : message;
-    answer = { status: STATUS, body };
-    await row.start();
-    if (row.transport === "xhr") {
-      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
-      FakeXhr.instances[0].respond(STATUS, body);
-    }
+  it.each(shapes)(
+    "shows the translated fallback for %s, not the server's text",
+    async (_label, body, message, reason) => {
+      const expected = row.framed ? row.framed(message) : message;
+      answer = { status: STATUS, body };
+      await row.start();
+      if (row.transport === "xhr") {
+        await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+        FakeXhr.instances[0].respond(STATUS, body);
+      }
 
-    if (row.shown) {
-      await waitFor(() => expect(row.shown?.()).toBe(expected), { timeout: 3000 });
-    } else {
-      await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument(), {
-        timeout: 3000,
-      });
-    }
-    expect(document.body.textContent).not.toContain("[object Object]");
-  });
+      if (row.shown) {
+        await waitFor(() => expect(row.shown?.()).toBe(expected), { timeout: 3000 });
+      } else {
+        await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument(), {
+          timeout: 3000,
+        });
+      }
+      expect(document.body.textContent).not.toContain("[object Object]");
+      if (reason) expect(document.body.textContent).not.toContain(reason);
+    },
+  );
 });
 
 describe.each(PANELS)("$panel: a 413", (row) => {
@@ -765,19 +789,23 @@ describe.each(
 describe("ocr: a failed answer", () => {
   it.each([
     ...answers(`Failed: ${STATUS}`),
-    ["a body that is not JSON", NOT_JSON, `Processing failed: ${STATUS}`],
-  ])("rejects %s with readable text", async (_label, body, expected) => {
-    const run = ocrOneFile(
-      image("scan.png"),
-      { quality: "fast", language: "en", enhance: false },
-      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
-      { t: en },
-    );
-    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
-    FakeXhr.instances[0].respond(STATUS, body);
+    ["a body that is not JSON", NOT_JSON, `Processing failed: ${STATUS}`, undefined],
+  ])(
+    "rejects %s with the translated fallback, not the server's text",
+    async (_label, body, expected, reason) => {
+      const run = ocrOneFile(
+        image("scan.png"),
+        { quality: "fast", language: "en", enhance: false },
+        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+        { t: en },
+      );
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(STATUS, body);
 
-    await expect(run).rejects.toThrow(expected);
-  });
+      await expect(run).rejects.toThrow(expected);
+      if (reason) await expect(run).rejects.not.toThrow(reason);
+    },
+  );
 
   it("rejects FEATURE_NOT_INSTALLED with the install message in the locale it was given", async () => {
     const run = ocrOneFile(
@@ -950,6 +978,6 @@ describe("no panel reads a failed answer's body by hand", () => {
     expect(entries[1].processedUrl).toBe("/api/v1/download/j1/one-watermarked.png");
     expect(entries[0].file.name).toBe("two.png");
     expect(entries[0].status).toBe("failed");
-    expect(entries[0].error).toBe("Second failed");
+    expect(entries[0].error).toBe(de.errors.processingFailedNoDetail);
   });
 });

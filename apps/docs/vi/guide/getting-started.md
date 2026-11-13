@@ -1,15 +1,15 @@
 ---
-description: "Cài đặt SnapOtter với Docker trong một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn, và tổng quan đầy đủ về tính năng."
-i18n_source_hash: 5bc863dc7351
+description: "Cài đặt SnapOtter bằng Docker chỉ với một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn và tổng quan đầy đủ các tính năng."
+i18n_source_hash: aa8428189808
 i18n_provenance: machine
-i18n_output_hash: 35795f26270f
+i18n_output_hash: 355c895f6050
 i18n_hash_version: 2
 ---
 
 # Bắt đầu {#getting-started}
 
 ::: tip Dùng thử trước khi cài đặt
-Khám phá toàn bộ giao diện tại [demo.snapotter.com](https://demo.snapotter.com), không cần đăng ký hay cài đặt.
+Khám phá toàn bộ giao diện tại [demo.snapotter.com](https://demo.snapotter.com) - không cần đăng ký hay cài đặt.
 :::
 
 ## Bắt đầu nhanh {#quick-start}
@@ -18,30 +18,30 @@ Khám phá toàn bộ giao diện tại [demo.snapotter.com](https://demo.snapot
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Vùng chứa duy nhất này chạy mọi thứ nó cần: không có bộ `DATABASE_URL`, nó khởi động PostgreSQL và Redis của riêng nó trên giao diện loopback (chế độ nhúng) và giữ tất cả dữ liệu trong ổ `SnapOtter-data`. Đây là cách nhanh nhất để dùng thử SnapOtter hoặc tự lưu trữ trên homelab. Để sản xuất, hãy sử dụng [ngăn xếp Docker Compose chuẩn](#docker-compose), để giữ PostgreSQL và Redis trong các vùng chứa riêng của chúng. Chế độ nhúng chạy bằng root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`.
+Container duy nhất này chạy mọi thứ cần thiết: khi không đặt `DATABASE_URL`, nó tự khởi động PostgreSQL và Redis riêng trên giao diện loopback (chế độ nhúng) và lưu toàn bộ dữ liệu trong volume `SnapOtter-data`. Đây là cách nhanh nhất để thử SnapOtter hoặc tự lưu trữ trên homelab. Với môi trường production, hãy dùng [stack Docker Compose chuẩn](#docker-compose), nơi PostgreSQL và Redis chạy trong các container riêng. Chế độ nhúng chạy với quyền root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`.
 
-Cài đặt trên Raspberry Pi, laptop cũ, hay một VPS nhỏ? Xem [Thiết lập trên phần cứng hạn chế](/vi/guide/low-resource) để có hướng dẫn từng bước đã tinh chỉnh và biết nên kỳ vọng gì từ phần cứng hạn chế.
+Bạn cài đặt trên Raspberry Pi, laptop cũ hoặc VPS nhỏ? Xem [Thiết lập cho tài nguyên thấp](/vi/guide/low-resource) để có hướng dẫn đã tinh chỉnh và biết nên kỳ vọng gì ở phần cứng hạn chế.
 
 Bạn sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.
 
-::: tip Phân tích sản phẩm ẩn danh
-SnapOtter bao gồm phân tích sản phẩm ẩn danh theo mặc định. Để tắt nó, mở **Settings → System → Privacy** và tắt **Anonymous Product Analytics**. Nó dừng ngay lập tức cho toàn bộ instance.
+::: tip Phân tích sử dụng sản phẩm ẩn danh
+SnapOtter mặc định có phân tích sử dụng sản phẩm ẩn danh. Để tắt, hãy mở **Settings → System → Privacy** và tắt **Anonymous Product Analytics**. Tính năng này dừng ngay lập tức cho toàn bộ instance.
 
-Bạn cũng có thể đặt biến môi trường `SNAPOTTER_TELEMETRY=0` (`false` và `off` cũng hoạt động) để tắt toàn bộ telemetry cho instance mà không cần xây dựng lại.
+Bạn cũng có thể đặt biến môi trường `SNAPOTTER_TELEMETRY=0` (`false` và `off` cũng dùng được) để tắt toàn bộ telemetry của instance mà không cần build lại.
 
-Việc giám sát lỗi được cung cấp bởi [Sentry](https://sentry.io), đơn vị tài trợ cho SnapOtter thông qua chương trình mã nguồn mở của họ.
+Việc giám sát lỗi do [Sentry](https://sentry.io) đảm nhiệm, đơn vị tài trợ cho SnapOtter thông qua chương trình mã nguồn mở của họ.
 
-Để biết chi tiết về những gì được thu thập, xem [SnapOtter thu thập gì](/vi/guide/telemetry).
+Để biết chi tiết về dữ liệu được thu thập, xem [SnapOtter thu thập những gì](/vi/guide/telemetry).
 :::
 
 ::: tip Tăng tốc NVIDIA CUDA
-Thêm `--gpus all` để loại bỏ nền, nâng cấp, nâng cấp và phục hồi khuôn mặt được tăng tốc CUDA của NVIDIA. OCR vẫn dựa trên CPU và hoạt động trong cùng một hình ảnh có hoặc không có quyền truy cập GPU:
+Thêm `--gpus all` để tăng tốc bằng NVIDIA CUDA cho các tác vụ xóa nền, upscale, nâng cấp khuôn mặt và phục hồi ảnh. OCR vẫn chạy trên CPU và hoạt động trong cùng một image, dù có quyền truy cập GPU hay không:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Yêu cầu [Bộ công cụ bộ chứa NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động quay trở lại CPU khi CUDA không khả dụng. Hiện nay, khả năng tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync hoặc OpenCL không được hỗ trợ cho suy luận AI. Xem [Thẻ Docker](/vi/guide/docker-tags) để biết điểm chuẩn. Nếu các công cụ AI chạy trên CPU mặc dù có `--gpus all`, hãy xem [Xác minh khả năng tăng tốc GPU](/vi/guide/deployment#verify-gpu-acceleration).
+Yêu cầu [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Tự động chuyển về CPU khi CUDA không khả dụng. Hiện tại không hỗ trợ tăng tốc suy luận AI bằng iGPU Intel/AMD qua VA-API, Quick Sync hoặc OpenCL. Xem [Tag Docker](/vi/guide/docker-tags) để biết benchmark. Nếu các công cụ AI vẫn chạy trên CPU dù đã dùng `--gpus all`, xem [Xác minh tăng tốc GPU](/vi/guide/deployment#verify-gpu-acceleration).
 :::
 
 ::: details Cũng có trên GHCR
@@ -49,12 +49,12 @@ Yêu cầu [Bộ công cụ bộ chứa NVIDIA](https://docs.nvidia.com/datacent
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
 ```
 
-Cả hai registry đều phát hành cùng một image trong mỗi bản phát hành.
+Cả hai registry đều phát hành cùng một image ở mỗi bản phát hành.
 :::
 
-## Docker Soạn {#docker-compose}
+## Docker Compose {#docker-compose}
 
-Sử dụng tệp sản xuất được duy trì và thử nghiệm với mỗi bản phát hành thay vì sao chép ví dụ Compose viết tắt từ trang này:
+Hãy dùng tệp production được duy trì và kiểm thử cùng mỗi bản phát hành thay vì sao chép một ví dụ Compose rút gọn từ trang này:
 
 ```bash
 install -d -m 700 snapotter && cd snapotter
@@ -72,9 +72,9 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) chuẩn bao gồm tất cả bốn khối thời gian chạy, kiểm tra tình trạng, giới hạn tài nguyên, cấu hình Redis bền vững, hình ảnh bộ đệm/cơ sở dữ liệu được ghim và tăng cường vùng chứa hiện tại. Thay đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể lặp lại, hãy ghim hình ảnh ứng dụng SnapOtter vào thẻ phát hành hoặc thông báo mà bạn đã xác minh thay vì theo dõi `latest`.
+Tệp [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) chuẩn bao gồm đủ bốn volume runtime, health check, giới hạn tài nguyên, cấu hình Redis bền vững, các image cơ sở dữ liệu/cache đã cố định phiên bản và các biện pháp tăng cường bảo mật container hiện hành. Hãy đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể tái lập, hãy cố định image ứng dụng SnapOtter theo tag hoặc digest bản phát hành mà bạn đã xác minh thay vì theo dõi `latest`.
 
-Xem [Cấu hình](/vi/guide/configuration) để biết tất cả các biến môi trường và [Bảo mật & tăng cường](/vi/guide/security) để biết bí mật, chính sách mạng và hướng dẫn sao lưu.
+Xem [Cấu hình](/vi/guide/configuration) để biết tất cả biến môi trường và [Bảo mật và tăng cường](/vi/guide/security) để biết hướng dẫn về secret, chính sách mạng và sao lưu.
 
 ## Build từ mã nguồn {#build-from-source}
 
@@ -91,38 +91,38 @@ pnpm dev
 - Frontend: [http://localhost:1351](http://localhost:1351)
 - Backend: [http://localhost:13490](http://localhost:13490)
 
-## Những gì bạn có thể làm {#what-you-can-do}
+## Bạn có thể làm gì {#what-you-can-do}
 
-### Xử lý tập tin (200+ công cụ) {#file-processing-200-tools}
+### Xử lý tệp (200+ công cụ) {#file-processing-200-tools}
 
 | Phương thức | Số lượng | Công cụ ví dụ |
 |----------|-------|---------------|
-| **Hình ảnh** | 112 | Thay đổi kích thước, Cắt, Nén, Chuyển đổi, Xóa nền, Nâng cấp độ phân giải, OCR, Đóng dấu, Ghép ảnh, Tô màu, Công cụ GIF, preset định dạng |
-| **Video** | 57 | Cắt, Cắt khung, Nén, Chuyển đổi, Gộp, Trích xuất âm thanh, Phụ đề tự động, Video sang GIF, Thay đổi kích thước, Ổn định, preset định dạng |
-| **Âm thanh** | 27 | Cắt, Gộp, Chuyển đổi, Chuẩn hóa, Giảm nhiễu, Phiên âm, Dịch cao độ, Fade, Tạo nhạc chuông, preset định dạng |
-| **PDF / Tài liệu** | 35 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |
-| **Tập tin** | 23 | CSV sang JSON, JSON sang XML, Gộp CSV, Tách CSV, Tạo ZIP, Giải nén ZIP, Tạo biểu đồ, YAML/JSON |
+| **Ảnh** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
+| **Video** | 57 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
+| **Âm thanh** | 27 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
+| **PDF / Tài liệu** | 35 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
+| **Tệp** | 23 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
 
 ### Pipeline {#pipelines}
 
-Ghép chuỗi các công cụ thành các quy trình nhiều bước và áp dụng chúng cho một hình ảnh hoặc cả một lô:
+Nối các công cụ thành quy trình nhiều bước và áp dụng cho một ảnh hoặc cả một lô:
 
-1. Mở **Pipelines** ở thanh bên.
+1. Mở **Pipelines** trên thanh bên.
 2. Thêm các bước (công cụ bất kỳ, cài đặt bất kỳ).
-3. Chạy trên một tập tin đơn, hoặc cả một lô cùng lúc.
-4. Lưu pipeline để tái sử dụng sau này.
+3. Chạy trên một tệp đơn lẻ - hoặc cả một lô cùng lúc.
+4. Lưu pipeline để dùng lại sau.
 
-Pipeline cho phép 20 bước theo mặc định. Đặt `MAX_PIPELINE_STEPS=0` để giới hạn thành không giới hạn.
+Mặc định pipeline cho phép 20 bước. Đặt `MAX_PIPELINE_STEPS=0` để bỏ giới hạn này.
 
-### Thư viện tập tin {#file-library}
+### Thư viện tệp {#file-library}
 
-Mọi tập tin bạn xử lý đều có thể được lưu vào thư viện **Files** của bạn. SnapOtter theo dõi toàn bộ lịch sử phiên bản để bạn có thể lần theo mọi bước xử lý từ tải lên gốc đến kết quả cuối cùng.
+Mọi tệp bạn xử lý đều có thể được lưu vào thư viện **Files** của bạn. SnapOtter theo dõi toàn bộ lịch sử phiên bản để bạn có thể lần lại từng bước xử lý, từ tệp tải lên ban đầu đến kết quả cuối cùng.
 
-Việc lưu là tường minh: các kết quả bạn lưu vào thư viện được giữ lại cho đến khi bạn xóa chúng, trong khi các kết quả bạn xử lý và để chưa lưu sẽ tự động bị xóa sau 72 giờ (có thể cấu hình thông qua `FILE_MAX_AGE_HOURS`).
+Việc lưu là chủ động: kết quả bạn lưu vào thư viện được giữ cho đến khi bạn xóa, còn kết quả đã xử lý mà không lưu sẽ tự động bị xóa sau 72 giờ (có thể cấu hình qua `FILE_MAX_AGE_HOURS`).
 
-### REST API & API Key {#rest-api-api-keys}
+### REST API và khóa API {#rest-api-api-keys}
 
-Mọi công cụ đều có thể truy cập qua HTTP:
+Mọi công cụ đều truy cập được qua HTTP:
 
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/resize \
@@ -131,28 +131,28 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
   -F 'settings={"width":800,"height":600,"fit":"cover"}'
 ```
 
-Tạo API key trong mục **Settings → API Keys**. Xem [tham chiếu REST API](/vi/api/rest) để biết tất cả các endpoint, hoặc truy cập [http://localhost:1349/api/docs](http://localhost:1349/api/docs) để có tham chiếu tương tác.
+Tạo khóa API tại **Settings → API Keys**. Xem [tài liệu tham khảo REST API](/vi/api/rest) để biết tất cả endpoint, hoặc truy cập [http://localhost:1349/api/docs](http://localhost:1349/api/docs) để xem tài liệu tương tác.
 
-### Đa người dùng & Nhóm {#multi-user-teams}
+### Nhiều người dùng và nhóm {#multi-user-teams}
 
-Bật nhiều người dùng với kiểm soát truy cập dựa trên vai trò:
+Bật nhiều người dùng với kiểm soát truy cập theo vai trò:
 
-- **Admin**: toàn quyền, quản lý người dùng, nhóm, cài đặt, tất cả tập tin/pipeline/API key
-- **User**: dùng công cụ, quản lý tập tin/pipeline/API key của riêng mình
+- **Admin**: toàn quyền - quản lý người dùng, nhóm, cài đặt, tất cả tệp/pipeline/khóa API
+- **User**: dùng các công cụ, quản lý tệp/pipeline/khóa API của chính mình
 
-Tạo các nhóm trong mục **Settings → Teams** để nhóm người dùng lại.
+Tạo nhóm tại **Settings → Teams** để gom người dùng.
 
-Đặt `AUTH_ENABLED=true` (hoặc `false` cho trường hợp một người dùng/tự sử dụng mà không cần đăng nhập).
+Đặt `AUTH_ENABLED=true` (hoặc `false` cho trường hợp một người dùng/tự dùng, không cần đăng nhập).
 
 ## Dùng trên điện thoại {#use-it-from-your-phone}
 
-SnapOtter chạy tốt trên trình duyệt di động, và bạn có thể cài nó như một ứng dụng. Mở instance của bạn trên điện thoại, sau đó:
+SnapOtter hoạt động trên trình duyệt di động và bạn có thể cài đặt nó như một ứng dụng. Mở instance của bạn trên điện thoại, sau đó:
 
-- **iPhone / iPad (Safari):** nhấn Chia sẻ, rồi chọn **Thêm vào MH chính**.
-- **Android (Chrome):** mở menu trình duyệt rồi nhấn **Cài đặt ứng dụng**.
+- **iPhone / iPad (Safari):** nhấn Chia sẻ, rồi chọn **Add to Home Screen**.
+- **Android (Chrome):** mở menu trình duyệt và nhấn **Install app**.
 
-Ứng dụng sau khi cài sẽ mở trong cửa sổ riêng, vào thẳng instance của bạn.
+Ứng dụng đã cài sẽ mở trong cửa sổ riêng, đi thẳng vào instance của bạn.
 
-Có một lưu ý: trình duyệt chỉ đưa ra lời mời cài đặt qua HTTPS. Địa chỉ HTTP thường trong mạng LAN vẫn dùng tốt trong một thẻ trình duyệt; còn muốn cài đặt thật sự, hãy đặt instance sau một reverse proxy có chứng chỉ (xem [hướng dẫn triển khai](/vi/guide/deployment)).
+Có một lưu ý: trình duyệt chỉ hiển thị lời nhắc cài đặt qua HTTPS. Địa chỉ HTTP thuần trong mạng LAN vẫn dùng tốt trong một tab trình duyệt; để cài đặt thật sự, hãy đặt instance sau một reverse proxy có chứng chỉ (xem [hướng dẫn triển khai](/vi/guide/deployment)).
 
-Trên điện thoại và máy tính bảng, các công cụ hình ảnh hiển thị nút **Chụp ảnh** bên cạnh nút tải lên. Chụp một tờ hóa đơn hay tấm bảng trắng, ảnh sẽ vào thẳng công cụ.
+Trên điện thoại và máy tính bảng, các công cụ ảnh hiển thị nút **Take photo** cạnh nút tải lên. Chụp một hóa đơn hoặc bảng trắng và ảnh sẽ đi thẳng vào công cụ.

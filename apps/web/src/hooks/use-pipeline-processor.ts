@@ -1,4 +1,8 @@
-import { ANALYTICS_EVENTS, type ToolRunDegradedProperties } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  FILE_NOTES_ALL_FILES,
+  type ToolRunDegradedProperties,
+} from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
@@ -15,6 +19,12 @@ import {
   parseResultBody,
   reportMalformedResult,
 } from "@/lib/progress-frames";
+import {
+  asNotesMap,
+  parseFileNotesHeader,
+  pickPipelineResultNotes,
+  pickResultNotes,
+} from "@/lib/result-notes";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { generateId } from "@/lib/utils";
@@ -625,6 +635,8 @@ export function usePipelineProcessor() {
                   status: "completed",
                   originalSize: result.originalSize,
                   processedSize: result.processedSize,
+                  // What the steps reported, such as a missed compress target.
+                  resultNotes: pickPipelineResultNotes(result),
                   ...(result.savedFileId && saveModeRef.current === "overwrite"
                     ? { serverFileId: result.savedFileId }
                     : {}),
@@ -1022,6 +1034,7 @@ export function usePipelineProcessor() {
                     status: "completed",
                     originalSize: result.originalSize,
                     processedSize: result.processedSize,
+                    resultNotes: pickPipelineResultNotes(result),
                     ...(result.savedFileId && saveModeRef.current === "overwrite"
                       ? { serverFileId: result.savedFileId }
                       : {}),
@@ -1293,6 +1306,7 @@ export function usePipelineProcessor() {
         const settleFromZip = async (
           zipBlob: Blob,
           fileResults: Record<string, string>,
+          fileNotes: Record<string, unknown>,
           status?: number,
         ) => {
           settling = true;
@@ -1340,6 +1354,12 @@ export function usePipelineProcessor() {
                 processedUrl,
                 processedFilename: processedName,
                 processedSize,
+                // What the file's steps reported, such as a missed compress
+                // target (#1374). A note shared by every file arrives once,
+                // under FILE_NOTES_ALL_FILES.
+                resultNotes: pickResultNotes(
+                  fileNotes[String(i)] ?? fileNotes[FILE_NOTES_ALL_FILES],
+                ),
                 status: "completed",
                 error: null,
               });
@@ -1347,6 +1367,7 @@ export function usePipelineProcessor() {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure (#771).
               updateEntryById(entryId, {
+                resultNotes: null,
                 // No result for this file, so none may show: the pane's failure
                 // card only renders without a processedUrl (#1699).
                 processedUrl: null,
@@ -1371,10 +1392,11 @@ export function usePipelineProcessor() {
         const settleOrFail = async (
           zipBlob: Blob,
           fileResults: Record<string, string>,
+          fileNotes: Record<string, unknown>,
           status?: number,
         ) => {
           try {
-            await settleFromZip(zipBlob, fileResults, status);
+            await settleFromZip(zipBlob, fileResults, fileNotes, status);
           } catch (cause) {
             const unsettled = useFileStore
               .getState()
@@ -1442,7 +1464,7 @@ export function usePipelineProcessor() {
             failRun(t.errors.processingInterrupted);
             return;
           }
-          await settleOrFail(zipBlob, fileResults);
+          await settleOrFail(zipBlob, fileResults, asNotesMap(result.fileNotes));
         };
 
         batchRunRef.current = {
@@ -1605,7 +1627,9 @@ export function usePipelineProcessor() {
               failRun(t.errors.batchFailed);
               return;
             }
-            void settleOrFail(xhr.response as Blob, fileResults ?? {}, xhr.status);
+            // Absent on servers from before #1374, which is no notes.
+            const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
+            void settleOrFail(xhr.response as Blob, fileResults ?? {}, fileNotes, xhr.status);
             return;
           }
 

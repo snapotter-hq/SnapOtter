@@ -1,23 +1,17 @@
 ---
-description: "Triển khai SnapOtter lên môi trường production với Docker. Yêu cầu phần cứng, cài đặt GPU, và cấu hình reverse proxy cho Nginx, Traefik, và Cloudflare."
-i18n_source_hash: 4cae787c775e
-i18n_provenance: human
-i18n_output_hash: da48d69dd40e
+description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
+i18n_source_hash: 3821f105f4ba
+i18n_provenance: machine
+i18n_output_hash: 9ee358838831
 i18n_hash_version: 2
 ---
 
 # Triển khai {#deployment}
 
-SnapOtter triển khai dưới dạng một stack Docker Compose gồm 3 container: image ứng dụng SnapOtter, PostgreSQL 17, và Redis 8. Image ứng dụng hỗ trợ **linux/amd64** (với NVIDIA CUDA để tăng tốc AI) và **linux/arm64** (CPU), nên nó chạy native trên các máy chủ Intel/AMD, máy Mac Apple Silicon, và các thiết bị ARM như Raspberry Pi 4/5. Việc tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync, hoặc OpenCL hiện chưa được hỗ trợ cho suy luận AI.
+SnapOtter được triển khai dưới dạng một stack Docker Compose gồm 3 container: image ứng dụng SnapOtter, PostgreSQL 17 và Redis 8. Image ứng dụng hỗ trợ **linux/amd64** (với NVIDIA CUDA để tăng tốc AI) và **linux/arm64** (CPU), nên chạy native trên máy chủ Intel/AMD, máy Mac Apple Silicon và các thiết bị ARM như Raspberry Pi 4/5. Hiện chưa hỗ trợ tăng tốc iGPU Intel/AMD qua VA-API, Quick Sync hoặc OpenCL cho suy luận AI.
 
-Xem [Docker Image](./docker-tags) để biết cách cài đặt GPU, các ví dụ Docker Compose, và cách ghim phiên bản.
+Xem [Docker Image](./docker-tags) để biết cách thiết lập GPU, ví dụ Docker Compose và cách ghim phiên bản.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Khả năng tương thích OCR tiếng Hàn
-OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`) và tiếng Ả Rập (`ar`). Cả hai cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Với tiếng Hàn và tiếng Ả Rập, hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn hoặc tiếng Ả Rập với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Bắt đầu nhanh (CPU) {#quick-start-cpu}
 
 ```yaml
@@ -38,7 +32,11 @@ services:
       - DEFAULT_PASSWORD=admin     # First-run admin password (you'll be forced to change it)
 
       # --- Database + Queue ---
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Requests are served by a role that can only read and write rows. The
+      # owner connects only during boot, to migrate and to grant. Set
+      # POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD for any non-local deployment.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
 
       # --- Limits (set 0 for unlimited) ---
@@ -53,6 +51,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,14 +82,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -114,13 +123,15 @@ volumes:
 docker compose up -d
 ```
 
-Sau đó ứng dụng sẽ có sẵn tại `http://localhost:1349`.
+Sau đó ứng dụng sẽ khả dụng tại `http://localhost:1349`.
 
-> **Bị giới hạn tần suất từ Docker Hub?** Thay `snapotter/snapotter:latest` bằng `ghcr.io/snapotter-hq/snapotter:latest` để kéo từ GitHub Container Registry. Cả hai registry đều nhận cùng một image trong mỗi bản phát hành.
+Stack ở trên kết nối với tư cách chủ sở hữu cơ sở dữ liệu. Từ SnapOtter 2.3.0, bạn có thể phục vụ yêu cầu bằng một role chỉ đọc và ghi các hàng; xem [Role đặc quyền tối thiểu](./database#least-privilege-roles).
+
+> **Gặp giới hạn tốc độ của Docker Hub?** Thay `snapotter/snapotter:latest` bằng `ghcr.io/snapotter-hq/snapotter:latest` để kéo image từ GitHub Container Registry. Cả hai registry đều nhận cùng một image ở mỗi bản phát hành.
 
 ## Bắt đầu nhanh (NVIDIA CUDA) {#quick-start-nvidia-cuda}
 
-Để tăng tốc NVIDIA CUDA trên các công cụ AI được hỗ trợ (xóa nền, nâng cấp, nâng cao khuôn mặt):
+Để tăng tốc NVIDIA CUDA cho các công cụ AI được hỗ trợ (xóa nền, phóng to, cải thiện khuôn mặt):
 
 ```yaml
 # docker-compose-gpu.yml - Requires: NVIDIA GPU + nvidia-container-toolkit
@@ -138,8 +149,18 @@ services:
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only) and the boot-only owner connection. See the CPU
+      # example above.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
+      # Engines (empty = the image's own binaries, see Configuration)
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,14 +191,17 @@ services:
     image: postgres:17-alpine
     container_name: SnapOtter-postgres
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Thay đổi điều này cho việc triển khai không cục bộ
-      POSTGRES_DB: snapotter
+      # These describe the owner. The app's own role (POSTGRES_APP_USER,
+      # POSTGRES_APP_PASSWORD) is created by SnapOtter at boot, so Postgres is
+      # not told about it here.
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -208,34 +232,34 @@ volumes:
 docker compose -f docker-compose-gpu.yml up -d
 ```
 
-### Xác minh khả năng tăng tốc GPU {#verify-gpu-acceleration}
+### Xác minh tăng tốc GPU {#verify-gpu-acceleration}
 
-Kiểm tra phát hiện CUDA trong nhật ký:
+Kiểm tra việc phát hiện CUDA trong nhật ký:
 
 ```bash
 docker logs SnapOtter 2>&1 | head -20
 # Look for: [gpu] CUDA available via torch
 ```
 
-Nếu các công cụ AI chạy trên CPU ngay cả khi `--gpus all` và Bộ công cụ bộ chứa NVIDIA được thiết lập chính xác, hãy cài đặt lại gói bị ảnh hưởng (ví dụ: Xóa nền) từ **Cài đặt → Tính năng AI**. Trình cài đặt khôi phục bản dựng GPU của ONNX Runtime, bản dựng chỉ dành cho CPU được kéo vào bởi một gói khác (chẳng hạn như phiên mã) có thể bị che khuất trong môi trường AI được chia sẻ. Nếu việc cài đặt lại từ giao diện người dùng không khôi phục GPU trên hình ảnh cũ hơn, hãy xem cách sửa chữa thủ công trong [vấn đề #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
+Nếu các công cụ AI vẫn chạy trên CPU dù `--gpus all` và NVIDIA Container Toolkit đã được thiết lập đúng, hãy cài đặt lại gói bị ảnh hưởng (ví dụ Background Removal) từ **Settings → AI Features**. Trình cài đặt sẽ khôi phục bản ONNX Runtime dành cho GPU, thứ có thể bị che bởi bản chỉ dành cho CPU do một gói khác (chẳng hạn transcription) kéo vào trong môi trường AI dùng chung. Nếu cài đặt lại từ giao diện không khôi phục được GPU trên một image cũ hơn, hãy xem hướng dẫn sửa thủ công tại [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
 ## Yêu cầu phần cứng {#hardware-requirements}
 
-Các con số này đến từ các phép đo hiệu năng trên nhiều hệ thống khác nhau, từ một máy trạm amd64 hiện đại với NVIDIA RTX 4070 xuống đến một Raspberry Pi, chạy toàn bộ danh mục công cụ trên mỗi máy và quét qua các giới hạn tài nguyên Docker để tìm ngưỡng thực tế.
+Các con số này đến từ các bài đo trên nhiều hệ thống, từ một máy trạm amd64 hiện đại với NVIDIA RTX 4070 cho đến một chiếc Raspberry Pi, chạy toàn bộ danh mục công cụ trên từng máy và quét các giới hạn tài nguyên Docker để tìm ngưỡng tối thiểu thực sự.
 
-Chạy ở mức thấp nhất của các cấp này (một chiếc Pi, laptop cũ, VPS 2 GB)? [Thiết lập trên phần cứng hạn chế](/vi/guide/low-resource) biến những con số này thành hướng dẫn từng bước cụ thể với các giới hạn đã tinh chỉnh.
+Đang chạy ở mức thấp của các cấp này (một chiếc Pi, laptop cũ, VPS 2 GB)? [Thiết lập tài nguyên thấp](/vi/guide/low-resource) biến các con số này thành hướng dẫn cụ thể với các mức giới hạn đã tinh chỉnh.
 
-### Tham chiếu nhanh {#quick-reference}
+### Tham khảo nhanh {#quick-reference}
 
 | Cấp | Trường hợp sử dụng | CPU | RAM | GPU | Lưu trữ |
 |------|----------|-----|-----|-----|---------|
-| Tối thiểu | Công cụ hình ảnh, tập tin, và PDF nhẹ; một người dùng; lô nhỏ | 2 nhân | 2 GB | Không | ~7 GB |
-| Khuyến nghị | Cả năm phương thức gồm video, PDF, và AI trên CPU; xử lý lô; một vài người dùng | 4 nhân | 4 GB | Không | ~25 GB |
-| Đầy đủ | Mọi thứ với tốc độ cao gồm AI trên GPU; lô lớn; nhiều người dùng | 6-8 nhân | 8 GB | NVIDIA 8 GB+ VRAM (12 GB thoải mái) | ~35 GB |
+| Tối thiểu | Công cụ không dùng AI (ảnh, tệp, PDF nhẹ) cùng Fast OCR và nhận diện khuôn mặt tích hợp sẵn; một người dùng; lô nhỏ | 2 nhân | 2 GB | Không | ~7 GB |
+| Khuyến nghị | Cả năm nhóm, gồm video, PDF và các gói AI tiêu chuẩn trên CPU; xử lý theo lô; vài người dùng | 4 nhân | 4 GB (8 GB cho inpainting HQ) | Không | ~25 GB |
+| Đầy đủ | Mọi thứ ở tốc độ cao, gồm AI trên GPU; lô lớn; nhiều người dùng | 6-8 nhân | 8 GB | NVIDIA 8 GB+ VRAM (12 GB là thoải mái) | ~35 GB |
 
-**Kiến trúc: chỉ 64-bit** (`linux/amd64` hoặc `linux/arm64`). SnapOtter chạy native trên các máy chủ Intel/AMD, máy Mac Apple Silicon, và các bo mạch ARM 64-bit bao gồm **Raspberry Pi 4 và 5** (4-8 GB). Nó **không** chạy trên ARM 32-bit (`armv7`/`armhf`), không có image nào được xây dựng cho nó, và cũng không chạy trên các bo mạch loại 512 MB như Pi Zero, vốn nằm dưới ngưỡng bộ nhớ (xem bên dưới).
+**Kiến trúc: chỉ 64-bit** (`linux/amd64` hoặc `linux/arm64`). SnapOtter chạy native trên máy chủ Intel/AMD, máy Mac Apple Silicon và các bo mạch ARM 64-bit, gồm cả **Raspberry Pi 4 và 5** (4-8 GB). Nó **không** chạy trên ARM 32-bit (`armv7`/`armhf`), vì không có image nào được build cho kiến trúc đó, cũng không chạy trên các bo mạch cỡ 512 MB như Pi Zero, vốn thấp hơn ngưỡng bộ nhớ (xem bên dưới).
 
-### Tối thiểu (công cụ hình ảnh, tập tin, và PDF nhẹ; không có AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
+### Tối thiểu (công cụ ảnh, tệp và PDF nhẹ; không có AI) {#minimum-image-files-and-light-pdf-tools-no-ai}
 
 | Tài nguyên | Yêu cầu |
 |---|---|
@@ -244,9 +268,9 @@ Chạy ở mức thấp nhất của các cấp này (một chiếc Pi, laptop c
 | Ổ đĩa | ~5.5 GB (image) + volume dữ liệu |
 | GPU | Không bắt buộc |
 
-Tất cả 222 công cụ không dùng AI trong danh mục, hình ảnh (thay đổi kích thước, cắt, chuyển đổi, nén, điều chỉnh, đóng dấu), video (cắt, tắt tiếng, remux), âm thanh (chuyển đổi, chuẩn hóa, cắt), PDF (gộp, tách, nén, xoay, bảo vệ), chuyển đổi tập tin, và các preset chuyển đổi chuyên dụng, đều chạy trên phần cứng khiêm tốn. Hầu hết các thao tác hoàn thành trong chưa đầy một giây ngay cả với tập tin lớn: một hình ảnh 2.7 MB được thay đổi kích thước trong ~0.05 giây và mã hóa lại sang WebP trong ~2 giây.
+Toàn bộ 222 công cụ không dùng AI trong danh mục - ảnh (đổi kích thước, cắt, chuyển đổi, nén, điều chỉnh, thêm watermark), video (cắt, tắt tiếng, remux), âm thanh (chuyển đổi, chuẩn hóa, cắt), PDF (gộp, tách, nén, xoay, bảo vệ), chuyển đổi tệp và các preset chuyển đổi chuyên dụng - đều chạy được trên phần cứng khiêm tốn. Hầu hết thao tác hoàn tất trong chưa đầy một giây, kể cả với tệp lớn: một ảnh 2.7 MB được đổi kích thước trong ~0.05 giây và mã hóa lại sang WebP trong ~2 giây.
 
-Ngưỡng bộ nhớ là có thật, từ một lượt quét giới hạn tài nguyên Docker: **512 MB không thể khởi động stack** (ngay cả một lần thay đổi kích thước hình ảnh cũng bị dừng), **1 GB** xử lý được các thao tác một tập tin nhưng một lô nhiều tập tin sẽ hết bộ nhớ, và **2 GB / 2 nhân** là cấu hình nhỏ nhất xử lý các lô một cách thoải mái.
+Ngưỡng bộ nhớ là có thật, theo kết quả quét giới hạn tài nguyên Docker: **512 MB không thể khởi động stack** (ngay cả một lần đổi kích thước ảnh cũng bị kill), **1 GB** xử lý được thao tác trên một tệp nhưng lô nhiều tệp sẽ hết bộ nhớ, và **2 GB / 2 nhân** là cấu hình nhỏ nhất xử lý thoải mái các lô không dùng AI. Fast OCR tích hợp sẵn và gói `face-detection` cũng nằm gọn trong 2 GB, trong khi các gói AI lớn hơn (Whisper, LaMa/DDColor, rembg, RealESRGAN, khôi phục ảnh và inpainting HQ SD1.5) cần 4 đến 8 GB RAM và bị từ chối ngay từ đầu khi bộ nhớ trống thấp hơn ngưỡng của từng gói.
 
 ```yaml
 deploy:
@@ -256,7 +280,7 @@ deploy:
       memory: 2G
 ```
 
-**Ngoại lệ nặng về CPU duy nhất là việc mã hóa lại video.** Các thao tác sao chép luồng (cắt, tắt tiếng, remux container) diễn ra tức thời, nhưng chuyển mã sang một codec khác thì phụ thuộc vào CPU. Một clip 1080p / 45 giây được mã hóa lại sang VP9 (WebM) mất khoảng **~40 giây** trên một CPU hiện đại nhanh, ~45 giây trên Apple Silicon, ~80 giây trên một CPU di động 4 nhân cũ hơn, và **~130 giây** trên một máy chủ 4 nhân cũ hơn. Nếu khối lượng công việc của bạn thiên về video, hãy ưu tiên số nhân CPU và tốc độ xung nhịp, hoặc nâng giới hạn `cpus:` của container, bản compose đi kèm mặc định giới hạn ứng dụng ở 4 nhân (8 nhân trên bản compose có GPU).
+**Ngoại lệ duy nhất tốn nhiều CPU là mã hóa lại video.** Các thao tác sao chép luồng (cắt, tắt tiếng, remux container) diễn ra tức thì, nhưng chuyển mã sang codec khác bị giới hạn bởi CPU. Một clip 1080p / 45 giây được mã hóa lại sang VP9 (WebM) mất khoảng **~40 giây** trên CPU hiện đại nhanh, ~45 giây trên Apple Silicon, ~80 giây trên laptop 4 nhân đời cũ và **~130 giây** trên máy chủ 4 nhân đời cũ. Nếu khối lượng công việc thiên về video, hãy ưu tiên số nhân CPU và xung nhịp, hoặc nâng giới hạn `cpus:` của container: compose được cung cấp mặc định giới hạn ứng dụng ở 4 nhân (8 trên compose GPU).
 
 ### Khuyến nghị (công cụ AI trên CPU) {#recommended-ai-tools-on-cpu}
 
@@ -264,44 +288,45 @@ deploy:
 |---|---|
 | CPU | 4 nhân |
 | RAM | 4 GB |
-| Disk | 3 GB (hình ảnh) + khoảng 20 GB (tất cả các gói AI tùy chọn) + không gian làm việc |
-| GPU | Không bắt buộc (dự phòng CPU) |
+| Ổ đĩa | 3 GB (image) + khoảng 20 GB (toàn bộ gói AI tùy chọn) + không gian làm việc |
+| GPU | Không bắt buộc (dự phòng bằng CPU) |
 
-**Cài đặt và chạy các gói AI lớn hơn là điều đẩy khuyến nghị lên 4 GB RAM.** Khi không cài đặt gói tùy chọn nào, ứng dụng sẽ không hoạt động khoảng 360 MB. Các công cụ Python cũ dùng chung sidecar, trong khi OCR chính xác sử dụng dispatcher chuyên dụng có thời gian tồn tại lâu dài được ghim vào thế hệ bất biến đang hoạt động. Trước khi kích hoạt, trình cài đặt chạy smoke test trên ứng viên. Sau đó, nó tự động chuyển sang dispatcher mới và tiêu hao dispatcher trước đó trước garbage collection. Mọi tạo phẩm OCR chính xác chính thức phải chuyển release suite trong trường hợp xấu nhất của nó bên trong 4 GiB cgroup, trong khi đề xuất máy chủ 4 GB để lại khoảng trống cho ứng dụng Node.js, Postgres, Redis, hàng đợi và công việc đồng thời.
+**Việc cài đặt và chạy các gói AI lớn hơn là lý do khuyến nghị lên 4 GB RAM.** Khi không cài gói tùy chọn nào, ứng dụng ở trạng thái nghỉ vào khoảng 360 MB. Các công cụ Python cũ dùng chung một sidecar, còn OCR chính xác dùng một dispatcher chạy lâu dài riêng, gắn với generation bất biến đang hoạt động. Trước khi kích hoạt, trình cài đặt chạy smoke test trên bản ứng viên. Sau đó nó chuyển nguyên tử sang dispatcher mới và xả dispatcher trước đó trước khi thu gom rác. Mọi artifact OCR chính xác chính thức phải vượt qua bộ kiểm thử trường hợp xấu nhất của bản phát hành trong một cgroup 4 GiB, trong khi mức khuyến nghị 4 GB cho máy chủ để lại khoảng dư cho ứng dụng Node.js, Postgres, Redis, các hàng đợi và công việc đồng thời.
 
-Hầu hết các công cụ AI hoàn toàn dùng được trên CPU; một vài công cụ thực sự cần GPU. Được đo trên một CPU 4 nhân hiện đại:
+Hầu hết công cụ AI dùng tốt trên CPU; một vài công cụ thực sự cần GPU. Đo trên CPU 4 nhân hiện đại:
 
-| Công cụ AI | Thời gian CPU | Dùng được trên CPU? |
+| Công cụ AI | Thời gian trên CPU | Dùng được trên CPU? |
 |---|---|---|
-| Phát hiện khuôn mặt (làm mờ khuôn mặt, cắt thông minh, mắt đỏ), khử nhiễu | dưới 1 giây | Có |
-| OCR, phiên âm, phụ đề | 1-3 giây | Có |
-| Tô màu, cải thiện khuôn mặt | ~10 giây | Có |
-| Xóa / thay thế / làm mờ nền | ~29 giây | Có (bạn sẽ phải chờ) |
-| Nâng cấp độ phân giải AI (RealESRGAN) | ~33 giây với ảnh nhỏ; vài phút với ảnh lớn | Ở mức tối thiểu, rất khuyến nghị dùng GPU |
-| Phục hồi ảnh (toàn bộ pipeline) | vài phút | Không, cần GPU hoặc một CPU nhiều nhân nhanh |
+| Nhận diện khuôn mặt (blur-faces, smart-crop, red-eye), noise-removal | dưới 1 giây | Có |
+| OCR, transcription, phụ đề | 1-3 giây | Có |
+| Colorize, cải thiện khuôn mặt | ~10 giây | Có |
+| Xóa / thay / làm mờ nền | ~29 giây | Có (bạn sẽ phải chờ) |
+| Phóng to bằng AI (RealESRGAN) | ~33 giây với ảnh nhỏ; nhiều phút với ảnh lớn | Tạm được - rất nên dùng GPU |
+| Khôi phục ảnh (toàn bộ quy trình) | vài phút | Không - cần GPU hoặc CPU nhiều nhân nhanh |
 
-SnapOtter cố ý không nhúng sẵn các bản tải mô hình này vào image Docker. Các bundle AI chỉ được kéo về khi một quản trị viên bật công cụ liên quan, được lưu trong volume `/data/ai` bền vững, và được chia sẻ bởi mọi công cụ phụ thuộc vào cùng một ngăn xếp mô hình. Điều này giữ cho image container cuối cùng nhỏ gọn trong khi vẫn cho phép một bản cài đặt AI đầy đủ đạt tới các con số lưu trữ lớn hơn bên dưới.
+SnapOtter chủ ý không đưa các bản tải mô hình này vào image Docker. Các gói AI chỉ được kéo về khi quản trị viên bật công cụ liên quan, được lưu trong volume `/data/ai` bền vững và được chia sẻ cho mọi công cụ phụ thuộc vào cùng một bộ mô hình. Cách này giữ image container cuối cùng nhỏ gọn mà vẫn cho phép một bản cài AI đầy đủ đạt đến các mức dung lượng lớn hơn bên dưới.
 
-Một số công cụ phụ thuộc vào nhiều hơn một bundle được chia sẻ. Ví dụ, Ảnh Hộ chiếu cần cả `background-removal` và `face-detection`; nếu `background-removal` đã được cài đặt, việc bật Ảnh Hộ chiếu chỉ tải về bundle `face-detection` còn thiếu. Việc tái sử dụng tương tự áp dụng cho tất cả các công cụ AI.
+Một số công cụ phụ thuộc vào nhiều hơn một gói dùng chung. Ví dụ, Passport Photo cần cả `background-removal` và `face-detection`; nếu `background-removal` đã được cài, việc bật Passport Photo chỉ tải gói `face-detection` còn thiếu. Cơ chế tái sử dụng này áp dụng cho mọi công cụ AI.
 
-Ước tính dung lượng gói AI tùy chọn:
+Dung lượng lưu trữ gói AI tùy chọn và ngưỡng bộ nhớ CPU (SnapOtter kiểm tra bộ nhớ khả dụng trước khi điều phối sang Python sidecar và từ chối ngay các lần chạy dưới ngưỡng bộ nhớ trống của gói):
 
-| Bundle | Dung lượng ổ đĩa |
-|---|---|
-| Xóa nền | 4-5 GB |
-| Nâng cấp độ phân giải + Cải thiện khuôn mặt + Khử nhiễu | 5-6 GB |
-| Phát hiện khuôn mặt | 200-300 MB |
-| Tẩy đối tượng + Tô màu | 1-2 GB |
-| OCR chính xác (`balanced`/`best`) | ~208-234 Tải xuống MiB / ~409-488 MiB đã cài đặt |
-| Phục hồi ảnh | 4-5 GB |
-| Phiên âm | ~600 MB |
-| **Tất cả các gói** | **Đã cài đặt ~20 GB** |
+| Gói | Dung lượng đĩa | Ngưỡng bộ nhớ CPU |
+|---|---|---|
+| Nhận diện khuôn mặt | 200-300 MB | 2 GB RAM máy chủ (~0.5 GB trống) |
+| Transcription | ~600 MB | 4 GB RAM máy chủ (~2 GB trống) |
+| Object eraser + Colorize | 1-2 GB | 4 GB RAM máy chủ (~2 GB trống) |
+| OCR chính xác (`balanced`/`best`) | tải về ~208-234 MiB / sau cài ~409-488 MiB | 4 GiB bộ nhớ hiệu dụng được cấu hình (`fast` chạy được trên 2 GB) |
+| Xóa nền | 4-5 GB | 4 GB RAM máy chủ (~2.5 GB trống) |
+| Upscale + Face enhance + Noise removal | 5-6 GB | 4 GB RAM máy chủ (~2.5 GB trống) |
+| Khôi phục ảnh | 4-5 GB | 4 GB RAM máy chủ (~3 GB trống) |
+| Inpainting chất lượng cao (`inpaint-hq`) | 5-7 GB | 8 GB RAM máy chủ (~6 GB trống) |
+| **Tất cả các gói** | **~25 GB sau khi cài** | **4 GB (8 GB với `inpaint-hq`)** |
 
-OCR nhanh được tích hợp vào hình ảnh thông qua Tesseract, bổ sung khoảng 25 MiB và không yêu cầu gói OCR tùy chọn hoặc yêu cầu bộ nhớ 4 GiB của nó. Gói chính xác có sẵn trong chính thức Linux  amd64 Và arm64 container và chạy ONNX Runtime TRÊN CPU. Các máy chủ NVIDIA sử dụng cùng thời gian chạy CPU OCR, vì vậy OCR không phụ thuộc vào phiên bản CUDA hoặc kiến ​​trúc GPU. Thời gian chạy chính xác yêu cầu ít nhất 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của vùng chứa được định cấu hình, nếu không thì bộ nhớ máy chủ. SnapOtter từ chối các hệ thống dưới mức tương thích tối thiểu đã được ký trước khi tải xuống gói. Việc cài đặt gói chính xác cũng bị từ chối trên bare-metal/các kho lưu trữ dựng sẵn mà libc và Python ABI không được đảm bảo.
+Fast OCR được tích hợp sẵn trong image thông qua Tesseract, thêm khoảng 25 MiB và không yêu cầu gói OCR tùy chọn hay yêu cầu bộ nhớ 4 GiB của nó. Fast hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`) hay tiếng Ả Rập (`ar`). Cả hai dùng `balanced` hoặc `best` nên yêu cầu gói chính xác. Gói chính xác có trong các container Linux amd64 và arm64 chính thức và chạy ONNX Runtime trên CPU. Máy chủ NVIDIA dùng cùng runtime OCR trên CPU đó, nên OCR không phụ thuộc vào phiên bản CUDA hay kiến trúc GPU. Runtime chính xác yêu cầu tối thiểu 4 GiB bộ nhớ hiệu dụng: giới hạn cgroup của container được cấu hình, nếu không thì là bộ nhớ máy chủ. SnapOtter từ chối các hệ thống dưới mức tối thiểu tương thích đã ký đó trước khi tải gói. Việc cài gói chính xác cũng bị từ chối trên các bản lưu trữ bare-metal/dựng sẵn mà libc và Python ABI không thể được đảm bảo. Trên các máy chủ không được hỗ trợ này, OCR tiếng Hàn và tiếng Ả Rập trả về lỗi không tương thích rõ ràng và không bao giờ âm thầm quay về Fast. Một yêu cầu Fast tường minh cho tiếng Hàn trả về `FEATURE_INCOMPATIBLE` với lý do `fast-korean-unsupported` trước khi tác vụ được đưa vào hàng đợi.
 
-Các bản sao dùng chung `DATA_DIR` phải sử dụng cùng một kiến trúc CPU; hãy ghim các triển khai nhiều bản sao vào các nút tương thích bằng node affinity. Các bản sao hỗn hợp amd64/arm64 cần có các volume dữ liệu riêng biệt và các bản triển khai SnapOtter độc lập.
+Các bản sao dùng chung `DATA_DIR` phải có cùng kiến trúc CPU; hãy ghim các triển khai nhiều bản sao bằng node affinity. Các bản sao amd64/arm64 hỗn hợp cần volume dữ liệu riêng và các triển khai SnapOtter độc lập.
 
-Thời gian chạy chính xác giúp duy trì một thế hệ hoạt động và xóa bộ đệm tải xuống sau khi kích hoạt. Đối với bản phát hành này, lần cài đặt đầu tiên tạm thời cần khoảng 620-720 MiB cho kho lưu trữ cộng với dàn dựng và bản nâng cấp có thể đạt đỉnh gần 1,2 GiB trong khi thế hệ cũ vẫn hoạt động. Trình cài đặt tính toán yêu cầu chính xác từ chỉ mục đã ký và các thế hệ hiện tại trước khi tải xuống hoặc giải nén và sẽ sớm bị lỗi nếu khối lượng dữ liệu quá nhỏ.
+Runtime chính xác giữ một generation hoạt động và xóa bộ nhớ đệm tải về sau khi kích hoạt. Với bản phát hành này, lần cài đầu tiên tạm thời cần khoảng 620-720 MiB cho kho lưu trữ cộng với vùng staging, và một lần nâng cấp có thể đạt đỉnh gần 1.2 GiB trong khi generation cũ vẫn đang hoạt động. Trình cài đặt tính chính xác dung lượng cần thiết từ chỉ mục đã ký và các generation hiện tại trước khi tải hoặc giải nén, và báo lỗi sớm nếu volume dữ liệu quá nhỏ.
 
 ```yaml
 deploy:
@@ -315,28 +340,28 @@ deploy:
 
 | Tài nguyên | Yêu cầu |
 |---|---|
-| CPU | 6-8 nhân (chuẩn bị video + đồng thời chạy trên CPU ngay cả với AI trên GPU) |
+| CPU | 6-8 nhân (chuẩn bị video và xử lý đồng thời chạy trên CPU ngay cả khi AI chạy trên GPU) |
 | RAM | 8 GB |
 | GPU | NVIDIA với 8+ GB VRAM (khuyến nghị 12 GB) |
-| Ổ đĩa | tổng ~35 GB |
+| Ổ đĩa | ~35 GB tổng cộng |
 
-Một GPU NVIDIA (CUDA) tăng tốc đáng kể các mô hình AI nặng. Được đo trên RTX 4070 so với một CPU hiện đại:
+GPU NVIDIA (CUDA) tăng tốc đáng kể các mô hình AI nặng. Đo trên RTX 4070 so với một CPU hiện đại:
 
-| Công cụ AI | Tăng tốc với GPU | Ghi chú |
+| Công cụ AI | Mức tăng tốc với GPU | Ghi chú |
 |---|---|---|
-| Nâng cấp độ phân giải AI (RealESRGAN 2×) | **~47×** | Lợi ích lớn nhất, dưới một giây so với ~33 giây (vài phút với ảnh lớn) |
+| Phóng to bằng AI (RealESRGAN 2×) | **~47×** | Lợi ích lớn nhất - dưới một giây so với ~33 giây (nhiều phút với ảnh lớn) |
 | Cải thiện khuôn mặt (CodeFormer) | **~12×** | ~0.9 giây so với ~11 giây |
-| Phiên âm (Whisper) | ~4.5× | |
-| Xóa / thay thế / làm mờ nền | ~4× | ~7 giây trên GPU so với ~29 giây trên CPU |
-| Tô màu | ~1.8× | |
-| OCR, phát hiện khuôn mặt, mắt đỏ, khử nhiễu | ~1× | Đã nhanh trên CPU, GPU không giúp ích |
-| Phục hồi ảnh | không | Phụ thuộc CPU ngay cả trên GPU (0% mức sử dụng GPU); một CPU nhanh quan trọng hơn GPU ở đây |
+| Transcription (Whisper) | ~4.5× | |
+| Xóa / thay / làm mờ nền | ~4× | ~7 giây trên GPU so với ~29 giây trên CPU |
+| Colorize | ~1.8× | |
+| OCR, nhận diện khuôn mặt, red-eye, noise-removal | ~1× | Đã nhanh trên CPU - GPU không giúp ích |
+| Khôi phục ảnh | không | Bị giới hạn bởi CPU ngay cả trên GPU (0% sử dụng GPU); CPU nhanh quan trọng hơn GPU ở đây |
 
-Các công cụ đáng dùng GPU là **nâng cấp độ phân giải, cải thiện khuôn mặt, phiên âm, và xóa nền**. Phát hiện khuôn mặt, OCR, và mắt đỏ phụ thuộc CPU và đã nhanh, nên GPU không thêm gì.
+Các công cụ đáng dùng GPU là **upscale, cải thiện khuôn mặt, transcription và xóa nền**. Nhận diện khuôn mặt, OCR và red-eye bị giới hạn bởi CPU và đã nhanh sẵn, nên GPU không bổ sung gì.
 
-Mức sử dụng VRAM đỉnh đạt 7.5 GB trong quá trình nâng cấp độ phân giải kèm cải thiện khuôn mặt. Một GPU NVIDIA 6 GB dùng được cho hầu hết các công cụ AI riêng lẻ nhưng sẽ thất bại khi nâng cấp độ phân giải. VRAM 8-12 GB xử lý được mọi thứ.
+Mức dùng VRAM đỉnh đạt 7.5 GB khi upscale kèm cải thiện khuôn mặt. GPU NVIDIA 6 GB hoạt động với hầu hết công cụ AI khi dùng riêng lẻ nhưng sẽ thất bại ở upscale. VRAM 8-12 GB xử lý được mọi thứ.
 
-Việc tăng tốc iGPU của Intel/AMD thông qua VA-API, Quick Sync, hoặc OpenCL hiện chưa được hỗ trợ cho suy luận AI. Ánh xạ `/dev/dri` vào container không kích hoạt tăng tốc AI trên GPU; SnapOtter sẽ chạy các công cụ AI trên CPU trừ khi có sẵn NVIDIA CUDA.
+Hiện chưa hỗ trợ tăng tốc iGPU Intel/AMD qua VA-API, Quick Sync hoặc OpenCL cho suy luận AI. Việc ánh xạ `/dev/dri` vào container không bật tăng tốc GPU cho AI; SnapOtter sẽ chạy các công cụ AI trên CPU trừ khi có NVIDIA CUDA.
 
 ```yaml
 deploy:
@@ -353,47 +378,47 @@ deploy:
 
 ### Người dùng đồng thời {#concurrent-users}
 
-Các yêu cầu thay đổi kích thước hình ảnh song song đối với container ứng dụng bị giới hạn 4 nhân mặc định:
+Các yêu cầu đổi kích thước ảnh song song với container ứng dụng mặc định giới hạn 4 nhân:
 
-| Yêu cầu đồng thời | Thời gian phản hồi trung bình | Lỗi |
+| Số yêu cầu đồng thời | Thời gian phản hồi trung bình | Lỗi |
 |---|---|---|
-| 1 | 0.4 giây | 0 |
-| 5 | 1.2 giây | 0 |
-| 10 | 2.1 giây | 0 |
+| 1 | 0.4s | 0 |
+| 5 | 1.2s | 0 |
+| 10 | 2.1s | 0 |
 
-Thời gian phản hồi suy giảm dưới tuyến tính mà không có lỗi khi nhóm worker bão hòa. Nâng giới hạn `cpus:` của container ứng dụng (hoặc dùng một host có nhiều nhân hơn) nâng trần lên. Lưu ý rằng các tác vụ nặng (chuyển mã video, AI trên CPU) giữ một worker suốt toàn bộ thời lượng, nên hãy cân đối CPU theo số lượng tác vụ nặng đồng thời dự kiến, không chỉ theo số lượng yêu cầu.
+Thời gian phản hồi tăng dưới tuyến tính và không có lỗi khi nhóm worker bão hòa. Nâng giới hạn `cpus:` của container ứng dụng (hoặc dùng máy chủ có nhiều nhân hơn) sẽ nâng trần này. Lưu ý rằng các tác vụ nặng (chuyển mã video, AI trên CPU) giữ một worker trong suốt thời gian chạy, nên hãy định cỡ CPU theo số tác vụ nặng đồng thời dự kiến, không chỉ theo số yêu cầu.
 
-### Định dạng hình ảnh được hỗ trợ {#supported-image-formats}
+### Định dạng ảnh được hỗ trợ {#supported-image-formats}
 
-SnapOtter hỗ trợ **55+ định dạng đầu vào** và **14 định dạng đầu ra**, bao gồm các tập tin RAW từ hơn 20 thương hiệu máy ảnh, các định dạng chuyên nghiệp (PSD, EPS, OpenEXR, HDR), các codec hiện đại (JPEG XL, AVIF, HEIC, QOI), và các định dạng khoa học/game (FITS, DDS).
+SnapOtter hỗ trợ **55+ định dạng đầu vào** và **14 định dạng đầu ra**, gồm tệp RAW từ hơn 20 hãng máy ảnh, các định dạng chuyên nghiệp (PSD, EPS, OpenEXR, HDR), các codec hiện đại (JPEG XL, AVIF, HEIC, QOI) và các định dạng khoa học/game (FITS, DDS).
 
-Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để biết chi tiết về mọi định dạng được hỗ trợ, bộ giải mã được dùng, và các tùy chọn kiểm soát chất lượng có sẵn.
+Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để biết chi tiết về từng định dạng được hỗ trợ, bộ giải mã được dùng và các tùy chọn chất lượng khả dụng.
 
 ### Hạn chế đã biết {#known-limitations}
 
-- **Thay đổi kích thước nhận biết nội dung** bị lỗi trên các ảnh lớn (>5 MP) do một hạn chế trong binary caire. Hoạt động tốt với ảnh nhỏ hơn.
-- **Giải mã HEIF** mất 13-23 giây. HEIC (biến thể của Apple) nhanh hơn nhiều ở mức 0.3-0.9 giây.
-- **Nâng cấp độ phân giải** hết thời gian chờ trên CPU với bất cứ thứ gì vượt quá ảnh nhỏ. Cần GPU để dùng thực tế.
-- **Cải thiện khuôn mặt CodeFormer** chậm hơn đáng kể so với GFPGAN (53 giây so với 2 giây trên GPU). GFPGAN được khuyến nghị cho hầu hết các trường hợp sử dụng.
+- **Content-aware resize** bị crash với ảnh lớn (>5 MP) do hạn chế của binary caire. Hoạt động bình thường với ảnh nhỏ hơn.
+- **Giải mã HEIF** mất 13-23 giây. HEIC (biến thể của Apple) nhanh hơn nhiều, ở mức 0.3-0.9 giây.
+- **Upscale** bị hết thời gian chờ trên CPU với mọi ảnh lớn hơn ảnh nhỏ. Cần GPU để dùng thực tế.
+- Cải thiện khuôn mặt bằng **CodeFormer** chậm hơn đáng kể so với GFPGAN (53 giây so với 2 giây trên GPU). GFPGAN được khuyến nghị cho hầu hết trường hợp.
 
 ## Volume {#volumes}
 
 | Mount / Volume | Mục đích | Bắt buộc? |
 |---|---|---|
-| `/data` (app) | Mô hình AI, venv Python, tập tin người dùng | **Có**, mất tập tin nếu thiếu |
-| `/tmp/workspace` (app) | Tập tin xử lý tạm thời (tự động dọn dẹp) | Khuyến nghị |
-| `SnapOtter-pgdata` (postgres) | Thư mục dữ liệu PostgreSQL (người dùng, cài đặt, pipeline, tác vụ) | **Có**, mất dữ liệu nếu thiếu |
-| `SnapOtter-redisdata` (redis) | Tập tin append-only của Redis cho hàng đợi tác vụ bền vững | Khuyến nghị |
+| `/data` (app) | Mô hình AI, Python venv, tệp người dùng | **Có** - mất tệp nếu thiếu |
+| `/tmp/workspace` (app) | Tệp xử lý tạm thời (tự động dọn) | Khuyến nghị |
+| `SnapOtter-pgdata` (postgres) | Thư mục dữ liệu PostgreSQL (người dùng, cài đặt, pipeline, tác vụ) | **Có** - mất dữ liệu nếu thiếu |
+| `SnapOtter-redisdata` (redis) | Tệp append-only của Redis cho hàng đợi tác vụ bền vững | Khuyến nghị |
 
 ### Bind mount so với named volume {#bind-mounts-vs-named-volumes}
 
-**Named volume** (khuyến nghị), Docker tự động quản lý quyền:
+**Named volume** (khuyến nghị) - Docker tự quản lý quyền:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount**, bạn quản lý quyền. Đặt `PUID`/`PGID` khớp với người dùng host của bạn:
+**Bind mount** - Bạn tự quản lý quyền. Đặt `PUID`/`PGID` khớp với người dùng trên máy chủ của bạn:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -404,13 +429,13 @@ environment:
 
 ### Quyền lưu trữ {#storage-permissions}
 
-SnapOtter ghi vào hai vị trí khi chạy: `/data` (tập tin người dùng, log, mô hình AI và venv Python) và `/tmp/workspace` (không gian tạm cho xử lý). Cả hai đều phải cho phép ghi bởi người dùng mà container chạy dưới danh nghĩa. Nếu một trong hai không cho phép, container **thất bại sớm khi khởi động** với một thông báo nêu tên thư mục, UID/GID đang chạy, và cách khắc phục, thay vì khởi động ở trạng thái "healthy" rồi thất bại ở lần tải lên đầu tiên với một lỗi khó hiểu.
+SnapOtter ghi vào hai vị trí khi chạy: `/data` (tệp người dùng, nhật ký, mô hình AI và Python venv) và `/tmp/workspace` (vùng đệm xử lý tạm thời). Cả hai phải ghi được bởi người dùng mà container chạy dưới danh nghĩa đó. Nếu không, container sẽ **báo lỗi ngay khi khởi động** với thông báo nêu tên thư mục, UID/GID đang chạy và cách khắc phục, thay vì khởi động ở trạng thái "healthy" rồi thất bại ở lần tải lên đầu tiên với một lỗi khó hiểu. Thư mục nhật ký (`LOG_DIR`, `/data/logs` trong image) được kiểm tra theo cách tương tự, ở mọi chế độ lưu trữ, vì nhật ký luôn nằm cục bộ ngay cả khi tệp nằm trên S3.
 
-Cách quyền được xử lý phụ thuộc vào cách container được khởi chạy:
+Cách xử lý quyền phụ thuộc vào cách container được khởi chạy:
 
-**Mặc định (khởi động dưới danh nghĩa root, hạ xuống `snapotter`)**, entrypoint khởi động dưới danh nghĩa root, sửa quyền sở hữu của các volume đã mount, rồi hạ xuống người dùng không đặc quyền `snapotter` thông qua `gosu`. Named volume hoạt động mà không cần cấu hình. Với bind mount, đặt `PUID`/`PGID` thành người dùng host của bạn (ở trên) để các tập tin nó ghi thuộc sở hữu của bạn.
+**Mặc định (khởi động bằng root, hạ xuống `snapotter`)** - entrypoint khởi động bằng root, sửa quyền sở hữu của các volume được mount, rồi hạ xuống người dùng không đặc quyền `snapotter` qua `gosu`. Named volume hoạt động mà không cần cấu hình. Với bind mount, hãy đặt `PUID`/`PGID` theo người dùng trên máy chủ của bạn (ở trên) để các tệp nó ghi thuộc quyền sở hữu của bạn.
 
-**Kubernetes / OpenShift (không phải root thông qua `runAsUser`)**, được khởi chạy trực tiếp dưới danh nghĩa người dùng không phải root, container không thể tự chown các volume, nên orchestrator phải làm cho chúng có thể ghi được. Đặt `fsGroup`:
+**Kubernetes / OpenShift (không phải root qua `runAsUser`)** - được khởi chạy trực tiếp bằng người dùng không phải root, container không thể tự chown các volume, nên bộ điều phối phải làm cho chúng ghi được. Đặt `fsGroup`:
 
 ```yaml
 securityContext:
@@ -419,45 +444,45 @@ securityContext:
   fsGroup: 999        # makes mounted volumes writable by the pod
 ```
 
-Các thư mục có thể ghi của image thuộc quyền sở hữu nhóm GID 0 và cho phép nhóm ghi, nên một pod chạy với một **UID tùy ý** cộng với nhóm bổ sung root (mặc định của OpenShift) có thể ghi mà không cần `chown`.
+Các thư mục ghi được của image thuộc nhóm GID 0 và có quyền ghi cho nhóm, vì vậy một pod chạy với **UID tùy ý** cùng nhóm phụ root (mặc định của OpenShift) có thể ghi mà không cần `chown`.
 
-**TrueNAS Scale (và các thiết lập "UID lạ" khác)**, TrueNAS chạy các ứng dụng dưới danh nghĩa một người dùng không phải root (thường là `568:568`) và mount các dataset host thuộc sở hữu của một người dùng khác, nên cả entrypoint lẫn `fsGroup` đều không tự làm cho chúng có thể ghi được. Hãy chọn một trong các cách:
+**TrueNAS Scale (và các thiết lập "UID lạ" khác)** - TrueNAS chạy ứng dụng bằng người dùng không phải root (thường là `568:568`) và mount các dataset của máy chủ thuộc về một người dùng khác, nên cả entrypoint lẫn `fsGroup` đều không tự làm cho chúng ghi được. Hãy chọn một trong các cách sau:
 
-- **Chạy ứng dụng dưới danh nghĩa root** (khuyến nghị), để trống người dùng của ứng dụng hoặc đặt thành `0`, và để entrypoint mặc định sửa quyền và hạ xuống `snapotter`.
-- **Chạy dưới danh nghĩa UID `999`**, đặt người dùng/nhóm của ứng dụng thành `999:999` (người dùng `snapotter` tích hợp sẵn của SnapOtter) để nó khớp với quyền sở hữu của image.
-- **`chown` dataset host** thành UID mà container chạy dưới danh nghĩa đó, từ shell TrueNAS:
+- **Chạy ứng dụng bằng root** (khuyến nghị) - để trống người dùng của ứng dụng hoặc đặt thành `0`, và để entrypoint mặc định sửa quyền rồi hạ xuống `snapotter`.
+- **Chạy với UID `999`** - đặt người dùng/nhóm của ứng dụng thành `999:999` (người dùng `snapotter` có sẵn của SnapOtter) để khớp với quyền sở hữu của image.
+- **`chown` dataset của máy chủ** sang UID mà container chạy, từ shell của TrueNAS:
 
   ```bash
-  # Dùng UID từ lỗi khi khởi động (hoặc chạy `id` bên trong container)
+  # Use the UID from the startup error (or run `id` inside the container)
   chown -R 568:568 /mnt/<pool>/<dataset>
   ```
 
-Lỗi khi khởi động nêu tên chính xác UID cần dùng, nên con đường nhanh nhất là khởi động ứng dụng một lần, đọc thông báo, rồi `chown` (hoặc điều chỉnh người dùng) cho phù hợp.
+Lỗi khi khởi động nêu chính xác UID cần dùng, nên cách nhanh nhất là khởi động ứng dụng một lần, đọc thông báo, rồi `chown` (hoặc điều chỉnh người dùng) cho phù hợp.
 
 ## Biến môi trường {#environment-variables}
 
 | Biến | Mặc định | Mô tả |
 |---|---|---|
 | `AUTH_ENABLED` | `true` | Bật/tắt yêu cầu đăng nhập |
-| `DEFAULT_USERNAME` | `admin` | Tên người dùng quản trị ban đầu |
-| `DEFAULT_PASSWORD` | `admin` | Mật khẩu quản trị ban đầu (buộc đổi ở lần đăng nhập đầu tiên) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (không giới hạn) | Giới hạn tải lên trên mỗi tập tin tính bằng MB. Image xuất xưởng với `0`; bản dựng từ mã nguồn bắt đầu ở 100 |
-| `MAX_BATCH_SIZE` | `0` (không giới hạn) | Số tập tin tối đa mỗi yêu cầu lô. Image xuất xưởng với `0`; bản dựng từ mã nguồn bắt đầu ở 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu API mỗi phút trên mỗi IP (đặt 0 để tắt) |
+| `DEFAULT_USERNAME` | `admin` | Tên người dùng quản trị viên ban đầu |
+| `DEFAULT_PASSWORD` | `admin` | Mật khẩu quản trị viên ban đầu (bắt buộc đổi ở lần đăng nhập đầu tiên) |
+| `MAX_UPLOAD_SIZE_MB` | `0` (không giới hạn) | Giới hạn tải lên theo từng tệp, tính bằng MB. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
+| `MAX_BATCH_SIZE` | `0` (không giới hạn) | Số tệp tối đa cho mỗi yêu cầu theo lô. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
+| `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu API mỗi phút cho mỗi IP (đặt 0 để tắt) |
 | `MAX_USERS` | `0` (không giới hạn) | Số tài khoản người dùng tối đa |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Mặc định chỉ các mạng riêng |
-| `PUID` | `999` | Chạy dưới danh nghĩa UID này (cho quyền bind mount) |
-| `PGID` | `999` | Chạy dưới danh nghĩa GID này (cho quyền bind mount) |
-| `LOG_LEVEL` | `info` | Mức độ chi tiết của log: fatal, error, warn, info, debug, trace |
+| `PUID` | `999` | Chạy với UID này (cho quyền bind mount) |
+| `PGID` | `999` | Chạy với GID này (cho quyền bind mount) |
+| `LOG_LEVEL` | `info` | Mức độ chi tiết của nhật ký: fatal, error, warn, info, debug, trace |
 | `CONCURRENT_JOBS` | `0` (tự động) | Số tác vụ xử lý AI song song tối đa |
-| `SESSION_DURATION_HOURS` | `168` | Thời gian sống của phiên đăng nhập (7 ngày) |
-| `CORS_ORIGIN` | (rỗng) | Danh sách origin được phép, phân tách bằng dấu phẩy, hoặc để rỗng cho same-origin |
+| `SESSION_DURATION_HOURS` | `168` | Thời hạn phiên đăng nhập (7 ngày) |
+| `CORS_ORIGIN` | (trống) | Danh sách origin được phép, phân tách bằng dấu phẩy, hoặc để trống để chỉ cho cùng origin |
 
-### Proxy gửi đi và CA riêng tư {#outbound-proxy-and-private-ca}
+### Proxy đi ra và CA riêng {#outbound-proxy-and-private-ca}
 
-Vùng chứa chính thức cho phép hỗ trợ proxy môi trường của Node. Nếu SnapOtter phải truy cập kho lưu trữ thời gian chạy OCR hoặc các dịch vụ HTTPS khác thông qua proxy công ty, hãy đặt `HTTPS_PROXY` (và `HTTP_PROXY` khi cần). Đặt `NO_PROXY` thành danh sách máy chủ được phân tách bằng dấu phẩy phải truy cập trực tiếp, chẳng hạn như Postgres, Redis và bộ lưu trữ đối tượng nội bộ.
+Container chính thức bật hỗ trợ proxy theo biến môi trường của Node. Nếu SnapOtter phải truy cập kho runtime OCR hoặc các dịch vụ HTTPS khác qua proxy của doanh nghiệp, hãy đặt `HTTPS_PROXY` (và `HTTP_PROXY` khi cần). Đặt `NO_PROXY` thành danh sách các host phân tách bằng dấu phẩy cần được truy cập trực tiếp, chẳng hạn Postgres, Redis và object storage nội bộ.
 
-Nếu proxy hoặc dịch vụ nội bộ được cơ quan cấp chứng chỉ riêng ký, hãy gắn chứng chỉ CA ở chế độ chỉ đọc và trỏ `NODE_EXTRA_CA_CERTS` vào chứng chỉ đó. Tệp phải tồn tại khi quá trình Node bắt đầu:
+Nếu proxy hoặc một dịch vụ nội bộ được ký bởi một tổ chức phát hành chứng chỉ riêng, hãy mount chứng chỉ CA ở chế độ chỉ đọc và trỏ `NODE_EXTRA_CA_CERTS` tới nó. Tệp phải tồn tại khi tiến trình Node khởi động:
 
 ```yaml
 services:
@@ -471,11 +496,11 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-Giữ thông tin xác thực proxy bên ngoài tệp Compose (ví dụ: trong tệp `.env` được bảo vệ hoặc bí mật). Không tắt xác minh TLS: chỉ mục OCR đã ký xác thực siêu dữ liệu phát hành, trong khi xác thực TLS thông thường vẫn bảo vệ việc truyền tải và mọi yêu cầu gửi đi khác.
+Hãy giữ thông tin xác thực của proxy bên ngoài tệp Compose (ví dụ trong một tệp `.env` được bảo vệ hoặc một secret). Không tắt xác minh TLS: chỉ mục OCR đã ký xác thực siêu dữ liệu bản phát hành, còn việc xác thực TLS thông thường vẫn bảo vệ đường truyền và mọi yêu cầu đi ra khác.
 
 ## Kiểm tra sức khỏe {#health-check}
 
-Container bao gồm một health check tích hợp sẵn:
+Container có sẵn health check tích hợp:
 
 ```bash
 # Check container health status
@@ -488,23 +513,23 @@ curl http://localhost:1349/api/v1/health
 
 ## Reverse Proxy {#reverse-proxy}
 
-`TRUST_PROXY` mặc định là `loopback,linklocal,uniquelocal`, nên SnapOtter chỉ tin `X-Forwarded-For` khi nó đến từ một peer thuộc mạng riêng. Một reverse proxy trên cùng máy chủ, trên mạng Docker hoặc trong mạng LAN của bạn được tin cậy ngay từ đầu, nghĩa là việc giới hạn tần suất, bộ hạn chế dò mật khẩu khi đăng nhập, nhật ký kiểm toán và danh sách IP được phép của bản enterprise đều thấy IP thật của client mà không cần cấu hình gì.
+`TRUST_PROXY` mặc định là `loopback,linklocal,uniquelocal`, nên SnapOtter chỉ tin `X-Forwarded-For` từ một peer nằm trên mạng riêng. Reverse proxy trên cùng máy chủ, trên một mạng Docker hoặc trên LAN của bạn được tin cậy ngay từ đầu, nghĩa là giới hạn tốc độ, bộ giới hạn brute-force đăng nhập, nhật ký kiểm toán và danh sách IP cho phép của bản enterprise đều thấy IP thật của client mà không cần cấu hình.
 
-Chỉ đặt `TRUST_PROXY=true` khi proxy phía trước tiếp cận SnapOtter từ một địa chỉ **công khai**, chẳng hạn một bộ cân bằng tải trên đám mây nằm ở mạng khác. Trên một thực thể phơi ra trực tiếp, giá trị đó khiến `request.ip` nằm trong tay kẻ tấn công, vì người gọi liên tục đổi header sẽ có một bộ đếm giới hạn tần suất mới ở mỗi yêu cầu.
+Chỉ đặt `TRUST_PROXY=true` khi proxy phía trước truy cập SnapOtter từ một địa chỉ **công khai**, chẳng hạn một bộ cân bằng tải trên đám mây ở mạng khác. Trên một instance mở trực tiếp ra ngoài, giá trị đó khiến `request.ip` bị kẻ tấn công kiểm soát, vì người gọi xoay vòng header sẽ nhận một bucket giới hạn tốc độ mới cho mỗi yêu cầu.
 
-Có hai điều cần biết trước khi bạn bắt tay đo IP của client. Docker Desktop trên macOS và Windows phục vụ cổng đã công bố thông qua một proxy ở không gian người dùng, nó viết lại mọi địa chỉ nguồn thành cổng vào của máy ảo `192.168.65.1`, nên ở đó không giá trị `TRUST_PROXY` nào lấy lại được client thật; hãy triển khai trên Linux với mọi thứ hướng ra internet. Và trên bất kỳ nền tảng nào, việc truy cập cổng đã công bố qua `localhost` được ghi nhận là cổng vào của cầu nối chứ không phải client của bạn, nên một phép thử qua localhost chẳng nói lên điều gì về cách một client thật được quy gán. Bảng đầy đủ các giá trị `TRUST_PROXY` và lưu ý về Docker Desktop nằm trong [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
+Có hai điều cần biết trước khi bạn đi đo IP của client. Docker Desktop trên macOS và Windows phục vụ một cổng đã publish qua một proxy userland ghi đè mọi địa chỉ nguồn thành gateway của VM `192.168.65.1`, nên không giá trị `TRUST_PROXY` nào khôi phục được client thật ở đó; hãy triển khai trên Linux cho mọi thứ hướng ra internet. Và trên mọi nền tảng, việc truy cập một cổng đã publish qua `localhost` được ghi nhận là gateway của bridge chứ không phải client của bạn, nên một bài thử trên localhost không cho bạn biết gì về cách một client thật được định danh. Bảng đầy đủ các giá trị `TRUST_PROXY` và lưu ý về Docker Desktop nằm trong [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md#client-ip-resolution-trust_proxy).
 
-Hai điều quan trọng đối với mọi proxy bên dưới: cho phép nội dung yêu cầu lớn (tải lên) và không đệm phản hồi. Proxy đệm phản hồi sẽ phá vỡ tiến trình SSE và rõ ràng hơn là khiến quá trình tải xuống tệp lớn "bắt đầu nhưng không bao giờ kết thúc", vì proxy giữ toàn bộ tệp trước khi chuyển nó đi. SnapOtter gửi `X-Accel-Buffering: no` khi tải xuống để nginx truyền phát chúng ngay cả khi bộ đệm được để ở nơi khác, nhưng các proxy khác ngoài nginx cần tắt bộ đệm phản hồi một cách rõ ràng (hiển thị trong từng cấu hình bên dưới). Nếu quá trình tải xuống bị đình trệ giữa chừng, proxy đệm ở phía trước là điều đầu tiên cần kiểm tra.
+Có hai điều quan trọng với mọi proxy bên dưới: cho phép nội dung yêu cầu lớn (tải lên) và không đệm phản hồi. Proxy đệm phản hồi sẽ làm hỏng tiến trình SSE và, dễ thấy hơn, khiến việc tải xuống tệp lớn "bắt đầu nhưng không bao giờ xong", vì proxy giữ toàn bộ tệp trước khi chuyển tiếp. SnapOtter gửi `X-Accel-Buffering: no` trên các lượt tải xuống để nginx phát luồng ngay cả khi việc đệm vẫn bật ở nơi khác, nhưng các proxy khác nginx cần tắt đệm phản hồi một cách tường minh (được minh họa trong từng cấu hình bên dưới). Nếu một lượt tải xuống bị đứng giữa chừng, proxy đệm ở phía trước là thứ đầu tiên cần kiểm tra.
 
-Một lưu ý về HSTS: API tự gửi `Strict-Transport-Security` trên mỗi phản hồi, nên một proxy truyền nguyên các header phản hồi (mọi cấu hình bên dưới đều làm vậy) không cần thiết lập HSTS riêng. Chỉ khi proxy của bạn được cấu hình để loại bỏ hoặc ghi đè các header phản hồi từ upstream thì bạn mới cần giữ lại header đó hoặc thêm lại nó ở biên.
+Một lưu ý về HSTS: bản thân API gửi `Strict-Transport-Security` trên mọi phản hồi, nên proxy chuyển tiếp các header phản hồi (mọi cấu hình bên dưới đều làm vậy) không cần thiết lập HSTS riêng. Chỉ khi proxy của bạn được cấu hình để loại bỏ hoặc ghi đè các header phản hồi từ upstream thì bạn mới cần giữ nguyên header đó hoặc thêm lại ở edge.
 
 ### Nginx {#nginx}
 
 ```nginx
 server {
-    # Hiển thị HTTP thuần cho gọn. Hãy kết thúc TLS trong khối máy chủ
-    # `listen 443 ssl` của riêng bạn; header Strict-Transport-Security mà API gửi
-    # được truyền qua với mọi phản hồi được proxy, nên không cần add_header ở đó.
+    # Plain HTTP shown for brevity. Terminate TLS in your own `listen 443 ssl`
+    # server block; the Strict-Transport-Security header the API sends passes
+    # through with every proxied response, so no add_header is needed there.
     listen 80;
     server_name images.example.com;
 
@@ -521,20 +546,26 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Truyền phát phản hồi thay vì lưu vào bộ đệm: cần thiết cho tiến trình SSE (cài đặt hàng loạt, AI, tính năng) và để tải xuống tệp lớn.
+        # Stream responses instead of buffering: needed for SSE progress
+        # (batch, AI, feature installs) and for large file downloads.
         proxy_buffering off;
         proxy_read_timeout 300s;
     }
 }
 ```
 
-### Triển khai dưới đường dẫn con {#subpath}
+### Triển khai dưới subpath {#subpath}
 
-Để phục vụ `https://example.com/snapotter`, hãy đặt `BASE_PATH=/snapotter` trong môi trường container SnapOtter và khởi động lại nó. Các tệp Compose CPU và GPU chính thức cũng chấp nhận `BASE_PATH` từ shell hoặc tệp `.env` của Compose. Cùng một image hoạt động ở bất kỳ đường dẫn nào; không cần xây dựng lại frontend.
+Để phục vụ tại `https://example.com/snapotter`, hãy đặt `BASE_PATH=/snapotter` trong môi trường
+container SnapOtter và khởi động lại nó. Các tệp Compose CPU và GPU chính thức
+cũng chấp nhận `BASE_PATH` từ shell của bạn hoặc tệp `.env` của Compose. Cùng một
+image hoạt động ở mọi đường dẫn; không cần build lại frontend.
 
-`BASE_PATH` chấp nhận các phân đoạn phân tách bằng dấu gạch chéo chứa chữ cái, chữ số, `_` hoặc `-`, bao gồm các đường dẫn lồng nhau như `/apps/snapotter`. Dấu gạch chéo cuối là tùy chọn. Để trống (mặc định), hoặc đặt `/`, cho triển khai ở gốc.
+`BASE_PATH` chấp nhận các đoạn phân tách bằng dấu gạch chéo chứa chữ cái, chữ số, `_` hoặc
+`-`, gồm cả đường dẫn lồng nhau như `/apps/snapotter`. Dấu gạch chéo ở cuối là
+tùy chọn. Để trống (mặc định), hoặc đặt `/`, cho triển khai ở gốc.
 
-Trong khối máy chủ HTTPS Nginx hiện có của bạn, hãy dùng:
+Trong khối server HTTPS Nginx hiện có của bạn, hãy dùng:
 
 ```nginx
 location = /snapotter {
@@ -553,11 +584,24 @@ location /snapotter/ {
 }
 ```
 
-Ví dụ này giữ nguyên tiền tố. Các proxy loại bỏ `/snapotter` trước khi chuyển tiếp cũng được hỗ trợ. Các kiểm tra sức khỏe nội bộ có thể tiếp tục dùng `/api/v1/health`. Đối với OIDC hoặc SAML, hãy đặt thêm `EXTERNAL_URL=https://example.com/snapotter` và cập nhật URL callback của nhà cung cấp danh tính để bao gồm `/snapotter/api/auth/oidc/callback` hoặc `/snapotter/api/auth/saml/callback` tương ứng.
+Ví dụ này giữ nguyên tiền tố. Các proxy loại bỏ `/snapotter` trước khi
+chuyển tiếp cũng được hỗ trợ. Các health check nội bộ có thể tiếp tục dùng
+`/api/v1/health`. Với OIDC hoặc SAML, hãy đặt thêm
+`EXTERNAL_URL=https://example.com/snapotter` và cập nhật các URL callback của
+nhà cung cấp danh tính để bao gồm `/snapotter/api/auth/oidc/callback` hoặc
+`/snapotter/api/auth/saml/callback` tương ứng.
 
-Các script API tiếp tục hoạt động không thay đổi: URL trong phản hồi API, chẳng hạn `downloadUrl` của một công cụ, bắt đầu bằng `/api/` bất kể `BASE_PATH` là gì. Hãy nối chúng vào URL gốc của thực thể (`https://example.com/snapotter` + `/api/v1/download/...`) thay vì phân giải chúng theo gốc miền.
+Các script API tiếp tục hoạt động mà không cần thay đổi: các URL trong phản hồi API, chẳng hạn
+`downloadUrl` của một công cụ, bắt đầu bằng `/api/` bất kể `BASE_PATH` là gì. Hãy nối chúng vào URL gốc của
+instance (`https://example.com/snapotter` + `/api/v1/download/...`)
+thay vì phân giải chúng theo gốc của tên miền.
 
-Mở giao diện qua URL có tiền tố (`https://example.com/snapotter`). Trình duyệt truy cập mà không có tiền tố sẽ được tự động chuyển đến đó; chỉ các yêu cầu API mới được mong đợi đến ứng dụng mà không có tiền tố. Nếu nhật ký hiển thị `Requests arrive under /snapotter/ but BASE_PATH is empty`, proxy của bạn đang chuyển tiếp một tiền tố mà `BASE_PATH` không khai báo: hãy đặt `BASE_PATH` thành tiền tố đó, hoặc loại bỏ tiền tố tại proxy.
+Hãy mở giao diện qua URL có tiền tố (`https://example.com/snapotter`). Trình
+duyệt truy cập mà không có tiền tố sẽ được tự động chuyển hướng tới đó; chỉ các yêu cầu
+API mới được kỳ vọng đến ứng dụng mà không có tiền tố. Nếu nhật ký ghi
+`Requests arrive under /snapotter/ but BASE_PATH is empty`, thì proxy của bạn đang
+chuyển tiếp một tiền tố mà `BASE_PATH` không khai báo: hãy đặt `BASE_PATH` thành tiền tố đó,
+hoặc loại bỏ tiền tố ở proxy.
 
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
@@ -565,9 +609,9 @@ Mở giao diện qua URL có tiền tố (`https://example.com/snapotter`). Trì
 2. Đặt Domain Name thành tên miền của bạn
 3. Đặt Scheme thành `http`, Forward Hostname thành `SnapOtter` (hoặc IP container của bạn), Forward Port thành `1349`
 4. Bật hỗ trợ WebSocket
-5. Trong mục Advanced, thêm: `client_max_body_size 500M;` và `proxy_buffering off;`
+5. Trong Advanced, thêm: `client_max_body_size 500M;` và `proxy_buffering off;`
 
-Header `Strict-Transport-Security` của API được truyền qua NPM nguyên vẹn; công tắc HSTS trên tab SSL là tùy chọn thêm vào đó.
+Header `Strict-Transport-Security` của API đi qua NPM nguyên vẹn; nút bật HSTS trên tab SSL là tùy chọn bổ sung.
 
 ### Traefik {#traefik}
 
@@ -584,7 +628,7 @@ labels:
   - "traefik.http.routers.snapotter.middlewares=snapotter-body"
 ```
 
-Traefik chuyển tiếp nguyên vẹn các header phản hồi từ upstream, nên header `Strict-Transport-Security` của API đến được trình duyệt mà không cần middleware `headers`. Nếu bạn đã chạy một middleware viết lại các header phản hồi, hãy đảm bảo nó giữ nguyên header đó.
+Traefik chuyển tiếp các header phản hồi từ upstream mà không thay đổi, nên header `Strict-Transport-Security` của API đến được trình duyệt mà không cần middleware `headers`. Nếu bạn đã chạy một middleware ghi đè header phản hồi, hãy đảm bảo nó giữ nguyên header đó.
 
 ### Caddy {#caddy}
 
@@ -600,7 +644,7 @@ images.example.com {
 }
 ```
 
-`flush_interval -1` vô hiệu hóa bộ đệm phản hồi, cần thiết cho các sự kiện tiến trình SSE (xử lý hàng loạt, công cụ AI, cài đặt tính năng) và để tải xuống tệp lớn để truyền phát thay vì bị đình trệ. Thời gian chờ kéo dài cho phép hoàn tất quá trình tải lên tệp lớn mà không cần Caddy đóng kết nối sớm. Caddy cũng truyền nguyên header `Strict-Transport-Security` của API, nên không cần chỉ thị `header` nào cho HSTS.
+`flush_interval -1` tắt việc đệm phản hồi, điều bắt buộc để các sự kiện tiến trình SSE (xử lý theo lô, công cụ AI, cài đặt tính năng) và các lượt tải xuống tệp lớn được truyền luồng thay vì bị đứng. Các timeout kéo dài cho phép việc tải lên tệp lớn hoàn tất mà Caddy không đóng kết nối sớm. Caddy cũng chuyển tiếp header `Strict-Transport-Security` của API mà không chỉnh sửa, nên không cần chỉ thị `header` nào cho HSTS.
 
 ### Cloudflare Tunnels {#cloudflare-tunnels}
 
@@ -608,41 +652,41 @@ images.example.com {
 cloudflared tunnel --url http://localhost:1349
 ```
 
-Lưu ý: Cloudflare có giới hạn tải lên 100 MB trên các gói miễn phí. Đặt `MAX_UPLOAD_SIZE_MB=100` cho khớp.
+Lưu ý: Cloudflare có giới hạn tải lên 100 MB ở các gói miễn phí. Hãy đặt `MAX_UPLOAD_SIZE_MB=100` cho khớp.
 
-Đường hầm chuyển tiếp các header phản hồi của API, bao gồm cả `Strict-Transport-Security`, nên không cần cấu hình HSTS nào trong dashboard (thiết lập HSTS ở biên của chính Cloudflare là tùy chọn thêm vào).
+Tunnel chuyển tiếp các header phản hồi của API, gồm cả `Strict-Transport-Security`, nên không cần cấu hình HSTS trên dashboard (thiết lập HSTS ở edge của Cloudflare là tùy chọn bổ sung).
 
 ## Khắc phục sự cố {#troubleshooting}
 
 ### "Postgres not reachable: EAI_AGAIN" ngay sau lần khởi động đầu tiên thất bại {#eai-again-after-failed-first-start}
 
-Nếu lần `docker compose up -d` đầu tiên thất bại giữa chừng (lý do thường gặp là một cổng đã được sử dụng), việc thử lại bằng `up -d` thông thường có thể khởi động container ứng dụng mà không gắn nó vào mạng compose. Ứng dụng sau đó sẽ lặp đi lặp lại việc khởi động lại với:
+Nếu lệnh `docker compose up -d` đầu tiên thất bại giữa chừng (nguyên nhân thường gặp là cổng đã được dùng), một lần thử lại `up -d` thông thường có thể khởi động container ứng dụng mà không gắn nó vào mạng compose. Ứng dụng khi đó crash liên tục với lỗi:
 
 ```
 Postgres not reachable: EAI_AGAIN
 ```
 
-trong khi `docker ps` cho thấy postgres khỏe mạnh. Lỗi là thật nhưng chỉ sai container: nếu không có mạng, DNS cho tên máy chủ `postgres` hoàn toàn không thể phân giải, và chính sách khởi động lại sẽ lặp lại lỗi tương tự mãi mãi.
+trong khi `docker ps` cho thấy postgres khỏe mạnh. Lỗi này là thật nhưng chỉ sai container: không có mạng, DNS cho hostname `postgres` hoàn toàn không phân giải được, và chính sách restart lặp lại cùng một lỗi mãi mãi.
 
-Hãy sửa nguyên nhân khiến lần khởi động đầu tiên thất bại (thường là: giải phóng cổng), rồi buộc container ứng dụng được tạo lại để nó gắn lại vào mạng:
+Hãy sửa nguyên nhân làm hỏng lần khởi động đầu (thường là giải phóng cổng), rồi buộc container ứng dụng được tạo lại để nó gắn lại vào mạng:
 
 ```bash
 docker compose up -d --force-recreate SnapOtter
 ```
 
-### Windows: truy cập được từ thiết bị khác, nhưng không từ chính PC {#windows-wsl2-loopback}
+### Windows: truy cập được từ các thiết bị khác, nhưng không từ chính PC {#windows-wsl2-loopback}
 
-Khi Docker chạy bên trong WSL2 (thiết lập Windows thông thường), ngăn xếp có thể truy cập được từ mọi máy khác trên mạng của bạn trong khi `http://localhost:1349` hết thời gian chờ trên chính máy chủ Windows, ngay cả khi chế độ mạng phản chiếu (mirrored networking) của WSL được bật. Cổng không bao giờ xuất hiện trong `netstat` của Windows, và không có gì sai với các container.
+Với Docker chạy bên trong WSL2 (thiết lập phổ biến trên Windows), stack có thể truy cập được từ mọi máy khác trong mạng của bạn trong khi `http://localhost:1349` bị hết thời gian chờ trên chính máy chủ Windows, ngay cả khi bật chế độ mạng mirrored của WSL. Cổng không bao giờ xuất hiện trong `netstat` của Windows, và các container không có gì sai.
 
-Hãy mở ứng dụng từ một thiết bị khác, hoặc từ bên trong bản phân phối bằng địa chỉ của chính nó (`hostname -I` trong shell WSL). Nếu chuyển tiếp localhost tình cờ hoạt động trên phiên bản WSL của bạn, hãy coi đó là điểm cộng chứ không phải thứ để dựa vào.
+Hãy mở ứng dụng từ thiết bị khác, hoặc từ bên trong distro bằng địa chỉ riêng của nó (`hostname -I` trong shell WSL). Nếu việc chuyển tiếp localhost tình cờ hoạt động trên phiên bản WSL của bạn, hãy coi đó là điểm cộng chứ đừng phụ thuộc vào nó.
 
 ## CI/CD {#ci-cd}
 
 Kho GitHub có ba workflow:
 
-- **ci.yml**, chạy tự động trên mỗi lần push và PR. Lint, kiểm tra kiểu, test, build, và xác thực image Docker (mà không push).
-- **release.yml**, được kích hoạt thủ công thông qua `workflow_dispatch`. Chạy semantic-release để tạo một thẻ phiên bản và bản phát hành GitHub, rồi xây dựng một image Docker đa kiến trúc (amd64 + arm64) và push lên Docker Hub (`snapotter/snapotter`) và GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
-- **deploy-docs.yml**, xây dựng trang tài liệu này và triển khai nó lên Cloudflare Pages khi push vào `main`.
+- **ci.yml** - Chạy tự động trên mỗi lần push và PR. Lint, typecheck, kiểm thử, build và xác thực image Docker (không push).
+- **release.yml** - Được kích hoạt thủ công qua `workflow_dispatch`. Chạy semantic-release để tạo tag phiên bản và bản phát hành GitHub, sau đó build image Docker đa kiến trúc (amd64 + arm64) và push lên Docker Hub (`snapotter/snapotter`) và GitHub Container Registry (`ghcr.io/snapotter-hq/snapotter`).
+- **deploy-docs.yml** - Build trang tài liệu này và triển khai lên Cloudflare Pages khi push lên `main`.
 
 Để tạo một bản phát hành, vào **Actions > Release > Run workflow** trong giao diện GitHub, hoặc chạy:
 
@@ -650,17 +694,17 @@ Kho GitHub có ba workflow:
 gh workflow run release.yml
 ```
 
-Semantic-release xác định phiên bản từ lịch sử commit. Thẻ Docker `latest` luôn trỏ đến bản phát hành mới nhất.
+Semantic-release xác định phiên bản từ lịch sử commit. Tag Docker `latest` luôn trỏ tới bản phát hành mới nhất.
 
-## Phân tích {#analytics}
+## Phân tích ẩn danh {#analytics}
 
-SnapOtter bao gồm phân tích sản phẩm ẩn danh (mẫu hình sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Nó được bật theo mặc định. Các tập tin, tên tập tin, và dữ liệu cá nhân của bạn không bao giờ là một phần của điều này. SnapOtter hoạt động bình thường khi tắt phân tích.
+SnapOtter có phân tích sản phẩm ẩn danh (mẫu sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Tính năng này được bật theo mặc định. Tệp, tên tệp và dữ liệu cá nhân của bạn không bao giờ là một phần của nó. SnapOtter vẫn hoạt động bình thường khi tắt phân tích.
 
 ### Tắt phân tích {#disabling-analytics}
 
-Tùy chọn từ chối khi chạy là một công tắc quản trị một cú nhấp. Mở Settings > System > Privacy và tắt Anonymous Product Analytics. Nó dừng ngay lập tức cho toàn bộ instance, không cần xây dựng lại.
+Việc tắt khi chạy là một công tắc một cú nhấp chuột dành cho quản trị viên. Mở Settings > System > Privacy và tắt Anonymous Product Analytics. Nó dừng ngay lập tức cho toàn bộ instance, không cần build lại.
 
-Để có một image không bao giờ có thể phát ra phân tích, hãy đặt tùy chọn tắt cứng tại thời điểm build bằng cách clone kho và xây dựng lại:
+Với một image không bao giờ có thể phát phân tích, hãy đặt hard-off ở thời điểm build bằng cách clone kho mã nguồn và build lại:
 
 ```bash
 git clone https://github.com/snapotter-hq/SnapOtter.git

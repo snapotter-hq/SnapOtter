@@ -1,8 +1,9 @@
 import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
 import { track } from "@/lib/analytics";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { currentTranslations } from "@/lib/current-translations";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -386,7 +387,11 @@ export const useMemeStore = create<MemeState>((set, get) => ({
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         templates: [],
-        error: err instanceof Error ? err.message : "Failed to load templates",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.loadTemplatesFailed,
+        ),
         loading: false,
       });
     } finally {
@@ -469,7 +474,11 @@ export const useMemeStore = create<MemeState>((set, get) => ({
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
-        error: err instanceof Error ? err.message : "Meme generation failed",
+        error: userErrorMessage(
+          currentTranslations(),
+          err,
+          currentTranslations().errors.memeGenerationFailed,
+        ),
         generating: false,
       });
     } finally {

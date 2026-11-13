@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import type { FastifyBaseLogger } from "fastify";
 import pino from "pino";
@@ -5,6 +6,78 @@ import { env } from "../config.js";
 import { traceMixin } from "./log-trace-mixin.js";
 
 let instance: pino.Logger | undefined;
+
+/** The slice of pino-roll's SonicBoom this module uses (pino-roll ships no types). */
+interface RollingFile {
+  write(line: string): boolean;
+  flushSync(): void;
+  on(event: "error", listener: (err: Error) => void): void;
+}
+
+type PinoRoll = (options: Record<string, unknown>) => Promise<RollingFile>;
+
+// Lines logged while pino-roll opens the file. Opening is a couple of stat
+// calls, so this only guards against a log dir that never answers.
+const MAX_PENDING_LINES = 10_000;
+
+/**
+ * Adds the rolling log file to `streams`, written in this thread.
+ *
+ * It used to be a pino transport. Its worker died on a full disk and took the
+ * API with it, twice over: the ENOSPC came back as an "error" event nobody
+ * listened for, and thread-stream then threw a RangeError from its own flush
+ * timer (Sentry NODE-4B, #4203). Now a failed write drops the file stream, says
+ * so once on stderr, and stdout logging carries on.
+ */
+function attachLogFile(streams: pino.MultiStreamRes<string>, file: string): void {
+  const pending: string[] = [];
+  let target: RollingFile | undefined;
+  let failed = false;
+
+  // Once the file fails, writes land nowhere: `failed` is set and `target` is
+  // cleared, so this entry stays in `streams` as a no-op.
+  streams.add({
+    level: "trace",
+    stream: {
+      write(line: string) {
+        if (target) target.write(line);
+        else if (!failed && pending.length < MAX_PENDING_LINES) pending.push(line);
+      },
+    },
+  });
+
+  const fail = (err: unknown) => {
+    if (failed) return;
+    failed = true;
+    target = undefined;
+    pending.length = 0;
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[logger] log file writes stopped, logging to stdout only until restart: ${reason}`,
+    );
+  };
+
+  const pinoRoll = createRequire(import.meta.url)("pino-roll") as PinoRoll;
+  pinoRoll({ file, extension: ".log", size: "10m", limit: { count: 5 }, mkdir: true }).then(
+    (dest) => {
+      dest.on("error", fail);
+      if (failed) return;
+      for (const line of pending) dest.write(line);
+      pending.length = 0;
+      target = dest;
+      // The file is written asynchronously; push out what is buffered when the
+      // process exits, as the transport's own exit hook used to.
+      process.once("exit", () => {
+        try {
+          if (target) target.flushSync();
+        } catch {
+          // Nothing left to report to at exit.
+        }
+      });
+    },
+    fail,
+  );
+}
 
 function createLogger(): pino.Logger {
   if (typeof env.LOG_DIR !== "string" || typeof env.LOG_LEVEL !== "string") {
@@ -14,26 +87,19 @@ function createLogger(): pino.Logger {
       "logger: LOG_DIR or LOG_LEVEL is missing from config. A suite that stubs config.js and reaches a log call must add both to the stub or mock lib/logger.js (#1418).",
     );
   }
-  return pino({
-    level: env.LOG_LEVEL,
-    mixin: traceMixin,
-    transport: {
-      targets: [
-        { target: "pino/file", options: { destination: 1 } },
-        {
-          target: "pino-roll",
-          options: {
-            file: join(env.LOG_DIR, "snapotter"),
-            extension: ".log",
-            size: "10m",
-            limit: { count: 5 },
-            mkdir: true,
-          },
-        },
-      ],
+  // Stream levels sit at the floor so the logger's own level decides.
+  const streams = pino.multistream([
+    { level: "trace", stream: pino.destination({ dest: 1, sync: false }) },
+  ]);
+  attachLogFile(streams, join(env.LOG_DIR, "snapotter"));
+  return pino(
+    {
+      level: env.LOG_LEVEL,
+      mixin: traceMixin,
+      redact: ["req.headers.authorization", "req.headers.cookie"],
     },
-    redact: ["req.headers.authorization", "req.headers.cookie"],
-  });
+    streams,
+  );
 }
 
 function real(): pino.Logger {

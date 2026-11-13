@@ -15,6 +15,7 @@ vi.mock("@/lib/analytics", () => ({
 
 vi.mock("@/lib/api", () => ({
   formatHeaders: () => new Map<string, string>(),
+  translatedCodeMessage: () => undefined,
   parseApiError: () => "error",
 }));
 
@@ -271,7 +272,7 @@ describe("useToolProcessor SSE recovery", () => {
 
       try {
         // The entry settle runs after the teardown and logs its throw
-        // (#1698), so the run ends on the server's own error instead of
+        // (#1698), so the run ends on the fallback instead of
         // falling into the generic frame-handling one.
         act(() => {
           MockEventSource.instances[0].onmessage?.({
@@ -281,7 +282,7 @@ describe("useToolProcessor SSE recovery", () => {
 
         expect(useFileStore.getState().processing).toBe(false);
         expect(useFileStore.getState().activeJobId).toBeNull();
-        expect(useFileStore.getState().error).toBe("server said no");
+        expect(useFileStore.getState().error).toBe("Processing failed");
         expect(consoleError).toHaveBeenCalledWith(
           "Failing the run's entry failed",
           expect.objectContaining({ message: "boom" }),

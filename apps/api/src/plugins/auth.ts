@@ -24,6 +24,7 @@ import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
 import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
+import { logger } from "../lib/logger.js";
 import {
   checkLoginThrottle,
   clearLoginFailures,
@@ -393,6 +394,14 @@ export function requireAdmin(request: FastifyRequest, reply: FastifyReply): Auth
 
 // ── Session helpers ────────────────────────────────────────────────
 
+/**
+ * Per-route body cap for the auth and MFA JSON routes. The global bodyLimit
+ * tracks the upload size (up to 1 GiB), and Fastify parses a JSON body before
+ * the route's zod schema can reject it, so without this cap an anonymous
+ * caller could make the server buffer an upload-sized login request (#2308).
+ */
+export const AUTH_BODY_LIMIT_BYTES = 16 * 1024;
+
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
 export function createSessionToken(): string {
@@ -504,7 +513,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
     .onConflictDoNothing();
 
   if (result.rowCount && result.rowCount > 0) {
-    console.log(
+    logger.info(
       mustChange
         ? `Default admin user '${env.DEFAULT_USERNAME}' created - password change required on first login`
         : `Default admin user '${env.DEFAULT_USERNAME}' created (password change skipped via env)`,
@@ -636,7 +645,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/login
   app.post(
     "/api/auth/login",
-    { config: { rateLimit: { max: getLoginAttemptLimit, timeWindow: "1 minute" } } },
+    {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
+      config: { rateLimit: { max: getLoginAttemptLimit, timeWindow: "1 minute" } },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!env.AUTH_ENABLED) {
         return reply.status(403).send({ error: "Authentication is disabled" });
@@ -1005,105 +1017,109 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // POST /api/auth/logout
-  app.post("/api/auth/logout", async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = extractToken(request);
-    const user = getAuthUser(request);
-    let logoutUrl: string | undefined;
-    let idpLogout: "failed" | undefined;
+  app.post(
+    "/api/auth/logout",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const token = extractToken(request);
+      const user = getAuthUser(request);
+      let logoutUrl: string | undefined;
+      let idpLogout: "failed" | undefined;
 
-    if (token) {
-      const [session] = await db
-        .select()
-        .from(schema.sessions)
-        .where(eq(schema.sessions.id, token));
+      if (token) {
+        const [session] = await db
+          .select()
+          .from(schema.sessions)
+          .where(eq(schema.sessions.id, token));
 
-      if (session?.idToken && env.OIDC_ENABLED) {
-        // A null endpoint means a local-only logout without a fault: the IdP
-        // advertises no end_session_endpoint. A process that hasn't run
-        // discovery yet runs it now instead of skipping the IdP (#1787). A
-        // throw is a fault (a failed or timed-out discovery, or a broken
-        // import): the session below is still destroyed, but the IdP session
-        // stays open, so report it and tell the caller (#1800).
-        try {
-          const { getOidcEndSessionEndpoint } = await import("./oidc.js");
-          const endSessionEndpoint = await getOidcEndSessionEndpoint();
-          if (endSessionEndpoint) {
-            // Set on the parsed URL rather than appending "?...": some IdPs
-            // advertise the endpoint with a query already on it (Azure AD
-            // B2C's `?p=<user flow>`), which has to survive. set() also
-            // replaces any copy of our two parameters the endpoint carries.
-            // An endpoint that isn't a URL (a relative path, any garbage) is
-            // an IdP fault like a bad scheme (#1788). Check it first rather
-            // than letting new URL throw: its TypeError carries the raw
-            // endpoint in an enumerable `input` and classifies as a bug. No
-            // `cause`, which would carry it again (#1887). canParse applies
-            // the same whitespace trimming as new URL.
-            if (!URL.canParse(endSessionEndpoint)) {
-              throw new SafeError("OIDC end_session_endpoint is not a valid URL", {
-                code: "OIDC_END_SESSION_INVALID",
-              });
+        if (session?.idToken && env.OIDC_ENABLED) {
+          // A null endpoint means a local-only logout without a fault: the IdP
+          // advertises no end_session_endpoint. A process that hasn't run
+          // discovery yet runs it now instead of skipping the IdP (#1787). A
+          // throw is a fault (a failed or timed-out discovery, or a broken
+          // import): the session below is still destroyed, but the IdP session
+          // stays open, so report it and tell the caller (#1800).
+          try {
+            const { getOidcEndSessionEndpoint } = await import("./oidc.js");
+            const endSessionEndpoint = await getOidcEndSessionEndpoint();
+            if (endSessionEndpoint) {
+              // Set on the parsed URL rather than appending "?...": some IdPs
+              // advertise the endpoint with a query already on it (Azure AD
+              // B2C's `?p=<user flow>`), which has to survive. set() also
+              // replaces any copy of our two parameters the endpoint carries.
+              // An endpoint that isn't a URL (a relative path, any garbage) is
+              // an IdP fault like a bad scheme (#1788). Check it first rather
+              // than letting new URL throw: its TypeError carries the raw
+              // endpoint in an enumerable `input` and classifies as a bug. No
+              // `cause`, which would carry it again (#1887). canParse applies
+              // the same whitespace trimming as new URL.
+              if (!URL.canParse(endSessionEndpoint)) {
+                throw new SafeError("OIDC end_session_endpoint is not a valid URL", {
+                  code: "OIDC_END_SESSION_INVALID",
+                });
+              }
+              const url = new URL(endSessionEndpoint);
+              // Discovery takes any string as end_session_endpoint, and the web
+              // app navigates to logoutUrl, so a javascript: or data: endpoint
+              // would run in our origin (#1855). Plain http only where discovery
+              // itself may use it (an http EXTERNAL_URL, i.e. a dev setup); on
+              // https it would also send the ID token in the clear. The message
+              // is constant so no part of the endpoint reaches Sentry; only the
+              // local log names the scheme, so an operator can tell an http
+              // endpoint on an https deployment from a hostile one.
+              const allowed = isHttpsUrl(env.EXTERNAL_URL) ? ["https:"] : ["https:", "http:"];
+              if (!allowed.includes(url.protocol)) {
+                request.log.warn(
+                  { scheme: url.protocol.slice(0, 32), userId: session.userId },
+                  "logout: OIDC end_session_endpoint scheme not allowed",
+                );
+                throw new SafeError("OIDC end_session_endpoint has an unsupported scheme", {
+                  code: "OIDC_END_SESSION_SCHEME",
+                });
+              }
+              url.searchParams.set("id_token_hint", session.idToken);
+              url.searchParams.set("post_logout_redirect_uri", `${env.EXTERNAL_URL}/login`);
+              logoutUrl = url.toString();
             }
-            const url = new URL(endSessionEndpoint);
-            // Discovery takes any string as end_session_endpoint, and the web
-            // app navigates to logoutUrl, so a javascript: or data: endpoint
-            // would run in our origin (#1855). Plain http only where discovery
-            // itself may use it (an http EXTERNAL_URL, i.e. a dev setup); on
-            // https it would also send the ID token in the clear. The message
-            // is constant so no part of the endpoint reaches Sentry; only the
-            // local log names the scheme, so an operator can tell an http
-            // endpoint on an https deployment from a hostile one.
-            const allowed = isHttpsUrl(env.EXTERNAL_URL) ? ["https:"] : ["https:", "http:"];
-            if (!allowed.includes(url.protocol)) {
-              request.log.warn(
-                { scheme: url.protocol.slice(0, 32), userId: session.userId },
-                "logout: OIDC end_session_endpoint scheme not allowed",
-              );
-              throw new SafeError("OIDC end_session_endpoint has an unsupported scheme", {
-                code: "OIDC_END_SESSION_SCHEME",
-              });
-            }
-            url.searchParams.set("id_token_hint", session.idToken);
-            url.searchParams.set("post_logout_redirect_uri", `${env.EXTERNAL_URL}/login`);
-            logoutUrl = url.toString();
+          } catch (err) {
+            idpLogout = "failed";
+            request.log.error(
+              { err, userId: session.userId },
+              "logout: failed to build the OIDC logout URL; IdP session left open",
+            );
+            // request.log has no Sentry bridge, and by catching here the error
+            // never reaches the global handler's reportError (#1514).
+            void reportError(err, {
+              source: "http",
+              route: request.routeOptions?.url,
+              method: request.method,
+              subsystem: "oidc-logout",
+            });
           }
-        } catch (err) {
-          idpLogout = "failed";
-          request.log.error(
-            { err, userId: session.userId },
-            "logout: failed to build the OIDC logout URL; IdP session left open",
-          );
-          // request.log has no Sentry bridge, and by catching here the error
-          // never reaches the global handler's reportError (#1514).
-          void reportError(err, {
-            source: "http",
-            route: request.routeOptions?.url,
-            method: request.method,
-            subsystem: "oidc-logout",
-          });
         }
+
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
       }
 
-      await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
-    }
+      // Clear the session cookie
+      const cookieReply = reply as FastifyReply & {
+        clearCookie?: (name: string, opts: Record<string, unknown>) => void;
+      };
+      if (typeof cookieReply.clearCookie === "function") {
+        cookieReply.clearCookie("snapotter-session", { path: `${env.BASE_PATH}/` });
+      }
 
-    // Clear the session cookie
-    const cookieReply = reply as FastifyReply & {
-      clearCookie?: (name: string, opts: Record<string, unknown>) => void;
-    };
-    if (typeof cookieReply.clearCookie === "function") {
-      cookieReply.clearCookie("snapotter-session", { path: `${env.BASE_PATH}/` });
-    }
-
-    await auditFromRequest(request)("LOGOUT", {
-      userId: user?.id,
-      username: user?.username,
-    });
-    return reply.send({
-      ok: true,
-      ...(logoutUrl && { logoutUrl }),
-      ...(idpLogout && { idpLogout }),
-    });
-  });
+      await auditFromRequest(request)("LOGOUT", {
+        userId: user?.id,
+        username: user?.username,
+      });
+      return reply.send({
+        ok: true,
+        ...(logoutUrl && { logoutUrl }),
+        ...(idpLogout && { idpLogout }),
+      });
+    },
+  );
 
   // GET /api/auth/session
   app.get("/api/auth/session", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -1167,7 +1183,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/change-password
   app.post(
     "/api/auth/change-password",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    {
+      bodyLimit: AUTH_BODY_LIMIT_BYTES,
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
       if (!authUser) return;
@@ -1314,220 +1333,225 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /api/auth/register (admin only)
-  app.post("/api/auth/register", async (request: FastifyRequest, reply: FastifyReply) => {
-    const admin = await requirePermission("users:manage")(request, reply);
-    if (!admin) return;
+  app.post(
+    "/api/auth/register",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const admin = await requirePermission("users:manage")(request, reply);
+      if (!admin) return;
 
-    const parsed = registerSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: "Username and password are required",
-        code: "VALIDATION_ERROR",
-      });
-    }
-    const body = parsed.data;
-
-    const usernameError = validateUsername(body.username);
-    if (usernameError) {
-      return reply.status(400).send({
-        error: usernameError,
-        code: "VALIDATION_ERROR",
-      });
-    }
-
-    const registerPwError = await validatePasswordStrength(body.password);
-    if (registerPwError) {
-      return reply.status(400).send(weakPasswordBody(registerPwError));
-    }
-
-    const validBuiltinRoles = ["admin", "editor", "user"];
-    let role: string = "user";
-    if (body.role !== undefined) {
-      if (validBuiltinRoles.includes(body.role)) {
-        role = body.role;
-      } else {
-        const [customRole] = await db
-          .select()
-          .from(schema.roles)
-          .where(eq(schema.roles.name, body.role));
-        if (!customRole) {
-          return reply.status(400).send({
-            error: "Role not found",
-            code: "UNKNOWN_ROLE",
-          });
-        }
-        role = body.role;
+      const parsed = registerSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: "Username and password are required",
+          code: "VALIDATION_ERROR",
+        });
       }
-    }
+      const body = parsed.data;
 
-    if (!(await canAssignRole(admin, role))) {
-      return reply.status(403).send({
-        error: "Cannot create a user beyond your role authority",
-        code: "ESCALATION_DENIED",
-      });
-    }
-
-    // Resolve team -- frontend sends team name (e.g. "Default"), not ID
-    const requestedTeam = body.team?.trim();
-    let teamId: string;
-    let teamName: string;
-
-    if (body.team !== undefined) {
-      if (!requestedTeam) {
-        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+      const usernameError = validateUsername(body.username);
+      if (usernameError) {
+        return reply.status(400).send({
+          error: usernameError,
+          code: "VALIDATION_ERROR",
+        });
       }
-      // Look up by name first, then fall back to ID
-      const [teamByName] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.name, requestedTeam));
-      const [teamById] = teamByName
-        ? [null]
-        : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
-      const found = teamByName || teamById;
-      if (!found) {
-        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+
+      const registerPwError = await validatePasswordStrength(body.password);
+      if (registerPwError) {
+        return reply.status(400).send(weakPasswordBody(registerPwError));
       }
-      teamId = found.id;
-      teamName = found.name;
-    } else {
-      const [defaultTeam] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.name, "Default"));
-      teamId = defaultTeam?.id || "default-team-00000000";
-      teamName = defaultTeam?.name || "Default";
-    }
 
-    // Check for duplicate username first (so 409 takes priority over limit)
-    const [existing] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.username, body.username));
-
-    if (existing) {
-      return reply.status(409).send({
-        error: "Username already exists",
-        code: "CONFLICT",
-      });
-    }
-
-    const id = randomUUID();
-    // Hash before the transaction: scrypt takes ~100ms and must not extend
-    // the user-limit lock window.
-    const passwordHash = await hashPassword(normalizePassword(body.password));
-
-    // The duplicate pre-check above can't close the username race (issue
-    // #900), and a plain count check can't close the limit race: two
-    // concurrent registers both pass it before either insert commits (issue
-    // #928). The locked count and the insert share one transaction so the
-    // loser sees the winner's committed row.
-    const inserted = await db.transaction(async (tx) => {
-      let roleExists = true;
-      if (!validBuiltinRoles.includes(role)) {
-        const [lockedRole] = await tx
-          .select({ id: schema.roles.id })
-          .from(schema.roles)
-          .where(eq(schema.roles.name, role))
-          .for("share");
-        roleExists = Boolean(lockedRole);
-      }
-      let teamExists = true;
-      if (body.team !== undefined) {
-        const [lockedTeam] = await tx
-          .select({ id: schema.teams.id, name: schema.teams.name })
-          .from(schema.teams)
-          .where(eq(schema.teams.id, teamId))
-          .for("share");
-        if (lockedTeam) {
-          teamName = lockedTeam.name;
+      const validBuiltinRoles = ["admin", "editor", "user"];
+      let role: string = "user";
+      if (body.role !== undefined) {
+        if (validBuiltinRoles.includes(body.role)) {
+          role = body.role;
         } else {
-          teamExists = false;
+          const [customRole] = await db
+            .select()
+            .from(schema.roles)
+            .where(eq(schema.roles.name, body.role));
+          if (!customRole) {
+            return reply.status(400).send({
+              error: "Role not found",
+              code: "UNKNOWN_ROLE",
+            });
+          }
+          role = body.role;
         }
       }
-      const [currentAdmin] = await tx
-        .select({ role: schema.users.role })
+
+      if (!(await canAssignRole(admin, role))) {
+        return reply.status(403).send({
+          error: "Cannot create a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
+      // Resolve team -- frontend sends team name (e.g. "Default"), not ID
+      const requestedTeam = body.team?.trim();
+      let teamId: string;
+      let teamName: string;
+
+      if (body.team !== undefined) {
+        if (!requestedTeam) {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+        }
+        // Look up by name first, then fall back to ID
+        const [teamByName] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.name, requestedTeam));
+        const [teamById] = teamByName
+          ? [null]
+          : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
+        const found = teamByName || teamById;
+        if (!found) {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+        }
+        teamId = found.id;
+        teamName = found.name;
+      } else {
+        const [defaultTeam] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.name, "Default"));
+        teamId = defaultTeam?.id || "default-team-00000000";
+        teamName = defaultTeam?.name || "Default";
+      }
+
+      // Check for duplicate username first (so 409 takes priority over limit)
+      const [existing] = await db
+        .select()
         .from(schema.users)
-        .where(eq(schema.users.id, admin.id));
-      if (!currentAdmin) return "escalation-denied" as const;
+        .where(eq(schema.users.username, body.username));
 
-      const currentActor = { ...admin, role: currentAdmin.role };
-      if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
-        return "escalation-denied" as const;
+      if (existing) {
+        return reply.status(409).send({
+          error: "Username already exists",
+          code: "CONFLICT",
+        });
       }
-      if (!roleExists) return "unknown-role" as const;
-      if (!(await canAssignRole(currentActor, role, tx))) {
-        return "escalation-denied" as const;
+
+      const id = randomUUID();
+      // Hash before the transaction: scrypt takes ~100ms and must not extend
+      // the user-limit lock window.
+      const passwordHash = await hashPassword(normalizePassword(body.password));
+
+      // The duplicate pre-check above can't close the username race (issue
+      // #900), and a plain count check can't close the limit race: two
+      // concurrent registers both pass it before either insert commits (issue
+      // #928). The locked count and the insert share one transaction so the
+      // loser sees the winner's committed row.
+      const inserted = await db.transaction(async (tx) => {
+        let roleExists = true;
+        if (!validBuiltinRoles.includes(role)) {
+          const [lockedRole] = await tx
+            .select({ id: schema.roles.id })
+            .from(schema.roles)
+            .where(eq(schema.roles.name, role))
+            .for("share");
+          roleExists = Boolean(lockedRole);
+        }
+        let teamExists = true;
+        if (body.team !== undefined) {
+          const [lockedTeam] = await tx
+            .select({ id: schema.teams.id, name: schema.teams.name })
+            .from(schema.teams)
+            .where(eq(schema.teams.id, teamId))
+            .for("share");
+          if (lockedTeam) {
+            teamName = lockedTeam.name;
+          } else {
+            teamExists = false;
+          }
+        }
+        const [currentAdmin] = await tx
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, admin.id));
+        if (!currentAdmin) return "escalation-denied" as const;
+
+        const currentActor = { ...admin, role: currentAdmin.role };
+        if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+          return "escalation-denied" as const;
+        }
+        if (!roleExists) return "unknown-role" as const;
+        if (!(await canAssignRole(currentActor, role, tx))) {
+          return "escalation-denied" as const;
+        }
+        if (!teamExists) return "unknown-team" as const;
+        if (await userLimitReached(tx)) return "limit" as const;
+        return tx
+          .insert(schema.users)
+          .values({
+            id,
+            username: body.username,
+            passwordHash,
+            role,
+            team: teamId,
+            mustChangePassword: true,
+          })
+          .onConflictDoNothing({ target: schema.users.username });
+      });
+
+      if (inserted === "unknown-role") {
+        return reply.status(400).send({
+          error: "Role not found",
+          code: "UNKNOWN_ROLE",
+        });
       }
-      if (!teamExists) return "unknown-team" as const;
-      if (await userLimitReached(tx)) return "limit" as const;
-      return tx
-        .insert(schema.users)
-        .values({
-          id,
-          username: body.username,
-          passwordHash,
-          role,
-          team: teamId,
-          mustChangePassword: true,
-        })
-        .onConflictDoNothing({ target: schema.users.username });
-    });
 
-    if (inserted === "unknown-role") {
-      return reply.status(400).send({
-        error: "Role not found",
-        code: "UNKNOWN_ROLE",
+      if (inserted === "unknown-team") {
+        return reply.status(400).send({
+          error: "Team not found",
+          code: "UNKNOWN_TEAM",
+        });
+      }
+
+      if (inserted === "escalation-denied") {
+        return reply.status(403).send({
+          error: "Cannot create a user beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+
+      if (inserted === "limit") {
+        return reply.status(403).send({
+          error: `User limit reached (${env.MAX_USERS} max)`,
+          code: "USER_LIMIT_REACHED",
+        });
+      }
+
+      if (!inserted.rowCount) {
+        return reply.status(409).send({
+          error: "Username already exists",
+          code: "CONFLICT",
+        });
+      }
+
+      await auditFromRequest(request)("USER_CREATED", {
+        adminId: admin.id,
+        username: admin.username,
+        newUserId: id,
+        newUsername: body.username,
+        role,
       });
-    }
 
-    if (inserted === "unknown-team") {
-      return reply.status(400).send({
-        error: "Team not found",
-        code: "UNKNOWN_TEAM",
+      return reply.status(201).send({
+        id,
+        username: body.username,
+        role,
+        team: teamName,
       });
-    }
-
-    if (inserted === "escalation-denied") {
-      return reply.status(403).send({
-        error: "Cannot create a user beyond your role authority",
-        code: "ESCALATION_DENIED",
-      });
-    }
-
-    if (inserted === "limit") {
-      return reply.status(403).send({
-        error: `User limit reached (${env.MAX_USERS} max)`,
-        code: "USER_LIMIT_REACHED",
-      });
-    }
-
-    if (!inserted.rowCount) {
-      return reply.status(409).send({
-        error: "Username already exists",
-        code: "CONFLICT",
-      });
-    }
-
-    await auditFromRequest(request)("USER_CREATED", {
-      adminId: admin.id,
-      username: admin.username,
-      newUserId: id,
-      newUsername: body.username,
-      role,
-    });
-
-    return reply.status(201).send({
-      id,
-      username: body.username,
-      role,
-      team: teamName,
-    });
-  });
+    },
+  );
 
   // PUT /api/auth/users/:id (admin only — update role/team)
   app.put(
     "/api/auth/users/:id",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
@@ -1762,6 +1786,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/users/:id/reset-password (admin only)
   app.post(
     "/api/auth/users/:id/reset-password",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
@@ -1885,6 +1910,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /api/auth/users/:id (admin only, can't delete self)
   app.delete(
     "/api/auth/users/:id",
+    { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
       if (!admin) return;
@@ -2100,7 +2126,14 @@ async function shouldAuditApiKeyAuthFailure(prefix: string, ip: string): Promise
 }
 
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
-  app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
+  // preParsing is the last hook before Fastify reads the body. A preHandler
+  // let an anonymous caller make any protected JSON route buffer and parse up
+  // to the upload-sized bodyLimit before the 401 (#4543). onRequest would be
+  // too early: @fastify/rate-limit adds its check as a route-level onRequest
+  // hook, which runs after every instance-level one, so anonymous 401s would
+  // never be counted. Cookies are parsed by now (@fastify/cookie, onRequest).
+  // Returning undefined keeps the payload stream; `return reply` stops the chain.
+  app.addHook("preParsing", async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip the session DB lookup for bundle assets: they are served on every
     // page load and an unreachable DB must not 500 them (Sentry NODE-1D).
     if (isStaticAssetRequest(request.method, request.url)) return;

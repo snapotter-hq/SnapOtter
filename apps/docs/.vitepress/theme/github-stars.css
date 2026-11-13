@@ -1,19 +1,19 @@
 /* Right-side custom nav cluster: our own appearance toggle + Fund + GitHub Star.
    VitePress's default theme collapses appearance/social/translations into a
    compact three-dots flyout below 1280px and shows them inline at >=1280px, so
-   the stock nav never overflows. Our cluster is wider than that native inline
-   set, so forcing it inline at every width pushed the nav past the viewport: a
-   horizontal page scrollbar in the 768-959px band (the nav is in normal flow
-   there) and off-screen clipping of the buttons on 1280-1366px laptops (the nav
-   is position:fixed at >=960px, so it clips instead of scrolling). Fix: show our
-   cluster only once the layout reaches its max width (1440px), where it fits, and
-   defer to VitePress's native responsive nav below that (three-dots flyout under
-   1280px, inline appearance + social from 1280-1439px). */
+   the stock nav never overflows. The full cluster is wider than that native
+   inline set, so forcing it inline at every width pushed the nav past the
+   viewport (#556): a horizontal page scrollbar in the 768-959px band (the nav is
+   in normal flow there) and off-screen clipping on 1280-1366px laptops (the nav
+   is position:fixed at >=960px, so it clips instead of scrolling). So the Star
+   button alone shows from 960px, where the desktop nav takes over, and the
+   appearance toggle and Fund button join it only at the layout's max width
+   (1440px), where everything fits. */
 .nav-bar-right {
   display: none;
 }
 
-@media (min-width: 1440px) {
+@media (min-width: 960px) {
   .nav-bar-right {
     display: flex;
     align-items: center;
@@ -21,6 +21,27 @@
     margin-left: 16px;
   }
 
+  /* The Star button links to the same repo, so drop VitePress's plain GitHub
+     icon beside it unless the button had to hide (see GitHubStars.vue). */
+  :root:not([data-star-fit="hidden"])
+    .VPNavBarSocialLinks
+    a[href="https://github.com/snapotter-hq/snapotter"] {
+    display: none;
+  }
+}
+
+:root[data-star-fit="compact"] .github-btn-label,
+:root[data-star-fit="hidden"] .github-btn-wrapper {
+  display: none;
+}
+
+@media (min-width: 960px) and (max-width: 1439px) {
+  .nav-bar-right > :not(.github-btn-wrapper) {
+    display: none;
+  }
+}
+
+@media (min-width: 1440px) {
   /* Our cluster carries the appearance toggle at this width, so hide VitePress's
      own inline toggle to avoid a duplicate. */
   .VPNavBarAppearance {

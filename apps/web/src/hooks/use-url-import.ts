@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { failedAnswerMessage, formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { format } from "@/lib/format";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -82,7 +83,14 @@ export function useUrlImport(options?: UseUrlImportOptions) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(failedAnswerMessage(t, body, res.status, `Fetch failed: ${res.status}`));
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.urlImport.fetchFailed, { status: res.status }),
+          ),
+        );
       }
       return resolveServerUrls(await res.json());
     },
@@ -114,7 +122,14 @@ export function useUrlImport(options?: UseUrlImportOptions) {
       const res = await fetch(downloadUrl, { headers: formatHeaders(), signal });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(failedAnswerMessage(t, body, res.status, `Download failed: ${res.status}`));
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.urlImport.downloadFailed, { status: res.status }),
+          ),
+        );
       }
       const blob = await res.blob();
       return new File([blob], filename, { type: blob.type });
@@ -189,7 +204,7 @@ export function useUrlImport(options?: UseUrlImportOptions) {
         }
       }
     },
-    [fetchUrls, downloadAsFile, t.dropzone.urlFetchFailed],
+    [fetchUrls, downloadAsFile, t],
   );
 
   const addReadyFiles = useCallback(async (): Promise<AddReadyFilesResult> => {
@@ -239,7 +254,7 @@ export function useUrlImport(options?: UseUrlImportOptions) {
         }
       } else {
         const reason = outcome.reason;
-        const message = reason instanceof Error ? reason.message : String(reason);
+        const message = userErrorMessage(t, reason, String(reason));
         failedByIndex.set(index, message);
       }
     }
@@ -257,7 +272,7 @@ export function useUrlImport(options?: UseUrlImportOptions) {
       failedCount: failedByIndex.size,
       fulfilledIndices,
     });
-  }, [entries, downloadAsFile, t.dropzone.unsupportedFileType]);
+  }, [entries, downloadAsFile, t]);
 
   const removeEntries = useCallback((indices: ReadonlySet<number> | readonly number[]) => {
     const toRemove = indices instanceof Set ? indices : new Set(indices);
@@ -300,7 +315,7 @@ export function useUrlImport(options?: UseUrlImportOptions) {
         if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
           return;
         }
-        const message = err instanceof Error ? err.message : String(err);
+        const message = userErrorMessage(t, err, String(err));
         setEntries((prev) =>
           prev.map((e) =>
             e.url === targetUrl ? { ...e, status: "failed" as const, error: message } : e,
@@ -312,7 +327,7 @@ export function useUrlImport(options?: UseUrlImportOptions) {
         }
       }
     },
-    [fetchUrls, resultToEntry, t.urlImport.failedStatus],
+    [fetchUrls, resultToEntry, t],
   );
 
   const cancel = useCallback(() => {

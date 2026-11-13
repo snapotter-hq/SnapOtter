@@ -147,13 +147,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[0].status).toBe("pending");
       expect(entries[0].error).toBeNull();
       expect(entries[1].status).toBe("failed");
-      expect(entries[1].error).toBe("Compose failed on B");
-      expect(screen.queryByText("Compose failed on B")).not.toBeInTheDocument();
+      expect(entries[1].error).toBe(en.errors.processingFailedWithStatus);
+      expect(screen.queryByText(en.errors.processingFailedWithStatus)).not.toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
-      expect(screen.getByText("Compose failed on B")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument();
       unmount();
     }
 
@@ -193,13 +193,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[0].status).toBe("pending");
       expect(entries[0].error).toBeNull();
       expect(entries[1].status).toBe("failed");
-      expect(entries[1].error).toBe("Compare failed on B");
-      expect(screen.queryByText("Compare failed on B")).not.toBeInTheDocument();
+      expect(entries[1].error).toBe(en.errors.failedWithStatus);
+      expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
-      expect(screen.getByText("Compare failed on B")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
       unmount();
     }
 
@@ -237,15 +237,15 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       const { entries } = useFileStore.getState();
       expect(entries[0].status).toBe("failed");
-      expect(entries[0].error).toBe("Watermark failed on A");
+      expect(entries[0].error).toBe(en.errors.processingFailedWithStatus);
       expect(entries[1].status).toBe("pending");
       expect(entries[1].error).toBeNull();
-      expect(screen.queryByText("Watermark failed on A")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.processingFailedWithStatus)).not.toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(0);
       });
-      expect(screen.getByText("Watermark failed on A")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument();
 
       // Re-running as a 2-file batch where a.png succeeds and b.png fails clears A's error and scopes B's error to index 1.
       let batchCall = 0;
@@ -273,12 +273,12 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       expect(useFileStore.getState().entries[0].status).toBe("completed");
       expect(useFileStore.getState().entries[0].error).toBeNull();
-      expect(screen.queryByText("Watermark failed on A")).not.toBeInTheDocument();
-      expect(screen.queryByText("Watermark batch B failed")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.processingFailedWithStatus)).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.processingFailedNoDetail)).not.toBeInTheDocument();
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
-      expect(screen.getByText("Watermark batch B failed")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.processingFailedNoDetail)).toBeInTheDocument();
       unmount();
     }
 
@@ -319,13 +319,15 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[0].status).toBe("pending");
       expect(entries[0].error).toBeNull();
       expect(entries[1].status).toBe("failed");
-      expect(entries[1].error).toBe("Beautify failed on B");
-      expect(screen.queryByText("Beautify failed on B")).not.toBeInTheDocument();
+      expect(entries[1].error).toBe(en.toolSettings.beautify.processingFailedStatus);
+      expect(
+        screen.queryByText(en.toolSettings.beautify.processingFailedStatus),
+      ).not.toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
-      expect(screen.getByText("Beautify failed on B")).toBeInTheDocument();
+      expect(screen.getByText(en.toolSettings.beautify.processingFailedStatus)).toBeInTheDocument();
 
       // Re-running on B to 200 clears B's error and hides the banner.
       vi.stubGlobal(
@@ -347,7 +349,9 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await waitFor(() => expect(screen.getByTestId("beautify-download")).toBeInTheDocument());
       expect(useFileStore.getState().entries[1].status).toBe("completed");
       expect(useFileStore.getState().entries[1].error).toBeNull();
-      expect(screen.queryByText("Beautify failed on B")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(en.toolSettings.beautify.processingFailedStatus),
+      ).not.toBeInTheDocument();
       unmount();
     }
 
@@ -1704,21 +1708,35 @@ describe("self-posting tool panels: failed entry status and scoped error banners
     const fetchPanels: Array<{
       Panel: ComponentType;
       submitId: string;
+      failedMessage: string;
       prepare?: () => void;
     }> = [
-      { Panel: ComposeSettings, submitId: "compose-submit" },
-      { Panel: CompareSettings, submitId: "compare-submit" },
-      { Panel: WatermarkImageSettings, submitId: "watermark-image-submit" },
+      {
+        Panel: ComposeSettings,
+        submitId: "compose-submit",
+        failedMessage: en.errors.processingFailedWithStatus,
+      },
+      {
+        Panel: CompareSettings,
+        submitId: "compare-submit",
+        failedMessage: en.errors.failedWithStatus,
+      },
+      {
+        Panel: WatermarkImageSettings,
+        submitId: "watermark-image-submit",
+        failedMessage: en.errors.processingFailedWithStatus,
+      },
       {
         Panel: BeautifySettings,
         submitId: "beautify-submit",
+        failedMessage: en.toolSettings.beautify.processingFailedStatus,
         prepare: () => {
           fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
         },
       },
     ];
 
-    for (const { Panel, submitId, prepare } of fetchPanels) {
+    for (const { Panel, submitId, failedMessage, prepare } of fetchPanels) {
       useFileStore.getState().reset();
       useFileStore.getState().setFiles([image("a.png")]);
 
@@ -1781,7 +1799,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       entry = useFileStore.getState().entries[0];
       expect(entry.status).toBe("failed");
-      expect(entry.error).toBe("Server processing failed");
+      expect(entry.error).toBe(failedMessage);
       expect(entry.errorCategory).toBeNull();
       expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
 
@@ -1865,7 +1883,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       );
       expect(entries[3]).toMatchObject({
         status: "failed",
-        error: "Watermark failed on D",
+        error: en.errors.processingFailedNoDetail,
         errorCategory: null,
       });
       expect(classifyFeedbackError(entries[3].error, entries[3].errorCategory)).toBe(
@@ -1920,7 +1938,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       expect(useFileStore.getState().entries[0]).toMatchObject({
         status: "failed",
-        error: "Dimensions mismatch",
+        error: en.errors.failedWithStatus,
         errorCategory: null,
       });
 
@@ -2102,13 +2120,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           new Response(JSON.stringify({ error: "Active c.png error" }), { status: 500 }),
         );
       });
-      expect(screen.getByText("Active c.png error")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
       expect(pending).toHaveLength(4);
-      expect(screen.queryByText("Active c.png error")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
       expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
 
       // Switch to c.png (starts request #5), abort by switching to b.png, and reject request #5 with a non-AbortError to exercise the catch abort guard.
@@ -2302,13 +2320,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           new Response(JSON.stringify({ error: "Active c.png error" }), { status: 500 }),
         );
       });
-      expect(screen.getByText("Active c.png error")).toBeInTheDocument();
+      expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
       expect(pending).toHaveLength(4);
-      expect(screen.queryByText("Active c.png error")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.errors.failedWithStatus)).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
         "FreshArtistB",
       );
@@ -2484,7 +2502,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         new Response(JSON.stringify({ error: "Inspect failed" }), { status: 500 }),
       );
     });
-    expect(screen.getByText("Inspect failed")).toBeInTheDocument();
+    expect(screen.getByText(en.errors.failedWithStatus)).toBeInTheDocument();
     expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
     expect(screen.queryByText(/removed/i)).not.toBeInTheDocument();
 

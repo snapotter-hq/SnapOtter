@@ -132,7 +132,7 @@ describe("offline AI bundle import", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Archive signature does not match the signed index",
+      "Bundle import failed: Import failed: 400",
     );
     expect(indexInput.files).toHaveLength(1);
     expect(archiveInput.files).toHaveLength(1);
@@ -164,36 +164,39 @@ describe("offline AI bundle import: a failed answer (#1915)", () => {
   const fallback = "Import failed: 422";
   it.each([
     ["an object error", { error: { reason: "x" } }, fallback],
-    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
-    ["a string error", { error: "Bad file" }, "Bad file"],
+    ["details alone", { details: "Not enough memory" }, fallback],
+    ["a string error", { error: "Bad file" }, fallback],
     [
       "the error handler's echo of one message",
       { error: "Bad file", details: "Bad file" },
-      "Bad file",
+      fallback,
     ],
     ["a body that is not JSON", null, fallback],
-  ])("shows %s as readable text", async (_label, body, reason) => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 422,
-      json: async () => {
-        if (body === null) throw new SyntaxError("Unexpected token '<'");
-        return body;
-      },
-    });
-    renderSection();
+  ])(
+    "shows the fallback for %s and keeps the server reason off the screen",
+    async (_label, body, reason) => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => {
+          if (body === null) throw new SyntaxError("Unexpected token '<'");
+          return body;
+        },
+      });
+      renderSection();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Legacy AI bundle" }));
-    fireEvent.change(screen.getByLabelText("Legacy bundle archive (.tar.gz)"), {
-      target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Legacy AI bundle" }));
+      fireEvent.change(screen.getByLabelText("Legacy bundle archive (.tar.gz)"), {
+        target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      format(en.settings.aiFeatures.importError, { error: reason }),
-    );
-    expect(document.body.textContent).not.toContain("[object Object]");
-  });
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        format(en.settings.aiFeatures.importError, { error: reason }),
+      );
+      expect(document.body.textContent).not.toContain("[object Object]");
+    },
+  );
 });
 
 describe("offline AI bundle import: a 413 (#1916)", () => {

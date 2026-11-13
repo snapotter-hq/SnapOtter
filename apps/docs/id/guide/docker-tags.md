@@ -1,14 +1,14 @@
 ---
 description: "Tag image Docker SnapOtter, benchmark GPU, penyematan versi, dan dukungan multi-platform untuk AMD64 dan ARM64."
-i18n_source_hash: 7a040f010e63
-i18n_provenance: human
-i18n_output_hash: 30b4ac3f38a5
+i18n_source_hash: a5871d76250c
+i18n_provenance: machine
+i18n_output_hash: 8312de46422d
 i18n_hash_version: 2
 ---
 
-# Image Docker {#docker-image}
+# Docker Image {#docker-image}
 
-SnapOtter dikirim sebagai satu image Docker. Jalankan sendiri dan ia akan memulai PostgreSQL 17 tertanam serta Redis pada antarmuka loopback (mode tertanam); untuk produksi, jalankan bersama container PostgreSQL 17 dan Redis 8 terpisah dengan Compose. Image aplikasi ini bekerja di semua platform.
+SnapOtter dirilis sebagai satu image Docker. Jalankan sendirian dan image ini memulai PostgreSQL 17 dan Redis tertanam pada antarmuka loopback (mode embedded); untuk produksi, jalankan bersama container PostgreSQL 17 dan Redis 8 terpisah dengan Compose. Image aplikasi berfungsi di semua platform.
 
 ## Mulai cepat {#quick-start}
 
@@ -16,46 +16,46 @@ SnapOtter dikirim sebagai satu image Docker. Jalankan sendiri dan ia akan memula
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Tanpa `DATABASE_URL` yang disetel, ini berjalan dalam mode tertanam: PostgreSQL dan Redis dimulai di dalam container pada loopback, dengan semua data di bawah volume `SnapOtter-data`. Setel `DATABASE_URL` dan `REDIS_URL` (seperti yang dilakukan stack [Compose](#docker-compose)) untuk menggunakan layanan eksternal sebagai gantinya. Lihat [Konfigurasi](/id/guide/configuration#embedded-mode).
+Tanpa `DATABASE_URL` yang diatur, image ini berjalan dalam mode embedded: PostgreSQL dan Redis dimulai di dalam container pada loopback, dengan semua data di bawah volume `SnapOtter-data`. Atur `DATABASE_URL` dan `REDIS_URL` (seperti yang dilakukan stack [Compose](#docker-compose)) untuk menggunakan layanan eksternal. Lihat [Konfigurasi](/id/guide/configuration#embedded-mode).
 
 ## Akselerasi NVIDIA CUDA {#nvidia-cuda-acceleration}
 
-Image menyertakan dukungan NVIDIA CUDA pada amd64. Jika Anda memiliki GPU NVIDIA dengan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) terpasang, tambahkan `--gpus all`:
+Image ini menyertakan dukungan NVIDIA CUDA di amd64. Jika Anda memiliki GPU NVIDIA dengan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) terinstal, tambahkan `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter --gpus all -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Image mendeteksi CUDA secara otomatis saat runtime. Tanpa `--gpus all`, atau saat CUDA tidak tersedia, tool AI berjalan di CPU. Image yang sama untuk keduanya.
+Image mendeteksi CUDA secara otomatis saat runtime. Tanpa `--gpus all`, atau ketika CUDA tidak tersedia, alat AI berjalan di CPU. Image yang sama untuk keduanya.
 
-Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak didukung untuk inferensi AI SnapOtter. Memetakan `/dev/dri` ke dalam container dapat mengekspos perangkat render, tetapi runtime AI akan tetap menggunakan CPU kecuali CUDA tersedia.
+Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini belum didukung untuk inferensi AI SnapOtter. Memetakan `/dev/dri` ke dalam container dapat mengekspos perangkat render, tetapi runtime AI tetap akan menggunakan CPU kecuali CUDA tersedia.
 
 ### Benchmark {#benchmarks}
 
 Diuji pada NVIDIA RTX 4070 (VRAM 12 GB) dengan potret JPEG 572x1024.
 
-#### Performa hangat {#warm-performance}
+#### Performa warm {#warm-performance}
 
-| Tool | CPU | GPU | Percepatan |
+| Alat | CPU | GPU | Percepatan |
 |------|-----|-----|---------|
-| Penghapusan latar (u2net) | 2.415ms | 879ms | 2,7x |
-| Penghapusan latar (isnet) | 2.457ms | 1.137ms | 2,2x |
-| Upscale 2x | 350ms | 309ms | 1,1x |
-| Upscale 4x | 910ms | 310ms | 2,9x |
-| Blur wajah | 139ms | 122ms | 1,1x |
+| Penghapusan latar belakang (u2net) | 2,415ms | 879ms | 2.7x |
+| Penghapusan latar belakang (isnet) | 2,457ms | 1,137ms | 2.2x |
+| Upscale 2x | 350ms | 309ms | 1.1x |
+| Upscale 4x | 910ms | 310ms | 2.9x |
+| Blur wajah | 139ms | 122ms | 1.1x |
 
-#### Cold start (permintaan pertama setelah container mulai) {#cold-start-first-request-after-container-start}
+#### Cold start (permintaan pertama setelah container dimulai) {#cold-start-first-request-after-container-start}
 
-| Tool | CPU | GPU | Percepatan |
+| Alat | CPU | GPU | Percepatan |
 |------|-----|-----|---------|
-| Penghapusan latar | 22.286ms | 4.792ms | 4,7x |
-| Upscale 2x | 3.957ms | 2.318ms | 1,7x |
+| Penghapusan latar belakang | 22,286ms | 4,792ms | 4.7x |
+| Upscale 2x | 3,957ms | 2,318ms | 1.7x |
 
-OCR tidak termasuk dalam perbandingan CUDA. Tingkat Tesseract bawaan dan tingkat RapidOCR/ONNX opsional menggunakan CPU, termasuk ketika kontainer memiliki akses NVIDIA GPU.
+OCR tidak disertakan dalam perbandingan CUDA. Baik tier Tesseract bawaan maupun tier RapidOCR/ONNX opsional menggunakan CPU, termasuk ketika container memiliki akses GPU NVIDIA.
 
-### Pemeriksaan kesehatan CUDA {#cuda-health-check}
+### Health check CUDA {#cuda-health-check}
 
-Setelah permintaan AI pertama, endpoint kesehatan admin melaporkan status GPU CUDA:
+Setelah permintaan AI pertama, endpoint health admin melaporkan status GPU CUDA:
 
 ```
 GET /api/v1/admin/health
@@ -64,7 +64,7 @@ GET /api/v1/admin/health
 
 ## Docker Compose {#docker-compose}
 
-Stack Compose lengkap mencakup aplikasi, PostgreSQL 17, dan Redis 8. Lihat [Penerapan](/id/guide/deployment) untuk `docker-compose.yml` lengkap. Contoh minimal:
+Stack Compose lengkap mencakup aplikasi, PostgreSQL 17, dan Redis 8. Lihat [Deployment](/id/guide/deployment) untuk `docker-compose.yml` yang lengkap. Contoh minimal:
 
 ```yaml
 services:
@@ -76,7 +76,9 @@ services:
       - SnapOtter-data:/data
       - SnapOtter-workspace:/tmp/workspace
     environment:
-      - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter
+      # Runtime role (rows only), then the boot-only owner connection.
+      - DATABASE_URL=postgres://${POSTGRES_APP_USER:-snapotter_app}:${POSTGRES_APP_PASSWORD:-snapotter_app}@postgres:5432/${POSTGRES_DB:-snapotter}
+      - DATABASE_MIGRATION_URL=postgres://${POSTGRES_USER:-snapotter}:${POSTGRES_PASSWORD:-snapotter}@postgres:5432/${POSTGRES_DB:-snapotter}
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -93,14 +95,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Ubah ini untuk penerapan non-lokal
-      POSTGRES_DB: snapotter
+      POSTGRES_USER: ${POSTGRES_USER:-snapotter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snapotter}     # Change this for non-local deployments
+      POSTGRES_DB: ${POSTGRES_DB:-snapotter}
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snapotter -d snapotter"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snapotter} -d ${POSTGRES_DB:-snapotter}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -124,7 +126,7 @@ volumes:
   SnapOtter-redisdata:
 ```
 
-Untuk akselerasi NVIDIA CUDA via Docker Compose, tambahkan bagian deploy ke layanan SnapOtter:
+Untuk akselerasi NVIDIA CUDA melalui Docker Compose, tambahkan bagian deploy ke layanan SnapOtter:
 
 ```yaml
     deploy:
@@ -149,11 +151,11 @@ Untuk akselerasi NVIDIA CUDA via Docker Compose, tambahkan bagian deploy ke laya
 
 | Arsitektur | Dukungan GPU | Catatan |
 |---|---|---|
-| linux/amd64 | NVIDIA CUDA | Akselerasi CUDA penuh untuk tool AI |
-| linux/arm64 | Hanya CPU | Raspberry Pi 4/5, Apple Silicon via Docker Desktop |
+| linux/amd64 | NVIDIA CUDA | Akselerasi CUDA penuh untuk alat AI |
+| linux/arm64 | Hanya CPU | Raspberry Pi 4/5, Apple Silicon melalui Docker Desktop |
 
 ## Migrasi dari tag sebelumnya {#migration-from-previous-tags}
 
-Jika Anda sebelumnya menggunakan tag `:cuda`, beralihlah ke `:latest` dan pertahankan `--gpus all`. Dukungan GPU sama, image terpadu.
+Jika Anda menggunakan tag `:cuda`, beralihlah ke `:latest` dan pertahankan `--gpus all`. Dukungan GPU yang sama, image yang terpadu.
 
-Data dan pengaturan Anda dipertahankan di dalam volume.
+Data dan pengaturan Anda tetap tersimpan di volume.

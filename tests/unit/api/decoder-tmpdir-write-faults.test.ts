@@ -1383,6 +1383,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(statsOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         const statsNonOomRes = await app.inject({
@@ -1423,6 +1424,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
           expect(metaOomRes.json()).toEqual({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
+            requestId: expect.any(String),
           });
           expect(decodeHeic).not.toHaveBeenCalled();
         } finally {
@@ -1458,6 +1460,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
           expect(dngProbeRes.json()).toEqual({
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
+            requestId: expect.any(String),
           });
         } finally {
           rawSpy.mockRestore();
@@ -1481,6 +1484,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(dngRawOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         decodeHeic.mockRejectedValueOnce(makeRawOom());
@@ -1493,6 +1497,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(heicRawOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
 
         decodeHeic.mockRejectedValueOnce(makeRawOom());
@@ -1507,6 +1512,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(fallbackHeicOomRes.json()).toEqual({
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
+          requestId: expect.any(String),
         });
       }
     });

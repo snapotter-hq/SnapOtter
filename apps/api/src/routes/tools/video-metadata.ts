@@ -7,6 +7,20 @@ import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
 
+/**
+ * Names of input format tags that the strip did not carry over unchanged.
+ * The muxer writes its own tags (brands, encoder) into every output, so an
+ * input key that comes back with the same value is not a removal.
+ */
+function removedTagNames(
+  before: Record<string, string> | undefined,
+  after: Record<string, string> | undefined,
+): string[] {
+  return Object.entries(before ?? {})
+    .filter(([key, value]) => !after || !Object.hasOwn(after, key) || after[key] !== value)
+    .map(([key]) => key);
+}
+
 export function registerVideoMetadata(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "video-metadata",
@@ -29,6 +43,7 @@ export function registerVideoMetadata(app: FastifyInstance) {
         ["-i", inPath, "-map", "0", "-map_metadata", "-1", "-c", "copy", outPath],
         info.durationS,
       );
+      const outInfo = await probeMedia(outPath);
 
       return {
         scratchPath: outPath,
@@ -40,6 +55,7 @@ export function registerVideoMetadata(app: FastifyInstance) {
             durationS: info.durationS,
             bitrateKbps: info.bitrateKbps,
             streams: info.streams,
+            removed: removedTagNames(info.tags, outInfo.tags),
           },
         },
       };

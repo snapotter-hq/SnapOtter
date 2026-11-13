@@ -28,8 +28,15 @@ import { describe, expect, it, vi } from "vitest";
 import { hasAiJobHandler, runAiToolJob } from "../../apps/api/src/jobs/ai-handlers.js";
 import { getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
 
+vi.mock("../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 // Mock the AI module which calls Python
 vi.mock("@snapotter/ai", () => ({
+  isGpuAvailable: vi.fn(() => false),
   blurFaces: vi.fn().mockResolvedValue({
     buffer: Buffer.from("mock"),
     width: 100,

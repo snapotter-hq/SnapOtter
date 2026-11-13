@@ -28,7 +28,7 @@ describe("ApiError (#1445)", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toBeInstanceOf(Error);
     expect(err).toMatchObject({
-      message: "Team name already exists",
+      message: "An error occurred",
       status: 409,
       code: "CONFLICT",
       body: { error: "Team name already exists", code: "CONFLICT" },
@@ -41,7 +41,7 @@ describe("ApiError (#1445)", () => {
     const err = await apiPost("/v1/teams").catch((e: unknown) => e);
 
     expect(err).toMatchObject({
-      message: "API error: 502",
+      message: "An error occurred",
       status: 502,
       code: undefined,
       body: {},
@@ -84,7 +84,7 @@ describe("apiErrorMessage (#1445)", () => {
   });
 
   it.each([
-    ["an unmapped code", err(409, "CONFLICT")],
+    ["an unmapped code", err(409, "NOT_MAPPED_ANYWHERE")],
     ["no code", err(500)],
     ["a plain Error", new Error("plain")],
   ])("falls back for %s and logs the reason", (_case, error) => {

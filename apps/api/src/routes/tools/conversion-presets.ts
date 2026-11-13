@@ -1,4 +1,9 @@
-import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
+import {
+  BASE_CONFIG,
+  COMPRESS_PRESETS,
+  CONVERSION_PRESETS,
+  isToolDisabled,
+} from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute, getToolConfig } from "../tool-factory.js";
@@ -9,20 +14,16 @@ import { registerSvgToRasterPreset } from "./svg-to-raster.js";
 /**
  * Narrow settings schema per preset base. Presets lock the output format, so
  * they expose only an optional quality/video knob (or nothing). The locked
- * format is merged in before the base's own processV2 re-validates.
+ * format is merged in before the base's own processV2 re-validates. Only
+ * registry-group bases reach this; the three custom ZIP bases register through
+ * their own parameterized registrars.
  */
 function presetSchema(base: string) {
-  if (base === "convert" || base === "svg-to-raster") {
+  if (base === "convert") {
     return z.object({ quality: z.number().int().min(1).max(100).optional() });
   }
   if (base === "convert-video") {
     return z.object({ quality: z.enum(["high", "balanced", "small"]).optional() });
-  }
-  if (base === "image-to-pdf") {
-    return z.object({
-      pageSize: z.enum(["A4", "Letter", "A3", "A5"]).optional(),
-      orientation: z.enum(["portrait", "landscape"]).optional(),
-    });
   }
   return z.object({});
 }
@@ -33,10 +34,24 @@ function presetSchema(base: string) {
  * MUST be registered after the base tools (ensured by index.ts ordering). The
  * three custom ZIP bases (image-to-pdf, pdf-to-image, svg-to-raster) reuse their
  * own parameterized registrars.
+ *
+ * A preset is skipped when `skipTools` holds its own id or its base id, so
+ * disabling a tool closes every route that runs it. The ZIP registrars and
+ * any preset disabled by its own id would otherwise stay live.
+ * `skippedByPolicy` counts those; presets lost to a missing base are not in it.
  */
-export function registerConversionPresets(app: FastifyInstance): number {
+export function registerConversionPresets(
+  app: FastifyInstance,
+  skipTools: ReadonlySet<string> = new Set(),
+): { registered: number; skippedByPolicy: number } {
   let skipped = 0;
+  let skippedByPolicy = 0;
+  const isSkipped = (preset: { id: string }) => isToolDisabled(preset.id, skipTools);
   for (const preset of CONVERSION_PRESETS) {
+    if (isSkipped(preset)) {
+      skippedByPolicy++;
+      continue;
+    }
     const cfg = BASE_CONFIG[preset.base];
     if (cfg.group === "image-to-pdf") {
       registerImageToPdfPreset(app, preset.id, preset.sourceInputs);
@@ -82,6 +97,10 @@ export function registerConversionPresets(app: FastifyInstance): number {
   }
 
   for (const preset of COMPRESS_PRESETS) {
+    if (isSkipped(preset)) {
+      skippedByPolicy++;
+      continue;
+    }
     const baseConfig = getToolConfig(preset.base);
     if (!baseConfig) {
       app.log.error(
@@ -107,5 +126,8 @@ export function registerConversionPresets(app: FastifyInstance): number {
     });
   }
 
-  return CONVERSION_PRESETS.length + COMPRESS_PRESETS.length - skipped;
+  return {
+    registered: CONVERSION_PRESETS.length + COMPRESS_PRESETS.length - skipped - skippedByPolicy,
+    skippedByPolicy,
+  };
 }

@@ -368,6 +368,38 @@ export function isEnvironmentalDbError(err: unknown): boolean {
   }
 }
 
+/**
+ * True for a wrapper with an empty message whose cause chain holds a pg client
+ * error but no SQLSTATE: the shape behind NODE-58 ("Error: Error" from a
+ * broken database). With no code and no text there is nothing to classify on,
+ * so callers use this only where the job context already says the database
+ * is the suspect (a scheduled system job). A chain that carries a SQLSTATE is
+ * excluded, so a real query bug (42P01 and friends) is never hidden by it.
+ */
+export function isEmptyPgClientError(err: unknown): boolean {
+  try {
+    const links = chain(err);
+    if (links.length < 2) return false;
+    const top = links[0].message;
+    if (typeof top !== "string" || top.trim() !== "") return false;
+    const hasSqlState = links.some(
+      (l) => typeof l.code === "string" && SQLSTATE.test(l.code) && !NODE_CODE.test(l.code),
+    );
+    if (hasSqlState) return false;
+    return links
+      .slice(1)
+      .some(
+        (l) =>
+          l.severity !== undefined ||
+          l.name === "PostgresError" ||
+          l.name === "DatabaseError" ||
+          l.name === "DrizzleQueryError",
+      );
+  } catch {
+    return false;
+  }
+}
+
 /** Client went away mid-request; operational noise, never reported. */
 export function isClientAbort(err: unknown): boolean {
   try {

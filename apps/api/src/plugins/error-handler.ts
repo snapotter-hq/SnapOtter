@@ -4,6 +4,29 @@ import { markUpstreamError, reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
 
+// Stable fallback codes for errors that carry no SafeError code. Clients can
+// branch on these without parsing the message. Keep the list in step with the
+// error catalog in apps/docs/api/errors.md.
+const STATUS_ERROR_CODES: Record<number, string> = {
+  400: "BAD_REQUEST",
+  401: "AUTH_REQUIRED",
+  403: "FORBIDDEN",
+  404: "NOT_FOUND",
+  409: "CONFLICT",
+  413: "PAYLOAD_TOO_LARGE",
+  415: "UNSUPPORTED_MEDIA_TYPE",
+  422: "UNPROCESSABLE_ENTITY",
+  429: "RATE_LIMITED",
+  500: "INTERNAL_ERROR",
+  501: "NOT_IMPLEMENTED",
+  503: "SERVICE_UNAVAILABLE",
+  507: "INSUFFICIENT_STORAGE",
+};
+
+export function errorCodeForStatus(statusCode: number): string {
+  return STATUS_ERROR_CODES[statusCode] ?? (statusCode >= 500 ? "INTERNAL_ERROR" : "BAD_REQUEST");
+}
+
 function isRequestClientGone(request: FastifyRequest): boolean {
   const raw = request.raw as
     | {
@@ -63,7 +86,42 @@ export function logAndReportRequestError(
  * answers through multipartFailure() instead, like the routes that catch it
  * (#2225).
  */
+// Every JSON body gets the envelope: error bodies get a stable `code` and the
+// `requestId`, including bodies a route sends directly with reply.send() and
+// never reaches the handler. A route that sets its own code keeps it. A 202
+// with a statusUrl also gets a Location header, so clients can follow it
+// without parsing the body.
+export function addResponseEnvelope(app: FastifyInstance): void {
+  app.addHook("onSend", async (request, reply, payload) => {
+    if (typeof payload !== "string") return payload;
+    if (reply.statusCode < 400 && reply.statusCode !== 202) return payload;
+    const type = reply.getHeader("content-type");
+    if (typeof type !== "string" || !type.includes("application/json")) return payload;
+    let body: unknown;
+    try {
+      body = JSON.parse(payload);
+    } catch {
+      return payload;
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return payload;
+    const record = body as Record<string, unknown>;
+
+    if (reply.statusCode === 202) {
+      if (typeof record.statusUrl === "string") reply.header("Location", record.statusUrl);
+      return payload;
+    }
+    if (typeof record.error !== "string") return payload;
+    const enveloped = {
+      ...record,
+      code: typeof record.code === "string" ? record.code : errorCodeForStatus(reply.statusCode),
+      requestId: record.requestId ?? request.id,
+    };
+    return JSON.stringify(enveloped);
+  });
+}
+
 export function registerErrorHandler(app: FastifyInstance): void {
+  addResponseEnvelope(app);
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     const statusCode = logAndReportRequestError(error, request);
     // An over-limit file whose error escaped a route's multipart read (the

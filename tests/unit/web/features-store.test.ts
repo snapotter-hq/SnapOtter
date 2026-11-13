@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared/i18n/en.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchMock = vi.fn();
@@ -10,6 +11,9 @@ const apiPostMock = vi.fn();
 vi.mock("@/lib/api", () => ({
   apiGet: (...args: unknown[]) => apiGetMock(...args),
   apiPost: (...args: unknown[]) => apiPostMock(...args),
+  translatedCodeMessage: () => undefined,
+  userErrorMessage: (_t: unknown, err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback,
 }));
 
 class FakeEventSource {
@@ -709,7 +713,7 @@ describe("useFeaturesStore", () => {
         expect(useFeaturesStore.getState().installAllActive).toBe(false);
       });
       expect(FakeEventSource.instances.length).toBe(2);
-      expect(useFeaturesStore.getState().errors.flaky).toBe("boom again");
+      expect(useFeaturesStore.getState().errors.flaky).toBe(en.errors.installFailed);
     }, 15000);
 
     it("clears stale errors for pending bundles", async () => {
@@ -789,7 +793,7 @@ describe("useFeaturesStore", () => {
 
       const state = useFeaturesStore.getState();
       expect(state.installing["fail-es-bundle"]).toBeUndefined();
-      expect(state.errors["fail-es-bundle"]).toBe("Download failed");
+      expect(state.errors["fail-es-bundle"]).toBe(en.errors.installFailed);
     });
 
     it("handles failed phase with no error message", async () => {
@@ -806,7 +810,7 @@ describe("useFeaturesStore", () => {
 
       await promise;
 
-      expect(useFeaturesStore.getState().errors["fail-noerr-bundle"]).toBe("Installation failed");
+      expect(useFeaturesStore.getState().errors["fail-noerr-bundle"]).toBe(en.errors.installFailed);
     });
 
     it("falls back to polling on EventSource error", async () => {
@@ -884,7 +888,7 @@ describe("useFeaturesStore", () => {
       });
       expect(esFailed.closed).toBe(true);
       expect(useFeaturesStore.getState().installing.upscaling).toBeUndefined();
-      expect(useFeaturesStore.getState().errors.upscaling).toBe("Checksum mismatch");
+      expect(useFeaturesStore.getState().errors.upscaling).toBe(en.errors.installFailed);
 
       vi.useFakeTimers();
       try {
@@ -910,7 +914,7 @@ describe("useFeaturesStore", () => {
         expect(useFeaturesStore.getState().installing["background-removal"]).toBeUndefined();
         expect(useFeaturesStore.getState().errors["background-removal"]).toBeUndefined();
         expect(useFeaturesStore.getState().installing.upscaling).toBeUndefined();
-        expect(useFeaturesStore.getState().errors.upscaling).toBe("Checksum mismatch");
+        expect(useFeaturesStore.getState().errors.upscaling).toBe(en.errors.installFailed);
 
         await vi.advanceTimersByTimeAsync(3_500);
         expect(apiGetMock).not.toHaveBeenCalled();
