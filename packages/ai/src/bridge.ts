@@ -474,6 +474,10 @@ function pythonAbortError(): Error {
   return error;
 }
 
+function pythonTimeoutError(): Error {
+  return new SafeError("Python script timed out", { kind: "operational", code: "timeout" });
+}
+
 function isTimeoutAbortReason(reason: unknown): boolean {
   if (reason === "timeout") return true;
   return (
@@ -969,6 +973,7 @@ export class PythonDispatcher {
     scriptName: string,
     args: string[],
     options: PythonRunOptions = {},
+    timeoutOverride?: number,
   ): Promise<{ stdout: string; stderr: string }> | null {
     if (options.signal?.aborted) return Promise.reject(pythonAbortError());
     const proc = this.getChild();
@@ -976,7 +981,7 @@ export class PythonDispatcher {
     if (!proc || !stdin || !this.childReady) return null;
 
     const id = randomUUID();
-    const timeout = resolvePythonTimeout(options.timeout);
+    const timeout = timeoutOverride ?? resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1009,12 +1014,7 @@ export class PythonDispatcher {
           if (!proc.killed) {
             proc.kill("SIGTERM");
           }
-          wrappedReject(
-            new SafeError("Python script timed out", {
-              kind: "operational",
-              code: "timeout",
-            }),
-          );
+          wrappedReject(pythonTimeoutError());
         }, timeout);
       }
 
@@ -1083,6 +1083,7 @@ export class PythonDispatcher {
     scriptName: string,
     args: string[],
     options: PythonRunOptions = {},
+    timeoutOverride?: number,
   ): Promise<{ stdout: string; stderr: string }> {
     if (options.signal?.aborted) return Promise.reject(pythonAbortError());
     // Mirror the dispatcher's feature gate. The persistent dispatcher rejects
@@ -1099,7 +1100,7 @@ export class PythonDispatcher {
       );
     }
     const scriptPath = resolve(PYTHON_DIR, scriptName);
-    const timeout = resolvePythonTimeout(options.timeout);
+    const timeout = timeoutOverride ?? resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
       let activeAttempt = 0;
@@ -1224,9 +1225,7 @@ export class PythonDispatcher {
           }
 
           if (timedOut) {
-            rejectOnce(
-              new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
-            );
+            rejectOnce(pythonTimeoutError());
             return;
           }
 
@@ -1368,7 +1367,9 @@ export class PythonDispatcher {
         })
       : null;
 
-    const doRun = (): Promise<{ stdout: string; stderr: string }> => {
+    // timeoutOverride is what is left of the call's budget after a venv lock
+    // wait; undefined means the full budget from resolvePythonTimeout.
+    const doRun = (timeoutOverride?: number): Promise<{ stdout: string; stderr: string }> => {
       if (this.profile === "ai") {
         const gpuAvailable =
           options.memoryOptions?.gpuAvailable ??
@@ -1398,7 +1399,7 @@ export class PythonDispatcher {
       }
 
       // Try persistent dispatcher first
-      const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
+      const dispatcherPromise = this.dispatcherRun(scriptName, args, options, timeoutOverride);
       if (dispatcherPromise) {
         return dispatcherPromise.catch((err: Error) => {
           if (
@@ -1408,22 +1409,24 @@ export class PythonDispatcher {
             aiLog.warn(
               `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
             );
-            return this.runPerRequest(scriptName, args, options).then((result) => ({
-              ...result,
-              stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
-            }));
+            return this.runPerRequest(scriptName, args, options, timeoutOverride).then(
+              (result) => ({
+                ...result,
+                stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
+              }),
+            );
           }
           throw err;
         });
       }
 
       // Fall back to per-request spawning
-      return this.runPerRequest(scriptName, args, options);
+      return this.runPerRequest(scriptName, args, options, timeoutOverride);
     };
 
-    const runWithSpan = (): Promise<{ stdout: string; stderr: string }> => {
-      if (!span) return doRun();
-      return doRun().then(
+    const runWithSpan = (timeoutOverride?: number): Promise<{ stdout: string; stderr: string }> => {
+      if (!span) return doRun(timeoutOverride);
+      return doRun(timeoutOverride).then(
         (result) => {
           span.end();
           return result;
@@ -1448,9 +1451,48 @@ export class PythonDispatcher {
     if (!this.takesVenvLock) return runWithSpan();
     const release = tryAcquireVenvRead();
     if (release) return runWithSpan().finally(release);
-    return acquireVenvRead(options.signal).then(
-      (r) => runWithSpan().finally(r),
-      () => Promise.reject(pythonAbortError()),
+    return this.waitForVenvThenRun(options, runWithSpan);
+  }
+
+  /**
+   * Slow path of run(): an install holds or awaits the venv lock. The call's
+   * timeout covers the wait too, so a call never waits out an install and
+   * then gets its whole budget again (#4601). An unlimited budget
+   * (PROCESSING_TIMEOUT_S=0) never times the wait out.
+   */
+  private waitForVenvThenRun(
+    options: PythonRunOptions,
+    runWithSpan: (timeoutOverride?: number) => Promise<{ stdout: string; stderr: string }>,
+  ): Promise<{ stdout: string; stderr: string }> {
+    if (options.signal?.aborted) return Promise.reject(pythonAbortError());
+    const budget = resolvePythonTimeout(options.timeout);
+    const waitStartedAt = Date.now();
+    const wait = new AbortController();
+    let timedOut = false;
+    const timer =
+      budget === undefined
+        ? undefined
+        : setTimeout(() => {
+            timedOut = true;
+            wait.abort();
+          }, budget);
+    const forwardAbort = () => wait.abort();
+    options.signal?.addEventListener("abort", forwardAbort, { once: true });
+    const stopWaiting = () => {
+      if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", forwardAbort);
+    };
+    return acquireVenvRead(wait.signal).then(
+      (r) => {
+        stopWaiting();
+        const remaining =
+          budget === undefined ? undefined : Math.max(1, budget - (Date.now() - waitStartedAt));
+        return runWithSpan(remaining).finally(r);
+      },
+      () => {
+        stopWaiting();
+        return Promise.reject(timedOut ? pythonTimeoutError() : pythonAbortError());
+      },
     );
   }
 }
