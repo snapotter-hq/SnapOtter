@@ -8,6 +8,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // `./bridge.js` import receives these stubs.
 const runPythonWithProgress = vi.fn();
 const parseStdoutJson = vi.fn();
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
 vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>();
   return {
