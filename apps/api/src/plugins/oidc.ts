@@ -187,8 +187,12 @@ function deriveUsername(claims: Record<string, unknown>): string {
 
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
-function redirectToLogin(reply: FastifyReply, errorCode: string): void {
-  reply.redirect(`${env.BASE_PATH}/login?error=${errorCode}`);
+// Returns the reply so the async route handlers' `return redirectToLogin(...)`
+// hands it back to Fastify. Resolving undefined after a send makes Fastify
+// send again while the app's async onSend hooks run, and the second writeHead
+// throws ERR_HTTP_HEADERS_SENT.
+function redirectToLogin(reply: FastifyReply, errorCode: string): FastifyReply {
+  return reply.redirect(`${env.BASE_PATH}/login?error=${errorCode}`);
 }
 
 /**
