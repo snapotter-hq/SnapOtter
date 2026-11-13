@@ -1,8 +1,9 @@
 ---
 description: "SnapOtter 會收集哪些匿名使用資料、何時傳送，以及如何關閉整個執行個體的產品分析。"
-i18n_source_hash: 875ed3efcabd
-i18n_provenance: human
-i18n_output_hash: 2f233be10af9
+i18n_source_hash: 1a68d9371570
+i18n_provenance: machine
+i18n_output_hash: 544fc5bac74d
+i18n_hash_version: 2
 ---
 
 # SnapOtter 收集的資料 {#what-snapotter-collects}
@@ -15,7 +16,7 @@ i18n_output_hash: 2f233be10af9
 - pipeline_executed：步驟數、工具 id、批次旗標、檔案數、時長、狀態。
 - ai_bundle_action：套件包 id、動作、時長。
 - 前端使用情形：開啟了哪些工具頁面、新增的檔案（僅計數）、已啟動的工具、下載、儲存、搜尋（僅結果數量）、已批次處理。
-- 當機回報：錯誤類型，以及僅含檔案基本名稱的來源堆疊。
+- 當機回報：錯誤類型、經過遮蔽處理的錯誤訊息（已移除檔案名稱、路徑、電子郵件地址與加引號的值）、僅含檔案基本名稱的來源堆疊，以及（AI 工具的）僅含檔案基本名稱的 Python 回溯。
 
 ## 我們絕不收集的資料 {#what-we-never-collect}
 
@@ -24,7 +25,9 @@ i18n_output_hash: 2f233be10af9
 - OCR 輸出文字
 - 影像中繼資料（EXIF）
 - 擷取的文件文字
-- 您的 IP 位址或帳號身分
+- 您的帳號身分
+
+和任何伺服器一樣，PostHog 看得到每個請求來源的 IP 位址。我們的 PostHog 專案會捨棄該位址而不儲存，SnapOtter 自己的伺服器事件則會以預留值取代它送出。
 
 ## 更新提示 {#update-notices}
 
@@ -33,3 +36,5 @@ i18n_output_hash: 2f233be10af9
 ## 關閉它 {#turning-it-off}
 
 管理員：Settings > System > Privacy，將「Anonymous Product Analytics」關閉。它會立即停止，涵蓋整個執行個體。若要建置一個永遠無法發送的映像，請設定 `SNAPOTTER_ANALYTICS=off` build arg。
+
+若要讓新的執行個體一開始就關閉分析，請在伺服器首次啟動前，將 `SNAPOTTER_ANALYTICS_DEFAULT=off` 加入伺服器的環境變數。使用 Docker Compose 時，請把它放在應用程式服務的 `environment:` 底下，因為只在 `.env` 中設定並不會傳到容器裡。
