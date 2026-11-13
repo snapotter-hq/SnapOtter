@@ -5132,6 +5132,7 @@ export const en = {
       disabledCount: "{count} tool(s) disabled",
       disabledCountOne: "{count} tool disabled",
       disabledCountOther: "{count} tools disabled",
+      offWithBase: "Off because {base} is disabled.",
     },
     experimental: {
       label: "Enable Experimental Tools",

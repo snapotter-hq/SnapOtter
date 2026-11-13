@@ -4903,6 +4903,7 @@ export const zhCN: TranslationKeys = {
       disabledCount: "{count} 个工具已禁用",
       disabledCountOne: "{count} 个工具已禁用",
       disabledCountOther: "{count} 个工具已禁用",
+      offWithBase: "已禁用，因为{base}已禁用。",
     },
     experimental: {
       label: "启用实验性工具",

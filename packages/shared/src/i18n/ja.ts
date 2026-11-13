@@ -5151,6 +5151,7 @@ export const ja: TranslationKeys = {
       disabledCount: "{count}個のツールが無効",
       disabledCountOne: "{count}個のツールが無効",
       disabledCountOther: "{count}個のツールが無効",
+      offWithBase: "{base}が無効のため、このツールも無効です。",
     },
     experimental: {
       label: "実験的ツールを有効化",

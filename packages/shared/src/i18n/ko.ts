@@ -5121,6 +5121,7 @@ export const ko: TranslationKeys = {
       disabledCount: "{count}개 도구 비활성화됨",
       disabledCountOne: "{count}개 도구 비활성화됨",
       disabledCountOther: "{count}개 도구 비활성화됨",
+      offWithBase: "{base} 도구가 비활성화되어 이 도구도 비활성화됩니다.",
     },
     experimental: {
       label: "실험적 도구 활성화",

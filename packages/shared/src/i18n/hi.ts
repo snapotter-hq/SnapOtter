@@ -4988,6 +4988,7 @@ export const hi: TranslationKeys = {
       disabledCount: "{count} टूल निष्क्रिय",
       disabledCountOne: "{count} टूल निष्क्रिय",
       disabledCountOther: "{count} टूल निष्क्रिय",
+      offWithBase: "बंद है क्योंकि {base} टूल निष्क्रिय है।",
     },
     experimental: {
       label: "प्रयोगात्मक टूल्स सक्रिय करें",

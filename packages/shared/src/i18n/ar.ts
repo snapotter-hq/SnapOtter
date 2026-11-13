@@ -5159,6 +5159,7 @@ export const ar: TranslationKeys = {
       disabledCount: "{count} أداة معطلة",
       disabledCountOne: "{count} أداة معطلة",
       disabledCountOther: "{count} أدوات معطلة",
+      offWithBase: "معطّلة لأن أداة {base} معطلة.",
     },
     experimental: {
       label: "تفعيل الأدوات التجريبية",

@@ -5212,6 +5212,7 @@ export const uk: TranslationKeys = {
       disabledCount: "Вимкнено {count} інструмент(ів)",
       disabledCountOne: "Вимкнено {count} інструмент",
       disabledCountOther: "Вимкнено {count} інструментів",
+      offWithBase: "Вимкнено, бо інструмент «{base}» вимкнено.",
     },
     experimental: {
       label: "Увімкнути експериментальні інструменти",

@@ -5220,6 +5220,7 @@ export const it: TranslationKeys = {
       disabledCount: "{count} strumento/i disattivato/i",
       disabledCountOne: "{count} strumento disattivato",
       disabledCountOther: "{count} strumenti disattivati",
+      offWithBase: "Disattivato perché lo strumento {base} è disattivato.",
     },
     experimental: {
       label: "Attiva strumenti sperimentali",
