@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdir, rm, statfs } from "node:fs/promises";
+import { access, constants, readdir, rm, statfs } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -49,22 +49,34 @@ async function outputVolumeIsFull(outDir: string): Promise<boolean | undefined> 
   }
 }
 
+/** The errno a write into outDir is refused with, or undefined when it's writable. */
+async function outputDirWriteRefusal(outDir: string): Promise<string | undefined> {
+  try {
+    await access(outDir, constants.W_OK);
+    return undefined;
+  } catch (e) {
+    const { code } = e as NodeJS.ErrnoException;
+    return code === "EACCES" || code === "EPERM" || code === "EROFS" ? code : undefined;
+  }
+}
+
 /**
  * Gives a failed conversion the errno its store error means, shaped like a
  * failed write, so callers answer a full disk (#4148, #4529) or an unwritable
  * output directory as the server's storage fault rather than a document
  * LibreOffice couldn't read. An access error is told apart by the output
- * volume's free space; when that can't be read, the error stays untagged.
+ * volume's free space, then by whether the directory refuses writes; when
+ * neither explains it, the error stays untagged.
  */
 async function failure(message: string, stderr: string, outDir: string): Promise<Error> {
   const err = new Error(message);
   if (OUT_OF_SPACE.test(stderr)) return Object.assign(err, { code: "ENOSPC", syscall: "write" });
   if (!ACCESS_DENIED.test(stderr)) return err;
-  const full = await outputVolumeIsFull(outDir);
-  if (full === undefined) return err;
-  return full
-    ? Object.assign(err, { code: "ENOSPC", syscall: "write" })
-    : Object.assign(err, { code: "EACCES", syscall: "open", path: outDir });
+  if (await outputVolumeIsFull(outDir)) {
+    return Object.assign(err, { code: "ENOSPC", syscall: "write" });
+  }
+  const refusal = await outputDirWriteRefusal(outDir);
+  return refusal ? Object.assign(err, { code: refusal, syscall: "open", path: outDir }) : err;
 }
 
 /**

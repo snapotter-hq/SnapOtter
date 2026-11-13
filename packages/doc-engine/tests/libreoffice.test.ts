@@ -9,7 +9,10 @@ vi.mock("node:os", () => ({ tmpdir: () => "/tmp" }));
 const readdir = vi.fn<(dir: string) => Promise<string[]>>();
 const rm = vi.fn<() => Promise<void>>(async () => {});
 const statfs = vi.fn<(dir: string) => Promise<{ bavail: number; bsize: number }>>();
+const access = vi.fn<(dir: string, mode: number) => Promise<void>>(async () => {});
 vi.mock("node:fs/promises", () => ({
+  constants: { W_OK: 2 },
+  access: (dir: string, mode: number) => access(dir, mode),
   readdir: (dir: string) => readdir(dir),
   rm: (...a: unknown[]) => rm(...(a as [])),
   statfs: (dir: string) => statfs(dir),
@@ -50,6 +53,7 @@ function lastBin(): string {
 beforeEach(() => {
   vi.clearAllMocks();
   rm.mockResolvedValue(undefined);
+  access.mockResolvedValue(undefined);
   process.env.SOFFICE_PATH = "/usr/bin/soffice";
   delete process.env.SUBPROCESS_MEMORY_LIMIT_MB;
 });
@@ -456,14 +460,32 @@ describe("convertDocument when the output can't be created (#4529)", () => {
     expect(await convertWithAccessError()).toMatchObject({ code: "ENOSPC", syscall: "write" });
   });
 
-  it("tags EACCES on open when the volume has room, since the directory is not writable", async () => {
+  it.each(["EACCES", "EPERM", "EROFS"])(
+    "tags %s on open when the volume has room but the directory refuses writes",
+    async (code) => {
+      statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+      access.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+      expect(await convertWithAccessError()).toMatchObject({
+        message: "LibreOffice produced no pdf output for report.docx",
+        code,
+        syscall: "open",
+        path: "/outdir",
+      });
+      expect(access).toHaveBeenCalledWith("/outdir", 2);
+    },
+  );
+
+  it("leaves the error untagged when the volume has room and the directory is writable", async () => {
     statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
-    expect(await convertWithAccessError()).toMatchObject({
-      message: "LibreOffice produced no pdf output for report.docx",
-      code: "EACCES",
-      syscall: "open",
-      path: "/outdir",
-    });
+    const err = await convertWithAccessError();
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
+  it("leaves the error untagged when the write check fails for another reason", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 1_000_000, bsize: 4096 });
+    access.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    expect((await convertWithAccessError()) as NodeJS.ErrnoException).not.toHaveProperty("code");
   });
 
   it("tags a non-zero exit with the access error the same way", async () => {
@@ -476,7 +498,13 @@ describe("convertDocument when the output can't be created (#4529)", () => {
     ).rejects.toMatchObject({ code: "ENOSPC", syscall: "write" });
   });
 
-  it("leaves the error untagged when the free space can't be read", async () => {
+  it("falls back to the write check when the free space can't be read", async () => {
+    statfs.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    access.mockRejectedValueOnce(Object.assign(new Error("EROFS"), { code: "EROFS" }));
+    expect(await convertWithAccessError()).toMatchObject({ code: "EROFS", syscall: "open" });
+  });
+
+  it("leaves the error untagged when the free space can't be read and the directory is writable", async () => {
     statfs.mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     const err = await convertWithAccessError();
     expect((err as Error).message).toBe("LibreOffice produced no pdf output for report.docx");
@@ -495,5 +523,6 @@ describe("convertDocument when the output can't be created (#4529)", () => {
       .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
       .catch(() => {});
     expect(statfs).not.toHaveBeenCalled();
+    expect(access).not.toHaveBeenCalled();
   });
 });
