@@ -4,6 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useTouchDevice } from "@/hooks/use-mobile";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { format } from "@/lib/format";
+import { openFileInput } from "@/lib/open-file-input";
 import { cn } from "@/lib/utils";
 import { UrlImportModal } from "./url-import-modal";
 
@@ -219,7 +220,7 @@ export function Dropzone({
         setError(unsupportedMessage);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [multiple, resolvedAccept, checkFile, onFiles, unsupportedMessage]);
 
   const handleCameraClick = useCallback(() => {
@@ -238,7 +239,7 @@ export function Dropzone({
         setError(unsupportedMessage);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [checkFile, onFiles, unsupportedMessage]);
 
   useEffect(() => {
