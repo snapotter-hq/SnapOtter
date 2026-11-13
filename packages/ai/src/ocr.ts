@@ -371,6 +371,26 @@ export interface PdfOcrOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Wall-clock budget per page for the accurate runtime. QA measured Best at
+ * about 40 s a page on a plain scan and 175 s with enhancement on CPU, and a
+ * 17-page Best job on 2.3.0 ran past a flat 30 minutes (NODE-4Y, #4439). The
+ * job deadline (JOB_TIMEOUT_LONG_S) stays the overall ceiling an operator
+ * tunes; this only stops a fixed whole-document timer from cutting in first.
+ */
+const ACCURATE_PDF_PAGE_BUDGET_MS: Record<Exclude<OcrQuality, "fast">, number> = {
+  balanced: 2 * 60_000,
+  best: 5 * 60_000,
+};
+
+export function accuratePdfRuntimeTimeoutMs(
+  pageCount: number,
+  quality: Exclude<OcrQuality, "fast">,
+  remainingMs: number,
+): number {
+  return Math.max(remainingMs, pageCount * ACCURATE_PDF_PAGE_BUDGET_MS[quality]);
+}
+
 export interface PdfOcrResult extends OcrExecutionMetadata {
   text: string;
   pages: number;
@@ -436,7 +456,11 @@ export async function extractPdfText(
             }),
           ],
           {
-            timeoutMs: prepared.remainingTimeoutMs(),
+            timeoutMs: accuratePdfRuntimeTimeoutMs(
+              prepared.pages.length,
+              quality,
+              prepared.remainingTimeoutMs(),
+            ),
             signal: opts.signal,
           },
         ),
