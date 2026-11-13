@@ -318,6 +318,45 @@ describe("detectFaceLandmarks", () => {
     });
   });
 
+  describe.skipIf(!hasPython)("face_landmarks.py crown estimate (issue #4599)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+
+    it("places the crown at the measured hair top of portrait-color.jpg", () => {
+      // Normalized y from extract_key_points on portrait-color.jpg (572x1024).
+      // Hair top is measured at pixel row 261, which is 0.2549 of the height.
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import importlib.util, os, sys
+
+py_dir = ${JSON.stringify(pyDir)}
+spec = importlib.util.spec_from_file_location("face_landmarks_mod", os.path.join(py_dir, "face_landmarks.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+lms = [(0.5, 0.5)] * 478
+for i in mod.LEFT_EYE_INDICES + mod.RIGHT_EYE_INDICES:
+    lms[i] = (0.5, 0.3969)
+lms[mod.NOSE_INDEX] = (0.5, 0.4443)
+lms[mod.FOREHEAD_INDEX] = (0.5, 0.3446)
+lms[mod.CHIN_INDEX] = (0.5, 0.5201)
+
+crown = mod.extract_key_points(lms)["crown"]["y"]
+hair_top = 261 / 1024
+assert abs(crown - hair_top) < 0.003, (crown, hair_top)
+print("CROWN_OK", crown)
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("CROWN_OK");
+    });
+  });
+
   describe.skipIf(!hasPython)(
     "face_landmarks.py ImportError scoping and detail reporting (issue #3625)",
     () => {
