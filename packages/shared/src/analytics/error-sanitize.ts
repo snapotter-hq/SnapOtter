@@ -22,6 +22,14 @@ interface ErrLike {
 const NODE_CODE = /^E[A-Z0-9_]+$/;
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 const PG_CONNECTIVITY = /^(08|57P0[123])/;
+// pg and pg-pool raise these with no code when the server goes away or never
+// answers (pg lib/client.js, pg-pool index.js). Exact matches only. A bare
+// "Connection terminated" is left out: pg says that when we end the pool.
+const PG_CONNECTION_LOSS_MESSAGES = new Set([
+  "Connection terminated unexpectedly",
+  "Connection terminated due to connection timeout",
+  "timeout exceeded when trying to connect",
+]);
 const PG_ROUTINE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const REPLY_TOKEN = /^[A-Z][A-Z0-9_]{1,19}$/;
 const SAFE_NAME = /^[A-Za-z][A-Za-z0-9_$]{0,63}$/;
@@ -332,6 +340,11 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
     );
     const hasNetCode = links.some((l) => typeof l.code === "string" && NET_CODES.has(l.code));
     if (hasPgState || (hasNetCode && looksLikePg(links))) return "pg-unavailable";
+    if (
+      links.some((l) => typeof l.message === "string" && PG_CONNECTION_LOSS_MESSAGES.has(l.message))
+    ) {
+      return "pg-unavailable";
+    }
     if (hasNetCode || links.some((l) => l.name === "TimeoutError" && "$metadata" in l)) {
       return "net-unavailable";
     }

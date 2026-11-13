@@ -525,6 +525,26 @@ describe("connectivityClass", () => {
       ),
     ).toBeNull();
   });
+  it.each([
+    "Connection terminated unexpectedly",
+    "Connection terminated due to connection timeout",
+    "timeout exceeded when trying to connect",
+  ])("classifies pg's codeless %s under a drizzle wrapper as pg-unavailable (#4653)", (msg) => {
+    const wrapped = Object.assign(new Error("Failed query: select 1\nparams: "), {
+      cause: new Error(msg),
+    });
+    expect(connectivityClass(wrapped)).toBe("pg-unavailable");
+    expect(connectivityClass(new Error(msg))).toBe("pg-unavailable");
+  });
+  it("leaves lookalike connection messages and our own pool shutdown unclassified (#4653)", () => {
+    expect(connectivityClass(new Error("Connection terminated"))).toBeNull();
+    expect(
+      connectivityClass(new Error("Connection terminated unexpectedly while parsing")),
+    ).toBeNull();
+    expect(
+      connectivityClass(new Error("Client has already been connected. You cannot reuse a client.")),
+    ).toBeNull();
+  });
   it("classifies ioredis connection loss as redis-unavailable", () => {
     const err = Object.assign(new Error("Connection is closed."), {
       name: "MaxRetriesPerRequestError",
