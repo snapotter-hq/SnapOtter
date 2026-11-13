@@ -4,7 +4,7 @@
  * settings validation, job enqueue/wait, and error handling without
  * spinning up a real Fastify server or requiring Postgres/Redis.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
@@ -37,6 +37,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
     MAX_MEGAPIXELS: 100,
     MAX_SVG_SIZE_MB: 10,
     MAX_UPLOAD_SIZE_MB: 50,
+    MAX_SETTINGS_PAYLOAD_KB: 64,
   },
 }));
 
@@ -172,6 +173,7 @@ vi.mock("sharp", () => ({
 // ── Imports ─────────────────────────────────────────────────────────────
 
 import { apiToolPath } from "@snapotter/shared";
+import { env } from "../../../apps/api/src/config.js";
 import { db } from "../../../apps/api/src/db/index.js";
 import {
   enqueueToolJob,
@@ -493,6 +495,89 @@ describe("createToolRoute", () => {
       );
       // Nothing was enqueued, so the upload is the route's to remove (#1690).
       expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+    });
+
+    describe("settings payload cap (MAX_SETTINGS_PAYLOAD_KB)", () => {
+      const originalLimit = env.MAX_SETTINGS_PAYLOAD_KB;
+      const settingsTooLarge = expect.objectContaining({
+        error: expect.stringContaining("Settings payload too large"),
+      });
+
+      afterEach(() => {
+        env.MAX_SETTINGS_PAYLOAD_KB = originalLimit;
+      });
+
+      async function postWithSettings(settings: string) {
+        const app = createMockApp();
+        const id = "resize";
+        createToolRoute(app as never, makeMockConfig(id));
+        const reply = createMockReply();
+        await app.routes[apiToolPath(id)](
+          createMockRequest({ fileBuffer: Buffer.from("png-data"), settings }),
+          reply,
+        );
+        return reply;
+      }
+
+      it("defaults to 64 KB and rejects a 70 KB settings payload with 400", async () => {
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(70_000) }),
+        );
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith({
+          error: "Settings payload too large (max 64KB)",
+        });
+        expect(enqueueToolJob).not.toHaveBeenCalled();
+      });
+
+      it("accepts a settings payload under the default 64 KB", async () => {
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(60_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("counts UTF-8 bytes, so 40,000 two-byte characters (80 KB) are rejected", async () => {
+        const reply = await postWithSettings(JSON.stringify({ text: "é".repeat(40_000) }));
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("raises the limit when MAX_SETTINGS_PAYLOAD_KB is set higher", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 128;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(70_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
+
+      it("reports the configured limit in the 400 message", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 128;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(140_000) }),
+        );
+
+        expect(reply.status).toHaveBeenCalledWith(400);
+        expect(reply.send).toHaveBeenCalledWith({
+          error: "Settings payload too large (max 128KB)",
+        });
+      });
+
+      it("disables the check when MAX_SETTINGS_PAYLOAD_KB is 0", async () => {
+        env.MAX_SETTINGS_PAYLOAD_KB = 0;
+
+        const reply = await postWithSettings(
+          JSON.stringify({ text: "hi", pad: "x".repeat(1_000_000) }),
+        );
+
+        expect(reply.send).not.toHaveBeenCalledWith(settingsTooLarge);
+      });
     });
 
     it("returns 400 when settings fail Zod validation", async () => {
