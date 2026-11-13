@@ -329,6 +329,8 @@ exec_without_db_urls() {
 # database URLs (export_embedded_db_env) and the 1.x SQLite import path. The
 # entrypoint calls it after its root check; another init that runs the same
 # service graph can call it too. Returns 1 on a refusal, after printing why.
+# Its caller's `|| exit 1` turns off set -e in here, so every step that can
+# fail returns explicitly.
 #
 # Per-install passwords are generated when asked for, then used on every boot
 # while the secrets directory exists. A secret missing from it is generated
@@ -344,7 +346,7 @@ embedded_setup_db_env() {
   export_embedded_db_env "$EMBEDDED_DB_SECRETS_DIR" || return 1
   # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
   # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
-  SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")"
+  SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")" || return 1
   export SQLITE_MIGRATE_PATH
   unset _esde_on
 }
@@ -356,15 +358,16 @@ embedded_setup_db_env() {
 # the copied venv's paths. <reseed_command> does the copy (reseed-ai-venv.sh
 # in the image). Installed bundles lived in the old venv, so a reseed resets
 # installed.json; models in <ai_dir>/models survive. Needs entrypoint-lib.sh
-# sourced first (rewrite_venv_paths). Returns 1 when the reseed or the path
-# repair fails: a caller's `|| exit 1` turns off set -e inside this function.
+# sourced first (rewrite_venv_paths). Returns 1 when any step fails. A caller's
+# `|| exit 1` turns off set -e inside this function, so each step that used to
+# abort the boot inline carries its own `|| return 1`.
 bootstrap_ai_venv() {
   _bav_base="$1"
   _bav_venv="$2/venv"
   _bav_tmp="$2/venv.bootstrapping"
   if [ -d "$_bav_tmp" ]; then
     echo "Cleaning up interrupted venv bootstrap..."
-    rm -rf "$_bav_tmp"
+    rm -rf "$_bav_tmp" || return 1
   fi
   if [ ! -d "$_bav_base" ]; then
     return 0
@@ -374,10 +377,10 @@ bootstrap_ai_venv() {
     _bav_need=true
     echo "First run: bootstrapping AI venv from base image..."
   elif [ -f "$_bav_base/.venv-version" ]; then
-    _bav_image="$(cat "$_bav_base/.venv-version")"
+    _bav_image="$(cat "$_bav_base/.venv-version")" || return 1
     _bav_current=""
     if [ -f "$_bav_venv/.venv-version" ]; then
-      _bav_current="$(cat "$_bav_venv/.venv-version")"
+      _bav_current="$(cat "$_bav_venv/.venv-version")" || return 1
     fi
     if [ "$_bav_current" != "$_bav_image" ]; then
       _bav_need=true
@@ -387,7 +390,7 @@ bootstrap_ai_venv() {
   if [ "$_bav_need" = true ]; then
     "$3" || return 1
     if [ -f "$2/installed.json" ]; then
-      echo '{"bundles":{}}' > "$2/installed.json"
+      echo '{"bundles":{}}' > "$2/installed.json" || return 1
       echo "WARNING: Installed AI feature bundles were reset after base venv upgrade. Reinstall them from the Settings page."
     fi
     echo "AI venv ready at $_bav_venv"

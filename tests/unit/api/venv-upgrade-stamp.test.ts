@@ -233,6 +233,24 @@ describe("venv upgrade stamp", () => {
     expect(runBootstrap()).toEqual({ status: 0, out: "" });
   });
 
+  // Root writes through a read-only mode, so the write can't be made to fail there.
+  it.skipIf(process.getuid?.() === 0)(
+    "returns 1 when installed.json can't be reset after a reseed",
+    () => {
+      // A stale installed.json would claim bundles whose packages left with the
+      // old venv, so a failed reset has to stop the boot.
+      mkdirSync(aiVenv, { recursive: true });
+      writeFileSync(join(aiVenv, ".venv-version"), "old-hash\n");
+      writeFileSync(installedJson, '{"bundles":{"background-removal":{}}}');
+      chmodSync(installedJson, 0o444);
+
+      const { status, out } = runBootstrap();
+      expect(status).toBe(1);
+      expect(out).not.toContain("AI venv ready");
+      expect(readFileSync(installedJson, "utf-8")).toContain("background-removal");
+    },
+  );
+
   it("returns 1 and claims nothing when the reseed fails", () => {
     const { status, out } = runBootstrap({ TEST_RESEED_FAIL: "1" });
     expect(status).toBe(1);
