@@ -3,6 +3,7 @@ import {
   CATEGORIES,
   CORE_AUDIT_EVENTS,
   isPasswordRuleEnabled,
+  isToolDisabled,
   isValidRoleName,
   isValidUsername,
   normalizeRoleName,
@@ -4278,7 +4279,7 @@ export function ToolsSection() {
                 // entry stays as stored, and comes back when the base does.
                 const base = presetBaseOf(tool.id);
                 const lockedByBase = base !== undefined && disabledTools.includes(base);
-                const isDisabled = lockedByBase || disabledTools.includes(tool.id);
+                const isDisabled = isToolDisabled(tool.id, disabledTools);
                 const hintId = `tool-locked-hint-${tool.id}`;
                 return (
                   <div
@@ -4310,10 +4311,14 @@ export function ToolsSection() {
                       aria-checked={!isDisabled}
                       aria-label={getToolName(t, tool.id, tool.name)}
                       aria-describedby={lockedByBase ? hintId : undefined}
-                      disabled={lockedByBase}
-                      onClick={() => toggleTool(tool.id)}
+                      // aria-disabled rather than disabled keeps the switch
+                      // focusable, so keyboard users still hear the hint.
+                      aria-disabled={lockedByBase || undefined}
+                      onClick={() => {
+                        if (!lockedByBase) toggleTool(tool.id);
+                      }}
                       className={cn(
-                        "w-11 h-6 rounded-full transition-colors relative shrink-0 ms-3 disabled:cursor-not-allowed disabled:opacity-50",
+                        "w-11 h-6 rounded-full transition-colors relative shrink-0 ms-3 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
                         !isDisabled ? "bg-primary" : "bg-muted-foreground/30",
                       )}
                     >

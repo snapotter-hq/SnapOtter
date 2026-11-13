@@ -77,13 +77,16 @@ describe("Settings > Tools: presets follow their base tool (#4624)", () => {
 
     const preset = toolSwitch(en.tools["heic-to-jpg"].name);
     expect(preset).toHaveAttribute("aria-checked", "false");
-    expect(preset).toBeDisabled();
+    expect(preset).toHaveAttribute("aria-disabled", "true");
     const hintId = preset.getAttribute("aria-describedby");
     expect(hintId).toBeTruthy();
     expect(document.getElementById(hintId as string)).toHaveTextContent(offWithConvert);
 
     fireEvent.click(preset);
     expect(preset).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(screen.getByRole("button", { name: s.saveButton }));
+    await vi.waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(apiPut.mock.calls[0][1].disabledTools)).toEqual(["convert"]);
   });
 
   it("leaves presets alone while their base is enabled", async () => {
@@ -92,7 +95,7 @@ describe("Settings > Tools: presets follow their base tool (#4624)", () => {
 
     const preset = toolSwitch(en.tools["heic-to-jpg"].name);
     expect(preset).toHaveAttribute("aria-checked", "true");
-    expect(preset).toBeEnabled();
+    expect(preset).not.toHaveAttribute("aria-disabled");
     expect(preset).not.toHaveAttribute("aria-describedby");
     expect(screen.queryByText(offWithConvert)).toBeNull();
   });
@@ -103,7 +106,7 @@ describe("Settings > Tools: presets follow their base tool (#4624)", () => {
 
     const base = toolSwitch(en.tools.convert.name);
     expect(base).toHaveAttribute("aria-checked", "false");
-    expect(base).toBeEnabled();
+    expect(base).not.toHaveAttribute("aria-disabled");
   });
 
   it("covers compress presets too", async () => {
@@ -112,7 +115,7 @@ describe("Settings > Tools: presets follow their base tool (#4624)", () => {
 
     const preset = toolSwitch(en.tools["compress-image-to-20kb"].name);
     expect(preset).toHaveAttribute("aria-checked", "false");
-    expect(preset).toBeDisabled();
+    expect(preset).toHaveAttribute("aria-disabled", "true");
     expect(screen.getAllByText(offWithCompress).length).toBeGreaterThan(0);
   });
 
@@ -124,10 +127,10 @@ describe("Settings > Tools: presets follow their base tool (#4624)", () => {
 
     const jpg = toolSwitch(en.tools["heic-to-jpg"].name);
     expect(jpg).toHaveAttribute("aria-checked", "true");
-    expect(jpg).toBeEnabled();
+    expect(jpg).not.toHaveAttribute("aria-disabled");
     const png = toolSwitch(en.tools["heic-to-png"].name);
     expect(png).toHaveAttribute("aria-checked", "false");
-    expect(png).toBeEnabled();
+    expect(png).not.toHaveAttribute("aria-disabled");
     expect(screen.queryByText(offWithConvert)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: s.saveButton }));
