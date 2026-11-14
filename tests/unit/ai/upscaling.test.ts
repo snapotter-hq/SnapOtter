@@ -871,6 +871,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     offline_mod = types.ModuleType("offline_guard")
     offline_mod.prepare_gfpgan_helper_weights = lambda base: None
+    offline_mod.library_workdir = __import__("contextlib").nullcontext
     sys.modules["offline_guard"] = offline_mod
 
     in_path = os.path.join(tmp, "in.png")
