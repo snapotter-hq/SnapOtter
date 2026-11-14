@@ -44,6 +44,20 @@ _MODEL_LOAD_ERROR_MARKERS = (
 )
 
 
+def background_removal_import_message(detail):
+    """The error for a background-removal import failure, with the fix.
+
+    The dispatcher only runs this script once the bundle is recorded as
+    installed, so a failed import means the install is partial or broken, not
+    missing (NODE-4W). Reinstalling is the fix the user can act on.
+    """
+    return (
+        f"Background removal is installed but its libraries did not load ({detail}). "
+        "Reinstall Background Removal from Settings > AI Features, or use Reset AI "
+        "Environment if that does not help."
+    )
+
+
 def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
@@ -406,7 +420,7 @@ def main():
         result = json.dumps(
             {
                 "success": False,
-                "error": f"rembg import failed: {detail}",
+                "error": background_removal_import_message(detail),
             }
         )
     except Exception as e:

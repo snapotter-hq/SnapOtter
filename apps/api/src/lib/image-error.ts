@@ -1,4 +1,10 @@
-import { isSafeMessageError, isToolInputError, SafeError, ToolInputError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  isToolInputError,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import sharp from "sharp";
 import type { AiJobHandler } from "../jobs/ai-handlers.js";
 import { isPixelSafetyError } from "../modality/image-input.js";
@@ -15,8 +21,7 @@ import { logger } from "./logger.js";
 /** Short single-line messages so friendlyError() passes them to the client verbatim. */
 export const UNDECODABLE_IMAGE_MESSAGE =
   "This image can't be decoded. The file may be corrupt or use an unsupported encoding.";
-export const PIXEL_LIMIT_IMAGE_MESSAGE =
-  "This image is too large to process. Reduce its dimensions and try again.";
+export { PIXEL_LIMIT_IMAGE_MESSAGE };
 export const PIXEL_LIMIT_RESULT_MESSAGE =
   "This image, or the result these settings would produce, is too large to process. Use a smaller image or settings that make a smaller result.";
 

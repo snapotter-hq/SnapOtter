@@ -361,7 +361,8 @@ describe("transparency-fixer three-rung OOM fallback chain (#3059)", () => {
     expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
     expect(isSafeMessageError(caught)).toBe(true);
     expect((caught as SafeError).kind).toBe("operational");
-    expect((caught as SafeError).message).toBe("CUDA out of memory");
+    // The bridge swaps CUDA's text for its constant GPU message.
+    expect((caught as SafeError).message).toMatch(/^The GPU ran out of memory/);
 
     runPythonWithProgress.mockClear();
     const config = getToolConfig("transparency-fixer");
@@ -373,7 +374,7 @@ describe("transparency-fixer three-rung OOM fallback chain (#3059)", () => {
         "photo.png",
         makeCtx(),
       ),
-    ).rejects.toThrow("CUDA out of memory");
+    ).rejects.toThrow(/^The GPU ran out of memory/);
     expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
   });
 
