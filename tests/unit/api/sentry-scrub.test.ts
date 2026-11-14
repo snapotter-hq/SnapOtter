@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildBeforeSend,
   buildBeforeSendTransaction,
 } from "../../../apps/api/src/lib/sentry-scrub.js";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 type AnyEvent = Record<string, any>;
 // The scrubber is typed over `unknown` payloads; tests drill into the result, so widen it.
@@ -128,6 +133,28 @@ describe("buildBeforeSend (api)", () => {
     expect(out.tags.job_id).toBe("j1");
     expect(out.tags.instance_id).toBe("i1");
     expect(out.tags.secret_tag).toBeUndefined();
+  });
+  it("keeps the job_age bucket reportError sets on job failures (#4662)", () => {
+    const out = send(evt({ tags: { job_age: "lt_24h" } }), {})!;
+    expect(out.tags.job_age).toBe("lt_24h");
+  });
+  it("keeps every tag the API sets, so none is silently scrubbed (#4662)", () => {
+    // A tag missing from TAG_ALLOWLIST is deleted by beforeSend without a trace,
+    // so scan the places that set API tags and check each one survives.
+    const sources = ["apps/api/src/lib/error-report.ts", "apps/api/src/instrument.ts"].map((f) =>
+      readFileSync(resolve(REPO_ROOT, f), "utf8"),
+    );
+    const keys = new Set<string>();
+    for (const src of sources) {
+      for (const m of src.matchAll(/setTag\(\s*"([a-z_]+)"/g)) keys.add(m[1]);
+      for (const m of src.matchAll(/tags:\s*\{([^}]*)\}/g)) {
+        for (const k of m[1].matchAll(/([a-z_]+)\s*:/g)) keys.add(k[1]);
+      }
+    }
+    expect(keys.size).toBeGreaterThan(10);
+    const tags = Object.fromEntries([...keys].map((k) => [k, "v"]));
+    const out = send(evt({ tags }), {})!;
+    expect(Object.keys(out.tags).sort()).toEqual([...keys].sort());
   });
   it("keeps a vetted tool context (primitives) and drops non-primitive fields", () => {
     const out = send(
