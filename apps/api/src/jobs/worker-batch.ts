@@ -155,8 +155,9 @@ export const BATCH_OUTPUT_MISSING_MESSAGE =
  * A child output that is gone by packaging time. Nothing failed to write, so
  * it must not reach putObjectStream as a bare ENOENT, which localWriteFault
  * would report as "couldn't write to its storage" (#4664). Carrying a status
- * makes localWriteFault pass it through unchanged. A bug, not an outage: with
- * re-runs answered from the stored ZIP, something deleted a live batch's file.
+ * makes localWriteFault pass it through unchanged. Classed as a bug: re-runs
+ * of a batch that already kept its ZIP are answered from it, so what's left
+ * is a file deleted under a batch nobody had finished.
  */
 function batchOutputMissing(cause: unknown): SafeError {
   return new SafeError(BATCH_OUTPUT_MISSING_MESSAGE, {
@@ -734,6 +735,19 @@ export async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJ
     );
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
+    // A stall-evicted original can still be running when its re-run passes
+    // the guard at the top; it commits the ZIP and reclaims the children
+    // mid-packaging. Its committed result is this run's answer too.
+    if ((err as { code?: unknown } | null)?.code === "batch-output-missing") {
+      const committed = await storedBatchZipResult(data.jobId);
+      if (committed) {
+        logger.warn(
+          { jobId: data.jobId, bullJobId: job.id },
+          "batch-finalize lost the race to a concurrent run that committed the ZIP; returning its result",
+        );
+        return committed;
+      }
+    }
     // A SafeError's message names what to do (the workspace cap is the one
     // that fills after a large batch, #1161); it still goes through the same
     // sanitizer as every other worker error, since the AI bridge's SafeErrors

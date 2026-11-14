@@ -3416,13 +3416,13 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
   });
 
   it("names a child output that vanished before packaging as missing, not as a storage write failure (#4664)", async () => {
-    objectStorageMocks.getObjectStream.mockRejectedValue(
+    objectStorageMocks.getObjectStream.mockRejectedValueOnce(
       enoent("/data/workspace/outputs/batch-gone-f0/a.png"),
     );
     objectStorageMocks.putObject.mockResolvedValue(undefined);
     // Drains the archive like the real upload, so the feed's failure reaches
     // it as the source error.
-    objectStorageMocks.putObjectStream.mockImplementation(
+    objectStorageMocks.putObjectStream.mockImplementationOnce(
       async (_key: string, source: AsyncIterable<Buffer>) => {
         for await (const _chunk of source) {
           // drain
@@ -3550,6 +3550,67 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       expect(failBatchJobMock).not.toHaveBeenCalled();
     },
   );
+
+  it("returns the ZIP a concurrent run committed while this one was packaging (#4664)", async () => {
+    const zipKey = "outputs/batch-race/batch-resize-batch-ra.zip";
+    const rowsById: Record<string, Record<string, unknown> | undefined> = {
+      "batch-race": { id: "batch-race", type: "batch", status: "processing" },
+      "batch-race-f0": {
+        id: "batch-race-f0",
+        status: "completed",
+        inputRefs: ["uploads/batch-race-f0/a.png"],
+        outputRefs: ["outputs/batch-race-f0/a.png"],
+      },
+    };
+    // The stall-evicted original commits and reclaims between this run's
+    // guard and its read of the child output.
+    objectStorageMocks.getObjectStream.mockImplementationOnce(async () => {
+      rowsById["batch-race"] = {
+        id: "batch-race",
+        type: "batch",
+        status: "completed",
+        outputRefs: [zipKey],
+        bytesOut: 7,
+        progress: {
+          result: { zipFilename: "batch-resize-batch-ra.zip", fileResults: { "0": "a.png" } },
+        },
+      };
+      throw enoent("/data/workspace/outputs/batch-race-f0/a.png");
+    });
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.putObjectStream.mockImplementationOnce(
+      async (_key: string, source: AsyncIterable<Buffer>) => {
+        for await (const _chunk of source) {
+          // drain
+        }
+        return 0;
+      },
+    );
+    const { processor, failBatchJobMock, completeBatchJobMock } = await setupSystemProcessor({
+      rowsById,
+    });
+
+    const result = (await processor({
+      id: "batch-race-rerun",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-race",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { outputRefs?: string[]; resultPayload?: { zip?: { key?: string; size?: number } } };
+
+    expect(result.outputRefs).toEqual([zipKey]);
+    expect(result.resultPayload?.zip).toEqual(expect.objectContaining({ key: zipKey, size: 7 }));
+    expect(failBatchJobMock).not.toHaveBeenCalled();
+    expect(completeBatchJobMock).not.toHaveBeenCalled();
+  });
 
   it("still runs the finalize for a terminal parent that kept no ZIP (#4664)", async () => {
     const { processor, failBatchJobMock } = await setupSystemProcessor({
