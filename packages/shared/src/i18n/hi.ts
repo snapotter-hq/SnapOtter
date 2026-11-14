@@ -5430,6 +5430,8 @@ export const hi: TranslationKeys = {
       BROWSER_CRASHED: "रेंडर करते समय ब्राउज़र क्रैश हो गया। फिर से कोशिश करें।",
       BROWSER_NOT_AVAILABLE: "इस टूल को जिस ब्राउज़र की ज़रूरत है, वह अभी उपलब्ध नहीं है।",
       DEPENDENCY_VALIDATION_FAILED: "यह सेटिंग एक ऐसी सेटिंग पर निर्भर है जो मान्य नहीं है।",
+      FEATURE_CPU_UNSUPPORTED:
+        "इस फ़ीचर के लिए AVX सपोर्ट वाला CPU चाहिए, और इस सर्वर के CPU में यह नहीं है।",
       FEATURE_INCOMPATIBLE: "यह फ़ीचर मौजूदा सेटिंग के साथ नहीं चल सकता।",
       FST_REQ_FILE_TOO_LARGE: "यह फ़ाइल अपलोड करने के लिए बहुत बड़ी है।",
       IDLE_TIMEOUT: "निष्क्रिय रहने के कारण आपको साइन आउट कर दिया गया। फिर से साइन इन करें।",

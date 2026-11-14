@@ -5674,6 +5674,8 @@ export const ptBR: TranslationKeys = {
         "O navegador de que esta ferramenta precisa não está disponível no momento.",
       DEPENDENCY_VALIDATION_FAILED:
         "Esta configuração depende de outra configuração que não é válida.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Este recurso precisa de um processador com suporte a AVX, e o processador deste servidor não tem.",
       FEATURE_INCOMPATIBLE: "Este recurso não pode ser executado com as configurações atuais.",
       FST_REQ_FILE_TOO_LARGE: "Este arquivo é grande demais para ser enviado.",
       IDLE_TIMEOUT: "Você foi desconectado por inatividade. Entre novamente.",

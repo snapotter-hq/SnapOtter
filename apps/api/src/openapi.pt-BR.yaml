@@ -8647,12 +8647,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibilidade do runtime de OCR; omitido em pacotes legados
+                          description: Compatibilidade com o host. O OCR sempre a informa. Um pacote legado informa incompatible somente quando este host não consegue executá-lo e omite o campo nos demais casos.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Motivo da compatibilidade do runtime de OCR; omitido em pacotes legados
+                          description: Por que o pacote é incompatível, como cpu-no-avx quando suas bibliotecas x86-64 precisam de AVX e esta CPU não tem. Omitido para pacotes legados compatíveis.
                         selectedTarget:
                           type:
                             - string
@@ -8971,6 +8971,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Um pacote de que a ferramenta precisa não pode ser instalado neste host: o runtime de OCR não é compatível, ou o pacote precisa de AVX e esta CPU não tem (código FEATURE_CPU_UNSUPPORTED). Nada é colocado na fila.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9057,7 +9063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Pacote já instalado ou runtime de OCR não suportado neste host
+          description: Pacote já instalado, runtime de OCR não compatível com este host, ou o pacote precisa de AVX e esta CPU não tem (código FEATURE_CPU_UNSUPPORTED, recusado antes de qualquer download)
           content:
             application/json:
               schema:
@@ -30796,13 +30802,13 @@ x-i18n:
       provenance: machine
       outputHash: 98ad15fe6b73
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 7efece408396
+      outputHash: 160f8c3d833d
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: db3e37e3484a
+      outputHash: 7cf36f9d953b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30895,6 +30901,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 3da1b3c793f9
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: ee9b457bb064
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30928,9 +30938,9 @@ x-i18n:
       provenance: machine
       outputHash: 0c34229e47e9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 2ce9664e5a30
+      outputHash: fbfe87099184
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

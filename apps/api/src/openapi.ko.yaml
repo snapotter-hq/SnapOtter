@@ -8645,12 +8645,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR 런타임 호환성. 레거시 번들에서는 생략됨
+                          description: 호스트 호환성입니다. OCR은 항상 이 값을 보고합니다. 레거시 번들은 이 호스트에서 실행할 수 없을 때만 incompatible을 보고하고, 그 외에는 이 필드를 생략합니다.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR 런타임 호환성 사유. 레거시 번들에서는 생략됨
+                          description: 번들이 호환되지 않는 이유입니다. 예를 들어 x86-64 라이브러리에 AVX가 필요한데 이 CPU에 AVX가 없으면 cpu-no-avx입니다. 호환되는 레거시 번들에서는 생략됩니다.
                         selectedTarget:
                           type:
                             - string
@@ -8969,6 +8969,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 도구에 필요한 번들을 이 호스트에 설치할 수 없습니다. OCR 런타임이 지원되지 않거나, 번들에 AVX가 필요한데 이 CPU에 AVX가 없습니다(코드 FEATURE_CPU_UNSUPPORTED). 대기열에 아무것도 추가되지 않습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9055,7 +9061,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: 번들이 이미 설치되었거나 이 호스트에서 OCR 런타임을 지원하지 않음
+          description: 번들이 이미 설치되었거나, 이 호스트에서 OCR 런타임이 지원되지 않거나, 번들에 AVX가 필요한데 이 CPU에 AVX가 없습니다(코드 FEATURE_CPU_UNSUPPORTED, 다운로드 전에 거부됨)
           content:
             application/json:
               schema:
@@ -30790,13 +30796,13 @@ x-i18n:
       provenance: machine
       outputHash: 99f1664dc1fa
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: c303a9c5c653
+      outputHash: 042e787253ba
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: a7daaf174c44
+      outputHash: 2865b72205e5
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30889,6 +30895,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 757eb1ead8fc
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 5f00ccb1afde
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30922,9 +30932,9 @@ x-i18n:
       provenance: machine
       outputHash: 8dad4efa0795
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: c637d13a1152
+      outputHash: c50864fa1851
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

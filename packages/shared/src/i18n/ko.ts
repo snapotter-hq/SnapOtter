@@ -5563,6 +5563,8 @@ export const ko: TranslationKeys = {
       BROWSER_CRASHED: "렌더링 중 브라우저가 종료되었습니다. 다시 시도하세요.",
       BROWSER_NOT_AVAILABLE: "이 도구에 필요한 브라우저를 지금은 사용할 수 없습니다.",
       DEPENDENCY_VALIDATION_FAILED: "이 설정이 의존하는 다른 설정이 올바르지 않습니다.",
+      FEATURE_CPU_UNSUPPORTED:
+        "이 기능에는 AVX를 지원하는 CPU가 필요하지만 이 서버의 CPU는 AVX를 지원하지 않습니다.",
       FEATURE_INCOMPATIBLE: "현재 설정에서는 이 기능을 실행할 수 없습니다.",
       FST_REQ_FILE_TOO_LARGE: "파일이 너무 커서 업로드할 수 없습니다.",
       IDLE_TIMEOUT: "활동이 없어 로그아웃되었습니다. 다시 로그인하세요.",

@@ -5679,6 +5679,8 @@ export const nl: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "De browser die dit hulpprogramma nodig heeft is nu niet beschikbaar.",
       DEPENDENCY_VALIDATION_FAILED:
         "Deze instelling hangt af van een andere instelling die niet geldig is.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Deze functie heeft een processor met AVX-ondersteuning nodig, en de processor van deze server heeft dat niet.",
       FEATURE_INCOMPATIBLE: "Deze functie kan niet draaien met de huidige instellingen.",
       FST_REQ_FILE_TOO_LARGE: "Dit bestand is te groot om te uploaden.",
       IDLE_TIMEOUT: "Je bent afgemeld wegens inactiviteit. Log opnieuw in.",

@@ -5652,6 +5652,8 @@ export const sv: TranslationKeys = {
         "Webbläsaren som det här verktyget behöver är inte tillgänglig just nu.",
       DEPENDENCY_VALIDATION_FAILED:
         "Den här inställningen beror på en annan inställning som inte är giltig.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Den här funktionen kräver en processor med AVX-stöd, och den här serverns processor saknar det.",
       FEATURE_INCOMPATIBLE: "Den här funktionen kan inte köras med de nuvarande inställningarna.",
       FST_REQ_FILE_TOO_LARGE: "Filen är för stor för att laddas upp.",
       IDLE_TIMEOUT: "Du loggades ut efter att ha varit inaktiv. Logga in igen.",

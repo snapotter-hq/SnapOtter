@@ -135,6 +135,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `code` | Status | Meaning | What to do |
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501 | The tool, or one step of a pipeline or batch, needs a bundle that is not installed. The body includes `feature` (the bundle ID) and `featureName`. | Install the bundle in Settings, then retry. |
+| `FEATURE_CPU_UNSUPPORTED` | 409 | An install was refused because the bundle's x86-64 libraries need AVX and this server's CPU doesn't have it. Nothing was downloaded. The body includes `feature` (the bundle ID) and `reason` (`cpu-no-avx`). `GET /api/v1/features` reports the same bundle with `compatibility: "incompatible"` and `compatibilityReason: "cpu-no-avx"`. | Run SnapOtter on a CPU with AVX, or on arm64. Other bundles still install. |
 | `FEATURE_INCOMPATIBLE` | 501 | The installed feature cannot do the requested quality or language. | Change the setting, or install a bundle that supports it. |
 | `ENGINE_UNAVAILABLE` | 503 | A required engine could not start, or an OCR runtime was removed after the request was validated. | Retry after an administrator repairs or reinstalls the feature. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium is not installed, so HTML to image cannot run. | Ask an administrator to install the browser. |

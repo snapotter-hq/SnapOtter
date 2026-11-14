@@ -5336,6 +5336,7 @@ export const zhCN: TranslationKeys = {
       BROWSER_CRASHED: "渲染时浏览器崩溃。请重试。",
       BROWSER_NOT_AVAILABLE: "此工具所需的浏览器目前不可用。",
       DEPENDENCY_VALIDATION_FAILED: "此设置依赖的另一项设置无效。",
+      FEATURE_CPU_UNSUPPORTED: "此功能需要支持 AVX 的 CPU，但此服务器的 CPU 不支持。",
       FEATURE_INCOMPATIBLE: "此功能无法在当前设置下运行。",
       FST_REQ_FILE_TOO_LARGE: "此文件过大，无法上传。",
       IDLE_TIMEOUT: "由于长时间未操作，你已退出登录。请重新登录。",

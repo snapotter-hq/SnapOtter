@@ -8606,12 +8606,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR 运行时兼容性；旧版功能包不返回
+                          description: 主机兼容性。OCR 始终会报告此字段。旧版功能包仅在此主机无法运行它时报告 incompatible，否则省略此字段。
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR 运行时兼容性原因；旧版功能包不返回
+                          description: 功能包不兼容的原因，例如当其 x86-64 库需要 AVX 而此 CPU 不支持时为 cpu-no-avx。兼容的旧版功能包会省略此字段。
                         selectedTarget:
                           type:
                             - string
@@ -8930,6 +8930,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 工具所需的功能包无法在此主机上安装：OCR 运行时不受支持，或者功能包需要 AVX 而此 CPU 不支持（代码 FEATURE_CPU_UNSUPPORTED）。不会有任何内容进入队列。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9014,7 +9020,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: 功能包已安装，或此主机不支持 OCR 运行时
+          description: 功能包已安装、此主机不支持 OCR 运行时，或者功能包需要 AVX 而此 CPU 不支持（代码 FEATURE_CPU_UNSUPPORTED，在任何下载之前拒绝）
           content:
             application/json:
               schema:
@@ -30719,13 +30725,13 @@ x-i18n:
       provenance: machine
       outputHash: f29f56b2da66
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 1eda23969b38
+      outputHash: 05d0cd8c0ee5
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 664c188bb2db
+      outputHash: ecbef02dbeda
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30818,6 +30824,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 762479fb829c
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: d987f7128adc
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30851,9 +30861,9 @@ x-i18n:
       provenance: machine
       outputHash: 3ac14f57c728
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: b8335f18a25a
+      outputHash: 4e29572e929b
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

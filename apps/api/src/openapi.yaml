@@ -8510,10 +8510,16 @@ paths:
                         compatibility:
                           type: string
                           enum: [compatible, incompatible, invalid]
-                          description: OCR runtime compatibility; omitted for legacy bundles
+                          description: >-
+                            Host compatibility. OCR always reports it. A legacy
+                            bundle reports incompatible only when this host
+                            can't run it, and omits the field otherwise.
                         compatibilityReason:
                           type: [string, "null"]
-                          description: OCR runtime compatibility reason; omitted for legacy bundles
+                          description: >-
+                            Why the bundle is incompatible, such as cpu-no-avx
+                            when its x86-64 libraries need AVX and this CPU
+                            lacks it. Omitted for compatible legacy bundles.
                         selectedTarget:
                           type: [string, "null"]
                           description: Selected OCR runtime target, such as linux-amd64-cpu-py312
@@ -8807,6 +8813,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            A bundle the tool needs can't be installed on this host: the OCR
+            runtime is unsupported, or the bundle needs AVX and this CPU lacks
+            it (code FEATURE_CPU_UNSUPPORTED). Nothing is queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/admin/features/{bundleId}/install:
     post:
@@ -8895,7 +8910,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: Bundle already installed or OCR runtime unsupported on this host
+          description: >-
+            Bundle already installed, OCR runtime unsupported on this host, or
+            the bundle needs AVX and this CPU lacks it (code
+            FEATURE_CPU_UNSUPPORTED, refused before any download)
           content:
             application/json:
               schema:

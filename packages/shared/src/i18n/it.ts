@@ -5676,6 +5676,8 @@ export const it: TranslationKeys = {
         "Il browser richiesto da questo strumento non è disponibile al momento.",
       DEPENDENCY_VALIDATION_FAILED:
         "Questa impostazione dipende da un'altra impostazione non valida.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Questa funzione richiede una CPU con supporto AVX, e la CPU di questo server non ce l'ha.",
       FEATURE_INCOMPATIBLE: "Questa funzione non può essere eseguita con le impostazioni attuali.",
       FST_REQ_FILE_TOO_LARGE: "Questo file è troppo grande per essere caricato.",
       IDLE_TIMEOUT: "Sei stato disconnesso per inattività. Accedi di nuovo.",

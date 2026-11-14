@@ -8646,12 +8646,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Khả năng tương thích runtime OCR; bỏ qua với gói cũ
+                          description: Khả năng tương thích với máy chủ. OCR luôn báo cáo trường này. Gói cũ chỉ báo incompatible khi máy chủ này không chạy được gói, và bỏ trường này trong các trường hợp khác.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Lý do tương thích runtime OCR; bỏ qua với gói cũ
+                          description: Lý do gói không tương thích, chẳng hạn cpu-no-avx khi thư viện x86-64 của gói cần AVX mà CPU này không có. Bị bỏ qua với các gói cũ tương thích.
                         selectedTarget:
                           type:
                             - string
@@ -8970,6 +8970,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Không thể cài đặt một gói mà công cụ cần trên máy chủ này: môi trường chạy OCR không được hỗ trợ, hoặc gói cần AVX mà CPU này không có (mã FEATURE_CPU_UNSUPPORTED). Không có gì được đưa vào hàng đợi.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9056,7 +9062,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Gói đã được cài hoặc runtime OCR không được hỗ trợ trên máy chủ này
+          description: Gói đã được cài đặt, môi trường chạy OCR không được hỗ trợ trên máy chủ này, hoặc gói cần AVX mà CPU này không có (mã FEATURE_CPU_UNSUPPORTED, bị từ chối trước mọi lượt tải xuống)
           content:
             application/json:
               schema:
@@ -30794,13 +30800,13 @@ x-i18n:
       provenance: machine
       outputHash: 2f74c8c4818e
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 6363c604ee3b
+      outputHash: b20801cf1f3e
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: de36545f7edf
+      outputHash: 9b7375a1221a
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30893,6 +30899,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 9a42aece0e4e
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: ba7b161f6418
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30926,9 +30936,9 @@ x-i18n:
       provenance: machine
       outputHash: 95f6dcf388f4
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 884e93f51023
+      outputHash: e0932ef025ba
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

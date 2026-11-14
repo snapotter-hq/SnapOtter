@@ -5602,6 +5602,8 @@ export const ja: TranslationKeys = {
       BROWSER_CRASHED: "レンダリング中にブラウザがクラッシュしました。もう一度お試しください。",
       BROWSER_NOT_AVAILABLE: "このツールに必要なブラウザは現在利用できません。",
       DEPENDENCY_VALIDATION_FAILED: "この設定は、無効な別の設定に依存しています。",
+      FEATURE_CPU_UNSUPPORTED:
+        "この機能には AVX に対応した CPU が必要ですが、このサーバーの CPU は対応していません。",
       FEATURE_INCOMPATIBLE: "この機能は現在の設定では実行できません。",
       FST_REQ_FILE_TOO_LARGE: "このファイルはサイズが大きすぎるためアップロードできません。",
       IDLE_TIMEOUT:

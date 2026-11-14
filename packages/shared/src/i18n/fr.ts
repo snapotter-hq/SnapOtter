@@ -5694,6 +5694,8 @@ export const fr: TranslationKeys = {
         "Le navigateur dont cet outil a besoin n'est pas disponible pour le moment.",
       DEPENDENCY_VALIDATION_FAILED:
         "Ce paramètre dépend d'un autre paramètre qui n'est pas valide.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Cette fonctionnalité nécessite un processeur compatible AVX, et celui de ce serveur ne l'est pas.",
       FEATURE_INCOMPATIBLE:
         "Cette fonctionnalité ne peut pas s'exécuter avec les paramètres actuels.",
       FST_REQ_FILE_TOO_LARGE: "Ce fichier est trop volumineux pour être téléversé.",

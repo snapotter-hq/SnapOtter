@@ -5602,6 +5602,8 @@ export const ar: TranslationKeys = {
       BROWSER_CRASHED: "تعطّل المتصفح أثناء العرض. حاول مرة أخرى.",
       BROWSER_NOT_AVAILABLE: "المتصفح الذي تحتاجه هذه الأداة غير متاح حاليًا.",
       DEPENDENCY_VALIDATION_FAILED: "يعتمد هذا الإعداد على إعداد آخر غير صالح.",
+      FEATURE_CPU_UNSUPPORTED:
+        "تحتاج هذه الميزة إلى معالج يدعم تعليمات AVX، ومعالج هذا الخادم لا يدعمها.",
       FEATURE_INCOMPATIBLE: "لا يمكن تشغيل هذه الميزة مع الإعدادات الحالية.",
       FST_REQ_FILE_TOO_LARGE: "حجم هذا الملف أكبر من أن يُرفع.",
       IDLE_TIMEOUT: "تم تسجيل خروجك بسبب عدم النشاط. سجّل الدخول مرة أخرى.",

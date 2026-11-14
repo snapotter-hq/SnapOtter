@@ -8649,12 +8649,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: توافق بيئة تشغيل OCR؛ يُحذف للحزم القديمة
+                          description: توافق المضيف. يُبلغ OCR عنه دائمًا. تُبلغ الحزمة القديمة عن incompatible فقط عندما يتعذر على هذا المضيف تشغيلها، وتحذف الحقل في غير ذلك.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: سبب توافق بيئة تشغيل OCR؛ يُحذف للحزم القديمة
+                          description: سبب عدم توافق الحزمة، مثل cpu-no-avx عندما تحتاج مكتبات x86-64 الخاصة بها إلى AVX ولا يدعمه هذا المعالج. يُحذف للحزم القديمة المتوافقة.
                         selectedTarget:
                           type:
                             - string
@@ -8973,6 +8973,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'لا يمكن تثبيت حزمة تحتاجها الأداة على هذا المضيف: بيئة تشغيل OCR غير مدعومة، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED). لا يُضاف شيء إلى قائمة الانتظار.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9059,7 +9065,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: الحزمة مثبتة بالفعل أو بيئة تشغيل OCR غير مدعومة على هذا المضيف
+          description: الحزمة مثبتة بالفعل، أو بيئة تشغيل OCR غير مدعومة على هذا المضيف، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED، يُرفض قبل أي تنزيل)
           content:
             application/json:
               schema:
@@ -30798,13 +30804,13 @@ x-i18n:
       provenance: machine
       outputHash: f58e4ceca712
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 75c08f8e8188
+      outputHash: 44d1069bcc37
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: abc378ca3739
+      outputHash: f3fe431b2839
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30897,6 +30903,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 15d8033c1725
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 7ac2cd903f5f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30930,9 +30940,9 @@ x-i18n:
       provenance: machine
       outputHash: 7ac2edaaf370
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 5a6f9b7c61ca
+      outputHash: 0866e437bc2a
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

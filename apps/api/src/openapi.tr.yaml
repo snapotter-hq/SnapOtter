@@ -8647,12 +8647,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR çalışma zamanı uyumluluğu; eski paketlerde bulunmaz
+                          description: Ana makine uyumluluğu. OCR bunu her zaman bildirir. Eski bir paket, yalnızca bu ana makine onu çalıştıramıyorsa incompatible bildirir, aksi halde alanı göndermez.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR çalışma zamanı uyumluluk nedeni; eski paketlerde bulunmaz
+                          description: Paketin neden uyumsuz olduğu; örneğin x86-64 kitaplıkları AVX gerektirdiğinde ve bu işlemcide AVX olmadığında cpu-no-avx. Uyumlu eski paketlerde gönderilmez.
                         selectedTarget:
                           type:
                             - string
@@ -8971,6 +8971,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Aracın ihtiyaç duyduğu bir paket bu ana makineye kurulamıyor: OCR çalışma ortamı desteklenmiyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED). Hiçbir şey kuyruğa alınmaz.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9057,7 +9063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Paket zaten kurulu veya OCR çalışma zamanı bu ana makinede desteklenmiyor
+          description: Paket zaten kurulu, OCR çalışma ortamı bu ana makinede desteklenmiyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED, herhangi bir indirmeden önce reddedilir)
           content:
             application/json:
               schema:
@@ -30795,13 +30801,13 @@ x-i18n:
       provenance: machine
       outputHash: fd72cca77be2
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 88deed3a1aab
+      outputHash: 97046ac924a3
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 24a51e408d16
+      outputHash: 53d96398a141
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30894,6 +30900,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: df9565214459
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: e40c9936c09a
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30927,9 +30937,9 @@ x-i18n:
       provenance: machine
       outputHash: 8581e6b5175f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 7b7241c7fa85
+      outputHash: 1bdbdf580d9f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

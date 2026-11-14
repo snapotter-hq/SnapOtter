@@ -5338,6 +5338,7 @@ export const zhTW: TranslationKeys = {
       BROWSER_CRASHED: "瀏覽器在算繪時當機。請再試一次。",
       BROWSER_NOT_AVAILABLE: "此工具所需的瀏覽器目前無法使用。",
       DEPENDENCY_VALIDATION_FAILED: "此設定所依賴的另一項設定無效。",
+      FEATURE_CPU_UNSUPPORTED: "此功能需要支援 AVX 的 CPU，但此伺服器的 CPU 不支援。",
       FEATURE_INCOMPATIBLE: "此功能無法搭配目前的設定執行。",
       FST_REQ_FILE_TOO_LARGE: "此檔案過大，無法上傳。",
       IDLE_TIMEOUT: "您因閒置過久已被登出。請重新登入。",

@@ -8607,12 +8607,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR ランタイムの互換性。レガシーバンドルでは省略されます
+                          description: ホストとの互換性。OCR は常にこれを返します。レガシーバンドルは、このホストで実行できない場合にのみ incompatible を返し、それ以外ではこのフィールドを省略します。
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR ランタイムの互換性の理由。レガシーバンドルでは省略されます
+                          description: バンドルが非互換である理由。たとえば、x86-64 ライブラリが AVX を必要とし、この CPU に AVX がない場合は cpu-no-avx です。互換性のあるレガシーバンドルでは省略されます。
                         selectedTarget:
                           type:
                             - string
@@ -8931,6 +8931,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: ツールに必要なバンドルをこのホストにインストールできません。OCR ランタイムがサポートされていないか、バンドルが AVX を必要とし、この CPU に AVX がありません（コード FEATURE_CPU_UNSUPPORTED）。キューには何も追加されません。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9017,7 +9023,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: バンドルは既にインストールされているか、このホストでは OCR ランタイムがサポートされていません
+          description: バンドルがすでにインストール済み、このホストで OCR ランタイムがサポートされていない、またはバンドルが AVX を必要とし、この CPU に AVX がない（コード FEATURE_CPU_UNSUPPORTED、ダウンロード前に拒否）
           content:
             application/json:
               schema:
@@ -30725,13 +30731,13 @@ x-i18n:
       provenance: machine
       outputHash: 0bcd4e1c67bc
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: ec493a614b70
+      outputHash: 26c29335bb0c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: acbe39336baa
+      outputHash: 302b41eba2ee
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30824,6 +30830,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: cac1b840aafc
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: d445c37c7bb6
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30857,9 +30867,9 @@ x-i18n:
       provenance: machine
       outputHash: cf1a2ced6408
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 9b18aefff84d
+      outputHash: 67acb3a494ad
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

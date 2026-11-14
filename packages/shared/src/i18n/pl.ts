@@ -5676,6 +5676,8 @@ export const pl: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "Przeglądarka potrzebna temu narzędziu jest teraz niedostępna.",
       DEPENDENCY_VALIDATION_FAILED:
         "To ustawienie zależy od innego ustawienia, które jest nieprawidłowe.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Ta funkcja wymaga procesora z obsługą AVX, a procesor tego serwera jej nie ma.",
       FEATURE_INCOMPATIBLE: "Ta funkcja nie może działać z bieżącymi ustawieniami.",
       FST_REQ_FILE_TOO_LARGE: "Ten plik jest zbyt duży, aby go przesłać.",
       IDLE_TIMEOUT: "Wylogowano Cię z powodu braku aktywności. Zaloguj się ponownie.",

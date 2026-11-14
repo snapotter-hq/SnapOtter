@@ -8607,12 +8607,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibiliteit van de OCR-runtime; weggelaten voor verouderde bundels
+                          description: Hostcompatibiliteit. OCR meldt die altijd. Een legacy-bundel meldt incompatible alleen als deze host hem niet kan draaien, en laat het veld anders weg.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Reden voor compatibiliteit van de OCR-runtime; weggelaten voor verouderde bundels
+                          description: Waarom de bundel incompatibel is, zoals cpu-no-avx wanneer de x86-64-bibliotheken AVX nodig hebben en deze CPU dat mist. Weggelaten voor compatibele legacy-bundels.
                         selectedTarget:
                           type:
                             - string
@@ -8931,6 +8931,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Een bundel die de tool nodig heeft, kan niet op deze host worden geïnstalleerd: de OCR-runtime wordt niet ondersteund, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED). Er wordt niets in de wachtrij gezet.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9017,7 +9023,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bundel al geïnstalleerd of OCR-runtime niet ondersteund op deze host
+          description: Bundel al geïnstalleerd, OCR-runtime niet ondersteund op deze host, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED, geweigerd vóór elke download)
           content:
             application/json:
               schema:
@@ -30724,13 +30730,13 @@ x-i18n:
       provenance: machine
       outputHash: 3f741e22bcdb
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 401bd8d2e52b
+      outputHash: 9ac4fc03be48
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 1249e1da833e
+      outputHash: 7db84913f150
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30823,6 +30829,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 94536647e321
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 0ef02e733eb9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30856,9 +30866,9 @@ x-i18n:
       provenance: machine
       outputHash: 68764de8214c
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 01027b104c37
+      outputHash: 40269169290d
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

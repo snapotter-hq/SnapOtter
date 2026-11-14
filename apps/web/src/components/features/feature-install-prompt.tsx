@@ -84,6 +84,12 @@ export function FeatureInstallPrompt({
   const bundlesNeedingDownload = requiredBundles.filter(
     (candidate) => candidate.status !== "installed",
   );
+  // The server refuses these before any download (#4680), so don't offer the click.
+  const cpuUnsupported = bundlesNeedingDownload.some(
+    (candidate) =>
+      candidate.compatibility === "incompatible" && candidate.compatibilityReason === "cpu-no-avx",
+  );
+  const cpuReasonId = `feature-install-${bundle.id}-cpu-reason`;
   const downloadSizeLabel =
     bundlesNeedingDownload
       .map((candidate) =>
@@ -221,11 +227,17 @@ export function FeatureInstallPrompt({
         </div>
       )}
 
+      {cpuUnsupported && (
+        <p id={cpuReasonId} className="text-sm text-muted-foreground max-w-md">
+          {t.errors.codes.FEATURE_CPU_UNSUPPORTED}
+        </p>
+      )}
+
       {(error || (isRepair && bundle.error)) && (
         <div className="flex items-center gap-2 bg-destructive/10 text-destructive rounded-lg px-4 py-3 max-w-md w-full">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span className="text-sm flex-1 text-start">{error || bundle.error}</span>
-          {error && (
+          {error && !cpuUnsupported && (
             <button
               type="button"
               onClick={handleInstall}
@@ -267,7 +279,9 @@ export function FeatureInstallPrompt({
         <button
           type="button"
           onClick={handleInstall}
-          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
+          disabled={cpuUnsupported}
+          aria-describedby={cpuUnsupported ? cpuReasonId : undefined}
+          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
         >
           {isRepair
             ? format(t.features.repairButton, { name: displayName })
