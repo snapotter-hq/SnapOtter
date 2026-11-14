@@ -107,6 +107,24 @@ describe("extract-zip (pure JS, no skipIf)", () => {
     expect(dl.payload).toBe("hello world from extract-zip test");
   }, 30_000);
 
+  it("extracts a single entry whose name contains '..' under a safe name (#4663)", async () => {
+    // The object store refuses any key containing "..", so the raw entry name
+    // failed the job with "Invalid object key" (Sentry NODE-AZ).
+    const content = Buffer.from("dots in the name");
+    const zipBuf = await buildZipBuffer([{ name: "report..final...txt", content }]);
+
+    const res = await runExtract("dots.zip", zipBuf);
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    const name = decodeURIComponent(String(envelope.downloadUrl).split("/").pop() ?? "");
+    expect(name).not.toContain("..");
+    expect(name.endsWith(".txt")).toBe(true);
+
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.payload).toBe("dots in the name");
+  }, 30_000);
+
   it("rejects a zip with path traversal (../evil.txt) with 400", async () => {
     // Most zip libraries sanitize entry names, so we binary-patch
     // a placeholder to inject "../evil.txt" into the raw zip bytes.
