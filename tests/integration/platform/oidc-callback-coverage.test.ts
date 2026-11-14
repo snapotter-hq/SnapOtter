@@ -255,6 +255,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   // Requests under /hang/ get no answer, standing in for an IdP that accepts
   // the connection and never replies. The test answers them in its finally.
   const hungResponses: ServerResponse[] = [];
+  // While set, the root issuer's discovery document answers 503: an IdP
+  // outage the test can end without changing OIDC_ISSUER_URL (#4713).
+  let discoveryDown = false;
 
   const origOidcEnabled = env.OIDC_ENABLED;
   const origExternalUrl = env.EXTERNAL_URL;
@@ -351,6 +354,11 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       }
       if (req.url === "/.well-known/openid-configuration") {
         discoveryRequests++;
+        if (discoveryDown) {
+          res.writeHead(503);
+          res.end();
+          return;
+        }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
@@ -744,6 +752,113 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     }
   });
 
+  // A failed discovery used to leave nothing behind, so on a process with no
+  // cached discovery every logout during an IdP outage asked the IdP again
+  // and waited for it to fail (#4713). The failure is now remembered for a
+  // short window, and the local logout still always happens.
+  describe("a failed discovery is remembered briefly (#4713)", () => {
+    afterEach(() => {
+      discoveryDown = false;
+      oidcModule.resetOidcDiscoveryCacheForTests();
+    });
+
+    it("answers a second logout during an IdP outage without asking the IdP again", async () => {
+      const first = await oidcSessionWithWarmCache();
+      const second = await oidcSessionWithWarmCache();
+      oidcModule.resetOidcDiscoveryCacheForTests();
+      discoveryDown = true;
+      const before = discoveryRequests;
+
+      const firstRes = await logoutWithSession(first);
+      await expectLoggedOutLocally(firstRes, first, { idpLogout: "failed" });
+      expect(discoveryRequests).toBe(before + 1);
+
+      reportErrorSpy.mockClear();
+      const secondRes = await logoutWithSession(second);
+      await expectLoggedOutLocally(secondRes, second, { idpLogout: "failed" });
+      expect(discoveryRequests).toBe(before + 1);
+      // Still reported (reportError throttles), so the outage stays visible.
+      expectReportedDiscoveryFault("OIDC_DISCOVERY_FAILED");
+    });
+
+    it("asks the IdP again once the window has passed, and recovers when it is back", async () => {
+      const duringOutage = await oidcSessionWithWarmCache();
+      const insideWindow = await oidcSessionWithWarmCache();
+      const afterWindow = await oidcSessionWithWarmCache();
+      oidcModule.resetOidcDiscoveryCacheForTests();
+      discoveryDown = true;
+      const before = discoveryRequests;
+
+      await expectLoggedOutLocally(await logoutWithSession(duringOutage), duringOutage, {
+        idpLogout: "failed",
+      });
+
+      // The IdP is back, but the failure is still inside its window.
+      discoveryDown = false;
+      await expectLoggedOutLocally(await logoutWithSession(insideWindow), insideWindow, {
+        idpLogout: "failed",
+      });
+      expect(discoveryRequests).toBe(before + 1);
+
+      oidcModule.expireOidcDiscoveryFailureForTests();
+      const res = await logoutWithSession(afterWindow);
+
+      expect(res.statusCode).toBe(200);
+      const logoutUrl = new URL(res.json().logoutUrl);
+      expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe(
+        `http://localhost:${mockPort}/logout`,
+      );
+      expect(discoveryRequests).toBe(before + 2);
+      await expectSessionGone(afterWindow);
+    });
+
+    it("lets login fail fast from the remembered failure, then discover again after the window", async () => {
+      oidcModule.resetOidcDiscoveryCacheForTests();
+      discoveryDown = true;
+      const before = discoveryRequests;
+      const login = () =>
+        oidcApp.app.inject({ method: "GET", url: `${env.BASE_PATH}/api/auth/oidc/login` });
+
+      expect((await login()).headers.location).toBe(
+        `${env.BASE_PATH}/login?error=oidc_provider_unreachable`,
+      );
+      expect((await login()).headers.location).toBe(
+        `${env.BASE_PATH}/login?error=oidc_provider_unreachable`,
+      );
+      expect(discoveryRequests).toBe(before + 1);
+
+      discoveryDown = false;
+      oidcModule.expireOidcDiscoveryFailureForTests();
+      const res = await login();
+
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toMatch(
+        new RegExp(`^http://localhost:${mockPort}/authorize\\?`),
+      );
+      expect(discoveryRequests).toBe(before + 2);
+    });
+
+    it("forgets the failure when OIDC_ISSUER_URL changes", async () => {
+      const sessionToken = await oidcSessionWithWarmCache();
+      oidcModule.resetOidcDiscoveryCacheForTests();
+      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/broken`;
+      try {
+        await expect(getOidcEndSessionEndpoint()).rejects.toMatchObject({
+          code: "OIDC_DISCOVERY_FAILED",
+        });
+      } finally {
+        (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+      }
+      const before = discoveryRequests;
+
+      const res = await logoutWithSession(sessionToken);
+
+      expect(res.statusCode).toBe(200);
+      expect(typeof res.json().logoutUrl).toBe("string");
+      expect(discoveryRequests).toBe(before + 1);
+    });
+  });
+
   it("omits logoutUrl without reporting when a cold-cache discovery finds no end_session_endpoint (#1787)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
     oidcModule.resetOidcDiscoveryCacheForTests();
@@ -1012,6 +1127,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
   it("gives up on a cold-cache discovery the IdP never answers, logs out locally, and reports it (#1787, #1800)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
+    const secondToken = await oidcSessionWithWarmCache();
     oidcModule.resetOidcDiscoveryCacheForTests();
     (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/hang`;
     try {
@@ -1025,12 +1141,53 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(hungResponses.length).toBeGreaterThan(0);
       await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       expectReportedDiscoveryFault("OIDC_DISCOVERY_TIMEOUT");
+
+      // The timeout is remembered, so the next logout doesn't wait again or
+      // send the IdP another request (#4713).
+      const hungBefore = hungResponses.length;
+      reportErrorSpy.mockClear();
+      const againStarted = Date.now();
+      const again = await logoutWithSession(secondToken);
+      expect(Date.now() - againStarted).toBeLessThan(2_000);
+      expect(hungResponses).toHaveLength(hungBefore);
+      await expectLoggedOutLocally(again, secondToken, { idpLogout: "failed" });
+      expectReportedDiscoveryFault("OIDC_DISCOVERY_TIMEOUT");
+
+      // A logout that stopped waiting is no reason to refuse a login: it
+      // joins the discovery still running, and a slow IdP that answers in
+      // the end lets it through.
+      const login = oidcApp.app.inject({
+        method: "GET",
+        url: `${env.BASE_PATH}/api/auth/oidc/login`,
+      });
+      for (const hung of hungResponses.splice(0)) {
+        hung.writeHead(200, { "Content-Type": "application/json" });
+        hung.end(
+          JSON.stringify({
+            issuer: `http://localhost:${mockPort}/hang`,
+            authorization_endpoint: `http://localhost:${mockPort}/authorize`,
+            token_endpoint: `http://localhost:${mockPort}/token`,
+            jwks_uri: `http://localhost:${mockPort}/jwks`,
+            response_types_supported: ["code"],
+            code_challenge_methods_supported: ["S256"],
+          }),
+        );
+      }
+      const loginRes = await login;
+      // A login that started its own discovery would still be hanging.
+      expect(hungResponses).toHaveLength(0);
+      expect(loginRes.statusCode).toBe(302);
+      expect(loginRes.headers.location).toMatch(
+        new RegExp(`^http://localhost:${mockPort}/authorize\\?`),
+      );
     } finally {
       (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
       for (const hung of hungResponses.splice(0)) {
         hung.writeHead(404);
         hung.end();
       }
+      // The answered discovery filled the cache with the /hang document.
+      oidcModule.resetOidcDiscoveryCacheForTests();
     }
   }, 20_000);
 

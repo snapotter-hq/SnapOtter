@@ -71,39 +71,114 @@ function isStateConsumed(state: string): boolean {
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// How long a failed discovery is answered from memory. Without it, every
+// logout on a process with no cached discovery waited out the full logout
+// timeout for as long as the IdP was down, and every login attempt waited on
+// openid-client's own 30s (#4713). Short, so a recovered IdP is picked up
+// again without a restart.
+const FAILED_DISCOVERY_TTL_MS = 30_000;
+
 let cachedConfig: { config: oidc.Configuration; cachedAt: number } | null = null;
 
+// Keyed on the issuer so a changed OIDC_ISSUER_URL never inherits the old
+// one's failure. `logoutTimeout` marks a logout that stopped waiting while
+// the discovery itself kept going.
+let failedDiscovery: {
+  issuer: string;
+  fault: SafeError;
+  failedAt: number;
+  logoutTimeout: boolean;
+} | null = null;
+
+// The discovery in progress, so concurrent callers share one request to the
+// IdP instead of each starting their own.
+let inflightDiscovery: { issuer: string; promise: Promise<oidc.Configuration> } | null = null;
+
 /**
- * Test hook: clear the module-level discovery cache so a test can force a cold
- * discovery independent of execution order. Production code never calls this.
+ * Test hook: clear the module-level discovery cache, failures included, so a
+ * test can force a cold discovery independent of execution order. Production
+ * code never calls this.
  */
 export function resetOidcDiscoveryCacheForTests(): void {
   cachedConfig = null;
+  failedDiscovery = null;
+  inflightDiscovery = null;
 }
 
-async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
+/**
+ * Test hook: age the remembered discovery failure past its window, so a test
+ * can watch the next request ask the IdP again without waiting 30s.
+ */
+export function expireOidcDiscoveryFailureForTests(): void {
+  if (failedDiscovery) failedDiscovery.failedAt -= FAILED_DISCOVERY_TTL_MS;
+}
+
+function rememberDiscoveryFailure(issuer: string, fault: SafeError, logoutTimeout = false): void {
+  failedDiscovery = { issuer, fault, failedAt: Date.now(), logoutTimeout };
+}
+
+function recentDiscoveryFailure(issuer: string): typeof failedDiscovery {
+  if (failedDiscovery?.issuer !== issuer) return null;
+  if (Date.now() - failedDiscovery.failedAt >= FAILED_DISCOVERY_TTL_MS) return null;
+  return failedDiscovery;
+}
+
+function freshCachedConfig(): oidc.Configuration | null {
   if (cachedConfig && Date.now() - cachedConfig.cachedAt < CACHE_TTL_MS) {
     return cachedConfig.config;
   }
+  return null;
+}
 
-  const issuerUrl = new URL(env.OIDC_ISSUER_URL);
-  const config = await oidc.discovery(
-    issuerUrl,
-    env.OIDC_CLIENT_ID,
-    env.OIDC_CLIENT_SECRET,
-    undefined,
-    {
-      // No request in scope here; this gates plain-http issuer URLs for dev
-      // setups, so only the declared origin matters. The scheme is parsed, so
-      // an "HTTPS://" spelling can't switch insecure discovery on (#1775).
-      // isHttpsUrl is false for an unparseable value, but with OIDC on the
-      // boot check in env.ts only lets an http(s) URL through.
-      execute: isHttpsUrl(env.EXTERNAL_URL) ? undefined : [oidc.allowInsecureRequests],
-    },
-  );
-
+async function discover(issuer: string): Promise<oidc.Configuration> {
+  let config: oidc.Configuration;
+  try {
+    config = await oidc.discovery(
+      new URL(issuer),
+      env.OIDC_CLIENT_ID,
+      env.OIDC_CLIENT_SECRET,
+      undefined,
+      {
+        // No request in scope here; this gates plain-http issuer URLs for dev
+        // setups, so only the declared origin matters. The scheme is parsed, so
+        // an "HTTPS://" spelling can't switch insecure discovery on (#1775).
+        // isHttpsUrl is false for an unparseable value, but with OIDC on the
+        // boot check in env.ts only lets an http(s) URL through.
+        execute: isHttpsUrl(env.EXTERNAL_URL) ? undefined : [oidc.allowInsecureRequests],
+      },
+    );
+  } catch (err) {
+    const fault = oidcDiscoveryFault(err);
+    rememberDiscoveryFailure(issuer, fault);
+    throw fault;
+  }
   cachedConfig = { config, cachedAt: Date.now() };
+  if (failedDiscovery?.issuer === issuer) failedDiscovery = null;
   return config;
+}
+
+/**
+ * The cached discovery, or a fresh one. Rejects with the classified SafeError
+ * from oidcDiscoveryFault. A recent failure for the same issuer is replayed
+ * instead of asking the IdP again. The replayed error is the same object
+ * each time, so its stack is the first failure's. A logout that only gave up
+ * waiting is not replayed here: login joins the discovery still running,
+ * so a slow but working IdP isn't locked out for the whole window.
+ */
+async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
+  const cached = freshCachedConfig();
+  if (cached) return cached;
+
+  const issuer = env.OIDC_ISSUER_URL;
+  const failure = recentDiscoveryFailure(issuer);
+  if (failure && !failure.logoutTimeout) throw failure.fault;
+  if (inflightDiscovery?.issuer === issuer) return inflightDiscovery.promise;
+
+  const promise = discover(issuer).finally(() => {
+    if (inflightDiscovery?.promise === promise) inflightDiscovery = null;
+  });
+  inflightDiscovery = { issuer, promise };
+  return promise;
 }
 
 // openid-client waits 30s by default; a logout click shouldn't. This is a
@@ -113,25 +188,29 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
 const LOGOUT_DISCOVERY_TIMEOUT_MS = 5_000;
 
 /**
- * Discovery for the logout path, bounded by LOGOUT_DISCOVERY_TIMEOUT_MS and
- * with every failure wrapped as an operational SafeError: an unreachable,
- * slow, or misconfigured IdP is an environment problem, not a SnapOtter bug.
- * A discovery that outlives the timeout keeps running and still fills the
- * cache for the next logout; Promise.race handles its late rejection.
+ * Discovery for the logout path, bounded by LOGOUT_DISCOVERY_TIMEOUT_MS. Every
+ * failure is an operational SafeError: an unreachable, slow, or misconfigured
+ * IdP is an environment problem, not a SnapOtter bug. Any recent failure,
+ * a timed-out logout included, is answered at once, so during an outage only
+ * the first logout waits (#4713). The discovery that outlived a timeout keeps
+ * running: its success fills the cache and clears the failure, its failure
+ * replaces it, and Promise.race handles a late rejection.
  */
 async function discoverForLogout(): Promise<oidc.Configuration> {
+  const issuer = env.OIDC_ISSUER_URL;
+  const failure = freshCachedConfig() ? null : recentDiscoveryFailure(issuer);
+  if (failure) throw failure.fault;
+
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new SafeError("OIDC discovery timed out", { code: "OIDC_DISCOVERY_TIMEOUT" })),
-      LOGOUT_DISCOVERY_TIMEOUT_MS,
-    );
-  });
-  const discovery = getOrDiscoverConfig().catch((cause: unknown) => {
-    throw oidcDiscoveryFault(cause);
+    timer = setTimeout(() => {
+      const fault = new SafeError("OIDC discovery timed out", { code: "OIDC_DISCOVERY_TIMEOUT" });
+      rememberDiscoveryFailure(issuer, fault, true);
+      reject(fault);
+    }, LOGOUT_DISCOVERY_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([discovery, timeout]);
+    return await Promise.race([getOrDiscoverConfig(), timeout]);
   } finally {
     clearTimeout(timer);
   }
@@ -219,9 +298,9 @@ async function discoverForSignIn(
   try {
     return { config: await getOrDiscoverConfig() };
   } catch (err) {
-    const fault = oidcDiscoveryFault(err);
+    const fault = err instanceof SafeError ? err : oidcDiscoveryFault(err);
     request.log.error(
-      { err, code: fault.code },
+      { err: fault.cause ?? fault, code: fault.code },
       fault.code === "OIDC_ISSUER_SCHEME_MISMATCH"
         ? "OIDC discovery refused: OIDC_ISSUER_URL is http but EXTERNAL_URL is https, and openid-client refuses plain-http issuers for an https deployment"
         : "OIDC discovery failed",
