@@ -660,6 +660,57 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(events).toEqual(["read:0-scan.png", "rm:0-scan.png", "validate"]);
   });
 
+  it("streams a spooled file over readFile's 2 GiB limit instead of failing ERR_FS_FILE_TOO_LARGE (#4660)", async () => {
+    const {
+      mkdtemp,
+      writeFile,
+      rm: rmReal,
+    } = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const dir = await mkdtemp(resolve(tmpdir(), "batch-large-"));
+    try {
+      // The bytes stay small; the spooled size is what decides the read path.
+      const spooled = resolve(dir, "0-big.mp4");
+      await writeFile(spooled, Buffer.from("large-video-bytes"));
+      mocks.spoolMultipartFile.mockImplementation(async () => ({
+        path: spooled,
+        filename: "big.mp4",
+        size: 3 * 1024 ** 3,
+      }));
+      mocks.readFile.mockImplementation(async () => {
+        throw Object.assign(new RangeError("File size (3221225472) is greater than 2 GiB"), {
+          code: "ERR_FS_FILE_TOO_LARGE",
+        });
+      });
+      const uploaded: string[] = [];
+      mocks.putObject.mockImplementation(async (_key: string, data: Buffer) => {
+        uploaded.push(data.toString());
+      });
+      const inputHandler = await import("../../../apps/api/src/modality/input-handler.js");
+      const prepareSpy = vi.spyOn(inputHandler, "inputHandlerFor").mockReturnValue({
+        prepare: vi.fn(async (buffer: Buffer, filename: string) => ({ buffer, filename })),
+      } as never);
+      try {
+        const reply = await invokeBatchRoute({
+          section: "video",
+          toolId: "webm-to-mp4",
+          parts: [
+            { type: "file", filename: "big.mp4", content: Buffer.from("x") },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ],
+        });
+
+        expect(reply.statusCode).toBe(202);
+        expect(mocks.readFile).not.toHaveBeenCalled();
+        expect(uploaded).toEqual(["large-video-bytes"]);
+      } finally {
+        prepareSpy.mockRestore();
+      }
+    } finally {
+      await rmReal(dir, { recursive: true, force: true });
+    }
+  });
+
   it("removes empty spooled files without calling readFile and preserves slot alignment", async () => {
     const reply = await invokeBatchRoute({
       section: "image",
