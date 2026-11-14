@@ -1190,7 +1190,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       expect(pixelLimitRes.statusCode).toBe(400);
       expect(pixelLimitRes.json()).toEqual({
         error: "This image is too large to process. Reduce its dimensions and try again.",
-        code: "BAD_REQUEST",
+        code: "IMAGE_TOO_LARGE",
         requestId: expect.any(String),
       });
 
