@@ -81,12 +81,14 @@ export async function upscale(
       if (pythonOptions.model !== "lanczos" && megapixels > maxCpuMp) {
         throw new ToolInputError(
           `Image is too large for CPU upscaling (${formatExceededMp(megapixels, maxCpuMp)} MP, max ${maxCpuMp} MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.`,
+          { code: "IMAGE_TOO_LARGE" },
         );
       }
       const maxCpuOutputMp = maxCpuMp * (MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP);
       if (effectiveMp > maxCpuOutputMp) {
         throw new ToolInputError(
           `Upscaled output is too large for CPU upscaling (${formatExceededMp(effectiveMp, maxCpuOutputMp)} MP at ${scale}x, max ${maxCpuOutputMp} MP on CPU). Use a smaller image, lower scale factor, or a GPU host.`,
+          { code: "RESULT_TOO_LARGE" },
         );
       }
     }

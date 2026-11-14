@@ -145,6 +145,7 @@ function assertOutputWorkload(width: number, height: number, pages: number): voi
     if (!isToolInputError(err)) throw err;
     throw new ToolInputError(
       `This edit would make the animation too large (${pages} frames at ${width}x${height}). Use a smaller setting, fewer frames, or a still format such as PNG.`,
+      { code: "RESULT_TOO_LARGE" },
     );
   }
 }

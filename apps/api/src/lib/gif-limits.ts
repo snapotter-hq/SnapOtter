@@ -143,21 +143,32 @@ function positiveInteger(value: number | undefined): value is number {
 /**
  * Validate dimensions before any animated decode or per-frame allocation.
  * Animated Sharp metadata exposes the individual frame height as pageHeight.
+ * `oversizeCode` says whose fault an oversized canvas is: the uploaded file's
+ * (IMAGE_TOO_LARGE) or the settings' when checking a planned output.
  */
-export function assertGifWorkload(metadata: GifMetadataLike, label = "GIF input"): GifWorkload {
+export function assertGifWorkload(
+  metadata: GifMetadataLike,
+  label = "GIF input",
+  oversizeCode: "IMAGE_TOO_LARGE" | "RESULT_TOO_LARGE" = "IMAGE_TOO_LARGE",
+): GifWorkload {
   const width = metadata.width;
   const height = metadata.pageHeight ?? metadata.height;
   const frames = metadata.pages ?? 1;
 
   if (!positiveInteger(width) || !positiveInteger(height) || !positiveInteger(frames)) {
-    throw new ToolInputError(`${label} dimensions could not be determined`);
+    throw new ToolInputError(`${label} dimensions could not be determined`, {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
   if (frames > MAX_GIF_FRAMES) {
-    throw new ToolInputError(`${label} must not exceed ${MAX_GIF_FRAMES} frames`);
+    throw new ToolInputError(`${label} must not exceed ${MAX_GIF_FRAMES} frames`, {
+      code: "TOO_MANY_FRAMES",
+    });
   }
   if (width > MAX_RESIZE_OUTPUT_DIMENSION || height > MAX_RESIZE_OUTPUT_DIMENSION) {
     throw new ToolInputError(
       `${label} must not exceed ${MAX_RESIZE_OUTPUT_DIMENSION} pixels on either side`,
+      { code: oversizeCode },
     );
   }
 
@@ -165,6 +176,7 @@ export function assertGifWorkload(metadata: GifMetadataLike, label = "GIF input"
   if (framePixels > MAX_RESIZE_OUTPUT_PIXELS) {
     throw new ToolInputError(
       `${label} must not exceed ${MAX_RESIZE_OUTPUT_PIXELS} pixels per frame`,
+      { code: oversizeCode },
     );
   }
 
@@ -172,6 +184,7 @@ export function assertGifWorkload(metadata: GifMetadataLike, label = "GIF input"
   if (!Number.isSafeInteger(totalPixels) || totalPixels > MAX_GIF_TOTAL_PIXELS) {
     throw new ToolInputError(
       `${label} must not exceed ${MAX_GIF_TOTAL_PIXELS} total pixels across all frames`,
+      { code: "TOO_MANY_PIXELS" },
     );
   }
 

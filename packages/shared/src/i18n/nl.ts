@@ -5746,6 +5746,24 @@ export const nl: TranslationKeys = {
         "Het resultaat van deze instellingen zou te groot worden. Gebruik een kleinere afbeelding of instellingen die een kleiner resultaat geven.",
       NO_AUDIO_TRACK:
         "Dit bestand heeft geen audiospoor. Kies een bestand met audio en probeer het opnieuw.",
+      IMAGE_UNDECODABLE:
+        "Deze afbeelding kan niet worden gelezen. Het bestand is mogelijk beschadigd of gebruikt een codering die deze tool niet ondersteunt.",
+      INVALID_SETTINGS:
+        "Deze instellingen werken niet met dit bestand. Controleer de waarden en probeer het opnieuw.",
+      CHART_DATA_INVALID:
+        "Grafiekmaker kon geen grafiekgegevens uit dit bestand lezen. Gebruik CSV of JSON met maximaal 100 rijen, elk met een label en een getal van nul of meer.",
+      NO_FACE_DETECTED:
+        "Er is geen gezicht gevonden. Upload een scherpe foto van voren met goede belichting.",
+      TARGET_SIZE_UNREACHABLE:
+        "Dit bestand kan niet klein genoeg worden gemaakt voor de doelgrootte. Probeer een groter doel.",
+      TOO_MANY_PAGES:
+        "Deze pdf heeft te veel pagina's om in één keer te verwerken. Kies minder pagina's en probeer het opnieuw.",
+      METADATA_DAMAGED:
+        "De bestaande metadata van deze afbeelding zijn beschadigd, dus ze kunnen niet veilig worden bewerkt.",
+      REMOTE_RESOURCES_DISABLED:
+        "Dit bestand laadt afbeeldingen of stijlen van internet, wat deze server niet toestaat. Sluit ze in het bestand in en probeer het opnieuw.",
+      TOO_MANY_PIXELS:
+        "Deze animatie heeft over al haar frames te veel pixels. Gebruik minder frames of een kleiner formaat.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",

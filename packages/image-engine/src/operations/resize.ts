@@ -52,39 +52,53 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
 
   if (percentage !== undefined) {
     if (!Number.isFinite(percentage)) {
-      throw new ToolInputError("Resize percentage must be finite");
+      throw new ToolInputError("Resize percentage must be finite", { code: "INVALID_SETTINGS" });
     }
     if (percentage <= 0) {
-      throw new ToolInputError("Resize percentage must be greater than 0");
+      throw new ToolInputError("Resize percentage must be greater than 0", {
+        code: "INVALID_SETTINGS",
+      });
     }
     if (percentage > MAX_RESIZE_PERCENTAGE) {
-      throw new ToolInputError(`Resize percentage must not exceed ${MAX_RESIZE_PERCENTAGE}`);
+      throw new ToolInputError(`Resize percentage must not exceed ${MAX_RESIZE_PERCENTAGE}`, {
+        code: "INVALID_SETTINGS",
+      });
     }
   }
 
   if (width !== undefined) {
     if (!Number.isSafeInteger(width)) {
-      throw new ToolInputError("Resize width must be a positive integer");
+      throw new ToolInputError("Resize width must be a positive integer", {
+        code: "INVALID_SETTINGS",
+      });
     }
     if (width <= 0) {
-      throw new ToolInputError("Resize width must be greater than 0");
+      throw new ToolInputError("Resize width must be greater than 0", { code: "INVALID_SETTINGS" });
     }
   }
   if (height !== undefined) {
     if (!Number.isSafeInteger(height)) {
-      throw new ToolInputError("Resize height must be a positive integer");
+      throw new ToolInputError("Resize height must be a positive integer", {
+        code: "INVALID_SETTINGS",
+      });
     }
     if (height <= 0) {
-      throw new ToolInputError("Resize height must be greater than 0");
+      throw new ToolInputError("Resize height must be greater than 0", {
+        code: "INVALID_SETTINGS",
+      });
     }
   }
   if (width === undefined && height === undefined && percentage === undefined) {
-    throw new ToolInputError("Resize requires width, height, or percentage");
+    throw new ToolInputError("Resize requires width, height, or percentage", {
+      code: "INVALID_SETTINGS",
+    });
   }
 
   const metadata = await image.metadata();
   if (!metadata.width || !metadata.height) {
-    throw new ToolInputError("Cannot determine image dimensions for resize");
+    throw new ToolInputError("Cannot determine image dimensions for resize", {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
 
   // An animated pipeline reports the stacked strip as its height, while resize
@@ -107,11 +121,13 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
   if (target.width > MAX_RESIZE_OUTPUT_DIMENSION || target.height > MAX_RESIZE_OUTPUT_DIMENSION) {
     throw new ToolInputError(
       `Resize output must not exceed ${MAX_RESIZE_OUTPUT_DIMENSION} pixels on either side`,
+      { code: "RESULT_TOO_LARGE" },
     );
   }
   if (target.width * target.height > MAX_RESIZE_OUTPUT_PIXELS) {
     throw new ToolInputError(
       `Resize output must not exceed ${MAX_RESIZE_OUTPUT_PIXELS} total pixels`,
+      { code: "RESULT_TOO_LARGE" },
     );
   }
 

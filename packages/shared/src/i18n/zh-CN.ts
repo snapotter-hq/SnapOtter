@@ -5395,6 +5395,17 @@ export const zhCN: TranslationKeys = {
       IMAGE_TOO_LARGE: "此图片太大，无法处理。请缩小尺寸后重试。",
       RESULT_TOO_LARGE: "这些设置生成的结果太大。请使用更小的图片，或使用能生成更小结果的设置。",
       NO_AUDIO_TRACK: "此文件没有音轨。请选择包含音频的文件后重试。",
+      IMAGE_UNDECODABLE: "无法读取此图片。文件可能已损坏，或使用了此工具不支持的编码。",
+      INVALID_SETTINGS: "这些设置不适用于此文件。请检查数值后重试。",
+      CHART_DATA_INVALID:
+        "图表制作器无法从此文件读取图表数据。请使用不超过 100 行的 CSV 或 JSON，每行包含一个标签和一个大于或等于零的数字。",
+      NO_FACE_DETECTED: "未检测到人脸。请上传一张光线充足、正面且清晰的照片。",
+      TARGET_SIZE_UNREACHABLE: "此文件无法缩小到目标大小。请尝试更大的目标。",
+      TOO_MANY_PAGES: "此 PDF 页数过多，无法一次处理。请选择更少的页面后重试。",
+      METADATA_DAMAGED: "此图片现有的元数据已损坏，无法安全编辑。",
+      REMOTE_RESOURCES_DISABLED:
+        "此文件会从互联网加载图片或样式，而此服务器不允许这样做。请将它们嵌入文件后重试。",
+      TOO_MANY_PIXELS: "此动画所有帧的像素总数过多。请使用更少的帧或更小的尺寸。",
     },
     generic: "发生错误",
     offline: "您已离线",

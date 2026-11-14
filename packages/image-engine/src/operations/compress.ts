@@ -43,24 +43,30 @@ export async function compressDetailed(
 
   const explicitFormat = FORMAT_MAP[format ?? ""];
   if (format !== undefined && explicitFormat === undefined) {
-    throw new ToolInputError(`Unsupported compression format: ${format}`);
+    throw new ToolInputError(`Unsupported compression format: ${format}`, {
+      code: "INVALID_SETTINGS",
+    });
   }
 
   if (quality !== undefined) {
     if (!Number.isFinite(quality) || !Number.isInteger(quality)) {
-      throw new ToolInputError("Quality must be an integer between 1 and 100");
+      throw new ToolInputError("Quality must be an integer between 1 and 100", {
+        code: "INVALID_SETTINGS",
+      });
     }
     if (quality < 1 || quality > 100) {
-      throw new ToolInputError("Quality must be between 1 and 100");
+      throw new ToolInputError("Quality must be between 1 and 100", { code: "INVALID_SETTINGS" });
     }
   }
 
   if (targetSizeBytes !== undefined) {
     if (!Number.isSafeInteger(targetSizeBytes)) {
-      throw new ToolInputError("Target size must be a positive integer");
+      throw new ToolInputError("Target size must be a positive integer", {
+        code: "INVALID_SETTINGS",
+      });
     }
     if (targetSizeBytes <= 0) {
-      throw new ToolInputError("Target size must be greater than 0");
+      throw new ToolInputError("Target size must be greater than 0", { code: "INVALID_SETTINGS" });
     }
   }
 
@@ -171,7 +177,9 @@ async function compressToTargetSize(
   const originalHeight = metadata.height ?? 0;
 
   if (originalWidth === 0 || originalHeight === 0) {
-    throw new ToolInputError("Cannot determine image dimensions for target-size compression");
+    throw new ToolInputError("Cannot determine image dimensions for target-size compression", {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
 
   const scaleFactor = 0.75;
@@ -198,5 +206,6 @@ async function compressToTargetSize(
 
   throw new ToolInputError(
     `Couldn't get this image under ${formatTargetKb(targetBytes)}, even after scaling it down. Try a larger target, or crop the image first.`,
+    { code: "TARGET_SIZE_UNREACHABLE" },
   );
 }

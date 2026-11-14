@@ -5767,6 +5767,24 @@ export const fr: TranslationKeys = {
         "Le résultat produit par ces réglages serait trop grand. Utilisez une image plus petite ou des réglages qui donnent un résultat plus petit.",
       NO_AUDIO_TRACK:
         "Ce fichier n'a pas de piste audio. Choisissez un fichier avec de l'audio et réessayez.",
+      IMAGE_UNDECODABLE:
+        "Impossible de lire cette image. Le fichier est peut-être endommagé ou utilise un encodage que cet outil ne prend pas en charge.",
+      INVALID_SETTINGS:
+        "Ces paramètres ne conviennent pas à ce fichier. Vérifiez les valeurs et réessayez.",
+      CHART_DATA_INVALID:
+        "Le Créateur de graphiques n'a pas pu lire de données dans ce fichier. Utilisez un CSV ou un JSON de 100 lignes au maximum, chacune avec un libellé et un nombre supérieur ou égal à zéro.",
+      NO_FACE_DETECTED:
+        "Aucun visage n'a été trouvé. Importez une photo nette, de face et bien éclairée.",
+      TARGET_SIZE_UNREACHABLE:
+        "Ce fichier ne peut pas être assez réduit pour atteindre la taille cible. Essayez une cible plus grande.",
+      TOO_MANY_PAGES:
+        "Ce PDF a trop de pages pour être traité en une fois. Choisissez moins de pages et réessayez.",
+      METADATA_DAMAGED:
+        "Les métadonnées existantes de cette image sont endommagées, elles ne peuvent donc pas être modifiées en toute sécurité.",
+      REMOTE_RESOURCES_DISABLED:
+        "Ce fichier charge des images ou des styles depuis Internet, ce que ce serveur n'autorise pas. Intégrez-les au fichier et réessayez.",
+      TOO_MANY_PIXELS:
+        "Cette animation compte trop de pixels sur l'ensemble de ses images. Utilisez moins d'images ou une taille plus petite.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",

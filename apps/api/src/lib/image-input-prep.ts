@@ -92,7 +92,9 @@ export async function prepareRouteImage(
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       opts.log?.warn({ err }, "Decode failed");
-      throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
+      throw err instanceof Error
+        ? markToolInputError(err)
+        : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
     }
   }
 
@@ -130,7 +132,7 @@ export async function prepareRouteImage(
         opts.log?.warn({ err: decodeErr }, "Decode failed");
         throw decodeErr instanceof Error
           ? markToolInputError(decodeErr)
-          : new ToolInputError(String(decodeErr));
+          : new ToolInputError(String(decodeErr), { code: "IMAGE_UNDECODABLE" });
       }
     }
   }

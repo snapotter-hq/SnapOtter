@@ -229,7 +229,7 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
     if (isPixelSafetyError(probeErr)) {
       return pixelLimitImageError(err);
     }
-    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err });
+    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err, code: "IMAGE_UNDECODABLE" });
   }
   return err instanceof Error ? err : new Error(String(err));
 }

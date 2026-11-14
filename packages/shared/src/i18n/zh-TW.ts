@@ -5396,6 +5396,17 @@ export const zhTW: TranslationKeys = {
       IMAGE_TOO_LARGE: "此圖片太大，無法處理。請縮小尺寸後再試一次。",
       RESULT_TOO_LARGE: "這些設定產生的結果太大。請使用較小的圖片，或使用能產生較小結果的設定。",
       NO_AUDIO_TRACK: "此檔案沒有音軌。請選擇包含音訊的檔案後再試一次。",
+      IMAGE_UNDECODABLE: "無法讀取此圖片。檔案可能已損壞，或使用了此工具不支援的編碼。",
+      INVALID_SETTINGS: "這些設定不適用於此檔案。請檢查數值後再試一次。",
+      CHART_DATA_INVALID:
+        "圖表製作工具無法從此檔案讀取圖表資料。請使用不超過 100 列的 CSV 或 JSON，每列包含一個標籤和一個大於或等於零的數字。",
+      NO_FACE_DETECTED: "未偵測到臉部。請上傳一張光線充足、正面且清晰的照片。",
+      TARGET_SIZE_UNREACHABLE: "此檔案無法縮小到目標大小。請嘗試更大的目標。",
+      TOO_MANY_PAGES: "此 PDF 頁數過多，無法一次處理。請選擇較少的頁面後再試一次。",
+      METADATA_DAMAGED: "此圖片現有的中繼資料已損壞，無法安全編輯。",
+      REMOTE_RESOURCES_DISABLED:
+        "此檔案會從網際網路載入圖片或樣式，而此伺服器不允許這麼做。請將它們嵌入檔案後再試一次。",
+      TOO_MANY_PIXELS: "此動畫所有影格的像素總數過多。請使用較少的影格或較小的尺寸。",
     },
     generic: "發生錯誤",
     offline: "您已離線",

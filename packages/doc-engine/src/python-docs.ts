@@ -306,7 +306,7 @@ export async function htmlToPdfPy(
   if ("error" in parsed) {
     const detail = formatDocsError(parsed.error, stdout);
     if (detail.startsWith("remote resources are disabled")) {
-      throw new ToolInputError(detail);
+      throw new ToolInputError(detail, { code: "REMOTE_RESOURCES_DISABLED" });
     }
     throw new Error(`doc_html_pdf failed: ${detail}`);
   }

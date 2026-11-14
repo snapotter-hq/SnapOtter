@@ -1181,7 +1181,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       expect(corruptHeaderRes.json()).toEqual({
         error:
           "This image can't be decoded. The file may be corrupt or use an unsupported encoding.",
-        code: "BAD_REQUEST",
+        code: "IMAGE_UNDECODABLE",
         requestId: expect.any(String),
       });
 

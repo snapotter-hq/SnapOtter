@@ -251,6 +251,7 @@ export function registerRestorePhoto(app: FastifyInstance) {
                 if (isDecoderUnavailable(avifErr) || hasServerErrorStatus(avifErr)) throw avifErr;
                 const combined = new ToolInputError(
                   `AVIF decode failed (native: ${probeErr instanceof Error ? probeErr.message : String(probeErr)}; cli: ${avifErr instanceof Error ? avifErr.message : String(avifErr)})`,
+                  { code: "IMAGE_UNDECODABLE" },
                 );
                 combined.cause = avifErr;
                 throw markToolInputError(combined);

@@ -5743,6 +5743,24 @@ export const ptBR: TranslationKeys = {
         "O resultado dessas configurações seria grande demais. Use uma imagem menor ou configurações que gerem um resultado menor.",
       NO_AUDIO_TRACK:
         "Este arquivo não tem faixa de áudio. Escolha um arquivo com áudio e tente novamente.",
+      IMAGE_UNDECODABLE:
+        "Não foi possível ler esta imagem. O arquivo pode estar danificado ou usar uma codificação que esta ferramenta não suporta.",
+      INVALID_SETTINGS:
+        "Estas configurações não funcionam com este arquivo. Verifique os valores e tente novamente.",
+      CHART_DATA_INVALID:
+        "O Criador de Gráficos não conseguiu ler dados deste arquivo. Use CSV ou JSON com até 100 linhas, cada uma com um rótulo e um número igual ou maior que zero.",
+      NO_FACE_DETECTED:
+        "Nenhum rosto foi encontrado. Envie uma foto nítida, de frente e com boa iluminação.",
+      TARGET_SIZE_UNREACHABLE:
+        "Não é possível reduzir este arquivo até o tamanho desejado. Tente um tamanho maior.",
+      TOO_MANY_PAGES:
+        "Este PDF tem páginas demais para processar de uma vez. Escolha menos páginas e tente novamente.",
+      METADATA_DAMAGED:
+        "Os metadados atuais desta imagem estão danificados, então não podem ser editados com segurança.",
+      REMOTE_RESOURCES_DISABLED:
+        "Este arquivo carrega imagens ou estilos da internet, o que este servidor não permite. Incorpore-os ao arquivo e tente novamente.",
+      TOO_MANY_PIXELS:
+        "Esta animação tem pixels demais somando todos os quadros. Use menos quadros ou um tamanho menor.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",
