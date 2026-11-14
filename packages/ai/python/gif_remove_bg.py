@@ -535,7 +535,8 @@ def main():
     except ImportError as e:
         detail = str(e).strip() or type(e).__name__
         print(json.dumps({"warning": f"[gif-remove-bg] Import failed: {detail}"}), file=sys.stderr, flush=True)
-        result = json.dumps({"success": False, "error": f"import failed: {detail}"})
+        from remove_bg import background_removal_import_message
+        result = json.dumps({"success": False, "error": background_removal_import_message(detail)})
     except Exception as e:  # noqa: BLE001
         result = json.dumps({"success": False, "error": str(e).strip() or type(e).__name__})
 

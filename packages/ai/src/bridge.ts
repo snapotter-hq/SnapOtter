@@ -4,7 +4,14 @@ import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { isSafeMessageError, nvidiaDeviceVisible, SafeError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  isToolInputError,
+  nvidiaDeviceVisible,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import {
   type GpuFramework,
   type GpuFrameworks,
@@ -228,21 +235,77 @@ function checkFsError(message: string): string | undefined {
 }
 
 /**
+ * A sidecar failure caused by the host or the input rather than our code. Each
+ * gets a constant message the user can act on, in place of library text that
+ * is either too long for friendlyError (CUDA's OOM dump) or meaningless to them.
+ */
+export const GPU_OUT_OF_MEMORY_MESSAGE =
+  "The GPU ran out of memory on this image. Try a smaller image, or set SNAPOTTER_GPU=false to run AI tools on the CPU.";
+export const CPU_LACKS_AVX_MESSAGE =
+  "This CPU doesn't support the AVX instructions the AI libraries need. Run SnapOtter on a CPU with AVX support.";
+
+const GPU_OOM_TEXT = /cuda out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed/i;
+// TensorFlow Lite and MediaPipe abort with this before running anything (NODE-AC).
+const CPU_LACKS_AVX_TEXT = /compiled with avx\w* enabled, but this feature is not available/i;
+// Pillow's DecompressionBombError: the input has more pixels than Pillow will
+// decode, so it is the same input fault as sharp's pixel limit (NODE-AR).
+// Pillow prints the same text as a DecompressionBombWarning for smaller
+// images, which is not the failure.
+const PIL_PIXEL_LIMIT_TEXT = /Image size \(\d+ pixels\) exceeds limit of \d+ pixels/;
+const PIL_PIXEL_WARNING_TEXT = /DecompressionBombWarning/;
+// remove_bg.py's import failure. The gate already confirmed the bundle is
+// recorded as installed, so this is a partial or broken install (NODE-4W). A
+// bare "No module named" stays a bug: it can be an import no bundle ships.
+const BROKEN_INSTALL_TEXT = /is installed but its libraries did not load/i;
+// offline_guard.ensure_download_allowed: a weight the bundle ships is gone.
+const MISSING_WEIGHT_TEXT = /is missing and automatic downloads are disabled/i;
+
+/**
+ * Turn a sidecar's failure reason into the error to throw. Host and input
+ * faults are classified here, in one place, for both the exit path and the
+ * `{success: false}` path; everything else is a bug that keeps its reason.
+ */
+function sidecarFailure(message: string, exitCode: string | undefined): SafeError | ToolInputError {
+  if (PIL_PIXEL_LIMIT_TEXT.test(message) && !PIL_PIXEL_WARNING_TEXT.test(message)) {
+    return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE);
+  }
+  if (CPU_LACKS_AVX_TEXT.test(message)) {
+    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+  }
+  if (GPU_OOM_TEXT.test(message)) {
+    return new SafeError(GPU_OUT_OF_MEMORY_MESSAGE, { kind: "operational", code: "gpu-oom" });
+  }
+  const fsCode = checkFsError(message);
+  if (fsCode) return new SafeError(message, { kind: "operational", code: fsCode });
+  if (OOM_EXIT_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: exitCode });
+  }
+  if (BROKEN_INSTALL_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: "ai-module-missing" });
+  }
+  if (MISSING_WEIGHT_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: "model-weight-missing" });
+  }
+  return new SafeError(message, { kind: "bug", code: exitCode });
+}
+
+/**
  * Build the error to reject a non-zero Python exit with. The extracted reason is
  * kept as the message (it is already surfaced to callers) but wrapped in a
  * SafeError so it survives the API's Sentry scrubber, which otherwise reduces a
  * plain Error to "Error: Error" (NODE-24). Classification is deliberate: a kill
  * signal / OS OOM (SIGKILL, exit 137) and a segfault (SIGSEGV, exit 139) are
  * operational, and their constant messages keep the "out of memory" text so
- * memory-aware callers still retry on a lighter model. Any other non-zero exit
- * is a bug, with the extracted reason (or an OOM reported in-band) preserved.
+ * memory-aware callers still retry on a lighter model. SIGILL (exit 132) is a
+ * CPU missing an instruction set the wheels were built for. Any other non-zero
+ * exit goes through sidecarFailure.
  */
 function pythonExitError(
   code: number | null,
   signal: string | null,
   extracted: string,
   info?: PythonErrorInfo | null,
-): SafeError {
+): SafeError | ToolInputError {
   if (signal === "SIGSEGV" || code === 139) {
     return new SafeError("Process crashed (segmentation fault)", {
       kind: "operational",
@@ -255,13 +318,12 @@ function pythonExitError(
       code: `exit-${code ?? signal ?? "unknown"}`,
     });
   }
+  if (signal === "SIGILL" || code === 132) {
+    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+  }
   const message = extracted || `Python script exited with code ${code}`;
-  const fsCode = checkFsError(message);
-  const err = new SafeError(message, {
-    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: fsCode || `exit-${code ?? "unknown"}`,
-  });
-  if (info) {
+  const err = sidecarFailure(message, `exit-${code ?? "unknown"}`);
+  if (info && isSafeMessageError(err)) {
     Object.assign(err, { pythonType: info.type, pythonFrames: info.frames });
   }
   return err;
@@ -273,18 +335,15 @@ function pythonExitError(
  * scrubber, which reduces a plain Error to "Error: Error" (NODE-24, NODE-2N,
  * NODE-1R). The specific sidecar reason is kept as the message, matching
  * pythonExitError; an empty reason falls back to the tool's constant message.
- * Memory-allocation reasons classify as operational (the deployment's
- * hardware), everything else as a bug. Errors we already author (the bridge's
- * SafeError timeout/OOM) pass through unchanged so their kind is not masked.
+ * Host and input faults classify through sidecarFailure, everything else as a
+ * bug. Errors we already author (the bridge's SafeError timeout/OOM, or an
+ * input error) pass through unchanged so their kind is not masked.
  */
 export function toSidecarError(reason: unknown, fallback: string): Error {
-  if (isSafeMessageError(reason)) return reason;
+  if (isSafeMessageError(reason) || isToolInputError(reason)) return reason;
   const message = (reason instanceof Error ? reason.message : String(reason ?? "")).trim();
-  const fsCode = checkFsError(message);
-  return new SafeError(message || fallback, {
-    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: fsCode,
-  });
+  if (!message) return new SafeError(fallback, { kind: "bug" });
+  return sidecarFailure(message, undefined);
 }
 
 function parsePythonJsonCandidates(output: string): Array<Record<string, unknown>> {

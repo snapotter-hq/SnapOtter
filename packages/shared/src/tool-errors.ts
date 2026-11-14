@@ -43,6 +43,14 @@ export function isSafeMessageError(err: unknown): err is SafeError {
   return err instanceof Error && (err as { isSafeMessage?: unknown }).isSafeMessage === true;
 }
 
+/**
+ * The input has more pixels than a decoder will take (sharp's limitInputPixels,
+ * Pillow's decompression-bomb check). One sentence for every decoder, so the
+ * user reads the same reason whichever one refused the image.
+ */
+export const PIXEL_LIMIT_IMAGE_MESSAGE =
+  "This image is too large to process. Reduce its dimensions and try again.";
+
 export class ToolInputError extends Error {
   readonly isToolInputError = true;
   readonly statusCode = 400;

@@ -1326,7 +1326,7 @@ describe("custom error messages from Python result", () => {
     });
 
     await expect(removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-      "CUDA out of memory",
+      /^The GPU ran out of memory/,
     );
   });
 

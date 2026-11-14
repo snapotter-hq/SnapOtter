@@ -9,6 +9,7 @@ import {
   createContextKey,
   ROOT_CONTEXT,
 } from "@opentelemetry/api";
+import { isToolInputError, PIXEL_LIMIT_IMAGE_MESSAGE } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 // Mock child_process.spawn before importing the bridge module
@@ -681,6 +682,62 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     expect(err.message).toContain("segmentation fault");
     expect(err.isSafeMessage).toBe(true);
     expect(err.code).toBe("exit-SIGSEGV");
+  });
+
+  it("treats SIGILL as a CPU missing AVX, an operational host fault", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("test_script.py", []);
+    mock.emitEvent("close", null, "SIGILL");
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      kind?: string;
+      code?: string;
+    };
+    expect(err.message).toMatch(/doesn't support the AVX instructions/);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("cpu-no-avx");
+  });
+
+  it("maps the MediaPipe AVX abort printed on stderr to the AVX message (NODE-AC)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("test_script.py", []);
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "FATAL ERROR: This binary was compiled with avx enabled, but this feature is not available on this processor (go/sigill-fail-fast).\n",
+      ),
+    );
+    mock.emitEvent("close", null, "SIGABRT");
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      kind?: string;
+      code?: string;
+    };
+    expect(err.message).toMatch(/doesn't support the AVX instructions/);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("cpu-no-avx");
+  });
+
+  it("rejects a Pillow decompression-bomb exit as an input error with the pixel-limit message (NODE-AR)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("test_script.py", []);
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        '{"success": false, "error": "Image size (199756800 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack."}\n',
+      ),
+    );
+    mock.emitEvent("close", 1, null);
+
+    const err = await promise.catch((e: unknown) => e);
+    expect(isToolInputError(err)).toBe(true);
+    expect((err as Error).message).toBe(PIXEL_LIMIT_IMAGE_MESSAGE);
   });
 
   it("includes exit code in error when no signal and no stderr", async () => {
@@ -2861,7 +2918,7 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
       ),
     );
 
-    await expect(promise).rejects.toThrow("CUDA out of memory");
+    await expect(promise).rejects.toThrow(/^The GPU ran out of memory/);
   });
 
   it("extracts error from traceback in dispatcher stderr", async () => {

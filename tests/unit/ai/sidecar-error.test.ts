@@ -1,7 +1,17 @@
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { isSafeMessageError, SafeError } from "@snapotter/shared";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  isSafeMessageError,
+  isToolInputError,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 // Mock only the process-spawning entry point; toSidecarError and
 // parseStdoutJson stay real so the wrappers exercise the actual wrap logic.
@@ -14,7 +24,11 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
   };
 });
 
-import { toSidecarError } from "../../../packages/ai/src/bridge.js";
+import {
+  CPU_LACKS_AVX_MESSAGE,
+  GPU_OUT_OF_MEMORY_MESSAGE,
+  toSidecarError,
+} from "../../../packages/ai/src/bridge.js";
 import { transcribeAudio } from "../../../packages/ai/src/transcription.js";
 import { upscale } from "../../../packages/ai/src/upscaling.js";
 
@@ -69,6 +83,109 @@ describe("toSidecarError", () => {
       const err = toSidecarError(nonTargetErrno, "Failed") as SafeError;
       expect(err.kind).toBe("bug");
     }
+  });
+
+  it("replaces CUDA's long out-of-memory dump with a constant GPU message (NODE-6F)", () => {
+    const reason =
+      "CUDA out of memory. Tried to allocate 2.98 GiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. Of the allocated memory 7.83 GiB is allocated by PyTorch, and 2.25 GiB is reserved by PyTorch but unallocated.";
+    const err = toSidecarError(reason, "Face enhancement failed") as SafeError;
+    expect(err.message).toBe(GPU_OUT_OF_MEMORY_MESSAGE);
+    // Memory-aware callers (the background-removal model fallback) match this text.
+    expect(err.message).toMatch(/out of memory/);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("gpu-oom");
+  });
+
+  it("names a CPU without AVX instead of passing on the library's abort text (NODE-AC)", () => {
+    const err = toSidecarError(
+      "FATAL ERROR: This binary was compiled with avx enabled, but this feature is not available on this processor (go/sigill-fail-fast).",
+      "Photo restoration failed",
+    ) as SafeError;
+    expect(err.message).toBe(CPU_LACKS_AVX_MESSAGE);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("cpu-no-avx");
+  });
+
+  it("turns Pillow's decompression-bomb refusal into the same input error sharp's pixel limit gives (NODE-AR)", () => {
+    const err = toSidecarError(
+      "Image size (199756800 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.",
+      "Animated background removal failed",
+    );
+    expect(isToolInputError(err)).toBe(true);
+    expect(isSafeMessageError(err)).toBe(false);
+    expect(err.message).toBe(PIXEL_LIMIT_IMAGE_MESSAGE);
+
+    const traceback = toSidecarError(
+      "PIL.Image.DecompressionBombError: Image size (199756800 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.",
+      "Failed",
+    );
+    expect(isToolInputError(traceback)).toBe(true);
+
+    const prefixed = toSidecarError(
+      "Failed to open image: Image size (199756800 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.",
+      "Failed",
+    );
+    expect(isToolInputError(prefixed)).toBe(true);
+
+    // Pillow prints the same text as a warning for smaller images; that is not the failure.
+    const warning = toSidecarError(
+      "Image.py:3402: DecompressionBombWarning: Image size (99756800 pixels) exceeds limit of 89478485 pixels, could be decompression bomb DOS attack.",
+      "Failed",
+    );
+    expect(isToolInputError(warning)).toBe(false);
+  });
+
+  it("classifies a module missing from an installed bundle as operational (NODE-4W)", () => {
+    const err = toSidecarError(
+      "Background removal is installed but its libraries did not load (No module named 'rembg'). Reinstall Background Removal from Settings > AI Features, or use Reset AI Environment if that does not help.",
+      "Background removal failed",
+    ) as SafeError;
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("ai-module-missing");
+    expect(err.message).toContain("Reinstall Background Removal");
+  });
+
+  it.skipIf(!hasPython)("classifies remove_bg.py's import failure as a broken install", () => {
+    const pyDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/ai/python");
+    const res = spawnSync(
+      pythonBin as string,
+      [
+        "-c",
+        `import sys; sys.path.insert(0, ${JSON.stringify(pyDir)}); import remove_bg; print(remove_bg.background_removal_import_message("No module named 'rembg'"))`,
+      ],
+      { encoding: "utf8", timeout: 15_000 },
+    );
+    expect(res.status, res.stderr).toBe(0);
+    const err = toSidecarError(res.stdout.trim(), "Background removal failed") as SafeError;
+    expect(err.message).toContain("No module named 'rembg'");
+    expect(err.message).toContain("Reinstall Background Removal");
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("ai-module-missing");
+  });
+
+  it("classifies a bundled weight that went missing as operational", () => {
+    const err = toSidecarError(
+      "CodeFormer weight codeformer.pth is missing and automatic downloads are disabled. Reinstall the feature bundle from Settings, or explicitly set SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 to permit runtime downloads.",
+      "Face enhancement failed",
+    ) as SafeError;
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("model-weight-missing");
+  });
+
+  it("keeps a bare missing module a bug, since no bundle may ship it", () => {
+    const err = toSidecarError("No module named 'newdep'", "Upscaling failed") as SafeError;
+    expect(err.kind).toBe("bug");
+  });
+
+  it("keeps a lookup error from our code as a bug with its reason", () => {
+    const err = toSidecarError("KeyError: 'tile'", "Upscaling failed") as SafeError;
+    expect(err.kind).toBe("bug");
+    expect(err.message).toBe("KeyError: 'tile'");
+  });
+
+  it("passes an input error through untouched", () => {
+    const input = new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE);
+    expect(toSidecarError(input, "Failed")).toBe(input);
   });
 
   it("falls back to the constant tool message when the reason is empty or whitespace-only", () => {
