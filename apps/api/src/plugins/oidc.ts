@@ -94,6 +94,14 @@ export function resetOidcDiscoveryCacheForTests(): void {
   failedDiscovery = null;
 }
 
+/**
+ * Test hook: age the remembered discovery failure past its window, so a test
+ * can watch the next request ask the IdP again without waiting 30s.
+ */
+export function expireOidcDiscoveryFailureForTests(): void {
+  if (failedDiscovery) failedDiscovery.failedAt -= FAILED_DISCOVERY_TTL_MS;
+}
+
 function rememberDiscoveryFailure(issuer: string, fault: SafeError): void {
   failedDiscovery = { issuer, fault, failedAt: Date.now() };
 }

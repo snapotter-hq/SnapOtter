@@ -759,7 +759,6 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   describe("a failed discovery is remembered briefly (#4713)", () => {
     afterEach(() => {
       discoveryDown = false;
-      vi.useRealTimers();
       oidcModule.resetOidcDiscoveryCacheForTests();
     });
 
@@ -789,7 +788,6 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       oidcModule.resetOidcDiscoveryCacheForTests();
       discoveryDown = true;
       const before = discoveryRequests;
-      const failedAt = Date.now();
 
       await expectLoggedOutLocally(await logoutWithSession(duringOutage), duringOutage, {
         idpLogout: "failed",
@@ -802,8 +800,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       });
       expect(discoveryRequests).toBe(before + 1);
 
-      vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(failedAt + 30_001);
+      oidcModule.expireOidcDiscoveryFailureForTests();
       const res = await logoutWithSession(afterWindow);
 
       expect(res.statusCode).toBe(200);
@@ -819,7 +816,6 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       oidcModule.resetOidcDiscoveryCacheForTests();
       discoveryDown = true;
       const before = discoveryRequests;
-      const failedAt = Date.now();
       const login = () =>
         oidcApp.app.inject({ method: "GET", url: `${env.BASE_PATH}/api/auth/oidc/login` });
 
@@ -832,8 +828,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(discoveryRequests).toBe(before + 1);
 
       discoveryDown = false;
-      vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(failedAt + 30_001);
+      oidcModule.expireOidcDiscoveryFailureForTests();
       const res = await login();
 
       expect(res.statusCode).toBe(302);
