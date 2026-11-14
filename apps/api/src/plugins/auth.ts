@@ -23,6 +23,7 @@ import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
+import { isHealthProbe } from "../lib/health-probe.js";
 import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
 import { logger } from "../lib/logger.js";
 import {
@@ -2137,6 +2138,9 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     // Skip the session DB lookup for bundle assets: they are served on every
     // page load and an unreachable DB must not 500 them (Sentry NODE-1D).
     if (isStaticAssetRequest(request.method, request.url)) return;
+    // The health probe needs no identity; a session lookup here would 500 it
+    // whenever Postgres is down instead of letting it answer 503 (#4652).
+    if (isHealthProbe(request)) return;
 
     if (!env.AUTH_ENABLED) {
       (request as FastifyRequest & { user?: AuthUser }).user = {

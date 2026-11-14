@@ -47,6 +47,7 @@ import {
   stopInterruptedInstallRecovery,
 } from "./lib/feature-status.js";
 import { gpuBootLine } from "./lib/gpu-boot-line.js";
+import { HEALTH_PROBE_ROUTE } from "./lib/health-probe.js";
 import { ensureInstanceId } from "./lib/instance-id.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
@@ -583,7 +584,7 @@ async function checkDiskSpace(path: string, minBytes: number): Promise<boolean> 
 }
 
 // Public health check (checks core dependencies)
-app.get("/api/v1/health", async (_request, reply) => {
+app.get(HEALTH_PROBE_ROUTE, async (_request, reply) => {
   let dbOk = false;
   try {
     await db.select().from(schema.settings).limit(1);
