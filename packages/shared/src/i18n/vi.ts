@@ -5717,6 +5717,8 @@ export const vi: TranslationKeys = {
         "Tệp này tải hình ảnh hoặc kiểu dáng từ internet, điều mà máy chủ này không cho phép. Hãy nhúng chúng vào tệp rồi thử lại.",
       TOO_MANY_PIXELS:
         "Ảnh động này có quá nhiều điểm ảnh trên tất cả các khung hình. Hãy dùng ít khung hình hơn hoặc kích thước nhỏ hơn.",
+      MEDIA_UNDECODABLE:
+        "Không thể đọc tệp này. Tệp có thể bị hỏng, không có luồng âm thanh hoặc video, hoặc dùng định dạng mà công cụ này không hỗ trợ.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",

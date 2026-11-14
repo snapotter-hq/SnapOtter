@@ -93,7 +93,7 @@ export async function prepareRouteImage(
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       opts.log?.warn({ err }, "Decode failed");
       throw err instanceof Error
-        ? markToolInputError(err)
+        ? markToolInputError(err, "IMAGE_UNDECODABLE")
         : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
     }
   }
@@ -131,7 +131,7 @@ export async function prepareRouteImage(
         }
         opts.log?.warn({ err: decodeErr }, "Decode failed");
         throw decodeErr instanceof Error
-          ? markToolInputError(decodeErr)
+          ? markToolInputError(decodeErr, "IMAGE_UNDECODABLE")
           : new ToolInputError(String(decodeErr), { code: "IMAGE_UNDECODABLE" });
       }
     }

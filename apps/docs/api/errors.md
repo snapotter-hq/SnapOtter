@@ -153,10 +153,11 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `TOO_MANY_PIXELS` | 400 | The animation's canvas times its frame count is over the server's limit: 268,402,689 pixels (16383 x 16383) for Remove GIF Background, or the GIF workload cap for other animated tools. | Send fewer frames or a smaller animation. |
 | `IMAGE_TOO_LARGE` | 400 | The image has more pixels than the decoder accepts. | Send a smaller image. |
 | `RESULT_TOO_LARGE` | 400 | The settings would produce an image larger than the encoder or pixel limit allows. | Use a smaller image or settings that make a smaller result. |
-| `DOCUMENT_UNREADABLE` | 400 | LibreOffice couldn't open the document. It may be damaged, password-protected, or not the format its extension says. | Check the file opens in an office app, then send it again. |
+| `DOCUMENT_UNREADABLE` | 400 | LibreOffice or pandoc couldn't open the document. It may be damaged, password-protected, or not the format its extension says. | Check the file opens in an office app, then send it again. |
 | `PDF_DAMAGED` | 400 | The PDF engine found broken document structure. | Run the file through Repair PDF, then retry. |
 | `PDF_PASSWORD_PROTECTED` | 400 | The PDF is encrypted and this tool can't open it. | Unlock it with Unlock PDF first. |
 | `NO_AUDIO_TRACK` | 400 | The file has no audio stream for an audio tool to use. | Send a file that has audio. |
+| `MEDIA_UNDECODABLE` | 400 | ffmpeg couldn't read the audio or video: it found no packets, no codec parameters, no `moov` atom, or data it can't parse. | Check the file plays in a media player, or re-export it, then retry. |
 | `PAGE_OUT_OF_RANGE` | 400 | The page range names a page the PDF doesn't have. | Check the page count and send a range inside it. |
 | `INVALID_PAGE_RANGE` | 400 | The page range isn't valid syntax. | Use page numbers like `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages was asked to remove every page. | Keep at least one page. |

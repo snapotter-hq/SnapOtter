@@ -5762,6 +5762,8 @@ export const pl: TranslationKeys = {
         "Ten plik wczytuje obrazy lub style z internetu, na co ten serwer nie pozwala. Osadź je w pliku i spróbuj ponownie.",
       TOO_MANY_PIXELS:
         "Ta animacja ma zbyt wiele pikseli we wszystkich klatkach. Użyj mniej klatek lub mniejszego rozmiaru.",
+      MEDIA_UNDECODABLE:
+        "Nie można odczytać tego pliku. Może być uszkodzony, nie mieć strumienia audio ani wideo lub używać formatu, którego to narzędzie nie obsługuje.",
     },
     generic: "Wystąpił błąd",
     offline: "Jesteś offline",

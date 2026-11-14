@@ -5758,6 +5758,8 @@ export const es: TranslationKeys = {
         "Este archivo carga imágenes o estilos de internet, algo que este servidor no permite. Incrústalos en el archivo y vuelve a intentarlo.",
       TOO_MANY_PIXELS:
         "Esta animación tiene demasiados píxeles entre todos sus fotogramas. Usa menos fotogramas o un tamaño menor.",
+      MEDIA_UNDECODABLE:
+        "No se puede leer este archivo. Puede que esté dañado, no tenga pista de audio ni de vídeo o use un formato que esta herramienta no admite.",
     },
     generic: "Ocurrió un error",
     offline: "Estás sin conexión",

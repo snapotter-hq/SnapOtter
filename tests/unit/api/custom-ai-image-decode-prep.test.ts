@@ -15,7 +15,7 @@
 
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
-import { isToolInputError } from "@snapotter/shared";
+import { isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import sharp, { type Sharp } from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -1393,6 +1393,39 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
     } finally {
       avifUnavailSpy.mockRestore();
       orientAvifSpy.mockRestore();
+    }
+  });
+});
+
+// A decoder's rejection is marked in place, so the web app needs the code
+// that rides beside the decoder's own (#4734).
+describe("prepareRouteImage decode failures carry a translatable code", () => {
+  it("codes a HEIC the decoder rejects as IMAGE_UNDECODABLE", async () => {
+    const spy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(Object.assign(new Error("heif: invalid input"), { code: "ERR_HEIF" }));
+    try {
+      const err = await prepareRouteImage(HEIC, "photo.heic", "heif").catch((e: unknown) => e);
+      expect(isToolInputError(err)).toBe(true);
+      expect(toolInputErrorCode(err)).toBe("IMAGE_UNDECODABLE");
+      expect((err as { code?: unknown }).code).toBe("ERR_HEIF");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("codes a CLI-decoded format that neither decoder reads as IMAGE_UNDECODABLE", async () => {
+    const spy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new Error("corrupt dng"));
+    try {
+      const err = await prepareRouteImage(Buffer.from("not an image"), "photo.dng", "raw").catch(
+        (e: unknown) => e,
+      );
+      expect(isToolInputError(err)).toBe(true);
+      expect(toolInputErrorCode(err)).toBe("IMAGE_UNDECODABLE");
+    } finally {
+      spy.mockRestore();
     }
   });
 });

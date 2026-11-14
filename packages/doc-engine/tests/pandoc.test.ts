@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -444,6 +444,10 @@ describe("runPandoc", () => {
     for (const stderr of samples) {
       expect(isToolInputError(markIfPandocInputError(new Error("fail"), 1, stderr))).toBe(true);
       expect(isToolInputError(markIfPandocInputError(new Error("fail"), null, stderr))).toBe(true);
+      // The web app translates the reason from this code (#4734).
+      expect(toolInputErrorCode(markIfPandocInputError(new Error("fail"), 1, stderr))).toBe(
+        "DOCUMENT_UNREADABLE",
+      );
     }
     expect(
       isToolInputError(markIfPandocInputError(new Error("fail"), 1, "pandoc: Out of memory")),

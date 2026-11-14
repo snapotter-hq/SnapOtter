@@ -5740,6 +5740,8 @@ export const tr: TranslationKeys = {
         "Bu dosya internetten görüntü veya stil yüklüyor ve bu sunucu buna izin vermiyor. Bunları dosyanın içine gömüp tekrar deneyin.",
       TOO_MANY_PIXELS:
         "Bu animasyonun tüm karelerindeki toplam piksel sayısı çok fazla. Daha az kare veya daha küçük bir boyut kullanın.",
+      MEDIA_UNDECODABLE:
+        "Bu dosya okunamıyor. Dosya bozuk olabilir, ses veya video akışı içermiyor olabilir ya da bu aracın desteklemediği bir biçimde olabilir.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",

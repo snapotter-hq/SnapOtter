@@ -5655,6 +5655,8 @@ export const en = {
         "This file loads images or styles from the internet, which this server doesn't allow. Embed them in the file and try again.",
       TOO_MANY_PIXELS:
         "This animation has too many pixels across its frames. Use fewer frames or a smaller size.",
+      MEDIA_UNDECODABLE:
+        "This file can't be read. It may be damaged, have no audio or video stream, or use a format this tool doesn't support.",
     },
     generic: "An error occurred",
     offline: "You're offline",

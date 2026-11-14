@@ -5764,6 +5764,8 @@ export const nl: TranslationKeys = {
         "Dit bestand laadt afbeeldingen of stijlen van internet, wat deze server niet toestaat. Sluit ze in het bestand in en probeer het opnieuw.",
       TOO_MANY_PIXELS:
         "Deze animatie heeft over al haar frames te veel pixels. Gebruik minder frames of een kleiner formaat.",
+      MEDIA_UNDECODABLE:
+        "Dit bestand kan niet worden gelezen. Het is mogelijk beschadigd, heeft geen audio- of videostream of gebruikt een formaat dat deze tool niet ondersteunt.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",
