@@ -5709,6 +5709,16 @@ export const id: TranslationKeys = {
       INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Anda tidak bisa menghapus semua halaman. Sisakan setidaknya satu.",
       NESTING_TOO_DEEP: "File ini bersarang terlalu dalam untuk dikonversi.",
+      DOCUMENT_UNREADABLE:
+        "Dokumen ini tidak dapat dibuka. Mungkin rusak, dilindungi kata sandi, atau bukan format yang ditunjukkan ekstensinya.",
+      PDF_DAMAGED: "PDF ini rusak. Proses dengan alat Perbaiki PDF, lalu coba lagi.",
+      PDF_PASSWORD_PROTECTED:
+        "PDF ini dilindungi kata sandi. Buka kuncinya dengan alat Buka Kunci PDF, lalu coba lagi.",
+      IMAGE_TOO_LARGE: "Gambar ini terlalu besar untuk diproses. Kurangi dimensinya dan coba lagi.",
+      RESULT_TOO_LARGE:
+        "Hasil dari pengaturan ini akan terlalu besar. Gunakan gambar yang lebih kecil atau pengaturan yang menghasilkan hasil lebih kecil.",
+      NO_AUDIO_TRACK:
+        "File ini tidak memiliki trek audio. Pilih file yang berisi audio dan coba lagi.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",

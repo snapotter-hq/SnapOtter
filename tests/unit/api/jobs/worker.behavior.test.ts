@@ -518,6 +518,7 @@ describe("worker result payload behavior", () => {
           isClientAbort,
           isSafeMessageError: () => false,
           isToolInputError: () => false,
+          toolInputErrorCode: () => undefined,
           hasServerErrorStatus: () => false,
           ANALYTICS_EVENTS: {},
           TOOLS: [],
@@ -5420,10 +5421,15 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { TOOLS } = await vi.importActual<
       typeof import("../../../../packages/shared/src/constants.js")
     >("../../../../packages/shared/src/constants.js");
-    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-        "../../../../packages/shared/src/tool-errors.js",
-      );
+    const {
+      SafeError,
+      isSafeMessageError,
+      isToolInputError,
+      hasServerErrorStatus,
+      toolInputErrorCode,
+    } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
@@ -5433,6 +5439,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         SafeError,
         isSafeMessageError,
         isToolInputError,
+        toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
         ANALYTICS_EVENTS: {},
@@ -5473,6 +5480,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         SafeError,
         isSafeMessageError,
         isToolInputError,
+        toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
         ANALYTICS_EVENTS: {},
@@ -5500,10 +5508,15 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { TOOLS } = await vi.importActual<
       typeof import("../../../../packages/shared/src/constants.js")
     >("../../../../packages/shared/src/constants.js");
-    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-        "../../../../packages/shared/src/tool-errors.js",
-      );
+    const {
+      SafeError,
+      isSafeMessageError,
+      isToolInputError,
+      hasServerErrorStatus,
+      toolInputErrorCode,
+    } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
@@ -5537,6 +5550,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           SafeError,
           isSafeMessageError,
           isToolInputError,
+          toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
           ANALYTICS_EVENTS: {},
@@ -5933,10 +5947,15 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
       const { TOOLS } = await vi.importActual<
         typeof import("../../../../packages/shared/src/constants.js")
       >("../../../../packages/shared/src/constants.js");
-      const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-        await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-          "../../../../packages/shared/src/tool-errors.js",
-        );
+      const {
+        SafeError,
+        isSafeMessageError,
+        isToolInputError,
+        hasServerErrorStatus,
+        toolInputErrorCode,
+      } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+        "../../../../packages/shared/src/tool-errors.js",
+      );
       const { IMAGE_EXT_TO_MIME } = await vi.importActual<
         typeof import("../../../../packages/shared/src/image-mime.js")
       >("../../../../packages/shared/src/image-mime.js");
@@ -5954,6 +5973,7 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
           SafeError,
           isSafeMessageError,
           isToolInputError,
+          toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
           ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },

@@ -5716,6 +5716,15 @@ export const tr: TranslationKeys = {
       INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",
       CANNOT_REMOVE_ALL_PAGES: "Tüm sayfaları kaldıramazsınız. En az bir sayfa bırakın.",
       NESTING_TOO_DEEP: "Bu dosya dönüştürülemeyecek kadar derin iç içe geçmiş.",
+      DOCUMENT_UNREADABLE:
+        "Bu belge açılamadı. Hasarlı, parola korumalı veya uzantısının belirttiği biçimde olmayabilir.",
+      PDF_DAMAGED: "Bu PDF hasarlı. PDF Onar aracından geçirip tekrar deneyin.",
+      PDF_PASSWORD_PROTECTED:
+        "Bu PDF parola korumalı. PDF Kilidini Aç aracıyla kilidini açıp tekrar deneyin.",
+      IMAGE_TOO_LARGE: "Bu görüntü işlenemeyecek kadar büyük. Boyutlarını küçültüp tekrar deneyin.",
+      RESULT_TOO_LARGE:
+        "Bu ayarların üreteceği sonuç çok büyük. Daha küçük bir görüntü veya daha küçük sonuç veren ayarlar kullanın.",
+      NO_AUDIO_TRACK: "Bu dosyada ses parçası yok. Ses içeren bir dosya seçip tekrar deneyin.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",

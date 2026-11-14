@@ -5734,6 +5734,18 @@ export const nl: TranslationKeys = {
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Je kunt niet alle pagina's verwijderen. Houd er minstens één over.",
       NESTING_TOO_DEEP: "Dit bestand is te diep genest om te converteren.",
+      DOCUMENT_UNREADABLE:
+        "Dit document kon niet worden geopend. Het is mogelijk beschadigd, met een wachtwoord beveiligd of niet het formaat dat de extensie aangeeft.",
+      PDF_DAMAGED:
+        "Deze PDF is beschadigd. Haal hem door de tool PDF repareren en probeer het opnieuw.",
+      PDF_PASSWORD_PROTECTED:
+        "Deze PDF is met een wachtwoord beveiligd. Ontgrendel hem met de tool PDF ontgrendelen en probeer het opnieuw.",
+      IMAGE_TOO_LARGE:
+        "Deze afbeelding is te groot om te verwerken. Verklein de afmetingen en probeer het opnieuw.",
+      RESULT_TOO_LARGE:
+        "Het resultaat van deze instellingen zou te groot worden. Gebruik een kleinere afbeelding of instellingen die een kleiner resultaat geven.",
+      NO_AUDIO_TRACK:
+        "Dit bestand heeft geen audiospoor. Kies een bestand met audio en probeer het opnieuw.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",

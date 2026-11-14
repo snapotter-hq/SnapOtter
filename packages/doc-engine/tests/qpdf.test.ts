@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -221,15 +221,17 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
     [
       "parsing numeric range for /doc.pdf: error at * in numeric range *13: number 13 out of range\n",
       "page-range",
+      "PAGE_OUT_OF_RANGE",
     ],
-    ["error at * in numeric range *1z: invalid range syntax\n", "page-range"],
-    ["/doc.pdf: invalid password\n", "invalid-password"],
-  ])("rejects qpdf's %j as a user-input error tagged %s", async (stderr, fault) => {
+    ["error at * in numeric range *1z: invalid range syntax\n", "page-range", "INVALID_PAGE_RANGE"],
+    ["/doc.pdf: invalid password\n", "invalid-password", "PDF_PASSWORD_PROTECTED"],
+  ])("rejects qpdf's %j as a user-input error tagged %s", async (stderr, fault, code) => {
     nextChild({ stderr, code: 2 });
     const m = await import("../src/qpdf.js");
     const err = await m.qpdfCheck("/doc.pdf").catch((e: unknown) => e);
     expect(isToolInputError(err)).toBe(true);
     expect(m.qpdfInputFault(err)).toBe(fault);
+    expect(toolInputErrorCode(err)).toBe(code);
     expect((err as Error).message).not.toContain("/doc.pdf");
     expect(((err as Error).cause as Error).message).toBe(`qpdf exited 2: ${stderr}`);
   });

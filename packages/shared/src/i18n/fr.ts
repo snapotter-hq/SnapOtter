@@ -5756,6 +5756,17 @@ export const fr: TranslationKeys = {
       CANNOT_REMOVE_ALL_PAGES:
         "Vous ne pouvez pas supprimer toutes les pages. Gardez-en au moins une.",
       NESTING_TOO_DEEP: "Ce fichier est trop profondément imbriqué pour être converti.",
+      DOCUMENT_UNREADABLE:
+        "Impossible d'ouvrir ce document. Il est peut-être endommagé, protégé par mot de passe ou pas au format qu'indique son extension.",
+      PDF_DAMAGED: "Ce PDF est endommagé. Passez-le dans l'outil Réparer un PDF, puis réessayez.",
+      PDF_PASSWORD_PROTECTED:
+        "Ce PDF est protégé par mot de passe. Déverrouillez-le avec l'outil Déverrouiller un PDF, puis réessayez.",
+      IMAGE_TOO_LARGE:
+        "Cette image est trop grande pour être traitée. Réduisez ses dimensions et réessayez.",
+      RESULT_TOO_LARGE:
+        "Le résultat produit par ces réglages serait trop grand. Utilisez une image plus petite ou des réglages qui donnent un résultat plus petit.",
+      NO_AUDIO_TRACK:
+        "Ce fichier n'a pas de piste audio. Choisissez un fichier avec de l'audio et réessayez.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",

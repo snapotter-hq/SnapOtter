@@ -5690,6 +5690,15 @@ export const vi: TranslationKeys = {
       INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Bạn không thể xóa tất cả các trang. Hãy giữ lại ít nhất một trang.",
       NESTING_TOO_DEEP: "Tệp này lồng nhau quá sâu để chuyển đổi.",
+      DOCUMENT_UNREADABLE:
+        "Không thể mở tài liệu này. Tài liệu có thể bị hỏng, được bảo vệ bằng mật khẩu hoặc không đúng định dạng như phần mở rộng cho biết.",
+      PDF_DAMAGED: "PDF này bị hỏng. Hãy xử lý nó bằng công cụ Sửa chữa PDF rồi thử lại.",
+      PDF_PASSWORD_PROTECTED:
+        "PDF này được bảo vệ bằng mật khẩu. Hãy mở khóa bằng công cụ Mở khóa PDF rồi thử lại.",
+      IMAGE_TOO_LARGE: "Hình ảnh này quá lớn để xử lý. Hãy giảm kích thước rồi thử lại.",
+      RESULT_TOO_LARGE:
+        "Kết quả từ các cài đặt này sẽ quá lớn. Hãy dùng hình ảnh nhỏ hơn hoặc cài đặt cho kết quả nhỏ hơn.",
+      NO_AUDIO_TRACK: "Tệp này không có bản âm thanh. Hãy chọn tệp có âm thanh rồi thử lại.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",

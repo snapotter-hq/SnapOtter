@@ -68,8 +68,9 @@ function parseDocsJson<T>(script: string, stdout: string): T {
     // Expected-class errors never reach Sentry or the worker's error log, so
     // keep the raw output on the cause: it is the only artifact left to
     // check when the classification itself is in question.
-    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), {
+    throw new ToolInputError(DAMAGED_PDF_MESSAGE, {
       cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`),
+      code: "PDF_DAMAGED",
     });
   }
   throw new SafeError("Document tool returned non-JSON output", {
@@ -86,7 +87,7 @@ function formatDocsError(error: unknown, stdout: string): string {
 
 function withDamageClassification(err: unknown): never {
   if (isSafeMessageError(err) && MUPDF_DAMAGE_ERROR.test(err.message)) {
-    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), { cause: err });
+    throw new ToolInputError(DAMAGED_PDF_MESSAGE, { cause: err, code: "PDF_DAMAGED" });
   }
   throw err;
 }

@@ -79,8 +79,10 @@ describe.skipIf(!sofficeAvailable())("word-to-pdf (requires soffice)", () => {
     expect(res.statusCode).toBe(202);
     const row = await settledJobRow(JSON.parse(res.body).jobId);
     expect(row.status).toBe("failed");
-    const error = row.error as { message: string; httpStatus?: number };
+    const error = row.error as { message: string; httpStatus?: number; code?: string };
     expect(error.httpStatus).toBe(400);
+    // The code is what the web app translates the failure from (#4679).
+    expect(error.code).toBe("DOCUMENT_UNREADABLE");
     expect(error.message).toMatch(/couldn't be opened/);
     expect(error.message).not.toContain("in-truncated");
   }, 90_000);

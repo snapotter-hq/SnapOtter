@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -186,6 +186,8 @@ describe("convertDocument with a document LibreOffice can't load", () => {
     expect(((err as Error).cause as Error).message).toBe(
       "LibreOffice produced no pdf output for in-truncated.docx",
     );
+    // The web app translates the failure from this code (#4679).
+    expect(toolInputErrorCode(err)).toBe("DOCUMENT_UNREADABLE");
   });
 
   it("keeps an unexplained empty run a bug, with LibreOffice's stderr on the cause", async () => {

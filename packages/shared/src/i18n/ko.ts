@@ -5617,6 +5617,16 @@ export const ko: TranslationKeys = {
       INVALID_PAGE_RANGE: "이 페이지 범위는 올바르지 않습니다. 1-3,5처럼 페이지 번호를 입력하세요.",
       CANNOT_REMOVE_ALL_PAGES: "모든 페이지를 삭제할 수는 없습니다. 최소 한 페이지는 남겨 두세요.",
       NESTING_TOO_DEEP: "이 파일은 중첩이 너무 깊어 변환할 수 없습니다.",
+      DOCUMENT_UNREADABLE:
+        "이 문서를 열 수 없습니다. 손상되었거나, 비밀번호로 보호되어 있거나, 확장자가 나타내는 형식이 아닐 수 있습니다.",
+      PDF_DAMAGED: "이 PDF가 손상되었습니다. PDF 복구 도구로 복구한 다음 다시 시도하세요.",
+      PDF_PASSWORD_PROTECTED:
+        "이 PDF는 비밀번호로 보호되어 있습니다. PDF 잠금 해제 도구로 잠금을 해제한 다음 다시 시도하세요.",
+      IMAGE_TOO_LARGE: "이 이미지는 너무 커서 처리할 수 없습니다. 크기를 줄이고 다시 시도하세요.",
+      RESULT_TOO_LARGE:
+        "이 설정으로 만들어질 결과가 너무 큽니다. 더 작은 이미지나 더 작은 결과를 만드는 설정을 사용하세요.",
+      NO_AUDIO_TRACK:
+        "이 파일에는 오디오 트랙이 없습니다. 오디오가 있는 파일을 선택하고 다시 시도하세요.",
     },
     generic: "오류가 발생했습니다",
     offline: "오프라인 상태입니다",

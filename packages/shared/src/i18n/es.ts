@@ -5728,6 +5728,18 @@ export const es: TranslationKeys = {
       INVALID_PAGE_RANGE: "Ese rango de páginas no es válido. Usa números de página como 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "No puedes quitar todas las páginas. Deja al menos una.",
       NESTING_TOO_DEEP: "Este archivo tiene demasiados niveles de anidación para convertirlo.",
+      DOCUMENT_UNREADABLE:
+        "No se pudo abrir este documento. Puede estar dañado, protegido con contraseña o no tener el formato que indica su extensión.",
+      PDF_DAMAGED:
+        "Este PDF está dañado. Pásalo por la herramienta Reparar PDF y vuelve a intentarlo.",
+      PDF_PASSWORD_PROTECTED:
+        "Este PDF está protegido con contraseña. Desbloquéalo con la herramienta Desbloquear PDF y vuelve a intentarlo.",
+      IMAGE_TOO_LARGE:
+        "Esta imagen es demasiado grande para procesarla. Reduce sus dimensiones y vuelve a intentarlo.",
+      RESULT_TOO_LARGE:
+        "El resultado que producirían estos ajustes es demasiado grande. Usa una imagen más pequeña o ajustes que den un resultado más pequeño.",
+      NO_AUDIO_TRACK:
+        "Este archivo no tiene pista de audio. Elige un archivo con audio y vuelve a intentarlo.",
     },
     generic: "Ocurrió un error",
     offline: "Estás sin conexión",

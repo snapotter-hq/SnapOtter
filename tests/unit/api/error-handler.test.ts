@@ -1,5 +1,10 @@
 import type { Readable } from "node:stream";
-import { SafeError } from "@snapotter/shared";
+import {
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  pixelLimitImageError,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import Fastify, { errorCodes, type FastifyRequest, type FastifyServerOptions } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -132,6 +137,25 @@ describe("registerErrorHandler", () => {
       code: "BAD_REQUEST",
       requestId: expect.any(String),
     });
+    await app.close();
+  });
+
+  it("keeps a coded ToolInputError's code so the web app can translate it (#4679)", async () => {
+    const app = await appThrowing(() => pixelLimitImageError(new Error("pixel limit")));
+    const res = await app.inject({ method: "GET", url: "/boom" });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      error: PIXEL_LIMIT_IMAGE_MESSAGE,
+      code: "IMAGE_TOO_LARGE",
+    });
+    await app.close();
+  });
+
+  it("falls back to the status code for a ToolInputError without one", async () => {
+    const app = await appThrowing(() => new ToolInputError("Requested GIF frame does not exist"));
+    const res = await app.inject({ method: "GET", url: "/boom" });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("BAD_REQUEST");
     await app.close();
   });
 });

@@ -5734,6 +5734,16 @@ export const it: TranslationKeys = {
         "Questo intervallo di pagine non è valido. Usa numeri di pagina come 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Non puoi rimuovere tutte le pagine. Tienine almeno una.",
       NESTING_TOO_DEEP: "Questo file è annidato troppo in profondità per essere convertito.",
+      DOCUMENT_UNREADABLE:
+        "Impossibile aprire questo documento. Potrebbe essere danneggiato, protetto da password o non nel formato indicato dalla sua estensione.",
+      PDF_DAMAGED: "Questo PDF è danneggiato. Passalo nello strumento Ripara PDF, poi riprova.",
+      PDF_PASSWORD_PROTECTED:
+        "Questo PDF è protetto da password. Sbloccalo con lo strumento Sblocca PDF, poi riprova.",
+      IMAGE_TOO_LARGE:
+        "Questa immagine è troppo grande da elaborare. Riduci le sue dimensioni e riprova.",
+      RESULT_TOO_LARGE:
+        "Il risultato di queste impostazioni sarebbe troppo grande. Usa un'immagine più piccola o impostazioni che producano un risultato più piccolo.",
+      NO_AUDIO_TRACK: "Questo file non ha una traccia audio. Scegli un file con audio e riprova.",
     },
     generic: "Si è verificato un errore",
     offline: "Sei offline",
