@@ -1,8 +1,9 @@
 ---
 description: "Welche anonymen Nutzungsdaten SnapOtter erfasst, wann sie gesendet werden und wie Sie instanzweite Produktanalysen deaktivieren."
-i18n_source_hash: 875ed3efcabd
-i18n_provenance: human
-i18n_output_hash: 80f93f5f790f
+i18n_source_hash: 1a68d9371570
+i18n_provenance: machine
+i18n_output_hash: d31042eb45dd
+i18n_hash_version: 2
 ---
 
 # Was SnapOtter erfasst {#what-snapotter-collects}
@@ -15,7 +16,7 @@ Anonyme Produktanalysen sind standardmäßig aktiviert und werden von einem Admi
 - pipeline_executed: Schrittanzahl, Werkzeug-IDs, Batch-Flag, Dateianzahl, Dauer, Status.
 - ai_bundle_action: Bündel-ID, Aktion, Dauer.
 - Frontend-Nutzung: welche Werkzeugseiten geöffnet werden, hinzugefügte Dateien (nur Anzahl), gestartetes Werkzeug, Downloads, Speicherungen, Suche (nur Ergebnisanzahl), Batch verarbeitet.
-- Absturzberichte: Fehlertyp und ein Quell-Stack nur mit Datei-Basisnamen.
+- Absturzberichte: Fehlertyp, eine bereinigte Fehlermeldung (Dateinamen, Pfade, E-Mail-Adressen und Werte in Anführungszeichen entfernt), ein Quell-Stack mit Datei-Basisnamen und bei AI-Werkzeugen ein Python-Traceback nur mit Datei-Basisnamen.
 
 ## Was wir niemals erfassen {#what-we-never-collect}
 
@@ -24,7 +25,9 @@ Anonyme Produktanalysen sind standardmäßig aktiviert und werden von einem Admi
 - OCR-Ausgabetext
 - Bildmetadaten (EXIF)
 - Extrahierten Dokumenttext
-- Ihre IP-Adresse oder Kontoidentität
+- Ihre Kontoidentität
+
+PostHog sieht wie jeder Server die IP-Adresse, von der eine Anfrage kommt. Unser PostHog-Projekt verwirft sie, statt sie zu speichern, und die eigenen Server-Ereignisse von SnapOtter senden an ihrer Stelle einen Platzhalter.
 
 ## Update-Hinweise {#update-notices}
 
@@ -33,3 +36,5 @@ Solange die Analyse aktiviert ist, fragt der Server alle paar Stunden bei PostHo
 ## Deaktivieren {#turning-it-off}
 
 Admins: Einstellungen > System > Datenschutz, schalten Sie "Anonyme Produktanalysen" aus. Sie stoppt sofort, instanzweit. Um ein Image zu erstellen, das niemals senden kann, setzen Sie das Build-Argument `SNAPOTTER_ANALYTICS=off`.
+
+Um eine neue Instanz mit bereits deaktivierter Analyse zu starten, fügen Sie `SNAPOTTER_ANALYTICS_DEFAULT=off` vor dem ersten Start zur Umgebung des Servers hinzu. Tragen Sie es bei Docker Compose unter `environment:` des App-Dienstes ein, denn ein Eintrag nur in `.env` erreicht den Container nicht.
