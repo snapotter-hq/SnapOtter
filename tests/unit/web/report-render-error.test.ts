@@ -161,6 +161,7 @@ describe("reportRenderError", () => {
 
     expect(reload).toHaveBeenCalledTimes(1);
     expect(captureReactException).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
   });
 
   // WEB-2R/WEB-8/WEB-1: the reload guard is spent, or the server is down, and
@@ -174,6 +175,24 @@ describe("reportRenderError", () => {
 
     expect(captureReactException).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalled();
+    // The user still saw the error screen, so the analytics crash count has it.
+    expect(track).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a chunk aborted while leaving, then counts it without Sentry", async () => {
+    vi.useFakeTimers();
+    try {
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+      const error = abortedImport("Importing a module script failed.");
+
+      reportRenderError(error, { componentStack: "\n    at Lazy" });
+      await vi.advanceTimersByTimeAsync(LEAVING_WINDOW_MS);
+
+      expect(track).toHaveBeenCalledTimes(1);
+      expect(captureReactException).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // WEB-2Q: the chunk arrived and threw while evaluating. That is a real crash.
