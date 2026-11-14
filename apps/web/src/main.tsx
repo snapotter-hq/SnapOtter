@@ -4,6 +4,7 @@ import { App } from "./App";
 import { redirectIfUnprefixed } from "./lib/app-url";
 import { installChunkReloadHandler } from "./lib/chunk-reload";
 import { startEarlyErrorCapture } from "./lib/early-errors";
+import { installTranslatorDomGuard } from "./lib/translator-dom-guard";
 import "./styles/globals.css";
 
 // The server serves this shell for unprefixed paths too (#1275), so a browser
@@ -20,6 +21,10 @@ if (!redirectIfUnprefixed(window.location)) {
   // A container update invalidates the hashed chunks an open tab still points
   // at; reload once instead of stranding the user on a crash screen.
   installChunkReloadHandler();
+
+  // Page translators rewrite text React owns; without this an icon swap next
+  // to translated text crashes the page (#4685).
+  installTranslatorDomGuard();
 
   const rootElement = document.getElementById("root");
   if (!rootElement) throw new Error("Root element not found");
