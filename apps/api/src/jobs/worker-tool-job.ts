@@ -72,6 +72,7 @@ import {
 import { loadToolInputs } from "./worker-inputs.js";
 import {
   buildLegacyResultPayload,
+  createJobDeadline,
   createJobProgressSink,
   failureStatus,
   jobAgeMs,
@@ -203,9 +204,10 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
     const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
+    // A handler that knows how long its input needs can push this out through
+    // ctx.extendDeadline (accurate PDF OCR, #4719).
     const timeoutMs = timeoutMsFor(data.pool, data.toolId);
-    const timeoutHandle =
-      timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
+    const deadline = createJobDeadline(timeoutMs, () => ac.abort("timeout"));
 
     // Per-attempt scratch directory. BullMQ re-runs a stalled job under the
     // same id while the first attempt may still be running, so a dir keyed on
@@ -290,7 +292,12 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       if (signal.aborted) throw new Error("Canceled");
 
       // Build the process context
-      const ctx: ToolProcessCtx = { signal, scratchDir, report };
+      const ctx: ToolProcessCtx = {
+        signal,
+        scratchDir,
+        report,
+        extendDeadline: deadline.extend,
+      };
 
       // Dispatch: AI handler or standard tool registry
       let resultBuffer: Buffer | null = null;
@@ -591,7 +598,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       // this line is what an operator tuning JOB_TIMEOUT_*_S has (#2144).
       if (signal.aborted && signal.reason === "timeout") {
         logger.warn(
-          { jobId, toolId: data.toolId, timeoutMs, durationMs },
+          { jobId, toolId: data.toolId, timeoutMs: deadline.timeoutMs(), durationMs },
           "handler returned after the job deadline; result kept",
         );
       }
@@ -678,7 +685,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? timeoutMessage(timeoutMs)
+          ? timeoutMessage(deadline.timeoutMs())
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see
@@ -941,7 +948,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       throw thrownErr;
     } finally {
       if (span) span.end();
-      clearTimeout(timeoutHandle);
+      deadline.clear();
       unregisterCancelable(jobId);
       // Clean up scratch directory
       await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

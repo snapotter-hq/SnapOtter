@@ -95,7 +95,7 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_WORKER_THREADS` | `0` (auto) | Maximum worker threads for image processing. Set to 0 to auto-detect based on available CPU cores. |
 | `PROCESSING_TIMEOUT_S` | `0` (no limit) | Timeout for each call into the Python sidecar that runs the AI tools, in seconds. Set to 0 for no limit. It does not cap image, PDF, or media jobs; `JOB_TIMEOUT_FAST_S` and `JOB_TIMEOUT_LONG_S` do that. |
 | `JOB_TIMEOUT_FAST_S` | `120` | Deadline for one job on the fast pools (image and document tools), in seconds. A job that runs longer fails with a timeout error. Set to 0 for no limit. |
-| `JOB_TIMEOUT_LONG_S` | `7200` | Deadline for one job on the long pools (AI and media tools, plus any tool marked as long-running), in seconds. Set to 0 for no limit. |
+| `JOB_TIMEOUT_LONG_S` | `7200` | Deadline for one job on the long pools (AI and media tools, plus any tool marked as long-running), in seconds. Set to 0 for no limit. Balanced and Best PDF OCR extend their own deadline by page count (2 and 5 minutes a page), up to 6 hours, so a large PDF doesn't need this raised. |
 | `SYNC_WAIT_MS` | `8000` | How long a tool request waits for its job before the API stops waiting and returns `202` with a job id to follow over SSE, in milliseconds. It does not stop the job. Set to 0 to wait for the job however long it takes. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximum number of steps in a pipeline. Set to 0 for no limit. |
 | `MAX_CANVAS_PIXELS` | `0` (no limit) | Maximum canvas size in pixels for output images. Set to 0 for no limit. |

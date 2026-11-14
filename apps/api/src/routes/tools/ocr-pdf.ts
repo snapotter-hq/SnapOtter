@@ -83,6 +83,7 @@ registerAiPathJobHandler("ocr-pdf", async (input, data, ctx) => {
       pages: settings.pages,
       enhance: settings.enhance ?? quality === "best",
       signal: ctx.signal,
+      onTimeBudget: ctx.extendDeadline,
     },
     (percent, stage) => ctx.report(percent, stage),
   );

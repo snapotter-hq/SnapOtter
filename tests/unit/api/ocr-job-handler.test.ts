@@ -1,3 +1,5 @@
+import { statSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -1374,6 +1376,47 @@ describe("OCR AI job handler resource controls", () => {
 
     expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.extractText).not.toHaveBeenCalled();
+  });
+});
+
+// The job deadline follows the accurate runtime's page-based budget only if the
+// handler hands the worker's extendDeadline to extractPdfText (#4719).
+describe("OCR PDF worker: the job deadline follows the runtime budget", () => {
+  it("passes ctx.extendDeadline to extractPdfText as onTimeBudget", async () => {
+    mocks.getOcrRuntimeCapability.mockReturnValue({
+      available: true,
+      qualities: ["fast", "balanced", "best"],
+      providers: ["CPUExecutionProvider"],
+    });
+    mocks.extractPdfText.mockResolvedValueOnce({
+      text: "ok",
+      pages: 3,
+      engine: "rapidocr-onnx",
+      requestedQuality: "best",
+      actualQuality: "best",
+      degraded: false,
+      warnings: [],
+    });
+    const extendDeadline = vi.fn();
+    const data = { ...job(), toolId: "ocr-pdf", settings: { quality: "best", language: "en" } };
+    const pdf = join(__dirname, "../../fixtures/document/valid/test-3page.pdf");
+
+    await runAiPathToolJob(
+      data,
+      { path: pdf, size: statSync(pdf).size },
+      {
+        scratchDir: "/tmp/ocr-job",
+        signal: new AbortController().signal,
+        report: vi.fn(),
+        extendDeadline,
+      },
+    );
+
+    expect(mocks.extractPdfText).toHaveBeenCalledWith(
+      pdf,
+      expect.objectContaining({ onTimeBudget: extendDeadline }),
+      expect.any(Function),
+    );
   });
 });
 

@@ -369,14 +369,24 @@ export interface PdfOcrOptions {
   pages?: string;
   enhance?: boolean;
   signal?: AbortSignal;
+  /**
+   * Called once the accurate runtime's budget is known, just before it starts,
+   * with how long the rest of the call may take. The worker moves the job
+   * deadline out to it, so JOB_TIMEOUT_LONG_S doesn't cut a long Best run
+   * short (#4719).
+   */
+  onTimeBudget?: (ms: number) => void;
 }
+
+// Room past the runtime's own timeout, so that timeout (with its own
+// operational message) fires before the job deadline does.
+const RUNTIME_SETTLE_MS = 60_000;
 
 /**
  * Wall-clock budget per page for the accurate runtime. QA measured Best at
  * about 40 s a page on a plain scan and 175 s with enhancement on CPU, and a
  * 17-page Best job on 2.3.0 ran past a flat 30 minutes (NODE-4Y, #4439). The
- * job deadline (JOB_TIMEOUT_LONG_S) stays the overall ceiling an operator
- * tunes; this only stops a fixed whole-document timer from cutting in first.
+ * job deadline follows it through `onTimeBudget` (#4719).
  */
 const ACCURATE_PDF_PAGE_BUDGET_MS: Record<Exclude<OcrQuality, "fast">, number> = {
   balanced: 2 * 60_000,
@@ -442,6 +452,12 @@ export async function extractPdfText(
     "Preparing accurate PDF OCR",
   );
   try {
+    const runtimeTimeoutMs = accuratePdfRuntimeTimeoutMs(
+      prepared.pages.length,
+      quality,
+      prepared.remainingTimeoutMs(),
+    );
+    opts.onTimeBudget?.(runtimeTimeoutMs + RUNTIME_SETTLE_MS);
     onProgress?.(50, "Starting accurate PDF OCR");
     const { result } = await withProgressHeartbeat(
       () =>
@@ -455,14 +471,7 @@ export async function extractPdfText(
               enhance: opts.enhance ?? quality === "best",
             }),
           ],
-          {
-            timeoutMs: accuratePdfRuntimeTimeoutMs(
-              prepared.pages.length,
-              quality,
-              prepared.remainingTimeoutMs(),
-            ),
-            signal: opts.signal,
-          },
+          { timeoutMs: runtimeTimeoutMs, signal: opts.signal },
         ),
       onProgress,
       50,
