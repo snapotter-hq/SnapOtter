@@ -12,6 +12,7 @@ import {
 } from "../../test-server.js";
 
 const MP4 = readFixture(fixtures.video.tiny("mp4"));
+const WEBM = readFixture(fixtures.video.hero.webm);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -25,9 +26,12 @@ afterAll(async () => {
   await testApp.cleanup();
 });
 
-async function runTool(settings: Record<string, unknown> = {}) {
+async function runTool(
+  settings: Record<string, unknown> = {},
+  file = { filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+    { name: "file", ...file },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
@@ -116,6 +120,31 @@ describe.skipIf(!ffmpegAvailable())("stabilize-video (requires ffmpeg)", () => {
     // The tiny fixture carries an audio track; a mux mismatch would drop it.
     expect(info.streams.some((s) => s.type === "audio")).toBe(true);
   }, 120_000);
+
+  // #4371: webm stabilization segfaulted inside libvidstab in about half of
+  // all runs on a loaded host. One run can't prove a race is gone (the stress
+  // numbers are on the issue), but it does prove the copy-fronted chain still
+  // produces a real VP9/Opus webm of the source's length.
+  it("stabilizes a webm into a valid VP9/Opus webm", async () => {
+    const res = await runTool(
+      { smoothing: 60 },
+      { filename: "hero.webm", contentType: "video/webm", content: WEBM },
+    );
+    const { downloadPayload } = await resolveResult(res);
+    // EBML magic: the payload is a Matroska/WebM file, not an error body.
+    expect(downloadPayload.subarray(0, 4).toString("hex")).toBe("1a45dfa3");
+
+    const tmpDir = mkdtempSync(join(tmpdir(), "stab-webm-"));
+    const inFile = join(tmpDir, "hero.webm");
+    const probeFile = join(tmpDir, "stabilized.webm");
+    writeFileSync(inFile, WEBM);
+    writeFileSync(probeFile, downloadPayload);
+    const [source, info] = await Promise.all([probeMedia(inFile), probeMedia(probeFile)]);
+    expect(info.streams.find((s) => s.type === "video")?.codec).toBe("vp9");
+    // hero.webm carries an Opus track; a mux mismatch would drop it.
+    expect(info.streams.find((s) => s.type === "audio")?.codec).toBe("opus");
+    expect(info.durationS).toBeCloseTo(source.durationS ?? 0, 0);
+  }, 180_000);
 
   it("rejects smoothing out of range with 400", async () => {
     const res = await runTool({ smoothing: 100 });

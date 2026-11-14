@@ -33,6 +33,19 @@ function faststartArgs(ext: string): string[] {
     : [];
 }
 
+/**
+ * The pass 2 filter chain. `copy` hands vidstabtransform a fresh, writable
+ * frame every time (#4371). libvidstab through 1.1.2 keeps a pointer to the
+ * caller's buffer after a read-only frame, then memcpys the next writable
+ * frame into it, so it segfaults in vsFrameCopy once that buffer is reused or
+ * freed, and corrupts frames when it doesn't (georgmartius/vid.stab#144, fixed
+ * after 1.1.2). Whether a decoded frame arrives writable depends on thread
+ * timing, which is why the crash looked intermittent.
+ */
+export function vidstabTransformFilter(trf: string, smoothing: number): string {
+  return `copy,vidstabtransform=input=${trf}:smoothing=${smoothing}`;
+}
+
 export function registerStabilizeVideo(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "stabilize-video",
@@ -83,7 +96,7 @@ export function registerStabilizeVideo(app: FastifyInstance) {
           "-i",
           inPath,
           "-vf",
-          `vidstabtransform=input=${trf}:smoothing=${settings.smoothing}`,
+          vidstabTransformFilter(trf, settings.smoothing),
           ...encodeArgs,
           ...audioArgs,
           ...faststartArgs(origExt),
