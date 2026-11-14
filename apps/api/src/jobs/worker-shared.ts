@@ -1,4 +1,9 @@
-import { hasServerErrorStatus, isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  SafeError,
+} from "@snapotter/shared";
 import type { Job } from "bullmq";
 import { reportError, safeFormatTag } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -103,7 +108,7 @@ export function reportToolJobFailure(
   const failedErr =
     err instanceof Error && err.name === "UnrecoverableError" && err.cause instanceof Error
       ? err.cause
-      : err;
+      : namedStallError(err);
   const pf = (failedErr as { pythonFrames?: unknown } | null)?.pythonFrames;
   if (Array.isArray(pf) && pf.length) {
     logger.error({ pool, jobId, pythonFrames: pf }, "sidecar failure");
@@ -117,4 +122,58 @@ export function reportToolJobFailure(
     settings: data?.settings,
     jobAgeMs: jobAgeMs(job),
   });
+}
+
+// BullMQ's own failure for a job whose lock was lost past maxStalledCount
+// (set by moveStalledJobsToWait as deferredFailure, then thrown by the worker
+// run loop). maxStartedAttempts produces the "started" variant.
+const BULLMQ_STALL_MESSAGE = /^job (stalled|started) more than allowable limit$/;
+
+/**
+ * Give BullMQ's cause-less stall failure a constant SafeError so the Sentry
+ * event names it. The scrubber keeps only rebuilt values, and a plain BullMQ
+ * error has none, so it arrived as "UnrecoverableError: UnrecoverableError"
+ * (Sentry NODE-4J). Still operational and throttled, as before (NODE-27).
+ */
+function namedStallError(err: unknown): unknown {
+  if (!(err instanceof Error) || err.name !== "UnrecoverableError") return err;
+  if (!BULLMQ_STALL_MESSAGE.test(err.message)) return err;
+  return new SafeError(
+    "The job was interrupted more times than the queue allows. Its worker lost the job lock, usually because the process restarted or ran short of memory or CPU.",
+    { kind: "operational", code: "JOB_STALLED", cause: err },
+  );
+}
+
+interface ProgressTarget {
+  id?: string;
+  updateProgress(progress: { percent: number; stage?: string }): Promise<void>;
+}
+
+/**
+ * Best-effort BullMQ progress writes for one job attempt. The job hash can
+ * vanish under a running processor, and BullMQ then rejects every write with
+ * "Missing key for job"; fired with `void`, each one escaped as an unhandled
+ * rejection, one Sentry event per percent (Sentry NODE-AT). Clients follow the
+ * pub/sub frame and the jobs row, never this hash, so the first failure is
+ * logged and the rest of the attempt's writes are skipped.
+ */
+export function createJobProgressSink(
+  job: ProgressTarget,
+  toolId?: string,
+): (progress: { percent: number; stage?: string }) => void {
+  let failed = false;
+  return (progress) => {
+    if (failed) return;
+    // Through a resolved promise so a synchronous throw takes the same path.
+    Promise.resolve()
+      .then(() => job.updateProgress(progress))
+      .catch((err: unknown) => {
+        if (failed) return;
+        failed = true;
+        logger.warn(
+          { err, jobId: job.id, toolId },
+          "BullMQ job progress update failed; skipping the rest of this attempt's progress writes",
+        );
+      });
+  };
 }
