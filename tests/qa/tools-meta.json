@@ -3,6 +3,7 @@
     "id": "resize",
     "name": "Resize Image",
     "modality": "image",
+    "route": "/image/resize",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -65,6 +66,7 @@
     "id": "crop",
     "name": "Crop Image",
     "modality": "image",
+    "route": "/image/crop",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -127,6 +129,7 @@
     "id": "rotate",
     "name": "Rotate & Flip Image",
     "modality": "image",
+    "route": "/image/rotate",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -189,6 +192,7 @@
     "id": "convert",
     "name": "Convert Image",
     "modality": "image",
+    "route": "/image/convert",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -251,6 +255,7 @@
     "id": "compress",
     "name": "Compress Image",
     "modality": "image",
+    "route": "/image/compress",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -313,6 +318,7 @@
     "id": "optimize-for-web",
     "name": "Optimize for Web",
     "modality": "image",
+    "route": "/image/optimize-for-web",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -375,6 +381,7 @@
     "id": "strip-metadata",
     "name": "Remove Image Metadata",
     "modality": "image",
+    "route": "/image/strip-metadata",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -437,6 +444,7 @@
     "id": "edit-metadata",
     "name": "Edit Image Metadata",
     "modality": "image",
+    "route": "/image/edit-metadata",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -499,6 +507,7 @@
     "id": "bulk-rename",
     "name": "Bulk Rename",
     "modality": "image",
+    "route": "/image/bulk-rename",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -561,6 +570,7 @@
     "id": "image-to-pdf",
     "name": "Image to PDF",
     "modality": "image",
+    "route": "/image/image-to-pdf",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -623,6 +633,7 @@
     "id": "favicon",
     "name": "Favicon Generator",
     "modality": "image",
+    "route": "/image/favicon",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -685,6 +696,7 @@
     "id": "adjust-colors",
     "name": "Adjust Colors",
     "modality": "image",
+    "route": "/image/adjust-colors",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -747,6 +759,7 @@
     "id": "sharpening",
     "name": "Sharpen Image",
     "modality": "image",
+    "route": "/image/sharpening",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -809,6 +822,7 @@
     "id": "replace-color",
     "name": "Replace & Invert Color",
     "modality": "image",
+    "route": "/image/replace-color",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -871,6 +885,7 @@
     "id": "color-blindness",
     "name": "Color Blindness Simulation",
     "modality": "image",
+    "route": "/image/color-blindness",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -933,6 +948,7 @@
     "id": "remove-background",
     "name": "Remove Background",
     "modality": "image",
+    "route": "/image/remove-background",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -995,7 +1011,13 @@
     "id": "remove-gif-background",
     "name": "Remove GIF Background",
     "modality": "image",
-    "acceptedInputs": [".gif", ".webp", ".apng", ".png"],
+    "route": "/image/remove-gif-background",
+    "acceptedInputs": [
+      ".gif",
+      ".webp",
+      ".apng",
+      ".png"
+    ],
     "executionHint": "long",
     "isAI": true
   },
@@ -1003,6 +1025,7 @@
     "id": "upscale",
     "name": "Image Upscaling",
     "modality": "image",
+    "route": "/image/upscale",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1065,6 +1088,7 @@
     "id": "erase-object",
     "name": "Object Eraser",
     "modality": "image",
+    "route": "/image/erase-object",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1127,6 +1151,7 @@
     "id": "ocr",
     "name": "Extract Text from Image (OCR)",
     "modality": "image",
+    "route": "/image/ocr",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1189,7 +1214,10 @@
     "id": "ocr-pdf",
     "name": "PDF OCR",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/ocr-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "long",
     "isAI": true
   },
@@ -1197,6 +1225,7 @@
     "id": "blur-faces",
     "name": "Blur Faces & PII",
     "modality": "image",
+    "route": "/image/blur-faces",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1259,6 +1288,7 @@
     "id": "smart-crop",
     "name": "Smart Crop",
     "modality": "image",
+    "route": "/image/smart-crop",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1321,6 +1351,7 @@
     "id": "image-enhancement",
     "name": "Image Enhancement",
     "modality": "image",
+    "route": "/image/image-enhancement",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1383,6 +1414,7 @@
     "id": "enhance-faces",
     "name": "Face Enhancement",
     "modality": "image",
+    "route": "/image/enhance-faces",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1445,6 +1477,7 @@
     "id": "colorize",
     "name": "AI Colorization",
     "modality": "image",
+    "route": "/image/colorize",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1507,6 +1540,7 @@
     "id": "noise-removal",
     "name": "Noise Removal",
     "modality": "image",
+    "route": "/image/noise-removal",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1569,6 +1603,7 @@
     "id": "red-eye-removal",
     "name": "Red Eye Removal",
     "modality": "image",
+    "route": "/image/red-eye-removal",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1631,6 +1666,7 @@
     "id": "restore-photo",
     "name": "Photo Restoration",
     "modality": "image",
+    "route": "/image/restore-photo",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1693,6 +1729,7 @@
     "id": "passport-photo",
     "name": "Passport Photo",
     "modality": "image",
+    "route": "/image/passport-photo",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1755,6 +1792,7 @@
     "id": "content-aware-resize",
     "name": "Content-Aware Resize",
     "modality": "image",
+    "route": "/image/content-aware-resize",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1817,6 +1855,7 @@
     "id": "ai-canvas-expand",
     "name": "AI Canvas Expand",
     "modality": "image",
+    "route": "/image/ai-canvas-expand",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1879,6 +1918,7 @@
     "id": "transcribe-audio",
     "name": "Transcribe Audio",
     "modality": "audio",
+    "route": "/audio/transcribe-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -1899,6 +1939,7 @@
     "id": "auto-subtitles",
     "name": "Auto Subtitles",
     "modality": "video",
+    "route": "/video/auto-subtitles",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -1923,6 +1964,7 @@
     "id": "transparency-fixer",
     "name": "PNG Transparency Fixer",
     "modality": "image",
+    "route": "/image/transparency-fixer",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -1985,6 +2027,7 @@
     "id": "background-replace",
     "name": "Background Replace",
     "modality": "image",
+    "route": "/image/background-replace",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2047,6 +2090,7 @@
     "id": "blur-background",
     "name": "Blur Background",
     "modality": "image",
+    "route": "/image/blur-background",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2109,6 +2153,7 @@
     "id": "watermark-text",
     "name": "Text Watermark",
     "modality": "image",
+    "route": "/image/watermark-text",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2171,6 +2216,7 @@
     "id": "watermark-image",
     "name": "Image Watermark",
     "modality": "image",
+    "route": "/image/watermark-image",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2233,6 +2279,7 @@
     "id": "text-overlay",
     "name": "Text Overlay",
     "modality": "image",
+    "route": "/image/text-overlay",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2295,6 +2342,7 @@
     "id": "compose",
     "name": "Image Composition",
     "modality": "image",
+    "route": "/image/compose",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2357,6 +2405,7 @@
     "id": "meme-generator",
     "name": "Meme Generator",
     "modality": "image",
+    "route": "/image/meme-generator",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2419,6 +2468,7 @@
     "id": "info",
     "name": "Image Info",
     "modality": "image",
+    "route": "/image/info",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2481,6 +2531,7 @@
     "id": "compare",
     "name": "Image Compare",
     "modality": "image",
+    "route": "/image/compare",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2543,6 +2594,7 @@
     "id": "find-duplicates",
     "name": "Find Duplicates",
     "modality": "image",
+    "route": "/image/find-duplicates",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2605,6 +2657,7 @@
     "id": "color-palette",
     "name": "Color Palette",
     "modality": "image",
+    "route": "/image/color-palette",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2667,6 +2720,7 @@
     "id": "qr-generate",
     "name": "QR Code Generator",
     "modality": "image",
+    "route": "/image/qr-generate",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2729,6 +2783,7 @@
     "id": "html-to-image",
     "name": "HTML to Image",
     "modality": "image",
+    "route": "/image/html-to-image",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2791,6 +2846,7 @@
     "id": "barcode-read",
     "name": "Barcode Reader",
     "modality": "image",
+    "route": "/image/barcode-read",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2853,6 +2909,7 @@
     "id": "image-to-base64",
     "name": "Image to Base64",
     "modality": "image",
+    "route": "/image/image-to-base64",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2915,6 +2972,7 @@
     "id": "barcode-generate",
     "name": "Barcode Generator",
     "modality": "image",
+    "route": "/image/barcode-generate",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -2977,6 +3035,7 @@
     "id": "collage",
     "name": "Collage & Grid",
     "modality": "image",
+    "route": "/image/collage",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3039,6 +3098,7 @@
     "id": "stitch",
     "name": "Stitch Images",
     "modality": "image",
+    "route": "/image/stitch",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3101,6 +3161,7 @@
     "id": "split",
     "name": "Split Image",
     "modality": "image",
+    "route": "/image/split",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3163,6 +3224,7 @@
     "id": "border",
     "name": "Border & Frame",
     "modality": "image",
+    "route": "/image/border",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3225,6 +3287,7 @@
     "id": "beautify",
     "name": "Beautify Screenshot",
     "modality": "image",
+    "route": "/image/beautify",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3287,6 +3350,7 @@
     "id": "circle-crop",
     "name": "Circle Crop",
     "modality": "image",
+    "route": "/image/circle-crop",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3349,6 +3413,7 @@
     "id": "rounded-crop",
     "name": "Rounded Crop",
     "modality": "image",
+    "route": "/image/rounded-crop",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3411,6 +3476,7 @@
     "id": "duotone",
     "name": "Duotone",
     "modality": "image",
+    "route": "/image/duotone",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3473,6 +3539,7 @@
     "id": "image-pad",
     "name": "Image Pad",
     "modality": "image",
+    "route": "/image/image-pad",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3535,6 +3602,7 @@
     "id": "pixelate",
     "name": "Pixelate",
     "modality": "image",
+    "route": "/image/pixelate",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3597,6 +3665,7 @@
     "id": "vignette",
     "name": "Vignette",
     "modality": "image",
+    "route": "/image/vignette",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3659,7 +3728,11 @@
     "id": "gif-webp",
     "name": "GIF/WebP Converter",
     "modality": "image",
-    "acceptedInputs": [".gif", ".webp"],
+    "route": "/image/gif-webp",
+    "acceptedInputs": [
+      ".gif",
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -3667,6 +3740,7 @@
     "id": "histogram",
     "name": "Histogram",
     "modality": "image",
+    "route": "/image/histogram",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3729,6 +3803,7 @@
     "id": "lqip-placeholder",
     "name": "LQIP Placeholder",
     "modality": "image",
+    "route": "/image/lqip-placeholder",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3791,6 +3866,7 @@
     "id": "sprite-sheet",
     "name": "Sprite Sheet",
     "modality": "image",
+    "route": "/image/sprite-sheet",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3853,7 +3929,11 @@
     "id": "svg-to-raster",
     "name": "SVG to Raster",
     "modality": "image",
-    "acceptedInputs": [".svg", ".svgz"],
+    "route": "/image/svg-to-raster",
+    "acceptedInputs": [
+      ".svg",
+      ".svgz"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -3861,6 +3941,7 @@
     "id": "vectorize",
     "name": "Image to SVG",
     "modality": "image",
+    "route": "/image/vectorize",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3923,6 +4004,7 @@
     "id": "gif-tools",
     "name": "GIF Tools",
     "modality": "image",
+    "route": "/image/gif-tools",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -3985,7 +4067,10 @@
     "id": "pdf-to-image",
     "name": "PDF to Image",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-image",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -3993,6 +4078,7 @@
     "id": "convert-video",
     "name": "Convert Video",
     "modality": "video",
+    "route": "/video/convert-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4017,6 +4103,7 @@
     "id": "compress-video",
     "name": "Compress Video",
     "modality": "video",
+    "route": "/video/compress-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4041,6 +4128,7 @@
     "id": "trim-video",
     "name": "Trim Video",
     "modality": "video",
+    "route": "/video/trim-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4065,6 +4153,7 @@
     "id": "mute-video",
     "name": "Mute Video",
     "modality": "video",
+    "route": "/video/mute-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4089,6 +4178,7 @@
     "id": "video-to-gif",
     "name": "Video to GIF",
     "modality": "video",
+    "route": "/video/video-to-gif",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4113,6 +4203,7 @@
     "id": "resize-video",
     "name": "Resize Video",
     "modality": "video",
+    "route": "/video/resize-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4137,6 +4228,7 @@
     "id": "crop-video",
     "name": "Crop Video",
     "modality": "video",
+    "route": "/video/crop-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4161,6 +4253,7 @@
     "id": "rotate-video",
     "name": "Rotate Video",
     "modality": "video",
+    "route": "/video/rotate-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4185,6 +4278,7 @@
     "id": "change-fps",
     "name": "Change FPS",
     "modality": "video",
+    "route": "/video/change-fps",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4209,6 +4303,7 @@
     "id": "video-color",
     "name": "Video Color",
     "modality": "video",
+    "route": "/video/video-color",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4233,6 +4328,7 @@
     "id": "video-speed",
     "name": "Video Speed",
     "modality": "video",
+    "route": "/video/video-speed",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4257,6 +4353,7 @@
     "id": "reverse-video",
     "name": "Reverse Video",
     "modality": "video",
+    "route": "/video/reverse-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4281,6 +4378,7 @@
     "id": "video-loudnorm",
     "name": "Normalize Video Audio",
     "modality": "video",
+    "route": "/video/video-loudnorm",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4305,6 +4403,7 @@
     "id": "aspect-pad",
     "name": "Aspect Pad",
     "modality": "video",
+    "route": "/video/aspect-pad",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4329,6 +4428,7 @@
     "id": "blur-pad",
     "name": "Blur Pad",
     "modality": "video",
+    "route": "/video/blur-pad",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4353,6 +4453,7 @@
     "id": "watermark-video",
     "name": "Watermark Video",
     "modality": "video",
+    "route": "/video/watermark-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4377,6 +4478,7 @@
     "id": "stabilize-video",
     "name": "Stabilize Video",
     "modality": "video",
+    "route": "/video/stabilize-video",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4401,7 +4503,10 @@
     "id": "gif-to-video",
     "name": "GIF to Video",
     "modality": "video",
-    "acceptedInputs": [".gif"],
+    "route": "/video/gif-to-video",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -4409,6 +4514,7 @@
     "id": "video-to-webp",
     "name": "Video to WebP",
     "modality": "video",
+    "route": "/video/video-to-webp",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4433,6 +4539,7 @@
     "id": "video-to-frames",
     "name": "Video to Frames",
     "modality": "video",
+    "route": "/video/video-to-frames",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4457,6 +4564,7 @@
     "id": "merge-videos",
     "name": "Merge Videos",
     "modality": "video",
+    "route": "/video/merge-videos",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4481,6 +4589,7 @@
     "id": "replace-audio",
     "name": "Replace Audio",
     "modality": "video",
+    "route": "/video/replace-audio",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4516,6 +4625,7 @@
     "id": "burn-subtitles",
     "name": "Burn Subtitles",
     "modality": "video",
+    "route": "/video/burn-subtitles",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4543,6 +4653,7 @@
     "id": "embed-subtitles",
     "name": "Embed Subtitles",
     "modality": "video",
+    "route": "/video/embed-subtitles",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4570,6 +4681,7 @@
     "id": "extract-subtitles",
     "name": "Extract Subtitles",
     "modality": "video",
+    "route": "/video/extract-subtitles",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4594,6 +4706,7 @@
     "id": "images-to-video",
     "name": "Images to Video",
     "modality": "video",
+    "route": "/video/images-to-video",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -4656,6 +4769,7 @@
     "id": "video-metadata",
     "name": "Clean Video Metadata",
     "modality": "video",
+    "route": "/video/video-metadata",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4680,6 +4794,7 @@
     "id": "convert-audio",
     "name": "Convert Audio",
     "modality": "audio",
+    "route": "/audio/convert-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4700,6 +4815,7 @@
     "id": "trim-audio",
     "name": "Trim Audio",
     "modality": "audio",
+    "route": "/audio/trim-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4720,6 +4836,7 @@
     "id": "extract-audio",
     "name": "Extract Audio",
     "modality": "video",
+    "route": "/video/extract-audio",
     "acceptedInputs": [
       ".mp4",
       ".mov",
@@ -4744,6 +4861,7 @@
     "id": "volume-adjust",
     "name": "Adjust Volume",
     "modality": "audio",
+    "route": "/audio/volume-adjust",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4764,6 +4882,7 @@
     "id": "normalize-audio",
     "name": "Normalize Audio",
     "modality": "audio",
+    "route": "/audio/normalize-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4784,6 +4903,7 @@
     "id": "fade-audio",
     "name": "Fade Audio",
     "modality": "audio",
+    "route": "/audio/fade-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4804,6 +4924,7 @@
     "id": "reverse-audio",
     "name": "Reverse Audio",
     "modality": "audio",
+    "route": "/audio/reverse-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4824,6 +4945,7 @@
     "id": "audio-speed",
     "name": "Audio Speed",
     "modality": "audio",
+    "route": "/audio/audio-speed",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4844,6 +4966,7 @@
     "id": "pitch-shift",
     "name": "Pitch Shift",
     "modality": "audio",
+    "route": "/audio/pitch-shift",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4864,6 +4987,7 @@
     "id": "audio-channels",
     "name": "Audio Channels",
     "modality": "audio",
+    "route": "/audio/audio-channels",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4884,6 +5008,7 @@
     "id": "silence-removal",
     "name": "Silence Removal",
     "modality": "audio",
+    "route": "/audio/silence-removal",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4904,6 +5029,7 @@
     "id": "noise-reduction",
     "name": "Noise Reduction",
     "modality": "audio",
+    "route": "/audio/noise-reduction",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4924,6 +5050,7 @@
     "id": "merge-audio",
     "name": "Merge Audio",
     "modality": "audio",
+    "route": "/audio/merge-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4944,6 +5071,7 @@
     "id": "split-audio",
     "name": "Split Audio",
     "modality": "audio",
+    "route": "/audio/split-audio",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4964,6 +5092,7 @@
     "id": "ringtone-maker",
     "name": "Ringtone Maker",
     "modality": "audio",
+    "route": "/audio/ringtone-maker",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -4984,6 +5113,7 @@
     "id": "waveform-image",
     "name": "Waveform Image",
     "modality": "audio",
+    "route": "/audio/waveform-image",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -5004,6 +5134,7 @@
     "id": "audio-metadata",
     "name": "Audio Metadata",
     "modality": "audio",
+    "route": "/audio/audio-metadata",
     "acceptedInputs": [
       ".mp3",
       ".wav",
@@ -5024,7 +5155,10 @@
     "id": "merge-pdf",
     "name": "Merge PDFs",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/merge-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5032,7 +5166,10 @@
     "id": "split-pdf",
     "name": "Split PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/split-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5040,7 +5177,10 @@
     "id": "compress-pdf",
     "name": "Compress PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/compress-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5048,7 +5188,10 @@
     "id": "rotate-pdf",
     "name": "Rotate PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/rotate-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5056,7 +5199,14 @@
     "id": "convert-document",
     "name": "Convert Document",
     "modality": "document",
-    "acceptedInputs": [".docx", ".doc", ".odt", ".rtf", ".txt"],
+    "route": "/files/convert-document",
+    "acceptedInputs": [
+      ".docx",
+      ".doc",
+      ".odt",
+      ".rtf",
+      ".txt"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5064,7 +5214,12 @@
     "id": "convert-presentation",
     "name": "Convert Presentation",
     "modality": "document",
-    "acceptedInputs": [".pptx", ".ppt", ".odp"],
+    "route": "/files/convert-presentation",
+    "acceptedInputs": [
+      ".pptx",
+      ".ppt",
+      ".odp"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5072,7 +5227,13 @@
     "id": "convert-spreadsheet",
     "name": "Convert Spreadsheet",
     "modality": "document",
-    "acceptedInputs": [".xlsx", ".xls", ".ods", ".csv"],
+    "route": "/files/convert-spreadsheet",
+    "acceptedInputs": [
+      ".xlsx",
+      ".xls",
+      ".ods",
+      ".csv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5080,7 +5241,13 @@
     "id": "excel-to-pdf",
     "name": "Excel to PDF",
     "modality": "document",
-    "acceptedInputs": [".xlsx", ".xls", ".ods", ".csv"],
+    "route": "/files/excel-to-pdf",
+    "acceptedInputs": [
+      ".xlsx",
+      ".xls",
+      ".ods",
+      ".csv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5088,7 +5255,14 @@
     "id": "word-to-pdf",
     "name": "Word to PDF",
     "modality": "document",
-    "acceptedInputs": [".docx", ".doc", ".odt", ".rtf", ".txt"],
+    "route": "/files/word-to-pdf",
+    "acceptedInputs": [
+      ".docx",
+      ".doc",
+      ".odt",
+      ".rtf",
+      ".txt"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5096,7 +5270,10 @@
     "id": "extract-pages",
     "name": "Extract Pages",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/extract-pages",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5104,7 +5281,10 @@
     "id": "remove-pages",
     "name": "Remove Pages",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/remove-pages",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5112,7 +5292,10 @@
     "id": "organize-pdf",
     "name": "Organize PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/organize-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5120,7 +5303,10 @@
     "id": "multi-tool-pdf",
     "name": "PDF Multi-Tool",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/multi-tool-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5128,7 +5314,10 @@
     "id": "protect-pdf",
     "name": "Protect PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/protect-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5136,7 +5325,10 @@
     "id": "unlock-pdf",
     "name": "Unlock PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/unlock-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5144,7 +5336,10 @@
     "id": "repair-pdf",
     "name": "Repair PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/repair-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5152,7 +5347,10 @@
     "id": "linearize-pdf",
     "name": "Web-Optimize PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/linearize-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5160,7 +5358,10 @@
     "id": "grayscale-pdf",
     "name": "Grayscale PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/grayscale-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5168,7 +5369,10 @@
     "id": "pdfa-convert",
     "name": "PDF/A Converter",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdfa-convert",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5176,7 +5380,10 @@
     "id": "crop-pdf",
     "name": "Crop PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/crop-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5184,7 +5391,10 @@
     "id": "nup-pdf",
     "name": "Pages Per Sheet (N-up)",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/nup-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5192,7 +5402,10 @@
     "id": "booklet-pdf",
     "name": "Booklet PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/booklet-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5200,7 +5413,10 @@
     "id": "watermark-pdf",
     "name": "Watermark PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/watermark-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5208,7 +5424,10 @@
     "id": "pdf-page-numbers",
     "name": "PDF Page Numbers",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-page-numbers",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5216,7 +5435,10 @@
     "id": "flatten-pdf",
     "name": "Flatten PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/flatten-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5224,7 +5446,10 @@
     "id": "redact-pdf",
     "name": "Redact PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/redact-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5232,7 +5457,10 @@
     "id": "sign-pdf",
     "name": "Sign PDF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/sign-pdf",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5240,7 +5468,10 @@
     "id": "pdf-to-text",
     "name": "PDF to Text",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-text",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5248,7 +5479,10 @@
     "id": "pdf-to-word",
     "name": "PDF to Word",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-word",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5256,7 +5490,10 @@
     "id": "pdf-metadata",
     "name": "PDF Metadata",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-metadata",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5264,7 +5501,12 @@
     "id": "powerpoint-to-pdf",
     "name": "PowerPoint to PDF",
     "modality": "document",
-    "acceptedInputs": [".pptx", ".ppt", ".odp"],
+    "route": "/files/powerpoint-to-pdf",
+    "acceptedInputs": [
+      ".pptx",
+      ".ppt",
+      ".odp"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5272,7 +5514,11 @@
     "id": "html-to-pdf",
     "name": "HTML to PDF",
     "modality": "document",
-    "acceptedInputs": [".html", ".htm"],
+    "route": "/files/html-to-pdf",
+    "acceptedInputs": [
+      ".html",
+      ".htm"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5280,7 +5526,11 @@
     "id": "markdown-to-docx",
     "name": "Markdown to Word",
     "modality": "document",
-    "acceptedInputs": [".md", ".markdown"],
+    "route": "/files/markdown-to-docx",
+    "acceptedInputs": [
+      ".md",
+      ".markdown"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5288,7 +5538,11 @@
     "id": "markdown-to-html",
     "name": "Markdown to HTML",
     "modality": "document",
-    "acceptedInputs": [".md", ".markdown"],
+    "route": "/files/markdown-to-html",
+    "acceptedInputs": [
+      ".md",
+      ".markdown"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5296,7 +5550,11 @@
     "id": "markdown-to-pdf",
     "name": "Markdown to PDF",
     "modality": "document",
-    "acceptedInputs": [".md", ".markdown"],
+    "route": "/files/markdown-to-pdf",
+    "acceptedInputs": [
+      ".md",
+      ".markdown"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5304,7 +5562,10 @@
     "id": "epub-convert",
     "name": "Convert from EPUB",
     "modality": "document",
-    "acceptedInputs": [".epub"],
+    "route": "/files/epub-convert",
+    "acceptedInputs": [
+      ".epub"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5312,7 +5573,13 @@
     "id": "to-epub",
     "name": "Convert to EPUB",
     "modality": "document",
-    "acceptedInputs": [".docx", ".md", ".html", ".txt"],
+    "route": "/files/to-epub",
+    "acceptedInputs": [
+      ".docx",
+      ".md",
+      ".html",
+      ".txt"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5320,7 +5587,11 @@
     "id": "chart-maker",
     "name": "Chart Maker",
     "modality": "file",
-    "acceptedInputs": [".csv", ".json"],
+    "route": "/files/chart-maker",
+    "acceptedInputs": [
+      ".csv",
+      ".json"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5328,7 +5599,12 @@
     "id": "csv-excel",
     "name": "CSV to Excel",
     "modality": "file",
-    "acceptedInputs": [".csv", ".tsv", ".xlsx"],
+    "route": "/files/csv-excel",
+    "acceptedInputs": [
+      ".csv",
+      ".tsv",
+      ".xlsx"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5336,7 +5612,12 @@
     "id": "csv-json",
     "name": "CSV to JSON",
     "modality": "file",
-    "acceptedInputs": [".csv", ".tsv", ".json"],
+    "route": "/files/csv-json",
+    "acceptedInputs": [
+      ".csv",
+      ".tsv",
+      ".json"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5344,7 +5625,11 @@
     "id": "json-xml",
     "name": "JSON to XML",
     "modality": "file",
-    "acceptedInputs": [".json", ".xml"],
+    "route": "/files/json-xml",
+    "acceptedInputs": [
+      ".json",
+      ".xml"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5352,7 +5637,11 @@
     "id": "split-csv",
     "name": "Split CSV",
     "modality": "file",
-    "acceptedInputs": [".csv", ".tsv"],
+    "route": "/files/split-csv",
+    "acceptedInputs": [
+      ".csv",
+      ".tsv"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5360,7 +5649,11 @@
     "id": "merge-csvs",
     "name": "Merge CSVs",
     "modality": "file",
-    "acceptedInputs": [".csv", ".tsv"],
+    "route": "/files/merge-csvs",
+    "acceptedInputs": [
+      ".csv",
+      ".tsv"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5368,7 +5661,12 @@
     "id": "yaml-json",
     "name": "Convert YAML / JSON",
     "modality": "file",
-    "acceptedInputs": [".yaml", ".yml", ".json"],
+    "route": "/files/yaml-json",
+    "acceptedInputs": [
+      ".yaml",
+      ".yml",
+      ".json"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5376,7 +5674,10 @@
     "id": "xml-to-csv",
     "name": "XML to CSV",
     "modality": "file",
-    "acceptedInputs": [".xml"],
+    "route": "/files/xml-to-csv",
+    "acceptedInputs": [
+      ".xml"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5384,6 +5685,7 @@
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",
+    "route": "/files/create-zip",
     "acceptedInputs": [],
     "executionHint": "fast",
     "isAI": false
@@ -5392,7 +5694,10 @@
     "id": "extract-zip",
     "name": "Extract ZIP",
     "modality": "file",
-    "acceptedInputs": [".zip"],
+    "route": "/files/extract-zip",
+    "acceptedInputs": [
+      ".zip"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5400,7 +5705,11 @@
     "id": "jpg-to-png",
     "name": "JPG to PNG",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-png",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5408,7 +5717,10 @@
     "id": "png-to-jpg",
     "name": "PNG to JPG",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-jpg",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5416,7 +5728,11 @@
     "id": "jpg-to-webp",
     "name": "JPG to WebP",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-webp",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5424,7 +5740,10 @@
     "id": "png-to-webp",
     "name": "PNG to WebP",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-webp",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5432,7 +5751,10 @@
     "id": "webp-to-jpg",
     "name": "WebP to JPG",
     "modality": "image",
-    "acceptedInputs": [".webp"],
+    "route": "/image/webp-to-jpg",
+    "acceptedInputs": [
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5440,7 +5762,10 @@
     "id": "webp-to-png",
     "name": "WebP to PNG",
     "modality": "image",
-    "acceptedInputs": [".webp"],
+    "route": "/image/webp-to-png",
+    "acceptedInputs": [
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5448,7 +5773,11 @@
     "id": "jpg-to-avif",
     "name": "JPG to AVIF",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-avif",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5456,7 +5785,10 @@
     "id": "png-to-avif",
     "name": "PNG to AVIF",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-avif",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5464,7 +5796,10 @@
     "id": "webp-to-avif",
     "name": "WebP to AVIF",
     "modality": "image",
-    "acceptedInputs": [".webp"],
+    "route": "/image/webp-to-avif",
+    "acceptedInputs": [
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5472,7 +5807,11 @@
     "id": "heic-to-jpg",
     "name": "HEIC to JPG",
     "modality": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "route": "/image/heic-to-jpg",
+    "acceptedInputs": [
+      ".heic",
+      ".heif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5480,7 +5819,11 @@
     "id": "heic-to-png",
     "name": "HEIC to PNG",
     "modality": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "route": "/image/heic-to-png",
+    "acceptedInputs": [
+      ".heic",
+      ".heif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5488,7 +5831,11 @@
     "id": "heic-to-avif",
     "name": "HEIC to AVIF",
     "modality": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "route": "/image/heic-to-avif",
+    "acceptedInputs": [
+      ".heic",
+      ".heif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5496,7 +5843,11 @@
     "id": "jpg-to-gif",
     "name": "JPG to GIF",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-gif",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5504,7 +5855,10 @@
     "id": "png-to-gif",
     "name": "PNG to GIF",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-gif",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5512,7 +5866,10 @@
     "id": "gif-to-jpg",
     "name": "GIF to JPG",
     "modality": "image",
-    "acceptedInputs": [".gif"],
+    "route": "/image/gif-to-jpg",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5520,7 +5877,10 @@
     "id": "gif-to-png",
     "name": "GIF to PNG",
     "modality": "image",
-    "acceptedInputs": [".gif"],
+    "route": "/image/gif-to-png",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5528,7 +5888,10 @@
     "id": "webp-to-gif",
     "name": "WebP to GIF",
     "modality": "image",
-    "acceptedInputs": [".webp"],
+    "route": "/image/webp-to-gif",
+    "acceptedInputs": [
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5536,7 +5899,11 @@
     "id": "jpg-to-tiff",
     "name": "JPG to TIFF",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-tiff",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5544,7 +5911,10 @@
     "id": "png-to-tiff",
     "name": "PNG to TIFF",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-tiff",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5552,7 +5922,11 @@
     "id": "tiff-to-jpg",
     "name": "TIFF to JPG",
     "modality": "image",
-    "acceptedInputs": [".tiff", ".tif"],
+    "route": "/image/tiff-to-jpg",
+    "acceptedInputs": [
+      ".tiff",
+      ".tif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5560,7 +5934,11 @@
     "id": "tiff-to-png",
     "name": "TIFF to PNG",
     "modality": "image",
-    "acceptedInputs": [".tiff", ".tif"],
+    "route": "/image/tiff-to-png",
+    "acceptedInputs": [
+      ".tiff",
+      ".tif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5568,7 +5946,10 @@
     "id": "psd-to-jpg",
     "name": "PSD to JPG",
     "modality": "image",
-    "acceptedInputs": [".psd"],
+    "route": "/image/psd-to-jpg",
+    "acceptedInputs": [
+      ".psd"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5576,7 +5957,10 @@
     "id": "psd-to-png",
     "name": "PSD to PNG",
     "modality": "image",
-    "acceptedInputs": [".psd"],
+    "route": "/image/psd-to-png",
+    "acceptedInputs": [
+      ".psd"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5584,7 +5968,10 @@
     "id": "png-to-eps",
     "name": "PNG to EPS",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-eps",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5592,7 +5979,11 @@
     "id": "jpg-to-eps",
     "name": "JPG to EPS",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-eps",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5600,7 +5991,10 @@
     "id": "eps-to-png",
     "name": "EPS to PNG",
     "modality": "image",
-    "acceptedInputs": [".eps"],
+    "route": "/image/eps-to-png",
+    "acceptedInputs": [
+      ".eps"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5608,7 +6002,10 @@
     "id": "eps-to-jpg",
     "name": "EPS to JPG",
     "modality": "image",
-    "acceptedInputs": [".eps"],
+    "route": "/image/eps-to-jpg",
+    "acceptedInputs": [
+      ".eps"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5616,7 +6013,10 @@
     "id": "png-to-svg",
     "name": "PNG to SVG",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-svg",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5624,7 +6024,11 @@
     "id": "jpg-to-svg",
     "name": "JPG to SVG",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-svg",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5632,7 +6036,11 @@
     "id": "tiff-to-svg",
     "name": "TIFF to SVG",
     "modality": "image",
-    "acceptedInputs": [".tiff", ".tif"],
+    "route": "/image/tiff-to-svg",
+    "acceptedInputs": [
+      ".tiff",
+      ".tif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5640,7 +6048,10 @@
     "id": "psd-to-svg",
     "name": "PSD to SVG",
     "modality": "image",
-    "acceptedInputs": [".psd"],
+    "route": "/image/psd-to-svg",
+    "acceptedInputs": [
+      ".psd"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5648,7 +6059,10 @@
     "id": "eps-to-svg",
     "name": "EPS to SVG",
     "modality": "image",
-    "acceptedInputs": [".eps"],
+    "route": "/image/eps-to-svg",
+    "acceptedInputs": [
+      ".eps"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5656,7 +6070,11 @@
     "id": "svg-to-png",
     "name": "SVG to PNG",
     "modality": "image",
-    "acceptedInputs": [".svg", ".svgz"],
+    "route": "/image/svg-to-png",
+    "acceptedInputs": [
+      ".svg",
+      ".svgz"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5664,7 +6082,11 @@
     "id": "svg-to-jpg",
     "name": "SVG to JPG",
     "modality": "image",
-    "acceptedInputs": [".svg", ".svgz"],
+    "route": "/image/svg-to-jpg",
+    "acceptedInputs": [
+      ".svg",
+      ".svgz"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5672,7 +6094,11 @@
     "id": "jpg-to-pdf",
     "name": "JPG to PDF",
     "modality": "image",
-    "acceptedInputs": [".jpg", ".jpeg"],
+    "route": "/image/jpg-to-pdf",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5680,7 +6106,10 @@
     "id": "png-to-pdf",
     "name": "PNG to PDF",
     "modality": "image",
-    "acceptedInputs": [".png"],
+    "route": "/image/png-to-pdf",
+    "acceptedInputs": [
+      ".png"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5688,7 +6117,11 @@
     "id": "heic-to-pdf",
     "name": "HEIC to PDF",
     "modality": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "route": "/image/heic-to-pdf",
+    "acceptedInputs": [
+      ".heic",
+      ".heif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5696,7 +6129,11 @@
     "id": "tiff-to-pdf",
     "name": "TIFF to PDF",
     "modality": "image",
-    "acceptedInputs": [".tiff", ".tif"],
+    "route": "/image/tiff-to-pdf",
+    "acceptedInputs": [
+      ".tiff",
+      ".tif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5704,7 +6141,10 @@
     "id": "webp-to-pdf",
     "name": "WebP to PDF",
     "modality": "image",
-    "acceptedInputs": [".webp"],
+    "route": "/image/webp-to-pdf",
+    "acceptedInputs": [
+      ".webp"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5712,7 +6152,10 @@
     "id": "gif-to-pdf",
     "name": "GIF to PDF",
     "modality": "image",
-    "acceptedInputs": [".gif"],
+    "route": "/image/gif-to-pdf",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5720,7 +6163,10 @@
     "id": "eps-to-pdf",
     "name": "EPS to PDF",
     "modality": "image",
-    "acceptedInputs": [".eps"],
+    "route": "/image/eps-to-pdf",
+    "acceptedInputs": [
+      ".eps"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5728,7 +6174,10 @@
     "id": "pdf-to-jpg",
     "name": "PDF to JPG",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-jpg",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5736,7 +6185,10 @@
     "id": "pdf-to-png",
     "name": "PDF to PNG",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-png",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5744,7 +6196,10 @@
     "id": "pdf-to-tiff",
     "name": "PDF to TIFF",
     "modality": "document",
-    "acceptedInputs": [".pdf"],
+    "route": "/pdf/pdf-to-tiff",
+    "acceptedInputs": [
+      ".pdf"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5752,7 +6207,10 @@
     "id": "mov-to-mp4",
     "name": "MOV to MP4",
     "modality": "video",
-    "acceptedInputs": [".mov"],
+    "route": "/video/mov-to-mp4",
+    "acceptedInputs": [
+      ".mov"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5760,7 +6218,10 @@
     "id": "webm-to-mp4",
     "name": "WEBM to MP4",
     "modality": "video",
-    "acceptedInputs": [".webm"],
+    "route": "/video/webm-to-mp4",
+    "acceptedInputs": [
+      ".webm"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5768,7 +6229,10 @@
     "id": "mkv-to-mp4",
     "name": "MKV to MP4",
     "modality": "video",
-    "acceptedInputs": [".mkv"],
+    "route": "/video/mkv-to-mp4",
+    "acceptedInputs": [
+      ".mkv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5776,7 +6240,10 @@
     "id": "avi-to-mp4",
     "name": "AVI to MP4",
     "modality": "video",
-    "acceptedInputs": [".avi"],
+    "route": "/video/avi-to-mp4",
+    "acceptedInputs": [
+      ".avi"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5784,7 +6251,10 @@
     "id": "mp4-to-mov",
     "name": "MP4 to MOV",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-mov",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5792,7 +6262,10 @@
     "id": "mp4-to-webm",
     "name": "MP4 to WEBM",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-webm",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5800,7 +6273,10 @@
     "id": "webm-to-mov",
     "name": "WEBM to MOV",
     "modality": "video",
-    "acceptedInputs": [".webm"],
+    "route": "/video/webm-to-mov",
+    "acceptedInputs": [
+      ".webm"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5808,7 +6284,10 @@
     "id": "mkv-to-mov",
     "name": "MKV to MOV",
     "modality": "video",
-    "acceptedInputs": [".mkv"],
+    "route": "/video/mkv-to-mov",
+    "acceptedInputs": [
+      ".mkv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5816,7 +6295,10 @@
     "id": "avi-to-mov",
     "name": "AVI to MOV",
     "modality": "video",
-    "acceptedInputs": [".avi"],
+    "route": "/video/avi-to-mov",
+    "acceptedInputs": [
+      ".avi"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5824,7 +6306,10 @@
     "id": "mp4-to-avi",
     "name": "MP4 to AVI",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-avi",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5832,7 +6317,10 @@
     "id": "mov-to-avi",
     "name": "MOV to AVI",
     "modality": "video",
-    "acceptedInputs": [".mov"],
+    "route": "/video/mov-to-avi",
+    "acceptedInputs": [
+      ".mov"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5840,7 +6328,10 @@
     "id": "mkv-to-avi",
     "name": "MKV to AVI",
     "modality": "video",
-    "acceptedInputs": [".mkv"],
+    "route": "/video/mkv-to-avi",
+    "acceptedInputs": [
+      ".mkv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5848,7 +6339,10 @@
     "id": "avi-to-mkv",
     "name": "AVI to MKV",
     "modality": "video",
-    "acceptedInputs": [".avi"],
+    "route": "/video/avi-to-mkv",
+    "acceptedInputs": [
+      ".avi"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5856,7 +6350,10 @@
     "id": "mp4-to-gif",
     "name": "MP4 to GIF",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-gif",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5864,7 +6361,10 @@
     "id": "mov-to-gif",
     "name": "MOV to GIF",
     "modality": "video",
-    "acceptedInputs": [".mov"],
+    "route": "/video/mov-to-gif",
+    "acceptedInputs": [
+      ".mov"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5872,7 +6372,10 @@
     "id": "mkv-to-gif",
     "name": "MKV to GIF",
     "modality": "video",
-    "acceptedInputs": [".mkv"],
+    "route": "/video/mkv-to-gif",
+    "acceptedInputs": [
+      ".mkv"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5880,7 +6383,10 @@
     "id": "avi-to-gif",
     "name": "AVI to GIF",
     "modality": "video",
-    "acceptedInputs": [".avi"],
+    "route": "/video/avi-to-gif",
+    "acceptedInputs": [
+      ".avi"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -5888,7 +6394,10 @@
     "id": "gif-to-mp4",
     "name": "GIF to MP4",
     "modality": "video",
-    "acceptedInputs": [".gif"],
+    "route": "/video/gif-to-mp4",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5896,7 +6405,10 @@
     "id": "gif-to-webm",
     "name": "GIF to WEBM",
     "modality": "video",
-    "acceptedInputs": [".gif"],
+    "route": "/video/gif-to-webm",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5904,7 +6416,10 @@
     "id": "gif-to-mov",
     "name": "GIF to MOV",
     "modality": "video",
-    "acceptedInputs": [".gif"],
+    "route": "/video/gif-to-mov",
+    "acceptedInputs": [
+      ".gif"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5912,7 +6427,10 @@
     "id": "mp4-to-mp3",
     "name": "MP4 to MP3",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-mp3",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5920,7 +6438,10 @@
     "id": "mov-to-mp3",
     "name": "MOV to MP3",
     "modality": "video",
-    "acceptedInputs": [".mov"],
+    "route": "/video/mov-to-mp3",
+    "acceptedInputs": [
+      ".mov"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5928,7 +6449,10 @@
     "id": "mkv-to-mp3",
     "name": "MKV to MP3",
     "modality": "video",
-    "acceptedInputs": [".mkv"],
+    "route": "/video/mkv-to-mp3",
+    "acceptedInputs": [
+      ".mkv"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5936,7 +6460,10 @@
     "id": "webm-to-mp3",
     "name": "WEBM to MP3",
     "modality": "video",
-    "acceptedInputs": [".webm"],
+    "route": "/video/webm-to-mp3",
+    "acceptedInputs": [
+      ".webm"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5944,7 +6471,10 @@
     "id": "avi-to-mp3",
     "name": "AVI to MP3",
     "modality": "video",
-    "acceptedInputs": [".avi"],
+    "route": "/video/avi-to-mp3",
+    "acceptedInputs": [
+      ".avi"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5952,7 +6482,10 @@
     "id": "mp4-to-wav",
     "name": "MP4 to WAV",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-wav",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5960,7 +6493,10 @@
     "id": "mov-to-wav",
     "name": "MOV to WAV",
     "modality": "video",
-    "acceptedInputs": [".mov"],
+    "route": "/video/mov-to-wav",
+    "acceptedInputs": [
+      ".mov"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5968,7 +6504,10 @@
     "id": "mp4-to-ogg",
     "name": "MP4 to OGG",
     "modality": "video",
-    "acceptedInputs": [".mp4"],
+    "route": "/video/mp4-to-ogg",
+    "acceptedInputs": [
+      ".mp4"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5976,7 +6515,10 @@
     "id": "m4a-to-mp3",
     "name": "M4A to MP3",
     "modality": "audio",
-    "acceptedInputs": [".m4a"],
+    "route": "/audio/m4a-to-mp3",
+    "acceptedInputs": [
+      ".m4a"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5984,7 +6526,10 @@
     "id": "m4a-to-wav",
     "name": "M4A to WAV",
     "modality": "audio",
-    "acceptedInputs": [".m4a"],
+    "route": "/audio/m4a-to-wav",
+    "acceptedInputs": [
+      ".m4a"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5992,7 +6537,10 @@
     "id": "aac-to-mp3",
     "name": "AAC to MP3",
     "modality": "audio",
-    "acceptedInputs": [".aac"],
+    "route": "/audio/aac-to-mp3",
+    "acceptedInputs": [
+      ".aac"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6000,7 +6548,10 @@
     "id": "aac-to-wav",
     "name": "AAC to WAV",
     "modality": "audio",
-    "acceptedInputs": [".aac"],
+    "route": "/audio/aac-to-wav",
+    "acceptedInputs": [
+      ".aac"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6008,7 +6559,10 @@
     "id": "aac-to-flac",
     "name": "AAC to FLAC",
     "modality": "audio",
-    "acceptedInputs": [".aac"],
+    "route": "/audio/aac-to-flac",
+    "acceptedInputs": [
+      ".aac"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6016,7 +6570,10 @@
     "id": "ogg-to-mp3",
     "name": "OGG to MP3",
     "modality": "audio",
-    "acceptedInputs": [".ogg"],
+    "route": "/audio/ogg-to-mp3",
+    "acceptedInputs": [
+      ".ogg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6024,7 +6581,10 @@
     "id": "ogg-to-wav",
     "name": "OGG to WAV",
     "modality": "audio",
-    "acceptedInputs": [".ogg"],
+    "route": "/audio/ogg-to-wav",
+    "acceptedInputs": [
+      ".ogg"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6032,7 +6592,10 @@
     "id": "wav-to-mp3",
     "name": "WAV to MP3",
     "modality": "audio",
-    "acceptedInputs": [".wav"],
+    "route": "/audio/wav-to-mp3",
+    "acceptedInputs": [
+      ".wav"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6040,7 +6603,10 @@
     "id": "mp3-to-wav",
     "name": "MP3 to WAV",
     "modality": "audio",
-    "acceptedInputs": [".mp3"],
+    "route": "/audio/mp3-to-wav",
+    "acceptedInputs": [
+      ".mp3"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6048,7 +6614,10 @@
     "id": "flac-to-mp3",
     "name": "FLAC to MP3",
     "modality": "audio",
-    "acceptedInputs": [".flac"],
+    "route": "/audio/flac-to-mp3",
+    "acceptedInputs": [
+      ".flac"
+    ],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6056,7 +6625,11 @@
     "id": "excel-to-csv",
     "name": "Excel to CSV",
     "modality": "document",
-    "acceptedInputs": [".xlsx", ".xls"],
+    "route": "/files/excel-to-csv",
+    "acceptedInputs": [
+      ".xlsx",
+      ".xls"
+    ],
     "executionHint": "long",
     "isAI": false
   },
@@ -6064,6 +6637,7 @@
     "id": "compress-image-to-20kb",
     "name": "Compress Image to 20 KB",
     "modality": "image",
+    "route": "/image/compress-image-to-20kb",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -6126,6 +6700,7 @@
     "id": "compress-image-to-50kb",
     "name": "Compress Image to 50 KB",
     "modality": "image",
+    "route": "/image/compress-image-to-50kb",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -6188,6 +6763,7 @@
     "id": "compress-image-to-100kb",
     "name": "Compress Image to 100 KB",
     "modality": "image",
+    "route": "/image/compress-image-to-100kb",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -6250,6 +6826,7 @@
     "id": "compress-image-to-200kb",
     "name": "Compress Image to 200 KB",
     "modality": "image",
+    "route": "/image/compress-image-to-200kb",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -6312,6 +6889,7 @@
     "id": "compress-image-to-500kb",
     "name": "Compress Image to 500 KB",
     "modality": "image",
+    "route": "/image/compress-image-to-500kb",
     "acceptedInputs": [
       ".jpg",
       ".jpeg",
@@ -6368,6 +6946,61 @@
       ".eps"
     ],
     "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "compress-pdf-to-100kb",
+    "name": "Compress PDF to 100 KB",
+    "modality": "document",
+    "route": "/pdf/compress-pdf-to-100kb",
+    "acceptedInputs": [
+      ".pdf"
+    ],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "compress-pdf-to-200kb",
+    "name": "Compress PDF to 200 KB",
+    "modality": "document",
+    "route": "/pdf/compress-pdf-to-200kb",
+    "acceptedInputs": [
+      ".pdf"
+    ],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "compress-pdf-to-500kb",
+    "name": "Compress PDF to 500 KB",
+    "modality": "document",
+    "route": "/pdf/compress-pdf-to-500kb",
+    "acceptedInputs": [
+      ".pdf"
+    ],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "compress-pdf-to-1mb",
+    "name": "Compress PDF to 1 MB",
+    "modality": "document",
+    "route": "/pdf/compress-pdf-to-1mb",
+    "acceptedInputs": [
+      ".pdf"
+    ],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
+    "id": "compress-pdf-to-2mb",
+    "name": "Compress PDF to 2 MB",
+    "modality": "document",
+    "route": "/pdf/compress-pdf-to-2mb",
+    "acceptedInputs": [
+      ".pdf"
+    ],
+    "executionHint": "long",
     "isAI": false
   }
 ]
