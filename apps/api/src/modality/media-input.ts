@@ -7,6 +7,10 @@ import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
+/** Shared with tools that take a video but need its audio (extract-audio). */
+export const NO_AUDIO_TRACK_MESSAGE =
+  "This file has no audio track (no audio stream). Choose a file with audio and try again.";
+
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
 
 const SUBTITLE_EXT_SET = new Set<string>(SUBTITLE_INPUTS);
@@ -124,9 +128,7 @@ export class MediaInputHandler implements InputHandler {
         throw new InputValidationError("File is a still image, not a video");
       }
       if (this.kind === "audio" && !hasAudio) {
-        throw new InputValidationError(
-          "This file has no audio track (no audio stream). Choose a file with audio and try again.",
-        );
+        throw new InputValidationError(NO_AUDIO_TRACK_MESSAGE);
       }
       const durationCap =
         this.kind === "video" ? env.MAX_VIDEO_DURATION_S : env.MAX_AUDIO_DURATION_S;
