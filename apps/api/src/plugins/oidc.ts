@@ -81,8 +81,18 @@ const FAILED_DISCOVERY_TTL_MS = 30_000;
 let cachedConfig: { config: oidc.Configuration; cachedAt: number } | null = null;
 
 // Keyed on the issuer so a changed OIDC_ISSUER_URL never inherits the old
-// one's failure.
-let failedDiscovery: { issuer: string; fault: SafeError; failedAt: number } | null = null;
+// one's failure. `logoutTimeout` marks a logout that stopped waiting while
+// the discovery itself kept going.
+let failedDiscovery: {
+  issuer: string;
+  fault: SafeError;
+  failedAt: number;
+  logoutTimeout: boolean;
+} | null = null;
+
+// The discovery in progress, so concurrent callers share one request to the
+// IdP instead of each starting their own.
+let inflightDiscovery: { issuer: string; promise: Promise<oidc.Configuration> } | null = null;
 
 /**
  * Test hook: clear the module-level discovery cache, failures included, so a
@@ -92,6 +102,7 @@ let failedDiscovery: { issuer: string; fault: SafeError; failedAt: number } | nu
 export function resetOidcDiscoveryCacheForTests(): void {
   cachedConfig = null;
   failedDiscovery = null;
+  inflightDiscovery = null;
 }
 
 /**
@@ -102,28 +113,24 @@ export function expireOidcDiscoveryFailureForTests(): void {
   if (failedDiscovery) failedDiscovery.failedAt -= FAILED_DISCOVERY_TTL_MS;
 }
 
-function rememberDiscoveryFailure(issuer: string, fault: SafeError): void {
-  failedDiscovery = { issuer, fault, failedAt: Date.now() };
+function rememberDiscoveryFailure(issuer: string, fault: SafeError, logoutTimeout = false): void {
+  failedDiscovery = { issuer, fault, failedAt: Date.now(), logoutTimeout };
 }
 
-/**
- * The cached discovery, or a fresh one. Rejects with the classified SafeError
- * from oidcDiscoveryFault, replaying a recent failure for the same issuer
- * instead of asking the IdP again.
- */
-async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
+function recentDiscoveryFailure(issuer: string): typeof failedDiscovery {
+  if (failedDiscovery?.issuer !== issuer) return null;
+  if (Date.now() - failedDiscovery.failedAt >= FAILED_DISCOVERY_TTL_MS) return null;
+  return failedDiscovery;
+}
+
+function freshCachedConfig(): oidc.Configuration | null {
   if (cachedConfig && Date.now() - cachedConfig.cachedAt < CACHE_TTL_MS) {
     return cachedConfig.config;
   }
+  return null;
+}
 
-  const issuer = env.OIDC_ISSUER_URL;
-  if (
-    failedDiscovery?.issuer === issuer &&
-    Date.now() - failedDiscovery.failedAt < FAILED_DISCOVERY_TTL_MS
-  ) {
-    throw failedDiscovery.fault;
-  }
-
+async function discover(issuer: string): Promise<oidc.Configuration> {
   let config: oidc.Configuration;
   try {
     config = await oidc.discovery(
@@ -145,10 +152,33 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
     rememberDiscoveryFailure(issuer, fault);
     throw fault;
   }
-
   cachedConfig = { config, cachedAt: Date.now() };
   if (failedDiscovery?.issuer === issuer) failedDiscovery = null;
   return config;
+}
+
+/**
+ * The cached discovery, or a fresh one. Rejects with the classified SafeError
+ * from oidcDiscoveryFault. A recent failure for the same issuer is replayed
+ * instead of asking the IdP again. The replayed error is the same object
+ * each time, so its stack is the first failure's. A logout that only gave up
+ * waiting is not replayed here: login joins the discovery still running,
+ * so a slow but working IdP isn't locked out for the whole window.
+ */
+async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
+  const cached = freshCachedConfig();
+  if (cached) return cached;
+
+  const issuer = env.OIDC_ISSUER_URL;
+  const failure = recentDiscoveryFailure(issuer);
+  if (failure && !failure.logoutTimeout) throw failure.fault;
+  if (inflightDiscovery?.issuer === issuer) return inflightDiscovery.promise;
+
+  const promise = discover(issuer).finally(() => {
+    if (inflightDiscovery?.promise === promise) inflightDiscovery = null;
+  });
+  inflightDiscovery = { issuer, promise };
+  return promise;
 }
 
 // openid-client waits 30s by default; a logout click shouldn't. This is a
@@ -160,18 +190,22 @@ const LOGOUT_DISCOVERY_TIMEOUT_MS = 5_000;
 /**
  * Discovery for the logout path, bounded by LOGOUT_DISCOVERY_TIMEOUT_MS. Every
  * failure is an operational SafeError: an unreachable, slow, or misconfigured
- * IdP is an environment problem, not a SnapOtter bug. A timeout is remembered
- * like any other failure, so the next logout doesn't wait again. The
- * discovery that outlived it keeps running: a late success still fills the
- * cache (and clears the failure), and Promise.race handles a late rejection.
+ * IdP is an environment problem, not a SnapOtter bug. Any recent failure,
+ * a timed-out logout included, is answered at once, so during an outage only
+ * the first logout waits (#4713). The discovery that outlived a timeout keeps
+ * running: its success fills the cache and clears the failure, its failure
+ * replaces it, and Promise.race handles a late rejection.
  */
 async function discoverForLogout(): Promise<oidc.Configuration> {
   const issuer = env.OIDC_ISSUER_URL;
+  const failure = freshCachedConfig() ? null : recentDiscoveryFailure(issuer);
+  if (failure) throw failure.fault;
+
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       const fault = new SafeError("OIDC discovery timed out", { code: "OIDC_DISCOVERY_TIMEOUT" });
-      rememberDiscoveryFailure(issuer, fault);
+      rememberDiscoveryFailure(issuer, fault, true);
       reject(fault);
     }, LOGOUT_DISCOVERY_TIMEOUT_MS);
   });

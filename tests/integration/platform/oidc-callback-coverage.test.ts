@@ -1152,12 +1152,42 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(hungResponses).toHaveLength(hungBefore);
       await expectLoggedOutLocally(again, secondToken, { idpLogout: "failed" });
       expectReportedDiscoveryFault("OIDC_DISCOVERY_TIMEOUT");
+
+      // A logout that stopped waiting is no reason to refuse a login: it
+      // joins the discovery still running, and a slow IdP that answers in
+      // the end lets it through.
+      const login = oidcApp.app.inject({
+        method: "GET",
+        url: `${env.BASE_PATH}/api/auth/oidc/login`,
+      });
+      for (const hung of hungResponses.splice(0)) {
+        hung.writeHead(200, { "Content-Type": "application/json" });
+        hung.end(
+          JSON.stringify({
+            issuer: `http://localhost:${mockPort}/hang`,
+            authorization_endpoint: `http://localhost:${mockPort}/authorize`,
+            token_endpoint: `http://localhost:${mockPort}/token`,
+            jwks_uri: `http://localhost:${mockPort}/jwks`,
+            response_types_supported: ["code"],
+            code_challenge_methods_supported: ["S256"],
+          }),
+        );
+      }
+      const loginRes = await login;
+      // A login that started its own discovery would still be hanging.
+      expect(hungResponses).toHaveLength(0);
+      expect(loginRes.statusCode).toBe(302);
+      expect(loginRes.headers.location).toMatch(
+        new RegExp(`^http://localhost:${mockPort}/authorize\\?`),
+      );
     } finally {
       (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
       for (const hung of hungResponses.splice(0)) {
         hung.writeHead(404);
         hung.end();
       }
+      // The answered discovery filled the cache with the /hang document.
+      oidcModule.resetOidcDiscoveryCacheForTests();
     }
   }, 20_000);
 
