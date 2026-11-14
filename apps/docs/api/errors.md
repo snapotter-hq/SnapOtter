@@ -72,6 +72,7 @@ A failed job keeps `error.code` only when the failure is an input error or a ser
 | `CANCELED` | The job was canceled by a user. It is not an HTTP status. Progress events carry `phase: failed` with this code. | Treat it as a user cancel. Do not retry it automatically. |
 | `INPUT_MISSING` | The input was removed before the job ran. | Upload the file again. |
 | `ENGINE_UNAVAILABLE` | A required engine could not start on the server. | Retry after an administrator repairs the install. |
+| `JOB_STALLED` | Not returned to clients; it labels the server's error report. The worker lost the job's lock more times than the queue allows, usually because the server restarted or ran short of memory or CPU. The job fails with a message saying it was interrupted. | Retry. If it keeps happening, give the server more memory or lower `CONCURRENT_JOBS`. |
 
 ## Authentication and MFA {#mfa-codes}
 
