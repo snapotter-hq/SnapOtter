@@ -8649,12 +8649,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibilidad del entorno de ejecución de OCR; se omite en los paquetes heredados
+                          description: Compatibilidad con el host. OCR siempre la informa. Un paquete heredado informa incompatible solo cuando este host no puede ejecutarlo, y omite el campo en los demás casos.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Motivo de compatibilidad del entorno de ejecución de OCR; se omite en los paquetes heredados
+                          description: Por qué el paquete es incompatible, por ejemplo cpu-no-avx cuando sus bibliotecas x86-64 necesitan AVX y esta CPU no lo tiene. Se omite en los paquetes heredados compatibles.
                         selectedTarget:
                           type:
                             - string
@@ -8973,6 +8973,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Un paquete que la herramienta necesita no se puede instalar en este host: el entorno de OCR no es compatible, o el paquete necesita AVX y esta CPU no lo tiene (código FEATURE_CPU_UNSUPPORTED). No se pone nada en cola.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9059,7 +9065,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: El paquete ya está instalado o el entorno de ejecución de OCR no es compatible con este host
+          description: El paquete ya está instalado, el entorno de OCR no es compatible con este host, o el paquete necesita AVX y esta CPU no lo tiene (código FEATURE_CPU_UNSUPPORTED, rechazado antes de cualquier descarga)
           content:
             application/json:
               schema:
@@ -30798,13 +30804,13 @@ x-i18n:
       provenance: machine
       outputHash: bd93478d3be8
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 1bd31c11c867
+      outputHash: ec33ca914e86
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: bd231e3c7c16
+      outputHash: 7d44d7556c47
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30897,6 +30903,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: a18e89a9bec6
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 9cf7ae9d43e3
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30930,9 +30940,9 @@ x-i18n:
       provenance: machine
       outputHash: c049f9af8605
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: f0bc21dedf87
+      outputHash: 5d384c816ca4
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

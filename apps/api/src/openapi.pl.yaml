@@ -8647,12 +8647,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Zgodność środowiska uruchomieniowego OCR; pomijane w starszych pakietach
+                          description: Zgodność z hostem. OCR zawsze ją zgłasza. Starszy pakiet zgłasza incompatible tylko wtedy, gdy ten host nie może go uruchomić, a w przeciwnym razie pomija to pole.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Powód zgodności środowiska uruchomieniowego OCR; pomijany w starszych pakietach
+                          description: Dlaczego pakiet jest niezgodny, np. cpu-no-avx, gdy jego biblioteki x86-64 wymagają AVX, a ten procesor go nie ma. Pomijane dla zgodnych starszych pakietów.
                         selectedTarget:
                           type:
                             - string
@@ -8971,6 +8971,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Pakietu wymaganego przez narzędzie nie można zainstalować na tym hoście: środowisko OCR nie jest obsługiwane albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED). Nic nie trafia do kolejki.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9057,7 +9063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Pakiet jest już zainstalowany lub środowisko OCR nie jest obsługiwane na tym hoście
+          description: Pakiet jest już zainstalowany, środowisko OCR nie jest obsługiwane na tym hoście albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED, odrzucone przed jakimkolwiek pobieraniem)
           content:
             application/json:
               schema:
@@ -30796,13 +30802,13 @@ x-i18n:
       provenance: machine
       outputHash: 8e651d3ed8be
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: e4f3079281e4
+      outputHash: 249fff52370b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: a12fc3bf714e
+      outputHash: ad1084af7463
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30895,6 +30901,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 0ec6e7d477f2
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 860a3ffbae61
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30928,9 +30938,9 @@ x-i18n:
       provenance: machine
       outputHash: 0e180c3c3ad1
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: bd873b18f09e
+      outputHash: bd8bc0e9bbcf
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

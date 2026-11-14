@@ -8649,12 +8649,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Совместимость среды выполнения OCR; не указывается для устаревших наборов
+                          description: Совместимость с хостом. OCR всегда её сообщает. Устаревший пакет сообщает incompatible, только если этот хост не может его запустить, и в остальных случаях опускает поле.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Причина несовместимости среды выполнения OCR; не указывается для устаревших наборов
+                          description: Причина несовместимости пакета, например cpu-no-avx, когда его библиотекам x86-64 нужен AVX, а этот процессор его не поддерживает. Опускается для совместимых устаревших пакетов.
                         selectedTarget:
                           type:
                             - string
@@ -8973,6 +8973,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Пакет, нужный инструменту, нельзя установить на этом хосте: среда OCR не поддерживается, или пакету нужен AVX, а этот процессор его не поддерживает (код FEATURE_CPU_UNSUPPORTED). Ничего не ставится в очередь.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9059,7 +9065,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Набор уже установлен или среда выполнения OCR не поддерживается на этом хосте
+          description: Пакет уже установлен, среда OCR не поддерживается на этом хосте, или пакету нужен AVX, а этот процессор его не поддерживает (код FEATURE_CPU_UNSUPPORTED, отказ до любой загрузки)
           content:
             application/json:
               schema:
@@ -30798,13 +30804,13 @@ x-i18n:
       provenance: machine
       outputHash: 0baac0669172
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 5119ed97c085
+      outputHash: aa146f1ea50c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 5e959989577e
+      outputHash: 543912d11b0f
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30897,6 +30903,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: a8780e844cec
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 6ac326c9dd08
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30930,9 +30940,9 @@ x-i18n:
       provenance: machine
       outputHash: cbac620d5213
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 6f13f4801121
+      outputHash: ea72f21fe732
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

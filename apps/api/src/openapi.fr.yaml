@@ -8647,12 +8647,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibilité du runtime OCR ; omis pour les bundles historiques
+                          description: Compatibilité avec l'hôte. OCR la signale toujours. Un bundle hérité signale incompatible uniquement quand cet hôte ne peut pas l'exécuter, et omet le champ sinon.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Raison de compatibilité du runtime OCR ; omise pour les bundles historiques
+                          description: Pourquoi le bundle est incompatible, par exemple cpu-no-avx quand ses bibliothèques x86-64 nécessitent AVX et que ce processeur ne l'a pas. Omis pour les bundles hérités compatibles.
                         selectedTarget:
                           type:
                             - string
@@ -8971,6 +8971,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Un bundle requis par l''outil ne peut pas être installé sur cet hôte : le runtime OCR n''est pas pris en charge, ou le bundle nécessite AVX et ce processeur ne l''a pas (code FEATURE_CPU_UNSUPPORTED). Rien n''est mis en file d''attente.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9037,7 +9043,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bundle déjà installé ou runtime OCR non pris en charge sur cet hôte
+          description: Bundle déjà installé, runtime OCR non pris en charge sur cet hôte, ou le bundle nécessite AVX et ce processeur ne l'a pas (code FEATURE_CPU_UNSUPPORTED, refusé avant tout téléchargement)
           content:
             application/json:
               schema:
@@ -30770,13 +30776,13 @@ x-i18n:
       provenance: machine
       outputHash: 640b32cb0714
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 01a3c7795071
+      outputHash: '916467897608'
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 7751881ef8d8
+      outputHash: 19485d613dd7
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30869,6 +30875,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 52d84442c379
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 0f68ab836632
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30902,9 +30912,9 @@ x-i18n:
       provenance: machine
       outputHash: d211668a7f9b
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 93602e6a8e32
+      outputHash: b1e8acc7eb57
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

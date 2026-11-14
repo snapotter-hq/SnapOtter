@@ -8646,12 +8646,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Kompatibilitet för OCR-körmiljön; utelämnas för äldre paket
+                          description: Värdkompatibilitet. OCR rapporterar den alltid. Ett äldre paket rapporterar incompatible bara när den här värden inte kan köra det, och utelämnar fältet annars.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Orsak till kompatibilitetsproblem för OCR-körmiljön; utelämnas för äldre paket
+                          description: Varför paketet är inkompatibelt, till exempel cpu-no-avx när dess x86-64-bibliotek kräver AVX och den här processorn saknar det. Utelämnas för kompatibla äldre paket.
                         selectedTarget:
                           type:
                             - string
@@ -8970,6 +8970,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Ett paket som verktyget behöver kan inte installeras på den här värden: OCR-körmiljön stöds inte, eller paketet kräver AVX och den här processorn saknar det (kod FEATURE_CPU_UNSUPPORTED). Inget köas.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9056,7 +9062,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Paketet är redan installerat eller OCR-körmiljön stöds inte på den här värden
+          description: Paketet är redan installerat, OCR-körmiljön stöds inte på den här värden, eller paketet kräver AVX och den här processorn saknar det (kod FEATURE_CPU_UNSUPPORTED, nekas före all nedladdning)
           content:
             application/json:
               schema:
@@ -30791,13 +30797,13 @@ x-i18n:
       provenance: machine
       outputHash: 0ee02b08b601
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: e0654d1d2c4d
+      outputHash: baca4c1ac416
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 36471132965f
+      outputHash: 9ff545244179
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30890,6 +30896,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: d0290fe38118
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 685c22d2a257
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30923,9 +30933,9 @@ x-i18n:
       provenance: machine
       outputHash: 470bed57fe43
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 0f95ffc84a49
+      outputHash: c95717f2ec65
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

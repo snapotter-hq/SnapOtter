@@ -56,11 +56,10 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
 import {
   getBundleHostUnsupportedReason,
   getModelsDir,
-  type Manifest,
   markInstalled,
   markUninstalled,
 } from "../../../apps/api/src/lib/feature-status.js";
-import { registerFeatureRoutes } from "../../../apps/api/src/routes/features.js";
+import { type Manifest, registerFeatureRoutes } from "../../../apps/api/src/routes/features.js";
 
 const manifest = (requiresAvx?: boolean): Manifest =>
   ({ bundles: { "face-detection": { models: [], requiresAvx } } }) as unknown as Manifest;

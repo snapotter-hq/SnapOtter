@@ -8645,12 +8645,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR रनटाइम संगतता; पुराने बंडलों के लिए छोड़ा गया
+                          description: होस्ट संगतता। OCR इसे हमेशा बताता है। कोई लेगेसी बंडल incompatible तभी बताता है जब यह होस्ट उसे नहीं चला सकता, वरना यह फ़ील्ड छोड़ देता है।
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR रनटाइम संगतता कारण; पुराने बंडलों के लिए छोड़ा गया
+                          description: बंडल असंगत क्यों है, जैसे cpu-no-avx जब इसकी x86-64 लाइब्रेरी को AVX चाहिए और इस CPU में यह नहीं है। संगत लेगेसी बंडल के लिए यह छोड़ दिया जाता है।
                         selectedTarget:
                           type:
                             - string
@@ -8969,6 +8969,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'टूल को जिस बंडल की ज़रूरत है, वह इस होस्ट पर इंस्टॉल नहीं हो सकता: OCR रनटाइम समर्थित नहीं है, या बंडल को AVX चाहिए और इस CPU में यह नहीं है (कोड FEATURE_CPU_UNSUPPORTED)। कुछ भी कतार में नहीं जाता।'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9055,7 +9061,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: बंडल पहले से इंस्टॉल है या इस होस्ट पर OCR रनटाइम समर्थित नहीं है
+          description: बंडल पहले से इंस्टॉल है, इस होस्ट पर OCR रनटाइम समर्थित नहीं है, या बंडल को AVX चाहिए और इस CPU में यह नहीं है (कोड FEATURE_CPU_UNSUPPORTED, किसी भी डाउनलोड से पहले अस्वीकार)
           content:
             application/json:
               schema:
@@ -30791,13 +30797,13 @@ x-i18n:
       provenance: machine
       outputHash: 0626b914bce3
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 572ea7eb1ad1
+      outputHash: 0828b9339d00
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 5f01c6326397
+      outputHash: c57c04e2a18c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30890,6 +30896,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 823bf92f235c
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: be3a40551a62
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30923,9 +30933,9 @@ x-i18n:
       provenance: machine
       outputHash: f258fd9d9a06
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 58fb6b212837
+      outputHash: 090a91eaa8ca
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

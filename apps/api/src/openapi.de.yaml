@@ -8643,12 +8643,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Kompatibilität der OCR-Laufzeit; bei älteren Bundles weggelassen
+                          description: Host-Kompatibilität. OCR meldet sie immer. Ein Legacy-Bundle meldet incompatible nur, wenn dieser Host es nicht ausführen kann, und lässt das Feld sonst weg.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Grund der Kompatibilität der OCR-Laufzeit; bei älteren Bundles weggelassen
+                          description: Warum das Bundle inkompatibel ist, etwa cpu-no-avx, wenn seine x86-64-Bibliotheken AVX brauchen und dieser CPU AVX fehlt. Fehlt bei kompatiblen Legacy-Bundles.
                         selectedTarget:
                           type:
                             - string
@@ -8967,6 +8967,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Ein Bundle, das das Tool braucht, kann auf diesem Host nicht installiert werden: Die OCR-Laufzeit wird nicht unterstützt, oder das Bundle braucht AVX und dieser CPU fehlt es (Code FEATURE_CPU_UNSUPPORTED). Es wird nichts in die Warteschlange gestellt.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9053,7 +9059,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bundle bereits installiert oder OCR-Laufzeit auf diesem Host nicht unterstützt
+          description: Bundle bereits installiert, OCR-Laufzeit auf diesem Host nicht unterstützt, oder das Bundle braucht AVX und dieser CPU fehlt es (Code FEATURE_CPU_UNSUPPORTED, abgelehnt vor jedem Download)
           content:
             application/json:
               schema:
@@ -30792,13 +30798,13 @@ x-i18n:
       provenance: machine
       outputHash: 683f6dc28bf2
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 350d81319333
+      outputHash: 1acce5315641
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 2f1eb7598dc2
+      outputHash: 78d30c1779f3
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30891,6 +30897,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: a9a08030a478
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 5b78967a30f9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30924,9 +30934,9 @@ x-i18n:
       provenance: machine
       outputHash: 83ee632dbee9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 6d7ff6e5bec6
+      outputHash: 68054c018d19
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine

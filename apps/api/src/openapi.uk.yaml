@@ -8647,12 +8647,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Сумісність середовища OCR; пропущено для застарілих пакетів
+                          description: Сумісність із хостом. OCR завжди її повідомляє. Застарілий пакет повідомляє incompatible лише тоді, коли цей хост не може його запустити, а інакше пропускає поле.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Причина несумісності середовища OCR; пропущено для застарілих пакетів
+                          description: Чому пакет несумісний, наприклад cpu-no-avx, коли його бібліотекам x86-64 потрібен AVX, а цей процесор його не має. Пропускається для сумісних застарілих пакетів.
                         selectedTarget:
                           type:
                             - string
@@ -8971,6 +8971,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Пакет, потрібний інструменту, не можна встановити на цьому хості: середовище OCR не підтримується, або пакету потрібен AVX, а цей процесор його не має (код FEATURE_CPU_UNSUPPORTED). Нічого не ставиться в чергу.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9057,7 +9063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Пакет уже встановлено або середовище OCR не підтримується на цьому хості
+          description: Пакет уже встановлено, середовище OCR не підтримується на цьому хості, або пакету потрібен AVX, а цей процесор його не має (код FEATURE_CPU_UNSUPPORTED, відмова до будь-якого завантаження)
           content:
             application/json:
               schema:
@@ -30796,13 +30802,13 @@ x-i18n:
       provenance: machine
       outputHash: 4d145fdf2d4b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 8a943bb03e39
+      outputHash: c435f62e0caa
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 1db96db8ef53
+      outputHash: ce138796e72a
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30895,6 +30901,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 07f4659b5022
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: e8acce6ad1e9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30928,9 +30938,9 @@ x-i18n:
       provenance: machine
       outputHash: c2c435821a02
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 197e6d5d7051
+      outputHash: be37d3151f86
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
