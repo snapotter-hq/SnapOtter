@@ -5576,6 +5576,8 @@ export const en = {
       BROWSER_CRASHED: "The browser crashed while rendering. Try again.",
       BROWSER_NOT_AVAILABLE: "The browser this tool needs isn't available right now.",
       DEPENDENCY_VALIDATION_FAILED: "This setting depends on another setting that isn't valid.",
+      FEATURE_CPU_UNSUPPORTED:
+        "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.",
       FEATURE_INCOMPATIBLE: "This feature can't run with the current settings.",
       FST_REQ_FILE_TOO_LARGE: "This file is too large to upload.",
       IDLE_TIMEOUT: "You were signed out after being idle. Sign in again.",

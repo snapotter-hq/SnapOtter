@@ -45,6 +45,7 @@ import {
   SafeError,
 } from "@snapotter/shared";
 import * as tar from "tar";
+import { hostLacksAvx } from "./cpu-features.js";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
 import { logger } from "./logger.js";
 
@@ -1032,6 +1033,8 @@ interface ManifestBundle {
   archives?: Record<string, ManifestArchive>;
   targets?: Record<string, ManifestTarget>;
   smokeImports?: string[];
+  /** The bundle's x86-64 wheels need AVX; arm64 builds never do (#4680). */
+  requiresAvx?: boolean;
 }
 
 interface Manifest {
@@ -1431,6 +1434,17 @@ function causeChain(error: unknown): string {
   return messages.join(": ");
 }
 
+/** Why this host can't run a bundle at all, or null when it can (#4680). */
+export type BundleHostUnsupportedReason = "cpu-no-avx";
+
+export function getBundleHostUnsupportedReason(
+  bundleId: string,
+  manifest: Manifest | null = readManifest(),
+): BundleHostUnsupportedReason | null {
+  if (manifest?.bundles[bundleId]?.requiresAvx && hostLacksAvx()) return "cpu-no-avx";
+  return null;
+}
+
 export function getFeatureStates(): FeatureBundleState[] {
   const installed = readInstalled();
   const lock = getInstallingBundle();
@@ -1599,7 +1613,12 @@ export function getFeatureStates(): FeatureBundleState[] {
       error,
     };
 
-    if (bundle.id !== "ocr") return baseState;
+    const hostUnsupportedReason = getBundleHostUnsupportedReason(bundle.id, manifest);
+    const hostUnsupported = hostUnsupportedReason
+      ? { compatibility: "incompatible" as const, compatibilityReason: hostUnsupportedReason }
+      : {};
+
+    if (bundle.id !== "ocr") return { ...baseState, ...hostUnsupported };
 
     const compatibility = !ocrCapability.available
       ? ocrCapability.status === "invalid"
@@ -1623,6 +1642,7 @@ export function getFeatureStates(): FeatureBundleState[] {
       availableQualities: ["fast", ...(ocrCapability.available ? ocrCapability.qualities : [])],
       requiredMemoryBytes: requiredOcrMemoryBytes,
       effectiveMemoryBytes: effectiveOcrMemoryBytes,
+      ...hostUnsupported,
     };
   });
 }

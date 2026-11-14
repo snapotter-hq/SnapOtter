@@ -5668,6 +5668,8 @@ export const es: TranslationKeys = {
       BROWSER_NOT_AVAILABLE:
         "El navegador que necesita esta herramienta no está disponible en este momento.",
       DEPENDENCY_VALIDATION_FAILED: "Este ajuste depende de otro ajuste que no es válido.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Esta función necesita un procesador compatible con AVX, y el procesador de este servidor no lo es.",
       FEATURE_INCOMPATIBLE: "Esta función no se puede ejecutar con los ajustes actuales.",
       FST_REQ_FILE_TOO_LARGE: "Este archivo es demasiado grande para subirlo.",
       IDLE_TIMEOUT: "Se cerró tu sesión por inactividad. Vuelve a iniciar sesión.",

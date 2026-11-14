@@ -61,6 +61,7 @@ import {
   cleanupInterruptedFeatureImports,
   getAiDir,
   getAiMutationEpoch,
+  getBundleHostUnsupportedReason,
   getFeatureStates,
   getInstallingBundle,
   getInstallLockFdForChild,
@@ -867,6 +868,25 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
   return null;
 }
 
+export const CPU_NO_AVX_INSTALL_MESSAGE =
+  "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.";
+
+/**
+ * Refuse a bundle this host can't run before anything is downloaded (#4680).
+ * Returns true when it sent the refusal.
+ */
+function refuseHostUnsupportedBundle(bundleId: string, reply: FastifyReply): boolean {
+  const reason = getBundleHostUnsupportedReason(bundleId);
+  if (!reason) return false;
+  reply.status(409).send({
+    error: CPU_NO_AVX_INSTALL_MESSAGE,
+    code: "FEATURE_CPU_UNSUPPORTED",
+    feature: bundleId,
+    reason,
+  });
+  return true;
+}
+
 /**
  * Drop an install reservation nothing will use. A failure here leaves a stray
  * queued row until the startup sweep, which is no reason to fail the request.
@@ -1061,6 +1081,8 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
       }
 
+      if (refuseHostUnsupportedBundle(bundleId, reply)) return reply;
+
       if (bundleId === "ocr") {
         const preflightError = getOcrInstallPreflightError();
         if (preflightError) {
@@ -1097,6 +1119,11 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         requiredBundles.length > 0 ? requiredBundles : optionalBundle ? [optionalBundle.id] : [];
       if (installBundles.length === 0) {
         return reply.status(404).send({ error: `No feature bundles required for tool: ${toolId}` });
+      }
+
+      // Check every bundle first so a refusal never leaves the others queued.
+      for (const bundleId of installBundles) {
+        if (refuseHostUnsupportedBundle(bundleId, reply)) return reply;
       }
 
       const bundles: ToolBundleInstallResult[] = [];

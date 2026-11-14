@@ -456,6 +456,8 @@ function BundleCard({
   const { t, locale } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const incompatible = bundle.compatibility === "incompatible";
+  const cpuUnsupported = incompatible && bundle.compatibilityReason === "cpu-no-avx";
+  const cpuReasonId = `bundle-${bundle.id}-cpu-reason`;
   const displayedError = error ?? bundle.error;
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * t.features.progressMessages.length),
@@ -496,6 +498,11 @@ function BundleCard({
               : ""}
             )
           </p>
+          {cpuUnsupported && (
+            <p id={cpuReasonId} className="text-xs text-muted-foreground mt-1">
+              {t.errors.codes.FEATURE_CPU_UNSUPPORTED}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3 shrink-0 ms-4">
           <div className="flex items-center gap-1.5">
@@ -539,6 +546,17 @@ function BundleCard({
             )}
           </div>
 
+          {status === "not_installed" && !displayedError && cpuUnsupported && (
+            <button
+              type="button"
+              disabled
+              aria-describedby={cpuReasonId}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium opacity-50 cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t.settings.aiFeatures.install}
+            </button>
+          )}
           {status === "not_installed" && !displayedError && !incompatible && (
             <button
               type="button"

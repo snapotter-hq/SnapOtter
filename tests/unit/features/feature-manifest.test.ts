@@ -287,6 +287,38 @@ describe("Feature manifest: architecture parity", () => {
   });
 });
 
+describe("Feature manifest: requiresAvx (#4680)", () => {
+  // Measured by running each bundle's x86-64 wheels under qemu-x86_64 with a
+  // CPU model that has no AVX: MediaPipe face detection aborts ("compiled with
+  // avx enabled") on the mediapipe that `>=0.10.21` resolves to now (1.2.3;
+  // 0.10.21 itself ran), while onnxruntime, onnxruntime-gpu, torch,
+  // ctranslate2 and a bare `import mediapipe` all run. So only the bundles whose tools need
+  // MediaPipe inference are flagged. upscale-enhance's enhance-faces also
+  // needs it, but upscale and noise-removal don't, so that bundle stays
+  // installable and its face tool relies on the run-time cpu-no-avx error.
+  const flagged = Object.entries(bundles)
+    .filter(([, bundle]) => (bundle as { requiresAvx?: unknown }).requiresAvx === true)
+    .map(([id]) => id)
+    .sort();
+
+  it("is a boolean wherever it is set", () => {
+    for (const [id, bundle] of Object.entries(bundles)) {
+      const value = (bundle as { requiresAvx?: unknown }).requiresAvx;
+      expect(value === undefined || typeof value === "boolean", id).toBe(true);
+    }
+  });
+
+  it("flags exactly the bundles whose tools all need MediaPipe inference", () => {
+    expect(flagged).toEqual(["face-detection", "photo-restoration"]);
+  });
+
+  it("only flags bundles that ship mediapipe on amd64", () => {
+    for (const id of flagged) {
+      expect(archPackagesInclude(id, "amd64", "mediapipe"), id).toBe(true);
+    }
+  });
+});
+
 describe("Feature manifest: enablesTools consistency with shared features", () => {
   it("manifest enablesTools matches features.ts for each bundle", async () => {
     const { FEATURE_BUNDLES } = await import("@snapotter/shared");

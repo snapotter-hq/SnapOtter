@@ -112,6 +112,7 @@
       "name": "Face Detection",
       "description": "Detect and blur faces, fix red-eye, smart crop",
       "estimatedSize": "200-300 MB",
+      "requiresAvx": true,
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/face-detection-amd64-gpu-r2.tar.gz",
@@ -401,6 +402,7 @@
       "name": "Photo Restoration",
       "description": "Restore old or damaged photos",
       "estimatedSize": "4-5 GB",
+      "requiresAvx": true,
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/photo-restoration-amd64-gpu-r2.tar.gz",

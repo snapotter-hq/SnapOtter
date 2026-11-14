@@ -5656,6 +5656,8 @@ export const id: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "Peramban yang dibutuhkan alat ini sedang tidak tersedia.",
       DEPENDENCY_VALIDATION_FAILED:
         "Pengaturan ini bergantung pada pengaturan lain yang tidak valid.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Fitur ini memerlukan CPU yang mendukung AVX, dan CPU server ini tidak mendukungnya.",
       FEATURE_INCOMPATIBLE: "Fitur ini tidak dapat berjalan dengan pengaturan saat ini.",
       FST_REQ_FILE_TOO_LARGE: "File ini terlalu besar untuk diunggah.",
       IDLE_TIMEOUT: "Anda keluar karena tidak aktif. Masuk lagi.",

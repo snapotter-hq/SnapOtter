@@ -5708,6 +5708,8 @@ export const de: TranslationKeys = {
         "Der Browser, den dieses Werkzeug benötigt, ist derzeit nicht verfügbar.",
       DEPENDENCY_VALIDATION_FAILED:
         "Diese Einstellung hängt von einer anderen Einstellung ab, die nicht gültig ist.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Diese Funktion braucht einen Prozessor mit AVX-Unterstützung, und der Prozessor dieses Servers hat sie nicht.",
       FEATURE_INCOMPATIBLE:
         "Diese Funktion kann mit den aktuellen Einstellungen nicht ausgeführt werden.",
       FST_REQ_FILE_TOO_LARGE: "Diese Datei ist zu groß zum Hochladen.",

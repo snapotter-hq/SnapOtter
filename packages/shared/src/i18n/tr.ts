@@ -5662,6 +5662,8 @@ export const tr: TranslationKeys = {
       BROWSER_CRASHED: "Tarayıcı oluşturma sırasında çöktü. Yeniden deneyin.",
       BROWSER_NOT_AVAILABLE: "Bu aracın ihtiyaç duyduğu tarayıcı şu anda kullanılamıyor.",
       DEPENDENCY_VALIDATION_FAILED: "Bu ayar, geçerli olmayan başka bir ayara bağlı.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Bu özellik AVX destekli bir işlemci gerektirir ve bu sunucunun işlemcisinde bu destek yok.",
       FEATURE_INCOMPATIBLE: "Bu özellik mevcut ayarlarla çalışamaz.",
       FST_REQ_FILE_TOO_LARGE: "Bu dosya yüklenemeyecek kadar büyük.",
       IDLE_TIMEOUT: "Hareketsiz kaldığınız için oturumunuz kapatıldı. Yeniden giriş yapın.",

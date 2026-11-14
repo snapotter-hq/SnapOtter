@@ -5636,6 +5636,8 @@ export const vi: TranslationKeys = {
       BROWSER_CRASHED: "Trình duyệt đã gặp sự cố khi kết xuất. Hãy thử lại.",
       BROWSER_NOT_AVAILABLE: "Trình duyệt mà công cụ này cần hiện không khả dụng.",
       DEPENDENCY_VALIDATION_FAILED: "Cài đặt này phụ thuộc vào một cài đặt khác không hợp lệ.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Tính năng này cần CPU hỗ trợ AVX, nhưng CPU của máy chủ này không hỗ trợ.",
       FEATURE_INCOMPATIBLE: "Tính năng này không thể chạy với các cài đặt hiện tại.",
       FST_REQ_FILE_TOO_LARGE: "Tệp này quá lớn để tải lên.",
       IDLE_TIMEOUT: "Bạn đã bị đăng xuất do không hoạt động. Hãy đăng nhập lại.",
