@@ -26,6 +26,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
@@ -399,9 +400,9 @@ export function registerSvgToRasterRoute(
               { err, filename: file.filename, toolId: opts.toolId },
               "SVG batch file conversion failed",
             );
-            const error = stripInternalPaths(
-              err instanceof Error ? err.message : "Conversion failed",
-            );
+            const error =
+              imageSizeLimitError(err)?.message ??
+              stripInternalPaths(err instanceof Error ? err.message : "Conversion failed");
             faults.push({ filename: file.filename, error });
             errors.push({
               filename: file.filename,
@@ -798,6 +799,8 @@ export function registerSvgToRasterRoute(
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log?.warn({ err, toolId: opts.toolId }, "SVG conversion failed");
       return reply.status(422).send({
         error: "SVG conversion failed",

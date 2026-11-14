@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import sharp from "sharp";
 import { z } from "zod";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { putObject } from "../../lib/object-storage.js";
 
 const QR_MARGIN_MODULES = 2;
@@ -154,6 +155,8 @@ export function registerQrGenerate(app: FastifyInstance) {
         });
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
+        const tooLarge = imageSizeLimitError(err);
+        if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         request.log?.warn({ err, toolId: "qr-generate" }, "QR code generation failed");
         return reply.status(422).send({
           error: "QR code generation failed",
