@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import { ToolInputError, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveQpdf } from "./binaries.js";
 
 /**
@@ -29,6 +29,39 @@ function qpdfSpawnFailure(
     path: bin,
     ...(signal ? { signal } : {}),
   });
+}
+
+/**
+ * qpdf failures caused by what the user asked for rather than by the file or
+ * by us: a page range that doesn't fit the document ("error at * in numeric
+ * range *13: number 13 out of range", or "invalid range syntax") and a wrong
+ * decrypt password. Both exit 2, the same code as real damage, so stderr is
+ * the only tell.
+ */
+export type QpdfInputFault = "page-range" | "invalid-password";
+
+const QPDF_INPUT_FAULTS: ReadonlyArray<[RegExp, QpdfInputFault, string]> = [
+  [/\bin numeric range\b/, "page-range", "The page range doesn't match this PDF's pages."],
+  // Neutral wording: most callers never take a password, so "wrong password"
+  // would blame the user for one they didn't give. unlock-pdf says it itself.
+  [/: invalid password\s*$/m, "invalid-password", "This PDF is password-protected."],
+];
+
+function qpdfInputError(code: number, detail: string): ToolInputError | undefined {
+  if (code !== 2) return undefined;
+  const match = QPDF_INPUT_FAULTS.find(([pattern]) => pattern.test(detail));
+  if (!match) return undefined;
+  const [, fault, message] = match;
+  return Object.assign(
+    new ToolInputError(message, { cause: new Error(`qpdf exited ${code}: ${detail}`) }),
+    { qpdfFault: fault },
+  );
+}
+
+/** The input fault a runQpdf rejection was classified as, if any. */
+export function qpdfInputFault(err: unknown): QpdfInputFault | undefined {
+  const fault = (err as { qpdfFault?: unknown } | null)?.qpdfFault;
+  return fault === "page-range" || fault === "invalid-password" ? fault : undefined;
 }
 
 export interface QpdfOptions {
@@ -105,7 +138,7 @@ export function runQpdf(
         reject(qpdfSpawnFailure(bin, code, signal, detail));
         return;
       }
-      reject(new Error(`qpdf exited ${code}: ${detail}`));
+      reject(qpdfInputError(code, detail) ?? new Error(`qpdf exited ${code}: ${detail}`));
     });
     abortSignal?.addEventListener("abort", onAbort, { once: true });
   });

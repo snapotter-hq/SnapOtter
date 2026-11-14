@@ -5724,6 +5724,11 @@ export const ptBR: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "O resultado não consegue atingir o tamanho desejado.",
       TOO_MANY_FRAMES: "Este arquivo tem quadros demais para processar.",
       CANCELED: "A operação foi cancelada.",
+      PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
+      INVALID_PAGE_RANGE:
+        "Esse intervalo de páginas não é válido. Use números de página como 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Você não pode remover todas as páginas. Mantenha pelo menos uma.",
+      NESTING_TOO_DEEP: "Este arquivo tem aninhamento profundo demais para ser convertido.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",

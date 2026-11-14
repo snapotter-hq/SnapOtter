@@ -5762,6 +5762,13 @@ export const de: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Das Ergebnis kann die Zielgröße nicht erreichen.",
       TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
+      PAGE_OUT_OF_RANGE:
+        "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",
+      INVALID_PAGE_RANGE:
+        "Dieser Seitenbereich ist ungültig. Verwenden Sie Seitenzahlen wie 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES:
+        "Sie können nicht alle Seiten entfernen. Behalten Sie mindestens eine.",
+      NESTING_TOO_DEEP: "Diese Datei ist zu tief verschachtelt, um sie zu konvertieren.",
     },
     generic: "Ein Fehler ist aufgetreten",
     offline: "Sie sind offline",

@@ -4,7 +4,7 @@ import { access, constants, readdir, rm, statfs } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import { ToolInputError, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
@@ -36,6 +36,12 @@ const OUT_OF_SPACE = /Error Area:Io Class:Space\b/;
 // file and logs an Io/Access error instead, the same one a read-only output
 // directory produces (#4529).
 const ACCESS_DENIED = /Error Area:Io Class:Access\b/;
+// LibreOffice's own word for an input it couldn't open: a truncated or
+// corrupt file, a password-protected one, or one whose contents don't match
+// its extension. It still exits 0, just without writing anything (#4380).
+const SOURCE_NOT_LOADED = /source file could not be loaded/i;
+const UNREADABLE_DOCUMENT_MESSAGE =
+  "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.";
 // A volume that reads as full can still report a few blocks free, reserved
 // for root or filesystem metadata, so "full" is anything under this.
 const FULL_DISK_FREE_BYTES = 1024 * 1024;
@@ -179,12 +185,21 @@ export async function convertDocument(
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);
-    if (!produced)
-      throw await failure(
+    if (!produced) {
+      const noOutput = await failure(
         `LibreOffice produced no ${ext} output for ${basename(inputPath)}`,
         err,
         outDir,
       );
+      if ((noOutput as NodeJS.ErrnoException).code !== undefined) throw noOutput;
+      if (SOURCE_NOT_LOADED.test(err)) {
+        throw new ToolInputError(UNREADABLE_DOCUMENT_MESSAGE, { cause: noOutput });
+      }
+      // Anything else is unexplained, so keep LibreOffice's own words with it
+      // for triage (NODE-35 events carried no stderr at all).
+      if (err.trim()) noOutput.cause = new Error(`LibreOffice stderr: ${err.slice(-1000).trim()}`);
+      throw noOutput;
+    }
     return join(outDir, produced);
   } finally {
     await rm(profileDir, { recursive: true, force: true }).catch(() => {});

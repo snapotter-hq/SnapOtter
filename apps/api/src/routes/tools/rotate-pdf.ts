@@ -1,8 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qpdfRotate } from "@snapotter/doc-engine";
+import { qpdfPageCount, qpdfRotate } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { assertPageSpecInRange } from "../../lib/page-spec.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -28,6 +29,7 @@ export function registerRotatePdf(app: FastifyInstance) {
       const inPath = join(ctx.scratchDir, `in-${input.filename.replace(/[^A-Za-z0-9._-]/g, "_")}`);
       await writeFile(inPath, input.buffer);
 
+      assertPageSpecInRange(settings.range, await qpdfPageCount(inPath, { signal: ctx.signal }));
       const outPath = join(ctx.scratchDir, `${base}_rotated.pdf`);
       ctx.report(10, "Rotating");
       await qpdfRotate(inPath, settings.angle, settings.range, outPath, { signal: ctx.signal });
