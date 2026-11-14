@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { flowParentStored, getFlowProducer } from "../../../apps/api/src/jobs/enqueue.js";
+import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { queueName } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -76,7 +77,11 @@ describe("a batch flow add that fails after Redis stored the flow (#4714)", () =
       children: [],
     });
 
-    expect(await flowParentStored("system", parentId)).toBe(true);
-    expect(await flowParentStored("system", randomUUID())).toBe(false);
+    try {
+      expect(await flowParentStored("system", parentId)).toBe(true);
+      expect(await flowParentStored("system", randomUUID())).toBe(false);
+    } finally {
+      await (await getQueue("system").getJob(parentId))?.remove();
+    }
   });
 });

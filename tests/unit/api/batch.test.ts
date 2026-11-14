@@ -1513,14 +1513,21 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     it("leaves rows and uploads to reconciliation and the TTL sweep when Redis can't be asked", async () => {
       mocks.flowAdd.mockRejectedValueOnce(lostReply);
       mocks.flowParentStored.mockResolvedValueOnce(null);
+      const log = { error: vi.fn(), warn: vi.fn() };
 
       await expect(
         invokeBatchRoute({
           section: "image",
           toolId: "resize",
+          log,
           parts: parts("batch-4714-unknown"),
         }),
       ).rejects.toBe(lostReply);
+
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("leaving cleanup to reconciliation"),
+      );
 
       expect(mocks.waitForJob).not.toHaveBeenCalled();
       expect(mocks.deleteObject).not.toHaveBeenCalled();
