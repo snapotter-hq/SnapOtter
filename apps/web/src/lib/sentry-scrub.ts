@@ -69,6 +69,37 @@ function hasDevServerFrames(event: AnyEvent): boolean {
   return false;
 }
 
+/**
+ * Page translators (Google Translate's <font> wrappers, Yandex's <ya-tr-span>)
+ * replace text nodes React still owns, and React's next insertBefore or
+ * removeChild next to one throws NotFoundError (WEB-2V/2T/2N/1G,
+ * facebook/react#11538). A real portal bug throws the same error, so the
+ * error alone isn't enough (#845): drop it only when a translator left its
+ * mark, in the click breadcrumbs or on <html>.
+ */
+const TRANSLATOR_SELECTOR = /(^|[\s>])(font|ya-tr-span)([\s>.#[:]|$)/;
+const TRANSLATED_HTML_CLASSES = ["translated-ltr", "translated-rtl"];
+
+function isTranslatorDomCrash(event: AnyEvent, error: unknown): boolean {
+  // Any NotFoundError: Safari words it "The object can not be found here.",
+  // naming neither method. The translator trace is what narrows it.
+  if (!(error instanceof Error) || error.name !== "NotFoundError") return false;
+  const html = typeof document === "undefined" ? undefined : document.documentElement;
+  if (html && TRANSLATED_HTML_CLASSES.some((c) => html.classList.contains(c))) return true;
+  const crumbs = event.breadcrumbs;
+  const list = Array.isArray(crumbs) ? crumbs : asObj(crumbs)?.values;
+  if (!Array.isArray(list)) return false;
+  return list.some((entry) => {
+    const crumb = asObj(entry);
+    return (
+      typeof crumb?.category === "string" &&
+      crumb.category.startsWith("ui.") &&
+      typeof crumb.message === "string" &&
+      TRANSLATOR_SELECTOR.test(crumb.message)
+    );
+  });
+}
+
 export const DENY_URLS: RegExp[] = [
   /^chrome-extension:\/\//,
   /^moz-extension:\/\//,
@@ -145,6 +176,7 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
     if (hasDevServerFrames(event)) return null;
+    if (isTranslatorDomCrash(event, hint?.originalException)) return null;
 
     // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;
