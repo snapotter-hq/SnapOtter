@@ -1631,17 +1631,23 @@ describe("worker result payload behavior", () => {
       });
       getGenericObjectStream.mockRejectedValueOnce(noSuchKey);
       failBatchJobMock.mockClear();
-      const caughtMissing = await processor(batchJob).catch((err: unknown) => err);
-      expect(caughtMissing).toBe(noSuchKey);
+      const caughtMissing = (await processor(batchJob).catch((err: unknown) => err)) as Error & {
+        code?: string;
+      };
+      // A vanished child output is named as such, not as a storage fault (#4664).
+      expect(caughtMissing.code).toBe("batch-output-missing");
+      expect(caughtMissing.cause).toBe(noSuchKey);
       expect(classifyError(caughtMissing, "worker")).toBe("bug");
+      const missingMessage =
+        "A processed file went missing before the batch could be packaged. Run the batch again.";
       expect(failBatchJobMock).toHaveBeenCalledWith({
         jobId: "batch-s3-1",
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 0,
-        message: "Failed to package batch results",
-        code: undefined,
-        errors: [{ filename: "", error: "Failed to package batch results" }],
+        message: missingMessage,
+        code: "batch-output-missing",
+        errors: [{ filename: "", error: missingMessage }],
       });
 
       getGenericObjectStream.mockRejectedValueOnce("raw-string-stream-fault");
@@ -3407,6 +3413,183 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       message: "All files failed processing",
       errors: counter100,
     });
+  });
+
+  it("names a child output that vanished before packaging as missing, not as a storage write failure (#4664)", async () => {
+    objectStorageMocks.getObjectStream.mockRejectedValue(
+      enoent("/data/workspace/outputs/batch-gone-f0/a.png"),
+    );
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    // Drains the archive like the real upload, so the feed's failure reaches
+    // it as the source error.
+    objectStorageMocks.putObjectStream.mockImplementation(
+      async (_key: string, source: AsyncIterable<Buffer>) => {
+        for await (const _chunk of source) {
+          // drain
+        }
+        return 0;
+      },
+    );
+    const { processor, failBatchJobMock, completeBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-gone-f0": {
+          id: "batch-gone-f0",
+          status: "completed",
+          inputRefs: ["uploads/batch-gone-f0/a.png"],
+          outputRefs: ["outputs/batch-gone-f0/a.png"],
+        },
+      },
+    });
+
+    const err = (await processor({
+      id: "batch-gone",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-gone",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    }).catch((e: unknown) => e)) as { code?: string; statusCode?: number; message?: string };
+
+    expect(err.code).toBe("batch-output-missing");
+    expect(err.statusCode).toBe(500);
+    expect(err.message).not.toMatch(/write to its storage/);
+    expect(completeBatchJobMock).not.toHaveBeenCalled();
+    expect(failBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "batch-gone", code: "batch-output-missing" }),
+    );
+  });
+
+  it.each([
+    ["completed", {}],
+    ["canceled", { canceled: true }],
+  ] as const)(
+    "a re-run finalize for a %s parent that kept its ZIP returns the stored result without repackaging (#4664)",
+    async (status, extra) => {
+      objectStorageMocks.getObjectStream.mockReset();
+      objectStorageMocks.putObject.mockReset();
+      objectStorageMocks.putObjectStream.mockReset();
+      const zipKey = "outputs/batch-dup/batch-resize-batch-du.zip";
+      const { processor, failBatchJobMock, completeBatchJobMock, cancelBatchJobMock } =
+        await setupSystemProcessor({
+          rowsById: {
+            "batch-dup": {
+              id: "batch-dup",
+              type: "batch",
+              status,
+              outputRefs: [zipKey],
+              bytesOut: 42,
+              progress: {
+                percent: 100,
+                totalFiles: 1,
+                completedFiles: 1,
+                failedFiles: 0,
+                result: {
+                  zipFilename: "batch-resize-batch-du.zip",
+                  fileResults: { "0": "a.png" },
+                  fileNotes: { "0": { resizedTo: "10x10" } },
+                  processedSize: 42,
+                },
+              },
+            },
+            // The first run reclaimed this output, so a repackage would fail.
+            "batch-dup-f0": {
+              id: "batch-dup-f0",
+              status: "completed",
+              inputRefs: ["uploads/batch-dup-f0/a.png"],
+              outputRefs: ["outputs/batch-dup-f0/a.png"],
+            },
+          },
+        });
+
+      const result = await processor({
+        id: "batch-dup",
+        name: "batch-finalize",
+        data: {
+          kind: "batch-finalize",
+          jobId: "batch-dup",
+          toolId: "resize",
+          userId: null,
+          pool: "system",
+          totalFiles: 1,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: 1, fileIndexMap: [0] },
+        },
+      });
+
+      expect(result).toEqual({
+        outputRefs: [zipKey],
+        filename: "batch-resize-batch-du.zip",
+        contentType: "application/zip",
+        originalSize: 0,
+        processedSize: 42,
+        resultPayload: {
+          manifest: [],
+          ...extra,
+          zip: {
+            key: zipKey,
+            filename: "batch-resize-batch-du.zip",
+            size: 42,
+            fileResults: { "0": "a.png" },
+            fileNotes: { "0": { resizedTo: "10x10" } },
+          },
+        },
+      });
+      expect(objectStorageMocks.getObjectStream).not.toHaveBeenCalled();
+      expect(objectStorageMocks.putObjectStream).not.toHaveBeenCalled();
+      expect(objectStorageMocks.putObject).not.toHaveBeenCalled();
+      expect(completeBatchJobMock).not.toHaveBeenCalled();
+      expect(cancelBatchJobMock).not.toHaveBeenCalled();
+      expect(failBatchJobMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still runs the finalize for a terminal parent that kept no ZIP (#4664)", async () => {
+    const { processor, failBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-nozip": {
+          id: "batch-nozip",
+          type: "batch",
+          status: "failed",
+          outputRefs: [],
+          error: { message: "All files failed processing" },
+        },
+        "batch-nozip-f0": {
+          id: "batch-nozip-f0",
+          status: "failed",
+          inputRefs: ["uploads/batch-nozip-f0/a.png"],
+          error: { message: "corrupt" },
+        },
+      },
+    });
+
+    const result = (await processor({
+      id: "batch-nozip",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-nozip",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { resultPayload?: { allFailed?: boolean } };
+
+    expect(result.resultPayload?.allFailed).toBe(true);
+    expect(failBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "batch-nozip" }),
+    );
   });
 
   it("retains per-file errors on partial failure, cancel, and packaging failure when Redis counters are empty", async () => {
