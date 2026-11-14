@@ -27,7 +27,11 @@ import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
-import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  imageSizeLimitError,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
@@ -691,6 +695,8 @@ export function registerPassportPhoto(app: FastifyInstance) {
         return reply.send(response);
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
+        const tooLarge = imageSizeLimitError(err);
+        if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         if (!isToolInputError(err)) {
           request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
         }

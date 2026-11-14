@@ -385,9 +385,10 @@ export function registerBarcodeRead(app: FastifyInstance) {
         });
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(rawErr);
-        if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || storing) throw err;
+        // Ahead of the storing rethrow: the annotated PNG encode runs after it is set.
         const tooLarge = imageSizeLimitError(err);
         if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || storing) throw err;
         // The decoder itself failing is a server fault, not a bad image
         // (isDecoderFault). zxing-wasm caches a failed instantiation for good,
         // so hand it the binary again: new overrides drop the cached instance

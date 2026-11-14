@@ -139,26 +139,62 @@ describe("sharp routes outside the encode wrappers (#4699)", () => {
 
 describe("every sharp tool route maps libvips size caps (#4699)", () => {
   const toolsDir = join(import.meta.dirname, "../../../apps/api/src/routes/tools");
-  const MAPPERS = [
+  const WRAPPERS = [
     "withImageEncodeContext",
     "withImageEncodeContextV2",
     "withAiImageEncodeContext",
-    "imageSizeLimitError(",
   ];
+  /**
+   * Hand-written handlers that only decode the input and enqueue (or call the
+   * wrapped process function), so their own catch never sees an encode. A new
+   * entry needs that to be true of the new route too.
+   */
+  const DECODE_ONLY_HANDLERS = new Set([
+    "ai-canvas-expand.ts",
+    "background-replace.ts",
+    "blur-background.ts",
+    "blur-faces.ts",
+    "colorize.ts",
+    "erase-object.ts",
+    "gif-tools.ts",
+    "image-enhancement.ts",
+    "remove-gif-background.ts",
+    "restore-photo.ts",
+    "strip-metadata.ts",
+    "transparency-fixer.ts",
+    "upscale.ts",
+  ]);
 
-  it("routes that import sharp go through an encode wrapper or call imageSizeLimitError", () => {
-    const sharpRoutes = readdirSync(toolsDir)
-      .filter((f) => f.endsWith(".ts"))
-      .filter((f) => /from "sharp";/.test(readFileSync(join(toolsDir, f), "utf8")));
+  const sources = readdirSync(toolsDir)
+    .filter((f) => f.endsWith(".ts"))
+    .map((f) => ({ file: f, src: readFileSync(join(toolsDir, f), "utf8") }))
+    .filter(({ src }) => /from "sharp";/.test(src));
+
+  it("finds the sharp routes at all", () => {
     // Guard against the scan quietly matching nothing after a move.
-    expect(sharpRoutes.length).toBeGreaterThan(40);
-    const unmapped = sharpRoutes.filter((f) => {
-      const src = readFileSync(join(toolsDir, f), "utf8");
-      return !MAPPERS.some((m) => src.includes(m));
-    });
+    expect(sources.length).toBeGreaterThan(40);
+  });
+
+  it("a route with its own handler calls imageSizeLimitError in it, and the rest use a wrapper", () => {
+    const unmapped = sources
+      .filter(({ file, src }) => {
+        const ownHandler = /\bapp\.(post|get|put)\(/.test(src);
+        if (ownHandler)
+          return !DECODE_ONLY_HANDLERS.has(file) && !src.includes("imageSizeLimitError(");
+        return !WRAPPERS.some((w) => src.includes(w));
+      })
+      .map(({ file }) => file);
     expect(
       unmapped,
-      "Wrap the process function in withImageEncodeContext, or call imageSizeLimitError() in the route's catch before its generic 422 or rethrow",
+      "Call imageSizeLimitError() in the handler's catch before its generic 422 or rethrow, or wrap the process function in withImageEncodeContext",
     ).toEqual([]);
+  });
+
+  it("keeps the decode-only list honest", () => {
+    const stale = [...DECODE_ONLY_HANDLERS].filter((file) => {
+      const entry = sources.find((s) => s.file === file);
+      return !entry || !WRAPPERS.some((w) => entry.src.includes(w));
+    });
+    expect(stale, "a decode-only handler must still hand processing to a wrapper").toEqual([]);
   });
 });
