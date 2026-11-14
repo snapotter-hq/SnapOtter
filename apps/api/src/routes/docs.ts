@@ -278,12 +278,15 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const llmsTxt = generateLlmsTxt(spec);
   const llmsFullTxt = generateLlmsFullTxt(spec);
 
+  // These async handlers return the reply after send(). Resolving undefined
+  // instead lets Fastify send a second time while the app's async onSend hooks
+  // run, and that second writeHead throws ERR_HTTP_HEADERS_SENT.
   app.get("/llms.txt", async (_request, reply) => {
-    reply.type("text/plain; charset=utf-8").send(llmsTxt);
+    return reply.type("text/plain; charset=utf-8").send(llmsTxt);
   });
 
   app.get("/llms-full.txt", async (_request, reply) => {
-    reply.type("text/plain; charset=utf-8").send(llmsFullTxt);
+    return reply.type("text/plain; charset=utf-8").send(llmsFullTxt);
   });
 
   app.get<{ Querystring: { lang?: string } }>(
@@ -299,7 +302,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
       // guarantee; localized files are UTF-8 and only served with ?lang.
       const body =
         file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"), file);
-      reply.type("text/yaml; charset=utf-8").send(body);
+      return reply.type("text/yaml; charset=utf-8").send(body);
     },
   );
 
@@ -337,7 +340,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
           ),
           toolStrings,
         });
-        reply.type("text/plain; charset=utf-8").send(body);
+        return reply.type("text/plain; charset=utf-8").send(body);
       },
     );
   }
