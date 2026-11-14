@@ -177,3 +177,54 @@ export function createJobProgressSink(
       });
   };
 }
+
+/**
+ * How far a handler can push a job's deadline with `extendDeadline`. Accurate
+ * PDF OCR, the one caller, needs at most 30 minutes of page preparation plus
+ * 50 pages at 5 minutes each (#4719); the ceiling stops a bad estimate from
+ * taking the deadline away altogether. An operator's own JOB_TIMEOUT_*_S above
+ * it still wins.
+ */
+export const MAX_EXTENDED_JOB_TIMEOUT_MS = 6 * 3600_000;
+
+export interface JobDeadline {
+  /** The deadline in ms from the start, as it stands now. 0 means none. */
+  readonly timeoutMs: () => number;
+  /** Make the deadline at least `ms` from now, up to the ceiling. Never shortens it. */
+  readonly extend: (ms: number) => void;
+  readonly clear: () => void;
+}
+
+/**
+ * One job attempt's deadline timer. `timeoutMs` 0 (or less) arms nothing and
+ * ignores every extension, so JOB_TIMEOUT_*_S=0 stays unlimited.
+ */
+export function createJobDeadline(
+  timeoutMs: number,
+  onExpire: () => void,
+  now: () => number = Date.now,
+): JobDeadline {
+  const startedAt = now();
+  let current = timeoutMs > 0 ? timeoutMs : 0;
+  let expired = false;
+  const fire = () => {
+    expired = true;
+    onExpire();
+  };
+  let handle = current > 0 ? setTimeout(fire, current) : undefined;
+  const ceiling = Math.max(MAX_EXTENDED_JOB_TIMEOUT_MS, current);
+  return {
+    timeoutMs: () => current,
+    extend: (ms) => {
+      // A deadline that already fired has aborted the handler; moving it now
+      // would only change what the timeout message claims.
+      if (current === 0 || expired || !Number.isFinite(ms) || ms <= 0) return;
+      const wanted = Math.min(now() - startedAt + ms, ceiling);
+      if (wanted <= current) return;
+      current = wanted;
+      clearTimeout(handle);
+      handle = setTimeout(fire, current - (now() - startedAt));
+    },
+    clear: () => clearTimeout(handle),
+  };
+}

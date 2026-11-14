@@ -52,6 +52,12 @@ export interface ToolProcessCtx {
   signal: AbortSignal;
   scratchDir: string;
   report: (percent: number, stage?: string) => void;
+  /**
+   * Ask for at least `ms` more before the job deadline fires, once the handler
+   * knows how much work its input needs. Never shortens the deadline, stops at
+   * a fixed ceiling, and does nothing when the job has none (#4719).
+   */
+  extendDeadline?: (ms: number) => void;
 }
 
 // ── V2 process contract (ref-based, multi-input) ──────────────
