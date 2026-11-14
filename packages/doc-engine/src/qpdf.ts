@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import {
   engineCrashError,
-  isEngineCrashExit,
+  engineCrashSignal,
   ToolInputError,
   wrapWithMemoryLimit,
 } from "@snapotter/shared";
@@ -141,8 +141,9 @@ export function runQpdf(
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", signal, detail));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, detail));
         return;
       }
       if (code === null || code === 126 || code === 127) {
@@ -227,8 +228,9 @@ export async function qpdfRequiresPassword(
         resolvePromise(false);
         return;
       }
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", signal, err));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, err));
         return;
       }
       if (code === null || code === 126 || code === 127) {

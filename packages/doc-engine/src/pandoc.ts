@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import {
   engineCrashError,
-  isEngineCrashExit,
+  engineCrashSignal,
   markToolInputError,
   wrapWithMemoryLimit,
 } from "@snapotter/shared";
@@ -177,8 +177,9 @@ export function runPandoc(
         return;
       }
       const cleanedErr = stripGhcBacktrace(err).slice(-1000);
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(PANDOC_CRASHED_MESSAGE, "pandoc", signal, cleanedErr));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(PANDOC_CRASHED_MESSAGE, "pandoc", crashSignal, cleanedErr));
         return;
       }
       if (code === null || code === 126 || code === 127) {

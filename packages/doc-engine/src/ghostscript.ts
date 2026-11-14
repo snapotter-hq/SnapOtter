@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { engineCrashError, isEngineCrashExit, wrapWithMemoryLimit } from "@snapotter/shared";
+import { engineCrashError, engineCrashSignal, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveGs } from "./binaries.js";
 
 export type PdfCompressionPreset = "screen" | "ebook" | "printer";
@@ -76,8 +76,9 @@ function runGs(args: string[], opts: GsOptions = {}): Promise<void> {
         resolvePromise();
         return;
       }
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(GS_CRASHED_MESSAGE, "gs", signal, err));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(GS_CRASHED_MESSAGE, "gs", crashSignal, err));
         return;
       }
       if (code === null || code === 126 || code === 127) {

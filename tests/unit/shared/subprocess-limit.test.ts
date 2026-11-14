@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ENGINE_CRASHED_CODE,
   engineCrashError,
+  engineCrashSignal,
   isEngineCrash,
-  isEngineCrashExit,
   wrapWithMemoryLimit,
 } from "../../../packages/shared/src/subprocess-limit.js";
 import { SafeError } from "../../../packages/shared/src/tool-errors.js";
@@ -113,16 +113,16 @@ describe("engine crash classification (#4684)", () => {
   it.each(["SIGSEGV", "SIGBUS", "SIGFPE", "SIGABRT", "SIGTRAP", "SIGSYS", "SIGILL"] as const)(
     "treats a %s exit as a crash",
     (signal) => {
-      expect(isEngineCrashExit(null, signal)).toBe(true);
+      expect(engineCrashSignal(null, signal)).toBe(signal);
     },
   );
 
   it("leaves SIGKILL, SIGTERM, a numeric exit, and a clean exit to the other branches", () => {
-    expect(isEngineCrashExit(null, "SIGKILL")).toBe(false);
-    expect(isEngineCrashExit(null, "SIGTERM")).toBe(false);
-    expect(isEngineCrashExit(null, null)).toBe(false);
-    expect(isEngineCrashExit(139, "SIGSEGV")).toBe(false);
-    expect(isEngineCrashExit(0, null)).toBe(false);
+    expect(engineCrashSignal(null, "SIGKILL")).toBeNull();
+    expect(engineCrashSignal(null, "SIGTERM")).toBeNull();
+    expect(engineCrashSignal(null, null)).toBeNull();
+    expect(engineCrashSignal(139, "SIGSEGV")).toBeNull();
+    expect(engineCrashSignal(0, null)).toBeNull();
   });
 
   it("builds a constant-message bug SafeError with the signal and output tail on the cause", () => {

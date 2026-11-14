@@ -6,7 +6,7 @@ import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   engineCrashError,
-  isEngineCrashExit,
+  engineCrashSignal,
   ToolInputError,
   wrapWithMemoryLimit,
 } from "@snapotter/shared";
@@ -183,8 +183,9 @@ export async function convertDocument(
           resolvePromise();
           return;
         }
-        if (isEngineCrashExit(code, signal)) {
-          reject(engineCrashError(LIBREOFFICE_CRASHED_MESSAGE, "LibreOffice", signal, err));
+        const crashSignal = engineCrashSignal(code, signal);
+        if (crashSignal) {
+          reject(engineCrashError(LIBREOFFICE_CRASHED_MESSAGE, "LibreOffice", crashSignal, err));
           return;
         }
         if (code === null || code === 126 || code === 127) {

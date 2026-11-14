@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import {
   engineCrashError,
-  isEngineCrashExit,
+  engineCrashSignal,
   markToolInputError,
   SafeError,
   wrapWithMemoryLimit,
@@ -158,8 +158,9 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
         resolvePromise(stderrTail);
         return;
       }
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(ENGINE_CRASHED_MESSAGE, "ffmpeg", signal, stderrTail));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(ENGINE_CRASHED_MESSAGE, "ffmpeg", crashSignal, stderrTail));
         return;
       }
       if (code === null || code === 126 || code === 127) {

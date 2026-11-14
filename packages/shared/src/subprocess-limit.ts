@@ -80,12 +80,16 @@ const CRASH_SIGNALS: ReadonlySet<string> = new Set([
 
 export const ENGINE_CRASHED_CODE = "ENGINE_CRASHED";
 
-/** True for a `close` event that means the engine crashed mid-run. */
-export function isEngineCrashExit(
+/**
+ * The signal when a `close` event means the engine crashed mid-run, else null.
+ * Returns the signal rather than narrowing it, so a caller's `signal` keeps
+ * its SIGKILL and SIGTERM values for the branches after it.
+ */
+export function engineCrashSignal(
   code: number | null,
   signal: NodeJS.Signals | null,
-): signal is NodeJS.Signals {
-  return code === null && signal !== null && CRASH_SIGNALS.has(signal);
+): NodeJS.Signals | null {
+  return code === null && signal !== null && CRASH_SIGNALS.has(signal) ? signal : null;
 }
 
 /**

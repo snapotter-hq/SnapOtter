@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { engineCrashError, isEngineCrashExit, wrapWithMemoryLimit } from "@snapotter/shared";
+import { engineCrashError, engineCrashSignal, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolvePdfcpu } from "./binaries.js";
 
 export interface PdfcpuOptions {
@@ -85,8 +85,9 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
-      if (isEngineCrashExit(code, signal)) {
-        reject(engineCrashError(PDFCPU_CRASHED_MESSAGE, "pdfcpu", signal, detail));
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(PDFCPU_CRASHED_MESSAGE, "pdfcpu", crashSignal, detail));
         return;
       }
       if (code === null || code === 126 || code === 127) {
