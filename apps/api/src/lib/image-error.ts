@@ -17,6 +17,8 @@ export const UNDECODABLE_IMAGE_MESSAGE =
   "This image can't be decoded. The file may be corrupt or use an unsupported encoding.";
 export const PIXEL_LIMIT_IMAGE_MESSAGE =
   "This image is too large to process. Reduce its dimensions and try again.";
+export const PIXEL_LIMIT_RESULT_MESSAGE =
+  "The image these settings would produce is too large to process. Use a smaller image or settings that make a smaller result.";
 
 /** User-facing reasons for an environmental errno, one constant per kind of fault. */
 export const DISK_ENVIRONMENT_MESSAGE =
@@ -86,6 +88,12 @@ function wrapEncodeFailure<T>(
   if (err instanceof Error && isOperationalErrno(err)) {
     const code = String((err as NodeJS.ErrnoException).code);
     throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
+  }
+  // The input already passed intake, so libvips' pixel cap firing here means a
+  // canvas the settings built (a 100:1 pad, a huge border) is over it: the
+  // request's size, not our bug.
+  if (isPixelSafetyError(err)) {
+    throw new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err });
   }
   throw new SafeError(message, {
     kind: "bug",

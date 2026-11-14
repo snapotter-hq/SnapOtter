@@ -1,5 +1,7 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
+import { ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
@@ -40,6 +42,37 @@ export function canvasFor(w: number, h: number, target: string): { cw: number; c
   return { cw, ch };
 }
 
+/**
+ * libvips refuses to read back an image above 16383 x 16383 pixels (sharp's
+ * default limitInputPixels), and the pad pipeline re-reads its own canvas, so
+ * a bigger canvas only fails after minutes of work on a multi-gigapixel blur.
+ */
+export const MAX_PAD_CANVAS_PIXELS = MAX_RESIZE_OUTPUT_DIMENSION ** 2;
+
+type PadSettings = Pick<z.infer<typeof settingsSchema>, "target" | "ratioW" | "ratioH" | "padding">;
+
+/** Final padded canvas for a w x h source: the target ratio plus the uniform margin. */
+export function padCanvasFor(
+  w: number,
+  h: number,
+  settings: PadSettings,
+): { finalW: number; finalH: number } {
+  const ratioStr =
+    settings.target === "custom" ? `${settings.ratioW}:${settings.ratioH}` : settings.target;
+  const { cw, ch } = canvasFor(w, h, ratioStr);
+  // Extra uniform padding margin (% of the canvas larger side)
+  const margin = settings.padding > 0 ? Math.round((Math.max(cw, ch) * settings.padding) / 100) : 0;
+  return { finalW: cw + margin * 2, finalH: ch + margin * 2 };
+}
+
+export function assertPadCanvasFits(finalW: number, finalH: number): void {
+  if (finalW * finalH > MAX_PAD_CANVAS_PIXELS) {
+    throw new ToolInputError(
+      `The padded image would be ${finalW} x ${finalH} pixels, over the ${MAX_PAD_CANVAS_PIXELS.toLocaleString("en-US")} pixel limit. Use a less extreme ratio or less padding.`,
+    );
+  }
+}
+
 function parseHex(hex: string) {
   return {
     r: parseInt(hex.slice(1, 3), 16),
@@ -52,6 +85,20 @@ export function registerImagePad(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "image-pad",
     settingsSchema,
+    // Rejects an oversized canvas at submit time. The same check runs per frame
+    // in the job, which also covers pipeline and batch runs that skip this hook.
+    preValidate: async ({ inputs, settings }) => {
+      let meta: Metadata;
+      try {
+        meta = await sharp(inputs[0].buffer).metadata();
+      } catch {
+        // Unreadable headers are the job's to classify (asInputErrorIfUndecodable).
+        return;
+      }
+      if (!meta.width || !meta.height) return;
+      const { finalW, finalH } = padCanvasFor(meta.width, meta.pageHeight ?? meta.height, settings);
+      assertPadCanvasFits(finalW, finalH);
+    },
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image padding failed",
       (s) => s?.background ?? "color",
@@ -76,19 +123,8 @@ export function registerImagePad(app: FastifyInstance) {
           const w = meta.width ?? 1;
           const h = meta.height ?? 1;
 
-          // Resolve target ratio; custom uses ratioW:ratioH
-          const ratioStr =
-            settings.target === "custom"
-              ? `${settings.ratioW}:${settings.ratioH}`
-              : settings.target;
-
-          const { cw, ch } = canvasFor(w, h, ratioStr);
-
-          // Extra uniform padding margin (% of the canvas larger side)
-          const margin =
-            settings.padding > 0 ? Math.round((Math.max(cw, ch) * settings.padding) / 100) : 0;
-          const finalW = cw + margin * 2;
-          const finalH = ch + margin * 2;
+          const { finalW, finalH } = padCanvasFor(w, h, settings);
+          assertPadCanvasFits(finalW, finalH);
 
           const padTop = Math.floor((finalH - h) / 2);
           const padBottom = finalH - h - padTop;
