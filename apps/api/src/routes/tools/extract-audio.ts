@@ -2,6 +2,8 @@ import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { NO_AUDIO_TRACK_MESSAGE } from "../../modality/media-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -27,7 +29,11 @@ export function registerExtractAudio(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}.${settings.format}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, out, { hasAudio }) => {
+        // Uploads arrive through the video handler, which never asks for audio.
+        // Without this, ffmpeg's "-vn" leaves an empty output and it fails with
+        // "Output file does not contain any stream" (exit 234, NODE-A7).
+        if (!hasAudio) throw new InputValidationError(NO_AUDIO_TRACK_MESSAGE);
         switch (settings.format) {
           case "mp3":
             return ["-i", inPath, "-vn", "-c:a", resolveEncoder("mp3"), "-b:a", "192k", out];
