@@ -66,7 +66,9 @@ describe("ToolInputError codes", () => {
   });
 
   it("gives every ToolInputError a code", () => {
-    const uncoded = sites.filter(({ args }) => !/\bcode:/.test(args)).map(({ where }) => where);
+    const uncoded = sites
+      .filter(({ args }) => !/\bcode\s*[:,}]/.test(args))
+      .map(({ where }) => where);
     expect(uncoded, "pass { code } so the web app can translate the reason").toEqual([]);
   });
 
