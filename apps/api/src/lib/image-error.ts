@@ -17,6 +17,21 @@ export const UNDECODABLE_IMAGE_MESSAGE =
   "This image can't be decoded. The file may be corrupt or use an unsupported encoding.";
 export const PIXEL_LIMIT_IMAGE_MESSAGE =
   "This image is too large to process. Reduce its dimensions and try again.";
+export const PIXEL_LIMIT_RESULT_MESSAGE =
+  "This image, or the result these settings would produce, is too large to process. Use a smaller image or settings that make a smaller result.";
+
+// libvips' per-side cap for an encoder, e.g. 16383 for WebP, 65535 for JPEG.
+const ENCODER_SIZE_LIMIT = /^Processed image is too large for the \w+ format$/;
+
+/**
+ * libvips refusing the size of an image: its read cap (16383 x 16383 pixels by
+ * default) or an encoder's per-side cap. The input already passed intake, so
+ * this is a canvas the settings built (a 100:1 pad, a huge border), or input
+ * the tool never probed: the request's size either way, not our bug.
+ */
+function isImageSizeLimitError(err: unknown): err is Error {
+  return isPixelSafetyError(err) || (err instanceof Error && ENCODER_SIZE_LIMIT.test(err.message));
+}
 
 /** User-facing reasons for an environmental errno, one constant per kind of fault. */
 export const DISK_ENVIRONMENT_MESSAGE =
@@ -86,6 +101,11 @@ function wrapEncodeFailure<T>(
   if (err instanceof Error && isOperationalErrno(err)) {
     const code = String((err as NodeJS.ErrnoException).code);
     throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
+  }
+  if (isImageSizeLimitError(err)) {
+    // Classified as input, so this is the only line that keeps libvips' reason.
+    logger.info({ err, reason: err.message }, "oversized image result rejected");
+    throw new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err });
   }
   throw new SafeError(message, {
     kind: "bug",
