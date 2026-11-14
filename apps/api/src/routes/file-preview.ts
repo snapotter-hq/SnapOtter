@@ -231,9 +231,12 @@ function abortOnDisconnect(request: FastifyRequest, reply: FastifyReply) {
  * couldn't read. That is a server fault to report as a 500, not a document or
  * media file the engine rejected. LibreOffice's own failures (a non-zero exit,
  * no output, its timeout, the memory cap killing it) and ffmpeg's carry no
- * `syscall` and stay a 422 (#1439).
+ * `syscall` and stay a 422 (#1439). An ffmpeg crash (SIGSEGV and the like) is
+ * the engine's fault too, and lost its `syscall` when it stopped posing as a
+ * failed spawn (#4683).
  */
 function isServerFault(err: unknown): boolean {
+  if (isSafeMessageError(err) && err.code === "ENGINE_CRASHED") return true;
   return typeof (err as { syscall?: unknown } | null)?.syscall === "string";
 }
 

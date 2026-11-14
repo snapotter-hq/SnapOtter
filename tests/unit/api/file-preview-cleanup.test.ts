@@ -765,6 +765,43 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
   });
 });
 
+describe("media previews when ffmpeg crashes (#4683)", () => {
+  beforeEach(async () => {
+    await writeFile(join(testDir, "stored-audio.mp3"), "mp3-bytes");
+    fileRows.set("aud-1", {
+      id: "aud-1",
+      userId: "user-1",
+      originalName: "song.mp3",
+      storedName: "stored-audio.mp3",
+      mimeType: "audio/mpeg",
+    });
+  });
+
+  it("answers GET preview with a reported 500, not a 422 that reads as a bad upload", async () => {
+    const { SafeError } = await import("@snapotter/shared");
+    previewMocks.runFfmpeg.mockRejectedValue(
+      new SafeError("The media engine (ffmpeg) crashed while processing this file.", {
+        kind: "bug",
+        code: "ENGINE_CRASHED",
+        statusCode: 500,
+        cause: Object.assign(new Error("ffmpeg exited SIGSEGV"), { signal: "SIGSEGV" }),
+      }),
+    );
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    const app = Fastify();
+    await filePreviewRoutes(app);
+    await app.ready();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/aud-1/preview" });
+      expect(res.statusCode).toBe(500);
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 describe("media previews when ffmpeg is missing (#1576)", () => {
   const ENGINE_MSG =
     "Media processing is unavailable on this server because ffmpeg is not installed.";

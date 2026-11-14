@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ENGINE_CRASHED_MESSAGE } from "../src/ffmpeg.js";
 import type { FfmpegProgress } from "../src/progress.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
@@ -266,7 +267,44 @@ describe("runFfmpeg: non-zero exit", () => {
     expect((caught as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it.each(["SIGSEGV", "SIGKILL"] as const)(
+  it.each(["SIGSEGV", "SIGBUS", "SIGABRT", "SIGFPE"] as const)(
+    "reports a crash mid-run (%s) as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4371)",
+    async (signal) => {
+      const child = makeChild();
+      mockSpawnReturns(child);
+      const runFfmpeg = await loadRunFfmpeg();
+      const p = runFfmpeg(["out.webm"]);
+      child.stderr.emit("data", Buffer.from("frame=  29 fps= 29 q=25.0 size=  1KiB\n"));
+      child.proc.emit("close", null, signal);
+      const caught = await p.catch((e: unknown) => e);
+      expect(isSafeMessageError(caught)).toBe(true);
+      expect(caught).toMatchObject({
+        message: ENGINE_CRASHED_MESSAGE,
+        kind: "bug",
+        code: "ENGINE_CRASHED",
+        statusCode: 500,
+      });
+      // No spawn shape, so the worker can't turn it into "binary could not be started".
+      expect((caught as NodeJS.ErrnoException).syscall).toBeUndefined();
+      const cause = (caught as Error).cause as Error & { signal?: string };
+      expect(cause.message).toBe(`ffmpeg exited ${signal}: frame=  29 fps= 29 q=25.0 size=  1KiB`);
+      expect(cause.signal).toBe(signal);
+      expect(isToolInputError(caught)).toBe(false);
+    },
+  );
+
+  it("reports SIGILL (an instruction the host CPU lacks) as an operational ENGINE_CRASHED SafeError (#4371)", async () => {
+    const child = makeChild();
+    mockSpawnReturns(child);
+    const runFfmpeg = await loadRunFfmpeg();
+    const p = runFfmpeg(["out.mp4"]);
+    child.proc.emit("close", null, "SIGILL");
+    const caught = await p.catch((e: unknown) => e);
+    expect(caught).toMatchObject({ kind: "operational", code: "ENGINE_CRASHED" });
+    expect(((caught as Error).cause as Error).message).toBe("ffmpeg exited SIGILL");
+  });
+
+  it.each(["SIGKILL"] as const)(
     "tags a signal kill (%s, exit code null) as an errno-coded spawn failure (#3829)",
     async (signal) => {
       const child = makeChild();
