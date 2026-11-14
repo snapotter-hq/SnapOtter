@@ -12,6 +12,7 @@
  * these pin the runtime behaviour on representative routes.
  */
 import { Writable } from "node:stream";
+import { apiToolPath } from "@snapotter/shared";
 import Fastify from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +26,11 @@ vi.mock("../../../apps/api/src/jobs/connection.js", () => ({ sharedRedis: () => 
 
 const { adminOpsRoutes } = await import("../../../apps/api/src/routes/admin-ops.js");
 const { auditLogRoutes } = await import("../../../apps/api/src/routes/audit-log.js");
+const { registerBatchRoutes } = await import("../../../apps/api/src/routes/batch.js");
+const { registerOcr } = await import("../../../apps/api/src/routes/tools/ocr.js");
+const { registerOcrPdf } = await import("../../../apps/api/src/routes/tools/ocr-pdf.js");
+const { registerPdfToImage } = await import("../../../apps/api/src/routes/tools/pdf-to-image.js");
+const { registerSvgToRaster } = await import("../../../apps/api/src/routes/tools/svg-to-raster.js");
 const { rolesRoutes } = await import("../../../apps/api/src/routes/roles.js");
 const { teamsRoutes } = await import("../../../apps/api/src/routes/teams.js");
 const { registerGdprRoutes } = await import("../../../apps/api/src/routes/enterprise/gdpr.js");
@@ -81,6 +87,13 @@ beforeAll(async () => {
   await app.register(registerLegalHoldRoutes);
   await app.register(registerScimRoutes);
   await app.register(registerWebhookRoutes);
+  await app.register(registerBatchRoutes);
+  await app.register(async (scope) => {
+    registerOcr(scope);
+    registerOcrPdf(scope);
+    registerPdfToImage(scope);
+    registerSvgToRaster(scope);
+  });
   await app.ready();
 });
 
@@ -109,6 +122,19 @@ const ROUTES = [
   ["requirePermission", "GET", "/api/v1/enterprise/legal-hold", "FORBIDDEN"],
   ["requirePermission", "GET", "/api/v1/enterprise/webhooks", "FORBIDDEN"],
   ["requireFullAdmin", "POST", "/api/v1/enterprise/scim/token", "ESCALATION_DENIED"],
+] as const;
+
+// Hand-written tool routes and the generic batch route deny through
+// requireToolAccess, which sends a 403 without a `code`.
+const TOOL_ROUTES = [
+  `${apiToolPath("ocr")}`,
+  `${apiToolPath("ocr-pdf")}`,
+  `${apiToolPath("pdf-to-image")}/info`,
+  `${apiToolPath("pdf-to-image")}/preview`,
+  `${apiToolPath("pdf-to-image")}/batch`,
+  `${apiToolPath("pdf-to-image")}`,
+  `${apiToolPath("svg-to-raster")}/batch`,
+  `${apiToolPath("resize")}/batch`,
 ] as const;
 
 describe("denied requests send once", () => {
@@ -148,4 +174,33 @@ describe("denied requests send once", () => {
     expect(res.headers["x-test-hook"]).toBe("1");
     expect(await settledDoubleSends()).toEqual([]);
   });
+
+  it.each(TOOL_ROUTES)(
+    "requireToolAccess on POST %s answers 401 once without a session",
+    async (url) => {
+      logLines.length = 0;
+      const res = await app.inject({ method: "POST", url, payload: {} });
+      expect(res.statusCode).toBe(401);
+      expect(res.json()).toMatchObject({ code: "AUTH_REQUIRED" });
+      expect(res.headers["x-test-hook"]).toBe("1");
+      expect(await settledDoubleSends()).toEqual([]);
+    },
+  );
+
+  it.each(TOOL_ROUTES)(
+    "requireToolAccess on POST %s answers 403 once for a disabled role",
+    async (url) => {
+      logLines.length = 0;
+      const res = await app.inject({
+        method: "POST",
+        url,
+        headers: { "x-test-role": "disabled" },
+        payload: {},
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: "You don't have permission to use this tool" });
+      expect(res.headers["x-test-hook"]).toBe("1");
+      expect(await settledDoubleSends()).toEqual([]);
+    },
+  );
 });

@@ -144,7 +144,7 @@ export function registerSvgToRasterRoute(
   // --- Batch endpoint (registered first for route priority) ---
   app.post(`${basePath}/batch`, async (request, reply) => {
     const authUser = await requireToolAccess(request, reply, opts.toolId);
-    if (!authUser) return;
+    if (!authUser) return reply;
 
     const files: ParsedSvgFile[] = [];
     let settingsRaw: string | null = null;

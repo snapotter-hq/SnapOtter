@@ -19,8 +19,7 @@
  *
  * Known limits: it matches spellings rather than types, so a helper that is
  * passed `reply` but can return null without sending would be flagged wrongly
- * (none do today; requireOwnershipOrPermission is the one that could, and it
- * has no callers). It does not follow a send inside a nested block that then
+ * (none do today). It does not follow a send inside a nested block that then
  * falls off the end of the function. Runtime coverage for representative
  * routes lives in denied-route-single-send.test.ts.
  */
@@ -165,18 +164,6 @@ function scan(sf: ts.SourceFile): Finding[] {
   return findings;
 }
 
-/**
- * Findings left in place on purpose, counted per file. #4712 fixes these; when
- * a count drops, shrink it here so the exemption can't hide a new site.
- */
-const KNOWN_UNFIXED: Record<string, number> = {
-  "routes/batch.ts": 1,
-  "routes/tools/ocr-pdf.ts": 1,
-  "routes/tools/ocr.ts": 1,
-  "routes/tools/pdf-to-image.ts": 4,
-  "routes/tools/svg-to-raster.ts": 1,
-};
-
 describe("async handlers return the reply after sending", () => {
   const files = sourceFiles(API_SRC);
 
@@ -185,23 +172,13 @@ describe("async handlers return the reply after sending", () => {
   });
 
   it("no async function with a reply parameter resolves undefined after a send", () => {
-    const all = files
+    const findings = files
       .map((file) =>
         ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true),
       )
-      .flatMap(scan);
-    const perFile = new Map<string, number>();
-    for (const f of all) perFile.set(f.file, (perFile.get(f.file) ?? 0) + 1);
-
-    const findings = all
-      .filter((f) => !(f.file in KNOWN_UNFIXED))
+      .flatMap(scan)
       .map((f) => `${f.file}:${f.line} ${f.shape}`);
     expect(findings).toEqual([]);
-
-    const exemptCounts = Object.fromEntries(
-      Object.keys(KNOWN_UNFIXED).map((file) => [file, perFile.get(file) ?? 0]),
-    );
-    expect(exemptCounts).toEqual(KNOWN_UNFIXED);
   });
 
   it("flags each shape it is meant to catch", () => {

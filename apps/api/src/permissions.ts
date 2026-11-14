@@ -479,13 +479,14 @@ export async function requireOwnershipOrPermission(
   reply: FastifyReply,
   resourceUserId: string | null,
   allPermission: Permission,
-) {
+): Promise<AuthUser | null> {
   const user = getAuthUser(request);
   if (!user) {
     reply.status(401).send({ error: "Authentication required", code: "AUTH_REQUIRED" });
     return null;
   }
   if (resourceUserId !== user.id && !(await hasEffectivePermission(user, allPermission))) {
+    reply.status(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
     return null;
   }
   return user;

@@ -143,7 +143,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "Not found", code: "NOT_FOUND" });
       }
       const authUser = await requireToolAccess(request, reply, toolId);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       // Batch processing (especially with AI) can take tens of minutes.
       // Disable the Node.js HTTP socket timeout so the connection is not
