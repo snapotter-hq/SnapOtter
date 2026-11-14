@@ -23895,7 +23895,7 @@ paths:
         '403':
           description: 권한이 부족함
         '409':
-          description: 가져오기 잠금이 점유 중
+          description: 가져오기 잠금이 점유 중이거나, 번들에 AVX가 필요한데 이 CPU에 AVX가 없습니다(코드 FEATURE_CPU_UNSUPPORTED)
         '413':
           description: 가져오기의 파일 중 하나가 20 GiB를 넘습니다. 이 경로에는 자체 크기 제한이 있으며 `MAX_UPLOAD_SIZE_MB`는 적용되지 않습니다.
         '507':
@@ -36276,9 +36276,9 @@ x-i18n:
       provenance: machine
       outputHash: 2a9ec4a2b0e6
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 4b0166e7bc2a
+      outputHash: d67edcc297d1
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

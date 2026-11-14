@@ -1821,6 +1821,12 @@ export async function importBundleArchive(
         "Legacy OCR bundle archives are no longer supported. Import the signed OCR v3 index and matching runtime archive instead.",
       );
     }
+    // Same refusal as the install routes (#4724): an imported bundle that
+    // can't run here would only fail at its first job.
+    const hostUnsupportedReason = getBundleHostUnsupportedReason(descriptor.bundleId, manifest);
+    if (hostUnsupportedReason) {
+      throw new ImportHostUnsupportedError(descriptor.bundleId, hostUnsupportedReason);
+    }
 
     // Resolve where site-packages and fixup wheels must land before moving
     // anything: a rejected import must not leave models or site-packages
@@ -2418,6 +2424,20 @@ export class ImportValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ImportValidationError";
+  }
+}
+
+export const CPU_NO_AVX_INSTALL_MESSAGE =
+  "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.";
+
+/** An offline import of a bundle this host can't run (#4724). */
+export class ImportHostUnsupportedError extends Error {
+  constructor(
+    readonly bundleId: string,
+    readonly reason: BundleHostUnsupportedReason,
+  ) {
+    super(CPU_NO_AVX_INSTALL_MESSAGE);
+    this.name = "ImportHostUnsupportedError";
   }
 }
 

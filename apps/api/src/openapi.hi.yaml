@@ -23896,7 +23896,7 @@ paths:
         '403':
           description: अपर्याप्त अनुमतियां
         '409':
-          description: आयात लॉक धारण है
+          description: आयात लॉक धारण है, या बंडल को AVX चाहिए और इस CPU में यह नहीं है (कोड FEATURE_CPU_UNSUPPORTED)
         '413':
           description: आयात में एक फ़ाइल 20 GiB से बड़ी है। इस रूट की अपनी आकार सीमाएं हैं; `MAX_UPLOAD_SIZE_MB` इस पर लागू नहीं होता।
         '507':
@@ -36277,9 +36277,9 @@ x-i18n:
       provenance: machine
       outputHash: 72bd7f907c39
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 2eb73ade5e42
+      outputHash: 2f85fa0c85a5
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

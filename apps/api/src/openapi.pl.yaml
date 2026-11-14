@@ -23901,7 +23901,7 @@ paths:
         '403':
           description: Brak wystarczających uprawnień
         '409':
-          description: Blokada importu jest zajęta
+          description: Blokada importu jest zajęta albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Plik w imporcie przekracza 20 GiB. Ta trasa ma własne limity rozmiaru; `MAX_UPLOAD_SIZE_MB` się do niej nie stosuje.
         '507':
@@ -36282,9 +36282,9 @@ x-i18n:
       provenance: machine
       outputHash: 344bae8f6c96
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: ee36d83d4a58
+      outputHash: 71f6cb3e7f82
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

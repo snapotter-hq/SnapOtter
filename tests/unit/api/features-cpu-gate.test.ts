@@ -2,8 +2,10 @@
  * Bundles whose x86-64 wheels need AVX are refused before any download on a
  * CPU without it, and the feature status says why (#4680).
  */
-import { mkdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import multipartPlugin from "@fastify/multipart";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -56,6 +58,7 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
 import {
   getBundleHostUnsupportedReason,
   getModelsDir,
+  isFeatureInstalled,
   markInstalled,
   markUninstalled,
 } from "../../../apps/api/src/lib/feature-status.js";
@@ -93,6 +96,7 @@ describe("feature routes on a CPU without AVX (#4680)", () => {
   beforeAll(async () => {
     mkdirSync(join(hoisted.dataDir, "ai"), { recursive: true });
     app = Fastify({ logger: false });
+    await app.register(multipartPlugin);
     await registerFeatureRoutes(app);
   });
 
@@ -236,6 +240,68 @@ describe("feature routes on a CPU without AVX (#4680)", () => {
       expect(res.statusCode, res.body).toBe(409);
       expect(res.json().code).toBe("FEATURE_CPU_UNSUPPORTED");
       expect(hoisted.reserveFeatureInstallStream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("offline import of a legacy bundle (#4724)", () => {
+    async function legacyArchive(bundleId: string): Promise<Buffer> {
+      const src = join(hoisted.dataDir, `archive-src-${bundleId}`);
+      rmSync(src, { recursive: true, force: true });
+      mkdirSync(join(src, "models"), { recursive: true });
+      writeFileSync(
+        join(src, "bundle.json"),
+        JSON.stringify({ bundleId, version: "test", models: [] }),
+      );
+      const out = join(hoisted.dataDir, `${bundleId}.tar.gz`);
+      execFileSync("tar", ["-czf", out, "-C", src, "bundle.json", "models"]);
+      return readFileSync(out);
+    }
+
+    function multipart(content: Buffer) {
+      const boundary = "----SnapOtterCpuGate4724";
+      const body = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="bundle.tar.gz"\r\nContent-Type: application/gzip\r\n\r\n`,
+        ),
+        content,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ]);
+      return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+    }
+
+    afterEach(() => markUninstalled("face-detection"));
+
+    it("refuses an AVX bundle with FEATURE_CPU_UNSUPPORTED and leaves it uninstalled", async () => {
+      const { body, contentType } = multipart(await legacyArchive("face-detection"));
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/features/import",
+        headers: { "content-type": contentType },
+        payload: body,
+      });
+      expect(res.statusCode, res.body).toBe(409);
+      expect(res.json()).toMatchObject({
+        code: "FEATURE_CPU_UNSUPPORTED",
+        feature: "face-detection",
+        reason: "cpu-no-avx",
+      });
+      expect(isFeatureInstalled("face-detection")).toBe(false);
+      // The refused archive's staging directory is gone too.
+      expect(
+        readdirSync(join(hoisted.dataDir, "ai")).filter((n) => n.startsWith("import-")),
+      ).toEqual([]);
+    });
+
+    it("doesn't refuse it when the CPU has AVX", async () => {
+      hoisted.hostLacksAvx.mockReturnValue(false);
+      const { body, contentType } = multipart(await legacyArchive("face-detection"));
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/features/import",
+        headers: { "content-type": contentType },
+        payload: body,
+      });
+      expect(res.json().code).not.toBe("FEATURE_CPU_UNSUPPORTED");
     });
   });
 });

@@ -23825,7 +23825,7 @@ paths:
         '403':
           description: 权限不足
         '409':
-          description: 导入锁已被占用
+          description: 导入锁已被占用，或者功能包需要 AVX 而此 CPU 不支持（代码 FEATURE_CPU_UNSUPPORTED）
         '413':
           description: 导入中的某个文件超过 20 GiB。此路由有独立的大小限制，`MAX_UPLOAD_SIZE_MB` 不适用于此路由。
         '507':
@@ -36205,9 +36205,9 @@ x-i18n:
       provenance: machine
       outputHash: 5e3c8a262b61
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: c42ffe17cc5d
+      outputHash: d962cd17825a
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -23900,7 +23900,7 @@ paths:
         '403':
           description: Yetersiz izinler
         '409':
-          description: İçe aktarma kilidi tutuluyor
+          description: İçe aktarma kilidi tutuluyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED)
         '413':
           description: İçe aktarmadaki bir dosya 20 GiB'ı aşıyor. Bu rotanın kendi boyut sınırları vardır; `MAX_UPLOAD_SIZE_MB` bu rota için geçerli değildir.
         '507':
@@ -36281,9 +36281,9 @@ x-i18n:
       provenance: machine
       outputHash: 433a4db881fd
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 10d237b6eb3e
+      outputHash: 5f6d89c74184
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

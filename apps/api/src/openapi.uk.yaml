@@ -23901,7 +23901,7 @@ paths:
         '403':
           description: Недостатньо прав доступу
         '409':
-          description: Імпорт заблоковано
+          description: Імпорт заблоковано, або пакету потрібен AVX, а цей процесор його не має (код FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Файл в імпорті перевищує 20 ГіБ. Цей маршрут має власні обмеження розміру; `MAX_UPLOAD_SIZE_MB` на нього не поширюється.
         '507':
@@ -36282,9 +36282,9 @@ x-i18n:
       provenance: machine
       outputHash: 3cab68dcd3e2
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: d897e442419e
+      outputHash: 8c0358d2e9ad
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

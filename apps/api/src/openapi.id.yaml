@@ -23901,7 +23901,7 @@ paths:
         '403':
           description: Izin tidak mencukupi
         '409':
-          description: Kunci impor sedang dipegang
+          description: Kunci impor sedang dipegang, atau bundle memerlukan AVX dan CPU ini tidak memilikinya (kode FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Sebuah berkas dalam impor melebihi 20 GiB. Rute ini memiliki batas ukurannya sendiri; `MAX_UPLOAD_SIZE_MB` tidak berlaku untuknya.
         '507':
@@ -36282,9 +36282,9 @@ x-i18n:
       provenance: machine
       outputHash: a7212ecc6757
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 23c5472773e6
+      outputHash: fc689297ff98
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

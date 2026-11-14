@@ -23829,7 +23829,7 @@ paths:
         '403':
           description: Onvoldoende rechten
         '409':
-          description: Importvergrendeling is actief
+          description: Importvergrendeling is actief, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Een bestand in de import is groter dan 20 GiB. Voor deze route gelden eigen groottelimieten; `MAX_UPLOAD_SIZE_MB` is hier niet van toepassing.
         '507':
@@ -36210,9 +36210,9 @@ x-i18n:
       provenance: machine
       outputHash: 43f5c6285959
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 876d09e3a8d8
+      outputHash: 686d9d6e7e5d
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

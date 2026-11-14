@@ -23877,7 +23877,7 @@ paths:
         '403':
           description: Permissions insuffisantes
         '409':
-          description: Le verrou d'importation est détenu
+          description: Le verrou d'importation est détenu, ou le bundle nécessite AVX et ce processeur ne l'a pas (code FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Un fichier de l'import dépasse 20 GiB. Cette route a ses propres limites de taille ; `MAX_UPLOAD_SIZE_MB` ne s'applique pas ici.
         '507':
@@ -36256,9 +36256,9 @@ x-i18n:
       provenance: machine
       outputHash: 62ac8848f9c1
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 19592a0ad7f3
+      outputHash: 9a20a8c67919
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

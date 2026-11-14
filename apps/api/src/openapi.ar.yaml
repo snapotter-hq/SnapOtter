@@ -23903,7 +23903,7 @@ paths:
         '403':
           description: صلاحيات غير كافية
         '409':
-          description: قفل الاستيراد مُستخدَم حاليًا
+          description: قفل الاستيراد مُستخدَم حاليًا، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED)
         '413':
           description: ملف في الاستيراد يتجاوز 20 GiB. لهذا المسار حدود حجم خاصة به، ولا تنطبق عليه `MAX_UPLOAD_SIZE_MB`.
         '507':
@@ -36284,9 +36284,9 @@ x-i18n:
       provenance: machine
       outputHash: 37a286c579fa
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: b7183d214004
+      outputHash: 190e20ee431f
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine
