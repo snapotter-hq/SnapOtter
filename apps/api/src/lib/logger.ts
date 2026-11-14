@@ -79,6 +79,30 @@ function attachLogFile(streams: pino.MultiStreamRes<string>, file: string): void
   );
 }
 
+/**
+ * The stdout destination, made unable to crash the process. pino swallows
+ * EPIPE on it but re-emits every other write error with no listener left, so
+ * a log socket that went away (ENOTCONN, Sentry NODE-6R) or an EIO (NODE-4E)
+ * was an uncaught exception (#4659). The first failure turns the stream into
+ * a no-op, as pino does for EPIPE, and says so once on stderr; the log file
+ * keeps logging.
+ */
+function stdoutDestination(): pino.DestinationStream {
+  const dest = pino.destination({ dest: 1, sync: false });
+  let failed = false;
+  dest.on("error", (err: unknown) => {
+    if (failed) return;
+    failed = true;
+    // flushSync and end run from pino's exit hook; on a dead fd they throw.
+    dest.write = () => true;
+    dest.flushSync = () => {};
+    dest.end = () => {};
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[logger] stdout writes stopped until restart: ${reason}`);
+  });
+  return dest;
+}
+
 function createLogger(): pino.Logger {
   if (typeof env.LOG_DIR !== "string" || typeof env.LOG_LEVEL !== "string") {
     // env.ts defaults both, so only a test's partial stub of config.js lands
@@ -88,9 +112,7 @@ function createLogger(): pino.Logger {
     );
   }
   // Stream levels sit at the floor so the logger's own level decides.
-  const streams = pino.multistream([
-    { level: "trace", stream: pino.destination({ dest: 1, sync: false }) },
-  ]);
+  const streams = pino.multistream([{ level: "trace", stream: stdoutDestination() }]);
   attachLogFile(streams, join(env.LOG_DIR, "snapotter"));
   return pino(
     {

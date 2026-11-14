@@ -194,6 +194,43 @@ describe("logger module load (#1418)", () => {
     },
   );
 
+  it("keeps running when a stdout write fails with something other than EPIPE (#4659)", async () => {
+    // pino swallows EPIPE on its stdout SonicBoom and re-emits every other
+    // write error with no listener left, so ENOTCONN (a log socket that went
+    // away, Sentry NODE-6R) or EIO (NODE-4E) took the API down.
+    stubConfig(fullEnv());
+    const { logger } = await import(LOGGER_PATH);
+    const pino = (await import("pino")).default;
+    const multi = (logger.child({}) as unknown as Record<symbol, unknown>)[
+      pino.symbols.streamSym
+    ] as {
+      streams: Array<{ stream: NodeJS.EventEmitter & { write(line: string): boolean } }>;
+    };
+    // The file entry is a plain wrapper object; stdout is the one SonicBoom.
+    const stdout = multi.streams.find((s) => typeof s.stream.emit === "function")
+      ?.stream as NodeJS.EventEmitter & { write(line: string): boolean };
+
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const fault = Object.assign(new Error("ENOTCONN: socket is not connected, write"), {
+        code: "ENOTCONN",
+      });
+      expect(() => stdout.emit("error", fault)).not.toThrow();
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/^\[logger\] stdout writes stopped.*ENOTCONN/),
+      );
+
+      // Later writes and a repeat error neither throw nor warn again.
+      expect(() => stdout.emit("error", fault)).not.toThrow();
+      expect(() => logger.error("after the failure")).not.toThrow();
+      expect(stdout.write("direct line\n")).toBe(true);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
   it("lets vi.spyOn intercept calls made through the shared export", async () => {
     // The export has to stay a plain object with own, configurable methods:
     // vi.spyOn installs spies with defineProperty, and
