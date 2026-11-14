@@ -1,7 +1,12 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import type { ErrorInfo } from "react";
 import { getRenderErrorDestination, isAnalyticsActive, track } from "@/lib/analytics";
-import { isAbortedByLeaving, LEAVING_WINDOW_MS } from "@/lib/chunk-reload";
+import {
+  isAbortedByLeaving,
+  isChunkLoadFailure,
+  isReloadingFor,
+  LEAVING_WINDOW_MS,
+} from "@/lib/chunk-reload";
 import { bufferRenderError } from "@/lib/early-errors";
 
 /**
@@ -11,6 +16,10 @@ import { bufferRenderError } from "@/lib/early-errors";
  */
 export function reportRenderError(error: unknown, errorInfo?: ErrorInfo): void {
   console.error("Uncaught render error:", error, errorInfo?.componentStack);
+  // The page is reloading to recover, or the chunk never arrived (server
+  // unreachable, tab outlived an upgrade). The error screen says so; neither
+  // is a bug in our code (#4668).
+  if (isReloadingFor(error) || isChunkLoadFailure(error)) return;
   if (isAbortedByLeaving(error)) {
     // An import the browser aborted on the way out is not a crash (#1480).
     // A document that unloads never runs this timer; one still here after
