@@ -126,7 +126,7 @@ describe("PDF validation when qpdf cannot be started", () => {
       };
       expect(failure?.name).toBe("InputValidationError");
       expect(failure.statusCode).toBe(400);
-      expect(failure.code).toBeUndefined();
+      expect(failure.code).toBe("PDF_DAMAGED");
       expect(failure.message).toMatch(/Damaged PDF: qpdf exited 1: broken xref table/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -249,7 +249,7 @@ describe("PDF validation when qpdf cannot be started", () => {
         };
         expect(failure?.name).toBe("InputValidationError");
         expect(failure.statusCode).toBe(400);
-        expect(failure.code).toBeUndefined();
+        expect(failure.code).toBe("PDF_DAMAGED");
         expect(failure.message).toMatch(expectedMessage);
       } finally {
         rmSync(dir, { recursive: true, force: true });
