@@ -198,6 +198,7 @@ describe("denied requests send once", () => {
         payload: {},
       });
       expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: "You don't have permission to use this tool" });
       expect(res.headers["x-test-hook"]).toBe("1");
       expect(await settledDoubleSends()).toEqual([]);
     },
