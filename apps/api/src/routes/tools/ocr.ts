@@ -138,7 +138,7 @@ export function registerOcr(app: FastifyInstance) {
   app.post("/api/v1/tools/image/ocr", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "ocr";
     const authUser = await requireToolAccess(request, reply, toolId);
-    if (!authUser) return;
+    if (!authUser) return reply;
     const userId = authUser.id;
     const jobId = randomUUID();
     let filename = "image";

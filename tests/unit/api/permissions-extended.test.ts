@@ -267,10 +267,10 @@ describe("requireOwnershipOrPermission", () => {
     expect(result).toEqual(admin);
   });
 
-  it("returns null when not owner and lacks allPermission", async () => {
+  it("returns null and sends 403 when not owner and lacks allPermission", async () => {
     const user = makeUser({ role: "user", id: "u-basic" });
     mockGetAuthUser.mockReturnValue(user);
-    const { reply } = makeMockReply();
+    const { reply, sent } = makeMockReply();
     const result = await requireOwnershipOrPermission(
       {} as never,
       reply as never,
@@ -278,5 +278,17 @@ describe("requireOwnershipOrPermission", () => {
       "files:all",
     );
     expect(result).toBeNull();
+    expect(sent).toEqual({
+      status: 403,
+      body: { error: "Insufficient permissions", code: "FORBIDDEN" },
+    });
+  });
+
+  it("sends nothing when it lets the caller through", async () => {
+    const user = makeUser({ role: "user", id: "u-owner" });
+    mockGetAuthUser.mockReturnValue(user);
+    const { reply, sent } = makeMockReply();
+    await requireOwnershipOrPermission({} as never, reply as never, "u-owner", "files:all");
+    expect(sent).toEqual({});
   });
 });

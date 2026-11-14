@@ -325,7 +325,7 @@ export function registerPdfToImageRoute(
 
   // ── Info endpoint ────────────────────────────────────────────
   app.post(`${basePath}/info`, async (request, reply) => {
-    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return reply;
 
     let fileBuffer: Buffer | null = null;
     try {
@@ -367,7 +367,7 @@ export function registerPdfToImageRoute(
 
   // ── Preview endpoint (thumbnails) ─────────────────────────────
   app.post(`${basePath}/preview`, async (request, reply) => {
-    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return reply;
 
     let fileBuffer: Buffer | null = null;
     try {
@@ -455,7 +455,7 @@ export function registerPdfToImageRoute(
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const authUser = await requireToolAccess(request, reply, opts.toolId);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       // Rasterizing several documents can outrun the default socket timeout.
       request.raw.socket?.setTimeout?.(0);
@@ -897,7 +897,7 @@ export function registerPdfToImageRoute(
 
   // ── Main processing endpoint ─────────────────────────────────
   app.post(basePath, async (request, reply) => {
-    if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+    if (!(await requireToolAccess(request, reply, opts.toolId))) return reply;
 
     let fileBuffer: Buffer | null = null;
     let settingsRaw: string | null = null;
