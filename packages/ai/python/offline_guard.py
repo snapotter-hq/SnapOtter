@@ -6,6 +6,7 @@ bundled files. If a model is missing, the runtime fails closed instead of
 fetching mutable content. Operators may explicitly opt into public model
 fallback downloads with SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1.
 """
+import contextlib
 import os
 
 
@@ -29,26 +30,71 @@ def ensure_download_allowed(what):
     )
 
 
+def library_workdir_path():
+    """Absolute path of the writable cwd the face libraries run in."""
+    return os.path.abspath(os.path.join(os.environ.get("DATA_DIR", "/data"), "ai", "lib-cwd"))
+
+
+@contextlib.contextmanager
+def library_workdir():
+    """Run gfpgan / codeformer-pip with a writable cwd under the data dir.
+
+    Both libraries resolve weights, and codeformer-pip writes output/out.png,
+    relative to the process cwd. The sidecar inherits the API's cwd
+    (/app/apps/api in the image), which is read-only when the container runs
+    with a read-only root filesystem, so linking the bundled weights there
+    fails with EROFS (#4710). The previous cwd is restored on exit.
+    """
+    workdir = library_workdir_path()
+    os.makedirs(workdir, exist_ok=True)
+    previous = os.getcwd()
+    os.chdir(workdir)
+    try:
+        yield workdir
+    finally:
+        os.chdir(previous)
+
+
 def link_bundled_weight(link_path, target_path):
-    """Best-effort: make link_path resolve to an installed bundle file.
+    """Make link_path resolve to an installed bundle file.
 
     gfpgan and codeformer-pip hardcode weight paths relative to the process
     cwd, while the feature bundles install those weights under MODELS_PATH.
     Symlinking the expected path to the bundled file lets the libraries find
-    the weight without downloading. Returns True when link_path exists
-    afterwards (already present, or successfully linked).
+    the weight without downloading. Returns True when link_path resolves
+    afterwards, False when neither it nor the bundled target exists. A symlink
+    that dangles or points somewhere else is replaced, so a moved models dir
+    can't leave a stale link that blocks relinking. Raises RuntimeError with
+    the underlying OSError when the bundled file exists but can't be linked,
+    because reporting that as a missing weight sends people to reinstall a
+    bundle that is already there.
     """
-    if os.path.exists(link_path):
+    if os.path.islink(link_path):
+        if os.path.exists(link_path) and (
+            not os.path.exists(target_path) or os.path.samefile(link_path, target_path)
+        ):
+            return True
+    elif os.path.exists(link_path):
         return True
     if not os.path.exists(target_path):
         return False
+    target_path = os.path.abspath(target_path)
+    staging = f"{link_path}.{os.getpid()}.tmp"
     try:
         parent = os.path.dirname(link_path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        os.symlink(target_path, link_path)
-    except OSError:
-        return os.path.exists(link_path)
+        if os.path.lexists(staging):
+            os.unlink(staging)
+        os.symlink(target_path, staging)
+        os.replace(staging, link_path)
+    except OSError as err:
+        with contextlib.suppress(OSError):
+            os.unlink(staging)
+        raise RuntimeError(
+            f"Could not link bundled weight {target_path} to "
+            f"{os.path.abspath(link_path)}: {err}"
+        ) from err
     return True
 
 
