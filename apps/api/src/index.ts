@@ -604,7 +604,7 @@ app.get(HEALTH_PROBE_ROUTE, async (_request, reply) => {
 // Admin health check (full diagnostics)
 app.get("/api/v1/admin/health", async (request, reply) => {
   const admin = await requirePermission("system:health")(request, reply);
-  if (!admin) return;
+  if (!admin) return reply;
 
   let dbOk = false;
   try {

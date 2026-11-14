@@ -121,7 +121,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // needs the same grant as the rest of the file surface. The tool-access
       // middleware only covers /api/v1/tools/, and never reached this route.
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const jobId = randomUUID();
 
@@ -420,7 +420,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/preview", async (request: FastifyRequest, reply: FastifyReply) => {
     // Decodes attacker-supplied bytes through Sharp, libheif and LibRaw on behalf
     // of the tool workflow, so it belongs behind the same grant as running a tool.
-    if (!(await requirePermission("tools:use")(request, reply))) return;
+    if (!(await requirePermission("tools:use")(request, reply))) return reply;
 
     const data = await request.file();
     if (!data) {

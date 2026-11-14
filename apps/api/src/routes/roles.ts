@@ -103,7 +103,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/roles — List all roles (requires audit:read to view)
   app.get("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("audit:read")(request, reply);
-    if (!user) return;
+    if (!user) return reply;
 
     const roles = await db.select().from(schema.roles);
     const userCounts = await db
@@ -134,7 +134,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/roles — Create custom role
   app.post("/api/v1/roles", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("security:manage")(request, reply);
-    if (!user) return;
+    if (!user) return reply;
 
     const parsed = createRoleSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -205,7 +205,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("security:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
       const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
@@ -387,7 +387,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/roles/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("security:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
       const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));

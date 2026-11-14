@@ -257,7 +257,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const limit = parseInt(request.query.limit ?? "50", 10) || 50;
       const offset = parseInt(request.query.offset ?? "0", 10) || 0;
@@ -318,7 +318,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
       const userId = user.id;
 
       // Refuse an account already over quota before reading the body.
@@ -576,7 +576,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -668,7 +668,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -718,7 +718,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -898,7 +898,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = deleteFilesSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1020,7 +1020,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post("/api/v1/files/save-result", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireFileAccess(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const userId = user.id;
 
     // Enforce per-user storage quota before saving results

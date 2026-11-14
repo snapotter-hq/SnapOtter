@@ -37,7 +37,7 @@ export function registerJobRoutes(app: FastifyInstance): void {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { jobId } = request.params;
 
@@ -104,7 +104,7 @@ export function registerJobRoutes(app: FastifyInstance): void {
     },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { jobId } = request.params;
 

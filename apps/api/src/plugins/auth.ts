@@ -1190,7 +1190,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       const parsed = changePasswordSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1295,7 +1295,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/auth/users (admin only)
   app.get("/api/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("users:manage")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const users = await db
       .select({
@@ -1339,7 +1339,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const parsed = registerSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1555,7 +1555,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
       if (isAnonymousUserId(id)) {
@@ -1790,7 +1790,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
       if (isAnonymousUserId(id)) {
@@ -1914,7 +1914,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
 

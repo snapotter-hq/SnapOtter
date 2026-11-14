@@ -120,7 +120,7 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = feedbackBodySchema.safeParse(request.body);
       if (!parsed.success) {

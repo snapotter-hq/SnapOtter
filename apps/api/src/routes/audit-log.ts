@@ -71,7 +71,7 @@ export async function auditLogRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("audit:read")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { page, limit, offset } = parsePagination(request.query);
       const conditions = parseFilters(request.query);

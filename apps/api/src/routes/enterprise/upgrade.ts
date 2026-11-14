@@ -42,8 +42,8 @@ export async function registerUpgradeRoutes(app: FastifyInstance): Promise<void>
   // GET /api/v1/admin/version
   app.get("/api/v1/admin/version", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("system:health")(request, reply);
-    if (!user) return;
-    if (!(await requireUpgradeFeature(reply))) return;
+    if (!user) return reply;
+    if (!(await requireUpgradeFeature(reply))) return reply;
 
     const journal = readJournal();
     const lastEntry = journal?.entries.at(-1);
@@ -62,8 +62,8 @@ export async function registerUpgradeRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/admin/migrations/pending",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePermission("system:health")(request, reply);
-      if (!user) return;
-      if (!(await requireUpgradeFeature(reply))) return;
+      if (!user) return reply;
+      if (!(await requireUpgradeFeature(reply))) return reply;
 
       const journal = readJournal();
       if (!journal) {
@@ -103,8 +103,8 @@ export async function registerUpgradeRoutes(app: FastifyInstance): Promise<void>
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePermission("system:health")(request, reply);
-      if (!user) return;
-      if (!(await requireUpgradeFeature(reply))) return;
+      if (!user) return reply;
+      if (!(await requireUpgradeFeature(reply))) return reply;
 
       // Check database connectivity
       let dbOk = false;

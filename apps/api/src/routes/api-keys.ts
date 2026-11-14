@@ -108,7 +108,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireApiKeyManagement(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = createApiKeySchema.safeParse(request.body ?? {});
       if (!parsed.success) {
@@ -184,7 +184,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireApiKeyManagement(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const selectFields = {
         id: schema.apiKeys.id,
@@ -214,7 +214,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireApiKeyManagement(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 

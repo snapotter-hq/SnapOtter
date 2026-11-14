@@ -1067,7 +1067,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       return reply.send({ bundles: getFeatureStates() });
     },
@@ -1079,7 +1079,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { bundleId } = request.params;
 
@@ -1116,7 +1116,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: ToolIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { toolId } = request.params;
       const requiredBundles = getRequiredBundlesForTool(toolId);
@@ -1158,7 +1158,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { bundleId } = request.params;
 
@@ -1270,7 +1270,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (_request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(_request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       if (!acquireInstallLock("__reset__")) {
         const installing = getInstallingBundle();
@@ -1329,7 +1329,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/admin/features/disk-usage",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const totalBytes = getDirSize(getAiDir());
       return reply.send({ totalBytes });
@@ -1345,7 +1345,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       let uploadDirectory: string | null = null;
       let legacyResult: Awaited<ReturnType<typeof importBundleArchive>> | null = null;
