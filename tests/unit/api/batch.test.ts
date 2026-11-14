@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(async () => {}),
   failBatchJob: vi.fn(async () => true),
   flowAdd: vi.fn(async () => {}),
+  flowParentStored: vi.fn(async (): Promise<boolean | null> => false),
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
   getToolConfig: vi.fn((_toolId?: string) => ({ settingsSchema: z.record(z.unknown()) })),
   insertValues: vi.fn((_row: Record<string, unknown>) => Promise.resolve()),
@@ -178,6 +179,7 @@ vi.mock("../../../apps/api/src/lib/auto-orient.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
+  flowParentStored: mocks.flowParentStored,
   getFlowProducer: () => ({ add: mocks.flowAdd }),
   injectTraceContext: vi.fn(),
   waitForJob: mocks.waitForJob,
@@ -1467,6 +1469,90 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       ],
       message: "Queue service unavailable",
       code: "queue-unavailable",
+    });
+  });
+
+  // FlowProducer.add sends the whole tree as one MULTI, and a connection lost
+  // after Redis ran EXEC still rejects the call. The cleanup used to run
+  // anyway, deleting the inputs and child rows of jobs Redis had queued, so
+  // they failed later with "input no longer available" (#4714).
+  describe("a flow add that rejects after Redis may have stored the flow (#4714)", () => {
+    const lostReply = Object.assign(new Error("Command aborted due to connection close"), {
+      name: "AbortError",
+    });
+    const parts = (clientJobId: string) => [
+      { type: "file" as const, filename: "a.png", content: Buffer.from("valid-png") },
+      { type: "field" as const, fieldname: "settings", value: "{}" },
+      { type: "field" as const, fieldname: "clientJobId", value: clientJobId },
+    ];
+
+    it("carries on as enqueued when Redis has the parent job", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(true);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        log,
+        parts: parts("batch-4714-stored"),
+      });
+
+      expect(mocks.flowParentStored).toHaveBeenCalledWith("system", lastBatchParentId());
+      expect(reply.statusCode).toBe(202);
+      expect(reply.payload).toMatchObject({ jobId: "batch-4714-stored", async: true });
+      expect(mocks.waitForJob).toHaveBeenCalledWith("system", lastBatchParentId(), 30 * 60_000);
+      expect(mocks.deleteObject).not.toHaveBeenCalled();
+      expect(mocks.failBatchJob).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("Redis stored the flow"),
+      );
+    });
+
+    it("leaves rows and uploads to reconciliation and the TTL sweep when Redis can't be asked", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(null);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          log,
+          parts: parts("batch-4714-unknown"),
+        }),
+      ).rejects.toBe(lostReply);
+
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("leaving cleanup to reconciliation"),
+      );
+
+      expect(mocks.waitForJob).not.toHaveBeenCalled();
+      expect(mocks.deleteObject).not.toHaveBeenCalled();
+      expect(mocks.failBatchJob).not.toHaveBeenCalled();
+    });
+
+    it("still cleans up when Redis confirms the flow was never stored", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(false);
+
+      await expect(
+        invokeBatchRoute({ section: "image", toolId: "resize", parts: parts("batch-4714-absent") }),
+      ).rejects.toBe(lostReply);
+
+      const parentId = lastBatchParentId();
+      expect(mocks.deleteObject).toHaveBeenCalledWith(`uploads/${parentId}-f0/a.png`);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: parentId, message: "Internal server error" }),
+      );
+    });
+
+    it("never probes Redis when the add succeeds", async () => {
+      await invokeBatchRoute({ section: "image", toolId: "resize", parts: parts("batch-4714-ok") });
+
+      expect(mocks.flowParentStored).not.toHaveBeenCalled();
     });
   });
 

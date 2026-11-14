@@ -123,6 +123,37 @@ export function getFlowProducer(): FlowProducer {
   return _flowProducer;
 }
 
+// A probe runs right after Redis failed a write, and our connections queue
+// commands forever (maxRetriesPerRequest: null), so it needs its own bound.
+const FLOW_PROBE_TIMEOUT_MS = 5_000;
+
+/**
+ * Whether a flow whose FlowProducer.add() rejected was stored anyway. add()
+ * sends the whole tree as one MULTI, so the parent's presence means every
+ * node committed; a connection that drops after Redis ran EXEC still rejects
+ * the call (ioredis aborts the rest of a half-answered pipeline). true:
+ * stored, false: not stored, null: Redis couldn't be asked in time.
+ */
+export async function flowParentStored(pool: Pool, parentId: string): Promise<boolean | null> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), FLOW_PROBE_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([
+      getQueue(pool)
+        .getJob(parentId)
+        .then((job) => job !== undefined),
+      timeout,
+    ]);
+  } catch (err) {
+    logger.warn({ err, jobId: parentId }, "[flow-producer] could not check for a stored flow");
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function closeFlowProducer(): Promise<void> {
   const fp = _flowProducer;
   _flowProducer = null;

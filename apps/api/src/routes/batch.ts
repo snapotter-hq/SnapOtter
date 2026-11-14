@@ -28,7 +28,12 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { claimBatchAlias } from "../jobs/batch-alias.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
-import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
+import {
+  flowParentStored,
+  getFlowProducer,
+  injectTraceContext,
+  waitForJob,
+} from "../jobs/enqueue.js";
 import {
   INVALID_CLIENT_JOB_ID_ERROR,
   type Pool,
@@ -885,7 +890,29 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           try {
             await getFlowProducer().add(batchTree);
           } catch (err) {
-            throw markUpstreamError(err);
+            // add() can reject after Redis stored the flow (a connection lost
+            // mid-reply). Cleaning up then would delete the inputs and rows
+            // of jobs that are queued to run (#4714), so ask Redis first.
+            const stored = await flowParentStored("system", parentId);
+            if (stored !== true) {
+              if (stored === null) {
+                // Can't tell. Leave the rows to job reconciliation, which
+                // settles them within a minute if BullMQ has no such job, and
+                // the uploads to the storage TTL sweep, which keeps them while
+                // a job that owns them is in flight.
+                request.log.warn(
+                  { err, jobId: parentId },
+                  "batch enqueue failed and Redis could not confirm whether the flow was stored; leaving cleanup to reconciliation",
+                );
+                uncommittedKeys.clear();
+                stagedBatch = null;
+              }
+              throw markUpstreamError(err);
+            }
+            request.log.warn(
+              { err, jobId: parentId },
+              "batch enqueue reported a failure but Redis stored the flow; continuing",
+            );
           }
           uncommittedKeys.clear();
           stagedBatch = null;
