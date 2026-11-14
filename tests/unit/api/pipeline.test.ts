@@ -8,7 +8,7 @@ import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { SafeError } from "@snapotter/shared";
 import Fastify, { type FastifyRequest } from "fastify";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 const onConflictDoUpdateMock = vi.hoisted(() =>
@@ -45,6 +45,9 @@ const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn(async () => {}));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
 const updateSingleFileProgressMock = vi.hoisted(() => vi.fn(async () => {}));
 const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
+const flowParentStoredMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<boolean | null>>(async () => false),
+);
 const waitForJobMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null),
 );
@@ -242,6 +245,7 @@ vi.mock("../../../apps/api/src/modality/document-input.js", async (importOrigina
 });
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
+  flowParentStored: flowParentStoredMock,
   getFlowProducer: () => ({ add: flowAddMock }),
   injectTraceContext: vi.fn(),
   waitForJob: waitForJobMock,
@@ -1618,6 +1622,134 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       filename: "out.png",
       contentType: "image/png",
     }),
+  });
+
+  // FlowProducer.add sends the flow as one MULTI, and a connection lost after
+  // Redis ran EXEC still rejects the call. Both pipeline routes used to clean
+  // up anyway, deleting the uploads (and, for /batch, the rows) of steps
+  // Redis had queued (#4715, the pipeline side of #4714).
+  describe("a flow add that rejects after Redis may have stored the flow (#4715)", () => {
+    const lostReply = Object.assign(new Error("Command aborted due to connection close"), {
+      name: "AbortError",
+    });
+    const parts = (clientJobId: string) => [
+      { type: "file" as const, filename: "photo.png", content: Buffer.from("png-bytes") },
+      {
+        type: "field" as const,
+        fieldname: "pipeline",
+        value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+      },
+      { type: "field" as const, fieldname: "clientJobId", value: clientJobId },
+    ];
+    const pipelineRowId = () =>
+      String(
+        insertValuesMock.mock.calls
+          .map((call) => call[0] as Record<string, unknown> | undefined)
+          .filter((row) => row?.type === "pipeline")
+          .at(-1)?.id,
+      );
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      waitForJobMock.mockResolvedValue(null);
+    });
+
+    it("/execute carries on as enqueued when Redis has the flow's root job", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(true);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await invokePipelineExecuteRoute(parts("pipeline-4715-exec-stored"), log);
+
+      const jobId = pipelineRowId();
+      expect(flowParentStoredMock).toHaveBeenCalledWith(expect.any(String), jobId);
+      expect(waitForJobMock).toHaveBeenCalledWith(expect.any(String), jobId, expect.any(Number));
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId }),
+        expect.stringContaining("Redis stored the flow"),
+      );
+    });
+
+    it("/execute leaves the upload to the TTL sweep when Redis can't be asked", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(null);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await expect(
+        invokePipelineExecuteRoute(parts("pipeline-4715-exec-unknown"), log),
+      ).rejects.toBe(lostReply);
+
+      expect(waitForJobMock).not.toHaveBeenCalled();
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: pipelineRowId() }),
+        expect.stringContaining("leaving the upload to the TTL sweep"),
+      );
+    });
+
+    it("/execute still deletes the upload when Redis confirms nothing was stored", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(false);
+
+      await expect(invokePipelineExecuteRoute(parts("pipeline-4715-exec-absent"))).rejects.toBe(
+        lostReply,
+      );
+
+      expect(deleteObjectMock).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^uploads/${pipelineRowId()}/`)),
+      );
+    });
+
+    it("/batch carries on as enqueued when Redis has the parent job", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(true);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      const reply = await invokePipelineBatchRoute(parts("pipeline-4715-batch-stored"), log);
+
+      expect(flowParentStoredMock).toHaveBeenCalledWith("system", lastBatchParentId());
+      expect(reply.statusCode).toBe(202);
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+      expect(failBatchJobMock).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("Redis stored the flow"),
+      );
+    });
+
+    it("/batch leaves rows and uploads to reconciliation and the TTL sweep when Redis can't be asked", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(null);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await expect(
+        invokePipelineBatchRoute(parts("pipeline-4715-batch-unknown"), log),
+      ).rejects.toBe(lostReply);
+
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+      expect(failBatchJobMock).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("leaving cleanup to reconciliation"),
+      );
+    });
+
+    it("/batch still cleans up when Redis confirms nothing was stored", async () => {
+      flowAddMock.mockRejectedValueOnce(lostReply);
+      flowParentStoredMock.mockResolvedValueOnce(false);
+
+      await expect(invokePipelineBatchRoute(parts("pipeline-4715-batch-absent"))).rejects.toBe(
+        lostReply,
+      );
+
+      expect(deleteObjectMock).toHaveBeenCalledWith(
+        `uploads/${lastBatchParentId()}-f0-s0/photo.png`,
+      );
+      expect(failBatchJobMock).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: lastBatchParentId() }),
+      );
+    });
   });
 
   it("removes empty spooled files without calling readFile and preserves slot alignment (#2684)", async () => {

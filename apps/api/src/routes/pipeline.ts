@@ -27,7 +27,12 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { claimBatchAlias } from "../jobs/batch-alias.js";
 import { clearBatchCanceled, recordChildOutcome } from "../jobs/batch-progress.js";
-import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
+import {
+  flowParentStored,
+  getFlowProducer,
+  injectTraceContext,
+  waitForJob,
+} from "../jobs/enqueue.js";
 import {
   INVALID_CLIENT_JOB_ID_ERROR,
   type Pool,
@@ -902,11 +907,30 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the flow tree
           injectTraceContextIntoFlow(tree);
 
-          // Add the flow to BullMQ
+          // Add the flow to BullMQ. add() can reject after Redis stored the
+          // flow (a connection lost mid-reply); deleting the upload then
+          // would starve the queued steps of their input (#4715), so ask
+          // Redis first, the way the batch route does (#4714).
           try {
             await getFlowProducer().add(tree);
           } catch (err) {
-            throw markUpstreamError(err);
+            const stored = await flowParentStored(pipelinePool, jobId);
+            if (stored !== true) {
+              if (stored === null) {
+                // Can't tell. Leave the upload to the storage TTL sweep,
+                // which keeps it while a job that owns it is in flight.
+                request.log.warn(
+                  { err, jobId },
+                  "pipeline enqueue failed and Redis could not confirm whether the flow was stored; leaving the upload to the TTL sweep",
+                );
+                uncommittedUploadKey = undefined;
+              }
+              throw markUpstreamError(err);
+            }
+            request.log.warn(
+              { err, jobId },
+              "pipeline enqueue reported a failure but Redis stored the flow; continuing",
+            );
           }
           uncommittedUploadKey = undefined;
 
@@ -1995,10 +2019,30 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
+          // Same lost-reply check as the single-file path above (#4715).
           try {
             await getFlowProducer().add(batchTree);
           } catch (err) {
-            throw markUpstreamError(err);
+            const stored = await flowParentStored("system", parentId);
+            if (stored !== true) {
+              if (stored === null) {
+                // Can't tell. Leave the rows to job reconciliation, which
+                // settles them within a minute if BullMQ has no such job, and
+                // the uploads to the storage TTL sweep, which keeps them while
+                // a job that owns them is in flight.
+                request.log.warn(
+                  { err, jobId: parentId },
+                  "pipeline batch enqueue failed and Redis could not confirm whether the flow was stored; leaving cleanup to reconciliation",
+                );
+                uncommittedOcrKeys.clear();
+                stagedBatch = null;
+              }
+              throw markUpstreamError(err);
+            }
+            request.log.warn(
+              { err, jobId: parentId },
+              "pipeline batch enqueue reported a failure but Redis stored the flow; continuing",
+            );
           }
           uncommittedOcrKeys.clear();
           stagedBatch = null;
