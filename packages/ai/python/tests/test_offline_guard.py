@@ -1,5 +1,5 @@
 """Contract tests for offline_guard: the strict-offline download gate and the
-best-effort bundle-weight symlink helpers. Pure (os + filesystem), no models,
+bundle-weight symlink helpers. Pure (os + filesystem), no models,
 so this runs on any Python the sidecar supports."""
 import os
 import sys
@@ -82,7 +82,7 @@ def test_link_creates_symlink_and_parent_dirs(tmp_path):
     assert link.read_text() == "weights"  # resolves to the target bytes
 
 
-def test_link_oserror_returns_false_when_symlink_fails(tmp_path, monkeypatch):
+def test_link_oserror_raises_with_cause_when_symlink_fails(tmp_path, monkeypatch):
     target = tmp_path / "t.pth"
     target.write_text("w")
     link = tmp_path / "l.pth"
@@ -91,8 +91,32 @@ def test_link_oserror_returns_false_when_symlink_fails(tmp_path, monkeypatch):
         raise OSError("read-only fs")
 
     monkeypatch.setattr(offline_guard.os, "symlink", raise_oserror)
-    # symlink fails and the link never materialised -> False.
-    assert offline_guard.link_bundled_weight(str(link), str(target)) is False
+    # The bundled file exists, so a failed link is a real error, not a
+    # missing weight (#4710).
+    with pytest.raises(RuntimeError, match="read-only fs"):
+        offline_guard.link_bundled_weight(str(link), str(target))
+    assert not link.exists()
+
+
+def test_link_replaces_dangling_symlink(tmp_path):
+    target = tmp_path / "bundle" / "w.pth"
+    target.parent.mkdir()
+    target.write_text("weights")
+    link = tmp_path / "w.pth"
+    link.symlink_to(tmp_path / "moved" / "w.pth")
+    assert offline_guard.link_bundled_weight(str(link), str(target)) is True
+    assert link.read_text() == "weights"
+
+
+def test_library_workdir_uses_data_dir_and_restores_cwd(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    start = tmp_path / "start"
+    start.mkdir()
+    monkeypatch.chdir(start)
+    with offline_guard.library_workdir() as workdir:
+        assert workdir == str(tmp_path / "data" / "ai" / "lib-cwd")
+        assert os.path.samefile(os.getcwd(), workdir)
+    assert os.path.samefile(os.getcwd(), start)
 
 
 # --- prepare_gfpgan_helper_weights / prepare_codeformer_weights -------------
