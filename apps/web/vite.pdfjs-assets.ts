@@ -17,9 +17,26 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm",
 };
 
+// pdf.js's modern build targets only the newest browsers: it touches
+// Iterator.prototype at module top level, so on Safari < 18.4 or Chrome < 122
+// every PDF tool crashed with "Iterator is not defined" (WEB-2Q, #4667). Our
+// own code builds for Vite's baseline target, which is older than that. The
+// legacy build carries the polyfills; aliasing here keeps every import site
+// and test mock on the plain "pdfjs-dist" specifier.
+export const PDFJS_LEGACY_ALIASES = [
+  { find: /^pdfjs-dist$/, replacement: "pdfjs-dist/legacy/build/pdf.mjs" },
+  {
+    find: /^pdfjs-dist\/build\/(pdf\.worker(?:\.min)?\.mjs)$/,
+    replacement: "pdfjs-dist/legacy/build/$1",
+  },
+];
+
 export function pdfjsAssets(): Plugin {
   return {
     name: "snapotter:pdfjs-assets",
+    config() {
+      return { resolve: { alias: PDFJS_LEGACY_ALIASES } };
+    },
     configureServer(server) {
       server.middlewares.use(`/${URL_PREFIX}`, (req, res) => {
         const [dir, file, ...rest] = (req.url ?? "").split("?")[0].split("/").filter(Boolean);
