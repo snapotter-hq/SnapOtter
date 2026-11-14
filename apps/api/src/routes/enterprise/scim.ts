@@ -564,6 +564,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.log.info("Enterprise SCIM 2.0 routes registered");
 }
 
+export const SCIM_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
+
 async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
   // Scoped to /api/v1/scim/v2/* so an unhandled throw answers the RFC 7644
   // Error envelope Okta and Entra ID expect rather than the app's { error }
@@ -574,6 +576,13 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     const detail =
       statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message);
     reply.status(statusCode).send(scimError(statusCode, detail));
+  });
+
+  // The global bodyLimit tracks the upload size (up to 1 GiB). SCIM documents
+  // are small JSON; this still fits a full-membership group PUT with tens of
+  // thousands of member references (#4632).
+  app.addHook("onRoute", (routeOptions) => {
+    routeOptions.bodyLimit ??= SCIM_BODY_LIMIT_BYTES;
   });
 
   // scimAuth otherwise runs as the first line of each handler, after
