@@ -72,6 +72,7 @@ import {
 import { loadToolInputs } from "./worker-inputs.js";
 import {
   buildLegacyResultPayload,
+  createJobProgressSink,
   failureStatus,
   jobAgeMs,
   validationErrorFields,
@@ -273,6 +274,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       // ffmpeg run, or a sidecar with its own scale) cannot send the client's
       // progress bar backwards. One reporter per attempt, so retries restart.
       const progressJobId = data.clientJobId ?? jobId;
+      const writeJobProgress = createJobProgressSink(job, data.toolId);
       const report = createMonotonicReporter((percent: number, stage?: string) => {
         void updateSingleFileProgress({
           jobId: progressJobId,
@@ -281,7 +283,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
           stage,
           ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
-        void job.updateProgress({ percent, stage });
+        writeJobProgress({ percent, stage });
       });
 
       // Check for cancellation before dispatching
