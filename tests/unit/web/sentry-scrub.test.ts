@@ -1,5 +1,5 @@
 import { httpStatusTag, SafeError } from "@snapotter/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS, isIgnoredError } from "@/lib/sentry-scrub";
 
 interface ScrubbedEvent {
@@ -279,5 +279,77 @@ describe("status_code tag (#1351)", () => {
   it("still sends nothing at all when telemetry is off", () => {
     const send = buildWebBeforeSend(() => false);
     expect(send(eventWithTags({ status_code: "500" }), {})).toBeNull();
+  });
+});
+
+// Sentry WEB-2V/2T/2N/1G: Google Translate wraps text in <font> and Yandex in
+// <ya-tr-span>; React then inserts next to a text node the translator already
+// replaced and insertBefore throws. Only drop the signature when a translator
+// left its mark, since a real portal bug throws the same error (#845, #4669).
+describe("page-translation reconciliation crashes", () => {
+  const notFound = () =>
+    new DOMException(
+      "Failed to execute 'insertBefore' on 'Node': The node before which the new node is to be inserted is not a child of this node.",
+      "NotFoundError",
+    );
+  const eventWith = (breadcrumbs: { category: string; message?: string }[]) => ({
+    breadcrumbs,
+    exception: {
+      values: [
+        {
+          type: "NotFoundError",
+          value: "Failed to execute 'insertBefore' on 'Node'",
+          stacktrace: { frames: [{ filename: "http://192.168.0.4:1349/assets/app.js" }] },
+        },
+      ],
+    },
+  });
+
+  it("drops the crash when breadcrumbs show Google Translate's <font> wrappers", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = eventWith([
+      { category: "ui.click", message: "button.px-4" },
+      { category: "ui.click", message: "font > font" },
+    ]);
+    expect(send(event, { originalException: notFound() })).toBeNull();
+  });
+
+  it("drops the crash when breadcrumbs show Yandex Translate's spans", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = eventWith([
+      { category: "ui.click", message: "p.text-xs.text-muted-foreground > ya-tr-span" },
+    ]);
+    expect(send(event, { originalException: notFound() })).toBeNull();
+  });
+
+  it("drops a removeChild crash on a page Google Translate marked as translated", () => {
+    const send = buildWebBeforeSend(() => true);
+    vi.stubGlobal("document", {
+      documentElement: { classList: { contains: (c: string) => c === "translated-ltr" } },
+    });
+    try {
+      const err = new DOMException(
+        "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
+        "NotFoundError",
+      );
+      expect(send(eventWith([]), { originalException: err })).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the crash when nothing points at a translator", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = eventWith([
+      { category: "ui.click", message: "button.font-medium" },
+      { category: "ui.click", message: "span.font-mono" },
+    ]);
+    expect(send(event, { originalException: notFound() })).not.toBeNull();
+  });
+
+  it("keeps other errors even on a translated page", () => {
+    const send = buildWebBeforeSend(() => true);
+    const event = eventWith([{ category: "ui.click", message: "font" }]);
+    expect(send(event, { originalException: new TypeError("real bug") })).not.toBeNull();
   });
 });
