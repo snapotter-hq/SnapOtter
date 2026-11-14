@@ -29,17 +29,19 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
-_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+# Absolute, because GFPGANer is built with its cwd switched to
+# offline_guard.library_workdir() and a relative MODELS_PATH would then miss.
+_MODELS_BASE = os.path.abspath(os.environ.get("MODELS_PATH", "/opt/models"))
 
 REALESRGAN_MODEL_PATH = os.environ.get(
     "REALESRGAN_MODEL_PATH",
     os.path.join(_MODELS_BASE, "realesrgan", "RealESRGAN_x4plus.pth"),
 )
 
-GFPGAN_MODEL_PATH = os.environ.get(
+GFPGAN_MODEL_PATH = os.path.abspath(os.environ.get(
     "GFPGAN_MODEL_PATH",
     os.path.join(_MODELS_BASE, "gfpgan", "GFPGANv1.3.pth"),
-)
+))
 
 GPU_TILE_SIZE = 512
 CPU_TILE_SIZE = 256
@@ -315,20 +317,24 @@ def main():
                                 f"GFPGAN model not found at {GFPGAN_MODEL_PATH}. "
                                 "Install the upscale-enhance feature or disable faceEnhance."
                             )
-                        # GFPGANer resolves its facexlib helper weights
-                        # relative to the cwd and downloads them from GitHub
-                        # when missing; resolve them from the bundle first so
-                        # no download is needed (strict offline mode errors
-                        # instead).
-                        from offline_guard import prepare_gfpgan_helper_weights
-                        prepare_gfpgan_helper_weights(_MODELS_BASE)
-                        face_enhancer = GFPGANer(
-                            model_path=GFPGAN_MODEL_PATH,
-                            upscale=scale,
-                            arch="clean",
-                            channel_multiplier=2,
-                            bg_upsampler=upsampler,
+                        # GFPGANer loads its facexlib helper weights
+                        # relative to the cwd when it is built and downloads
+                        # them from GitHub when missing; resolve them from the
+                        # bundle first, inside a writable cwd, so no download
+                        # is needed (strict offline mode errors instead).
+                        from offline_guard import (
+                            library_workdir,
+                            prepare_gfpgan_helper_weights,
                         )
+                        with library_workdir():
+                            prepare_gfpgan_helper_weights(_MODELS_BASE)
+                            face_enhancer = GFPGANer(
+                                model_path=GFPGAN_MODEL_PATH,
+                                upscale=scale,
+                                arch="clean",
+                                channel_multiplier=2,
+                                bg_upsampler=upsampler,
+                            )
                         face_retry_tile = None
                         try:
                             _, _, face_output = call_with_tile_errors(

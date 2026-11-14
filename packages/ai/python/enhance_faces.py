@@ -53,12 +53,14 @@ def _is_oom(err):
     return any(s in m for s in _OOM_MARKERS)
 
 
-_MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
+# Absolute, because the face libraries run with their cwd switched to
+# offline_guard.library_workdir() and a relative MODELS_PATH would then miss.
+_MODELS_BASE = os.path.abspath(os.environ.get("MODELS_PATH", "/opt/models"))
 
-GFPGAN_MODEL_PATH = os.environ.get(
+GFPGAN_MODEL_PATH = os.path.abspath(os.environ.get(
     "GFPGAN_MODEL_PATH",
     os.path.join(_MODELS_BASE, "gfpgan", "GFPGANv1.3.pth"),
-)
+))
 
 CODEFORMER_MODEL_PATH = os.environ.get(
     "CODEFORMER_MODEL_PATH",
@@ -189,27 +191,29 @@ def enhance_with_gfpgan(img_array, only_center_face):
 
     # GFPGANer resolves its facexlib helper weights relative to the cwd and
     # downloads them from GitHub when missing; resolve them from the bundle
-    # first so no download is needed (strict offline mode errors instead).
-    from offline_guard import prepare_gfpgan_helper_weights
-    prepare_gfpgan_helper_weights(_MODELS_BASE)
+    # first, inside a writable cwd, so no download is needed (strict offline
+    # mode errors instead).
+    from offline_guard import library_workdir, prepare_gfpgan_helper_weights
 
     use_gpu = torch_gpu_available()
     device = torch.device("cuda" if use_gpu else "cpu")
 
-    enhancer = GFPGANer(
-        model_path=GFPGAN_MODEL_PATH,
-        upscale=1,
-        arch="clean",
-        channel_multiplier=2,
-        bg_upsampler=None,
-        device=device,
-    )
-    _, _, output = enhancer.enhance(
-        img_array,
-        has_aligned=False,
-        only_center_face=only_center_face,
-        paste_back=True,
-    )
+    with library_workdir():
+        prepare_gfpgan_helper_weights(_MODELS_BASE)
+        enhancer = GFPGANer(
+            model_path=GFPGAN_MODEL_PATH,
+            upscale=1,
+            arch="clean",
+            channel_multiplier=2,
+            bg_upsampler=None,
+            device=device,
+        )
+        _, _, output = enhancer.enhance(
+            img_array,
+            has_aligned=False,
+            only_center_face=only_center_face,
+            paste_back=True,
+        )
     if output is None:
         raise RuntimeError("GFPGAN returned no result (face enhancement may have failed)")
     return output
@@ -235,49 +239,53 @@ def enhance_with_codeformer(img_array, fidelity_weight):
     use_gpu = torch_gpu_available()
 
     # codeformer-pip downloads four weights into a cwd-relative tree at import
-    # time when they are missing; resolve the bundled ones first so only a
-    # genuinely unbundled weight can trigger the download fallback.
-    from offline_guard import prepare_codeformer_weights
-    prepare_codeformer_weights(_MODELS_BASE)
+    # time when they are missing, and writes its result to a cwd-relative
+    # output/out.png; run it inside a writable cwd and resolve the bundled
+    # weights first so only a genuinely unbundled weight can trigger the
+    # download fallback.
+    from offline_guard import library_workdir, prepare_codeformer_weights
 
-    _orig_cuda_check = torch.cuda.is_available
-    if not use_gpu:
-        torch.cuda.is_available = lambda: False
-    try:
-        from codeformer.app import inference_app
+    with library_workdir():
+        prepare_codeformer_weights(_MODELS_BASE)
 
-        img_bgr = img_array[:, :, ::-1].copy()
-
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
-            tmp_in_path = tmp_in.name
-
+        _orig_cuda_check = torch.cuda.is_available
+        if not use_gpu:
+            torch.cuda.is_available = lambda: False
         try:
-            if not cv2.imwrite(tmp_in_path, img_bgr):
-                raise RuntimeError(f"Failed to write output image: {tmp_in_path}")
-            result_path = inference_app(
-                image=tmp_in_path,
-                background_enhance=False,
-                face_upsample=False,
-                upscale=1,
-                codeformer_fidelity=fidelity_weight,
-            )
-        finally:
-            os.unlink(tmp_in_path)
+            from codeformer.app import inference_app
 
-        if result_path is None:
-            raise RuntimeError("CodeFormer returned no result (face detection may have failed)")
+            img_bgr = img_array[:, :, ::-1].copy()
 
-        try:
-            restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
-        finally:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
+                tmp_in_path = tmp_in.name
+
             try:
-                os.unlink(str(result_path))
-            except OSError:
-                pass
-        if restored_bgr is None:
-            raise RuntimeError("CodeFormer output file could not be read")
-    finally:
-        torch.cuda.is_available = _orig_cuda_check
+                if not cv2.imwrite(tmp_in_path, img_bgr):
+                    raise RuntimeError(f"Failed to write output image: {tmp_in_path}")
+                result_path = inference_app(
+                    image=tmp_in_path,
+                    background_enhance=False,
+                    face_upsample=False,
+                    upscale=1,
+                    codeformer_fidelity=fidelity_weight,
+                )
+            finally:
+                os.unlink(tmp_in_path)
+
+            if result_path is None:
+                raise RuntimeError("CodeFormer returned no result (face detection may have failed)")
+
+            try:
+                restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+            finally:
+                try:
+                    os.unlink(str(result_path))
+                except OSError:
+                    pass
+            if restored_bgr is None:
+                raise RuntimeError("CodeFormer output file could not be read")
+        finally:
+            torch.cuda.is_available = _orig_cuda_check
 
     restored_rgb = restored_bgr[:, :, ::-1].copy()
     return restored_rgb
