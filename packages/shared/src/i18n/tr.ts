@@ -5725,6 +5725,21 @@ export const tr: TranslationKeys = {
       RESULT_TOO_LARGE:
         "Bu ayarların üreteceği sonuç çok büyük. Daha küçük bir görüntü veya daha küçük sonuç veren ayarlar kullanın.",
       NO_AUDIO_TRACK: "Bu dosyada ses parçası yok. Ses içeren bir dosya seçip tekrar deneyin.",
+      IMAGE_UNDECODABLE:
+        "Bu görüntü okunamıyor. Dosya bozuk olabilir veya bu aracın desteklemediği bir kodlama kullanıyor olabilir.",
+      INVALID_SETTINGS: "Bu ayarlar bu dosyayla çalışmıyor. Değerleri kontrol edip tekrar deneyin.",
+      CHART_DATA_INVALID:
+        "Grafik Oluşturucu bu dosyadan grafik verisi okuyamadı. Her satırında bir etiket ve sıfır ya da daha büyük bir sayı olan, en fazla 100 satırlık bir CSV veya JSON kullanın.",
+      NO_FACE_DETECTED: "Yüz bulunamadı. İyi ışıkta, önden çekilmiş net bir fotoğraf yükleyin.",
+      TARGET_SIZE_UNREACHABLE:
+        "Bu dosya hedef boyuta kadar küçültülemiyor. Daha büyük bir hedef deneyin.",
+      TOO_MANY_PAGES:
+        "Bu PDF'de tek seferde işlenemeyecek kadar çok sayfa var. Daha az sayfa seçip tekrar deneyin.",
+      METADATA_DAMAGED: "Bu görüntünün mevcut meta verileri bozuk, bu yüzden güvenle düzenlenemez.",
+      REMOTE_RESOURCES_DISABLED:
+        "Bu dosya internetten görüntü veya stil yüklüyor ve bu sunucu buna izin vermiyor. Bunları dosyanın içine gömüp tekrar deneyin.",
+      TOO_MANY_PIXELS:
+        "Bu animasyonun tüm karelerindeki toplam piksel sayısı çok fazla. Daha az kare veya daha küçük bir boyut kullanın.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",

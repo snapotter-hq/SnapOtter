@@ -99,11 +99,13 @@ function validatePositiveInteger(value: number, label: string, maximum?: number)
 export function parsePdfPageSpec(spec: string, totalPages: number): number[] {
   validatePositiveInteger(totalPages, "PDF page count");
   const normalized = spec.trim();
-  if (!normalized) throw new ToolInputError("No pages specified");
+  if (!normalized) throw new ToolInputError("No pages specified", { code: "INVALID_PAGE_RANGE" });
 
   if (normalized.toLowerCase() === "all") {
     if (totalPages > MAX_PDF_OCR_PAGES) {
-      throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
+      throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`, {
+        code: "TOO_MANY_PAGES",
+      });
     }
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
@@ -111,36 +113,45 @@ export function parsePdfPageSpec(spec: string, totalPages: number): number[] {
   const selected = new Set<number>();
   for (const rawPart of normalized.split(",")) {
     const part = rawPart.trim();
-    if (!part) throw new ToolInputError(`Invalid page selection: "${spec}"`);
+    if (!part)
+      throw new ToolInputError(`Invalid page selection: "${spec}"`, { code: "INVALID_PAGE_RANGE" });
 
     const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
-    if (!match) throw new ToolInputError(`Invalid page selection: "${part}"`);
+    if (!match)
+      throw new ToolInputError(`Invalid page selection: "${part}"`, { code: "INVALID_PAGE_RANGE" });
 
     const start = Number(match[1]);
     const end = match[2] === undefined ? start : Number(match[2]);
     if (start < 1 || end < 1) {
-      throw new ToolInputError(`Invalid page selection: "${part}" (pages start at 1)`);
+      throw new ToolInputError(`Invalid page selection: "${part}" (pages start at 1)`, {
+        code: "INVALID_PAGE_RANGE",
+      });
     }
     if (start > end) {
       throw new ToolInputError(
         `Invalid page selection: "${part}" (range start is after range end)`,
+        { code: "INVALID_PAGE_RANGE" },
       );
     }
     if (end > totalPages) {
       throw new ToolInputError(
         `Invalid page selection: "${part}" (document has ${totalPages} pages)`,
+        { code: "PAGE_OUT_OF_RANGE" },
       );
     }
 
     for (let page = start; page <= end; page += 1) {
       selected.add(page);
       if (selected.size > MAX_PDF_OCR_PAGES) {
-        throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`);
+        throw new ToolInputError(`Too many pages for OCR (max ${MAX_PDF_OCR_PAGES})`, {
+          code: "TOO_MANY_PAGES",
+        });
       }
     }
   }
 
-  if (selected.size === 0) throw new ToolInputError("No pages specified");
+  if (selected.size === 0)
+    throw new ToolInputError("No pages specified", { code: "INVALID_PAGE_RANGE" });
   return [...selected].sort((left, right) => left - right);
 }
 

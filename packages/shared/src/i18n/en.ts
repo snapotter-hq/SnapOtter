@@ -5640,6 +5640,21 @@ export const en = {
       RESULT_TOO_LARGE:
         "The result these settings would produce is too large. Use a smaller image or settings that make a smaller result.",
       NO_AUDIO_TRACK: "This file has no audio track. Choose a file with audio and try again.",
+      IMAGE_UNDECODABLE:
+        "This image can't be read. The file may be damaged or use an encoding this tool doesn't support.",
+      INVALID_SETTINGS: "These settings don't work with this file. Check the values and try again.",
+      CHART_DATA_INVALID:
+        "Chart Maker couldn't read chart data from this file. Use CSV or JSON with up to 100 rows, each with a label and a number of zero or more.",
+      NO_FACE_DETECTED: "No face was found. Upload a clear, front-facing photo with good lighting.",
+      TARGET_SIZE_UNREACHABLE:
+        "This file can't be made small enough for the target size. Try a larger target.",
+      TOO_MANY_PAGES:
+        "This PDF has too many pages to process at once. Choose fewer pages and try again.",
+      METADATA_DAMAGED: "This image's existing metadata is damaged, so it can't be edited safely.",
+      REMOTE_RESOURCES_DISABLED:
+        "This file loads images or styles from the internet, which this server doesn't allow. Embed them in the file and try again.",
+      TOO_MANY_PIXELS:
+        "This animation has too many pixels across its frames. Use fewer frames or a smaller size.",
     },
     generic: "An error occurred",
     offline: "You're offline",

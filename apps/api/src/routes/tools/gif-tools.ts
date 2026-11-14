@@ -104,7 +104,10 @@ async function inspectGifWorkload(inputBuffer: Buffer) {
     if (isPixelSafetyError(err)) {
       throw pixelLimitImageError(rawErr);
     }
-    throw new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: rawErr });
+    throw new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, {
+      cause: rawErr,
+      code: "IMAGE_UNDECODABLE",
+    });
   }
   return { metadata, workload: assertGifWorkload(metadata) };
 }
@@ -118,6 +121,7 @@ function assertGifResizeOutput(
   assertGifWorkload(
     { width: output.width, height: output.height, pages: workload.frames },
     "GIF resize output",
+    "RESULT_TOO_LARGE",
   );
 }
 
@@ -309,7 +313,9 @@ export function registerGifTools(app: FastifyInstance) {
             case "extract": {
               if (settings.extractMode === "single") {
                 if (settings.frameNumber >= inputWorkload.frames) {
-                  throw new ToolInputError("Requested GIF frame does not exist");
+                  throw new ToolInputError("Requested GIF frame does not exist", {
+                    code: "INVALID_SETTINGS",
+                  });
                 }
                 const frame = sharp(inputBuffer, {
                   page: settings.frameNumber,
@@ -335,7 +341,9 @@ export function registerGifTools(app: FastifyInstance) {
                   : Math.min(settings.frameEnd ?? pageCount - 1, pageCount - 1);
 
               if (start >= pageCount || end < start) {
-                throw new ToolInputError("Requested GIF frame range does not exist");
+                throw new ToolInputError("Requested GIF frame range does not exist", {
+                  code: "INVALID_SETTINGS",
+                });
               }
 
               const ext = settings.extractFormat;

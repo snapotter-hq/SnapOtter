@@ -5719,6 +5719,24 @@ export const id: TranslationKeys = {
         "Hasil dari pengaturan ini akan terlalu besar. Gunakan gambar yang lebih kecil atau pengaturan yang menghasilkan hasil lebih kecil.",
       NO_AUDIO_TRACK:
         "File ini tidak memiliki trek audio. Pilih file yang berisi audio dan coba lagi.",
+      IMAGE_UNDECODABLE:
+        "Gambar ini tidak dapat dibaca. File mungkin rusak atau memakai encoding yang tidak didukung alat ini.",
+      INVALID_SETTINGS:
+        "Pengaturan ini tidak cocok untuk file ini. Periksa nilainya dan coba lagi.",
+      CHART_DATA_INVALID:
+        "Pembuat Grafik tidak dapat membaca data grafik dari file ini. Gunakan CSV atau JSON dengan paling banyak 100 baris, masing-masing berisi label dan angka nol atau lebih.",
+      NO_FACE_DETECTED:
+        "Tidak ada wajah yang ditemukan. Unggah foto yang jelas, menghadap depan, dengan pencahayaan yang baik.",
+      TARGET_SIZE_UNREACHABLE:
+        "File ini tidak dapat diperkecil sampai ukuran target. Coba target yang lebih besar.",
+      TOO_MANY_PAGES:
+        "PDF ini memiliki terlalu banyak halaman untuk diproses sekaligus. Pilih lebih sedikit halaman dan coba lagi.",
+      METADATA_DAMAGED:
+        "Metadata yang ada pada gambar ini rusak, jadi tidak dapat diedit dengan aman.",
+      REMOTE_RESOURCES_DISABLED:
+        "File ini memuat gambar atau gaya dari internet, yang tidak diizinkan server ini. Sematkan ke dalam file dan coba lagi.",
+      TOO_MANY_PIXELS:
+        "Animasi ini memiliki terlalu banyak piksel di seluruh frame-nya. Gunakan lebih sedikit frame atau ukuran yang lebih kecil.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",

@@ -69,6 +69,7 @@ export function assertPadCanvasFits(finalW: number, finalH: number): void {
   if (finalW * finalH > MAX_PAD_CANVAS_PIXELS) {
     throw new ToolInputError(
       `The padded image would be ${finalW} x ${finalH} pixels, over the ${MAX_PAD_CANVAS_PIXELS.toLocaleString("en-US")} pixel limit. Use a less extreme ratio or less padding.`,
+      { code: "RESULT_TOO_LARGE" },
     );
   }
 }

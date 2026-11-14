@@ -110,7 +110,8 @@ export async function removeBackgroundAnimated(
     const result = parseStdoutJson(stdout);
     if (!result.success) {
       if (result.error === "canceled") throw new AnimatedRemovalCanceledError();
-      if (result.code === "CANVAS_TOO_LARGE") throw new ToolInputError(String(result.error));
+      if (result.code === "CANVAS_TOO_LARGE")
+        throw new ToolInputError(String(result.error), { code: "TOO_MANY_PIXELS" });
       throw toSidecarError(result.error, "Animated background removal failed");
     }
     const buffer = await readScratchOutput("remove-bg-anim", outputPath);

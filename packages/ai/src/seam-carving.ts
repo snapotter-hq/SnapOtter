@@ -92,6 +92,7 @@ export async function seamCarve(
     if (megapixels > MAX_MP) {
       throw new ToolInputError(
         `Image is too large for content-aware resize (${formatExceededMp(megapixels, MAX_MP)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
+        { code: "IMAGE_TOO_LARGE" },
       );
     }
 
@@ -108,6 +109,7 @@ export async function seamCarve(
     if (targetW * targetH > MAX_PIXELS) {
       throw new ToolInputError(
         `Target size ${targetW} x ${targetH} is over the ${MAX_PIXELS} pixel (${MAX_MP} MP) limit for content-aware resize`,
+        { code: "RESULT_TOO_LARGE" },
       );
     }
 
@@ -118,6 +120,7 @@ export async function seamCarve(
     ) {
       throw new ToolInputError(
         `Content-aware resize can enlarge each side by at most ${MAX_ENLARGE_RATIO}x (requested ${targetW} x ${targetH} from ${width} x ${height})`,
+        { code: "INVALID_SETTINGS" },
       );
     }
 

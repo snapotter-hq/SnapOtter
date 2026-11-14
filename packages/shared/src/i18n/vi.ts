@@ -5699,6 +5699,24 @@ export const vi: TranslationKeys = {
       RESULT_TOO_LARGE:
         "Kết quả từ các cài đặt này sẽ quá lớn. Hãy dùng hình ảnh nhỏ hơn hoặc cài đặt cho kết quả nhỏ hơn.",
       NO_AUDIO_TRACK: "Tệp này không có bản âm thanh. Hãy chọn tệp có âm thanh rồi thử lại.",
+      IMAGE_UNDECODABLE:
+        "Không thể đọc hình ảnh này. Tệp có thể bị hỏng hoặc dùng kiểu mã hóa mà công cụ này không hỗ trợ.",
+      INVALID_SETTINGS:
+        "Các cài đặt này không dùng được với tệp này. Hãy kiểm tra các giá trị rồi thử lại.",
+      CHART_DATA_INVALID:
+        "Công cụ Tạo biểu đồ không đọc được dữ liệu biểu đồ từ tệp này. Hãy dùng CSV hoặc JSON có tối đa 100 hàng, mỗi hàng gồm một nhãn và một số từ 0 trở lên.",
+      NO_FACE_DETECTED:
+        "Không tìm thấy khuôn mặt. Hãy tải lên ảnh chụp chính diện, rõ nét và đủ sáng.",
+      TARGET_SIZE_UNREACHABLE:
+        "Không thể thu nhỏ tệp này đến kích thước mục tiêu. Hãy thử mục tiêu lớn hơn.",
+      TOO_MANY_PAGES:
+        "Tệp PDF này có quá nhiều trang để xử lý cùng lúc. Hãy chọn ít trang hơn rồi thử lại.",
+      METADATA_DAMAGED:
+        "Siêu dữ liệu hiện có của hình ảnh này bị hỏng nên không thể chỉnh sửa an toàn.",
+      REMOTE_RESOURCES_DISABLED:
+        "Tệp này tải hình ảnh hoặc kiểu dáng từ internet, điều mà máy chủ này không cho phép. Hãy nhúng chúng vào tệp rồi thử lại.",
+      TOO_MANY_PIXELS:
+        "Ảnh động này có quá nhiều điểm ảnh trên tất cả các khung hình. Hãy dùng ít khung hình hơn hoặc kích thước nhỏ hơn.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",

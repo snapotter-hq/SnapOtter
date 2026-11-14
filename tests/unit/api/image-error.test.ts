@@ -6,6 +6,7 @@ import {
   isToolInputError,
   markToolInputError,
   SafeError,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Sharp } from "sharp";
@@ -568,6 +569,8 @@ describe("asInputErrorIfUndecodable", () => {
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toBe(UNDECODABLE_IMAGE_MESSAGE);
     expect(err.cause).toBe(sharpErr);
+    // The web app translates the reason from the code (#4727).
+    expect(toolInputErrorCode(err)).toBe("IMAGE_UNDECODABLE");
   });
 
   it("logs the probe's libvips reason as a string, since pino serializes only the err key", async () => {

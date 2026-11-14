@@ -57,6 +57,14 @@ const JSON_SHAPES =
   'an object of name to number ({"Q1": 12}), or an array wrapped in a single ' +
   'property ({"data": [...]}).';
 
+/**
+ * Every data problem shares one code, so the web app shows one translated
+ * reason; the English message keeps the specifics for API callers (#4727).
+ */
+function chartDataError(message: string): ToolInputError {
+  return new ToolInputError(message, { code: "CHART_DATA_INVALID" });
+}
+
 /** A column carries the values only if MORE than half its rows hold a number. */
 const NUMERIC_MAJORITY = 0.5;
 
@@ -297,7 +305,7 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
   if (rows.length === 0) return [];
 
   const { decimals, labelCol, valueCol, width } = detectColumns(rows, header?.length ?? 0);
-  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
+  if (valueCol < 0) throw chartDataError(noNumericColumnMessage(header, width));
 
   const points: DataPoint[] = [];
   for (const row of rows) {
@@ -421,7 +429,7 @@ function parseCsv(text: string): Table {
     (err) => !(err.code === "UndetectableDelimiter" && singleColumn),
   );
   if (fatal.length > 0) {
-    throw new ToolInputError(`CSV parse failed: ${fatal[0].message}`);
+    throw chartDataError(`CSV parse failed: ${fatal[0].message}`);
   }
   const hasHeader = isHeaderRow(rows);
   return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
@@ -434,7 +442,7 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
     (item): item is Record<string, unknown> =>
       typeof item === "object" && item !== null && !Array.isArray(item),
   );
-  if (objects.length !== items.length) throw new ToolInputError(JSON_SHAPES);
+  if (objects.length !== items.length) throw chartDataError(JSON_SHAPES);
 
   // An explicit {label, value} shape wins: the file named its fields, so don't
   // second-guess it by sniffing the other keys.
@@ -445,7 +453,7 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
         // Sliced: the value can be an arbitrarily large nested object, and a
         // message over 280 characters collapses to a generic one.
         const shown = JSON.stringify(item.value) ?? "undefined";
-        throw new ToolInputError(
+        throw chartDataError(
           `Chart Maker needs every "value" to be a number, and ${shown.slice(0, 60)} is not.`,
         );
       }
@@ -456,7 +464,7 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
   // Union of every object's keys, not just the first one's: records that omit
   // an optional field would otherwise read as blank and be dropped.
   const keys = [...new Set(objects.flatMap((item) => Object.keys(item)))];
-  if (keys.length === 0) throw new ToolInputError(JSON_SHAPES);
+  if (keys.length === 0) throw chartDataError(JSON_SHAPES);
   return tableToPoints(
     {
       header: keys,
@@ -474,10 +482,10 @@ function isNumericEntry(entry: { label: string; value: number | null }): entry i
 
 function pointsFromJson(raw: unknown, skipped?: SkippedRows): DataPoint[] {
   if (Array.isArray(raw)) return pointsFromJsonArray(raw, skipped);
-  if (typeof raw !== "object" || raw === null) throw new ToolInputError(JSON_SHAPES);
+  if (typeof raw !== "object" || raw === null) throw chartDataError(JSON_SHAPES);
 
   const entries = Object.entries(raw as Record<string, unknown>);
-  if (entries.length === 0) throw new ToolInputError(JSON_SHAPES);
+  if (entries.length === 0) throw chartDataError(JSON_SHAPES);
 
   const flat = entries.map(([label, value]) => ({ label, value: numericCell(value) }));
   if (flat.every(isNumericEntry)) return flat;
@@ -486,7 +494,7 @@ function pointsFromJson(raw: unknown, skipped?: SkippedRows): DataPoint[] {
   const wrapped = entries.filter(([, value]) => Array.isArray(value));
   if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[], skipped);
 
-  throw new ToolInputError(JSON_SHAPES);
+  throw chartDataError(JSON_SHAPES);
 }
 
 export function parseInput(buf: Buffer, skipped?: SkippedRows): DataPoint[] {
@@ -503,7 +511,7 @@ export function parseInput(buf: Buffer, skipped?: SkippedRows): DataPoint[] {
     try {
       raw = JSON.parse(text);
     } catch (err) {
-      throw new ToolInputError(
+      throw chartDataError(
         `This file starts like JSON but does not parse: ${err instanceof Error ? err.message : "invalid JSON"}`,
       );
     }
@@ -646,16 +654,16 @@ export function registerChartMaker(app: FastifyInstance) {
           // kept our own bugs out of Sentry entirely.
           if (isToolInputError(err)) throw err;
           if (err instanceof RangeError) {
-            throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+            throw chartDataError("This file is too large for Chart Maker to read as text.");
           }
           throw err;
         }
 
         if (data.length === 0) {
-          throw new ToolInputError("No data points found in input");
+          throw chartDataError("No data points found in input");
         }
         if (data.length > 100) {
-          throw new ToolInputError("Too many data points (max 100)");
+          throw chartDataError("Too many data points (max 100)");
         }
 
         // Every parse path above returns finite numbers or throws, so there is
@@ -663,7 +671,7 @@ export function registerChartMaker(app: FastifyInstance) {
         // Negative values render as invalid/degenerate SVG (negative bar heights,
         // backward pie arcs that Sharp silently drops); reject with a clear message.
         if (data.some((point) => point.value < 0)) {
-          throw new ToolInputError("Chart values must be zero or greater");
+          throw chartDataError("Chart values must be zero or greater");
         }
 
         let svg: string;

@@ -74,7 +74,7 @@ export function fastLanguageUnsupportedReason(language: string | undefined): str
 function assertFastLanguageSupported(quality: OcrQuality, language: string | undefined): void {
   const reason = quality === "fast" ? fastLanguageUnsupportedReason(language) : undefined;
   if (reason) {
-    throw new ToolInputError(reason);
+    throw new ToolInputError(reason, { code: "FEATURE_INCOMPATIBLE" });
   }
 }
 
@@ -195,16 +195,20 @@ export async function extractText(
   const height = meta.height ?? 0;
   const pixels = width * height;
   if (!Number.isSafeInteger(pixels) || pixels <= 0) {
-    throw new ToolInputError("OCR input has invalid image dimensions");
+    throw new ToolInputError("OCR input has invalid image dimensions", {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
   if (width > MAX_OCR_INPUT_DIMENSION || height > MAX_OCR_INPUT_DIMENSION) {
     throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_DIMENSION.toLocaleString("en-US")} pixel dimension safety limit`,
+      { code: "IMAGE_TOO_LARGE" },
     );
   }
   if (pixels > MAX_OCR_INPUT_PIXELS) {
     throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_PIXELS.toLocaleString("en-US")} pixel safety limit`,
+      { code: "IMAGE_TOO_LARGE" },
     );
   }
   let recognitionImage: ReturnType<typeof sharp> | undefined;

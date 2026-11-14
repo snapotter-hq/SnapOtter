@@ -5744,6 +5744,24 @@ export const pl: TranslationKeys = {
       RESULT_TOO_LARGE:
         "Wynik tych ustawień byłby za duży. Użyj mniejszego obrazu lub ustawień, które dają mniejszy wynik.",
       NO_AUDIO_TRACK: "Ten plik nie ma ścieżki audio. Wybierz plik z dźwiękiem i spróbuj ponownie.",
+      IMAGE_UNDECODABLE:
+        "Nie można odczytać tego obrazu. Plik może być uszkodzony lub używać kodowania, którego to narzędzie nie obsługuje.",
+      INVALID_SETTINGS:
+        "Te ustawienia nie pasują do tego pliku. Sprawdź wartości i spróbuj ponownie.",
+      CHART_DATA_INVALID:
+        "Kreator wykresów nie mógł odczytać danych z tego pliku. Użyj pliku CSV lub JSON z maksymalnie 100 wierszami, z których każdy ma etykietę i liczbę równą zero lub większą.",
+      NO_FACE_DETECTED:
+        "Nie znaleziono twarzy. Prześlij wyraźne zdjęcie zrobione od przodu przy dobrym oświetleniu.",
+      TARGET_SIZE_UNREACHABLE:
+        "Tego pliku nie da się zmniejszyć do docelowego rozmiaru. Spróbuj większego celu.",
+      TOO_MANY_PAGES:
+        "Ten plik PDF ma zbyt wiele stron, aby przetworzyć je naraz. Wybierz mniej stron i spróbuj ponownie.",
+      METADATA_DAMAGED:
+        "Istniejące metadane tego obrazu są uszkodzone, więc nie można ich bezpiecznie edytować.",
+      REMOTE_RESOURCES_DISABLED:
+        "Ten plik wczytuje obrazy lub style z internetu, na co ten serwer nie pozwala. Osadź je w pliku i spróbuj ponownie.",
+      TOO_MANY_PIXELS:
+        "Ta animacja ma zbyt wiele pikseli we wszystkich klatkach. Użyj mniej klatek lub mniejszego rozmiaru.",
     },
     generic: "Wystąpił błąd",
     offline: "Jesteś offline",

@@ -5719,6 +5719,24 @@ export const sv: TranslationKeys = {
       RESULT_TOO_LARGE:
         "Resultatet av de här inställningarna skulle bli för stort. Använd en mindre bild eller inställningar som ger ett mindre resultat.",
       NO_AUDIO_TRACK: "Den här filen har inget ljudspår. Välj en fil med ljud och försök igen.",
+      IMAGE_UNDECODABLE:
+        "Bilden kan inte läsas. Filen kan vara skadad eller använda en kodning som det här verktyget inte stöder.",
+      INVALID_SETTINGS:
+        "De här inställningarna fungerar inte med den här filen. Kontrollera värdena och försök igen.",
+      CHART_DATA_INVALID:
+        "Diagramskaparen kunde inte läsa diagramdata från filen. Använd CSV eller JSON med högst 100 rader, var och en med en etikett och ett tal som är noll eller större.",
+      NO_FACE_DETECTED:
+        "Inget ansikte hittades. Ladda upp ett skarpt foto taget rakt framifrån i bra ljus.",
+      TARGET_SIZE_UNREACHABLE:
+        "Filen kan inte göras tillräckligt liten för målstorleken. Prova ett större mål.",
+      TOO_MANY_PAGES:
+        "Den här PDF-filen har för många sidor för att bearbetas på en gång. Välj färre sidor och försök igen.",
+      METADATA_DAMAGED:
+        "Bildens befintliga metadata är skadade, så de kan inte redigeras på ett säkert sätt.",
+      REMOTE_RESOURCES_DISABLED:
+        "Filen laddar bilder eller stilar från internet, vilket den här servern inte tillåter. Bädda in dem i filen och försök igen.",
+      TOO_MANY_PIXELS:
+        "Animeringen har för många pixlar sammanlagt över sina bildrutor. Använd färre bildrutor eller en mindre storlek.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",

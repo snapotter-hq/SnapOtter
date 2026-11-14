@@ -501,7 +501,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
               animationFramePixels(inputBuffer, meta.width ?? 0, meta.height ?? 0),
               animation.frames,
             );
-            if (budgetError) throw new ToolInputError(budgetError);
+            if (budgetError) throw new ToolInputError(budgetError, { code: "TOO_MANY_PIXELS" });
             result = await removeBackgroundAnimated(
               inputBuffer,
               scratchDir,
