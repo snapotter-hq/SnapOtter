@@ -56,7 +56,7 @@ import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { showUnsupportedFileType } from "@/lib/intake-notice";
 import { withAnalytics } from "@/lib/lazy-analytics";
-import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
+import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import {
@@ -1099,31 +1099,33 @@ function ToolPageContent({
           );
         }
       }
-      // Tools that convert video to a non-video format (gif, webp, frames):
-      // after processing, show the result as an image instead of a video player
-      if (hasProcessed && processedUrl) {
-        const outName = currentEntry?.processedFilename ?? processedFileName;
-        const ext = outName.split(".").pop()?.toLowerCase();
-        if (ext && ["gif", "webp", "png", "jpg", "jpeg", "apng"].includes(ext)) {
+      const currentFileName = hasProcessed
+        ? (currentEntry?.processedFilename ?? processedFileName ?? "")
+        : (currentEntry?.file?.name ?? "");
+      const view = videoAreaView(currentFileName);
+      // A GIF input (gif-to-video) or an image result (video-to-gif, -webp):
+      // the browser shows those itself.
+      if (view === "image") {
+        const imageSrc = hasProcessed ? processedUrl : originalBlobUrl;
+        if (imageSrc) {
           return (
             <ImageViewer
-              src={processedUrl}
-              filename={outName}
-              fileSize={currentEntry?.processedSize ?? null}
-              resultContext={{ toolId }}
+              src={imageSrc}
+              filename={currentFileName}
+              fileSize={
+                hasProcessed
+                  ? (currentEntry?.processedSize ?? null)
+                  : (currentEntry?.file?.size ?? 0)
+              }
+              resultContext={hasProcessed ? { toolId } : undefined}
             />
           );
         }
       }
-      // Check if the current file is browser-playable
-      const currentFileName = hasProcessed
-        ? (currentEntry?.processedFilename ?? processedFileName ?? "")
-        : (currentEntry?.file?.name ?? "");
-      const currentExt = currentFileName.split(".").pop()?.toLowerCase() ?? "";
-      const nativeVideoExts = new Set(["mp4", "webm", "ogg", "ogv", "m4v", "mov"]);
-      const isNativeVideo = nativeVideoExts.has(currentExt);
-
-      if (!isNativeVideo && currentExt) {
+      // A ZIP of frames or a subtitle file: neither the browser nor the
+      // preview transcode can show it, and the transcode answers 400 (#4666).
+      if (view === "no-preview" && hasProcessed) return conversionCompleteCard;
+      if (view === "server-preview") {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
         const previewSrc = hasProcessed
           ? (processedUrl ?? originalBlobUrl ?? undefined)
