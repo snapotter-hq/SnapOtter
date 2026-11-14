@@ -58,9 +58,11 @@ export {
   pdfToWordPy,
 } from "./python-docs.js";
 export {
+  type QpdfInputFault,
   type QpdfOptions,
   QpdfTimeoutError,
   qpdfCheck,
+  qpdfInputFault,
   qpdfPageCount,
   qpdfRequiresPassword,
 } from "./qpdf.js";

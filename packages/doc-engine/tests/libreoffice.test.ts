@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -160,6 +161,55 @@ describe("convertDocument success path", () => {
         m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
       ),
     ).rejects.toThrow("LibreOffice produced no pdf output for report.docx");
+  });
+});
+
+// Sentry NODE-35: a truncated or unreadable document makes LibreOffice say
+// "source file could not be loaded" on stderr and exit 0 with no output. That
+// is the user's file, not our bug (#4380).
+describe("convertDocument with a document LibreOffice can't load", () => {
+  async function convertNoOutput(stderr: string): Promise<unknown> {
+    nextClose({ stderr, code: 0 });
+    readdir.mockResolvedValueOnce([]);
+    return import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/in-truncated.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+  }
+
+  it("rejects as a user-input error that names the likely causes, not the temp file", async () => {
+    const err = await convertNoOutput("Error: source file could not be loaded\n");
+    expect(isToolInputError(err)).toBe(true);
+    expect((err as Error).message).toBe(
+      "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.",
+    );
+    expect((err as Error).message).not.toContain("in-truncated");
+    expect(((err as Error).cause as Error).message).toBe(
+      "LibreOffice produced no pdf output for in-truncated.docx",
+    );
+  });
+
+  it("keeps an unexplained empty run a bug, with LibreOffice's stderr on the cause", async () => {
+    const err = await convertNoOutput("javaldx: Could not find a Java Runtime Environment!\n");
+    expect(isToolInputError(err)).toBe(false);
+    expect((err as Error).message).toBe("LibreOffice produced no pdf output for in-truncated.docx");
+    expect(((err as Error).cause as Error).message).toBe(
+      "LibreOffice stderr: javaldx: Could not find a Java Runtime Environment!",
+    );
+  });
+
+  it("leaves the cause unset when LibreOffice said nothing", async () => {
+    const err = await convertNoOutput("  \n");
+    expect(isToolInputError(err)).toBe(false);
+    expect((err as Error).cause).toBeUndefined();
+  });
+
+  it("answers a full disk as storage-full even when the load error also appears", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    const err = await convertNoOutput(
+      "Error Area:Io Class:Access Code:5\nError: source file could not be loaded\n",
+    );
+    expect(isToolInputError(err)).toBe(false);
+    expect(err).toMatchObject({ code: "ENOSPC", syscall: "write" });
   });
 });
 

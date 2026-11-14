@@ -5727,6 +5727,11 @@ export const it: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Il risultato non può raggiungere la dimensione richiesta.",
       TOO_MANY_FRAMES: "Questo file ha troppi fotogrammi da elaborare.",
       CANCELED: "L'operazione è stata annullata.",
+      PAGE_OUT_OF_RANGE: "Questo intervallo include una pagina che questo PDF non ha.",
+      INVALID_PAGE_RANGE:
+        "Questo intervallo di pagine non è valido. Usa numeri di pagina come 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Non puoi rimuovere tutte le pagine. Tienine almeno una.",
+      NESTING_TOO_DEEP: "Questo file è annidato troppo in profondità per essere convertito.",
     },
     generic: "Si è verificato un errore",
     offline: "Sei offline",

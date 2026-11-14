@@ -14,11 +14,17 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-// Every `code: "NAME"` literal the API can send, across all routes and helpers.
+// Every `code: "NAME"` literal the API can send, across all routes and helpers,
+// plus self-named constants (`const NAME = "NAME"`) that routes hand to
+// InputValidationError's positional code argument.
 function emittedCodes(): Set<string> {
   const codes = new Set<string>();
   for (const file of sourceFiles(API_SRC)) {
-    for (const match of readFileSync(file, "utf8").matchAll(/code: "([A-Z_]+)"/g)) {
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(/code: "([A-Z_]+)"/g)) {
+      codes.add(match[1]);
+    }
+    for (const match of source.matchAll(/\bconst ([A-Z][A-Z_]+) = "\1"/g)) {
       codes.add(match[1]);
     }
   }

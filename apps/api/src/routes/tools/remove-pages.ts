@@ -4,12 +4,15 @@ import { qpdfPageCount, qpdfPagesSpecUnchecked } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { compressPageRuns, parsePageSpec } from "../../lib/page-spec.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const rangeField = z
   .string()
   .max(200)
   .regex(/^[0-9rz][0-9rz,-]*$/i, "Invalid page range");
+
+const CANNOT_REMOVE_ALL_PAGES = "CANNOT_REMOVE_ALL_PAGES";
 
 const settingsSchema = z.object({
   pages: rangeField,
@@ -42,7 +45,12 @@ export function registerRemovePages(app: FastifyInstance) {
       }
 
       if (keepPages.length === 0) {
-        throw new Error("Cannot remove every page from the document");
+        throw new InputValidationError(
+          "Cannot remove every page from the document",
+          400,
+          undefined,
+          CANNOT_REMOVE_ALL_PAGES,
+        );
       }
 
       const keepSpec = compressPageRuns(keepPages);

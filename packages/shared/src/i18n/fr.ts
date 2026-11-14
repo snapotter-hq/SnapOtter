@@ -5748,6 +5748,12 @@ export const fr: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Le résultat ne peut pas atteindre la taille cible.",
       TOO_MANY_FRAMES: "Ce fichier contient trop d'images pour être traité.",
       CANCELED: "L'opération a été annulée.",
+      PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
+      INVALID_PAGE_RANGE:
+        "Cette plage de pages n'est pas valide. Utilisez des numéros comme 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES:
+        "Vous ne pouvez pas supprimer toutes les pages. Gardez-en au moins une.",
+      NESTING_TOO_DEEP: "Ce fichier est trop profondément imbriqué pour être converti.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",

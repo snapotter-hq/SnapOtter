@@ -72,4 +72,36 @@ describe("json-xml (pure JS, no skipIf)", () => {
     const ada = persons.find((p: Record<string, string>) => p.name === "Ada");
     expect(ada).toBeDefined();
   }, 30_000);
+
+  // Sentry NODE-A8: the XML builder and parser cap nesting at 100 levels and
+  // throw a plain Error that used to read as our bug (#4378).
+  function nestedJson(depth: number): Buffer {
+    let doc = '{"leaf":1}';
+    for (let i = 0; i < depth; i++) doc = `{"n":${doc}}`;
+    return Buffer.from(doc);
+  }
+
+  it("still converts JSON just under the nesting limit", async () => {
+    const res = await runTool("deep-98.json", nestedJson(98), { pretty: false });
+    expect(res.statusCode).toBe(200);
+  }, 30_000);
+
+  it.each([100, 500])(
+    "rejects JSON nested %i levels with a coded 400",
+    async (depth) => {
+      const res = await runTool(`deep-${depth}.json`, nestedJson(depth), { pretty: false });
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.code).toBe("NESTING_TOO_DEEP");
+      expect(body.error).toMatch(/more than 100 levels/);
+    },
+    30_000,
+  );
+
+  it("rejects XML nested past the limit with a coded 400", async () => {
+    const xml = Buffer.from(`${"<a>".repeat(150)}x${"</a>".repeat(150)}`);
+    const res = await runTool("deep.xml", xml);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("NESTING_TOO_DEEP");
+  }, 30_000);
 });

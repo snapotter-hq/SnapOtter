@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { compressPageRuns, parsePageSpec } from "../../../apps/api/src/lib/page-spec.js";
+import {
+  assertPageSpecInRange,
+  compressPageRuns,
+  INVALID_PAGE_RANGE,
+  PAGE_OUT_OF_RANGE,
+  parsePageSpec,
+} from "../../../apps/api/src/lib/page-spec.js";
 
 describe("parsePageSpec", () => {
   it("resolves a single page", () => {
@@ -52,6 +58,41 @@ describe("parsePageSpec", () => {
 
   it("throws on page 0", () => {
     expect(() => parsePageSpec("0", 3)).toThrow();
+  });
+
+  // Every rejection is the user's input, so it must be a 400 the worker
+  // classifies as expected and the web app can translate by code (NODE-A4).
+  it.each([
+    ["5", PAGE_OUT_OF_RANGE],
+    ["2-9", PAGE_OUT_OF_RANGE],
+    ["r4", PAGE_OUT_OF_RANGE],
+    ["0", PAGE_OUT_OF_RANGE],
+    ["1z", INVALID_PAGE_RANGE],
+    ["3-", INVALID_PAGE_RANGE],
+    ["1-2-3", INVALID_PAGE_RANGE],
+    ["r", INVALID_PAGE_RANGE],
+    ["r0", INVALID_PAGE_RANGE],
+    [",", INVALID_PAGE_RANGE],
+  ])("rejects %j with a 400 InputValidationError coded %s", (spec, code) => {
+    let caught: unknown;
+    try {
+      parsePageSpec(spec, 3);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toMatchObject({ name: "InputValidationError", statusCode: 400, code });
+  });
+
+  it("assertPageSpecInRange accepts every page reference qpdf accepts for the document", () => {
+    for (const spec of ["1", "1-z", "z-1", "r1", "r3-r1", "1,3", "2-3,1"]) {
+      expect(() => assertPageSpecInRange(spec, 3)).not.toThrow();
+    }
+  });
+
+  it("assertPageSpecInRange rejects a page past the end", () => {
+    expect(() => assertPageSpecInRange("13", 12)).toThrow(
+      "Page 13 is out of range for a 12-page document",
+    );
   });
 
   // Removal keep-list derivation tests:

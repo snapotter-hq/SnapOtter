@@ -1,8 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qpdfDecrypt } from "@snapotter/doc-engine";
+import { qpdfDecrypt, qpdfInputFault } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -36,7 +37,19 @@ export function registerUnlockPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_unlocked.pdf`);
       ctx.report(10, "Decrypting");
-      await qpdfDecrypt(inPath, settings.password, outPath, { signal: ctx.signal });
+      try {
+        await qpdfDecrypt(inPath, settings.password, outPath, { signal: ctx.signal });
+      } catch (err) {
+        if (qpdfInputFault(err) === "invalid-password") {
+          throw new InputValidationError(
+            "The password for this PDF isn't correct.",
+            400,
+            undefined,
+            "INVALID_PASSWORD",
+          );
+        }
+        throw err;
+      }
       ctx.report(90, "Done");
 
       return {
