@@ -1,11 +1,13 @@
 import { spawn } from "node:child_process";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import { engineCrashError, isEngineCrashExit, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolvePdfcpu } from "./binaries.js";
 
 export interface PdfcpuOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
 }
+
+const PDFCPU_CRASHED_MESSAGE = "The document engine (pdfcpu) crashed while processing this file.";
 
 function pdfcpuSpawnFailure(
   bin: string,
@@ -83,6 +85,10 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      if (isEngineCrashExit(code, signal)) {
+        reject(engineCrashError(PDFCPU_CRASHED_MESSAGE, "pdfcpu", signal, detail));
+        return;
+      }
       if (code === null || code === 126 || code === 127) {
         reject(pdfcpuSpawnFailure(bin, code, signal, detail));
         return;

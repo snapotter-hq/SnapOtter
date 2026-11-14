@@ -8,6 +8,7 @@ import {
   qpdfPageCount,
   qpdfRequiresPassword,
 } from "@snapotter/doc-engine";
+import { isEngineCrash } from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
@@ -28,6 +29,11 @@ function isAbortError(err: unknown): boolean {
   return err instanceof Error && (err.name === "AbortError" || err.message === "Canceled");
 }
 
+/**
+ * Not used for a qpdf crash (`isEngineCrash`), which passes through as a
+ * reported 500: qpdf faulting is our bug, not proof the upload is damaged
+ * (#4684).
+ */
 function damagedPdfError(err: unknown): InputValidationError {
   return new InputValidationError(
     `Damaged PDF: ${err instanceof Error ? stripInternalPaths(err.message).slice(0, 300) : "structural check failed"}`,
@@ -108,6 +114,7 @@ export async function validatePdfPath(
     if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
+    if (isEngineCrash(err)) throw err;
     if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // --requires-password only reads the encryption dictionary, so it does not
     // scale with content the way --check does: a stall here is anomalous (a
@@ -137,6 +144,7 @@ export async function validatePdfPath(
     if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
+    if (isEngineCrash(err)) throw err;
     if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // A big-but-healthy PDF on a slow host can outlive the check budget
     // (issue #920). That is inconclusive, not damage: proceed like the
@@ -167,6 +175,7 @@ export async function validatePdfPath(
       if (isAbortError(err)) throw err;
       const unavailable = qpdfUnavailable(err);
       if (unavailable) throw unavailable;
+      if (isEngineCrash(err)) throw err;
       if (!isQpdfTimeout(err)) throw damagedPdfError(err);
       // Fail closed: the cap is a resource guard, so a file that stalls the
       // page-count probe must not slip past it. Say so instead of a 500.

@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
-import { markToolInputError, SafeError, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  isEngineCrashExit,
+  markToolInputError,
+  SafeError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 import { type FfmpegProgress, parseProgressBlock } from "./progress.js";
 
@@ -47,42 +53,8 @@ export function markIfInputError<E extends Error>(err: E, stderr: string): E {
   return INPUT_ERROR_PATTERNS.some((re) => re.test(stderr)) ? markToolInputError(err) : err;
 }
 
-/**
- * Signals that mean ffmpeg crashed while running, not that it couldn't start
- * or was killed for memory. SIGILL is an instruction the host CPU lacks (an
- * environment fault); the rest are ffmpeg or a library it links faulting.
- */
-const CRASH_SIGNALS: ReadonlySet<NodeJS.Signals> = new Set([
-  "SIGSEGV",
-  "SIGBUS",
-  "SIGFPE",
-  "SIGABRT",
-  "SIGTRAP",
-  "SIGSYS",
-  "SIGILL",
-]);
-
 export const ENGINE_CRASHED_MESSAGE =
   "The media engine (ffmpeg) crashed while processing this file.";
-
-/**
- * A crash mid-run, kept apart from a spawn failure so the worker doesn't call
- * it a missing binary (#4371). The stderr tail rides on the cause, since a
- * SafeError's message must stay constant.
- */
-function ffmpegCrash(signal: NodeJS.Signals, output: string): SafeError {
-  const detail = output.slice(-1000).trim();
-  const cause = Object.assign(
-    new Error(detail ? `ffmpeg exited ${signal}: ${detail}` : `ffmpeg exited ${signal}`),
-    { signal },
-  );
-  return new SafeError(ENGINE_CRASHED_MESSAGE, {
-    kind: signal === "SIGILL" ? "operational" : "bug",
-    code: "ENGINE_CRASHED",
-    statusCode: 500,
-    cause,
-  });
-}
 
 function ffmpegSpawnFailure(
   bin: string,
@@ -186,8 +158,8 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
         resolvePromise(stderrTail);
         return;
       }
-      if (code === null && signal !== null && CRASH_SIGNALS.has(signal)) {
-        reject(ffmpegCrash(signal, stderrTail));
+      if (isEngineCrashExit(code, signal)) {
+        reject(engineCrashError(ENGINE_CRASHED_MESSAGE, "ffmpeg", signal, stderrTail));
         return;
       }
       if (code === null || code === 126 || code === 127) {

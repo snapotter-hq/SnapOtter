@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaInfo } from "../src/ffprobe.js";
 
@@ -315,6 +315,32 @@ describe("probeMedia: error paths", () => {
       signal: "SIGKILL",
     });
   });
+
+  it.each(["SIGSEGV", "SIGILL"] as const)(
+    "reports a crash signal (%s) as an ENGINE_CRASHED SafeError, not a spawn failure (#4684)",
+    async (signal) => {
+      const child = makeChild();
+      vi.mocked(spawn).mockReturnValue(child.proc);
+      const { probeMedia } = await import("../src/ffprobe.js");
+      const p = probeMedia("/media/clip.mp4");
+      child.stderr.emit("data", Buffer.from("faulted\n"));
+      child.proc.emit("close", null, signal);
+      const err = await p.catch((e: unknown) => e);
+      expect(isSafeMessageError(err)).toBe(true);
+      expect(err).toMatchObject({
+        message: "The media engine (ffprobe) crashed while processing this file.",
+        kind: signal === "SIGILL" ? "operational" : "bug",
+        code: "ENGINE_CRASHED",
+        statusCode: 500,
+      });
+      expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+      expect((err as Error).cause).toMatchObject({
+        message: `ffprobe exited ${signal}: faulted`,
+        signal,
+      });
+      expect(isToolInputError(err)).toBe(false);
+    },
+  );
 
   it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3825)", async () => {
     const child = makeChild();

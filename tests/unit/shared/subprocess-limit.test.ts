@@ -2,7 +2,14 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { wrapWithMemoryLimit } from "../../../packages/shared/src/subprocess-limit.js";
+import {
+  ENGINE_CRASHED_CODE,
+  engineCrashError,
+  isEngineCrash,
+  isEngineCrashExit,
+  wrapWithMemoryLimit,
+} from "../../../packages/shared/src/subprocess-limit.js";
+import { SafeError } from "../../../packages/shared/src/tool-errors.js";
 
 const KEY = "SUBPROCESS_MEMORY_LIMIT_MB";
 const orig = process.env[KEY];
@@ -99,5 +106,63 @@ describe("wrapWithMemoryLimit", () => {
     // The metacharacter-laden value is a positional param, not part of the script body.
     expect(args[1]).not.toContain("whoami");
     expect(args).toContain("-sOutputFile=/x/$(whoami).pdf");
+  });
+});
+
+describe("engine crash classification (#4684)", () => {
+  it.each(["SIGSEGV", "SIGBUS", "SIGFPE", "SIGABRT", "SIGTRAP", "SIGSYS", "SIGILL"] as const)(
+    "treats a %s exit as a crash",
+    (signal) => {
+      expect(isEngineCrashExit(null, signal)).toBe(true);
+    },
+  );
+
+  it("leaves SIGKILL, SIGTERM, a numeric exit, and a clean exit to the other branches", () => {
+    expect(isEngineCrashExit(null, "SIGKILL")).toBe(false);
+    expect(isEngineCrashExit(null, "SIGTERM")).toBe(false);
+    expect(isEngineCrashExit(null, null)).toBe(false);
+    expect(isEngineCrashExit(139, "SIGSEGV")).toBe(false);
+    expect(isEngineCrashExit(0, null)).toBe(false);
+  });
+
+  it("builds a constant-message bug SafeError with the signal and output tail on the cause", () => {
+    const err = engineCrashError(
+      "The thing crashed.",
+      "thing",
+      "SIGSEGV",
+      `${"x".repeat(2000)}tail\n`,
+    );
+    expect(err).toBeInstanceOf(SafeError);
+    expect(err).toMatchObject({
+      message: "The thing crashed.",
+      kind: "bug",
+      code: ENGINE_CRASHED_CODE,
+      statusCode: 500,
+    });
+    expect((err as { syscall?: unknown }).syscall).toBeUndefined();
+    const cause = err.cause as Error & { signal?: string };
+    expect(cause.signal).toBe("SIGSEGV");
+    expect(cause.message.startsWith("thing exited SIGSEGV: ")).toBe(true);
+    expect(cause.message.endsWith("tail")).toBe(true);
+    expect(cause.message.length).toBeLessThan(1100);
+  });
+
+  it("marks SIGILL operational and drops the colon when there is no output", () => {
+    const err = engineCrashError("The thing crashed.", "thing", "SIGILL", "  \n");
+    expect(err.kind).toBe("operational");
+    expect((err.cause as Error).message).toBe("thing exited SIGILL");
+  });
+
+  it("recognises a crash by its marker and code, and nothing else", () => {
+    const err = engineCrashError("The thing crashed.", "thing", "SIGABRT", "");
+    expect(isEngineCrash(err)).toBe(true);
+    expect(
+      isEngineCrash(
+        Object.assign(new Error("copy"), { isSafeMessage: true, code: "ENGINE_CRASHED" }),
+      ),
+    ).toBe(true);
+    expect(isEngineCrash(new SafeError("other", { code: "timeout" }))).toBe(false);
+    expect(isEngineCrash(Object.assign(new Error("x"), { code: "ENGINE_CRASHED" }))).toBe(false);
+    expect(isEngineCrash(null)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -148,6 +148,25 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
       syscall: "spawn",
       path: QPDF_STUB,
       signal: "SIGTERM",
+    });
+  });
+
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
+    nextChild({ stderr: "", stdout: "partial", code: null, signal: "SIGSEGV" });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfCheck("/doc.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (qpdf) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "qpdf exited SIGSEGV: partial",
+      signal: "SIGSEGV",
     });
   });
 
@@ -429,6 +448,25 @@ describe("qpdfRequiresPassword", () => {
       syscall: "spawn",
       path: QPDF_STUB,
       signal: "SIGKILL",
+    });
+  });
+
+  it("reports a crash signal from the password probe as ENGINE_CRASHED (#4684)", async () => {
+    nextChild({ stderr: "abort\n", code: null, signal: "SIGABRT" });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfRequiresPassword("/enc.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (qpdf) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "qpdf exited SIGABRT: abort",
+      signal: "SIGABRT",
     });
   });
 

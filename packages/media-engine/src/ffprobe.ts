@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import { engineCrashError, isEngineCrashExit, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveFfprobe } from "./binaries.js";
 import { markIfInputError } from "./ffmpeg.js";
 
@@ -35,6 +35,8 @@ export class FfprobeTimeoutError extends Error {
     this.name = "FfprobeTimeoutError";
   }
 }
+
+const FFPROBE_CRASHED_MESSAGE = "The media engine (ffprobe) crashed while processing this file.";
 
 function ffprobeSpawnFailure(
   bin: string,
@@ -122,6 +124,10 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      if (isEngineCrashExit(code, signal)) {
+        reject(engineCrashError(FFPROBE_CRASHED_MESSAGE, "ffprobe", signal, detail));
+        return;
+      }
       if (code === null || code === 126 || code === 127) {
         reject(ffprobeSpawnFailure(bin, code, signal, detail));
         return;
