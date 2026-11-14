@@ -1,5 +1,5 @@
 // Extracts tool metadata from @snapotter/shared into tools-meta.json so the QA
-// harness and discovery shards have routing (/:modality/:toolId), the input-format
+// harness and discovery shards have routing (the /:section/:toolId page route), the input-format
 // matrix, execution hints, and AI flags without resolving the workspace package at
 // Playwright runtime. Run: npx tsx tests/qa/extract-tools-meta.mts
 import { writeFileSync } from "node:fs";
@@ -13,6 +13,7 @@ const meta = TOOLS.map((t) => ({
   id: t.id,
   name: t.name,
   modality: t.modality,
+  route: t.route,
   acceptedInputs: t.acceptedInputs,
   executionHint: t.executionHint,
   isAI: ai.has(t.id),
