@@ -11,7 +11,8 @@ interface ShortcutDef {
   /** Keys: "mod" = Cmd on Mac, Ctrl on others. Plus key names separated by "+" */
   keys: string;
   description: string;
-  action: () => void;
+  /** Returns false when it had nothing to do, so the key carries on to the page. */
+  action: () => unknown;
 }
 
 /**
@@ -83,7 +84,9 @@ export function useKeyboardShortcuts() {
 
   const triggerDownload = useCallback(() => {
     const el = document.querySelector<HTMLElement>("[data-download-button]");
-    if (el) el.click();
+    if (!el) return false;
+    el.click();
+    return true;
   }, []);
 
   useEffect(() => {
@@ -139,8 +142,10 @@ export function useKeyboardShortcuts() {
         if (matchesShortcut(e, shortcut.keys)) {
           if (isInput && !inputSafeKeys.has(shortcut.keys)) continue;
           e.preventDefault();
+          // Nothing to download: let a page's own binding have the key (the
+          // editor saves its state on Ctrl+S).
+          if (shortcut.action() === false) return;
           e.stopPropagation();
-          shortcut.action();
           return;
         }
       }
