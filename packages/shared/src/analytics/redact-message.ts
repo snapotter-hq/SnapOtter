@@ -342,8 +342,20 @@ const QUOTED_RE = /(['"])(.{24,}?)\1/g;
 const HEX_RE = /\b[0-9a-fA-F]{16,}\b/g;
 const MAX_LEN = 300;
 
+// drizzle-orm's query error is `Failed query: <sql>\nparams: <values>`. The SQL
+// is ours; the values are user data and credentials (a session id is a bearer
+// token, NODE-1D), so the tail goes in every mode, diagnostic included (#4653).
+// Two plain searches keep a huge message linear. A wrapper that embeds the
+// drizzle message after its own prefix is covered too.
+function stripDrizzleParams(s: string): string {
+  const query = s.indexOf("Failed query: ");
+  if (query === -1) return s;
+  const at = s.slice(query).search(/\sparams: /);
+  return at === -1 ? s : s.slice(0, query + at);
+}
+
 export function redactMessage(message: unknown, opts?: { raw?: boolean }): string {
-  let s = String(message ?? "").replace(CTRL_RE, " ");
+  let s = stripDrizzleParams(String(message ?? "")).replace(CTRL_RE, " ");
   if (!opts?.raw) {
     s = s
       .replace(BLOB_RE, "<blob>")
