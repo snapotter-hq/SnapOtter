@@ -288,7 +288,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         { err: error, bundleId, jobId },
         "[ocr-runtime] OCR install failed",
       );
-      void reportError(error, { source: "ai-install" });
+      // This install often starts from pump() after an earlier bundle's install
+      // finishes, so the event inherits that earlier request's transaction (a
+      // background-removal install, say). The subsystem tag names the real one.
+      void reportError(error, { source: "ai-install", subsystem: "ocr-runtime" });
       const errorMessage = error instanceof Error ? error.message : String(error);
       setInstallProgress(bundleId, null, errorMessage);
       try {

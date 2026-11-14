@@ -28,6 +28,7 @@ import {
   type VerifiedOcrRuntimeIndex,
   verifyRuntimeIndex,
 } from "@snapotter/ai";
+import { SafeError } from "@snapotter/shared";
 
 export type { OcrRuntimeTrustKey, VerifiedOcrRuntimeIndex };
 export { canonicalRuntimeJson, loadOcrRuntimeTrustKeys, verifyRuntimeIndex };
@@ -167,12 +168,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 class RetryableOcrDownloadError extends Error {
   readonly retryAfterMs: number | null;
+  /** The request never got an HTTP response (DNS, connect, TLS, reset). */
+  readonly unreachable: boolean;
 
-  constructor(message: string, retryAfterMs: number | null = null, options?: ErrorOptions) {
+  constructor(
+    message: string,
+    retryAfterMs: number | null = null,
+    options?: ErrorOptions & { unreachable?: boolean },
+  ) {
     super(message, options);
     this.name = "RetryableOcrDownloadError";
     this.retryAfterMs = retryAfterMs;
+    this.unreachable = options?.unreachable ?? false;
   }
+}
+
+/**
+ * Every retry of an OCR runtime download failed before any HTTP response came
+ * back: the server is offline, air-gapped, or blocked by a firewall or proxy.
+ * That is the host's network, not a defect, so it is an operational SafeError
+ * whose constant message tells the operator what to check; the attempt count
+ * and the network error stay on the cause for the log (NODE-8P).
+ */
+export class OcrRuntimeUnreachableError extends SafeError {
+  constructor(cause: unknown) {
+    super(
+      "SnapOtter could not reach huggingface.co to download the accurate OCR runtime. " +
+        "Check that the server has outbound HTTPS access, set HTTPS_PROXY if it must use a proxy, " +
+        "or install the runtime offline by importing the OCR bundle archive.",
+      { kind: "operational", code: "OCR_RUNTIME_UNREACHABLE", statusCode: 502, cause },
+    );
+    this.name = "OcrRuntimeUnreachableError";
+  }
+}
+
+function exhaustedRetriesError(message: string, lastError: RetryableOcrDownloadError): Error {
+  const detail = new Error(message, { cause: lastError });
+  return lastError.unreachable ? new OcrRuntimeUnreachableError(detail) : detail;
 }
 
 export class OcrRuntimeDiskSpaceError extends Error {
@@ -186,6 +218,32 @@ export class OcrRuntimeImportValidationError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "OcrRuntimeImportValidationError";
+  }
+}
+
+/**
+ * The AI data volume cannot hold the OCR runtime cache safely: chmod was
+ * refused or silently ignored and left other-write or special bits behind (an
+ * SMB/CIFS share mounted 0777 does this while reporting success). That is the operator's
+ * storage choice, not a defect, so it is an operational SafeError with a
+ * constant message; the path and observed mode stay on the cause for the log.
+ */
+export class OcrRuntimeCachePermissionError extends SafeError {
+  constructor(path: string, observedMode: number, cause: unknown) {
+    super(
+      "The AI data volume does not keep the file permissions the OCR runtime cache needs. " +
+        "Keep the data directory on a local Linux filesystem rather than an SMB/CIFS share " +
+        "or a FUSE mount that ignores chmod, then retry the install.",
+      {
+        kind: "operational",
+        code: "OCR_CACHE_PERMISSIONS",
+        cause: new Error(
+          `OCR runtime cache path has unsafe permissions (mode ${observedMode.toString(8)}): ${path}`,
+          { cause },
+        ),
+      },
+    );
+    this.name = "OcrRuntimeCachePermissionError";
   }
 }
 
@@ -281,6 +339,15 @@ function resolveRetryPolicy(
 function errorCode(error: unknown): string | undefined {
   if (!isRecord(error)) return undefined;
   return typeof error.code === "string" ? error.code : undefined;
+}
+
+function hasErrorCode(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (errorCode(current)) return true;
+    current = isRecord(current) ? current.cause : undefined;
+  }
+  return false;
 }
 
 function isTransientNetworkError(error: unknown): boolean {
@@ -440,17 +507,17 @@ async function withTransientDownloadRetries<T>(
     } catch (error) {
       if (signal.aborted || !(error instanceof RetryableOcrDownloadError)) throw error;
       if (attempt === policy.maxAttempts) {
-        throw new Error(
+        throw exhaustedRetriesError(
           `${label} failed after ${attempt} attempts (${budget.totalDelayMs}ms retry delay): ${errorMessage(error)}`,
-          { cause: error },
+          error,
         );
       }
       const requestedDelayMs = retryDelayMs(error, attempt, policy);
       const remainingDelayMs = policy.maxTotalDelayMs - budget.totalDelayMs;
       if (requestedDelayMs > remainingDelayMs) {
-        throw new Error(
+        throw exhaustedRetriesError(
           `${label} retry delay budget was exhausted after ${attempt} attempts: ${errorMessage(error)}`,
-          { cause: error },
+          error,
         );
       }
       await sleepUntilRetry(requestedDelayMs, policy, signal);
@@ -505,7 +572,10 @@ async function fetchTrusted(
         throw new RetryableOcrDownloadError(
           `OCR runtime network request failed: ${errorMessage(error)}`,
           null,
-          { cause: error },
+          // A bare TypeError can be a local bug; only a socket-level code
+          // (ECONNREFUSED, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT) proves the host
+          // never answered.
+          { cause: error, unreachable: hasErrorCode(error) },
         );
       }
       throw error;
@@ -693,33 +763,35 @@ async function applyExactSharedMode(
 ): Promise<void> {
   const current = await handle.stat({ bigint: true });
   if (permissionMode(current) === desiredMode) return;
+  let chmodError: unknown;
   try {
     await handle.chmod(desiredMode);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    const observed = await handle.stat({ bigint: true });
-    if (code === "EPERM" || code === "EACCES") {
-      const observedMode = permissionMode(observed);
-      // Cache bytes are signed public release artifacts, so legacy/fsGroup
-      // volumes may retain harmless other-read/execute bits. Never accept
-      // other-write, a sticky ownership trap, or privilege special bits.
-      const forbiddenBits = observed.isDirectory() ? 0o5002 : 0o7002;
-      if ((observedMode & forbiddenBits) === 0) {
-        // A prior replica UID can own an inode shared through fsGroup or a
-        // volume ACL. Opening proves the access used by file callers; for a
-        // directory, explicitly prove create/delete-class write + traversal
-        // access without leaving a crash-strandable probe inode behind.
-        if (observed.isDirectory()) {
-          await access(descriptorRoot(handle, path), fsConstants.W_OK | fsConstants.X_OK);
-        }
-        return;
-      }
+    if (code !== "EPERM" && code !== "EACCES") {
+      throw new Error(`OCR runtime cache path has unsafe permissions: ${path}`, { cause: error });
     }
-    throw new Error(`OCR runtime cache path has unsafe permissions: ${path}`, { cause: error });
+    chmodError = error;
   }
-  const hardened = await handle.stat({ bigint: true });
-  if (permissionMode(hardened) !== desiredMode) {
-    throw new Error(`OCR runtime cache path did not retain its required permissions: ${path}`);
+  const observed = await handle.stat({ bigint: true });
+  const observedMode = permissionMode(observed);
+  if (observedMode === desiredMode) return;
+  // Two ways to land here: EPERM/EACCES because a prior replica UID owns an
+  // inode shared through fsGroup or a volume ACL, or a chmod that reported
+  // success but did not stick because the volume ignores permission changes
+  // (SMB/CIFS and some FUSE mounts, NODE-AB). Both leave the same observed
+  // mode, so they get the same rule. Cache bytes are signed public release
+  // artifacts, so harmless other-read/execute bits are fine. Never accept
+  // other-write, a sticky ownership trap, or privilege special bits.
+  const forbiddenBits = observed.isDirectory() ? 0o5002 : 0o7002;
+  if ((observedMode & forbiddenBits) !== 0) {
+    throw new OcrRuntimeCachePermissionError(path, observedMode, chmodError);
+  }
+  // Opening proves the access used by file callers; for a directory,
+  // explicitly prove create/delete-class write + traversal access without
+  // leaving a crash-strandable probe inode behind.
+  if (observed.isDirectory()) {
+    await access(descriptorRoot(handle, path), fsConstants.W_OK | fsConstants.X_OK);
   }
 }
 
@@ -1456,6 +1528,8 @@ async function promotePartial(
   partialPath: string,
   finalPath: string,
   expected: RegularFileIdentity,
+  digest: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const descriptorIdentity = regularFileIdentity(await file.stat({ bigint: true }), partialPath);
   if (!sameFileIdentity(descriptorIdentity, expected)) {
@@ -1467,9 +1541,19 @@ async function promotePartial(
   const promoted = await existingRegularFileIdentity(finalPath);
   // POSIX filesystems may update ctime during rename, so verify the stable
   // object identity after promotion rather than the pre-rename metadata time.
-  if (promoted === null || !sameFileObject(promoted, expected)) {
-    throw new Error("OCR runtime partial archive changed while it was being promoted");
+  if (promoted !== null && sameFileObject(promoted, expected)) return;
+  // Some FUSE and network filesystems hand out a new inode number on rename,
+  // so a changed identity alone does not prove the bytes changed (NODE-AM).
+  // The signed digest is the real check: accept the promoted file only if it
+  // still hashes to it.
+  if (
+    promoted !== null &&
+    promoted.size === expected.size &&
+    (await verifyArchiveFile(finalPath, Number(expected.size), digest, signal))
+  ) {
+    return;
   }
+  throw new Error("OCR runtime partial archive changed while it was being promoted");
 }
 
 async function filesystemFreeBytes(path: string): Promise<bigint> {
@@ -1596,7 +1680,15 @@ async function downloadArchive(
         signal,
       );
       if (verifiedIdentity !== null) {
-        await promotePartial(cache, pinnedPartial.file, partialPath, finalPath, verifiedIdentity);
+        await promotePartial(
+          cache,
+          pinnedPartial.file,
+          partialPath,
+          finalPath,
+          verifiedIdentity,
+          digest,
+          signal,
+        );
         return finalPublicPath;
       }
       await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
@@ -1739,7 +1831,7 @@ async function downloadArchive(
         }
         throw new Error("OCR runtime archive failed SHA-256 verification");
       }
-      await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity);
+      await promotePartial(cache, file, partialPath, finalPath, verifiedIdentity, digest, signal);
       return finalPublicPath;
     } catch (error) {
       failed = true;

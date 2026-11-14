@@ -198,3 +198,5 @@ These codes exist in the server source for logs, telemetry, or Fastify's own err
 | `ETIMEDOUT` | Set on the timeout error for a GDPR export. The export fails, and it can be requested again. |
 | `FST_REQ_FILE_TOO_LARGE` | Fastify's code for an upload over the limit. Clients get a 413 with `PAYLOAD_TOO_LARGE`, or the route's own 413 message. |
 | `TARGET_SIZE_EXCEEDED` | Thrown when a target-size compression misses its target. The error has no status or code, so clients get a generic failure. |
+| `OCR_CACHE_PERMISSIONS` | Reported to error tracking as an operational fault when the AI data volume leaves the OCR runtime cache world-writable. The install job fails with a message that names the storage problem. |
+| `OCR_RUNTIME_UNREACHABLE` | Reported to error tracking as an operational fault when the server never reached huggingface.co to download the OCR runtime. The install job fails with a message about network access, `HTTPS_PROXY`, and offline import. |
