@@ -18,7 +18,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
+import { asInputErrorIfUndecodable, imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -834,6 +834,8 @@ export function registerCollage(app: FastifyInstance) {
         processedSize: finalBuffer.length,
       });
     } catch (err) {
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       if (err instanceof InputValidationError || isToolInputError(err)) {
         // Genuine bad input (e.g. an image whose dimensions or pixels won't
         // decode). The 422 here is the documented worker-error convention, not

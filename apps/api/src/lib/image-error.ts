@@ -38,6 +38,18 @@ function isImageSizeLimitError(err: unknown): err is Error {
   return isPixelSafetyError(err) || (err instanceof Error && ENCODER_SIZE_LIMIT.test(err.message));
 }
 
+/**
+ * The 400 a libvips size cap gets, or null for any other error. The wrappers
+ * below apply it; a custom route that answers from its own catch calls it
+ * there instead, before its generic 422 or rethrow (#4699).
+ */
+export function imageSizeLimitError(err: unknown): ToolInputError | null {
+  if (!isImageSizeLimitError(err)) return null;
+  // Classified as input, so this is the only line that keeps libvips' reason.
+  logger.info({ err, reason: err.message }, "oversized image result rejected");
+  return new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err });
+}
+
 /** User-facing reasons for an environmental errno, one constant per kind of fault. */
 export const DISK_ENVIRONMENT_MESSAGE =
   "The server couldn't write its temporary files: it's out of disk space or not allowed to write there.";
@@ -107,11 +119,8 @@ function wrapEncodeFailure<T>(
     const code = String((err as NodeJS.ErrnoException).code);
     throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
   }
-  if (isImageSizeLimitError(err)) {
-    // Classified as input, so this is the only line that keeps libvips' reason.
-    logger.info({ err, reason: err.message }, "oversized image result rejected");
-    throw new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err });
-  }
+  const tooLarge = imageSizeLimitError(err);
+  if (tooLarge) throw tooLarge;
   throw new SafeError(message, {
     kind: "bug",
     code: codeOf(settings),

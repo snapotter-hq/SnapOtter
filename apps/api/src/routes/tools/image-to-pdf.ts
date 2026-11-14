@@ -19,6 +19,7 @@ import {
   noteDecoderFallback,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
@@ -450,6 +451,8 @@ export function registerImageToPdfRoute(
       }
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");
       return reply.status(422).send({
         error: "PDF creation failed",

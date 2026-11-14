@@ -18,6 +18,7 @@ import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
@@ -685,8 +686,11 @@ export function registerPdfToImageRoute(
             ),
           );
 
+          const tooLarge = imageSizeLimitError(err);
           if (err instanceof PdfInputError) {
             errors.push({ filename: file.filename, error: err.message });
+          } else if (tooLarge) {
+            errors.push({ filename: file.filename, error: tooLarge.message });
           } else {
             request.log.error(
               { err, filename: file.filename, toolId: opts.toolId },
@@ -982,6 +986,8 @@ export function registerPdfToImageRoute(
         });
       }
       if (hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({
         error: "PDF conversion failed",

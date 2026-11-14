@@ -24,6 +24,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import {
   asInputErrorIfUndecodable,
+  imageSizeLimitError,
   PIXEL_LIMIT_IMAGE_MESSAGE,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
@@ -442,6 +443,8 @@ export function registerMemeGenerator(app: FastifyInstance) {
           error: err.message,
         });
       }
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       if (!isToolInputError(err)) {
         request.log?.error({ err, toolId: "meme-generator" }, "Meme generation failed");
       }

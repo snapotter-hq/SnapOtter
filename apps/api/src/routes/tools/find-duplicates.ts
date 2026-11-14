@@ -17,7 +17,7 @@ import {
   noteDecoderFallback,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
+import { asInputErrorIfUndecodable, imageSizeLimitError } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
@@ -434,6 +434,8 @@ export function registerFindDuplicates(app: FastifyInstance) {
       // as 503 and report it, the way the other custom routes do (#795, #1428, #2800).
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log?.warn({ err, toolId: "find-duplicates" }, "Duplicate detection failed");
       return reply.status(422).send({
         error: "Duplicate detection failed",
