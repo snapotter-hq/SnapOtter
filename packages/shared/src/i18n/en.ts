@@ -5631,6 +5631,15 @@ export const en = {
       INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "You can't remove every page. Keep at least one.",
       NESTING_TOO_DEEP: "This file is nested too deeply to convert.",
+      DOCUMENT_UNREADABLE:
+        "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.",
+      PDF_DAMAGED: "This PDF is damaged. Run it through the Repair PDF tool, then try again.",
+      PDF_PASSWORD_PROTECTED:
+        "This PDF is password-protected. Unlock it with the Unlock PDF tool, then try again.",
+      IMAGE_TOO_LARGE: "This image is too large to process. Reduce its dimensions and try again.",
+      RESULT_TOO_LARGE:
+        "The result these settings would produce is too large. Use a smaller image or settings that make a smaller result.",
+      NO_AUDIO_TRACK: "This file has no audio track. Choose a file with audio and try again.",
     },
     generic: "An error occurred",
     offline: "You're offline",

@@ -3,6 +3,7 @@ import {
   isSafeMessageError,
   isToolInputError,
   SafeError,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import type { Job } from "bullmq";
 import { reportError, safeFormatTag } from "../lib/error-report.js";
@@ -60,6 +61,10 @@ export function validationErrorFields(err: unknown): { code?: string; details?: 
   if (isSafeMessageError(err) && hasServerErrorStatus(err)) {
     return typeof err.code === "string" ? { code: err.code } : {};
   }
+  // An engine package can't import InputValidationError, so its input faults
+  // arrive as ToolInputErrors; their code reaches the row the same way (#4679).
+  const inputCode = toolInputErrorCode(err);
+  if (inputCode) return { code: inputCode };
   if (!(err instanceof Error) || err.name !== "InputValidationError") return {};
   const { code, details } = err as { code?: unknown; details?: unknown };
   return {

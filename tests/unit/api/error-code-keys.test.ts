@@ -4,7 +4,16 @@ import { join, resolve } from "node:path";
 import { en, SUPPORTED_LOCALES, TRANSLATION_LOADERS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
-const API_SRC = resolve(__dirname, "../../../apps/api/src");
+// Engine packages throw coded ToolInputErrors that reach the API's answers too
+// (#4679), so their sources count as emitting codes.
+const CODE_SOURCES = [
+  "apps/api/src",
+  "packages/shared/src",
+  "packages/doc-engine/src",
+  "packages/image-engine/src",
+  "packages/media-engine/src",
+  "packages/ai/src",
+].map((dir) => resolve(__dirname, "../../..", dir));
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -14,12 +23,12 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-// Every `code: "NAME"` literal the API can send, across all routes and helpers,
+// Every `code: "NAME"` literal the API can send, across all routes, helpers and engines,
 // plus self-named constants (`const NAME = "NAME"`) that routes hand to
 // InputValidationError's positional code argument.
 function emittedCodes(): Set<string> {
   const codes = new Set<string>();
-  for (const file of sourceFiles(API_SRC)) {
+  for (const file of CODE_SOURCES.flatMap(sourceFiles)) {
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(/code: "([A-Z_]+)"/g)) {
       codes.add(match[1]);

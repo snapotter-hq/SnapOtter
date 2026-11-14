@@ -2,6 +2,7 @@ import {
   isSafeMessageError,
   isToolInputError,
   PIXEL_LIMIT_IMAGE_MESSAGE,
+  pixelLimitImageError,
   SafeError,
   ToolInputError,
 } from "@snapotter/shared";
@@ -47,7 +48,7 @@ export function imageSizeLimitError(err: unknown): ToolInputError | null {
   if (!isImageSizeLimitError(err)) return null;
   // Classified as input, so this is the only line that keeps libvips' reason.
   logger.info({ err, reason: err.message }, "oversized image result rejected");
-  return new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err });
+  return new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err, code: "RESULT_TOO_LARGE" });
 }
 
 /** User-facing reasons for an environmental errno, one constant per kind of fault. */
@@ -226,7 +227,7 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
       "undecodable image input rejected",
     );
     if (isPixelSafetyError(probeErr)) {
-      return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
+      return pixelLimitImageError(err);
     }
     return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err });
   }

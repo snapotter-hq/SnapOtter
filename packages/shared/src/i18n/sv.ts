@@ -5708,6 +5708,17 @@ export const sv: TranslationKeys = {
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Du kan inte ta bort alla sidor. Behåll minst en.",
       NESTING_TOO_DEEP: "Den här filen är för djupt nästlad för att konverteras.",
+      DOCUMENT_UNREADABLE:
+        "Det gick inte att öppna dokumentet. Det kan vara skadat, lösenordsskyddat eller inte i det format som filändelsen anger.",
+      PDF_DAMAGED:
+        "Den här PDF-filen är skadad. Kör den genom verktyget Reparera PDF och försök sedan igen.",
+      PDF_PASSWORD_PROTECTED:
+        "Den här PDF-filen är lösenordsskyddad. Lås upp den med verktyget Lås upp PDF och försök sedan igen.",
+      IMAGE_TOO_LARGE:
+        "Bilden är för stor för att bearbetas. Minska dess dimensioner och försök igen.",
+      RESULT_TOO_LARGE:
+        "Resultatet av de här inställningarna skulle bli för stort. Använd en mindre bild eller inställningar som ger ett mindre resultat.",
+      NO_AUDIO_TRACK: "Den här filen har inget ljudspår. Välj en fil med ljud och försök igen.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",

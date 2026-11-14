@@ -9,6 +9,7 @@ import {
   type Section,
   TOOL_BUNDLE_MAP,
   TOOLS,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -595,7 +596,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               return reply.status(err.statusCode).send(body);
             }
             if (isToolInputError(err)) {
-              return reply.status(400).send({ error: err.message });
+              const code = toolInputErrorCode(err);
+              return reply.status(400).send({ error: err.message, ...(code && { code }) });
             }
             throw err;
           }

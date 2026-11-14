@@ -206,7 +206,10 @@ export async function convertDocument(
       );
       if ((noOutput as NodeJS.ErrnoException).code !== undefined) throw noOutput;
       if (SOURCE_NOT_LOADED.test(err)) {
-        throw new ToolInputError(UNREADABLE_DOCUMENT_MESSAGE, { cause: noOutput });
+        throw new ToolInputError(UNREADABLE_DOCUMENT_MESSAGE, {
+          cause: noOutput,
+          code: "DOCUMENT_UNREADABLE",
+        });
       }
       // Anything else is unexplained, so keep LibreOffice's own words with it
       // for triage (NODE-35 events carried no stderr at all).

@@ -5388,6 +5388,13 @@ export const zhCN: TranslationKeys = {
       INVALID_PAGE_RANGE: "该页码范围无效。请使用类似 1-3,5 的页码。",
       CANNOT_REMOVE_ALL_PAGES: "不能删除所有页面。请至少保留一页。",
       NESTING_TOO_DEEP: "此文件嵌套层级过深，无法转换。",
+      DOCUMENT_UNREADABLE:
+        "无法打开此文档。它可能已损坏、受密码保护，或者不是其扩展名所表示的格式。",
+      PDF_DAMAGED: "此 PDF 已损坏。请先用修复 PDF 工具处理，然后重试。",
+      PDF_PASSWORD_PROTECTED: "此 PDF 受密码保护。请先用解锁 PDF 工具解锁，然后重试。",
+      IMAGE_TOO_LARGE: "此图片太大，无法处理。请缩小尺寸后重试。",
+      RESULT_TOO_LARGE: "这些设置生成的结果太大。请使用更小的图片，或使用能生成更小结果的设置。",
+      NO_AUDIO_TRACK: "此文件没有音轨。请选择包含音频的文件后重试。",
     },
     generic: "发生错误",
     offline: "您已离线",

@@ -8,9 +8,9 @@ import {
   isSafeMessageError,
   isToolInputError,
   nvidiaDeviceVisible,
-  PIXEL_LIMIT_IMAGE_MESSAGE,
+  pixelLimitImageError,
   SafeError,
-  ToolInputError,
+  type ToolInputError,
 } from "@snapotter/shared";
 import {
   type GpuFramework,
@@ -267,7 +267,7 @@ const MISSING_WEIGHT_TEXT = /is missing and automatic downloads are disabled/i;
  */
 function sidecarFailure(message: string, exitCode: string | undefined): SafeError | ToolInputError {
   if (PIL_PIXEL_LIMIT_TEXT.test(message) && !PIL_PIXEL_WARNING_TEXT.test(message)) {
-    return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE);
+    return pixelLimitImageError();
   }
   if (CPU_LACKS_AVX_TEXT.test(message)) {
     return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });

@@ -5731,6 +5731,18 @@ export const ptBR: TranslationKeys = {
         "Esse intervalo de páginas não é válido. Use números de página como 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Você não pode remover todas as páginas. Mantenha pelo menos uma.",
       NESTING_TOO_DEEP: "Este arquivo tem aninhamento profundo demais para ser convertido.",
+      DOCUMENT_UNREADABLE:
+        "Não foi possível abrir este documento. Ele pode estar danificado, protegido por senha ou não estar no formato que a extensão indica.",
+      PDF_DAMAGED:
+        "Este PDF está danificado. Passe-o pela ferramenta Reparar PDF e tente novamente.",
+      PDF_PASSWORD_PROTECTED:
+        "Este PDF está protegido por senha. Desbloqueie-o com a ferramenta Desbloquear PDF e tente novamente.",
+      IMAGE_TOO_LARGE:
+        "Esta imagem é grande demais para ser processada. Reduza as dimensões e tente novamente.",
+      RESULT_TOO_LARGE:
+        "O resultado dessas configurações seria grande demais. Use uma imagem menor ou configurações que gerem um resultado menor.",
+      NO_AUDIO_TRACK:
+        "Este arquivo não tem faixa de áudio. Escolha um arquivo com áudio e tente novamente.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",

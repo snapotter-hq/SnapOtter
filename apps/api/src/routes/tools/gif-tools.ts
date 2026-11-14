@@ -3,6 +3,7 @@ import {
   hasServerErrorStatus,
   isSafeMessageError,
   isToolInputError,
+  pixelLimitImageError,
   SafeError,
   ToolInputError,
 } from "@snapotter/shared";
@@ -25,7 +26,6 @@ import {
 import {
   asInputErrorIfUndecodable,
   DESCRIPTOR_ENVIRONMENT_MESSAGE,
-  PIXEL_LIMIT_IMAGE_MESSAGE,
   UNDECODABLE_IMAGE_MESSAGE,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
@@ -102,7 +102,7 @@ async function inspectGifWorkload(inputBuffer: Buffer) {
     }
     logger.info({ err: rawErr }, "undecodable image input rejected");
     if (isPixelSafetyError(err)) {
-      throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawErr });
+      throw pixelLimitImageError(rawErr);
     }
     throw new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: rawErr });
   }

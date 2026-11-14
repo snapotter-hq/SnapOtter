@@ -5771,6 +5771,18 @@ export const de: TranslationKeys = {
       CANNOT_REMOVE_ALL_PAGES:
         "Sie können nicht alle Seiten entfernen. Behalten Sie mindestens eine.",
       NESTING_TOO_DEEP: "Diese Datei ist zu tief verschachtelt, um sie zu konvertieren.",
+      DOCUMENT_UNREADABLE:
+        "Dieses Dokument konnte nicht geöffnet werden. Es ist möglicherweise beschädigt, passwortgeschützt oder hat nicht das Format, das seine Endung angibt.",
+      PDF_DAMAGED:
+        "Dieses PDF ist beschädigt. Lass es durch das Tool „PDF reparieren“ laufen und versuche es dann erneut.",
+      PDF_PASSWORD_PROTECTED:
+        "Dieses PDF ist passwortgeschützt. Entsperre es mit dem Tool „PDF entsperren“ und versuche es dann erneut.",
+      IMAGE_TOO_LARGE:
+        "Dieses Bild ist zu groß für die Verarbeitung. Verringere seine Abmessungen und versuche es erneut.",
+      RESULT_TOO_LARGE:
+        "Das Ergebnis dieser Einstellungen wäre zu groß. Verwende ein kleineres Bild oder Einstellungen, die ein kleineres Ergebnis erzeugen.",
+      NO_AUDIO_TRACK:
+        "Diese Datei hat keine Audiospur. Wähle eine Datei mit Audio und versuche es erneut.",
     },
     generic: "Ein Fehler ist aufgetreten",
     offline: "Sie sind offline",

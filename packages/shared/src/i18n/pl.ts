@@ -5733,6 +5733,17 @@ export const pl: TranslationKeys = {
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",
       CANNOT_REMOVE_ALL_PAGES: "Nie możesz usunąć wszystkich stron. Zostaw co najmniej jedną.",
       NESTING_TOO_DEEP: "Ten plik jest zbyt głęboko zagnieżdżony, aby go przekonwertować.",
+      DOCUMENT_UNREADABLE:
+        "Nie udało się otworzyć tego dokumentu. Może być uszkodzony, chroniony hasłem albo nie mieć formatu wskazanego przez rozszerzenie.",
+      PDF_DAMAGED:
+        "Ten plik PDF jest uszkodzony. Przepuść go przez narzędzie Napraw PDF i spróbuj ponownie.",
+      PDF_PASSWORD_PROTECTED:
+        "Ten plik PDF jest chroniony hasłem. Odblokuj go narzędziem Odblokuj PDF i spróbuj ponownie.",
+      IMAGE_TOO_LARGE:
+        "Ten obraz jest za duży do przetworzenia. Zmniejsz jego wymiary i spróbuj ponownie.",
+      RESULT_TOO_LARGE:
+        "Wynik tych ustawień byłby za duży. Użyj mniejszego obrazu lub ustawień, które dają mniejszy wynik.",
+      NO_AUDIO_TRACK: "Ten plik nie ma ścieżki audio. Wybierz plik z dźwiękiem i spróbuj ponownie.",
     },
     generic: "Wystąpił błąd",
     offline: "Jesteś offline",

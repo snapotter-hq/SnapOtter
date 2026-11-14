@@ -5,6 +5,7 @@ import {
   hasServerErrorStatus,
   isToolInputError,
   markToolInputError,
+  pixelLimitImageError,
   ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
@@ -25,7 +26,6 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import {
   asInputErrorIfUndecodable,
   imageSizeLimitError,
-  PIXEL_LIMIT_IMAGE_MESSAGE,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
@@ -189,7 +189,7 @@ async function prepareMemeImage(
         if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
         if (isPixelSafetyError(rawProbeErr)) {
-          throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawProbeErr });
+          throw pixelLimitImageError(rawProbeErr);
         }
         log?.warn({ err: decodeErr, toolId: "meme-generator" }, "Decode failed");
         throw decodeErr instanceof Error
