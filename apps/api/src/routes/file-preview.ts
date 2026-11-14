@@ -23,7 +23,14 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
 import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
-import { connectivityClass, isClientAbort, isSafeMessageError, SafeError } from "@snapotter/shared";
+import {
+  connectivityClass,
+  isClientAbort,
+  isSafeMessageError,
+  MEDIA_PREVIEW_AUDIO_EXTS,
+  MEDIA_PREVIEW_VIDEO_EXTS,
+  SafeError,
+} from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
@@ -663,51 +670,8 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const ext = extname(filename).toLowerCase().replace(/^\./, "");
-      const videoExts = new Set([
-        "avi",
-        "mkv",
-        "wmv",
-        "flv",
-        "mov",
-        "mpg",
-        "mpeg",
-        "m4v",
-        "3gp",
-        "3g2",
-        "ts",
-        "mts",
-        "m2ts",
-        "vob",
-        "divx",
-        "asf",
-        "rm",
-        "rmvb",
-        "f4v",
-        "ogv",
-        "mp4",
-        "webm",
-        "ogg",
-      ]);
-      const audioExts = new Set([
-        "wav",
-        "flac",
-        "aac",
-        "wma",
-        "ogg",
-        "oga",
-        "opus",
-        "m4a",
-        "aiff",
-        "aif",
-        "amr",
-        "ape",
-        "ac3",
-        "dts",
-        "mp3",
-      ]);
-
-      const isVideo = videoExts.has(ext);
-      const isAudio = audioExts.has(ext);
+      const isVideo = MEDIA_PREVIEW_VIDEO_EXTS.has(ext);
+      const isAudio = MEDIA_PREVIEW_AUDIO_EXTS.has(ext);
 
       if (!isVideo && !isAudio) {
         return reply.status(400).send({ error: "Unsupported file type for preview" });
