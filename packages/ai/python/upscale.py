@@ -113,6 +113,45 @@ def realesrgan_failure_message(error: BaseException) -> str:
     return f"Real-ESRGAN is not available: {detail}. {remedy}, or use model=lanczos for basic upscaling."
 
 
+class TileInferenceError(Exception):
+    """Carries a model failure out of RealESRGANer.tile_process.
+
+    realesrgan 0.3.0 catches RuntimeError around each tile's forward pass, prints
+    it, and carries on: the first failed tile then raises UnboundLocalError on
+    output_tile, and a later one silently pastes the previous tile's pixels.
+    Raising something that is not a RuntimeError stops the loop so the real
+    error (usually CUDA out of memory) reaches the tile-size retry (NODE-AJ).
+    """
+
+    def __init__(self, original):
+        super().__init__(str(original))
+        self.original = original
+
+
+class PropagatingModel:
+    """Wraps the network so a RuntimeError in forward() escapes tile_process."""
+
+    def __init__(self, model):
+        self._model = model
+
+    def __call__(self, *args, **kwargs):
+        try:
+            return self._model(*args, **kwargs)
+        except RuntimeError as err:
+            raise TileInferenceError(err) from err
+
+    def __getattr__(self, name):
+        return getattr(self._model, name)
+
+
+def call_with_tile_errors(fn, *args, **kwargs):
+    """Call fn, re-raising a TileInferenceError as the model error it carries."""
+    try:
+        return fn(*args, **kwargs)
+    except TileInferenceError as err:
+        raise err.original from None
+
+
 def apply_denoise(img, strength):
     """Apply denoising to a PIL image. Uses OpenCV when available, falls back to PIL."""
     if strength <= 0:
@@ -222,6 +261,7 @@ def main():
                         half=use_gpu,
                         device=device,
                     )
+                    upsampler.model = PropagatingModel(upsampler.model)
                     emit_progress(20, "AI model loaded")
 
                     img_array = np.array(img.convert("RGB"))
@@ -234,22 +274,29 @@ def main():
 
                     def _enhance():
                         try:
-                            return upsampler.enhance(img_array, outscale=scale)
+                            return call_with_tile_errors(
+                                upsampler.enhance, img_array, outscale=scale
+                            )
                         except (RuntimeError, MemoryError, OSError) as oom_err:
                             if not is_oom_error(oom_err):
                                 raise
-                            retry_tile = fallback_tile_size(upsampler.tile)
-                            if retry_tile >= upsampler.tile:
+                            retry_tile = fallback_tile_size(upsampler.tile_size)
+                            if retry_tile >= upsampler.tile_size:
                                 raise
-                            if use_gpu:
-                                torch.cuda.empty_cache()
-                            print(
-                                f"[upscale] OOM with tile={upsampler.tile}, retrying with tile={retry_tile}",
-                                file=sys.stderr,
-                                flush=True,
-                            )
-                            upsampler.tile = retry_tile
-                            return upsampler.enhance(img_array, outscale=scale)
+                        # Retry after the handler exits: the caught error's
+                        # traceback pins the failed attempt's tensors, so
+                        # empty_cache() inside it frees little.
+                        if use_gpu:
+                            torch.cuda.empty_cache()
+                        print(
+                            f"[upscale] OOM with tile={upsampler.tile_size}, retrying with tile={retry_tile}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        upsampler.tile_size = retry_tile
+                        return call_with_tile_errors(
+                            upsampler.enhance, img_array, outscale=scale
+                        )
 
                     output_array, _ = run_with_heartbeat(
                         _enhance, emit_progress, 30, 80, "Enhancing image with AI"
@@ -282,8 +329,10 @@ def main():
                             channel_multiplier=2,
                             bg_upsampler=upsampler,
                         )
+                        face_retry_tile = None
                         try:
-                            _, _, face_output = face_enhancer.enhance(
+                            _, _, face_output = call_with_tile_errors(
+                                face_enhancer.enhance,
                                 img_array,
                                 has_aligned=False,
                                 only_center_face=False,
@@ -292,20 +341,22 @@ def main():
                         except (RuntimeError, MemoryError, OSError) as oom_err:
                             if not is_oom_error(oom_err):
                                 raise
-                            retry_tile = fallback_tile_size(upsampler.tile)
-                            if retry_tile >= upsampler.tile:
+                            face_retry_tile = fallback_tile_size(upsampler.tile_size)
+                            if face_retry_tile >= upsampler.tile_size:
                                 raise
+                        if face_retry_tile is not None:
                             if use_gpu:
                                 torch.cuda.empty_cache()
                             print(
-                                f"[upscale] OOM during face enhance, retrying with tile={retry_tile}",
+                                f"[upscale] OOM during face enhance, retrying with tile={face_retry_tile}",
                                 file=sys.stderr,
                                 flush=True,
                             )
                             emit_progress(84, "Retrying face enhancement")
-                            upsampler.tile = retry_tile
+                            upsampler.tile_size = face_retry_tile
                             face_enhancer.bg_upsampler = upsampler
-                            _, _, face_output = face_enhancer.enhance(
+                            _, _, face_output = call_with_tile_errors(
+                                face_enhancer.enhance,
                                 img_array,
                                 has_aligned=False,
                                 only_center_face=False,
@@ -390,7 +441,8 @@ def main():
         )
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
+        from sidecar_errors import describe_exception
+        print(json.dumps({"success": False, "error": describe_exception(e)}))
         sys.exit(1)
 
 
