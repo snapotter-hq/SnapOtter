@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { FfprobeTimeoutError, probeMedia } from "@snapotter/media-engine";
-import { SUBTITLE_INPUTS } from "@snapotter/shared";
+import { isEngineCrash, SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
@@ -86,6 +86,9 @@ export class MediaInputHandler implements InputHandler {
           converted.cause = err;
           throw converted;
         }
+        // ffprobe crashing is the engine's fault, not proof the upload is bad,
+        // so it stays a reported 500 (#4684).
+        if (isEngineCrash(err)) throw err;
         if (isFfprobeTimeout(err)) {
           throw new InputValidationError(
             `Could not inspect this ${this.kind} file within the time limit. It may be malformed; try a different file.`,

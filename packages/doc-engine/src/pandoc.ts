@@ -1,5 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
-import { markToolInputError, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  markToolInputError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 
 /** Resolve the pandoc binary, honoring PANDOC_PATH for parity with the other doc-engine wrappers. */
 function pandocBin(): string {
@@ -71,6 +76,8 @@ function stripGhcBacktrace(stderr: string): string {
     .replace(/\n{2,}/g, "\n")
     .trimEnd();
 }
+
+const PANDOC_CRASHED_MESSAGE = "The document engine (pandoc) crashed while processing this file.";
 
 function pandocSpawnFailure(
   bin: string,
@@ -170,6 +177,11 @@ export function runPandoc(
         return;
       }
       const cleanedErr = stripGhcBacktrace(err).slice(-1000);
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(PANDOC_CRASHED_MESSAGE, "pandoc", crashSignal, cleanedErr));
+        return;
+      }
       if (code === null || code === 126 || code === 127) {
         reject(pandocSpawnFailure(bin, code, signal, cleanedErr));
         return;

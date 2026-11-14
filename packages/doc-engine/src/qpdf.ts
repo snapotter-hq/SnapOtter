@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
-import { ToolInputError, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  ToolInputError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolveQpdf } from "./binaries.js";
 
 /**
@@ -13,6 +18,8 @@ export class QpdfTimeoutError extends Error {
     this.name = "QpdfTimeoutError";
   }
 }
+
+const QPDF_CRASHED_MESSAGE = "The document engine (qpdf) crashed while processing this file.";
 
 function qpdfSpawnFailure(
   bin: string,
@@ -134,6 +141,11 @@ export function runQpdf(
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, detail));
+        return;
+      }
       if (code === null || code === 126 || code === 127) {
         reject(qpdfSpawnFailure(bin, code, signal, detail));
         return;
@@ -214,6 +226,11 @@ export async function qpdfRequiresPassword(
       }
       if (code === 2 || code === 3) {
         resolvePromise(false);
+        return;
+      }
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, err));
         return;
       }
       if (code === null || code === 126 || code === 127) {

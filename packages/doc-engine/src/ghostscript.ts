@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import { engineCrashError, engineCrashSignal, wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolveGs } from "./binaries.js";
 
 export type PdfCompressionPreset = "screen" | "ebook" | "printer";
@@ -8,6 +8,8 @@ export interface GsOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
 }
+
+const GS_CRASHED_MESSAGE = "The document engine (Ghostscript) crashed while processing this file.";
 
 function gsSpawnFailure(
   bin: string,
@@ -72,6 +74,11 @@ function runGs(args: string[], opts: GsOptions = {}): Promise<void> {
       opts.signal?.removeEventListener("abort", onAbort);
       if (code === 0) {
         resolvePromise();
+        return;
+      }
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(GS_CRASHED_MESSAGE, "gs", crashSignal, err));
         return;
       }
       if (code === null || code === 126 || code === 127) {

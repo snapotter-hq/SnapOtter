@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfSignPy } from "@snapotter/doc-engine";
-import type { SignPlacement } from "@snapotter/shared";
+import { isEngineCrash, type SignPlacement } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -190,6 +190,9 @@ export function registerSignPdf(app: FastifyInstance) {
             ...(err.code && { code: err.code }),
           });
         }
+        // qpdf crashing is our bug, not a bad document: let it reach the error
+        // handler as a reported 500 (#4684).
+        if (isEngineCrash(err)) throw err;
         return reply.status(400).send({
           error: "Invalid PDF",
           details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

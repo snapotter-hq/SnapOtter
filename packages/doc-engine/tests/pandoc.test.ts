@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -274,17 +274,24 @@ describe("runPandoc", () => {
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
     h.nextClose({ stderr: "died\n", code: null, signal: "SIGABRT" });
-    await expect(
-      import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
-    ).rejects.toMatchObject({
+    const err = await import("../src/pandoc.js")
+      .then((m) => m.runPandoc("/in.md", "/out.html"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (pandoc) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
       message: "pandoc exited SIGABRT: died",
-      code: "ENOMEM",
-      syscall: "spawn",
-      path: "pandoc",
       signal: "SIGABRT",
     });
+    expect(isToolInputError(err)).toBe(false);
   });
 
   it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {

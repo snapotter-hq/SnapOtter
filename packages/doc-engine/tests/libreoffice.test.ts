@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -224,17 +224,21 @@ describe("convertDocument failure paths", () => {
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
     nextClose({ stderr: "crashed\n", code: null, signal: "SIGSEGV" });
-    await expect(
-      import("../src/libreoffice.js").then((m) =>
-        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
-      ),
-    ).rejects.toMatchObject({
+    const err = await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (LibreOffice) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
       message: "LibreOffice exited SIGSEGV: crashed",
-      code: "ENOMEM",
-      syscall: "spawn",
-      path: "/usr/bin/soffice",
       signal: "SIGSEGV",
     });
   });

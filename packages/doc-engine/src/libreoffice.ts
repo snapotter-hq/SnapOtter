@@ -4,13 +4,21 @@ import { access, constants, readdir, rm, statfs } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { ToolInputError, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  ToolInputError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
   timeoutMs?: number; // default 120s, spec 4.7 hard kill
   signal?: AbortSignal;
 }
+
+const LIBREOFFICE_CRASHED_MESSAGE =
+  "The document engine (LibreOffice) crashed while processing this file.";
 
 function libreofficeSpawnFailure(
   bin: string,
@@ -173,6 +181,11 @@ export async function convertDocument(
         opts.signal?.removeEventListener("abort", onAbort);
         if (code === 0) {
           resolvePromise();
+          return;
+        }
+        const crashSignal = engineCrashSignal(code, signal);
+        if (crashSignal) {
+          reject(engineCrashError(LIBREOFFICE_CRASHED_MESSAGE, "LibreOffice", crashSignal, err));
           return;
         }
         if (code === null || code === 126 || code === 127) {

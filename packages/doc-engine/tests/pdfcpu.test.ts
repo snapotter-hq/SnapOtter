@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { isSafeMessageError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -78,6 +79,25 @@ describe("runPdfcpu (shared runner via pdfcpuCropMargin)", () => {
       syscall: "spawn",
       path: "/usr/bin/pdfcpu",
       signal: "SIGKILL",
+    });
+  });
+
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
+    h.nextClose({ stderr: "panic\n", code: null, signal: "SIGBUS" });
+    const err = await import("../src/pdfcpu.js")
+      .then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (pdfcpu) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "pdfcpu exited SIGBUS: panic",
+      signal: "SIGBUS",
     });
   });
 
