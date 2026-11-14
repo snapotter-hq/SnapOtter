@@ -42,7 +42,9 @@ export type QpdfInputFault = "page-range" | "invalid-password";
 
 const QPDF_INPUT_FAULTS: ReadonlyArray<[RegExp, QpdfInputFault, string]> = [
   [/\bin numeric range\b/, "page-range", "The page range doesn't match this PDF's pages."],
-  [/: invalid password\s*$/m, "invalid-password", "The password for this PDF isn't correct."],
+  // Neutral wording: most callers never take a password, so "wrong password"
+  // would blame the user for one they didn't give. unlock-pdf says it itself.
+  [/: invalid password\s*$/m, "invalid-password", "This PDF is password-protected."],
 ];
 
 function qpdfInputError(code: number, detail: string): ToolInputError | undefined {
