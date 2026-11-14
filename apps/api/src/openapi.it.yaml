@@ -23901,7 +23901,7 @@ paths:
         '403':
           description: Permessi insufficienti
         '409':
-          description: Blocco di importazione in uso
+          description: Blocco di importazione in uso, oppure il bundle richiede AVX e questa CPU non lo supporta (codice FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Un file nell'importazione supera i 20 GiB. Questa rotta ha limiti di dimensione propri; `MAX_UPLOAD_SIZE_MB` non si applica.
         '507':
@@ -36282,9 +36282,9 @@ x-i18n:
       provenance: machine
       outputHash: fb4e0f9f7208
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 60051fe7dd31
+      outputHash: 867a866f996c
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

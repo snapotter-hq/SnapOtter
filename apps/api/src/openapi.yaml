@@ -23512,7 +23512,9 @@ paths:
         "403":
           description: Insufficient permissions
         "409":
-          description: Import lock is held
+          description: >-
+            Import lock is held, or the bundle needs AVX and this CPU lacks it
+            (code FEATURE_CPU_UNSUPPORTED)
         "413":
           description: >-
             A file in the import is over 20 GiB. This route has its own size

@@ -23812,7 +23812,7 @@ paths:
         '403':
           description: 權限不足
         '409':
-          description: 匯入鎖定中
+          description: 匯入鎖定中，或功能套件需要 AVX 而此 CPU 不支援（代碼 FEATURE_CPU_UNSUPPORTED）
         '413':
           description: 匯入中的某個檔案超過 20 GiB。此路由有自己的大小限制；`MAX_UPLOAD_SIZE_MB` 不適用於此路由。
         '507':
@@ -36192,9 +36192,9 @@ x-i18n:
       provenance: machine
       outputHash: eb28a63446b9
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 46b59b253567
+      outputHash: 70192ae4ed24
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

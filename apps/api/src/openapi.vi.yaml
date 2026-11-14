@@ -23899,7 +23899,7 @@ paths:
         '403':
           description: Không đủ quyền
         '409':
-          description: Khóa nhập đang được giữ
+          description: Khóa nhập đang được giữ, hoặc gói cần AVX mà CPU này không có (mã FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Một tệp trong lần nhập vượt quá 20 GiB. Route này có giới hạn kích thước riêng; `MAX_UPLOAD_SIZE_MB` không áp dụng cho route này.
         '507':
@@ -36280,9 +36280,9 @@ x-i18n:
       provenance: machine
       outputHash: fff9a603b779
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 3bb8adec80a7
+      outputHash: 6ea21d45b7ba
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

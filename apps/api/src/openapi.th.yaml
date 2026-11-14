@@ -23828,7 +23828,7 @@ paths:
         '403':
           description: สิทธิ์ไม่เพียงพอ
         '409':
-          description: มีการล็อกการนำเข้าอยู่
+          description: มีการล็อกการนำเข้าอยู่ หรือบันเดิลต้องใช้ AVX แต่ CPU นี้ไม่มี (รหัส FEATURE_CPU_UNSUPPORTED)
         '413':
           description: ไฟล์ในการนำเข้ามีขนาดเกิน 20 GiB เส้นทางนี้มีขีดจำกัดขนาดของตัวเอง `MAX_UPLOAD_SIZE_MB` ไม่มีผลกับเส้นทางนี้
         '507':
@@ -36209,9 +36209,9 @@ x-i18n:
       provenance: machine
       outputHash: 93ba20f8b72b
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: ddf9a8eed524
+      outputHash: 441d8fd3c549
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

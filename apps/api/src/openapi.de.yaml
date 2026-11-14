@@ -23897,7 +23897,7 @@ paths:
         '403':
           description: Unzureichende Berechtigungen
         '409':
-          description: Importsperre ist belegt
+          description: Importsperre ist belegt, oder das Bundle braucht AVX und dieser CPU fehlt es (Code FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Eine Datei im Import überschreitet 20 GiB. Für diese Route gelten eigene Größenlimits; `MAX_UPLOAD_SIZE_MB` gilt hier nicht.
         '507':
@@ -36278,9 +36278,9 @@ x-i18n:
       provenance: machine
       outputHash: 7ac016ee6747
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: cfd13d9d81ba
+      outputHash: 261bb456216e
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -23896,7 +23896,7 @@ paths:
         '403':
           description: Otillräckliga behörigheter
         '409':
-          description: Importlåset hålls
+          description: Importlåset hålls, eller paketet kräver AVX och den här processorn saknar det (kod FEATURE_CPU_UNSUPPORTED)
         '413':
           description: En fil i importen är större än 20 GiB. Den här rutten har egna storleksgränser; `MAX_UPLOAD_SIZE_MB` gäller inte för den.
         '507':
@@ -36277,9 +36277,9 @@ x-i18n:
       provenance: machine
       outputHash: 6e6142910cb9
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: ca80af1e2da4
+      outputHash: c47e6bba8205
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

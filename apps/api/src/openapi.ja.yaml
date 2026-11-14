@@ -23830,7 +23830,7 @@ paths:
         '403':
           description: 権限が不足しています
         '409':
-          description: インポートのロックが保持されています
+          description: インポートのロックが保持されているか、バンドルが AVX を必要とし、この CPU に AVX がありません（コード FEATURE_CPU_UNSUPPORTED）
         '413':
           description: インポート内のファイルのいずれかが 20 GiB を超えています。このルートには独自のサイズ上限があり、`MAX_UPLOAD_SIZE_MB` は適用されません。
         '507':
@@ -36211,9 +36211,9 @@ x-i18n:
       provenance: machine
       outputHash: d452a12f8f32
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 947d536542d1
+      outputHash: 03da7d87cf0e
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

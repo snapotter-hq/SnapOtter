@@ -58,6 +58,7 @@ import {
 import {
   acquireInstallLock,
   advanceAiMutationEpoch,
+  CPU_NO_AVX_INSTALL_MESSAGE,
   cleanupInterruptedFeatureImports,
   getAiDir,
   getAiMutationEpoch,
@@ -68,6 +69,7 @@ import {
   getInstallScriptPath,
   getManifestPath,
   getModelsDir,
+  ImportHostUnsupportedError,
   ImportLockError,
   ImportValidationError,
   importBundleArchive,
@@ -868,9 +870,6 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
   return null;
 }
 
-export const CPU_NO_AVX_INSTALL_MESSAGE =
-  "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.";
-
 /**
  * Refuse to install a bundle this host can't run, before anything is
  * downloaded (#4680).
@@ -1536,6 +1535,19 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         ) {
           reply.status(409);
           return { error: errorMessage };
+        }
+        if (
+          err instanceof ImportHostUnsupportedError ||
+          (err instanceof Error && err.name === "ImportHostUnsupportedError")
+        ) {
+          const { bundleId, reason } = err as ImportHostUnsupportedError;
+          reply.status(409);
+          return {
+            error: CPU_NO_AVX_INSTALL_MESSAGE,
+            code: "FEATURE_CPU_UNSUPPORTED",
+            feature: bundleId,
+            reason,
+          };
         }
         if (
           err instanceof ImportValidationError ||
