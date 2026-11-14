@@ -127,8 +127,8 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
   // GET /api/v1/enterprise/webhooks -- list all destinations
   app.get("/api/v1/enterprise/webhooks", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("webhooks:manage")(request, reply);
-    if (!user) return;
-    if (!(await checkFeatureGate(reply))) return;
+    if (!user) return reply;
+    if (!(await checkFeatureGate(reply))) return reply;
 
     const destinations = await readDestinations();
 
@@ -146,8 +146,8 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/enterprise/webhooks",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
-      if (!(await checkFeatureGate(reply))) return;
+      if (!user) return reply;
+      if (!(await checkFeatureGate(reply))) return reply;
 
       const parsed = webhookSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -157,7 +157,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       }
 
       const dest = { ...parsed.data };
-      if (!(await validateWebhookDestinationUrl(dest.url, reply))) return;
+      if (!(await validateWebhookDestinationUrl(dest.url, reply))) return reply;
 
       // Encrypt the auth header before storage
       if (dest.authHeader && env.DATA_ENCRYPTION_KEY) {
@@ -188,8 +188,8 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
-      if (!(await checkFeatureGate(reply))) return;
+      if (!user) return reply;
+      if (!(await checkFeatureGate(reply))) return reply;
 
       const index = parseInt(request.params.index, 10);
       if (Number.isNaN(index) || index < 0) {
@@ -209,7 +209,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       }
 
       const dest = { ...parsed.data };
-      if (!(await validateWebhookDestinationUrl(dest.url, reply))) return;
+      if (!(await validateWebhookDestinationUrl(dest.url, reply))) return reply;
 
       // GET masks a non-empty authHeader as "***"; preserve the stored secret
       // when a client echoes the mask back on update (#2531), rotating it to
@@ -260,8 +260,8 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/enterprise/webhooks/:index",
     async (request: FastifyRequest<{ Params: { index: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
-      if (!(await checkFeatureGate(reply))) return;
+      if (!user) return reply;
+      if (!(await checkFeatureGate(reply))) return reply;
 
       const index = parseInt(request.params.index, 10);
       if (Number.isNaN(index) || index < 0) {
@@ -293,8 +293,8 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/enterprise/webhooks/:index/test",
     async (request: FastifyRequest<{ Params: { index: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
-      if (!(await checkFeatureGate(reply))) return;
+      if (!user) return reply;
+      if (!(await checkFeatureGate(reply))) return reply;
 
       const index = parseInt(request.params.index, 10);
       if (Number.isNaN(index) || index < 0) {

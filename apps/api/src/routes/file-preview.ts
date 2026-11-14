@@ -369,7 +369,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -656,7 +656,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       // the same grant as running a tool. This used to call getAuthUser and discard
       // the result, leaving it open to any authenticated principal no matter what
       // the operator had scoped them down to.
-      if (!(await requirePermission("tools:use")(request, reply))) return;
+      if (!(await requirePermission("tools:use")(request, reply))) return reply;
 
       const parts = request.parts();
       let fileBuffer: Buffer | null = null;

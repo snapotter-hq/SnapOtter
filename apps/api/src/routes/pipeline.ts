@@ -363,7 +363,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       return withRouteScratch("pipeline", async (scratchDir) => {
         const ingressAbort = new AbortController();
@@ -1044,7 +1044,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const body = request.body as unknown;
       const result = savePipelineSchema.safeParse(body);
@@ -1133,7 +1133,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Admins see all pipelines; regular users see their own + legacy (no owner)
       const allRows = await db.select().from(schema.pipelines);
@@ -1163,7 +1163,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -1216,7 +1216,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       return withRouteScratch("pipeline-batch", async (scratchDir) => {
         const ingressAbort = new AbortController();

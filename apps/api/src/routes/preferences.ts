@@ -22,7 +22,7 @@ export async function preferencesRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const rows = await db
         .select()
@@ -43,7 +43,7 @@ export async function preferencesRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = putSchema.safeParse(request.body ?? {});
       if (!parsed.success) {

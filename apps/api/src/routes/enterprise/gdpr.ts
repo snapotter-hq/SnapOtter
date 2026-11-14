@@ -127,7 +127,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/enterprise/users/:id/export",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("compliance:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
@@ -199,7 +199,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("compliance:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
@@ -264,7 +264,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("compliance:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");
@@ -359,7 +359,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("compliance:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("gdpr_lifecycle");

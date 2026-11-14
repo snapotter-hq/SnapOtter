@@ -622,7 +622,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Check enterprise feature gate
       const mfaLicensed = await isEnterpriseFeatureEnabled("mfa");
@@ -687,7 +687,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = verifyCodeSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1405,7 +1405,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = disableSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1465,7 +1465,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
 

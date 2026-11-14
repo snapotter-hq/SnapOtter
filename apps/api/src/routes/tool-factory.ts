@@ -299,7 +299,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
     { config: { rateLimit: toolRateLimit } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = await requireToolAccess(request, reply, config.toolId);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       const jobId = randomUUID();
       const maxInputs = config.maxInputs ?? 1;

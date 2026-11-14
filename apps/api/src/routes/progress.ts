@@ -1060,7 +1060,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       // /api/v1/jobs/ is a public prefix, so this route checks for itself.
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const requestedJobId = request.params.jobId;
       // The stream's id. A batch started with a clientJobId runs and

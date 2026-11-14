@@ -31,14 +31,14 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/admin/log-level
   app.get("/api/v1/admin/log-level", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
     return { level: app.log.level };
   });
 
   // POST /api/v1/admin/log-level
   app.post("/api/v1/admin/log-level", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
     const parsed = logLevelSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({
@@ -55,14 +55,14 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
   // Answers { latest: null } when analytics is off or nothing newer exists.
   app.get("/api/v1/admin/latest-release", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
     return { latest: await getNewerRelease() };
   });
 
   // GET /api/v1/metrics -- Prometheus scrape endpoint
   app.get("/api/v1/metrics", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("system:health")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
     const text = await metricsText();
     return reply.type("text/plain; version=0.0.4").send(text);
   });
@@ -70,7 +70,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/admin/support-bundle -- download diagnostic zip
   app.get("/api/v1/admin/support-bundle", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("system:health")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
     const date = new Date().toISOString().slice(0, 10);
     const stream = buildSupportBundle();
     return reply
@@ -93,7 +93,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/v1/admin/usage", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("audit:read")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const parsed = usageQuerySchema.safeParse(request.query);
     if (!parsed.success) {
@@ -262,7 +262,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/admin/backup-status -- record backup completion
   app.post("/api/v1/admin/backup-status", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("system:health")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const parsed = backupStatusSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -289,7 +289,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/admin/backup-status -- read last backup info + staleness
   app.get("/api/v1/admin/backup-status", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("system:health")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const result = await db
       .select({ value: schema.settings.value })

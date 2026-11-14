@@ -40,7 +40,7 @@ export async function registerAuditExport(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requirePermission("audit:read")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Check enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("audit_export");

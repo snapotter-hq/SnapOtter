@@ -57,7 +57,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/teams — List all teams with member count (admin only)
   app.get("/api/v1/teams", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("teams:manage")(request, reply);
-    if (!user) return;
+    if (!user) return reply;
 
     const teams = await db
       .select({
@@ -81,7 +81,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/v1/teams — Create team (admin only)
   app.post("/api/v1/teams", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("teams:manage")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const parsed = createTeamSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -136,7 +136,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/teams/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("teams:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
 
@@ -205,7 +205,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/teams/:id",
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("teams:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
 
