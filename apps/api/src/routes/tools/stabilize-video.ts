@@ -38,10 +38,9 @@ function faststartArgs(ext: string): string[] {
  * frame every time (#4371). libvidstab through 1.1.2 keeps a pointer to the
  * caller's buffer after a read-only frame, then memcpys the next writable
  * frame into it, so it segfaults in vsFrameCopy once that buffer is reused or
- * freed (georgmartius/vid.stab#144, fixed after 1.1.2). Whether a decoded
- * frame arrives writable depends on thread timing: on a loaded host it
- * crashed in 6 to 39 of every 40 runs depending on the codecs, and in none
- * of 240 with `copy` in front.
+ * freed, and corrupts frames when it doesn't (georgmartius/vid.stab#144, fixed
+ * after 1.1.2). Whether a decoded frame arrives writable depends on thread
+ * timing, which is why the crash looked intermittent.
  */
 export function vidstabTransformFilter(trf: string, smoothing: number): string {
   return `copy,vidstabtransform=input=${trf}:smoothing=${smoothing}`;
