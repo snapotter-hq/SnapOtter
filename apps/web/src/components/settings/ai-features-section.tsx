@@ -569,14 +569,18 @@ function BundleCard({
           )}
           {status === "installed" && !confirming && (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onReinstall}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                {t.settings.aiFeatures.repair}
-              </button>
+              {/* Repair reinstalls, and the server refuses that install here,
+                  so it would only leave the bundle uninstalled (#4680). */}
+              {!cpuUnsupported && (
+                <button
+                  type="button"
+                  onClick={onReinstall}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {t.settings.aiFeatures.repair}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setConfirming(true)}

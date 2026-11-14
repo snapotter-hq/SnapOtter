@@ -872,10 +872,17 @@ export const CPU_NO_AVX_INSTALL_MESSAGE =
   "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.";
 
 /**
- * Refuse a bundle this host can't run before anything is downloaded (#4680).
+ * Refuse to install a bundle this host can't run, before anything is
+ * downloaded (#4680).
  * Returns true when it sent the refusal.
  */
 function refuseHostUnsupportedBundle(bundleId: string, reply: FastifyReply): boolean {
+  // A healthy install from before the gate keeps its usual answer (already
+  // installed, or skipped by a tool install): that request downloads nothing.
+  // A broken one would be downloaded again, so it is refused like a new one.
+  if (isFeatureInstalled(bundleId) && (bundleId === "ocr" || !verifyBundleModels(bundleId))) {
+    return false;
+  }
   const reason = getBundleHostUnsupportedReason(bundleId);
   if (!reason) return false;
   reply.status(409).send({

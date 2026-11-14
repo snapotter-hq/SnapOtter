@@ -2,9 +2,10 @@
  * Bundles whose x86-64 wheels need AVX are refused before any download on a
  * CPU without it, and the feature status says why (#4680).
  */
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const hoisted = vi.hoisted(() => {
   // feature-status reads DATA_DIR at import, so it is set before any import.
@@ -54,7 +55,10 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
 
 import {
   getBundleHostUnsupportedReason,
+  getModelsDir,
   type Manifest,
+  markInstalled,
+  markUninstalled,
 } from "../../../apps/api/src/lib/feature-status.js";
 import { registerFeatureRoutes } from "../../../apps/api/src/routes/features.js";
 
@@ -88,7 +92,7 @@ describe("feature routes on a CPU without AVX (#4680)", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    mkdirSync(hoisted.dataDir, { recursive: true });
+    mkdirSync(join(hoisted.dataDir, "ai"), { recursive: true });
     app = Fastify({ logger: false });
     await registerFeatureRoutes(app);
   });
@@ -172,5 +176,67 @@ describe("feature routes on a CPU without AVX (#4680)", () => {
     });
     expect(res.statusCode).not.toBe(409);
     expect(hoisted.reserveFeatureInstallStream).toHaveBeenCalledTimes(1);
+  });
+
+  describe("a face-detection install from before the gate", () => {
+    // face-detection's two models, at their manifest minimum sizes.
+    const models = [
+      ["mediapipe/blaze_face_short_range.tflite", 100_000],
+      ["mediapipe/face_landmarker.task", 1_000_000],
+    ] as const;
+
+    function writeModels() {
+      for (const [path, size] of models) {
+        const full = join(getModelsDir(), path);
+        mkdirSync(dirname(full), { recursive: true });
+        writeFileSync(full, "");
+        truncateSync(full, size);
+      }
+    }
+
+    beforeEach(() => {
+      rmSync(getModelsDir(), { recursive: true, force: true });
+      markInstalled("face-detection", "test", []);
+    });
+
+    afterEach(() => {
+      markUninstalled("face-detection");
+      rmSync(getModelsDir(), { recursive: true, force: true });
+    });
+
+    it("keeps the already-installed answer when it is healthy", async () => {
+      writeModels();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/features/face-detection/install",
+      });
+      expect(res.statusCode, res.body).toBe(409);
+      expect(res.json().code).not.toBe("FEATURE_CPU_UNSUPPORTED");
+      expect(res.json().error).toMatch(/already installed/);
+    });
+
+    it("lets a tool install skip it and go on to the bundle that can install", async () => {
+      writeModels();
+      hoisted.reserveFeatureInstallStream.mockRejectedValueOnce(new Error("stop here"));
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/tools/passport-photo/features/install",
+      });
+      expect(res.json().code).not.toBe("FEATURE_CPU_UNSUPPORTED");
+      expect(hoisted.reserveFeatureInstallStream).toHaveBeenCalledTimes(1);
+      expect(hoisted.reserveFeatureInstallStream).toHaveBeenCalledWith(
+        expect.objectContaining({ bundleId: "background-removal" }),
+      );
+    });
+
+    it("refuses it when its models are missing, since that install would download again", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/features/face-detection/install",
+      });
+      expect(res.statusCode, res.body).toBe(409);
+      expect(res.json().code).toBe("FEATURE_CPU_UNSUPPORTED");
+      expect(hoisted.reserveFeatureInstallStream).not.toHaveBeenCalled();
+    });
   });
 });
