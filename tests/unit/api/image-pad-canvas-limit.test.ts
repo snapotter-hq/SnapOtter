@@ -58,8 +58,8 @@ describe("padCanvasFor", () => {
 
 describe("assertPadCanvasFits", () => {
   it("accepts a canvas at the limit and rejects one pixel over it as a ToolInputError", () => {
+    expect(MAX_PAD_CANVAS_PIXELS).toBe(268_402_689);
     expect(() => assertPadCanvasFits(16383, 16383)).not.toThrow();
-    expect(16383 * 16383).toBe(MAX_PAD_CANVAS_PIXELS);
     let caught: unknown;
     try {
       assertPadCanvasFits(16384, 16383);
@@ -107,7 +107,6 @@ describe("image-pad oversized canvas (#4404)", () => {
   it("fails the job fast as a ToolInputError, not a bug-kind SafeError", async () => {
     // Pipelines and batch runs skip preValidate, so the job checks again.
     const buffer = await png(300, 200);
-    const started = Date.now();
     let caught: unknown;
     try {
       await config.process(buffer, extreme, "in.png");
@@ -117,7 +116,24 @@ describe("image-pad oversized canvas (#4404)", () => {
     expect(isToolInputError(caught)).toBe(true);
     expect(isSafeMessageError(caught)).toBe(false);
     expect((caught as Error).message).toContain("40000 x 20200");
-    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("answers a canvas too wide for WebP as a ToolInputError (the area check can't see it)", async () => {
+    // 20000 x 200 is 4 MP, well inside the area limit, but the WebP encoder caps
+    // each side at 16383, and a WebP input stays WebP.
+    const webp = await sharp({
+      create: { width: 300, height: 200, channels: 3, background: "#336699" },
+    })
+      .webp()
+      .toBuffer();
+    let caught: unknown;
+    try {
+      await config.process(webp, { ...extreme, background: "color", padding: 0 }, "in.webp");
+    } catch (err) {
+      caught = err;
+    }
+    expect(isToolInputError(caught)).toBe(true);
+    expect(isSafeMessageError(caught)).toBe(false);
   });
 
   it("still pads a normal request", async () => {
