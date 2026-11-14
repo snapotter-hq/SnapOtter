@@ -130,7 +130,12 @@ describe("reportRenderError", () => {
       // A document that really unloads never runs this timer. One that is
       // still here after the window stayed, so the failure was genuine.
       window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
-      const error = abortedImport("Importing a module script failed.");
+      // A chunk that never arrived is not reported at all (#4668), so this
+      // one arrived and threw while evaluating.
+      const error = new ReferenceError("Iterator is not defined");
+      window.dispatchEvent(
+        Object.assign(new Event("vite:preloadError", { cancelable: true }), { payload: error }),
+      );
 
       reportRenderError(error, { componentStack: "\n    at Lazy" });
       await vi.advanceTimersByTimeAsync(LEAVING_WINDOW_MS);
@@ -142,8 +147,61 @@ describe("reportRenderError", () => {
     });
   });
 
-  it("still reports a chunk failure outside a leave (a real stale deploy)", async () => {
-    const error = abortedImport("Importing a module script failed.");
+  // WEB-2P: the handler reloads for the first failure, and the boundary sees
+  // the rethrown error a moment before the reload lands.
+  it("sends nothing for the failure the page is reloading for", async () => {
+    sessionStorage.clear();
+    uninstall();
+    const reload = vi.fn();
+    uninstall = installChunkReloadHandler(reload);
+    const error = abortedImport("Failed to fetch dynamically imported module: /assets/a.js");
+
+    reportRenderError(error, { componentStack: "\n    at Lazy" });
+    await settle();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(captureReactException).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  // WEB-2R/WEB-8/WEB-1: the reload guard is spent, or the server is down, and
+  // the chunk still won't load. The error screen shows; Sentry hears nothing.
+  it("sends nothing for a chunk that still won't load after the guarded reload", async () => {
+    abortedImport("Importing a module script failed.");
+    const error = abortedImport("error loading dynamically imported module: /assets/a.js");
+
+    reportRenderError(error, { componentStack: "\n    at Lazy" });
+    await settle();
+
+    expect(captureReactException).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalled();
+    // The user still saw the error screen, so the analytics crash count has it.
+    expect(track).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a chunk aborted while leaving, then counts it without Sentry", async () => {
+    vi.useFakeTimers();
+    try {
+      window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+      const error = abortedImport("Importing a module script failed.");
+
+      reportRenderError(error, { componentStack: "\n    at Lazy" });
+      await vi.advanceTimersByTimeAsync(LEAVING_WINDOW_MS);
+
+      expect(track).toHaveBeenCalledTimes(1);
+      expect(captureReactException).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // WEB-2Q: the chunk arrived and threw while evaluating. That is a real crash.
+  it("still reports a module that loaded and then threw", async () => {
+    abortedImport("Importing a module script failed.");
+    const error = new ReferenceError("Iterator is not defined");
+    window.dispatchEvent(
+      Object.assign(new Event("vite:preloadError", { cancelable: true }), { payload: error }),
+    );
 
     reportRenderError(error, { componentStack: "\n    at Lazy" });
     await settle();

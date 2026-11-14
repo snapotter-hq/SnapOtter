@@ -20,6 +20,8 @@ import {
   CHUNK_RELOAD_GUARD_MS,
   installChunkReloadHandler,
   isAbortedByLeaving,
+  isChunkLoadFailure,
+  isReloadingFor,
   LEAVING_WINDOW_MS,
   quietImport,
 } from "@/lib/chunk-reload";
@@ -58,12 +60,61 @@ describe("installChunkReloadHandler", () => {
     vi.useRealTimers();
   });
 
-  it("reloads once on a chunk preload error and marks the event handled", () => {
-    const event = fireChunkError();
+  it("reloads once on a chunk preload error and lets Vite rethrow it", () => {
+    const stale = new TypeError("Failed to fetch dynamically imported module: /assets/a.js");
+    const event = fireChunkErrorWith(stale);
 
     expect(reload).toHaveBeenCalledTimes(1);
-    // preventDefault stops Vite from rethrowing the error into the boundary.
-    expect(event.defaultPrevented).toBe(true);
+    // preventDefault would make Vite resolve the import with undefined, and
+    // React's lazy() then crashed on "reading 'default'" (WEB-2P, #4668).
+    expect(event.defaultPrevented).toBe(false);
+    expect(isReloadingFor(stale)).toBe(true);
+  });
+
+  it("does not mark an error it left to the boundary as reloading", () => {
+    fireChunkError();
+    const second = new TypeError("Importing a module script failed.");
+    fireChunkErrorWith(second);
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(isReloadingFor(second)).toBe(false);
+  });
+
+  describe("isChunkLoadFailure (#4668)", () => {
+    it.each([
+      "Failed to fetch dynamically imported module: /assets/tool-page-x.js",
+      "error loading dynamically imported module: /assets/tool-page-x.js",
+      "Importing a module script failed.",
+      "Unable to preload CSS for /assets/tool-page-x.css",
+    ])("recognises the load failure %s", (message) => {
+      const error = new TypeError(message);
+      fireChunkErrorWith(error);
+      expect(isChunkLoadFailure(error)).toBe(true);
+    });
+
+    it("recognises one raised while a quiet import is in flight or the page is leaving", async () => {
+      const quiet = new TypeError("Importing a module script failed.");
+      await quietImport(async () => {
+        fireChunkErrorWith(quiet);
+      });
+      startLeaving();
+      const leaving = new TypeError("Importing a module script failed.");
+      fireChunkErrorWith(leaving);
+
+      expect(isChunkLoadFailure(quiet)).toBe(true);
+      expect(isChunkLoadFailure(leaving)).toBe(true);
+    });
+
+    it("does not count a module that loaded and then threw while evaluating", () => {
+      const evaluation = new ReferenceError("Iterator is not defined");
+      fireChunkErrorWith(evaluation);
+      expect(isChunkLoadFailure(evaluation)).toBe(false);
+    });
+
+    it("does not count the same message when Vite never reported it", () => {
+      expect(isChunkLoadFailure(new TypeError("Importing a module script failed."))).toBe(false);
+      expect(isChunkLoadFailure("Importing a module script failed.")).toBe(false);
+    });
   });
 
   it("does not reload again within the guard window (broken server, not an update)", () => {
