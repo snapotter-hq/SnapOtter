@@ -74,15 +74,16 @@ function hasDevServerFrames(event: AnyEvent): boolean {
  * replace text nodes React still owns, and React's next insertBefore or
  * removeChild next to one throws NotFoundError (WEB-2V/2T/2N/1G,
  * facebook/react#11538). A real portal bug throws the same error, so the
- * message alone isn't enough (#845): drop it only when a translator left its
+ * error alone isn't enough (#845): drop it only when a translator left its
  * mark, in the click breadcrumbs or on <html>.
  */
 const TRANSLATOR_SELECTOR = /(^|[\s>])(font|ya-tr-span)([\s>.#[:]|$)/;
 const TRANSLATED_HTML_CLASSES = ["translated-ltr", "translated-rtl"];
 
 function isTranslatorDomCrash(event: AnyEvent, error: unknown): boolean {
+  // Any NotFoundError: Safari words it "The object can not be found here.",
+  // naming neither method. The translator trace is what narrows it.
   if (!(error instanceof Error) || error.name !== "NotFoundError") return false;
-  if (!/\b(insertBefore|removeChild)\b/.test(error.message)) return false;
   const html = typeof document === "undefined" ? undefined : document.documentElement;
   if (html && TRANSLATED_HTML_CLASSES.some((c) => html.classList.contains(c))) return true;
   const crumbs = event.breadcrumbs;

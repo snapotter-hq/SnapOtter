@@ -338,6 +338,14 @@ describe("page-translation reconciliation crashes", () => {
     }
   });
 
+  it("drops Safari's wording of the same crash on a translated page", () => {
+    const send = buildWebBeforeSend(() => true);
+    const err = new DOMException("The object can not be found here.", "NotFoundError");
+    expect(
+      send(eventWith([{ category: "ui.click", message: "font" }]), { originalException: err }),
+    ).toBeNull();
+  });
+
   it("keeps the crash when nothing points at a translator", () => {
     const send = buildWebBeforeSend(() => true);
     const event = eventWith([
