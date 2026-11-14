@@ -10,6 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
 import {
@@ -107,6 +108,19 @@ function injectTraceContextIntoFlow(node: FlowJob): void {
       injectTraceContextIntoFlow(child);
     }
   }
+}
+
+// fs.readFile refuses a single read over 2 GiB (ERR_FS_FILE_TOO_LARGE), and
+// MAX_UPLOAD_SIZE_MB=0 lets a video that large through (Sentry NODE-AV). A
+// bigger spooled file is read as a stream instead, the way the single-file
+// route's getObjectBuffer reads it, since Buffer itself has no 2 GiB cap.
+const READ_FILE_MAX_BYTES = 2 ** 31 - 1;
+
+async function readSpooledFile(file: SpooledMultipartFile): Promise<Buffer> {
+  if (file.size <= READ_FILE_MAX_BYTES) return readFile(file.path);
+  const chunks: Buffer[] = [];
+  for await (const chunk of createReadStream(file.path)) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
 }
 
 export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
@@ -499,7 +513,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             } else {
               let processBuffer: Buffer;
               try {
-                processBuffer = await readFile(file.path).catch((err: unknown) => {
+                processBuffer = await readSpooledFile(file).catch((err: unknown) => {
                   throw asDecoderOutOfMemory(err);
                 });
               } finally {
