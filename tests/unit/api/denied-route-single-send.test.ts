@@ -112,6 +112,20 @@ const ROUTES = [
 ] as const;
 
 describe("denied requests send once", () => {
+  it.each([
+    ["GET", "/api/v1/scim/v2/Users"],
+    ["POST", "/api/v1/scim/v2/Users"],
+  ] as const)(
+    "scimAuth in preParsing on %s %s answers 401 once without a bearer",
+    async (method, url) => {
+      logLines.length = 0;
+      const res = await app.inject({ method, url, payload: method === "POST" ? {} : undefined });
+      expect(res.statusCode).toBe(401);
+      expect(res.headers["x-test-hook"]).toBe("1");
+      expect(await settledDoubleSends()).toEqual([]);
+    },
+  );
+
   it.each(ROUTES)("%s on %s %s answers 401 once without a session", async (_h, method, url) => {
     logLines.length = 0;
     const res = await app.inject({ method, url, payload: method === "POST" ? {} : undefined });
