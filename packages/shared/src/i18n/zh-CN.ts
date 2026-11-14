@@ -5406,6 +5406,8 @@ export const zhCN: TranslationKeys = {
       REMOTE_RESOURCES_DISABLED:
         "此文件会从互联网加载图片或样式，而此服务器不允许这样做。请将它们嵌入文件后重试。",
       TOO_MANY_PIXELS: "此动画所有帧的像素总数过多。请使用更少的帧或更小的尺寸。",
+      MEDIA_UNDECODABLE:
+        "无法读取此文件。文件可能已损坏、没有音频或视频流，或使用了此工具不支持的格式。",
     },
     generic: "发生错误",
     offline: "您已离线",

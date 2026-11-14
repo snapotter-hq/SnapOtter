@@ -163,7 +163,7 @@ async function prepareMemeImage(
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       log?.warn({ err, toolId: "meme-generator" }, "Decode failed");
       throw err instanceof Error
-        ? markToolInputError(err)
+        ? markToolInputError(err, "IMAGE_UNDECODABLE")
         : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
     }
   }
@@ -195,7 +195,7 @@ async function prepareMemeImage(
         }
         log?.warn({ err: decodeErr, toolId: "meme-generator" }, "Decode failed");
         throw decodeErr instanceof Error
-          ? markToolInputError(decodeErr)
+          ? markToolInputError(decodeErr, "IMAGE_UNDECODABLE")
           : new ToolInputError(String(decodeErr), { code: "IMAGE_UNDECODABLE" });
       }
     }

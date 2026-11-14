@@ -5761,6 +5761,8 @@ export const ptBR: TranslationKeys = {
         "Este arquivo carrega imagens ou estilos da internet, o que este servidor não permite. Incorpore-os ao arquivo e tente novamente.",
       TOO_MANY_PIXELS:
         "Esta animação tem pixels demais somando todos os quadros. Use menos quadros ou um tamanho menor.",
+      MEDIA_UNDECODABLE:
+        "Não foi possível ler este arquivo. Ele pode estar danificado, não ter faixa de áudio ou vídeo ou usar um formato que esta ferramenta não suporta.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",

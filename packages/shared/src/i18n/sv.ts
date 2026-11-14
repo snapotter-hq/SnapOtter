@@ -5737,6 +5737,8 @@ export const sv: TranslationKeys = {
         "Filen laddar bilder eller stilar från internet, vilket den här servern inte tillåter. Bädda in dem i filen och försök igen.",
       TOO_MANY_PIXELS:
         "Animeringen har för många pixlar sammanlagt över sina bildrutor. Använd färre bildrutor eller en mindre storlek.",
+      MEDIA_UNDECODABLE:
+        "Filen kan inte läsas. Den kan vara skadad, sakna ljud- eller videoström eller använda ett format som det här verktyget inte stöder.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",

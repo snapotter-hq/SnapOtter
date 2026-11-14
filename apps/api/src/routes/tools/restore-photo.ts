@@ -7,7 +7,6 @@ import {
   getBundleForTool,
   hasServerErrorStatus,
   isToolInputError,
-  markToolInputError,
   ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -254,7 +253,7 @@ export function registerRestorePhoto(app: FastifyInstance) {
                   { code: "IMAGE_UNDECODABLE" },
                 );
                 combined.cause = avifErr;
-                throw markToolInputError(combined);
+                throw combined;
               }
             }
           }

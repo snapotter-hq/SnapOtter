@@ -74,13 +74,16 @@ export function pixelLimitImageError(cause?: unknown): ToolInputError {
 }
 
 /**
- * The code of a ToolInputError built with one. A marker-form input error
- * (markToolInputError on a decoder's or ffmpeg's own error) is skipped: its
- * `code` is whatever that library set (an errno, an exit status), not ours.
+ * The code of a ToolInputError built with one, or the code markToolInputError
+ * gave a library's error. A marked error's own `code` is never read: it is
+ * whatever that library set (an errno, an exit status), not ours.
  */
 export function toolInputErrorCode(err: unknown): string | undefined {
-  if (!isToolInputError(err) || err.name !== "ToolInputError") return undefined;
-  const code = (err as { code?: unknown }).code;
+  if (!isToolInputError(err)) return undefined;
+  const code =
+    err.name === "ToolInputError"
+      ? (err as { code?: unknown }).code
+      : (err as { toolInputCode?: unknown }).toolInputCode;
   return typeof code === "string" && code.length > 0 ? code : undefined;
 }
 
@@ -88,8 +91,13 @@ export function isToolInputError(err: unknown): err is Error & { isToolInputErro
   return err instanceof Error && (err as { isToolInputError?: unknown }).isToolInputError === true;
 }
 
-export function markToolInputError<E extends Error>(err: E): E {
-  return Object.assign(err, { isToolInputError: true });
+/**
+ * Flags a library's error as the user's input fault in place. `code` is the
+ * translatable reason (IMAGE_UNDECODABLE); it rides `toolInputCode` so the
+ * library's own `code` stays as it was (#4734).
+ */
+export function markToolInputError<E extends Error>(err: E, code?: string): E {
+  return Object.assign(err, { isToolInputError: true }, code ? { toolInputCode: code } : {});
 }
 
 /**

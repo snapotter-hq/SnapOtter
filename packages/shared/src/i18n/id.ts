@@ -5737,6 +5737,8 @@ export const id: TranslationKeys = {
         "File ini memuat gambar atau gaya dari internet, yang tidak diizinkan server ini. Sematkan ke dalam file dan coba lagi.",
       TOO_MANY_PIXELS:
         "Animasi ini memiliki terlalu banyak piksel di seluruh frame-nya. Gunakan lebih sedikit frame atau ukuran yang lebih kecil.",
+      MEDIA_UNDECODABLE:
+        "File ini tidak dapat dibaca. File mungkin rusak, tidak memiliki aliran audio atau video, atau memakai format yang tidak didukung alat ini.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",

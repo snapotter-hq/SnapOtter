@@ -5761,6 +5761,8 @@ export const it: TranslationKeys = {
         "Questo file carica immagini o stili da internet, cosa che questo server non consente. Incorporali nel file e riprova.",
       TOO_MANY_PIXELS:
         "Questa animazione ha troppi pixel nell'insieme dei suoi fotogrammi. Usa meno fotogrammi o una dimensione più piccola.",
+      MEDIA_UNDECODABLE:
+        "Impossibile leggere questo file. Potrebbe essere danneggiato, non avere tracce audio o video o usare un formato che questo strumento non supporta.",
     },
     generic: "Si è verificato un errore",
     offline: "Sei offline",

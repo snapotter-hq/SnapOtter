@@ -5407,6 +5407,8 @@ export const zhTW: TranslationKeys = {
       REMOTE_RESOURCES_DISABLED:
         "此檔案會從網際網路載入圖片或樣式，而此伺服器不允許這麼做。請將它們嵌入檔案後再試一次。",
       TOO_MANY_PIXELS: "此動畫所有影格的像素總數過多。請使用較少的影格或較小的尺寸。",
+      MEDIA_UNDECODABLE:
+        "無法讀取此檔案。檔案可能已損壞、沒有音訊或視訊串流，或使用了此工具不支援的格式。",
     },
     generic: "發生錯誤",
     offline: "您已離線",

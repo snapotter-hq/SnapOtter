@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
  * The web app shows a ToolInputError's reason only through its `code`; one
  * thrown without a code reaches the user as the generic failure text (#4727).
  * So every `new ToolInputError(...)` in the API and the engines must pass one,
- * and a literal code must have a translation.
+ * as must every markToolInputError, and a literal code must have a translation.
  */
 
 const ROOT = resolve(__dirname, "../../..");
@@ -34,9 +34,8 @@ interface Site {
   args: string;
 }
 
-/** Every `new ToolInputError(...)` call with its argument text, parens balanced. */
-function toolInputErrorSites(): Site[] {
-  const opener = "new ToolInputError(";
+/** Every `<opener>...)` call with its argument text, parens balanced. */
+function callSites(opener: string): Site[] {
   const sites: Site[] = [];
   for (const file of SOURCES.flatMap(sourceFiles)) {
     const source = readFileSync(file, "utf8");
@@ -59,7 +58,9 @@ function toolInputErrorSites(): Site[] {
 }
 
 describe("ToolInputError codes", () => {
-  const sites = toolInputErrorSites();
+  const sites = callSites("new ToolInputError(");
+  // A library's error marked as an input fault in place (#4734).
+  const markers = callSites("markToolInputError(");
 
   it("finds the call sites it checks", () => {
     expect(sites.length).toBeGreaterThan(50);
@@ -76,6 +77,21 @@ describe("ToolInputError codes", () => {
     const keys = new Set(Object.keys(en.errors.codes));
     const untranslated = sites.flatMap(({ where, args }) => {
       const code = /\bcode:\s*"([A-Z_]+)"/.exec(args)?.[1];
+      return code && !keys.has(code) ? [`${where} ${code}`] : [];
+    });
+    expect(untranslated, "add the code to errors.codes in every locale").toEqual([]);
+  });
+
+  it("gives every marked library error a code", () => {
+    expect(markers.length).toBeGreaterThan(0);
+    const uncoded = markers.filter(({ args }) => !args.includes(",")).map(({ where }) => where);
+    expect(uncoded, "pass the code as markToolInputError's second argument").toEqual([]);
+  });
+
+  it("translates every literal code a marked error carries", () => {
+    const keys = new Set(Object.keys(en.errors.codes));
+    const untranslated = markers.flatMap(({ where, args }) => {
+      const code = /,\s*"([A-Z_]+)"/.exec(args)?.[1];
       return code && !keys.has(code) ? [`${where} ${code}`] : [];
     });
     expect(untranslated, "add the code to errors.codes in every locale").toEqual([]);

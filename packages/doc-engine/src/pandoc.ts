@@ -105,7 +105,7 @@ export function markIfPandocInputError<E extends Error>(
     (code !== null && PANDOC_INPUT_ERROR_CODES.has(code)) ||
     PANDOC_INPUT_ERROR_PATTERNS.some((re) => re.test(stderr))
   ) {
-    return markToolInputError(err);
+    return markToolInputError(err, "DOCUMENT_UNREADABLE");
   }
   return err;
 }

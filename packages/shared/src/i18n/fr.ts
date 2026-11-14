@@ -5785,6 +5785,8 @@ export const fr: TranslationKeys = {
         "Ce fichier charge des images ou des styles depuis Internet, ce que ce serveur n'autorise pas. Intégrez-les au fichier et réessayez.",
       TOO_MANY_PIXELS:
         "Cette animation compte trop de pixels sur l'ensemble de ses images. Utilisez moins d'images ou une taille plus petite.",
+      MEDIA_UNDECODABLE:
+        "Impossible de lire ce fichier. Il est peut-être endommagé, sans flux audio ou vidéo, ou dans un format que cet outil ne prend pas en charge.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",
