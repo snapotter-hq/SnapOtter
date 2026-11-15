@@ -50,10 +50,10 @@
           "extractedSize": 7006805516
         },
         "arm64-cpu": {
-          "file": "v2.0.0/background-removal-arm64-cpu-r3.tar.gz",
-          "sha256": "a31f5f8677dde1da34dfde992f177e9315548b6c5afa95a0a53620f61ea52a10",
-          "compressedSize": 4541593265,
-          "extractedSize": 6393738831
+          "file": "v2.0.0/background-removal-arm64-cpu-r4.tar.gz",
+          "sha256": "75c52bf775f9f4240658e7d2dc7c4bfa653037518da32c7b850097cdf10491fd",
+          "compressedSize": 4510347021,
+          "extractedSize": 6309290105
         }
       },
       "packages": {
@@ -135,10 +135,10 @@
           "extractedSize": 88427148
         },
         "arm64-cpu": {
-          "file": "v2.0.0/face-detection-arm64-cpu-r2.tar.gz",
-          "sha256": "c66d494c03beb3988decb2eea528ba4dced95956f337855ee6efee9b95f03720",
-          "compressedSize": 81361023,
-          "extractedSize": 232238876
+          "file": "v2.0.0/face-detection-arm64-cpu-r3.tar.gz",
+          "sha256": "40e27fc28eb37016089199fa7494699db60c54f1d7ea5c6a68ddb6756dd54ee1",
+          "compressedSize": 55778843,
+          "extractedSize": 165385882
         }
       },
       "packages": {
@@ -173,16 +173,16 @@
       "estimatedSize": "1-2 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/object-eraser-colorize-amd64-gpu-r2.tar.gz",
-          "sha256": "0d858f287b9ab57a60e9e3209eae1c14a6a0792687f7105d40b1f4c2a19ef102",
-          "compressedSize": 1532343662,
-          "extractedSize": 2204704276
+          "file": "v2.0.0/object-eraser-colorize-amd64-gpu-r3.tar.gz",
+          "sha256": "9a8c96eb2063d3529cd5049e8927fd2541cfd3d4068fad542ae733176d3642bb",
+          "compressedSize": 1532374252,
+          "extractedSize": 2204804554
         },
         "arm64-cpu": {
-          "file": "v2.0.0/object-eraser-colorize-arm64-cpu-r3.tar.gz",
-          "sha256": "18aaf0bc507e94e248296f3092e625ff6339365b6df7030439c4ec9465098bfa",
-          "compressedSize": 1253914457,
-          "extractedSize": 1437568952
+          "file": "v2.0.0/object-eraser-colorize-arm64-cpu-r4.tar.gz",
+          "sha256": "e420d63d30f942d66815ff0828d5731fd2a6abaf5568a2bd3b0a8d845063ce09",
+          "compressedSize": 1253948752,
+          "extractedSize": 1437677731
         }
       },
       "packages": {
@@ -301,10 +301,10 @@
           "extractedSize": 8190357527
         },
         "arm64-cpu": {
-          "file": "v2.0.0/upscale-enhance-arm64-cpu-r2.tar.gz",
-          "sha256": "d2d9745d2ca1b546c4e5399d5bf8c024bad349135fdb1ad0e4da28b7ac19fc9e",
-          "compressedSize": 2209931629,
-          "extractedSize": 3246159800
+          "file": "v2.0.0/upscale-enhance-arm64-cpu-r3.tar.gz",
+          "sha256": "8e7ee7f6880a4cf779bd24a191afa157f54a03cc6edffe69a46cbb761cb330f4",
+          "compressedSize": 2159615465,
+          "extractedSize": 3114482268
         }
       },
       "packages": {
@@ -425,10 +425,10 @@
           "extractedSize": 7956363893
         },
         "arm64-cpu": {
-          "file": "v2.0.0/photo-restoration-arm64-cpu-r2.tar.gz",
-          "sha256": "86f1b261314f9f66146c02fddcbeff1880da0b52716e21126c75c7eee00e445d",
-          "compressedSize": 1252233816,
-          "extractedSize": 2238681871
+          "file": "v2.0.0/photo-restoration-arm64-cpu-r3.tar.gz",
+          "sha256": "4d0cc2848ca1899e089b3f1568cd979a9d9f91a892f54b5b8fc749edd137adbf",
+          "compressedSize": 1201919210,
+          "extractedSize": 2107004341
         }
       },
       "packages": {
@@ -569,16 +569,16 @@
       "estimatedSize": "600 MB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/transcription-amd64-gpu-r2.tar.gz",
-          "sha256": "6229180f698d1ceb0866df4b1c091ed4a89f6324427d373dbbc13a763ae26ce2",
-          "compressedSize": 845757082,
-          "extractedSize": 1647328796
+          "file": "v2.0.0/transcription-amd64-gpu-r3.tar.gz",
+          "sha256": "40ee1f5e3cfdff0e675fcd67fedaf20999fdc435ab61a40d94d02ee594ad252a",
+          "compressedSize": 845792897,
+          "extractedSize": 1647429074
         },
         "arm64-cpu": {
-          "file": "v2.0.0/transcription-arm64-cpu-r3.tar.gz",
-          "sha256": "19938e1220bdcfdbdb0e6c5019971b38b4a519f818d9cd29b789bc19de661485",
-          "compressedSize": 536230905,
-          "extractedSize": 781074121
+          "file": "v2.0.0/transcription-arm64-cpu-r4.tar.gz",
+          "sha256": "67cd2828fa9f66f7a1f717523f7d8762b0dcddddf397e0eb85e69b81040f985a",
+          "compressedSize": 536279169,
+          "extractedSize": 781182903
         }
       },
       "packages": {
