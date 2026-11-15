@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  type AuthLoginFailureReason,
   isPasswordRuleEnabled,
   PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
@@ -642,6 +643,11 @@ async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
 
 // ── Auth routes ────────────────────────────────────────────────────
 
+/** One place to emit a password login failure, so every path forwards a bounded reason (#4216). */
+function trackPasswordFailure(reason: AuthLoginFailureReason): void {
+  void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password", reason });
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/login
   app.post(
@@ -665,6 +671,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           const rawBody = request.body as Record<string, unknown> | null;
           const rawUsername = typeof rawBody?.username === "string" ? rawBody.username : "";
 
+          trackPasswordFailure("other");
           await audit("LOGIN_FAILED", {
             username: sanitizeAuditInput(rawUsername),
             reason: "password_too_long",
@@ -703,6 +710,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const throttleConfig = await getLoginThrottleConfig();
       const throttle = await checkLoginThrottle(redis, body.username, throttleConfig);
       if (throttle.throttled) {
+        trackPasswordFailure("rate_limited");
         reply.header("Retry-After", String(throttle.retryAfterS));
         return reply.status(429).send({
           error: "Too many failed login attempts. Try again later.",
@@ -742,7 +750,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // response timing doesn't reveal whether the username exists.
         await verifyUserPassword(body.password, DUMMY_HASH);
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure(
+          ssoRefused
+            ? "sso_enforced"
+            : user && isDisabledRole(user.role)
+              ? "disabled"
+              : "bad_credentials",
+        );
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           ...(ssoRefused && user && { userId: user.id }),
@@ -762,7 +776,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const { valid, legacy } = await verifyUserPassword(body.password, user.passwordHash);
       if (!valid) {
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure(isDisabledRole(user.role) ? "disabled" : "bad_credentials");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: isDisabledRole(user.role) ? "disabled_user" : "bad_password",
@@ -782,6 +796,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // disabled account record throttle failures via the 401 path above.
       if (isDisabledRole(user.role)) {
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("disabled");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "disabled_user",
@@ -875,6 +890,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           return reply.status(200).send({ requiresMfaEnrollment: true, ...enrollment });
         }
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("mfa");
         await audit("LOGIN_FAILED", {
           userId: user.id,
           username: user.username,
@@ -894,7 +910,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // ones were challenged above); the distinct retryable code beats
         // minting a policy-exempt session off a transient settings fault.
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure("policy_unavailable");
         await audit("LOGIN_FAILED", {
           userId: user.id,
           username: user.username,
@@ -970,6 +986,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (inserted.status === "user_disabled") {
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("disabled");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "disabled_user",
@@ -979,7 +996,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (inserted.status !== "ok") {
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure("other");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason:

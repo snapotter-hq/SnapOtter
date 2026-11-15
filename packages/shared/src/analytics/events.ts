@@ -72,6 +72,8 @@ export interface PipelineExecutedProperties {
   file_count?: number;
   duration_ms: number;
   status: "completed" | "failed" | "canceled";
+  /** Machine code of the failing step, when it has one (never the message). */
+  error_code?: string;
 }
 
 export interface AiBundleActionProperties {
@@ -135,4 +137,45 @@ export interface ToolRunDegradedProperties {
   /** Whether an SSE frame had already proven the job reached the server when
    * the degrade happened. */
   had_evidence: boolean;
+}
+
+/** Closed set so a login failure can be explained without naming an account.
+ * Unknown user and wrong password share `bad_credentials` on purpose: splitting
+ * them would turn the event into an account-enumeration oracle (#4216). */
+export const AUTH_LOGIN_FAILURE_REASONS = [
+  "bad_credentials",
+  "sso_enforced",
+  "disabled",
+  "rate_limited",
+  "mfa",
+  "policy_unavailable",
+  "other",
+] as const;
+
+export type AuthLoginFailureReason = (typeof AUTH_LOGIN_FAILURE_REASONS)[number];
+
+export interface AuthLoginFailedProperties {
+  method: "password" | "oidc";
+  /** Sent on password failures; OIDC failures carry only the method. */
+  reason?: AuthLoginFailureReason;
+}
+
+/** Where a client crash happened, so a null `tool_id` is explained by the phase. */
+export type ToolClientErrorPhase = "render" | "chunk-load";
+
+export interface ToolClientErrorProperties {
+  error_name: string;
+  /** Present only when the crash happened on a tool route. */
+  tool_id?: string;
+  phase?: ToolClientErrorPhase;
+}
+
+export interface BatchProcessedProperties {
+  tool_id: string;
+  file_count: number;
+  status: "completed" | "failed" | "canceled";
+  reason?: string;
+  total_bytes: number;
+  /** Files with no result in a run that finished; absent when none failed. */
+  failed_count?: number;
 }
