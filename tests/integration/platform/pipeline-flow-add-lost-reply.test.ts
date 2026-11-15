@@ -10,7 +10,7 @@
  * has to finish.
  */
 import AdmZip from "adm-zip";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { getFlowProducer } from "../../../apps/api/src/jobs/enqueue.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -33,8 +33,14 @@ describe("a pipeline flow add that fails after Redis stored the flow (#4715)", (
     adminToken = await loginAsAdmin(testApp.app);
   });
 
-  afterAll(async () => {
+  // Restore per test: vitest 4's spyOn hands back the existing spy when add()
+  // is still mocked, so the second test would inherit the first one's calls and
+  // capture the spy itself as realAdd.
+  afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
     await testApp.cleanup();
   });
 

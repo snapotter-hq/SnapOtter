@@ -48,7 +48,9 @@ function createMockChild() {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // Reset, not just clear: vitest 4's restoreAllMocks no longer drops a
+  // mockReturnValueOnce that an earlier test left unconsumed.
+  vi.resetAllMocks();
   const fullInventory = new Set(["eng", "deu", "fra", "spa", "chi_sim", "jpn", "osd"]);
   mockGetInstalledTesseractLanguages.mockResolvedValue(fullInventory);
   mockGetCachedTesseractLanguages.mockReturnValue(fullInventory);

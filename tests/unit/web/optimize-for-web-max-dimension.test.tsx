@@ -81,7 +81,13 @@ beforeEach(() => {
     "fetch",
     vi.fn(async () => new Response("{}", { status: 200 })),
   );
-  vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => {} });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   const stored = new Map<string, string>();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => stored.get(k) ?? null,
@@ -251,11 +257,13 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
     try {
       let previewCount = 0;
       let blobCount = 0;
-      vi.stubGlobal("URL", {
-        ...URL,
-        createObjectURL: () => `blob:preview-${++blobCount}`,
-        revokeObjectURL: vi.fn(),
-      });
+      vi.stubGlobal(
+        "URL",
+        Object.assign(class extends URL {}, {
+          createObjectURL: () => `blob:preview-${++blobCount}`,
+          revokeObjectURL: vi.fn(),
+        }),
+      );
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input: RequestInfo | URL) => {
@@ -329,11 +337,13 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
     try {
       let previewCount = 0;
       let blobCount = 0;
-      vi.stubGlobal("URL", {
-        ...URL,
-        createObjectURL: () => `blob:preview-${++blobCount}`,
-        revokeObjectURL: vi.fn(),
-      });
+      vi.stubGlobal(
+        "URL",
+        Object.assign(class extends URL {}, {
+          createObjectURL: () => `blob:preview-${++blobCount}`,
+          revokeObjectURL: vi.fn(),
+        }),
+      );
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input: RequestInfo | URL) => {
@@ -447,11 +457,13 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
     try {
       const revokeObjectURL = vi.fn();
       let blobCount = 0;
-      vi.stubGlobal("URL", {
-        ...URL,
-        createObjectURL: () => `blob:preview-${++blobCount}`,
-        revokeObjectURL,
-      });
+      vi.stubGlobal(
+        "URL",
+        Object.assign(class extends URL {}, {
+          createObjectURL: () => `blob:preview-${++blobCount}`,
+          revokeObjectURL,
+        }),
+      );
 
       const resolvers: Array<(res: Response) => void> = [];
       vi.stubGlobal(
@@ -555,11 +567,13 @@ describe("Optimize for Web live preview does not masquerade as a completed resul
     vi.useFakeTimers();
     try {
       let blobCount = 0;
-      vi.stubGlobal("URL", {
-        ...URL,
-        createObjectURL: () => `blob:preview-${++blobCount}`,
-        revokeObjectURL: vi.fn(),
-      });
+      vi.stubGlobal(
+        "URL",
+        Object.assign(class extends URL {}, {
+          createObjectURL: () => `blob:preview-${++blobCount}`,
+          revokeObjectURL: vi.fn(),
+        }),
+      );
       let failNextPreview = false;
       vi.stubGlobal(
         "fetch",

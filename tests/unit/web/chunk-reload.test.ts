@@ -14,7 +14,7 @@
  * follow a beforeunload are left alone.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import {
   CHUNK_RELOAD_GUARD_KEY,
   CHUNK_RELOAD_GUARD_MS,
@@ -43,7 +43,7 @@ function startLeaving(): void {
 }
 
 describe("installChunkReloadHandler", () => {
-  let reload: ReturnType<typeof vi.fn>;
+  let reload: Mock<() => void>;
   let uninstall: () => void;
 
   beforeEach(() => {

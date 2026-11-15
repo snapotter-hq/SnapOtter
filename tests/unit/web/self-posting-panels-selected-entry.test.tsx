@@ -91,11 +91,13 @@ describe("self-posting tool panels: upload selected entry and land result by cap
   beforeEach(() => {
     FakeXhr.instances = [];
     vi.stubGlobal("XMLHttpRequest", FakeXhr);
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn((blob: Blob) => `blob:${(blob as File).name ?? "mock"}`),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: vi.fn((blob: Blob) => `blob:${(blob as File).name ?? "mock"}`),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
     document.addEventListener("click", swallowNavigation, true);
     useFileStore.getState().reset();
   });

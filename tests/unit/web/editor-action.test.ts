@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const toastError = vi.hoisted(() => vi.fn());
 // sonner only resolves under apps/web, so a bare "sonner" here would register a
 // different module id than the helper imports and silently mock nothing (#1235).
-vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
+  toast: { error: toastError },
+}));
 
 vi.mock("@/lib/analytics", async () => {
   const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");

@@ -17,11 +17,13 @@ const SOURCE_URL = "/api/v1/download/job-1/clip.mkv";
 const PREVIEW_URL = "/api/v1/preview/generate";
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:preview",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:preview",
+      revokeObjectURL: () => {},
+    }),
+  );
 });
 
 afterEach(() => {

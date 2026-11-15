@@ -50,11 +50,13 @@ function imageFile(name: string, type = "image/png", content = name) {
 const INFO_URL = "/api/v1/tools/image/info";
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: vi.fn(() => "blob:fake"),
-    revokeObjectURL: vi.fn(),
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: vi.fn(() => "blob:fake"),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
   const stored = new Map<string, string>();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => stored.get(k) ?? null,

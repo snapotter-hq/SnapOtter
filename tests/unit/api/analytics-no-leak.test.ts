@@ -22,7 +22,9 @@ describe("Server-side analytics gating (behavioral)", () => {
     process.env.ANALYTICS_BAKED_OVERRIDE = "off";
     const capture = vi.fn();
     vi.doMock("posthog-node", () => ({
-      PostHog: vi.fn(() => ({ capture, shutdown: vi.fn() })),
+      PostHog: vi.fn(function MockPostHog() {
+        return { capture, shutdown: vi.fn() };
+      }),
     }));
     const { trackEvent } = await import("../../../apps/api/src/lib/analytics.js");
     await trackEvent("tool_used", { tool_id: "resize" }, "did-1");

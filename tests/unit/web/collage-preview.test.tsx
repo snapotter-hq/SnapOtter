@@ -72,6 +72,12 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     const cell1 = screen.getByRole("button", { name: "Collage cell 1" });
     const cell2 = screen.getByRole("button", { name: "Collage cell 2" });
     const grip = screen.getByRole("button", { name: "Drag to reorder" });
+    // Element spies go first: vitest 4's spyOn hands back the existing spy when the
+    // method is already mocked, so after the prototype spy below every element
+    // would share one rect.
+    mockRect(cell1, 0, 0, 180, 180);
+    mockRect(cell2, 200, 0, 180, 180);
+    mockRect(grip, 150, 10, 24, 24);
     // DragOverlay mounts dynamically on drag start; give unmocked elements (including
     // the overlay node) a non-zero initial rect at the grip position so rectIntersection
     // has positive area in jsdom.
@@ -86,9 +92,6 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
       height: 24,
       toJSON: () => ({}),
     });
-    mockRect(cell1, 0, 0, 180, 180);
-    mockRect(cell2, 200, 0, 180, 180);
-    mockRect(grip, 150, 10, 24, 24);
     return { cell1, cell2, grip };
   }
 

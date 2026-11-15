@@ -69,18 +69,15 @@ export default defineConfig({
     testTimeout: Number(process.env.VITEST_TEST_TIMEOUT) || 30_000,
     hookTimeout: Number(process.env.VITEST_HOOK_TIMEOUT) || 30_000,
     pool: "forks",
-    poolOptions: {
-      forks: {
-        // Parallel forks; each fork gets an isolated DB + workspace via
-        // tests/setup/per-fork-env.ts. CI runners have 4 vCPUs. Env-overridable
-        // (VITEST_MAX_FORKS) so the heavy nightly jobs (FULL_MATRIX, coverage)
-        // can drop to fewer forks and give each slow media test more CPU, which
-        // keeps format-matrix conversions from starving and timing out.
-        maxForks:
-          Number(process.env.VITEST_MAX_FORKS) ||
-          (process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2))),
-      },
-    },
+    // Parallel forks; each fork gets an isolated DB + workspace via
+    // tests/setup/per-fork-env.ts. CI runners have 4 vCPUs. Env-overridable
+    // (VITEST_MAX_FORKS) so the heavy nightly jobs (FULL_MATRIX, coverage)
+    // can drop to fewer forks and give each slow media test more CPU, which
+    // keeps format-matrix conversions from starving and timing out.
+    // Vitest 4 dropped poolOptions.forks.maxForks in favour of maxWorkers.
+    maxWorkers:
+      Number(process.env.VITEST_MAX_FORKS) ||
+      (process.env.CI ? 4 : Math.max(2, Math.floor(os.availableParallelism() / 2))),
     sequence: {
       sequencer: CostAwareSequencer,
     },

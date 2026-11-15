@@ -13,10 +13,12 @@ const bakedConfig = vi.hoisted(() => ({
 const mockCapture = vi.hoisted(() => vi.fn());
 const mockShutdown = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const MockPostHog = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => ({
-    capture: mockCapture,
-    shutdown: mockShutdown,
-  })),
+  vi.fn().mockImplementation(function MockPostHog() {
+    return {
+      capture: mockCapture,
+      shutdown: mockShutdown,
+    };
+  }),
 );
 
 const mockLogWarn = vi.hoisted(() => vi.fn());
@@ -129,7 +131,7 @@ describe("initAnalytics", () => {
     bakedConfig.enabled = true;
     bakedConfig.posthogApiKey = "phc_test_key";
     const failure = new Error("posthog constructor blew up");
-    MockPostHog.mockImplementationOnce(() => {
+    MockPostHog.mockImplementationOnce(function FailingPostHog() {
       throw failure;
     });
 

@@ -73,11 +73,13 @@ const CANCEL_URL = `/api/v1/jobs/${JOB_ID}/cancel`;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubGlobal("URL", {
-    ...globalThis.URL,
-    createObjectURL: vi.fn(() => "blob:fake-url"),
-    revokeObjectURL: vi.fn(),
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: vi.fn(() => "blob:fake-url"),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
   useFileStore.getState().reset();
   xhrs = [];
   MockEventSource.instances = [];
@@ -86,7 +88,7 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", MockEventSource);
   vi.stubGlobal(
     "XMLHttpRequest",
-    vi.fn(() => {
+    vi.fn(function FakeXhr() {
       const xhr: MockXhr = {
         status: 0,
         responseText: "",
