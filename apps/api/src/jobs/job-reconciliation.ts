@@ -156,6 +156,7 @@ function isResultPayloadKey(key: string): boolean {
  */
 async function readResultPayload(
   jobId: string,
+  toolId: string | null,
   objects: ObjectInfo[],
 ): Promise<Record<string, unknown> | undefined> {
   const sidecar = objects.find((object) => isResultPayloadKey(object.key));
@@ -178,13 +179,25 @@ async function readResultPayload(
       { err: shapeErr, jobId, key: sidecar.key },
       "Result payload sidecar is not a JSON object; ignoring",
     );
-    void reportError(shapeErr, { source: "worker", pool: "system", jobId, ...PERIODIC_REPORT });
+    void reportError(shapeErr, {
+      source: "worker",
+      pool: "system",
+      toolId: toolId ?? undefined,
+      jobId,
+      ...PERIODIC_REPORT,
+    });
   } catch (err) {
     logger.error(
       { err, jobId, key: sidecar.key },
       "Failed to parse result payload sidecar during job reconciliation; continuing without tool payload",
     );
-    void reportError(err, { source: "worker", pool: "system", jobId, ...PERIODIC_REPORT });
+    void reportError(err, {
+      source: "worker",
+      pool: "system",
+      toolId: toolId ?? undefined,
+      jobId,
+      ...PERIODIC_REPORT,
+    });
   }
   return undefined;
 }
@@ -321,7 +334,7 @@ async function recoverFromOutputs(
   const preview = objects.find((object) => isPreviewKey(object.key));
   const originalSize = await resolveOriginalSize(row);
   const outputRefs = artifacts.map((artifact) => artifact.key);
-  const toolPayload = await readResultPayload(row.id, objects);
+  const toolPayload = await readResultPayload(row.id, row.toolId, objects);
 
   const result: Record<string, unknown> = {
     ...toolPayload,

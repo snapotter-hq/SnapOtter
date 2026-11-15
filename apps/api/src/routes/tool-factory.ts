@@ -770,6 +770,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
+                  toolId: config.toolId,
                   jobId,
                 });
                 return false;
@@ -792,6 +793,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                 source: "http",
                 route: request.routeOptions?.url,
                 method: request.method,
+                toolId: config.toolId,
                 jobId,
               });
               return null;

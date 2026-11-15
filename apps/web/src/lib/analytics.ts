@@ -355,6 +355,7 @@ async function startSentry(config: AnalyticsConfig): Promise<void> {
       // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
       // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
       beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
+      ...(config.deployMode ? { initialScope: { tags: { deploy_mode: config.deployMode } } } : {}),
     });
     sentryRunning = true;
     // Everything recorded while the client was missing goes out now, tags

@@ -2691,6 +2691,32 @@ describe("worker failure reports carry the job age (#1414)", () => {
       });
     });
 
+    it("tags the report with the tool id when the safety net's own write fails (#4742)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const writeErr = new Error("postgres write failed");
+      vi.mocked(failSingleJobGuarded).mockRejectedValueOnce(writeErr);
+      const job = {
+        id: "job-s4",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s4" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+      await vi.waitFor(() =>
+        expect(reportErrorMock).toHaveBeenCalledWith(writeErr, expect.anything()),
+      );
+
+      expect(reportErrorMock).toHaveBeenCalledWith(writeErr, {
+        source: "worker",
+        toolId: "transparency-fixer",
+        jobId: "job-s4",
+      });
+    });
+
     it("leaves a stall that BullMQ will retry to the next attempt", async () => {
       const listeners = await failedListeners();
       const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
@@ -4658,6 +4684,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-batch-f0",
     });
     expect(recordChildOutcomeMock).toHaveBeenCalledWith(
@@ -5004,6 +5031,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-batch-ok",
     });
     expect(recordChildOutcomeMock).toHaveBeenCalledWith("bp-ok", 2, "out.png");
@@ -5174,6 +5202,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(singleWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-1",
     });
 
@@ -5232,11 +5261,13 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-batch-f0",
     });
     expect(reportErrorMock).toHaveBeenCalledWith(outcomeWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-batch-f0",
     });
     expect(trackEventMock).toHaveBeenCalledTimes(1);

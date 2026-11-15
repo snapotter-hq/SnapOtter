@@ -824,6 +824,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
               void reportError(aliasErr, {
                 source: "worker",
                 pool: data.pool,
+                toolId: data.toolId,
                 jobId: progressJobId,
               });
             }

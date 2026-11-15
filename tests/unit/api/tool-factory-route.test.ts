@@ -1519,6 +1519,7 @@ describe("createToolRoute", () => {
         source: "http",
         route: apiToolPath(id),
         method: "POST",
+        toolId: id,
         jobId,
       });
       expect(req.log.error).toHaveBeenCalledWith(
@@ -1576,6 +1577,7 @@ describe("createToolRoute", () => {
         source: "http",
         route: apiToolPath(id),
         method: "POST",
+        toolId: id,
         jobId,
       });
       expect(classifyError(statusReadErr, "http")).toBe("operational");
@@ -1628,6 +1630,7 @@ describe("createToolRoute", () => {
         source: "http",
         route: apiToolPath(id),
         method: "POST",
+        toolId: id,
         jobId,
       });
       expect(classifyError(errorReadErr, "http")).toBe("operational");

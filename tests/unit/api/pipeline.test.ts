@@ -1096,6 +1096,7 @@ describe("pipeline step error message formatting", () => {
         source: "http",
         route: "/api/v1/pipeline/execute",
         method: "POST",
+        toolId: "pipeline",
         jobId: expect.any(String),
       });
 

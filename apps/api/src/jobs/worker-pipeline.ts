@@ -395,7 +395,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           { err, jobId: data.jobId, target: rowId },
           "canceled pipeline terminal write failed",
         );
-        void reportError(err, { source: "worker", pool: data.pool, jobId: rowId });
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: rowId,
+        });
         return true;
       }
     };
@@ -435,7 +440,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           { err, jobId: data.jobId, parentId: data.parentId },
           "canceled pipeline batch outcome write failed",
         );
-        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: data.jobId,
+        });
       }
     }
 
@@ -500,7 +510,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
         { err, jobId: data.jobId, parentId: data.parentId },
         "failed pipeline terminal write failed",
       );
-      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: data.jobId,
+      });
     }
 
     // Batch progress (pipeline-batch only): guarded like the cancel branch
@@ -514,7 +529,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           { err, jobId: data.jobId, parentId: data.parentId },
           "failed pipeline batch outcome write failed",
         );
-        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: data.jobId,
+        });
       }
     }
 
@@ -610,7 +630,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
         { err: writeErr, jobId: data.jobId, ...(data.parentId && { parentId: data.parentId }) },
         "failed pipeline terminal write failed",
       );
-      void reportError(writeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+      void reportError(writeErr, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: data.jobId,
+      });
     }
 
     if (data.parentId && data.totalFiles !== undefined) {
@@ -621,7 +646,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           { err: outcomeErr, jobId: data.jobId, parentId: data.parentId },
           "failed pipeline batch outcome write failed",
         );
-        void reportError(outcomeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+        void reportError(outcomeErr, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: data.jobId,
+        });
       }
     }
 
@@ -698,7 +728,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
       { err, jobId: data.jobId, parentId: data.parentId },
       "completed pipeline terminal write failed",
     );
-    void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+    void reportError(err, {
+      source: "worker",
+      pool: data.pool,
+      toolId: data.toolId,
+      jobId: data.jobId,
+    });
   }
 
   // Batch progress (pipeline-batch only): guarded (#2620) so a Redis counter
@@ -712,7 +747,12 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
         { err, jobId: data.jobId, parentId: data.parentId },
         "completed pipeline batch outcome write failed",
       );
-      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: data.jobId,
+      });
     }
   }
 

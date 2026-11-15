@@ -1,3 +1,7 @@
+/** Fixed install-type enum; the only values that may become a Sentry or PostHog tag. */
+export const DEPLOY_MODES = ["embedded", "external", "native"] as const;
+export type DeployMode = (typeof DEPLOY_MODES)[number];
+
 export interface AnalyticsConfig {
   enabled: boolean;
   posthogApiKey: string;
@@ -17,4 +21,9 @@ export interface AnalyticsConfig {
   sentryDsnWeb: string;
   posthogSampleRate: number;
   instanceId: string;
+  /**
+   * How this instance is installed. Tags web Sentry events so triage can tell a
+   * Compose stack from the all-in-one container. Absent when analytics is off.
+   */
+  deployMode?: DeployMode;
 }

@@ -1,3 +1,5 @@
+import type { DeployMode } from "./types.js";
+
 export const ANALYTICS_EVENTS = {
   TOOL_USED: "tool_used",
   TOOL_OPENED: "tool_opened",
@@ -85,7 +87,7 @@ export interface AiBundleActionProperties {
 export interface InstanceStartedProperties {
   arch: "arm64" | "amd64";
   os_platform: string;
-  deploy_mode: "embedded" | "external" | "native";
+  deploy_mode: DeployMode;
   gpu_present: boolean;
   /** APP_VERSION at boot. trackEvent stamps the same property on every allow-listed server event (#4215). */
   app_version: string;

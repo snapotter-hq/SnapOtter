@@ -955,6 +955,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
+                  toolId: "pipeline",
                   jobId,
                 });
                 return null;

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
+import type { DeployMode } from "@snapotter/shared";
 
-export type DeployMode = "embedded" | "external" | "native";
+export type { DeployMode };
 
 // All-in-one detection: docker/entrypoint.sh exports EMBEDDED_MODE=1 before
 // exec'ing s6-overlay, and the snapotter service run script is with-contenv,

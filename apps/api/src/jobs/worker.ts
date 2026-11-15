@@ -117,7 +117,7 @@ function settleInterruptedSingleJob(data: ToolJobData): void {
   const settle = (args: FailSingleJobArgs) =>
     failSingleJobGuarded(args).catch((netErr) => {
       logger.error({ err: netErr, jobId: data.jobId }, "interrupted job safety net failed");
-      void reportError(netErr, { source: "worker", jobId: data.jobId });
+      void reportError(netErr, { source: "worker", toolId: data.toolId, jobId: data.jobId });
     });
   void settle({
     jobId: frameId,
@@ -177,7 +177,12 @@ export function startWorkers(): void {
             // The net itself failing means a degraded client may hang on a
             // row that never goes terminal; that must reach the operator.
             logger.error({ err: netErr, jobId: data.jobId }, "batch-finalize safety net failed");
-            void reportError(netErr, { source: "worker", pool, jobId: data.jobId });
+            void reportError(netErr, {
+              source: "worker",
+              pool,
+              toolId: data.toolId,
+              jobId: data.jobId,
+            });
           });
         }
         // When a GDPR export exhausts its retry budget, settle the durable row
@@ -298,7 +303,12 @@ export function startWorkers(): void {
               { err: probeErr, jobId: data.jobId },
               "pipeline-finalize safety net step probe failed; falling back to failed label",
             );
-            void reportError(probeErr, { source: "worker", pool, jobId: data.jobId });
+            void reportError(probeErr, {
+              source: "worker",
+              pool,
+              toolId: data.toolId,
+              jobId: data.jobId,
+            });
             return false;
           })
           .then((canceled) => {
@@ -316,7 +326,7 @@ export function startWorkers(): void {
                   })
               ).catch((netErr) => {
                 logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
-                void reportError(netErr, { source: "worker", pool, jobId });
+                void reportError(netErr, { source: "worker", pool, toolId: data.toolId, jobId });
               });
             const frameId = data.clientJobId ?? data.jobId;
             void netSettle(frameId, frameId !== data.jobId ? data.jobId : undefined);
