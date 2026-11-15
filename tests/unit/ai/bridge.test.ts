@@ -279,6 +279,11 @@ describe("bridge - gpuMayBeAvailable (#4746, #4502)", () => {
     expect(bridge.gpuMayBeAvailable("torch", nvidiaNode)).toBe(true);
   });
 
+  it("honours hidden GPUs before the probe", () => {
+    vi.stubEnv("CUDA_VISIBLE_DEVICES", "-1");
+    expect(bridge.gpuMayBeAvailable("onnx", nvidiaNode)).toBe(false);
+  });
+
   it("honours SNAPOTTER_GPU=0 before the probe", () => {
     vi.stubEnv("SNAPOTTER_GPU", "0");
     expect(bridge.gpuMayBeAvailable("onnx", nvidiaNode)).toBe(false);

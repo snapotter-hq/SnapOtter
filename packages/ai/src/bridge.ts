@@ -1341,9 +1341,11 @@ export class PythonDispatcher {
 
   /**
    * For CPU-only refusals: whether a GPU could be doing this work. Until the
-   * dispatcher reports (boot, or a shutdown after a bundle install) the probe
-   * fields still hold their defaults, so this answers from the device node,
-   * the same fallback the memory gate in run() uses (#4746, #4502).
+   * dispatcher reports (boot, or a shutdown after a bundle install, until the
+   * next AI request respawns it) the probe fields still hold their defaults, so
+   * this answers from the device node, the same fallback the memory gate in
+   * run() uses (#4746, #4502). A device node whose framework has no CUDA can
+   * pass one request in that window; refusing every GPU host instead was worse.
    */
   gpuMayBeAvailable(
     framework: GpuFramework,
