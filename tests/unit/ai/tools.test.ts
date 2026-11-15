@@ -28,6 +28,7 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
   isGpuAvailable: vi.fn(() => false),
+  gpuMayBeAvailable: vi.fn(() => false),
   shutdownDispatcher: vi.fn(),
 }));
 
