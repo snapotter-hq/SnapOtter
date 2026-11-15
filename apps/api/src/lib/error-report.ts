@@ -322,6 +322,15 @@ function periodicKey(err: unknown, job: string | undefined): string {
   return `periodic:${job ?? "unknown"}:${code}`;
 }
 
+function errnoSyscall(err: unknown): string {
+  for (let cur = err, depth = 0; cur && typeof cur === "object" && depth < 6; depth++) {
+    const { syscall, cause } = cur as { syscall?: unknown; cause?: unknown };
+    if (typeof syscall === "string" && /^[a-z]{2,12}$/.test(syscall)) return syscall;
+    cur = cause;
+  }
+  return "-";
+}
+
 export function resetThrottleForTests(): void {
   seen.clear();
 }
@@ -447,7 +456,8 @@ export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<
         // A missing model file shows up from many call sites, each its own
         // per-frame group. One tool failing with one errno is one problem
         // (#4214). Only errnos: other bug codes are often derived from settings.
-        scope.setFingerprint(["bug", ctx.toolId, code]);
+        // The syscall keeps a model load (open) apart from a cleanup race (unlink).
+        scope.setFingerprint(["bug", ctx.toolId, code, errnoSyscall(err)]);
       }
       if (cls === "bug" && ctx.settings !== undefined) {
         // Attach the knobs that triggered a bug (format, quality, mode, ...) so

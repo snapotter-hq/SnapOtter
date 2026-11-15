@@ -51,7 +51,7 @@ describe("bug-class errno fingerprint (#4214)", () => {
     const prints = h.scope.setFingerprint.mock.calls.map((c) => c[0]);
     expect(prints).toHaveLength(2);
     expect(prints[0]).toEqual(prints[1]);
-    expect(prints[0]).toEqual(["bug", "remove-background", "ENOENT"]);
+    expect(prints[0]).toEqual(["bug", "remove-background", "ENOENT", "open"]);
   });
 
   it("keeps a different tool or code in its own group", async () => {
@@ -59,6 +59,30 @@ describe("bug-class errno fingerprint (#4214)", () => {
     await reportError(enoent("a.ts"), { source: "worker", toolId: "upscale" });
     const [first, second] = h.scope.setFingerprint.mock.calls.map((c) => c[0]);
     expect(first).not.toEqual(second);
+  });
+
+  it("keeps the same errno from another syscall in its own group", async () => {
+    const cleanup = Object.assign(enoent("a.ts"), { syscall: "unlink" });
+    await reportError(enoent("a.ts"), { source: "worker", toolId: "upscale" });
+    await reportError(cleanup, { source: "worker", toolId: "upscale" });
+    const [first, second] = h.scope.setFingerprint.mock.calls.map((c) => c[0]);
+    expect(first).not.toEqual(second);
+  });
+
+  it("keeps a different errno of the same tool in its own group", async () => {
+    const exists = Object.assign(enoent("a.ts"), { code: "EEXIST" });
+    await reportError(enoent("a.ts"), { source: "worker", toolId: "upscale" });
+    await reportError(exists, { source: "worker", toolId: "upscale" });
+    const [first, second] = h.scope.setFingerprint.mock.calls.map((c) => c[0]);
+    expect(first).not.toEqual(second);
+  });
+
+  it("leaves default grouping for ERR_* codes and non-errno codes", async () => {
+    const node = Object.assign(new Error("bad arg"), { code: "ERR_INVALID_ARG_TYPE" });
+    const custom = Object.assign(new Error("tool broke"), { code: "TOOL_FAILED" });
+    await reportError(node, { source: "worker", toolId: "upscale" });
+    await reportError(custom, { source: "worker", toolId: "upscale" });
+    expect(h.scope.setFingerprint).not.toHaveBeenCalled();
   });
 
   it("leaves default grouping when there is no tool or no errno", async () => {
