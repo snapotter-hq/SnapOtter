@@ -10,7 +10,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -1022,14 +1022,10 @@ async function main() {
   }
 
   // Write JSON results
-  const resultsPath = join(
-    import.meta.dirname,
-    "..",
-    "..",
-    "docs",
-    "qa",
-    "pipeline-api-results.json",
-  );
+  // biome-ignore lint/suspicious/noUndeclaredEnvVars: QA scripts are run directly, outside Turbo.
+  const outDir = process.env.QA_OUT_DIR ?? join(import.meta.dirname, "..", "..", "docs", "qa");
+  mkdirSync(outDir, { recursive: true });
+  const resultsPath = join(outDir, "pipeline-api-results.json");
   writeFileSync(resultsPath, JSON.stringify(findings, null, 2));
   console.log(`\nResults written to: ${resultsPath}`);
 
