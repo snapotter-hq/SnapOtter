@@ -1339,6 +1339,19 @@ export class PythonDispatcher {
     return this.gpuAvail;
   }
 
+  /**
+   * For CPU-only refusals: whether a GPU could be doing this work. Until the
+   * dispatcher reports (boot, or a shutdown after a bundle install) the probe
+   * fields still hold their defaults, so this answers from the device node,
+   * the same fallback the memory gate in run() uses (#4746, #4502).
+   */
+  gpuMayBeAvailable(
+    framework: GpuFramework,
+    deviceExists: (path: string) => boolean = existsSync,
+  ): boolean {
+    return this.gpuProbed ? this.isGpuAvailable(framework) : isNvidiaDevicePresent(deviceExists);
+  }
+
   getStatus(): DispatcherStatus {
     return {
       running: this.child !== null && !this.child.killed,
@@ -1588,6 +1601,18 @@ function getAiDispatcher(): PythonDispatcher {
  */
 export function isGpuAvailable(framework?: GpuFramework): boolean {
   return getAiDispatcher().isGpuAvailable(framework);
+}
+
+/**
+ * Whether a GPU could run work for `framework`. Use this, not isGpuAvailable,
+ * to decide a CPU-only refusal: before the dispatcher's first probe it answers
+ * from the device node instead of "no GPU".
+ */
+export function gpuMayBeAvailable(
+  framework: GpuFramework,
+  deviceExists?: (path: string) => boolean,
+): boolean {
+  return getAiDispatcher().gpuMayBeAvailable(framework, deviceExists);
 }
 
 export function getDispatcherStatus(): DispatcherStatus {

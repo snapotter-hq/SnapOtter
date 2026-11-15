@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isGpuAvailable, isMemoryAllocError, removeBackground } from "@snapotter/ai";
+import { gpuMayBeAvailable, isMemoryAllocError, removeBackground } from "@snapotter/ai";
 import {
   getBundleForTool,
   hasServerErrorStatus,
@@ -173,7 +173,7 @@ async function processTransparencyFix(
   signal?: AbortSignal,
 ): Promise<Buffer> {
   // Checked here as well as in the route so pipeline and batch runs are guarded.
-  const refusal = hrMattingMemoryRefusal(isGpuAvailable("onnx"), availableMemoryBytes());
+  const refusal = hrMattingMemoryRefusal(gpuMayBeAvailable("onnx"), availableMemoryBytes());
   if (refusal) throw new Error(refusal);
 
   let workingBuffer = inputBuffer;
@@ -355,7 +355,7 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         // The HR matting model always takes a 2048x2048 input, so a CPU host short
         // on memory is SIGKILLed partway through. Refuse before any decode (#4510).
         const memoryRefusal = hrMattingMemoryRefusal(
-          isGpuAvailable("onnx"),
+          gpuMayBeAvailable("onnx"),
           availableMemoryBytes(),
         );
         if (memoryRefusal) {

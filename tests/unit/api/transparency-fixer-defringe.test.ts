@@ -26,6 +26,7 @@ const aiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@snapotter/ai", () => ({
+  gpuMayBeAvailable: vi.fn(() => false),
   isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: aiMocks.isMemoryAllocError,
   removeBackground: aiMocks.removeBackground,
