@@ -29,10 +29,10 @@
       "estimatedSize": "4-5 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/background-removal-amd64-gpu-r3.tar.gz",
-          "sha256": "18cbe7881abc0aec019824dcf6dacfc47608bc8bf55af3ca48c840735c77a714",
-          "compressedSize": 4833204151,
-          "extractedSize": 7197559452
+          "file": "v2.0.0/background-removal-amd64-gpu-r4.tar.gz",
+          "sha256": "7b6156eb100922716db39bcbf5a6207288b4f83bf6968081713e32be6c87f8f8",
+          "compressedSize": 4771013000,
+          "extractedSize": 7007305346
         },
         "arm64-cpu": {
           "file": "v2.0.0/background-removal-arm64-cpu-r3.tar.gz",
@@ -43,8 +43,8 @@
       },
       "packages": {
         "common": ["rembg==2.0.69"],
-        "amd64": ["onnxruntime-gpu==1.20.2", "mediapipe>=0.10.21"],
-        "arm64": ["onnxruntime==1.20.1", "mediapipe>=0.10.18"]
+        "amd64": ["onnxruntime-gpu==1.20.2", "mediapipe==0.10.35"],
+        "arm64": ["onnxruntime==1.20.1", "mediapipe==1.0.0"]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -112,13 +112,12 @@
       "name": "Face Detection",
       "description": "Detect and blur faces, fix red-eye, smart crop",
       "estimatedSize": "200-300 MB",
-      "requiresAvx": true,
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/face-detection-amd64-gpu-r2.tar.gz",
-          "sha256": "ff242709bd03befe424fa5096a9d60c6b70f22fcef8af803a1c86838140832be",
-          "compressedSize": 88895081,
-          "extractedSize": 260502197
+          "file": "v2.0.0/face-detection-amd64-gpu-r3.tar.gz",
+          "sha256": "e7c6eab1eaff265b324d0ee7e4b2d6592218704d11b75a7e0dc1ec74ce3a700c",
+          "compressedSize": 33007495,
+          "extractedSize": 88926970
         },
         "arm64-cpu": {
           "file": "v2.0.0/face-detection-arm64-cpu-r2.tar.gz",
@@ -129,8 +128,8 @@
       },
       "packages": {
         "common": [],
-        "amd64": ["mediapipe>=0.10.21"],
-        "arm64": ["mediapipe>=0.10.18"]
+        "amd64": ["mediapipe==0.10.35"],
+        "arm64": ["mediapipe==1.0.0"]
       },
       "pipFlags": {},
       "postInstall": [],
@@ -280,10 +279,10 @@
       "estimatedSize": "5-6 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/upscale-enhance-amd64-gpu-r2.tar.gz",
-          "sha256": "81f0c688abcdd277fbcdd5501aa22a4fe789e08fe9822811ea326a3de1a8b15d",
-          "compressedSize": 5371590150,
-          "extractedSize": 8454624391
+          "file": "v2.0.0/upscale-enhance-amd64-gpu-r3.tar.gz",
+          "sha256": "8b8283aca3fae0d44c81079c11c63686f144b0745123fa42e1b4122c7a0797f4",
+          "compressedSize": 5284733768,
+          "extractedSize": 8190951770
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu-r2.tar.gz",
@@ -304,14 +303,14 @@
           "lpips",
           "basicsr==1.4.2",
           "realesrgan==0.3.0",
-          "mediapipe>=0.10.21"
+          "mediapipe==0.10.35"
         ],
         "arm64": [
           "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
           "lpips",
           "basicsr==1.4.2",
           "realesrgan==0.3.0",
-          "mediapipe>=0.10.18"
+          "mediapipe==1.0.0"
         ]
       },
       "pipFlags": {
@@ -402,13 +401,12 @@
       "name": "Photo Restoration",
       "description": "Restore old or damaged photos",
       "estimatedSize": "4-5 GB",
-      "requiresAvx": true,
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/photo-restoration-amd64-gpu-r2.tar.gz",
-          "sha256": "38c82e61acf03980b97f6f2a4754dd7cdbc3d4d64f864bf2776168fc8fb91eea",
-          "compressedSize": 4693244387,
-          "extractedSize": 8220630756
+          "file": "v2.0.0/photo-restoration-amd64-gpu-r3.tar.gz",
+          "sha256": "3eea6423dd43e597d577e6688eaf043d0c732703247c32793b5791294fcf3cad",
+          "compressedSize": 4606370560,
+          "extractedSize": 7956958135
         },
         "arm64-cpu": {
           "file": "v2.0.0/photo-restoration-arm64-cpu-r2.tar.gz",
@@ -421,7 +419,7 @@
         "common": ["codeformer-pip==0.0.4", "huggingface-hub[hf_xet]==0.36.2", "setuptools<75"],
         "amd64": [
           "onnxruntime-gpu==1.20.2",
-          "mediapipe>=0.10.21",
+          "mediapipe==0.10.35",
           "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
           "lpips",
           "basicsr==1.4.2",
@@ -430,7 +428,7 @@
         "arm64": [
           "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
           "onnxruntime==1.20.1",
-          "mediapipe>=0.10.18",
+          "mediapipe==1.0.0",
           "lpips",
           "basicsr==1.4.2",
           "realesrgan==0.3.0"
