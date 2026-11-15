@@ -233,12 +233,18 @@ registerAiJobHandler(
 
       // Phase 1: AI background removal -> transparent PNG
       let transparentResult: Buffer;
+      // Reported back to the client, so it must name the model an
+      // out-of-memory retry switched to, not the one asked for (#4753).
+      let modelUsed: string | undefined = settings.model;
       try {
         transparentResult = await removeBackground(
           source,
           ctx.scratchDir,
           {
             model: settings.model,
+            onFallbackModel: (model) => {
+              modelUsed = model;
+            },
             edgeRefine: settings.edgeRefine,
             decontaminate: settings.decontaminate,
             signal: ctx.signal,
@@ -274,7 +280,7 @@ registerAiJobHandler(
         resultPayload: {
           maskUrl,
           filename: data.filename,
-          model: settings.model,
+          model: modelUsed,
         },
       };
     },

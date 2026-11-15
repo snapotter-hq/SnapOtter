@@ -353,6 +353,22 @@ describe("worker abort signal pass-through", () => {
     );
   });
 
+  it("remove-background reports the model an out-of-memory retry switched to (#4753)", async () => {
+    registerRemoveBackground(fakeApp);
+    vi.mocked(removeBackground).mockImplementationOnce(async (_input, _dir, options) => {
+      options?.onFallbackModel?.("birefnet-general");
+      return PNG;
+    });
+
+    const result = await runAiToolJob(
+      job("remove-background", { model: "birefnet-hr-matting" }),
+      PNG,
+      ctx,
+    );
+
+    expect(result.resultPayload).toMatchObject({ model: "birefnet-general" });
+  });
+
   it("upscale forwards ctx.signal to the sidecar call", async () => {
     registerUpscale(fakeApp);
 

@@ -14,7 +14,10 @@ import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface RemoveBackgroundOptions {
   model?: string;
+  /** One lighter model to retry on after an out-of-memory failure, or false for none. */
   oomFallbackModel?: string | false;
+  /** Called with the model actually used when an out-of-memory retry replaces `model`. */
+  onFallbackModel?: (model: string) => void;
   backgroundColor?: string;
   edgeRefine?: number;
   decontaminate?: boolean;
@@ -24,6 +27,13 @@ export interface RemoveBackgroundOptions {
 
 const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
 const OOM_FALLBACK_MODEL = "u2net";
+// The nearest lighter model to retry on after an out-of-memory failure, when
+// it is not u2net. HR matting outgrows 12 and 16 GB GPUs where birefnet-general
+// fits, and dropping Ultra straight to u2net swapped the best model for the
+// weakest one (#4753). A failure there still ends at u2net.
+const OOM_FALLBACK_STEPS: Readonly<Record<string, string>> = {
+  "birefnet-hr-matting": "birefnet-general",
+};
 
 /**
  * onnxruntime / CUDA / PyTorch CPU allocator / NumPy surface allocation
@@ -50,7 +60,7 @@ export async function removeBackground(
   options: RemoveBackgroundOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<Buffer> {
-  const { oomFallbackModel, signal, toolId, ...sidecarOptions } = options;
+  const { oomFallbackModel, onFallbackModel, signal, toolId, ...sidecarOptions } = options;
   const id = randomUUID();
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
@@ -92,6 +102,7 @@ export async function removeBackground(
       signal,
       toolId,
       oomFallbackModel,
+      onFallbackModel,
     );
 
     if (needsDownscale) {
@@ -108,12 +119,16 @@ export async function removeBackground(
 async function runAndParse(
   inputPath: string,
   outputPath: string,
-  options: Omit<RemoveBackgroundOptions, "oomFallbackModel" | "signal" | "toolId">,
+  options: Omit<
+    RemoveBackgroundOptions,
+    "oomFallbackModel" | "onFallbackModel" | "signal" | "toolId"
+  >,
   onProgress: ProgressCallback | undefined,
   timeout: number,
   signal: AbortSignal | undefined,
   toolId?: string,
   oomFallbackModel?: string | false,
+  onFallbackModel?: (model: string) => void,
 ): Promise<Buffer> {
   const runOptions = {
     onProgress,
@@ -121,10 +136,10 @@ async function runAndParse(
     signal,
     ...(toolId ? { toolId } : {}),
   };
-  try {
+  const attempt = async (opts: typeof options): Promise<Buffer> => {
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
-      [inputPath, outputPath, JSON.stringify(options)],
+      [inputPath, outputPath, JSON.stringify(opts)],
       runOptions,
     );
     const result = parseStdoutJson(stdout);
@@ -132,28 +147,26 @@ async function runAndParse(
       throw toBgRemovalError(result.error || "Background removal failed");
     }
     return await readScratchOutput("remove-bg", outputPath);
-  } catch (err) {
-    const isOom = isMemoryAllocError(err);
-    const fallbackModel = oomFallbackModel === undefined ? OOM_FALLBACK_MODEL : oomFallbackModel;
-    if (!isOom || !fallbackModel || options.model === fallbackModel) {
-      throw toBgRemovalError(err);
-    }
+  };
 
-    onProgress?.(5, `Retrying with lighter model (${fallbackModel})`);
-    const fallbackOpts = { ...options, model: fallbackModel };
+  let current = options;
+  // An explicit fallback is one step; the default walks OOM_FALLBACK_STEPS down to u2net.
+  let steps = oomFallbackModel === undefined ? Number.POSITIVE_INFINITY : 1;
+  for (;;) {
     try {
-      const { stdout } = await runPythonWithProgress(
-        "remove_bg.py",
-        [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-        runOptions,
-      );
-      const result = parseStdoutJson(stdout);
-      if (!result.success) {
-        throw toBgRemovalError(result.error || "Background removal failed");
+      return await attempt(current);
+    } catch (err) {
+      const next =
+        oomFallbackModel === undefined
+          ? (OOM_FALLBACK_STEPS[current.model ?? ""] ?? OOM_FALLBACK_MODEL)
+          : oomFallbackModel;
+      if (!isMemoryAllocError(err) || !next || steps <= 0 || current.model === next) {
+        throw toBgRemovalError(err);
       }
-      return await readScratchOutput("remove-bg", outputPath);
-    } catch (fallbackErr) {
-      throw toBgRemovalError(fallbackErr);
+      steps--;
+      onProgress?.(5, `Retrying with lighter model (${next})`);
+      onFallbackModel?.(next);
+      current = { ...current, model: next };
     }
   }
 }
