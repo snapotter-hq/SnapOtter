@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { POOLS, queueName } from "../../../../apps/api/src/jobs/types.js";
 import { isBinarySpawnFailure } from "../../../../apps/api/src/lib/binary-overrides.js";
+import { drainDoMockQueue } from "../../../helpers/mock-queue.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const initialSharpConcurrency = sharp.concurrency();
@@ -211,10 +212,8 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     },
   }));
 
-  // Vitest 4 resolves a run of queued vi.doMock calls in parallel and registers
-  // them in completion order, so an extraMocks override of a path mocked above
-  // could lose to the default. Any import drains the queue first.
-  await import("../../../../apps/api/src/jobs/connection.js");
+  // An extraMocks override of a path mocked above must not race the default.
+  await drainDoMockQueue();
   extraMocks?.();
 
   return import("../../../../apps/api/src/jobs/worker.js");
