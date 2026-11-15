@@ -1,8 +1,8 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 1295afb31707
+i18n_output_hash: 63386d8c2866
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ Lihat [daftar format lengkap](/id/guide/supported-formats) untuk detail setiap f
 - **Decode HEIF** memakan waktu 13-23 detik. HEIC (varian Apple) jauh lebih cepat, yaitu 0,3-0,9 detik.
 - **Upscale** mengalami timeout di CPU untuk gambar yang lebih dari kecil. GPU diperlukan untuk penggunaan praktis.
 - Peningkatan wajah **CodeFormer** jauh lebih lambat daripada GFPGAN (53 dtk vs 2 dtk di GPU). GFPGAN direkomendasikan untuk sebagian besar kasus penggunaan.
+
+### Instalasi bundel AI dengan beberapa replika {#ai-bundle-installs-with-several-replicas}
+
+Ubah bundel AI hanya saat satu replika berjalan. Menginstal bundel, mengimpornya secara offline, atau mereset lingkungan AI akan menulis ulang lingkungan Python bersama di `/data/ai/venv`. Instalasi menunggu job AI di replikanya sendiri, dan setiap tindakan ini kemudian me-restart sidecar replika tersebut, tetapi tidak satu pun dapat melihat job AI di replika lain. Sidecar di replika itu tetap memuat torch dan ONNX Runtime dari direktori tersebut saat direktori ditulis ulang, sehingga dapat crash di tengah job. Turunkan skala deployment menjadi satu replika (atau hentikan yang lain), lakukan perubahan, lalu naikkan skala kembali.
 
 ## Volume {#volumes}
 

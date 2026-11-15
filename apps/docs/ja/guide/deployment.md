@@ -1,8 +1,8 @@
 ---
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 7b2b4e0313ca
+i18n_output_hash: d7039e8cda27
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ SnapOtter は **55 以上の入力フォーマット**と **14 の出力フォ�
 - **HEIF のデコード**には 13-23 秒かかります。HEIC (Apple の派生形式) は 0.3-0.9 秒と、はるかに高速です。
 - **アップスケール**は、小さな画像を超えると CPU ではタイムアウトします。実用には GPU が必要です。
 - **CodeFormer** による顔補正は GFPGAN よりも大幅に遅くなります (GPU で 53 秒に対して 2 秒)。ほとんどの用途では GFPGAN を推奨します。
+
+### 複数レプリカでの AI バンドルのインストール {#ai-bundle-installs-with-several-replicas}
+
+AI バンドルを変更するときは、レプリカを 1 つだけ起動した状態にしてください。バンドルのインストール、オフラインでのインポート、AI 環境のリセットはいずれも、`/data/ai/venv` にある共有の Python 環境を書き換えます。インストールは自分のレプリカの AI ジョブの完了を待ち、これらの操作はいずれも終了後にそのレプリカのサイドカーを再起動しますが、他のレプリカの AI ジョブは見えません。他のレプリカのサイドカーは、そのディレクトリが書き換えられている間も torch と ONNX Runtime をそこから読み込んだままなので、ジョブの途中でクラッシュすることがあります。デプロイを 1 レプリカまでスケールダウンするか他のレプリカを停止し、変更を行ってから、元の数にスケールアップしてください。
 
 ## ボリューム {#volumes}
 

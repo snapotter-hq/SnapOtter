@@ -1,8 +1,8 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 5ca03ee758b7
+i18n_output_hash: 1bf173d153ad
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để 
 - **Giải mã HEIF** mất 13-23 giây. HEIC (biến thể của Apple) nhanh hơn nhiều, ở mức 0.3-0.9 giây.
 - **Upscale** bị hết thời gian chờ trên CPU với mọi ảnh lớn hơn ảnh nhỏ. Cần GPU để dùng thực tế.
 - Cải thiện khuôn mặt bằng **CodeFormer** chậm hơn đáng kể so với GFPGAN (53 giây so với 2 giây trên GPU). GFPGAN được khuyến nghị cho hầu hết trường hợp.
+
+### Cài đặt gói AI khi có nhiều replica {#ai-bundle-installs-with-several-replicas}
+
+Chỉ thay đổi các gói AI khi chỉ có một replica đang chạy. Việc cài một gói, nhập gói ngoại tuyến hoặc đặt lại môi trường AI sẽ ghi đè môi trường Python dùng chung trong `/data/ai/venv`. Bản cài đặt chờ các job AI trên replica của chính nó, và mỗi thao tác này sau đó đều khởi động lại sidecar của replica đó, nhưng không thao tác nào thấy được job AI trên các replica khác. Sidecar của các replica kia vẫn giữ torch và ONNX Runtime đã nạp từ thư mục đó trong lúc nó bị ghi đè, và có thể bị sập giữa chừng một job. Hãy giảm quy mô triển khai xuống một replica (hoặc dừng các replica còn lại), thực hiện thay đổi, rồi mở rộng trở lại.
 
 ## Volume {#volumes}
 

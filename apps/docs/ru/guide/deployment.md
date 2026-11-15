@@ -1,8 +1,8 @@
 ---
 description: "Развёртывание SnapOtter в продакшене с Docker. Требования к оборудованию, настройка GPU и конфигурации обратного прокси для Nginx, Traefik и Cloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: c56d7f2dcece
+i18n_output_hash: 41ae52f744e3
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ SnapOtter поддерживает **55+ входных форматов** и **
 - **Декодирование HEIF** занимает 13-23 секунды. HEIC (вариант Apple) намного быстрее: 0,3-0,9 секунды.
 - **Увеличение** на CPU завершается по тайм-ауту для всего, кроме небольших изображений. Для практического использования нужен GPU.
 - **Улучшение лиц CodeFormer** заметно медленнее GFPGAN (53 с против 2 с на GPU). Для большинства случаев рекомендуется GFPGAN.
+
+### Установка пакетов ИИ при нескольких репликах {#ai-bundle-installs-with-several-replicas}
+
+Меняйте пакеты ИИ только при одной запущенной реплике. Установка пакета, офлайн-импорт пакета и сброс среды ИИ перезаписывают общую среду Python в `/data/ai/venv`. Установка ждёт завершения задач ИИ на своей реплике, и после каждого из этих действий sidecar этой реплики перезапускается, но ни одно из них не видит задач ИИ на других репликах. Их sidecar продолжают держать torch и ONNX Runtime, загруженные из этого каталога, пока он перезаписывается, и могут упасть посреди задачи. Уменьшите развёртывание до одной реплики (или остановите остальные), внесите изменение, затем верните прежнее число реплик.
 
 ## Тома {#volumes}
 

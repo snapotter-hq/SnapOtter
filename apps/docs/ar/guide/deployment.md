@@ -1,8 +1,8 @@
 ---
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد، وإعداد GPU، وإعدادات الوكيل العكسي لكل من Nginx وTraefik وCloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 51ea735e08a1
+i18n_output_hash: 8f6a0286441e
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ deploy:
 - **فك ترميز HEIF** يستغرق 13-23 ثانية. أما HEIC (صيغة Apple) فأسرع بكثير: 0.3-0.9 ثانية.
 - **التكبير** تنتهي مهلته على CPU لأي صورة تتجاوز الصور الصغيرة. يلزم GPU للاستخدام العملي.
 - **تحسين الوجوه بـ CodeFormer** أبطأ بكثير من GFPGAN (53 ثانية مقابل 2 ثانية على GPU). يوصى بـ GFPGAN لمعظم حالات الاستخدام.
+
+### تثبيت حزم الذكاء الاصطناعي مع عدة نسخ متماثلة {#ai-bundle-installs-with-several-replicas}
+
+غيّر حزم الذكاء الاصطناعي ولا يعمل سوى نسخة متماثلة واحدة. تثبيت حزمة أو استيراد حزمة دون اتصال أو إعادة ضبط بيئة الذكاء الاصطناعي يعيد كتابة بيئة Python المشتركة في `/data/ai/venv`. ينتظر التثبيت انتهاء مهام الذكاء الاصطناعي على نسخته المتماثلة فقط، وكل عملية من هذه العمليات تعيد تشغيل العملية الجانبية (sidecar) لتلك النسخة بعد ذلك، لكن أيًّا منها لا يرى مهام الذكاء الاصطناعي على النسخ المتماثلة الأخرى. تبقى العمليات الجانبية في تلك النسخ محمّلةً بـ torch وONNX Runtime من هذا المجلد أثناء إعادة كتابته، وقد تتعطل في منتصف المهمة. قلّص النشر إلى نسخة متماثلة واحدة (أو أوقف النسخ الأخرى)، ثم أجرِ التغيير، ثم أعد التوسيع.
 
 ## وحدات التخزين {#volumes}
 

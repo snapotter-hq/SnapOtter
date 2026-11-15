@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。包含硬件要求、GPU 设置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: a3d06bc472b4
+i18n_output_hash: cb1d9f41ad17
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ SnapOtter 支持 **55 种以上输入格式**和 **14 种输出格式**，包括
 - **HEIF 解码**需要 13-23 秒。HEIC（Apple 的变体）要快得多，仅需 0.3-0.9 秒。
 - **放大**在 CPU 上处理稍大的图像就会超时。实际使用需要 GPU。
 - **CodeFormer** 人脸增强明显慢于 GFPGAN（GPU 上为 53 秒对 2 秒）。大多数场景推荐使用 GFPGAN。
+
+### 多副本部署下安装 AI 功能包 {#ai-bundle-installs-with-several-replicas}
+
+更改 AI 功能包时，只保留一个副本运行。安装功能包、离线导入功能包或重置 AI 环境，都会重写 `/data/ai/venv` 中共享的 Python 环境。安装会等待自身副本上的 AI 任务完成，这些操作随后都会重启该副本的 sidecar，但它们都看不到其他副本上的 AI 任务。其他副本的 sidecar 在该目录被重写期间，仍保持从中加载的 torch 和 ONNX Runtime，可能在任务中途崩溃。请先把部署缩减到一个副本（或停止其他副本），完成更改后再扩容回去。
 
 ## 卷 {#volumes}
 
