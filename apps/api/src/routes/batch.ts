@@ -925,7 +925,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // A failed finalize settles the parent row with its reason (the
             // workspace cap's message, for one); answer with that instead of
             // the plain Error BullMQ rejects with (#1161).
-            const failure = await settledFailureResponse(parentId, request.log);
+            const failure = await settledFailureResponse(parentId, request.log, toolId);
             if (!failure) throw markQueueEventsJobFailure(err);
             return reply.status(failure.status).send(failure.body);
           }

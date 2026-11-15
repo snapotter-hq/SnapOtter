@@ -273,6 +273,7 @@ export function registerSignPdf(app: FastifyInstance) {
               source: "http",
               route: request.routeOptions?.url,
               method: request.method,
+              toolId: TOOL_ID,
               jobId,
             });
             return false;
@@ -292,6 +293,7 @@ export function registerSignPdf(app: FastifyInstance) {
             source: "http",
             route: request.routeOptions?.url,
             method: request.method,
+            toolId: TOOL_ID,
             jobId,
           });
           return null;

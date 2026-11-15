@@ -233,6 +233,21 @@ describe("status_code tag (#1351)", () => {
     };
   }
 
+  it.each(["embedded", "external", "native"])("keeps the %s deploy_mode tag (#4742)", (mode) => {
+    const send = buildWebBeforeSend(() => true);
+    const out = asScrubbed(send(eventWithTags({ deploy_mode: mode, drop_me: "x" }), {}));
+    expect(out.tags).toEqual({ deploy_mode: mode });
+  });
+
+  it.each(["my-host.example.com", "/srv/snapotter", "", 7])(
+    "drops a deploy_mode value outside the install-type enum (%s)",
+    (value) => {
+      const send = buildWebBeforeSend(() => true);
+      const out = asScrubbed(send(eventWithTags({ deploy_mode: value, tool_id: "resize" }), {}));
+      expect(out.tags).toEqual({ tool_id: "resize" });
+    },
+  );
+
   it("keeps a valid status_code tag next to the other allowlisted tags", () => {
     const send = buildWebBeforeSend(() => true);
     const out = asScrubbed(

@@ -109,6 +109,8 @@ describe("GET /api/v1/config/analytics", () => {
     );
     expect(withSink.enabled).toBe(true);
     expect(withSink.feedbackSink).toBe(true);
+    // A fixed install-type enum, never a hostname or path (#4742).
+    expect(["embedded", "external", "native"]).toContain(withSink.deployMode);
 
     feedbackSink.present = false;
     const withoutSink = JSON.parse(

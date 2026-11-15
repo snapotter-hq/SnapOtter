@@ -99,6 +99,23 @@ describe("analytics lifecycle (#2197)", () => {
     expect(mockSentryInit).toHaveBeenCalledTimes(1);
   });
 
+  it("tags web Sentry events with the install type from the instance config (#4742)", async () => {
+    await mod.applyInstanceAnalytics({ ...ON, deployMode: "embedded" });
+    await settle();
+
+    expect(mockSentryInit).toHaveBeenCalledWith(
+      expect.objectContaining({ initialScope: { tags: { deploy_mode: "embedded" } } }),
+    );
+  });
+
+  it("starts Sentry without an install-type tag when the instance reports none", async () => {
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+
+    const opts = (mockSentryInit.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(opts).not.toHaveProperty("initialScope");
+  });
+
   it("drops errors captured while the instance was off", async () => {
     early.startEarlyErrorCapture();
     const err = new Error("while off");

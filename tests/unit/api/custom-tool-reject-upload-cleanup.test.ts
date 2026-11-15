@@ -956,12 +956,14 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
+      toolId: "sign-pdf",
       jobId: expect.any(String),
     });
     expect(mocks.reportError).toHaveBeenNthCalledWith(2, rowReadReset, {
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
+      toolId: "sign-pdf",
       jobId: expect.any(String),
     });
     expect(classifyError(statusReadReset, "http")).toBe("operational");
@@ -1003,6 +1005,7 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
+      toolId: "sign-pdf",
       jobId: expect.any(String),
     });
     expect(classifyError(transientStatusReset, "http")).toBe("operational");

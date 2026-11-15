@@ -1242,4 +1242,35 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       job: "system:job-reconciliation",
     });
   });
+  it("tags a corrupt result payload sidecar report with the job's tool id (#4742)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+    dbSelectRows.rows = [
+      {
+        id: "job-corrupt-sidecar",
+        toolId: "compress",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 100,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+    listObjectsMock.mockResolvedValueOnce([
+      { key: "outputs/job-corrupt-sidecar/.result-payload.json", size: 64, mtimeMs: 1_000 },
+      { key: "outputs/job-corrupt-sidecar/out.jpg", size: 256, mtimeMs: 1_001 },
+    ]);
+    getObjectBufferMock.mockResolvedValueOnce(Buffer.from("{not json"));
+
+    await reconcileStrandedJobs({ graceMs: 0 });
+
+    expect(reportErrorMock).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      source: "worker",
+      pool: "system",
+      toolId: "compress",
+      jobId: "job-corrupt-sidecar",
+      periodic: true,
+      job: "system:job-reconciliation",
+    });
+  });
 });
