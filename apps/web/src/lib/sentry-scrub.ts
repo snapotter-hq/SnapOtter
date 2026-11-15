@@ -204,6 +204,7 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     }
 
     const rebuilt = rebuildErrorValue(hint?.originalException);
+    const errorless = hint?.originalException == null;
 
     const values = asObj(event.exception)?.values;
     if (Array.isArray(values)) {
@@ -211,8 +212,14 @@ export function buildWebBeforeSend(isActive: () => boolean) {
         const ex = asObj(values[i]);
         if (!ex) continue;
         // The last entry is the original error; linked/outer wrappers get type-only.
-        ex.value = i === values.length - 1 && rebuilt ? rebuilt : ex.type;
+        const isOriginal = i === values.length - 1;
         const frames = asObj(ex.stacktrace)?.frames;
+        ex.value =
+          isOriginal && rebuilt
+            ? rebuilt
+            : isOriginal && errorless && isGlobalOnerror(ex)
+              ? (errorEventValue(ex.value, frames) ?? ex.type)
+              : ex.type;
         if (Array.isArray(frames)) {
           for (const entry of frames) {
             const frame = asObj(entry);
@@ -236,6 +243,36 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     }
     return event;
   };
+}
+
+function isGlobalOnerror(ex: AnyEvent): boolean {
+  const type = asObj(ex.mechanism)?.type;
+  return typeof type === "string" && type.includes("global_handlers.onerror");
+}
+
+/**
+ * window.onerror hands Sentry a bare ErrorEvent with no Error object when a
+ * worker script throws (pdf.js's worker, WEB-1A): there is no originalException
+ * for rebuildErrorValue, and falling back to the type alone left 360 events
+ * titled "Error: Error". The message the browser reported goes through the
+ * same redactor as every other value, and the throwing script's basename and
+ * line number follow it, never its path or query string.
+ */
+function errorEventValue(message: unknown, frames: unknown): string | null {
+  const text = typeof message === "string" ? redactMessage(message).trim() : "";
+  const top = Array.isArray(frames) ? asObj(frames[frames.length - 1]) : null;
+  const file = typeof top?.filename === "string" ? scriptBasename(top.filename) : "";
+  const line = typeof top?.lineno === "number" ? top.lineno : null;
+  const where = file ? `${file}${line === null ? "" : `:${line}`}` : "";
+  if (text && where) return `${text} (${where})`;
+  return text || (where ? `Script error (${where})` : null);
+}
+
+// blob: and data: URLs name no file, and a blob id is unique per session.
+function scriptBasename(filename: string): string {
+  if (/^(blob|data):/i.test(filename)) return "";
+  const path = scrubFramePath(filename.split(/[?#]/)[0]);
+  return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
 }
 
 // App bundle frames are http(s) URLs: keep the host-less pathname so Sentry can
