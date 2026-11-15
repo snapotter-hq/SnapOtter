@@ -5011,7 +5011,7 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
     await readyPromise;
 
     const reqPromise = runPythonWithProgress("remove_bg.py", []);
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.waitFor(() => expect(mock.stdinWrites.length).toBeGreaterThan(0));
     const { id } = JSON.parse(mock.stdinWrites.join("").trim());
     const arenaOom =
       "[ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code returned while running BiasGelu node. " +

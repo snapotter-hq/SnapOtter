@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { isMemoryAllocError } from "../../../packages/ai/src/background-removal.js";
+import { toSidecarError } from "../../../packages/ai/src/bridge.js";
 import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -56,8 +57,8 @@ open(src, "wb").write(b"img")
 def run(model, providers, total_gb, free_gb, free_after_evict_gb=None):
     gpu.onnx_providers = lambda: (providers, "cuda" if "CUDAExecutionProvider" in providers else "cpu")
     frees = [free_gb, free_after_evict_gb if free_after_evict_gb is not None else free_gb]
-    session_cache._total_vram_bytes = lambda: int(total_gb * GB)
-    session_cache.free_vram_bytes = lambda: int((frees.pop(0) if len(frees) > 1 else frees[0]) * GB)
+    session_cache.device_vram_bytes = lambda: (
+        int(total_gb * GB), int((frees.pop(0) if len(frees) > 1 else frees[0]) * GB))
     loaded.clear(); info.clear()
     out = io.StringIO()
     saved = sys.stdout
@@ -94,7 +95,9 @@ arena = ("[ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code retu
          "requested buffer of size 805306368")
 report["poison"] = {
     "arena_oom": dispatcher._is_cuda_poison_error(arena),
-    "cuda_oom": dispatcher._is_cuda_poison_error("CUDA failure 2: out of memory"),
+    "oom_then_poison": dispatcher._is_cuda_poison_error(
+        "[session-cache] evicted all sessions (out of memory)\\n" + arena.replace("Failed to allocate memory", "CUDA failure 999: unknown error")),
+    "ort_other": dispatcher._is_cuda_poison_error("[ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : failed to run session"),
     "shortfall": dispatcher._is_cuda_poison_error(report["card12"]["result"].get("error", "")),
     "cuda_999": dispatcher._is_cuda_poison_error("[ONNXRuntimeError] : 1 : FAIL : CUDA failure 999: unknown error"),
     "illegal": dispatcher._is_cuda_poison_error("CUDA error: an illegal memory access was encountered"),
@@ -134,7 +137,10 @@ describe.runIf(hasPython)("remove_bg VRAM gate for birefnet-hr-matting (#4744)",
   });
 
   it("words the refusal so the API's lighter-model retry picks it up", () => {
-    expect(isMemoryAllocError(new Error(report.card12.result.error))).toBe(true);
+    // removeBackground wraps the script's error exactly like this before the
+    // route's isMemoryAllocError check decides whether to retry.
+    const wrapped = toSidecarError(report.card12.result.error, "Background removal failed");
+    expect(isMemoryAllocError(wrapped)).toBe(true);
   });
 
   it("still loads lighter models on the same card", () => {
@@ -165,7 +171,8 @@ describe.runIf(hasPython)("remove_bg VRAM gate for birefnet-hr-matting (#4744)",
   it("does not treat an allocation failure as a poisoned CUDA context", () => {
     expect(report.poison).toEqual({
       arena_oom: false,
-      cuda_oom: false,
+      oom_then_poison: true,
+      ort_other: true,
       shortfall: false,
       cuda_999: true,
       illegal: true,

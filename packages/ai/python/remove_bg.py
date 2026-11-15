@@ -174,9 +174,9 @@ ALLOWED_MODELS = {
 # HR matting takes a fixed 2048x2048 fp32 input. On a 12 GB RTX 4070 it fails
 # after filling about 11.6 GB whatever the provider options (arena strategy,
 # cuDNN search, workspace cap, graph optimization level), and one CPU-provider
-# run peaks at 21.5 GB RSS (#4744). 16 GiB rules out the 8 to 16 GB cards it
-# can't fit on; a card above that which still runs short gets a plain
-# allocation error, which the caller treats the same way.
+# run peaks at 21.5 GB RSS (#4744). 16 GiB is a floor from that evidence, not a
+# measured CUDA peak (#4747): a bigger card that still runs short gets a plain
+# allocation error, which the caller handles the same way.
 _MIN_FREE_VRAM_BYTES = {"birefnet-hr-matting": 16 * 1024**3}
 
 
@@ -184,23 +184,22 @@ def _gpu_memory_shortfall(model, providers):
     """(needed, free) bytes when `model` cannot fit in free VRAM, else None.
 
     Evicts cached sessions first when that could make the difference, so a
-    session kept from an earlier request never forces a lighter model. An
-    unreadable VRAM figure returns None and the load is attempted as before.
+    session kept from an earlier request never forces a lighter model. VRAM
+    that can't be read returns None and the load is attempted as before.
     """
     needed = _MIN_FREE_VRAM_BYTES.get(model)
     if not needed or "CUDAExecutionProvider" not in providers:
         return None
-    from session_cache import _total_vram_bytes, evict_all, free_vram_bytes
+    from session_cache import device_vram_bytes, evict_all
 
-    total = _total_vram_bytes()
-    if 0 < total < needed:
-        return needed, free_vram_bytes()
-    free = free_vram_bytes()
-    if free <= 0 or free >= needed:
+    total, free = device_vram_bytes()
+    if total <= 0 or free >= needed:
         return None
+    if total < needed:
+        return needed, free
     if evict_all(f"making room for {model}"):
-        free = free_vram_bytes()
-        if free <= 0 or free >= needed:
+        total, free = device_vram_bytes()
+        if total <= 0 or free >= needed:
             return None
     return needed, free
 

@@ -70,14 +70,14 @@ def _visible_gpu_index():
     return int(first) if first.isdigit() else "all"
 
 
-def _vram_bytes(field):
-    """VRAM of the GPU the sidecar uses, or 0. `field` is "total" or "free".
+def _total_vram_bytes():
+    """Total VRAM of the GPU the sidecar uses, or 0.
 
     The background-removal bundle ships onnxruntime without torch, so torch
     alone would leave exactly those hosts with caching silently off. When the
     device can't be pinned (nvidia-smi orders by PCI bus, CUDA by speed, and
     CUDA_VISIBLE_DEVICES may hold UUIDs) the smallest card is used, so the
-    answer errs low instead of sizing itself from a bigger GPU than ORT runs on.
+    budget errs low instead of sizing itself from a bigger GPU than ORT runs on.
     """
     index = _visible_gpu_index()
     if index is None:
@@ -85,30 +85,55 @@ def _vram_bytes(field):
     try:
         import torch
         if torch.cuda.is_available():
-            free, total = torch.cuda.mem_get_info()
-            return total if field == "total" else free
+            return torch.cuda.mem_get_info()[1]
     except Exception:
         pass
     try:
         out = subprocess.run(
-            ["nvidia-smi", f"--query-gpu=memory.{field}", "--format=csv,noheader,nounits"],
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
         )
         if out.returncode == 0:
-            values = [int(line) * 1024 * 1024 for line in out.stdout.split()]
-            return min(values) if index == "all" else values[index]
+            totals = [int(line) * 1024 * 1024 for line in out.stdout.split()]
+            return min(totals) if index == "all" else totals[index]
     except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
         pass
     return 0
 
 
-def _total_vram_bytes():
-    return _vram_bytes("total")
+def device_vram_bytes():
+    """(total, free) VRAM of the one GPU ORT will run on, or (0, 0) when unknown.
 
-
-def free_vram_bytes():
-    """Free VRAM right now, or 0 when it can't be read. Counts other processes too."""
-    return _vram_bytes("free")
+    Unlike _total_vram_bytes this never guesses: a caller refusing work on it
+    must not size a 24 GB card by a smaller display card next to it, so an
+    unpinnable multi-GPU host reads as unknown. Free counts other processes too.
+    """
+    index = _visible_gpu_index()
+    if index is None:
+        return 0, 0
+    try:
+        import torch
+        if torch.cuda.is_available():
+            free, total = torch.cuda.mem_get_info()
+            return total, free
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total,memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if out.returncode != 0:
+            return 0, 0
+        rows = [line.split(",") for line in out.stdout.strip().splitlines()]
+        if index == "all":
+            if len(rows) != 1:
+                return 0, 0
+            index = 0
+        total, free = (int(v.strip()) * 1024 * 1024 for v in rows[index])
+        return total, free
+    except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return 0, 0
 
 
 _auto_budget_cache = None

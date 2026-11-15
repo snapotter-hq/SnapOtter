@@ -566,16 +566,19 @@ const EXIT_STDERR_TAIL_LINES = 20;
 const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
 
 const CUDA_POISON_RE =
-  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
 
-// An allocation failure leaves the CUDA context usable, so it must not count as
-// poison even though every ORT error string matches "onnxruntimeerror" (#4744).
-// Mirrors _ALLOC_FAILURE_RE in dispatcher.py.
-const ALLOC_FAILURE_RE =
-  /failed to allocate memory|out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed/i;
+// Every ONNX Runtime error carries one of these wrappers, including an arena
+// allocation failure, which leaves the CUDA context usable. So the wrapper alone
+// only counts as poison when the error isn't an allocation failure; the specific
+// CUDA signatures above count whatever else the output says (#4744). Mirrors
+// _is_cuda_poison_error in dispatcher.py.
+const ORT_WRAPPER_RE = /ort_runtime_exception|onnxruntimeerror/i;
+const ALLOC_FAILURE_RE = /failed to allocate memory|out of memory/i;
 
 function isCudaPoison(text: string): boolean {
-  return CUDA_POISON_RE.test(text) && !ALLOC_FAILURE_RE.test(text);
+  if (CUDA_POISON_RE.test(text)) return true;
+  return ORT_WRAPPER_RE.test(text) && !ALLOC_FAILURE_RE.test(text);
 }
 
 const PRE_EXEC_GATE_ERRORS = new Set([
