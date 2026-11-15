@@ -15,7 +15,9 @@ permissions:
 jobs:
   mutation:
     name: Stryker (${{ matrix.lane }})
-    runs-on: ubuntu-latest
+    # Same image as ci.yml's Unit job: the api lane runs its tests and needs
+    # the same apt packages and EXR coder, which 26.04 lacks (#4768, #4749).
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       # One broken lane must not hide the others. This is exactly how the
@@ -38,6 +40,10 @@ jobs:
             report: packages/doc-engine/reports/mutation/
           - lane: api
             run: packages/image-engine/node_modules/.bin/stryker run stryker.api.config.json
+            # The api lane runs tests/unit/api, which expects the decoder tools
+            # the Unit job installs in ci.yml; keep this list in step with it
+            # (#4749).
+            apt: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
             incremental: reports/stryker-api-incremental.json
             report: reports/mutation-api/
           - lane: shared
@@ -47,6 +53,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
+      - name: Install system dependencies
+        if: ${{ matrix.apt }}
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ matrix.apt }}
+      # Same as the Unit job: Ubuntu's ImageMagick ships without an EXR coder,
+      # and the EXR decode test in tests/unit/api fails without one (#4749).
+      - name: Install the ImageMagick EXR coder and verify
+        if: ${{ matrix.apt }}
+        run: |
+          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
+            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+          else
+            echo "No supported ImageMagick EXR coder package found" >&2
+            exit 1
+          fi
+          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
       - name: Restore incremental mutation state
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
