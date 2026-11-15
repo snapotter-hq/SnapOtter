@@ -2,7 +2,7 @@
 description: "SnapOtter in der Produktion mit Docker bereitstellen. Hardwareanforderungen, GPU-Einrichtung und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: ed4aa5fa75bf
+i18n_output_hash: 4a3faf5372d0
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Die [vollständige Formatliste](/de/guide/supported-formats) enthält Details zu
 | Mount / Volume | Zweck | Erforderlich? |
 |---|---|---|
 | `/data` (app) | KI-Modelle, Python-venv, Benutzerdateien | **Ja**, ohne es gehen Dateien verloren |
-| `/tmp/workspace` (app) | Temporäre Verarbeitungsdateien (werden automatisch bereinigt) | Empfohlen |
+| `/tmp/workspace` (app) | Temporäre Verarbeitungsdateien und Auftragsausgaben (werden automatisch bereinigt). Nicht unter `/data` gespeichert, daher gehen Ergebnisse beim Ersetzen des Containers verloren, wenn dieses Verzeichnis nicht eingebunden ist | Empfohlen |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL-Datenverzeichnis (Benutzer, Einstellungen, Pipelines, Jobs) | **Ja**, ohne es gehen Daten verloren |
 | `SnapOtter-redisdata` (redis) | Redis-Append-only-Datei für dauerhafte Job-Warteschlangen | Empfohlen |
+
+### Auftragsausgaben mit `docker run` behalten {#keeping-job-output}
+
+Auftragsergebnisse liegen unter `/tmp/workspace`. Das ist Dateisystem des Containers, solange Sie es nicht einbinden. Mit nur `-v SnapOtter-data:/data` bleiben Ihre Benutzer, Einstellungen und Dateien erhalten, doch die Ergebnisse früherer Aufträge sind weg, sobald der Container ersetzt wird, und ihre Download-Links liefern 404. Um sie zu behalten, binden Sie zusätzlich den Workspace ein:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Die Compose-Stacks binden `SnapOtter-workspace` bereits ein.
 
 ### Bind-Mounts und benannte Volumes {#bind-mounts-vs-named-volumes}
 

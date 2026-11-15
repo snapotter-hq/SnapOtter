@@ -1,8 +1,8 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: aa8428189808
+i18n_source_hash: 288f6c9218f6
 i18n_provenance: machine
-i18n_output_hash: 8cfb48c1f68f
+i18n_output_hash: c959ff992908
 i18n_hash_version: 2
 ---
 
@@ -19,6 +19,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 تشغّل هذه الحاوية الواحدة كل ما تحتاج إليه: عند عدم ضبط `DATABASE_URL`، تبدأ PostgreSQL وRedis الخاصتين بها على واجهة loopback (الوضع المضمَّن) وتحفظ جميع البيانات في وحدة التخزين `SnapOtter-data`. وهي أسرع طريقة لتجربة SnapOtter أو استضافته ذاتياً على خادم منزلي. للإنتاج، استخدم [حزمة Docker Compose المعتمدة](#docker-compose) التي تُبقي PostgreSQL وRedis في حاويتيهما الخاصتين. يعمل الوضع المضمَّن بصلاحيات root (الافتراضي) ويتوقف تلقائياً بمجرد ضبط `DATABASE_URL`.
+
+لا تُحفظ نتائج المهام في وحدة تخزين البيانات، لذا تختفي عند استبدال الحاوية (عند ترقية الصورة مثلًا) وتتوقف روابط تنزيلها عن العمل. يشرح قسم وحدات التخزين في دليل النشر كيفية الاحتفاظ بها.
 
 هل تثبّت على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير؟ راجع [الإعدادات منخفضة الموارد](/ar/guide/low-resource) للحصول على شرح مضبوط وما يمكن توقعه من العتاد المحدود.
 

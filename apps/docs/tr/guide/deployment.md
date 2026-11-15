@@ -2,7 +2,7 @@
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: aa3bcbf1132a
+i18n_output_hash: 8ef22d768f2b
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Desteklenen her biçim, kullanılan çözücü ve mevcut kalite denetimleri hakk
 | Bağlama / Birim | Amaç | Gerekli mi? |
 |---|---|---|
 | `/data` (uygulama) | AI modelleri, Python venv, kullanıcı dosyaları | **Evet** - onsuz dosya kaybı olur |
-| `/tmp/workspace` (uygulama) | Geçici işleme dosyaları (otomatik temizlenir) | Önerilir |
+| `/tmp/workspace` (uygulama) | Geçici işleme dosyaları ve iş çıktıları (otomatik temizlenir). `/data` altında saklanmaz, bu yüzden bu dizin bağlanmadıkça kapsayıcı değiştirildiğinde sonuçlar kaybolur | Önerilir |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL veri dizini (kullanıcılar, ayarlar, işlem hatları, işler) | **Evet** - onsuz veri kaybı olur |
 | `SnapOtter-redisdata` (redis) | Dayanıklı iş kuyrukları için Redis yalnızca-ekleme dosyası | Önerilir |
+
+### `docker run` ile iş çıktısını korumak {#keeping-job-output}
+
+İş sonuçları `/tmp/workspace` altında bulunur ve bağlamadığınız sürece kapsayıcının dosya sisteminin bir parçasıdır. Yalnızca `-v SnapOtter-data:/data` ile kullanıcılarınız, ayarlarınız ve dosyalarınız korunur, ancak önceki işlerin sonuçları kapsayıcı değiştirilir değiştirilmez kaybolur ve indirme bağlantıları 404 döndürür. Bunları korumak için workspace'i de bağlayın:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose yığınları `SnapOtter-workspace` birimini zaten bağlar.
 
 ### Bind mount'lar ve adlandırılmış birimler {#bind-mounts-vs-named-volumes}
 

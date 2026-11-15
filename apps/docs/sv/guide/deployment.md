@@ -2,7 +2,7 @@
 description: "Driftsätt SnapOtter i produktion med Docker. Maskinvarukrav, GPU-konfiguration och reverse proxy-konfigurationer för Nginx, Traefik och Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 5ebffa079af5
+i18n_output_hash: ac19fd3aae87
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Se den [fullständiga formatlistan](/sv/guide/supported-formats) för detaljer o
 | Monteringspunkt / volym | Syfte | Krävs? |
 |---|---|---|
 | `/data` (app) | AI-modeller, Python-venv, användarfiler | **Ja** - filförlust utan den |
-| `/tmp/workspace` (app) | Temporära bearbetningsfiler (rensas automatiskt) | Rekommenderas |
+| `/tmp/workspace` (app) | Temporära bearbetningsfiler och jobbutdata (rensas automatiskt). Lagras inte under `/data`, så resultaten går förlorade när containern byts ut om den här katalogen inte är monterad | Rekommenderas |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL-datakatalog (användare, inställningar, pipelines, jobb) | **Ja** - dataförlust utan den |
 | `SnapOtter-redisdata` (redis) | Redis append-only-fil för beständiga jobbköer | Rekommenderas |
+
+### Behålla jobbutdata med `docker run` {#keeping-job-output}
+
+Jobbresultat ligger under `/tmp/workspace`, som är en del av containerns filsystem om du inte monterar det. Med bara `-v SnapOtter-data:/data` finns dina användare, inställningar och filer kvar, men resultaten från tidigare jobb är borta så fort containern byts ut, och deras nedladdningslänkar ger 404. Montera även workspace för att behålla dem:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose-stackarna monterar redan `SnapOtter-workspace`.
 
 ### Bind mounts jämfört med namngivna volymer {#bind-mounts-vs-named-volumes}
 

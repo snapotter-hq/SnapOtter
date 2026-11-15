@@ -2,7 +2,7 @@
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 306ca03c89bd
+i18n_output_hash: 03fa7fd41dc3
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ SnapOtter **55+ इनपुट फ़ॉर्मेट** और **14 आउट
 | माउंट / वॉल्यूम | उद्देश्य | आवश्यक? |
 |---|---|---|
 | `/data` (app) | AI मॉडल, Python venv, उपयोगकर्ता फ़ाइलें | **हाँ** - इसके बिना फ़ाइलें खो जाती हैं |
-| `/tmp/workspace` (app) | अस्थायी प्रोसेसिंग फ़ाइलें (अपने आप साफ़ होती हैं) | अनुशंसित |
+| `/tmp/workspace` (app) | अस्थायी प्रोसेसिंग फ़ाइलें और जॉब आउटपुट (अपने आप साफ़ होते हैं)। यह `/data` में संग्रहीत नहीं होता, इसलिए इसे माउंट न करने पर कंटेनर बदलते ही नतीजे खो जाते हैं | अनुशंसित |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL डेटा डायरेक्टरी (उपयोगकर्ता, सेटिंग, पाइपलाइन, जॉब) | **हाँ** - इसके बिना डेटा खो जाता है |
 | `SnapOtter-redisdata` (redis) | टिकाऊ जॉब क्यू के लिए Redis append-only फ़ाइल | अनुशंसित |
+
+### `docker run` के साथ जॉब आउटपुट सुरक्षित रखना {#keeping-job-output}
+
+जॉब के नतीजे `/tmp/workspace` में रहते हैं, जो माउंट न करने पर कंटेनर के फ़ाइल सिस्टम का हिस्सा है। केवल `-v SnapOtter-data:/data` देने पर आपके उपयोगकर्ता, सेटिंग और फ़ाइलें बनी रहती हैं, लेकिन पिछले जॉब के नतीजे कंटेनर बदलते ही चले जाते हैं और उनके डाउनलोड लिंक 404 लौटाते हैं। उन्हें सुरक्षित रखने के लिए वर्कस्पेस को भी माउंट करें:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose स्टैक पहले से `SnapOtter-workspace` माउंट करते हैं।
 
 ### बाइंड माउंट बनाम नामित वॉल्यूम {#bind-mounts-vs-named-volumes}
 

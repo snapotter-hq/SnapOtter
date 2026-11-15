@@ -2,7 +2,7 @@
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 9ee358838831
+i18n_output_hash: 5ca03ee758b7
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để 
 | Mount / Volume | Mục đích | Bắt buộc? |
 |---|---|---|
 | `/data` (app) | Mô hình AI, Python venv, tệp người dùng | **Có** - mất tệp nếu thiếu |
-| `/tmp/workspace` (app) | Tệp xử lý tạm thời (tự động dọn) | Khuyến nghị |
+| `/tmp/workspace` (app) | Tệp xử lý tạm thời và kết quả đầu ra của job (tự động dọn). Không được lưu trong `/data`, nên kết quả sẽ mất khi container được thay thế nếu thư mục này không được mount | Khuyến nghị |
 | `SnapOtter-pgdata` (postgres) | Thư mục dữ liệu PostgreSQL (người dùng, cài đặt, pipeline, tác vụ) | **Có** - mất dữ liệu nếu thiếu |
 | `SnapOtter-redisdata` (redis) | Tệp append-only của Redis cho hàng đợi tác vụ bền vững | Khuyến nghị |
+
+### Giữ lại kết quả đầu ra của job với `docker run` {#keeping-job-output}
+
+Kết quả của job nằm trong `/tmp/workspace`, thuộc hệ thống tệp của container trừ khi bạn mount nó. Chỉ với `-v SnapOtter-data:/data`, người dùng, cài đặt và tệp của bạn vẫn được giữ, nhưng kết quả của các job trước sẽ mất ngay khi container được thay thế, và liên kết tải xuống của chúng trả về 404. Để giữ lại, hãy mount thêm workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Các stack Compose đã mount sẵn `SnapOtter-workspace`.
 
 ### Bind mount so với named volume {#bind-mounts-vs-named-volumes}
 
