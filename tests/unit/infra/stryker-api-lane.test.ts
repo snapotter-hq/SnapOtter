@@ -10,14 +10,16 @@ import strykerApiConfig from "../../../vitest.stryker-api.config.js";
  * dry run only passes when those tests see the same environment the Unit job
  * gives them. It went weeks without a score because it didn't (#4749): the
  * lane dropped the root config's env (MAX_BATCH_SIZE fell back to 100) and its
- * runner lacked the decoder tools the Unit job installs (no djxl, so the JXL
- * preview test failed). Stryker aborts on the first failing test of the dry
+ * runner lacked the decoder tools the Unit job installs (no djxl for the JXL
+ * preview test, no ImageMagick EXR coder for the EXR decode test). Stryker aborts on the first failing test of the dry
  * run, so each gap hid the next one.
  */
 
 const root = path.resolve(import.meta.dirname, "../../..");
 
 interface Step {
+  name?: string;
+  run?: string;
   uses?: string;
   if?: string;
   with?: Record<string, string>;
@@ -67,5 +69,16 @@ describe("api mutation lane (#4749)", () => {
     expect(installStep?.with?.packages).toBe("${{ matrix.apt }}");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression
     expect(installStep?.if).toBe("${{ matrix.apt }}");
+  });
+
+  it("installs the ImageMagick EXR coder the same way the Unit job does", () => {
+    const exrStep = (steps: Step[]) =>
+      steps.find((step) => step.name?.startsWith("Install the ImageMagick EXR coder"));
+    const unitExr = exrStep(readWorkflow("ci.yml").jobs["test-unit"].steps);
+    const laneExr = exrStep(readWorkflow("mutation.yml").jobs.mutation.steps);
+    expect(unitExr?.run).toBeDefined();
+    expect(laneExr?.run).toBe(unitExr?.run);
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression
+    expect(laneExr?.if).toBe("${{ matrix.apt }}");
   });
 });
