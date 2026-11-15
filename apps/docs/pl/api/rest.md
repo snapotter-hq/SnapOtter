@@ -1,6 +1,7 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: a086ba746be3
+i18n_output_hash: 53e8d429a362
+i18n_hash_version: 2
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -537,7 +538,7 @@ Aby automatycznie zapisać wynik narzędzia w bibliotece, dołącz `fileId` jako
 
 ## Ustawienia {#settings}
 
-Konfiguracja środowiska uruchomieniowego używa zamkniętego zbioru rozpoznawanych kluczy. Odczyt wymaga uprawnienia `settings:read`, a zapis — `settings:write`; klucze zabezpieczeń i zgodności dodatkowo wymagają uprawnienia `security:manage` lub `compliance:manage`. Ustawienia tajne wymagają uprawnień pełnego administratora, natomiast poświadczenia i stan zarządzane przez dedykowane punkty końcowe są tutaj tylko do odczytu. Aktualizacje zbiorcze są weryfikowane przed zapisaniem jakiejkolwiek wartości.
+Konfiguracja środowiska uruchomieniowego używa zamkniętego zbioru rozpoznawanych kluczy. Odczyt wymaga uprawnienia `settings:read`, a zapis, `settings:write`; klucze zabezpieczeń i zgodności dodatkowo wymagają uprawnienia `security:manage` lub `compliance:manage`. Ustawienia tajne wymagają uprawnień pełnego administratora, natomiast poświadczenia i stan zarządzane przez dedykowane punkty końcowe są tutaj tylko do odczytu. Aktualizacje zbiorcze są weryfikowane przed zapisaniem jakiejkolwiek wartości.
 
 | Metoda | Ścieżka | Opis |
 |--------|------|-------------|

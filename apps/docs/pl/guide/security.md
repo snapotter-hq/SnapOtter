@@ -1,6 +1,6 @@
 ---
 description: "Przewodnik utwardzania bezpieczeństwa SnapOtter. Bezpieczeństwo kontenera, izolacja sieci, sekrety Docker, wdrożenie w Kubernetes i artefakty zgodności."
-i18n_source_hash: 5cf773ddb4c0
+i18n_source_hash: 630381c08cde
 i18n_provenance: machine
 i18n_output_hash: 29ec324a8903
 i18n_hash_version: 2

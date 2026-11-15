@@ -1,5 +1,5 @@
 /**
- * API key edge-case tests — name validation, delete behavior, key revocation.
+ * API key edge-case tests, name validation, delete behavior, key revocation.
  */
 
 import { eq } from "drizzle-orm";
@@ -241,7 +241,7 @@ describe("API key delete behavior", () => {
     });
     const { id: keyId, key: rawKey } = JSON.parse(createRes.body);
 
-    // Use the key — should succeed
+    // Use the key: should succeed
     const beforeRes = await testApp.app.inject({
       method: "GET",
       url: "/api/v1/settings",
@@ -257,7 +257,7 @@ describe("API key delete behavior", () => {
     });
     expect(delRes.statusCode).toBe(200);
 
-    // Use the key again — should fail
+    // Use the key again, should fail
     const afterRes = await testApp.app.inject({
       method: "GET",
       url: "/api/v1/settings",

@@ -1,9 +1,9 @@
 /**
  * API Key management routes.
  *
- * POST   /api/v1/api-keys      — Generate a new API key
- * GET    /api/v1/api-keys      — List the current user's API keys
- * DELETE /api/v1/api-keys/:id  — Delete an API key
+ * POST   /api/v1/api-keys: Generate a new API key
+ * GET    /api/v1/api-keys: List the current user's API keys
+ * DELETE /api/v1/api-keys/:id: Delete an API key
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
@@ -102,7 +102,7 @@ export async function deriveApiKeyPermissionsForCreate(
 }
 
 export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
-  // POST /api/v1/api-keys — Generate a new API key
+  // POST /api/v1/api-keys: Generate a new API key
   app.post(
     "/api/v1/api-keys",
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },
@@ -166,7 +166,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         keyName: name,
       });
 
-      // Return the raw key ONCE — it cannot be retrieved again
+      // Return the raw key ONCE; it cannot be retrieved again
       return reply.status(201).send({
         id,
         key: rawKey,
@@ -178,7 +178,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // GET /api/v1/api-keys — List user's API keys (never returns the key itself)
+  // GET /api/v1/api-keys: List user's API keys (never returns the key itself)
   app.get(
     "/api/v1/api-keys",
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },
@@ -208,7 +208,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // DELETE /api/v1/api-keys/:id — Delete an API key
+  // DELETE /api/v1/api-keys/:id: Delete an API key
   app.delete(
     "/api/v1/api-keys/:id",
     { config: { rateLimit: API_KEYS_RATE_LIMIT } },

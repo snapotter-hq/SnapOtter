@@ -1088,7 +1088,7 @@ async function decodeJxl(buffer: Buffer, options: DecodeSafetyOptions): Promise<
   try {
     await writeTempExclusive(inputPath, buffer);
 
-    // Try djxl first (from libjxl-tools) — works even when ImageMagick
+    // Try djxl first (from libjxl-tools), works even when ImageMagick
     // lacks a JXL delegate (common on Ubuntu stock packages).
     let djxlFailure: unknown;
     try {

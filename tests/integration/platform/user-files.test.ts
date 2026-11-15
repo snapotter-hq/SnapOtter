@@ -1160,7 +1160,7 @@ describe("Save result", () => {
     expect(v3.version).toBe(3);
     expect(v3.toolChain).toEqual(["resize", "compress"]);
 
-    // Get detail for v3 — should include full chain
+    // Get detail for v3, should include full chain
     const detailRes = await app.inject({
       method: "GET",
       url: `/api/v1/files/${v3.id}`,

@@ -24,7 +24,7 @@ export interface TransformValues {
  *
  * Points-based objects (brush/pencil strokes, lasso shapes) are mirrored by
  * reflecting their points around their own bounding-box centre. Sized objects
- * negate their scale and shift position to stay in place — the renderer applies
+ * negate their scale and shift position to stay in place; the renderer applies
  * `scaleX`/`scaleY`. Ellipses are positioned by their centre, so they need no
  * position compensation.
  */

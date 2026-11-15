@@ -492,7 +492,7 @@ def enhance_faces(img_bgr, fidelity=0.7):
     import mediapipe as mp
     from gpu import safe_onnx_session
 
-    # Detect faces — downscale large images for reliable MediaPipe detection
+    # Detect faces: downscale large images for reliable MediaPipe detection
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     ih, iw = img_bgr.shape[:2]
 
