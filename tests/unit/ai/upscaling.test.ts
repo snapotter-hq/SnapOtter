@@ -24,11 +24,13 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
   isGpuAvailable: vi.fn().mockReturnValue(false),
+  gpuMayBeAvailable: vi.fn().mockReturnValue(false),
 }));
 
 import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
+  gpuMayBeAvailable,
   isGpuAvailable,
   parseStdoutJson,
   runPythonWithProgress,
@@ -66,6 +68,11 @@ beforeEach(() => {
       }) as unknown as ReturnType<typeof sharp>,
   );
   vi.mocked(isGpuAvailable).mockReturnValue(false);
+  // After the dispatcher's probe the two agree; tests of the pre-probe window
+  // override this to diverge.
+  vi.mocked(gpuMayBeAvailable).mockImplementation((framework) =>
+    vi.mocked(isGpuAvailable)(framework),
+  );
 });
 
 afterEach(() => {
@@ -507,7 +514,7 @@ describe("upscale", () => {
       expect(runPythonWithProgress).not.toHaveBeenCalled();
     });
 
-    it("queries isGpuAvailable('torch') so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
+    it("scopes the GPU checks to torch so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
       const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
       vi.mocked(sharp).mockImplementation(
         () =>
@@ -524,7 +531,7 @@ describe("upscale", () => {
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).rejects.toThrow(
         /12\.0 MP.*max 4 MP on CPU/i,
       );
-      expect(isGpuAvailable).toHaveBeenCalledWith("torch");
+      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
       expect(runPythonWithProgress).not.toHaveBeenCalled();
 
       // For a 2 MP input at 2x (8 MP effective), CPU rate (180s/MP -> 1,440,000ms) is used instead of GPU rate (600,000ms floor).
@@ -560,6 +567,51 @@ describe("upscale", () => {
         height: 1200,
       });
       expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not refuse a GPU host before the dispatcher's GPU probe, and keeps the CPU timeout until it reports (#4758)", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      // Boot, or a shutdown after a bundle install: no probe yet, so the
+      // probed answer is still "no GPU" while a device node is visible.
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+      vi.mocked(gpuMayBeAvailable).mockReturnValue(true);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toMatchObject({
+        width: 1600,
+      });
+      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
+      // 12 MP at 4x is 192 MP, past the 64 MP CPU output cap too, so neither
+      // refusal ran. The timeout uses the CPU rate, which only errs long.
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "upscale.py",
+        expect.any(Array),
+        expect.objectContaining({ timeout: 192 * 180_000 }),
+      );
+    });
+
+    it("still refuses a 12 MP input on CPU when no GPU device is visible before the probe", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+      vi.mocked(gpuMayBeAvailable).mockReturnValue(false);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        /max 4 MP on CPU/i,
+      );
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
     });
 
     it("rejects CPU upscale when output megapixels exceed MAX_CPU_UPSCALE_OUTPUT_MP (e.g. 3 MP at 8x = 192 MP)", async () => {

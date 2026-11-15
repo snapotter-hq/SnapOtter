@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
+  gpuMayBeAvailable,
   isGpuAvailable,
   type ProgressCallback,
   parseStdoutJson,
@@ -73,9 +74,10 @@ export async function upscale(
   const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
   const scale = pythonOptions.scale ?? 2;
   const effectiveMp = megapixels * scale ** 2;
-  const gpu = isGpuAvailable("torch");
-
-  if (!gpu) {
+  // The refusal asks whether a GPU could run this (a device node counts until
+  // the dispatcher reports, #4758); the timeout keeps the probed answer, so a
+  // pre-probe run gets the generous CPU budget.
+  if (!gpuMayBeAvailable("torch")) {
     const maxCpuMp = resolveMaxCpuUpscaleMp();
     if (maxCpuMp > 0) {
       if (pythonOptions.model !== "lanczos" && megapixels > maxCpuMp) {
@@ -98,7 +100,7 @@ export async function upscale(
   await writeScratchInput("upscale", inputPath, pngBuffer);
 
   // CPU inference is ~50-100x slower than GPU; be generous for self-hosted NAS hardware
-  const rateMs = gpu ? 30_000 : 180_000;
+  const rateMs = isGpuAvailable("torch") ? 30_000 : 180_000;
   const timeout = Math.max(600_000, effectiveMp * rateMs);
 
   const { stdout } = await runPythonWithProgress(
