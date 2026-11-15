@@ -344,6 +344,33 @@ describe("Feature manifest: mediapipe pin (#4723)", () => {
   }
 });
 
+describe("Feature manifest: torch dependents install after the pinned torch (#4752)", () => {
+  // build-bundle.sh installs common packages first, then the arch list in
+  // order. A torch dependent installed before the pinned torch resolves the
+  // newest PyPI torch and its CUDA 13 wheels; the cu126 torch then replaces
+  // torch but leaves cuDNN cu13 and friends behind (inpaint-hq shipped both).
+  // pipFlags --no-deps entries (codeformer-pip) pull nothing, so they may stay in common.
+  const TORCH_DEPENDENTS = ["accelerate", "lpips", "basicsr", "realesrgan", "gfpgan"];
+  const name = (spec: string) => spec.split(/[=<>!\s[]/)[0].toLowerCase();
+
+  for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+    const pkgs = bundle.packages as Record<string, string[]>;
+    for (const arch of ["amd64", "arm64"] as const) {
+      const list = pkgs[arch] ?? [];
+      const torchAt = list.findIndex((p) => name(p) === "torch");
+      if (torchAt < 0) continue;
+      it(`${id} (${arch}) installs every torch dependent after torch`, () => {
+        for (const spec of pkgs.common ?? []) {
+          expect(TORCH_DEPENDENTS.includes(name(spec)), `${spec} is in common`).toBe(false);
+        }
+        list.forEach((spec, i) => {
+          if (TORCH_DEPENDENTS.includes(name(spec))) expect(i, spec).toBeGreaterThan(torchAt);
+        });
+      });
+    }
+  }
+});
+
 describe("Feature manifest: enablesTools consistency with shared features", () => {
   it("manifest enablesTools matches features.ts for each bundle", async () => {
     const { FEATURE_BUNDLES } = await import("@snapotter/shared");

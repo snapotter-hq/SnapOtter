@@ -246,15 +246,16 @@
         "common": [
           "diffusers==0.31.0",
           "transformers==4.46.3",
-          "accelerate==1.2.1",
           "safetensors==0.4.5",
           "huggingface-hub[hf_xet]==0.36.2"
         ],
         "amd64": [
-          "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126"
+          "torch==2.7.0+cu126 torchvision==0.22.0+cu126 --index-url https://download.pytorch.org/whl/cu126",
+          "accelerate==1.2.1"
         ],
         "arm64": [
-          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu"
+          "torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu",
+          "accelerate==1.2.1"
         ]
       },
       "pipFlags": {},
