@@ -32,11 +32,13 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
   useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });

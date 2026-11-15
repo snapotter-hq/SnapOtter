@@ -117,7 +117,7 @@ async function loadEnqueueModule(
   });
 
   vi.doMock("bullmq", () => ({
-    QueueEvents: vi.fn((name: string, opts: Record<string, unknown>) => {
+    QueueEvents: vi.fn(function MockQueueEvents(name: string, opts: Record<string, unknown>) {
       queueEventsCtor(name, opts);
       return {
         close: queueEventClose,
@@ -126,11 +126,13 @@ async function loadEnqueueModule(
         on: queueEventOn,
       };
     }),
-    FlowProducer: vi.fn(() => ({
-      add: flowProducerAdd,
-      close: flowProducerClose,
-      on: flowProducerOn,
-    })),
+    FlowProducer: vi.fn(function MockFlowProducer() {
+      return {
+        add: flowProducerAdd,
+        close: flowProducerClose,
+        on: flowProducerOn,
+      };
+    }),
   }));
 
   vi.doMock("@opentelemetry/api", () => ({

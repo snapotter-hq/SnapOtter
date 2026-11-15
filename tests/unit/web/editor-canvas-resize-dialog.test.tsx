@@ -19,7 +19,9 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 });
 
 const toastError = vi.hoisted(() => vi.fn());
-vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
+  toast: { error: toastError },
+}));
 
 vi.mock("@/lib/analytics", async () => {
   const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");

@@ -45,6 +45,17 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   storageMap.clear();
+  // vitest 4's restoreAllMocks leaves vi.fn() implementations alone, so a test
+  // that makes setItem throw would otherwise leak into every later test.
+  for (const fn of [
+    localStorageMock.getItem,
+    localStorageMock.setItem,
+    localStorageMock.removeItem,
+    localStorageMock.clear,
+    localStorageMock.key,
+  ]) {
+    fn.mockReset();
+  }
   vi.stubGlobal("localStorage", localStorageMock);
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({

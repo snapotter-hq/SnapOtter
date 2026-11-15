@@ -23,7 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const toastError = vi.hoisted(() => vi.fn());
 
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
-vi.mock("../../../apps/web/node_modules/sonner", () => ({
+// It names the ESM entry the app imports: vitest 4 resolves the bare package directory to the CJS main.
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
   toast: { error: toastError, success: vi.fn() },
 }));
 vi.mock("@/lib/analytics", async () => {

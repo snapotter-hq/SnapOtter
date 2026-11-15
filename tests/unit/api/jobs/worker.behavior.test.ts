@@ -75,13 +75,15 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     UnrecoverableError: class UnrecoverableError extends Error {
       name = "UnrecoverableError";
     },
-    Worker: vi.fn(() => ({
-      on: vi.fn(),
-      close: vi.fn().mockResolvedValue(undefined),
-      isPaused: vi.fn(() => false),
-      pause: vi.fn().mockResolvedValue(undefined),
-      resume: vi.fn(),
-    })),
+    Worker: vi.fn(function MockWorker() {
+      return {
+        on: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        isPaused: vi.fn(() => false),
+        pause: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn(),
+      };
+    }),
   }));
 
   vi.doMock("drizzle-orm", () => ({
@@ -209,6 +211,10 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     },
   }));
 
+  // Vitest 4 resolves a run of queued vi.doMock calls in parallel and registers
+  // them in completion order, so an extraMocks override of a path mocked above
+  // could lose to the default. Any import drains the queue first.
+  await import("../../../../apps/api/src/jobs/connection.js");
   extraMocks?.();
 
   return import("../../../../apps/api/src/jobs/worker.js");

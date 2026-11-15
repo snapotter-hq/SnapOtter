@@ -288,7 +288,7 @@ describe("apiUploadUserFiles", () => {
     xhrInstances = [];
     OriginalXHR = globalThis.XMLHttpRequest;
 
-    const MockXHR = vi.fn().mockImplementation(() => {
+    const MockXHR = vi.fn().mockImplementation(function MockXHR() {
       const instance: Record<string, unknown> = {
         open: vi.fn(),
         send: vi.fn(),

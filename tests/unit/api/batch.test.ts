@@ -39,7 +39,10 @@ const mocks = vi.hoisted(() => ({
   requireToolAccess: vi.fn(async () => ({ id: "user-1" })),
   rm: vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}),
   spoolMultipartFile: vi.fn(),
-  storeValidatedOcrPdf: vi.fn<(...args: unknown[]) => Promise<number>>(async () => 42),
+  // No default implementation: vitest 4's mockReset() restores the vi.fn()
+  // implementation rather than clearing it, and the passthrough below routes
+  // to the real storeValidatedOcrPdf only when no implementation is set.
+  storeValidatedOcrPdf: vi.fn<(...args: unknown[]) => Promise<number>>(),
   updateJobProgress: vi.fn(),
   validateImageBuffer: vi.fn<
     (_buf: Buffer, _name: string) => Promise<{ valid: boolean; format: string }>

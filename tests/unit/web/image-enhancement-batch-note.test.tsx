@@ -11,11 +11,13 @@ import { en } from "@snapotter/shared";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL: vi.fn(() => "blob:fake-url"),
-  revokeObjectURL: vi.fn(),
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL: vi.fn(() => "blob:fake-url"),
+    revokeObjectURL: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/image-preview", () => ({
   needsServerPreview: vi.fn(() => false),

@@ -107,11 +107,13 @@ function swallowNavigation(event: MouseEvent) {
 
 beforeEach(() => {
   clipboard.ok = true;
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   // This jsdom has a localStorage object with no methods on it, and
   // I18nProvider reads the stored locale on mount.
   const stored = new Map<string, string>();

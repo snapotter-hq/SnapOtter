@@ -76,11 +76,13 @@ beforeEach(() => {
       return new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 });
     }),
   );
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   document.addEventListener("click", swallowNavigation, true);
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.mp3", { type: "audio/mpeg" })]);
