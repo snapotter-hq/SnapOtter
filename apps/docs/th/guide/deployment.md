@@ -1,8 +1,8 @@
 ---
 description: "ติดตั้ง SnapOtter ในระบบจริงด้วย Docker ครอบคลุมความต้องการด้านฮาร์ดแวร์ การตั้งค่า GPU และการกำหนดค่า reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 270986c34e25
+i18n_output_hash: a55184e665f6
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ SnapOtter รองรับ **รูปแบบอินพุตมากก�
 - **การถอดรหัส HEIF** ใช้เวลา 13-23 วินาที ส่วน HEIC (รุ่นของ Apple) เร็วกว่ามากที่ 0.3-0.9 วินาที
 - **การขยายภาพ** หมดเวลาบน CPU สำหรับภาพที่ใหญ่กว่าขนาดเล็ก ต้องใช้ GPU จึงจะใช้งานได้จริง
 - **CodeFormer** สำหรับปรับปรุงใบหน้าช้ากว่า GFPGAN อย่างมาก (53 วินาทีเทียบกับ 2 วินาทีบน GPU) แนะนำ GFPGAN สำหรับกรณีใช้งานส่วนใหญ่
+
+### การติดตั้งชุด AI เมื่อมีหลายเรพลิกา {#ai-bundle-installs-with-several-replicas}
+
+เปลี่ยนชุด AI เมื่อมีเรพลิกาทำงานอยู่เพียงตัวเดียวเท่านั้น การติดตั้งชุด การนำเข้าชุดแบบออฟไลน์ หรือการรีเซ็ตสภาพแวดล้อม AI จะเขียนสภาพแวดล้อม Python ที่ใช้ร่วมกันใน `/data/ai/venv` ใหม่ การติดตั้งจะรองานของ AI บนเรพลิกาของตัวเองเท่านั้น และทุกการดำเนินการเหล่านี้จะรีสตาร์ท sidecar ของเรพลิกานั้นในภายหลัง แต่ไม่มีการดำเนินการใดมองเห็นงานของ AI บนเรพลิกาอื่น sidecar ของเรพลิกาเหล่านั้นยังคงโหลด torch และ ONNX Runtime จากไดเรกทอรีนั้นไว้ขณะที่ถูกเขียนใหม่ และอาจล่มกลางงานได้ ให้ลดการติดตั้งใช้งานเหลือหนึ่งเรพลิกา (หรือหยุดตัวอื่น) ทำการเปลี่ยนแปลง แล้วค่อยขยายกลับ
 
 ## วอลุ่ม {#volumes}
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 8ef22d768f2b
+i18n_output_hash: a9a07b980608
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ Desteklenen her biçim, kullanılan çözücü ve mevcut kalite denetimleri hakk
 - **HEIF çözme** 13-23 saniye sürer. HEIC (Apple'ın varyantı) 0,3-0,9 saniye ile çok daha hızlıdır.
 - **Büyütme**, küçük görüntülerin ötesinde her şeyde CPU'da zaman aşımına uğrar. Pratik kullanım için GPU gerekir.
 - **CodeFormer** yüz iyileştirmesi GFPGAN'dan belirgin biçimde yavaştır (GPU'da 53 sn'ye karşı 2 sn). Çoğu kullanım için GFPGAN önerilir.
+
+### Birden fazla replikada AI paketi kurulumu {#ai-bundle-installs-with-several-replicas}
+
+AI paketlerini yalnızca tek bir replika çalışırken değiştirin. Bir paketi kurmak, çevrimdışı içe aktarmak veya AI ortamını sıfırlamak, `/data/ai/venv` içindeki paylaşılan Python ortamını yeniden yazar. Kurulum kendi replikasındaki AI işlerini bekler ve bu işlemlerin her biri sonrasında o replikanın sidecar'ını yeniden başlatır, ancak hiçbiri diğer replikalardaki AI işlerini göremez. Onların sidecar'ları, dizin yeniden yazılırken torch ve ONNX Runtime'ı o dizinden yüklü tutar ve iş ortasında çökebilir. Dağıtımı tek replikaya düşürün (veya diğerlerini durdurun), değişikliği yapın, sonra tekrar ölçeklendirin.
 
 ## Birimler {#volumes}
 

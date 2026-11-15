@@ -1,8 +1,8 @@
 ---
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 954e0bce2fe1
+i18n_output_hash: 2b582c621e3e
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ SnapOtter는 **55개 이상의 입력 형식**과 **14개의 출력 형식**을 
 - **HEIF 디코딩**에는 13-23초가 걸립니다. HEIC(Apple의 변형)는 0.3-0.9초로 훨씬 빠릅니다.
 - **업스케일**은 CPU에서 작은 이미지를 넘어가면 시간 초과가 발생합니다. 실용적으로 사용하려면 GPU가 필요합니다.
 - **CodeFormer** 얼굴 보정은 GFPGAN보다 훨씬 느립니다(GPU에서 53초 대 2초). 대부분의 경우 GFPGAN을 권장합니다.
+
+### 여러 레플리카에서 AI 번들 설치 {#ai-bundle-installs-with-several-replicas}
+
+AI 번들은 레플리카를 하나만 실행한 상태에서 변경하세요. 번들 설치, 오프라인 가져오기, AI 환경 초기화는 모두 `/data/ai/venv`의 공유 Python 환경을 다시 씁니다. 설치는 자기 레플리카의 AI 작업이 끝나기를 기다리고, 이 작업들은 모두 끝난 뒤 해당 레플리카의 사이드카를 재시작하지만, 다른 레플리카의 AI 작업은 볼 수 없습니다. 다른 레플리카의 사이드카는 해당 디렉터리가 다시 쓰이는 동안에도 그 디렉터리에서 torch와 ONNX Runtime을 로드한 상태로 유지하므로 작업 도중 충돌할 수 있습니다. 배포를 레플리카 하나로 줄이거나 나머지를 중지한 다음 변경하고, 다시 원래대로 늘리세요.
 
 ## 볼륨 {#volumes}
 

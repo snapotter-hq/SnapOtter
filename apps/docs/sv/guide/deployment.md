@@ -1,8 +1,8 @@
 ---
 description: "Driftsätt SnapOtter i produktion med Docker. Maskinvarukrav, GPU-konfiguration och reverse proxy-konfigurationer för Nginx, Traefik och Cloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: ac19fd3aae87
+i18n_output_hash: d1157512cbd3
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ Se den [fullständiga formatlistan](/sv/guide/supported-formats) för detaljer o
 - **HEIF-avkodning** tar 13-23 sekunder. HEIC (Apples variant) är mycket snabbare, 0,3-0,9 sekunder.
 - **Uppskalning** får tidsgränsen överskriden på CPU för allt utöver små bilder. GPU krävs för praktisk användning.
 - **CodeFormer** för ansiktsförbättring är betydligt långsammare än GFPGAN (53 s jämfört med 2 s på GPU). GFPGAN rekommenderas för de flesta användningsfall.
+
+### Installation av AI-paket med flera repliker {#ai-bundle-installs-with-several-replicas}
+
+Ändra AI-paket bara när en enda replik körs. Att installera ett paket, importera ett offline eller återställa AI-miljön skriver om den delade Python-miljön i `/data/ai/venv`. En installation väntar på AI-jobb på den egna repliken, och varje sådan åtgärd startar därefter om den replikens sidecar, men ingen av dem ser AI-jobb på de andra replikerna. Deras sidecars har torch och ONNX Runtime laddade från den katalogen medan den skrivs om och kan krascha mitt i ett jobb. Skala ned driftsättningen till en replik (eller stoppa de andra), gör ändringen och skala sedan upp igen.
 
 ## Volymer {#volumes}
 

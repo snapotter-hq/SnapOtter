@@ -1,8 +1,8 @@
 ---
 description: "Wdrażanie SnapOtter w środowisku produkcyjnym z użyciem Docker. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
-i18n_source_hash: 0c8f078ebe75
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 46d1ff06d734
+i18n_output_hash: d1197e43fb25
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -400,6 +408,10 @@ Szczegóły każdego obsługiwanego formatu, użytego dekodera i dostępnych opc
 - **Dekodowanie HEIF** trwa 13-23 sekund. HEIC (wariant Apple) jest znacznie szybszy: 0,3-0,9 sekundy.
 - **Skalowanie w górę** przekracza limit czasu na CPU dla czegokolwiek większego niż małe obrazy. Do praktycznego użycia wymagane jest GPU.
 - **CodeFormer** do poprawy twarzy jest znacznie wolniejszy niż GFPGAN (53 s wobec 2 s na GPU). W większości przypadków zalecany jest GFPGAN.
+
+### Instalacja pakietów AI przy wielu replikach {#ai-bundle-installs-with-several-replicas}
+
+Zmieniaj pakiety AI tylko wtedy, gdy działa jedna replika. Instalacja pakietu, import pakietu offline lub zresetowanie środowiska AI przepisuje współdzielone środowisko Pythona w `/data/ai/venv`. Instalacja czeka na zadania AI własnej repliki, a każda z tych czynności później restartuje sidecar tej repliki, ale żadna z nich nie widzi zadań AI na pozostałych replikach. Ich sidecary trzymają załadowane torch i ONNX Runtime z tego katalogu, gdy jest on przepisywany, i mogą ulec awarii w trakcie zadania. Zmniejsz wdrożenie do jednej repliki (lub zatrzymaj pozostałe), wprowadź zmianę, a potem skaluj z powrotem.
 
 ## Wolumeny {#volumes}
 
