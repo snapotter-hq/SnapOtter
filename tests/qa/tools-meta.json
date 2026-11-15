@@ -1012,12 +1012,7 @@
     "name": "Remove GIF Background",
     "modality": "image",
     "route": "/image/remove-gif-background",
-    "acceptedInputs": [
-      ".gif",
-      ".webp",
-      ".apng",
-      ".png"
-    ],
+    "acceptedInputs": [".gif", ".webp", ".apng", ".png"],
     "executionHint": "long",
     "isAI": true
   },
@@ -1215,9 +1210,7 @@
     "name": "PDF OCR",
     "modality": "document",
     "route": "/pdf/ocr-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": true
   },
@@ -3729,10 +3722,7 @@
     "name": "GIF/WebP Converter",
     "modality": "image",
     "route": "/image/gif-webp",
-    "acceptedInputs": [
-      ".gif",
-      ".webp"
-    ],
+    "acceptedInputs": [".gif", ".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -3930,10 +3920,7 @@
     "name": "SVG to Raster",
     "modality": "image",
     "route": "/image/svg-to-raster",
-    "acceptedInputs": [
-      ".svg",
-      ".svgz"
-    ],
+    "acceptedInputs": [".svg", ".svgz"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -4068,9 +4055,7 @@
     "name": "PDF to Image",
     "modality": "document",
     "route": "/pdf/pdf-to-image",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -4504,9 +4489,7 @@
     "name": "GIF to Video",
     "modality": "video",
     "route": "/video/gif-to-video",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5156,9 +5139,7 @@
     "name": "Merge PDFs",
     "modality": "document",
     "route": "/pdf/merge-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5167,9 +5148,7 @@
     "name": "Split PDF",
     "modality": "document",
     "route": "/pdf/split-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5178,9 +5157,7 @@
     "name": "Compress PDF",
     "modality": "document",
     "route": "/pdf/compress-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5189,9 +5166,7 @@
     "name": "Rotate PDF",
     "modality": "document",
     "route": "/pdf/rotate-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5200,13 +5175,7 @@
     "name": "Convert Document",
     "modality": "document",
     "route": "/files/convert-document",
-    "acceptedInputs": [
-      ".docx",
-      ".doc",
-      ".odt",
-      ".rtf",
-      ".txt"
-    ],
+    "acceptedInputs": [".docx", ".doc", ".odt", ".rtf", ".txt"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5215,11 +5184,7 @@
     "name": "Convert Presentation",
     "modality": "document",
     "route": "/files/convert-presentation",
-    "acceptedInputs": [
-      ".pptx",
-      ".ppt",
-      ".odp"
-    ],
+    "acceptedInputs": [".pptx", ".ppt", ".odp"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5228,12 +5193,7 @@
     "name": "Convert Spreadsheet",
     "modality": "document",
     "route": "/files/convert-spreadsheet",
-    "acceptedInputs": [
-      ".xlsx",
-      ".xls",
-      ".ods",
-      ".csv"
-    ],
+    "acceptedInputs": [".xlsx", ".xls", ".ods", ".csv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5242,12 +5202,7 @@
     "name": "Excel to PDF",
     "modality": "document",
     "route": "/files/excel-to-pdf",
-    "acceptedInputs": [
-      ".xlsx",
-      ".xls",
-      ".ods",
-      ".csv"
-    ],
+    "acceptedInputs": [".xlsx", ".xls", ".ods", ".csv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5256,13 +5211,7 @@
     "name": "Word to PDF",
     "modality": "document",
     "route": "/files/word-to-pdf",
-    "acceptedInputs": [
-      ".docx",
-      ".doc",
-      ".odt",
-      ".rtf",
-      ".txt"
-    ],
+    "acceptedInputs": [".docx", ".doc", ".odt", ".rtf", ".txt"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5271,9 +5220,7 @@
     "name": "Extract Pages",
     "modality": "document",
     "route": "/pdf/extract-pages",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5282,9 +5229,7 @@
     "name": "Remove Pages",
     "modality": "document",
     "route": "/pdf/remove-pages",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5293,9 +5238,7 @@
     "name": "Organize PDF",
     "modality": "document",
     "route": "/pdf/organize-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5304,9 +5247,7 @@
     "name": "PDF Multi-Tool",
     "modality": "document",
     "route": "/pdf/multi-tool-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5315,9 +5256,7 @@
     "name": "Protect PDF",
     "modality": "document",
     "route": "/pdf/protect-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5326,9 +5265,7 @@
     "name": "Unlock PDF",
     "modality": "document",
     "route": "/pdf/unlock-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5337,9 +5274,7 @@
     "name": "Repair PDF",
     "modality": "document",
     "route": "/pdf/repair-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5348,9 +5283,7 @@
     "name": "Web-Optimize PDF",
     "modality": "document",
     "route": "/pdf/linearize-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5359,9 +5292,7 @@
     "name": "Grayscale PDF",
     "modality": "document",
     "route": "/pdf/grayscale-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5370,9 +5301,7 @@
     "name": "PDF/A Converter",
     "modality": "document",
     "route": "/pdf/pdfa-convert",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5381,9 +5310,7 @@
     "name": "Crop PDF",
     "modality": "document",
     "route": "/pdf/crop-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5392,9 +5319,7 @@
     "name": "Pages Per Sheet (N-up)",
     "modality": "document",
     "route": "/pdf/nup-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5403,9 +5328,7 @@
     "name": "Booklet PDF",
     "modality": "document",
     "route": "/pdf/booklet-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5414,9 +5337,7 @@
     "name": "Watermark PDF",
     "modality": "document",
     "route": "/pdf/watermark-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5425,9 +5346,7 @@
     "name": "PDF Page Numbers",
     "modality": "document",
     "route": "/pdf/pdf-page-numbers",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5436,9 +5355,7 @@
     "name": "Flatten PDF",
     "modality": "document",
     "route": "/pdf/flatten-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5447,9 +5364,7 @@
     "name": "Redact PDF",
     "modality": "document",
     "route": "/pdf/redact-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5458,9 +5373,7 @@
     "name": "Sign PDF",
     "modality": "document",
     "route": "/pdf/sign-pdf",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5469,9 +5382,7 @@
     "name": "PDF to Text",
     "modality": "document",
     "route": "/pdf/pdf-to-text",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5480,9 +5391,7 @@
     "name": "PDF to Word",
     "modality": "document",
     "route": "/pdf/pdf-to-word",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5491,9 +5400,7 @@
     "name": "PDF Metadata",
     "modality": "document",
     "route": "/pdf/pdf-metadata",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5502,11 +5409,7 @@
     "name": "PowerPoint to PDF",
     "modality": "document",
     "route": "/files/powerpoint-to-pdf",
-    "acceptedInputs": [
-      ".pptx",
-      ".ppt",
-      ".odp"
-    ],
+    "acceptedInputs": [".pptx", ".ppt", ".odp"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5515,10 +5418,7 @@
     "name": "HTML to PDF",
     "modality": "document",
     "route": "/files/html-to-pdf",
-    "acceptedInputs": [
-      ".html",
-      ".htm"
-    ],
+    "acceptedInputs": [".html", ".htm"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5527,10 +5427,7 @@
     "name": "Markdown to Word",
     "modality": "document",
     "route": "/files/markdown-to-docx",
-    "acceptedInputs": [
-      ".md",
-      ".markdown"
-    ],
+    "acceptedInputs": [".md", ".markdown"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5539,10 +5436,7 @@
     "name": "Markdown to HTML",
     "modality": "document",
     "route": "/files/markdown-to-html",
-    "acceptedInputs": [
-      ".md",
-      ".markdown"
-    ],
+    "acceptedInputs": [".md", ".markdown"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5551,10 +5445,7 @@
     "name": "Markdown to PDF",
     "modality": "document",
     "route": "/files/markdown-to-pdf",
-    "acceptedInputs": [
-      ".md",
-      ".markdown"
-    ],
+    "acceptedInputs": [".md", ".markdown"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5563,9 +5454,7 @@
     "name": "Convert from EPUB",
     "modality": "document",
     "route": "/files/epub-convert",
-    "acceptedInputs": [
-      ".epub"
-    ],
+    "acceptedInputs": [".epub"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5574,12 +5463,7 @@
     "name": "Convert to EPUB",
     "modality": "document",
     "route": "/files/to-epub",
-    "acceptedInputs": [
-      ".docx",
-      ".md",
-      ".html",
-      ".txt"
-    ],
+    "acceptedInputs": [".docx", ".md", ".html", ".txt"],
     "executionHint": "long",
     "isAI": false
   },
@@ -5588,10 +5472,7 @@
     "name": "Chart Maker",
     "modality": "file",
     "route": "/files/chart-maker",
-    "acceptedInputs": [
-      ".csv",
-      ".json"
-    ],
+    "acceptedInputs": [".csv", ".json"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5600,11 +5481,7 @@
     "name": "CSV to Excel",
     "modality": "file",
     "route": "/files/csv-excel",
-    "acceptedInputs": [
-      ".csv",
-      ".tsv",
-      ".xlsx"
-    ],
+    "acceptedInputs": [".csv", ".tsv", ".xlsx"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5613,11 +5490,7 @@
     "name": "CSV to JSON",
     "modality": "file",
     "route": "/files/csv-json",
-    "acceptedInputs": [
-      ".csv",
-      ".tsv",
-      ".json"
-    ],
+    "acceptedInputs": [".csv", ".tsv", ".json"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5626,10 +5499,7 @@
     "name": "JSON to XML",
     "modality": "file",
     "route": "/files/json-xml",
-    "acceptedInputs": [
-      ".json",
-      ".xml"
-    ],
+    "acceptedInputs": [".json", ".xml"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5638,10 +5508,7 @@
     "name": "Split CSV",
     "modality": "file",
     "route": "/files/split-csv",
-    "acceptedInputs": [
-      ".csv",
-      ".tsv"
-    ],
+    "acceptedInputs": [".csv", ".tsv"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5650,10 +5517,7 @@
     "name": "Merge CSVs",
     "modality": "file",
     "route": "/files/merge-csvs",
-    "acceptedInputs": [
-      ".csv",
-      ".tsv"
-    ],
+    "acceptedInputs": [".csv", ".tsv"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5662,11 +5526,7 @@
     "name": "Convert YAML / JSON",
     "modality": "file",
     "route": "/files/yaml-json",
-    "acceptedInputs": [
-      ".yaml",
-      ".yml",
-      ".json"
-    ],
+    "acceptedInputs": [".yaml", ".yml", ".json"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5675,9 +5535,7 @@
     "name": "XML to CSV",
     "modality": "file",
     "route": "/files/xml-to-csv",
-    "acceptedInputs": [
-      ".xml"
-    ],
+    "acceptedInputs": [".xml"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5695,9 +5553,7 @@
     "name": "Extract ZIP",
     "modality": "file",
     "route": "/files/extract-zip",
-    "acceptedInputs": [
-      ".zip"
-    ],
+    "acceptedInputs": [".zip"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5706,10 +5562,7 @@
     "name": "JPG to PNG",
     "modality": "image",
     "route": "/image/jpg-to-png",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5718,9 +5571,7 @@
     "name": "PNG to JPG",
     "modality": "image",
     "route": "/image/png-to-jpg",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5729,10 +5580,7 @@
     "name": "JPG to WebP",
     "modality": "image",
     "route": "/image/jpg-to-webp",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5741,9 +5589,7 @@
     "name": "PNG to WebP",
     "modality": "image",
     "route": "/image/png-to-webp",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5752,9 +5598,7 @@
     "name": "WebP to JPG",
     "modality": "image",
     "route": "/image/webp-to-jpg",
-    "acceptedInputs": [
-      ".webp"
-    ],
+    "acceptedInputs": [".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5763,9 +5607,7 @@
     "name": "WebP to PNG",
     "modality": "image",
     "route": "/image/webp-to-png",
-    "acceptedInputs": [
-      ".webp"
-    ],
+    "acceptedInputs": [".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5774,10 +5616,7 @@
     "name": "JPG to AVIF",
     "modality": "image",
     "route": "/image/jpg-to-avif",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5786,9 +5625,7 @@
     "name": "PNG to AVIF",
     "modality": "image",
     "route": "/image/png-to-avif",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5797,9 +5634,7 @@
     "name": "WebP to AVIF",
     "modality": "image",
     "route": "/image/webp-to-avif",
-    "acceptedInputs": [
-      ".webp"
-    ],
+    "acceptedInputs": [".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5808,10 +5643,7 @@
     "name": "HEIC to JPG",
     "modality": "image",
     "route": "/image/heic-to-jpg",
-    "acceptedInputs": [
-      ".heic",
-      ".heif"
-    ],
+    "acceptedInputs": [".heic", ".heif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5820,10 +5652,7 @@
     "name": "HEIC to PNG",
     "modality": "image",
     "route": "/image/heic-to-png",
-    "acceptedInputs": [
-      ".heic",
-      ".heif"
-    ],
+    "acceptedInputs": [".heic", ".heif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5832,10 +5661,7 @@
     "name": "HEIC to AVIF",
     "modality": "image",
     "route": "/image/heic-to-avif",
-    "acceptedInputs": [
-      ".heic",
-      ".heif"
-    ],
+    "acceptedInputs": [".heic", ".heif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5844,10 +5670,7 @@
     "name": "JPG to GIF",
     "modality": "image",
     "route": "/image/jpg-to-gif",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5856,9 +5679,7 @@
     "name": "PNG to GIF",
     "modality": "image",
     "route": "/image/png-to-gif",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5867,9 +5688,7 @@
     "name": "GIF to JPG",
     "modality": "image",
     "route": "/image/gif-to-jpg",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5878,9 +5697,7 @@
     "name": "GIF to PNG",
     "modality": "image",
     "route": "/image/gif-to-png",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5889,9 +5706,7 @@
     "name": "WebP to GIF",
     "modality": "image",
     "route": "/image/webp-to-gif",
-    "acceptedInputs": [
-      ".webp"
-    ],
+    "acceptedInputs": [".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5900,10 +5715,7 @@
     "name": "JPG to TIFF",
     "modality": "image",
     "route": "/image/jpg-to-tiff",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5912,9 +5724,7 @@
     "name": "PNG to TIFF",
     "modality": "image",
     "route": "/image/png-to-tiff",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5923,10 +5733,7 @@
     "name": "TIFF to JPG",
     "modality": "image",
     "route": "/image/tiff-to-jpg",
-    "acceptedInputs": [
-      ".tiff",
-      ".tif"
-    ],
+    "acceptedInputs": [".tiff", ".tif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5935,10 +5742,7 @@
     "name": "TIFF to PNG",
     "modality": "image",
     "route": "/image/tiff-to-png",
-    "acceptedInputs": [
-      ".tiff",
-      ".tif"
-    ],
+    "acceptedInputs": [".tiff", ".tif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5947,9 +5751,7 @@
     "name": "PSD to JPG",
     "modality": "image",
     "route": "/image/psd-to-jpg",
-    "acceptedInputs": [
-      ".psd"
-    ],
+    "acceptedInputs": [".psd"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5958,9 +5760,7 @@
     "name": "PSD to PNG",
     "modality": "image",
     "route": "/image/psd-to-png",
-    "acceptedInputs": [
-      ".psd"
-    ],
+    "acceptedInputs": [".psd"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5969,9 +5769,7 @@
     "name": "PNG to EPS",
     "modality": "image",
     "route": "/image/png-to-eps",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5980,10 +5778,7 @@
     "name": "JPG to EPS",
     "modality": "image",
     "route": "/image/jpg-to-eps",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -5992,9 +5787,7 @@
     "name": "EPS to PNG",
     "modality": "image",
     "route": "/image/eps-to-png",
-    "acceptedInputs": [
-      ".eps"
-    ],
+    "acceptedInputs": [".eps"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6003,9 +5796,7 @@
     "name": "EPS to JPG",
     "modality": "image",
     "route": "/image/eps-to-jpg",
-    "acceptedInputs": [
-      ".eps"
-    ],
+    "acceptedInputs": [".eps"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6014,9 +5805,7 @@
     "name": "PNG to SVG",
     "modality": "image",
     "route": "/image/png-to-svg",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6025,10 +5814,7 @@
     "name": "JPG to SVG",
     "modality": "image",
     "route": "/image/jpg-to-svg",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6037,10 +5823,7 @@
     "name": "TIFF to SVG",
     "modality": "image",
     "route": "/image/tiff-to-svg",
-    "acceptedInputs": [
-      ".tiff",
-      ".tif"
-    ],
+    "acceptedInputs": [".tiff", ".tif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6049,9 +5832,7 @@
     "name": "PSD to SVG",
     "modality": "image",
     "route": "/image/psd-to-svg",
-    "acceptedInputs": [
-      ".psd"
-    ],
+    "acceptedInputs": [".psd"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6060,9 +5841,7 @@
     "name": "EPS to SVG",
     "modality": "image",
     "route": "/image/eps-to-svg",
-    "acceptedInputs": [
-      ".eps"
-    ],
+    "acceptedInputs": [".eps"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6071,10 +5850,7 @@
     "name": "SVG to PNG",
     "modality": "image",
     "route": "/image/svg-to-png",
-    "acceptedInputs": [
-      ".svg",
-      ".svgz"
-    ],
+    "acceptedInputs": [".svg", ".svgz"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6083,10 +5859,7 @@
     "name": "SVG to JPG",
     "modality": "image",
     "route": "/image/svg-to-jpg",
-    "acceptedInputs": [
-      ".svg",
-      ".svgz"
-    ],
+    "acceptedInputs": [".svg", ".svgz"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6095,10 +5868,7 @@
     "name": "JPG to PDF",
     "modality": "image",
     "route": "/image/jpg-to-pdf",
-    "acceptedInputs": [
-      ".jpg",
-      ".jpeg"
-    ],
+    "acceptedInputs": [".jpg", ".jpeg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6107,9 +5877,7 @@
     "name": "PNG to PDF",
     "modality": "image",
     "route": "/image/png-to-pdf",
-    "acceptedInputs": [
-      ".png"
-    ],
+    "acceptedInputs": [".png"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6118,10 +5886,7 @@
     "name": "HEIC to PDF",
     "modality": "image",
     "route": "/image/heic-to-pdf",
-    "acceptedInputs": [
-      ".heic",
-      ".heif"
-    ],
+    "acceptedInputs": [".heic", ".heif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6130,10 +5895,7 @@
     "name": "TIFF to PDF",
     "modality": "image",
     "route": "/image/tiff-to-pdf",
-    "acceptedInputs": [
-      ".tiff",
-      ".tif"
-    ],
+    "acceptedInputs": [".tiff", ".tif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6142,9 +5904,7 @@
     "name": "WebP to PDF",
     "modality": "image",
     "route": "/image/webp-to-pdf",
-    "acceptedInputs": [
-      ".webp"
-    ],
+    "acceptedInputs": [".webp"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6153,9 +5913,7 @@
     "name": "GIF to PDF",
     "modality": "image",
     "route": "/image/gif-to-pdf",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6164,9 +5922,7 @@
     "name": "EPS to PDF",
     "modality": "image",
     "route": "/image/eps-to-pdf",
-    "acceptedInputs": [
-      ".eps"
-    ],
+    "acceptedInputs": [".eps"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6175,9 +5931,7 @@
     "name": "PDF to JPG",
     "modality": "document",
     "route": "/pdf/pdf-to-jpg",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6186,9 +5940,7 @@
     "name": "PDF to PNG",
     "modality": "document",
     "route": "/pdf/pdf-to-png",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6197,9 +5949,7 @@
     "name": "PDF to TIFF",
     "modality": "document",
     "route": "/pdf/pdf-to-tiff",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6208,9 +5958,7 @@
     "name": "MOV to MP4",
     "modality": "video",
     "route": "/video/mov-to-mp4",
-    "acceptedInputs": [
-      ".mov"
-    ],
+    "acceptedInputs": [".mov"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6219,9 +5967,7 @@
     "name": "WEBM to MP4",
     "modality": "video",
     "route": "/video/webm-to-mp4",
-    "acceptedInputs": [
-      ".webm"
-    ],
+    "acceptedInputs": [".webm"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6230,9 +5976,7 @@
     "name": "MKV to MP4",
     "modality": "video",
     "route": "/video/mkv-to-mp4",
-    "acceptedInputs": [
-      ".mkv"
-    ],
+    "acceptedInputs": [".mkv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6241,9 +5985,7 @@
     "name": "AVI to MP4",
     "modality": "video",
     "route": "/video/avi-to-mp4",
-    "acceptedInputs": [
-      ".avi"
-    ],
+    "acceptedInputs": [".avi"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6252,9 +5994,7 @@
     "name": "MP4 to MOV",
     "modality": "video",
     "route": "/video/mp4-to-mov",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6263,9 +6003,7 @@
     "name": "MP4 to WEBM",
     "modality": "video",
     "route": "/video/mp4-to-webm",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6274,9 +6012,7 @@
     "name": "WEBM to MOV",
     "modality": "video",
     "route": "/video/webm-to-mov",
-    "acceptedInputs": [
-      ".webm"
-    ],
+    "acceptedInputs": [".webm"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6285,9 +6021,7 @@
     "name": "MKV to MOV",
     "modality": "video",
     "route": "/video/mkv-to-mov",
-    "acceptedInputs": [
-      ".mkv"
-    ],
+    "acceptedInputs": [".mkv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6296,9 +6030,7 @@
     "name": "AVI to MOV",
     "modality": "video",
     "route": "/video/avi-to-mov",
-    "acceptedInputs": [
-      ".avi"
-    ],
+    "acceptedInputs": [".avi"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6307,9 +6039,7 @@
     "name": "MP4 to AVI",
     "modality": "video",
     "route": "/video/mp4-to-avi",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6318,9 +6048,7 @@
     "name": "MOV to AVI",
     "modality": "video",
     "route": "/video/mov-to-avi",
-    "acceptedInputs": [
-      ".mov"
-    ],
+    "acceptedInputs": [".mov"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6329,9 +6057,7 @@
     "name": "MKV to AVI",
     "modality": "video",
     "route": "/video/mkv-to-avi",
-    "acceptedInputs": [
-      ".mkv"
-    ],
+    "acceptedInputs": [".mkv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6340,9 +6066,7 @@
     "name": "AVI to MKV",
     "modality": "video",
     "route": "/video/avi-to-mkv",
-    "acceptedInputs": [
-      ".avi"
-    ],
+    "acceptedInputs": [".avi"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6351,9 +6075,7 @@
     "name": "MP4 to GIF",
     "modality": "video",
     "route": "/video/mp4-to-gif",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6362,9 +6084,7 @@
     "name": "MOV to GIF",
     "modality": "video",
     "route": "/video/mov-to-gif",
-    "acceptedInputs": [
-      ".mov"
-    ],
+    "acceptedInputs": [".mov"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6373,9 +6093,7 @@
     "name": "MKV to GIF",
     "modality": "video",
     "route": "/video/mkv-to-gif",
-    "acceptedInputs": [
-      ".mkv"
-    ],
+    "acceptedInputs": [".mkv"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6384,9 +6102,7 @@
     "name": "AVI to GIF",
     "modality": "video",
     "route": "/video/avi-to-gif",
-    "acceptedInputs": [
-      ".avi"
-    ],
+    "acceptedInputs": [".avi"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6395,9 +6111,7 @@
     "name": "GIF to MP4",
     "modality": "video",
     "route": "/video/gif-to-mp4",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6406,9 +6120,7 @@
     "name": "GIF to WEBM",
     "modality": "video",
     "route": "/video/gif-to-webm",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6417,9 +6129,7 @@
     "name": "GIF to MOV",
     "modality": "video",
     "route": "/video/gif-to-mov",
-    "acceptedInputs": [
-      ".gif"
-    ],
+    "acceptedInputs": [".gif"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6428,9 +6138,7 @@
     "name": "MP4 to MP3",
     "modality": "video",
     "route": "/video/mp4-to-mp3",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6439,9 +6147,7 @@
     "name": "MOV to MP3",
     "modality": "video",
     "route": "/video/mov-to-mp3",
-    "acceptedInputs": [
-      ".mov"
-    ],
+    "acceptedInputs": [".mov"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6450,9 +6156,7 @@
     "name": "MKV to MP3",
     "modality": "video",
     "route": "/video/mkv-to-mp3",
-    "acceptedInputs": [
-      ".mkv"
-    ],
+    "acceptedInputs": [".mkv"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6461,9 +6165,7 @@
     "name": "WEBM to MP3",
     "modality": "video",
     "route": "/video/webm-to-mp3",
-    "acceptedInputs": [
-      ".webm"
-    ],
+    "acceptedInputs": [".webm"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6472,9 +6174,7 @@
     "name": "AVI to MP3",
     "modality": "video",
     "route": "/video/avi-to-mp3",
-    "acceptedInputs": [
-      ".avi"
-    ],
+    "acceptedInputs": [".avi"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6483,9 +6183,7 @@
     "name": "MP4 to WAV",
     "modality": "video",
     "route": "/video/mp4-to-wav",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6494,9 +6192,7 @@
     "name": "MOV to WAV",
     "modality": "video",
     "route": "/video/mov-to-wav",
-    "acceptedInputs": [
-      ".mov"
-    ],
+    "acceptedInputs": [".mov"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6505,9 +6201,7 @@
     "name": "MP4 to OGG",
     "modality": "video",
     "route": "/video/mp4-to-ogg",
-    "acceptedInputs": [
-      ".mp4"
-    ],
+    "acceptedInputs": [".mp4"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6516,9 +6210,7 @@
     "name": "M4A to MP3",
     "modality": "audio",
     "route": "/audio/m4a-to-mp3",
-    "acceptedInputs": [
-      ".m4a"
-    ],
+    "acceptedInputs": [".m4a"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6527,9 +6219,7 @@
     "name": "M4A to WAV",
     "modality": "audio",
     "route": "/audio/m4a-to-wav",
-    "acceptedInputs": [
-      ".m4a"
-    ],
+    "acceptedInputs": [".m4a"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6538,9 +6228,7 @@
     "name": "AAC to MP3",
     "modality": "audio",
     "route": "/audio/aac-to-mp3",
-    "acceptedInputs": [
-      ".aac"
-    ],
+    "acceptedInputs": [".aac"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6549,9 +6237,7 @@
     "name": "AAC to WAV",
     "modality": "audio",
     "route": "/audio/aac-to-wav",
-    "acceptedInputs": [
-      ".aac"
-    ],
+    "acceptedInputs": [".aac"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6560,9 +6246,7 @@
     "name": "AAC to FLAC",
     "modality": "audio",
     "route": "/audio/aac-to-flac",
-    "acceptedInputs": [
-      ".aac"
-    ],
+    "acceptedInputs": [".aac"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6571,9 +6255,7 @@
     "name": "OGG to MP3",
     "modality": "audio",
     "route": "/audio/ogg-to-mp3",
-    "acceptedInputs": [
-      ".ogg"
-    ],
+    "acceptedInputs": [".ogg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6582,9 +6264,7 @@
     "name": "OGG to WAV",
     "modality": "audio",
     "route": "/audio/ogg-to-wav",
-    "acceptedInputs": [
-      ".ogg"
-    ],
+    "acceptedInputs": [".ogg"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6593,9 +6273,7 @@
     "name": "WAV to MP3",
     "modality": "audio",
     "route": "/audio/wav-to-mp3",
-    "acceptedInputs": [
-      ".wav"
-    ],
+    "acceptedInputs": [".wav"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6604,9 +6282,7 @@
     "name": "MP3 to WAV",
     "modality": "audio",
     "route": "/audio/mp3-to-wav",
-    "acceptedInputs": [
-      ".mp3"
-    ],
+    "acceptedInputs": [".mp3"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6615,9 +6291,7 @@
     "name": "FLAC to MP3",
     "modality": "audio",
     "route": "/audio/flac-to-mp3",
-    "acceptedInputs": [
-      ".flac"
-    ],
+    "acceptedInputs": [".flac"],
     "executionHint": "fast",
     "isAI": false
   },
@@ -6626,10 +6300,7 @@
     "name": "Excel to CSV",
     "modality": "document",
     "route": "/files/excel-to-csv",
-    "acceptedInputs": [
-      ".xlsx",
-      ".xls"
-    ],
+    "acceptedInputs": [".xlsx", ".xls"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6953,9 +6624,7 @@
     "name": "Compress PDF to 100 KB",
     "modality": "document",
     "route": "/pdf/compress-pdf-to-100kb",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6964,9 +6633,7 @@
     "name": "Compress PDF to 200 KB",
     "modality": "document",
     "route": "/pdf/compress-pdf-to-200kb",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6975,9 +6642,7 @@
     "name": "Compress PDF to 500 KB",
     "modality": "document",
     "route": "/pdf/compress-pdf-to-500kb",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6986,9 +6651,7 @@
     "name": "Compress PDF to 1 MB",
     "modality": "document",
     "route": "/pdf/compress-pdf-to-1mb",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   },
@@ -6997,9 +6660,7 @@
     "name": "Compress PDF to 2 MB",
     "modality": "document",
     "route": "/pdf/compress-pdf-to-2mb",
-    "acceptedInputs": [
-      ".pdf"
-    ],
+    "acceptedInputs": [".pdf"],
     "executionHint": "long",
     "isAI": false
   }
