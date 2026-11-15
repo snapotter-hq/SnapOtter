@@ -29,6 +29,7 @@ interface Workflow {
   jobs: Record<
     string,
     {
+      "runs-on"?: string;
       steps: Step[];
       strategy?: { matrix?: { include?: Array<Record<string, string>> } };
     }
@@ -80,5 +81,11 @@ describe("api mutation lane (#4749)", () => {
     expect(laneExr?.run).toBe(unitExr?.run);
     // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression
     expect(laneExr?.if).toBe("${{ matrix.apt }}");
+  });
+
+  it("runs on the Unit job's runner image", () => {
+    const unitRunner = readWorkflow("ci.yml").jobs["test-unit"]["runs-on"];
+    expect(unitRunner).toBeDefined();
+    expect(readWorkflow("mutation.yml").jobs.mutation["runs-on"]).toBe(unitRunner);
   });
 });

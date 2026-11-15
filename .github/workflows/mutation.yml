@@ -15,7 +15,9 @@ permissions:
 jobs:
   mutation:
     name: Stryker (${{ matrix.lane }})
-    runs-on: ubuntu-latest
+    # Same image as ci.yml's Unit job: the api lane runs its tests and needs
+    # the same apt packages and EXR coder, which 26.04 lacks (#4768, #4749).
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       # One broken lane must not hide the others. This is exactly how the
