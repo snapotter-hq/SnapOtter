@@ -12,6 +12,7 @@ Progress is reported via JSON lines on stderr (parsed by the Node bridge).
 Final result is a JSON object on stdout.
 """
 
+import base64
 import contextlib
 import csv
 import errno
@@ -1586,6 +1587,287 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
     )
 
 
+# -- Metadata that matches the files on disk (#4740) --
+#
+# build-bundle.sh used to diff site-packages by top-level name, so when a build
+# upgraded a package the base venv already had (filelock, certifi, Pillow...),
+# the new `<name>-<version>.dist-info` counted as new while the package
+# directory did not. Published bundles therefore carry metadata whose files
+# they do not ship. Placing that metadata relabels the venv: the supersede pass
+# removes the base version's dist-info and keeps its files, so `pip list` and
+# importlib.metadata report a version that is not what imports. These helpers
+# keep every published bundle safe to overlay without a rebuild.
+
+
+def base_package_names(manifest: dict) -> set:
+    """Canonical names of the manifest's `basePackages`, extras and pins stripped."""
+    names = set()
+    for spec in manifest.get("basePackages", []) or []:
+        m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
+        if m:
+            names.add(canonical_dist_name(m.group(1)))
+    return names
+
+
+def _record_entries(sp_dir: str, dist_info: str) -> list:
+    """(path, hash) rows of a RECORD, with the same path filtering as distribution_files."""
+    record = os.path.join(sp_dir, dist_info, "RECORD")
+    if not os.path.exists(record):
+        return []
+    rows = []
+    with open(record, newline="", errors="replace") as f:
+        for row in csv.reader(f):
+            if not row:
+                continue
+            rel = row[0].strip().replace("\\", "/")
+            if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                continue
+            rows.append((rel, row[1].strip() if len(row) > 1 else ""))
+    return rows
+
+
+def _payload_entries(sp_dir: str, dist_info: str) -> list:
+    """RECORD rows for the files a distribution installs outside its own metadata.
+
+    Bytecode is left out: archives and venvs regenerate or drop `.pyc` files
+    freely, so their presence says nothing about which version is installed.
+    """
+    prefix = dist_info + "/"
+    return [
+        (rel, digest)
+        for rel, digest in _record_entries(sp_dir, dist_info)
+        if not rel.startswith(prefix)
+        and not rel.endswith(".pyc")
+        and "/__pycache__/" not in f"/{rel}"
+    ]
+
+
+def drop_base_distributions(staging_sp: str, base_names: set) -> list:
+    """Remove every staged copy of a base package, metadata and files alike.
+
+    The image's base venv pins these (numpy, Pillow, OpenCV, huggingface-hub),
+    and build-bundle.sh re-pins them before diffing, so a bundle has no business
+    placing them. The published inpaint-hq archive does anyway: it carries
+    `pillow-12.3.0.dist-info` without `PIL/`, which turned a Pillow 13 venv into
+    one that reports 12.3.0.
+    """
+    staged = list_distributions(staging_sp)
+    targets = sorted(
+        dist_info
+        for name, copies in staged.items()
+        if name in base_names
+        for _version, dist_info in copies
+    )
+    if not targets:
+        return []
+    shared = paths_claimed_by_others(staging_sp, set(targets))
+    for dist_info in targets:
+        for rel in distribution_files(staging_sp, dist_info):
+            if rel in shared or rel.startswith(dist_info + "/"):
+                continue
+            path = os.path.join(staging_sp, rel)
+            if os.path.isfile(path) or os.path.islink(path):
+                os.unlink(path)
+                _discard_stale_bytecode(staging_sp, rel)
+                _prune_empty_parents(staging_sp, rel)
+        shutil.rmtree(os.path.join(staging_sp, dist_info), ignore_errors=True)
+    sys.stderr.write(
+        "[install] kept the base venv's copy of base packages; dropped this bundle's "
+        f"{', '.join(targets)}\n"
+    )
+    sys.stderr.flush()
+    return targets
+
+
+def drop_orphan_dist_infos(staging_sp: str) -> list:
+    """Remove staged metadata that arrives without any of the files it describes.
+
+    Placing it would only relabel whatever copy of the package the venv already
+    has. The venv keeps its own, truthful, metadata instead. A distribution
+    that ships some of its files is left alone: the supersede pass already
+    keeps the old version's files for whatever the new copy does not cover.
+    """
+    if not os.path.isdir(staging_sp):
+        return []
+    dropped = []
+    for entry in sorted(os.listdir(staging_sp)):
+        if not entry.endswith(DIST_INFO_SUFFIX):
+            continue
+        payload = _payload_entries(staging_sp, entry)
+        if not payload:
+            continue
+        if any(os.path.lexists(os.path.join(staging_sp, rel)) for rel, _ in payload):
+            continue
+        shutil.rmtree(os.path.join(staging_sp, entry), ignore_errors=True)
+        dropped.append(entry)
+    if dropped:
+        sys.stderr.write(
+            "[install] dropped metadata this bundle ships without its package files, so "
+            f"the venv keeps reporting the versions it really has: {', '.join(dropped)}\n"
+        )
+        sys.stderr.flush()
+    return dropped
+
+
+def _record_hash_matches(path: str, digest: str):
+    """True/False when RECORD carries a sha256 for the file, None when it does not."""
+    algo, sep, expected = digest.partition("=")
+    if not sep or algo != "sha256":
+        return None
+    if not os.path.isfile(path):
+        return False
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    actual = base64.urlsafe_b64encode(h.digest()).rstrip(b"=").decode("ascii")
+    return actual == expected
+
+
+def files_match_record(record_sp: str, dist_info: str, files_sp: str) -> bool:
+    """Whether every hashed payload file of `dist_info` (read from `record_sp`)
+    is present in `files_sp` with exactly the recorded bytes."""
+    checked = 0
+    for rel, digest in _payload_entries(record_sp, dist_info):
+        result = _record_hash_matches(os.path.join(files_sp, rel), digest)
+        if result is None:
+            continue
+        if not result:
+            return False
+        checked += 1
+    return checked > 0
+
+
+def repair_metadata_from_base(sp_dir: str, base_sp: str) -> list:
+    """Put back the base venv's metadata where an earlier install relabelled it.
+
+    Venvs that already took one of the affected bundles hold, say,
+    `pillow-12.3.0.dist-info` beside Pillow 13's files, with the 13.0.0
+    metadata gone. When the files on disk are byte for byte the base venv's
+    copy, the base venv's dist-info is the truth: it replaces the relabelled
+    one. Duplicate metadata for one package is resolved the same way, keeping
+    the copy whose RECORD the files match. Anything that cannot be proven from
+    the RECORD hashes is left as it is.
+    """
+    if not base_sp or not os.path.isdir(base_sp) or not os.path.isdir(sp_dir):
+        return []
+    if os.path.abspath(base_sp) == os.path.abspath(sp_dir):
+        return []
+    base = list_distributions(base_sp)
+    repaired = []
+    for name, copies in sorted(list_distributions(sp_dir).items()):
+        base_copies = base.get(name, [])
+        if len(base_copies) != 1:
+            continue
+        base_version, base_dist_info = base_copies[0]
+        if len(copies) == 1 and copies[0][0] == base_version:
+            continue
+        truthful = [di for _v, di in copies if files_match_record(sp_dir, di, sp_dir)]
+        if len(truthful) == len(copies) == 1:
+            continue
+        if truthful:
+            if len(truthful) > 1:
+                continue
+            keep = truthful[0]
+            for _v, di in copies:
+                if di != keep:
+                    shutil.rmtree(os.path.join(sp_dir, di), ignore_errors=True)
+                    repaired.append(di)
+            continue
+        if not files_match_record(base_sp, base_dist_info, sp_dir):
+            continue
+        for _v, di in copies:
+            shutil.rmtree(os.path.join(sp_dir, di), ignore_errors=True)
+            repaired.append(di)
+        shutil.copytree(
+            os.path.join(base_sp, base_dist_info), os.path.join(sp_dir, base_dist_info)
+        )
+    if repaired:
+        sys.stderr.write(
+            "[install] removed metadata that did not match the installed files: "
+            f"{', '.join(repaired)}\n"
+        )
+        sys.stderr.flush()
+    return repaired
+
+
+def base_site_packages_for(site_packages_dir: str, venv_path: str, base_venv: str) -> str:
+    """The base venv's site-packages at the same relative spot as the live venv's."""
+    if not site_packages_dir or not venv_path or not base_venv:
+        return ""
+    rel = os.path.relpath(site_packages_dir, venv_path)
+    if rel.startswith(".."):
+        return ""
+    candidate = os.path.join(base_venv, rel)
+    return candidate if os.path.isdir(candidate) else ""
+
+
+def plan_bundle_merge(
+    staging_sp: str,
+    site_packages_dir: str,
+    quarantine_dir: str,
+    base_names=frozenset(),
+    base_sp: str = "",
+) -> list:
+    """Every fix-up that runs before a bundle's site-packages are moved in.
+
+    Returns the reconciliation plan. The caller then runs
+    supersede_distributions and move_tree, so a failure part way still has the
+    plan to roll back with. docker/verify-bundle-compatibility.sh layers
+    bundles through this same function, so the compatibility check sees the
+    venv a real install produces.
+    """
+    # Flavor first: `onnxruntime` and `onnxruntime-gpu` are two different
+    # distributions writing the same package directory, so which one wins
+    # is not a version question and the general pass below cannot decide
+    # it. Running it first also means that when the CPU build is dropped
+    # from staging, the general pass never sees it and so never uninstalls
+    # the GPU build the venv is keeping (#490).
+    reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
+    reconcile_opencv(staging_sp, site_packages_dir)
+    drop_base_distributions(staging_sp, set(base_names))
+    drop_orphan_dist_infos(staging_sp)
+    repair_metadata_from_base(site_packages_dir, base_sp)
+    return plan_reconciliation(staging_sp, site_packages_dir)
+
+
+def audit_distribution_metadata(sp_dir: str) -> dict:
+    """Find metadata a venv should never hold.
+
+    `duplicates`: packages with more than one dist-info. `orphans`: dist-info
+    whose RECORD lists files and none of them is on disk. `mismatched`:
+    dist-info where most of the present, sha256-hashed files differ from its
+    RECORD, which is what a relabelled package looks like. A few differing
+    files are normal (build-bundle.sh patches sources, and packages such as
+    OpenCV share files across project names), so this takes a majority.
+    """
+    duplicates = {
+        name: sorted(di for _v, di in copies)
+        for name, copies in list_distributions(sp_dir).items()
+        if len(copies) > 1
+    }
+    orphans = []
+    mismatched = []
+    for entry in sorted(os.listdir(sp_dir)) if os.path.isdir(sp_dir) else []:
+        if not entry.endswith(DIST_INFO_SUFFIX):
+            continue
+        payload = _payload_entries(sp_dir, entry)
+        if not payload:
+            continue
+        present = [(rel, d) for rel, d in payload if os.path.lexists(os.path.join(sp_dir, rel))]
+        if not present:
+            orphans.append(entry)
+            continue
+        results = [
+            r
+            for r in (_record_hash_matches(os.path.join(sp_dir, rel), d) for rel, d in present)
+            if r is not None
+        ]
+        if results and sum(results) * 2 < len(results):
+            mismatched.append(entry)
+    return {"duplicates": duplicates, "orphans": orphans, "mismatched": mismatched}
+
+
 REMEDIATION_BACKUP_DIRNAME = ".remediation"
 
 
@@ -2512,15 +2794,17 @@ def _install() -> None:
             # again then (a later models-move failure can't tear the venv).
             mark_venv_writing(venv_writing_marker, bundle_id)
             shutil.rmtree(quarantine_dir, ignore_errors=True)
-            # Flavor first: `onnxruntime` and `onnxruntime-gpu` are two different
-            # distributions writing the same package directory, so which one wins
-            # is not a version question and the general pass below cannot decide
-            # it. Running it first also means that when the CPU build is dropped
-            # from staging, the general pass never sees it and so never uninstalls
-            # the GPU build the venv is keeping (#490).
-            reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
-            reconcile_opencv(staging_sp, site_packages_dir)
-            reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
+            reconciliation_plan = plan_bundle_merge(
+                staging_sp,
+                site_packages_dir,
+                quarantine_dir,
+                base_names=base_package_names(manifest),
+                base_sp=base_site_packages_for(
+                    site_packages_dir,
+                    venv_path,
+                    os.environ.get("SNAPOTTER_BASE_VENV_PATH", "/opt/venv"),
+                ),
+            )
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
             move_tree(
                 staging_sp,

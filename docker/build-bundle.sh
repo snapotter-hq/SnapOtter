@@ -19,6 +19,7 @@ set -euo pipefail
 export BUNDLE_ID="${1:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
 export ARCH="${2:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
 OUTPUT_DIR="${3:?Usage: build-bundle.sh <bundleId> <arch> <outputDir>}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # OCR uses the v3 complete-runtime format. Keep legacy aliases at this boundary
 # until every release caller has moved to explicit capability target names.
@@ -35,7 +36,6 @@ if [[ "${BUNDLE_ID}" == "ocr" ]]; then
       exit 2
       ;;
   esac
-  SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   OCR_BUILDER="${OCR_RUNTIME_BUILDER:-${SCRIPT_DIR}/build-ocr-runtime.sh}"
   if [[ ! -x "${OCR_BUILDER}" ]]; then
     echo "ERROR: OCR runtime builder is missing or not executable: ${OCR_BUILDER}" >&2
@@ -82,6 +82,12 @@ echo "Site-packages: ${SITE_PACKAGES}"
 if [[ ! -f "${MANIFEST}" ]]; then
   echo "ERROR: Manifest not found at ${MANIFEST}" >&2
   exit 1
+fi
+
+DELTA_HELPER="${SCRIPT_DIR}/bundle-delta.py"
+if [[ ! -f "${DELTA_HELPER}" ]]; then
+  echo "ERROR: ${DELTA_HELPER} is missing; mount the whole docker/ directory, not just this script" >&2
+  exit 2
 fi
 
 # Validate bundle exists in manifest
@@ -208,8 +214,12 @@ if not base_packages:
     print("  No base packages to re-pin")
     sys.exit(0)
 
+# --no-deps: without it the force-reinstall also upgrades every unpinned
+# dependency of the base packages (filelock, certifi, idna, urllib3...). Their
+# package directories already exist in the base venv, so Step 6 used to ship
+# only their new dist-info, which relabelled the venv on install (#4740).
 pkgs = " ".join(base_packages)
-cmd = f"{sys.executable} -m pip install --no-cache-dir --force-reinstall {pkgs}"
+cmd = f"{sys.executable} -m pip install --no-cache-dir --force-reinstall --no-deps {pkgs}"
 print(f"  > {cmd}", flush=True)
 result = subprocess.run(shlex.split(cmd))
 if result.returncode != 0:
@@ -488,6 +498,13 @@ while IFS= read -r dir; do
   [[ -z "${dir}" ]] && continue
   cp -a "${dir}" "${BUILD_DIR}/site-packages/"
 done <<< "${DELTA_DIRS}"
+
+# The top-level diff above cannot see a distribution whose package directory
+# the base venv already had, so it may have staged metadata without files.
+# Drop basePackages from the delta and complete every other distribution from
+# the build venv; fail rather than publish metadata without its package.
+echo "=== Reconciling staged distributions ==="
+python3 "${DELTA_HELPER}" "${SITE_PACKAGES}" "${BUILD_DIR}/site-packages" "${MANIFEST}"
 
 # Copy models to build staging
 if [[ -d "${MODELS_DIR}" ]] && [[ -n "$(ls -A "${MODELS_DIR}" 2>/dev/null)" ]]; then
