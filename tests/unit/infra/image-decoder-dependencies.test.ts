@@ -24,16 +24,19 @@ function expectImageMagickExtraCoders(source: string): void {
 }
 
 describe("cross-platform image decoder dependencies", () => {
-  it("installs EXR-capable ImageMagick coders in unit and integration CI", () => {
-    const workflow = read(".github/workflows/ci.yml");
-    expectImageMagickExtraCoders(workflowJob(workflow, "test-unit", "test-integration"));
-    expectImageMagickExtraCoders(workflowJob(workflow, "test-integration", "test-e2e-smoke"));
+  it("installs EXR-capable ImageMagick coders through one shared action (#4777)", () => {
+    const action = read(".github/actions/imagemagick-exr/action.yml");
+    expectImageMagickExtraCoders(action);
     // Bounded so a degraded mirror cannot hang the job until its ceiling (#4124).
+    expect(action).toContain("timeout -k 30 300 apt-get install");
+
+    const workflow = read(".github/workflows/ci.yml");
     for (const job of [
       workflowJob(workflow, "test-unit", "test-integration"),
       workflowJob(workflow, "test-integration", "test-e2e-smoke"),
     ]) {
-      expect(job).toContain("timeout -k 30 300 apt-get install");
+      expect(job).toContain("uses: ./.github/actions/imagemagick-exr");
+      expect(job).not.toContain("apt-get install -y --no-install-recommends libmagickcore");
     }
   });
 

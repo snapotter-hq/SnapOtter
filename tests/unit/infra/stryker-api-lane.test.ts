@@ -72,13 +72,12 @@ describe("api mutation lane (#4749)", () => {
     expect(installStep?.if).toBe("${{ matrix.apt }}");
   });
 
-  it("installs the ImageMagick EXR coder the same way the Unit job does", () => {
+  it("installs the ImageMagick EXR coder through the Unit job's shared action", () => {
     const exrStep = (steps: Step[]) =>
-      steps.find((step) => step.name?.startsWith("Install the ImageMagick EXR coder"));
-    const unitExr = exrStep(readWorkflow("ci.yml").jobs["test-unit"].steps);
+      steps.find((step) => step.uses === "./.github/actions/imagemagick-exr");
+    expect(exrStep(readWorkflow("ci.yml").jobs["test-unit"].steps)).toBeDefined();
     const laneExr = exrStep(readWorkflow("mutation.yml").jobs.mutation.steps);
-    expect(unitExr?.run).toBeDefined();
-    expect(laneExr?.run).toBe(unitExr?.run);
+    expect(laneExr).toBeDefined();
     // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression
     expect(laneExr?.if).toBe("${{ matrix.apt }}");
   });
