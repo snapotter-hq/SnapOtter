@@ -167,17 +167,7 @@ jobs:
         with:
           packages: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
 
-      - name: Install the ImageMagick EXR coder and verify
-        run: |
-          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
-          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
-          else
-            echo "No supported ImageMagick EXR coder package found" >&2
-            exit 1
-          fi
-          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
+      - uses: ./.github/actions/imagemagick-exr
 
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
@@ -243,18 +233,10 @@ jobs:
             tesseract-ocr-fra tesseract-ocr-spa
             tesseract-ocr-chi-sim tesseract-ocr-jpn
 
-      - name: Install the ImageMagick EXR coder and verify the format toolchain
-        run: |
-          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
-          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
-          else
-            echo "No supported ImageMagick EXR coder package found" >&2
-            exit 1
-          fi
-          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
+      - uses: ./.github/actions/imagemagick-exr
 
+      - name: Verify the Fast OCR language payload
+        run: |
           sudo rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
           test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
 
