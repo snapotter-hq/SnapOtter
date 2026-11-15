@@ -19,7 +19,19 @@
     "pandas==2.2.2",
     "huggingface-hub==0.36.2",
     "tokenizers==0.20.3",
-    "onnxruntime==1.20.1"
+    "onnxruntime==1.20.1",
+    "absl-py==2.5.1",
+    "imageio==2.38.1",
+    "kiwisolver==1.5.1",
+    "lazy-loader==0.6",
+    "llvmlite==0.50.0",
+    "matplotlib==3.11.2",
+    "numba==0.68.1",
+    "platformdirs==4.14.5",
+    "protobuf==7.36.2",
+    "pyparsing==3.3.3",
+    "python-dateutil==4.0.0",
+    "sounddevice==0.5.6"
   ],
   "bundleRepo": "deepsafe/feature-bundles",
   "bundles": {

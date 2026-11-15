@@ -203,6 +203,39 @@ describe("verify-bundle-compatibility.sh exit codes", () => {
     expect(run.output).toContain("Every dist-info has its files installed, one per package");
   });
 
+  it("exits 2 when two bundles ship one package at different versions (#4739)", () => {
+    const run = runVerify({
+      bundles: {
+        "background-removal": [
+          ["protobuf", "7.36.2", { "google/protobuf/__init__.py": "# 7.36.2" }, true],
+        ],
+        transcription: [
+          ["protobuf", "7.35.1", { "google/protobuf/__init__.py": "# 7.35.1" }, true],
+        ],
+      },
+    });
+    expect(run.status, run.output).toBe(2);
+    expect(run.output).toContain("protobuf: background-removal 7.36.2, transcription 7.35.1");
+    expect(run.output).toContain("Bundles ship different versions of the same package");
+  });
+
+  it("passes when every bundle ships the same version of a shared package", () => {
+    const run = runVerify({
+      bundles: {
+        "background-removal": [
+          ["protobuf", "7.36.2", { "google/protobuf/__init__.py": "# 7.36.2" }, true],
+        ],
+        transcription: [
+          ["protobuf", "7.36.2", { "google/protobuf/__init__.py": "# 7.36.2" }, true],
+        ],
+      },
+    });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain(
+      "No package is shipped at more than one version across the bundles",
+    );
+  });
+
   it("exits 1 when the manifest is missing (integrity failure)", () => {
     const run = runVerify({ manifest: false });
     expect(run.status).toBe(1);
