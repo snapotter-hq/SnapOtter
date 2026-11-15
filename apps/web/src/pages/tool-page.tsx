@@ -850,9 +850,7 @@ function ToolPageContent({
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
-    if (toolId) {
-      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
-    }
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, toolId ? { tool_id: toolId } : {});
     downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
     useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename, toolId]);

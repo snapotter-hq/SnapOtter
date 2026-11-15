@@ -254,6 +254,7 @@ export function pipelineExecutedProps(
   toolIds: string[],
   durationMs: number,
   status: "completed" | "failed" | "canceled",
+  errorCode?: string,
 ) {
   // `satisfies` (not a return-type annotation) validates the shape against
   // PipelineExecutedProperties while keeping the inferred anonymous type, which
@@ -266,6 +267,7 @@ export function pipelineExecutedProps(
     file_count: data.totalFiles ?? 1,
     duration_ms: durationMs,
     status,
+    ...(errorCode && { error_code: errorCode }),
   } satisfies PipelineExecutedProperties;
 }
 
@@ -526,6 +528,7 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           steps.map((s) => s.toolId),
           Date.now() - startTime,
           "failed",
+          failFault.code,
         ),
         data.analyticsDistinctId,
       );
@@ -631,6 +634,7 @@ export async function processPipelineFinalize(job: Job<ToolJobData>): Promise<To
           steps.map((s) => s.toolId),
           Date.now() - startTime,
           "failed",
+          errorFields.code,
         ),
         data.analyticsDistinctId,
       );

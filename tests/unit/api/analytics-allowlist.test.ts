@@ -87,3 +87,22 @@ describe("app_version (#4215)", () => {
     });
   });
 });
+
+describe("auth_login_failed reason (#4216)", () => {
+  it("keeps a closed-set reason and drops free text keys", () => {
+    expect(
+      sanitizeEventProperties("auth_login_failed", {
+        method: "password",
+        reason: "bad_credentials",
+        username: "alice",
+        detail: "bad_password",
+      }),
+    ).toEqual({ method: "password", reason: "bad_credentials" });
+  });
+
+  it("drops a reason outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("auth_login_failed", { method: "password", reason: "alice" }),
+    ).toEqual({ method: "password" });
+  });
+});

@@ -2457,6 +2457,18 @@ describe("pipelineExecutedProps", () => {
       ),
     ).toMatchObject({ is_batch: false, file_count: 1, status: "failed" });
   });
+
+  it("adds error_code only when the failing step had one (#4216)", async () => {
+    const { pipelineExecutedProps } = await loadWorker();
+    const base = { kind: "pipeline-finalize" } as const;
+
+    expect(pipelineExecutedProps(base, 2, ["a", "b"], 5, "failed", "FILE_TOO_LARGE")).toMatchObject(
+      { error_code: "FILE_TOO_LARGE" },
+    );
+    expect(pipelineExecutedProps(base, 2, ["a", "b"], 5, "failed")).not.toHaveProperty(
+      "error_code",
+    );
+  });
 });
 
 // #1414: a failure event carried no job age, so Sentry could not tell an
