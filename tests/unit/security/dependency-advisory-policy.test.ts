@@ -67,6 +67,15 @@ describe("production dependency advisory policy", () => {
     expect(lockfile).not.toContain("react-router@7.18.1");
     expect(lockfile).not.toContain("tar@7.5.20");
   });
+
+  it("keeps the vulnerable tinypool 1.x out of the lockfile", () => {
+    const lockfile = readFileSync(resolve(root, "pnpm-lock.yaml"), "utf8");
+
+    // Alerts 148 and 149: tinypool <= 2.1.0 has a worker-options prototype
+    // pollution RCE. No vitest 3 release uses tinypool 2, so vitest 4 is the fix.
+    expect(lockfile).not.toMatch(/\n {2}tinypool@1\./);
+    expect(lockfile).not.toMatch(/\n {2}vitest@3\./);
+  });
 });
 
 type Version = [number, number, number];
