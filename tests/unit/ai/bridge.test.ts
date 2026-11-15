@@ -4999,6 +4999,41 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
     expect(finalStatus.lastRecycleReason).toBe("cuda_error");
   });
 
+  it("keeps the dispatcher on an ONNX Runtime allocation failure, which leaves the CUDA context usable (#4744)", async () => {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const readyPromise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await readyPromise;
+
+    const reqPromise = runPythonWithProgress("remove_bg.py", []);
+    await vi.waitFor(() => expect(mock.stdinWrites.length).toBeGreaterThan(0));
+    const { id } = JSON.parse(mock.stdinWrites.join("").trim());
+    const arenaOom =
+      "[ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION : Non-zero status code returned while running BiasGelu node. " +
+      "Status Message: /onnxruntime_src/onnxruntime/core/framework/bfc_arena.cc:376 " +
+      "void* onnxruntime::BFCArena::AllocateRawInternal(size_t, bool, onnxruntime::Stream*, bool, " +
+      "onnxruntime::WaitNotificationFn) Failed to allocate memory for requested buffer of size 805306368";
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id, exitCode: 0, stdout: JSON.stringify({ success: false, error: arenaOom }) })}\n`,
+      ),
+    );
+    await reqPromise;
+
+    const status = getDispatcherStatus();
+    expect(status.running).toBe(true);
+    expect(status.ready).toBe(true);
+    expect(status.consecutiveScriptFailures).toBe(1);
+    expect(status.lastRecycleReason).toBeNull();
+    expect(mock.process.kill).not.toHaveBeenCalled();
+  });
+
   it("recycles the dispatcher after 3 consecutive script failures and resets on success without tripping MAX_CONSECUTIVE_CRASHES", async () => {
     const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
       await import("../../../packages/ai/src/bridge.js");

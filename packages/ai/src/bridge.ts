@@ -566,7 +566,20 @@ const EXIT_STDERR_TAIL_LINES = 20;
 const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
 
 const CUDA_POISON_RE =
-  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+
+// Every ONNX Runtime error carries one of these wrappers, including an arena
+// allocation failure, which leaves the CUDA context usable. So the wrapper alone
+// only counts as poison when the error isn't an allocation failure; the specific
+// CUDA signatures above count whatever else the output says (#4744). Mirrors
+// _is_cuda_poison_error in dispatcher.py.
+const ORT_WRAPPER_RE = /ort_runtime_exception|onnxruntimeerror/i;
+const ALLOC_FAILURE_RE = /failed to allocate memory|out of memory/i;
+
+function isCudaPoison(text: string): boolean {
+  if (CUDA_POISON_RE.test(text)) return true;
+  return ORT_WRAPPER_RE.test(text) && !ALLOC_FAILURE_RE.test(text);
+}
 
 const PRE_EXEC_GATE_ERRORS = new Set([
   "invalid_script_name",
@@ -601,14 +614,14 @@ function classifyDispatcherResponseFailure(
       exitCode !== 0 || parsed.success === false || (errVal.length > 0 && parsed.success !== true);
     if (!failed) return { status: "succeeded", cudaPoison: false };
     const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   if (exitCode !== 0) {
     if (extracted === "canceled" || PRE_EXEC_GATE_ERRORS.has(extracted)) {
       return { status: "ignored", cudaPoison: false };
     }
     const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   return { status: "succeeded", cudaPoison: false };
 }
