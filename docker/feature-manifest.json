@@ -30,9 +30,9 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/background-removal-amd64-gpu-r4.tar.gz",
-          "sha256": "7b6156eb100922716db39bcbf5a6207288b4f83bf6968081713e32be6c87f8f8",
-          "compressedSize": 4771013000,
-          "extractedSize": 7007305346
+          "sha256": "2e895a42224ae379d204f0229c07b41111f9dd77a6b535e7f33b0d206e335c83",
+          "compressedSize": 4770951554,
+          "extractedSize": 7006805516
         },
         "arm64-cpu": {
           "file": "v2.0.0/background-removal-arm64-cpu-r3.tar.gz",
@@ -115,9 +115,9 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/face-detection-amd64-gpu-r3.tar.gz",
-          "sha256": "e7c6eab1eaff265b324d0ee7e4b2d6592218704d11b75a7e0dc1ec74ce3a700c",
-          "compressedSize": 33007495,
-          "extractedSize": 88926970
+          "sha256": "b56301ce675e3076bd12f75d5009fdd879a6679b16b23cef38df886413933d4d",
+          "compressedSize": 32953446,
+          "extractedSize": 88427148
         },
         "arm64-cpu": {
           "file": "v2.0.0/face-detection-arm64-cpu-r2.tar.gz",
@@ -230,10 +230,10 @@
       "estimatedSize": "5-7 GB",
       "archives": {
         "amd64-gpu": {
-          "file": "v2.0.0/inpaint-hq-amd64-gpu.tar.gz",
-          "sha256": "da65c2b7e678b50815c7c2d8ae4594ad7bbf4c1e84682bfc91b46948cdff71de",
-          "compressedSize": 7283076233,
-          "extractedSize": 10745029298
+          "file": "v2.0.0/inpaint-hq-amd64-gpu-r2.tar.gz",
+          "sha256": "6f1bf4832b059ee166a7909e9e7119663891271a19c82d412e267377cf2be1f4",
+          "compressedSize": 5843820883,
+          "extractedSize": 8555056786
         },
         "arm64-cpu": {
           "file": "v2.0.0/inpaint-hq-arm64-cpu.tar.gz",
@@ -281,9 +281,9 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/upscale-enhance-amd64-gpu-r3.tar.gz",
-          "sha256": "8b8283aca3fae0d44c81079c11c63686f144b0745123fa42e1b4122c7a0797f4",
-          "compressedSize": 5284733768,
-          "extractedSize": 8190951770
+          "sha256": "421bccb1f3c037ab194957710bc9b8acc8b779bf02f400058fff8b6fa323b189",
+          "compressedSize": 5284648959,
+          "extractedSize": 8190357527
         },
         "arm64-cpu": {
           "file": "v2.0.0/upscale-enhance-arm64-cpu-r2.tar.gz",
@@ -405,9 +405,9 @@
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/photo-restoration-amd64-gpu-r3.tar.gz",
-          "sha256": "3eea6423dd43e597d577e6688eaf043d0c732703247c32793b5791294fcf3cad",
-          "compressedSize": 4606370560,
-          "extractedSize": 7956958135
+          "sha256": "9d528c3d7fe4eeb614ae1094cb0dfb7d97a7aef4c401cf58b4c6662ab2c4ae75",
+          "compressedSize": 4606287776,
+          "extractedSize": 7956363893
         },
         "arm64-cpu": {
           "file": "v2.0.0/photo-restoration-arm64-cpu-r2.tar.gz",
