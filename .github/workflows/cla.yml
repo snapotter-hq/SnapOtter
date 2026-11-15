@@ -46,7 +46,10 @@ jobs:
           path-to-signatures: "signatures/cla.json"
           path-to-document: "https://github.com/snapotter-hq/snapotter/blob/main/CLA.md"
           branch: "cla-signatures"
-          allowlist: "snapotter-hq,dependabot[bot],renovate[bot],github-actions[bot],snapotter-bot"
+          # Bots can't sign a CLA: the sign-phrase trigger above ignores their
+          # comments, so a bot-authored PR stays red on this required check
+          # unless the bot is listed. posthog[bot] opens the self-driving fix PRs.
+          allowlist: "snapotter-hq,dependabot[bot],renovate[bot],github-actions[bot],snapotter-bot,posthog[bot]"
           custom-notsigned-prcomment: |
             Thanks for the PR! Before we can merge it, we need you to sign our [Contributor License Agreement](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md). You keep ownership of your code and grant SnapOtter a license to use it, including under our commercial license ([plain-language summary](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md#plain-language-summary)).
 
