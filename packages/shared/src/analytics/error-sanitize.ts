@@ -282,11 +282,18 @@ export function rebuildErrorValue(err: unknown): string | null {
       return redactMessage(top.message);
     }
 
-    // 5. Empty message with a stack: derive a title from the first in-app frame.
+    // 5. Empty wrapper (BullMQ, a rethrow with no text): the detail sits one
+    //    or more causes down. Redacted like any other message (#4214).
+    for (let i = 1; i < links.length; i++) {
+      const m = links[i].message;
+      if (typeof m === "string" && m.trim().length > 0) return redactMessage(m);
+    }
+
+    // 6. Empty message with a stack: derive a title from the first in-app frame.
     const hint = frameHint(err);
     if (hint) return hint;
 
-    // 6. Nothing safe to surface: type-only.
+    // 7. Nothing safe to surface: type-only.
     return null;
   } catch {
     return null;
