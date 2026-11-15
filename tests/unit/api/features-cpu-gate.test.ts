@@ -13,6 +13,17 @@ const hoisted = vi.hoisted(() => {
   // feature-status reads DATA_DIR at import, so it is set before any import.
   const dataDir = `${process.env.TMPDIR ?? "/tmp"}/snapotter-cpu-gate-${process.pid}-${Date.now()}`;
   process.env.DATA_DIR = dataDir;
+  // No shipped bundle needs AVX since mediapipe was pinned (#4723), so the
+  // gate runs against a copy of the real manifest with two bundles flagged.
+  const fs = process.getBuiltinModule("node:fs");
+  const path = process.getBuiltinModule("node:path");
+  const realManifest = path.join(import.meta.dirname, "../../../docker/feature-manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(realManifest, "utf-8"));
+  for (const id of ["face-detection", "photo-restoration"]) manifest.bundles[id].requiresAvx = true;
+  fs.mkdirSync(dataDir, { recursive: true });
+  const manifestPath = path.join(dataDir, "feature-manifest.json");
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  process.env.FEATURE_MANIFEST_PATH = manifestPath;
   return {
     dataDir,
     hostLacksAvx: vi.fn(() => false),

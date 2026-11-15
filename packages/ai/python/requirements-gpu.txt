@@ -7,7 +7,11 @@
 # allowlisted model names (remove_bg.py ALLOWED_MODELS), never user paths.
 rembg==2.0.69
 realesrgan==0.3.0
-mediapipe>=0.10.21
+# mediapipe is pinned per arch to match the AI bundles (docker/feature-manifest.json).
+# 0.10.35 is the newest x86-64 build that runs without AVX (1.x aborts on such
+# CPUs, #4723) but has no Linux aarch64 wheel, so aarch64 takes 1.0.0.
+mediapipe==0.10.35; platform_machine != "aarch64"
+mediapipe==1.0.0; platform_machine == "aarch64"
 onnxruntime-gpu==1.20.1
 numpy==1.26.4
 Pillow==13.0.0

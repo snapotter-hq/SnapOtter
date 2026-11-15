@@ -241,9 +241,10 @@ log "Checking every dist-info against the files on disk"
 # pip list, importlib.metadata and vulnerability scanners all read dist-info.
 # A dist-info whose files are missing, or a package with two of them, makes
 # the venv report versions that are not what imports (#4740). Hash mismatches
-# are only reported: two distributions can legitimately write the same files
-# (the published inpaint-hq amd64 archive carries nvidia-cudnn-cu12 and -cu13,
-# which both install nvidia/cudnn/), and one RECORD then describes the other.
+# are only reported: two distributions can write the same files, and one
+# RECORD then describes the other. inpaint-hq amd64 r1 did that with cuDNN cu12
+# and cu13 (#4752); the amd64 set is clean since r2, but the arm64 archives
+# have not been audited, so this stays a warning until they are.
 "${VENV}/bin/python3" - "${SITE_PACKAGES}" <<'PYAUDIT' || fail "Installed metadata does not match the installed files" 2
 import importlib.util, os, sys
 
