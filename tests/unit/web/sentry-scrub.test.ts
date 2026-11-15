@@ -402,6 +402,23 @@ describe("errors that arrive without an Error object", () => {
     expect(out.exception.values[0].value).toBe("Script error (pdf.worker.min-x.mjs:29)");
   });
 
+  it("never lets a query string, fragment or blob id into the title", () => {
+    const query = asScrubbed(send(workerEvent("boom", "file:///Users/a/x.js?token=1#f"), {}));
+    expect(query.exception.values[0].value).toBe("boom (x.js:29)");
+    const blob = asScrubbed(send(workerEvent("boom", "blob:https://h.example/0f8fad5b-d9cb"), {}));
+    expect(blob.exception.values[0].value).toBe("boom");
+  });
+
+  it("only gives the original (last) exception the message", () => {
+    const event = workerEvent("boom", "/assets/w.js");
+    event.exception.values.unshift({
+      ...event.exception.values[0],
+      value: "outer /Users/a/b",
+    });
+    const values = asScrubbed(send(event, undefined as never)).exception.values;
+    expect(values.map((v) => v.value)).toEqual(["Error", "boom (w.js:29)"]);
+  });
+
   it("falls back to the type when there is no message and no frame", () => {
     const event = workerEvent("", "x");
     event.exception.values[0].stacktrace = { frames: [] };

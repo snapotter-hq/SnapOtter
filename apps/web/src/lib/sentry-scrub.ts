@@ -261,15 +261,18 @@ function isGlobalOnerror(ex: AnyEvent): boolean {
 function errorEventValue(message: unknown, frames: unknown): string | null {
   const text = typeof message === "string" ? redactMessage(message).trim() : "";
   const top = Array.isArray(frames) ? asObj(frames[frames.length - 1]) : null;
-  const file = typeof top?.filename === "string" ? basename(scrubFramePath(top.filename)) : "";
+  const file = typeof top?.filename === "string" ? scriptBasename(top.filename) : "";
   const line = typeof top?.lineno === "number" ? top.lineno : null;
   const where = file ? `${file}${line === null ? "" : `:${line}`}` : "";
   if (text && where) return `${text} (${where})`;
   return text || (where ? `Script error (${where})` : null);
 }
 
-function basename(p: string): string {
-  return p.slice(Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")) + 1);
+// blob: and data: URLs name no file, and a blob id is unique per session.
+function scriptBasename(filename: string): string {
+  if (/^(blob|data):/i.test(filename)) return "";
+  const path = scrubFramePath(filename.split(/[?#]/)[0]);
+  return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
 }
 
 // App bundle frames are http(s) URLs: keep the host-less pathname so Sentry can
