@@ -28,6 +28,7 @@ import { isBinarySpawnFailure } from "./binary-overrides.js";
 export type ErrorClass = "expected" | "operational" | "bug";
 
 const HOUR_MS = 3600_000;
+const NODE_ERRNO = /^E[A-Z0-9]{2,}$/;
 const PERIODIC_WINDOW_MS = 24 * HOUR_MS;
 const LIMITS: Record<Exclude<ErrorClass, "expected">, number> = { operational: 1, bug: 10 };
 export const STORAGE_FULL_CODES = new Set(["ENOSPC", "EDQUOT"]);
@@ -441,6 +442,12 @@ export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<
           ? "UnrecoverableError"
           : (err as { name?: string }).name;
         scope.setFingerprint(["operational", code ?? stallOrName ?? "op"]);
+      }
+      if (cls === "bug" && !net && ctx.toolId && code && NODE_ERRNO.test(code)) {
+        // A missing model file shows up from many call sites, each its own
+        // per-frame group. One tool failing with one errno is one problem
+        // (#4214). Only errnos: other bug codes are often derived from settings.
+        scope.setFingerprint(["bug", ctx.toolId, code]);
       }
       if (cls === "bug" && ctx.settings !== undefined) {
         // Attach the knobs that triggered a bug (format, quality, mode, ...) so

@@ -12,6 +12,28 @@ const sysErr = (code: string, syscall?: string) =>
   Object.assign(new Error(`${code}: boom /Users/secret/file.png`), { code, syscall });
 
 describe("rebuildErrorValue", () => {
+  it("falls back to the first non-empty cause message for an empty wrapper (#4214)", () => {
+    const cause = new Error("pdfcpu said no");
+    expect(rebuildErrorValue(new Error("", { cause }))).toBe("pdfcpu said no");
+    const deep = new Error("", { cause: new Error("", { cause: new Error("deep cause") }) });
+    expect(rebuildErrorValue(deep)).toBe("deep cause");
+  });
+
+  it("redacts the cause message it falls back to (#4214)", () => {
+    const cause = new Error("cannot open /home/alice/secret-report.pdf for user bob@example.com");
+    const out = rebuildErrorValue(new Error("", { cause })) ?? "";
+    expect(out).not.toBe("");
+    expect(out).not.toContain("alice");
+    expect(out).not.toContain("secret-report");
+    expect(out).not.toContain("bob@example.com");
+  });
+
+  it("prefers a cause message over the frame hint (#4214)", () => {
+    const err = new Error("", { cause: new Error("real reason") });
+    err.stack = "Error\n    at x (/app/apps/api/src/a.ts:10:2)";
+    expect(rebuildErrorValue(err)).toBe("real reason");
+  });
+
   it("passes SafeError messages through", () => {
     expect(rebuildErrorValue(new SafeError("Storage directory is not writable"))).toBe(
       "Storage directory is not writable",
