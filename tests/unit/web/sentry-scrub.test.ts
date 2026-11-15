@@ -361,3 +361,56 @@ describe("page-translation reconciliation crashes", () => {
     expect(send(event, { originalException: new TypeError("real bug") })).not.toBeNull();
   });
 });
+
+// WEB-1A (#4743): a worker script that throws reaches window.onerror as a bare
+// ErrorEvent, so Sentry has no Error object and the scrubber used to replace
+// the message with the type, leaving every event titled "Error: Error".
+describe("errors that arrive without an Error object", () => {
+  const send = buildWebBeforeSend(() => true);
+  const workerEvent = (value: string, filename: string, lineno = 29) => ({
+    exception: {
+      values: [
+        {
+          type: "Error",
+          value,
+          mechanism: { type: "auto.browser.global_handlers.onerror", handled: false },
+          stacktrace: { frames: [{ filename, lineno, colno: 925688 }] },
+        },
+      ],
+    },
+    tags: { tool_id: "merge-pdf" },
+  });
+
+  it("keeps the redacted message, script basename and line in the title", () => {
+    const out = asScrubbed(
+      send(
+        workerEvent(
+          "Jbig2Error at /Users/alice/Documents/scan.pdf",
+          "https://snap.example.com/assets/pdf.worker.min-DEtVeC4l.mjs?token=abc#frag",
+        ),
+        {},
+      ),
+    );
+    const { value, stacktrace } = out.exception.values[0];
+    expect(value).toBe("Jbig2Error at <path> (pdf.worker.min-DEtVeC4l.mjs:29)");
+    expect(value).not.toMatch(/alice|token|snap\.example/);
+    expect(stacktrace?.frames[0].filename).toBe("/assets/pdf.worker.min-DEtVeC4l.mjs");
+  });
+
+  it("names the script and line when the browser gave no message", () => {
+    const out = asScrubbed(send(workerEvent("", "/assets/pdf.worker.min-x.mjs"), {}));
+    expect(out.exception.values[0].value).toBe("Script error (pdf.worker.min-x.mjs:29)");
+  });
+
+  it("falls back to the type when there is no message and no frame", () => {
+    const event = workerEvent("", "x");
+    event.exception.values[0].stacktrace = { frames: [] };
+    expect(asScrubbed(send(event, {})).exception.values[0].value).toBe("Error");
+  });
+
+  it("does not echo the value of other errors that have no original exception", () => {
+    const event = workerEvent("secret /Users/a/b", "/assets/app.js");
+    event.exception.values[0].mechanism = { type: "generic", handled: true };
+    expect(asScrubbed(send(event, {})).exception.values[0].value).toBe("Error");
+  });
+});
