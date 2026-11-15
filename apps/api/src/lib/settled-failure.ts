@@ -43,6 +43,7 @@ export interface SettledFailureResponse {
 export async function settledFailureResponse(
   jobId: string,
   log: FastifyBaseLogger,
+  toolId?: string,
 ): Promise<SettledFailureResponse | null> {
   let row: typeof schema.jobs.$inferSelect | undefined;
   for (let attempt = 0; ; attempt++) {
@@ -50,7 +51,7 @@ export async function settledFailureResponse(
       [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     } catch (err) {
       log.warn({ err, jobId }, "Could not read the parent row of a failed batch");
-      void reportError(markUpstreamError(err), { source: "http", jobId });
+      void reportError(markUpstreamError(err), { source: "http", toolId, jobId });
       return null;
     }
     const inFlight = row?.status === "processing" || row?.status === "queued";
