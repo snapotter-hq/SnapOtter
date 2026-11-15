@@ -1748,6 +1748,12 @@ def repair_metadata_from_base(sp_dir: str, base_sp: str) -> list:
     one. Duplicate metadata for one package is resolved the same way, keeping
     the copy whose RECORD the files match. Anything that cannot be proven from
     the RECORD hashes is left as it is.
+
+    It only rewrites metadata, and runs once an install is recorded, so it
+    never has to be rolled back. The base copy goes in under a temporary name
+    and is renamed into place before the relabelled copy is removed, so an
+    interruption leaves a duplicate the next install resolves, never a package
+    without metadata.
     """
     if not base_sp or not os.path.isdir(base_sp) or not os.path.isdir(sp_dir):
         return []
@@ -1776,12 +1782,16 @@ def repair_metadata_from_base(sp_dir: str, base_sp: str) -> list:
             continue
         if not files_match_record(base_sp, base_dist_info, sp_dir):
             continue
+        target = os.path.join(sp_dir, base_dist_info)
+        if not os.path.exists(target):
+            incoming = os.path.join(sp_dir, f".{base_dist_info}.repair")
+            shutil.rmtree(incoming, ignore_errors=True)
+            shutil.copytree(os.path.join(base_sp, base_dist_info), incoming)
+            os.replace(incoming, target)
         for _v, di in copies:
-            shutil.rmtree(os.path.join(sp_dir, di), ignore_errors=True)
-            repaired.append(di)
-        shutil.copytree(
-            os.path.join(base_sp, base_dist_info), os.path.join(sp_dir, base_dist_info)
-        )
+            if di != base_dist_info:
+                shutil.rmtree(os.path.join(sp_dir, di), ignore_errors=True)
+                repaired.append(di)
     if repaired:
         sys.stderr.write(
             "[install] removed metadata that did not match the installed files: "
@@ -1795,7 +1805,9 @@ def base_site_packages_for(site_packages_dir: str, venv_path: str, base_venv: st
     """The base venv's site-packages at the same relative spot as the live venv's."""
     if not site_packages_dir or not venv_path or not base_venv:
         return ""
-    rel = os.path.relpath(site_packages_dir, venv_path)
+    # realpath: the site-packages probe resolves symlinks (/var -> /private/var
+    # on macOS) while PYTHON_VENV_PATH may not.
+    rel = os.path.relpath(os.path.realpath(site_packages_dir), os.path.realpath(venv_path))
     if rel.startswith(".."):
         return ""
     candidate = os.path.join(base_venv, rel)
@@ -1807,7 +1819,6 @@ def plan_bundle_merge(
     site_packages_dir: str,
     quarantine_dir: str,
     base_names=frozenset(),
-    base_sp: str = "",
 ) -> list:
     """Every fix-up that runs before a bundle's site-packages are moved in.
 
@@ -1817,17 +1828,18 @@ def plan_bundle_merge(
     bundles through this same function, so the compatibility check sees the
     venv a real install produces.
     """
-    # Flavor first: `onnxruntime` and `onnxruntime-gpu` are two different
-    # distributions writing the same package directory, so which one wins
-    # is not a version question and the general pass below cannot decide
-    # it. Running it first also means that when the CPU build is dropped
-    # from staging, the general pass never sees it and so never uninstalls
-    # the GPU build the venv is keeping (#490).
-    reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
-    reconcile_opencv(staging_sp, site_packages_dir)
+    # Staging-only drops come first, so the ONNX Runtime pass never quarantines
+    # the venv's build in favour of staged metadata that is about to vanish.
     drop_base_distributions(staging_sp, set(base_names))
     drop_orphan_dist_infos(staging_sp)
-    repair_metadata_from_base(site_packages_dir, base_sp)
+    # Flavor next: `onnxruntime` and `onnxruntime-gpu` are two different
+    # distributions writing the same package directory, so which one wins
+    # is not a version question and the general pass below cannot decide
+    # it. Running it before that pass also means that when the CPU build is
+    # dropped from staging, the general pass never sees it and so never
+    # uninstalls the GPU build the venv is keeping (#490).
+    reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
+    reconcile_opencv(staging_sp, site_packages_dir)
     return plan_reconciliation(staging_sp, site_packages_dir)
 
 
@@ -2799,11 +2811,6 @@ def _install() -> None:
                 site_packages_dir,
                 quarantine_dir,
                 base_names=base_package_names(manifest),
-                base_sp=base_site_packages_for(
-                    site_packages_dir,
-                    venv_path,
-                    os.environ.get("SNAPOTTER_BASE_VENV_PATH", "/opt/venv"),
-                ),
             )
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
             move_tree(
@@ -3204,6 +3211,21 @@ def _install() -> None:
     # The install is recorded, so the versions this bundle displaced are never
     # coming back and their quarantine copy is just disk.
     shutil.rmtree(quarantine_dir, ignore_errors=True)
+    # Earlier installs of the published bundles relabelled base packages
+    # (#4740); put the base venv's metadata back where the files prove it.
+    if site_packages_dir:
+        try:
+            repair_metadata_from_base(
+                site_packages_dir,
+                base_site_packages_for(
+                    site_packages_dir,
+                    venv_path,
+                    os.environ.get("SNAPOTTER_BASE_VENV_PATH", "/opt/venv"),
+                ),
+            )
+        except OSError as e:
+            sys.stderr.write(f"[install] could not repair package metadata: {e}\n")
+            sys.stderr.flush()
     if os.path.exists(staging_dir):
         shutil.rmtree(staging_dir, ignore_errors=True)
     # Clean up downloaded tar (but not if local override)

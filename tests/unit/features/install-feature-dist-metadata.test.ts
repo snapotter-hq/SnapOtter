@@ -110,75 +110,102 @@ function distInfos(sp: string): string[] {
     .sort();
 }
 
+/**
+ * Run install_feature.py on a one-bundle local archive. `live` lays out the
+ * venv's site-packages, `base` the base venv's (omitted: no base venv), and
+ * `staged` the archive's site-packages.
+ */
+function installFixture(layout: {
+  live: (sp: string) => void;
+  staged: (sp: string) => void;
+  base?: (sp: string) => void;
+}) {
+  const aiDir = join(tempDir, "ai");
+  const modelsDir = join(aiDir, "models");
+  const venvDir = join(aiDir, "venv");
+  const sp = join(venvDir, hostPython.relSitePackages);
+  mkdirSync(sp, { recursive: true });
+  mkdirSync(join(venvDir, "bin"), { recursive: true });
+  symlinkSync(hostPython.executable, join(venvDir, "bin", "python3"));
+  writeFileSync(
+    join(venvDir, "pyvenv.cfg"),
+    `home = ${dirname(hostPython.executable)}\ninclude-system-site-packages = false\n`,
+  );
+  mkdirSync(modelsDir, { recursive: true });
+  writeFileSync(join(aiDir, "installed.json"), JSON.stringify({ bundles: {} }));
+  layout.live(sp);
+
+  const baseVenv = join(tempDir, "base-venv");
+  if (layout.base) {
+    const baseSp = join(baseVenv, hostPython.relSitePackages);
+    mkdirSync(baseSp, { recursive: true });
+    layout.base(baseSp);
+  }
+
+  const build = join(tempDir, "build");
+  mkdirSync(join(build, "models"), { recursive: true });
+  layout.staged(join(build, "site-packages"));
+  writeFileSync(
+    join(build, "bundle.json"),
+    JSON.stringify({ bundleId: "inpaint-hq", version: "1.0.0-test", models: [] }),
+  );
+  const tarPath = join(tempDir, "inpaint-hq.tar.gz");
+  // COPYFILE_DISABLE stops macOS tar adding ._* AppleDouble entries.
+  execFileSync("tar", ["czf", tarPath, "-C", build, "."], {
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+  });
+  const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+  const size = readFileSync(tarPath).length;
+  const manifestPath = join(tempDir, "feature-manifest.json");
+  const archive = { file: tarPath, sha256, compressedSize: size, extractedSize: size * 2 };
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      manifestVersion: 2,
+      imageVersion: "2.0.0",
+      basePackages: ["numpy==1.26.4", "Pillow==13.0.0"],
+      bundles: {
+        "inpaint-hq": {
+          name: "Inpaint",
+          archives: { "amd64-gpu": archive, "arm64-cpu": archive },
+          models: [],
+          enablesTools: [],
+        },
+      },
+    }),
+  );
+
+  const run = spawnSync("python3", [scriptPath, "inpaint-hq", manifestPath, modelsDir], {
+    env: {
+      ...process.env,
+      DATA_DIR: tempDir,
+      PYTHON_VENV_PATH: venvDir,
+      SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
+      SNAPOTTER_BASE_VENV_PATH: baseVenv,
+    },
+    encoding: "utf8",
+    timeout: 30_000,
+  });
+  return { sp, run };
+}
+
 describe("install_feature.py keeps metadata true to the installed files (#4740)", () => {
   it("installs a bundle carrying orphan base-package metadata without relabelling the venv", () => {
     // The published inpaint-hq archive, in miniature: Pillow's dist-info with
     // no PIL/, filelock's dist-info with no filelock/, and one real package.
-    const aiDir = join(tempDir, "ai");
-    const modelsDir = join(aiDir, "models");
-    const venvDir = join(aiDir, "venv");
-    const sp = join(venvDir, hostPython.relSitePackages);
-    mkdirSync(sp, { recursive: true });
-    mkdirSync(join(venvDir, "bin"), { recursive: true });
-    symlinkSync(hostPython.executable, join(venvDir, "bin", "python3"));
-    writeFileSync(
-      join(venvDir, "pyvenv.cfg"),
-      `home = ${dirname(hostPython.executable)}\ninclude-system-site-packages = false\n`,
-    );
-    mkdirSync(modelsDir, { recursive: true });
-    writeFileSync(join(aiDir, "installed.json"), JSON.stringify({ bundles: {} }));
-    writeDist(sp, "pillow", "13.0.0", PIL13);
-    writeDist(sp, "filelock", "4.2.7", FILELOCK_BASE);
-
-    const build = join(tempDir, "build");
-    const stagedSp = join(build, "site-packages");
-    mkdirSync(join(build, "models"), { recursive: true });
-    writeDist(stagedSp, "pillow", "12.3.0", PIL12, false);
-    writeDist(stagedSp, "filelock", "4.2.10", FILELOCK_NEW, false);
-    writeDist(stagedSp, "diffusers", "0.31.0", { "diffusers/__init__.py": "# d\n" });
-    writeFileSync(
-      join(build, "bundle.json"),
-      JSON.stringify({ bundleId: "inpaint-hq", version: "1.0.0-test", models: [] }),
-    );
-    const tarPath = join(tempDir, "inpaint-hq.tar.gz");
-    // COPYFILE_DISABLE stops macOS tar adding ._* AppleDouble entries.
-    execFileSync("tar", ["czf", tarPath, "-C", build, "."], {
-      env: { ...process.env, COPYFILE_DISABLE: "1" },
-    });
-    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
-    const size = readFileSync(tarPath).length;
-    const manifestPath = join(tempDir, "feature-manifest.json");
-    const archive = { file: tarPath, sha256, compressedSize: size, extractedSize: size * 2 };
-    writeFileSync(
-      manifestPath,
-      JSON.stringify({
-        manifestVersion: 2,
-        imageVersion: "2.0.0",
-        basePackages: ["numpy==1.26.4", "Pillow==13.0.0"],
-        bundles: {
-          "inpaint-hq": {
-            name: "Inpaint",
-            archives: { "amd64-gpu": archive, "arm64-cpu": archive },
-            models: [],
-            enablesTools: [],
-          },
-        },
-      }),
-    );
-
-    const result = spawnSync("python3", [scriptPath, "inpaint-hq", manifestPath, modelsDir], {
-      env: {
-        ...process.env,
-        DATA_DIR: tempDir,
-        PYTHON_VENV_PATH: venvDir,
-        SNAPOTTER_BUNDLE_LOCAL_PATH: tarPath,
-        SNAPOTTER_BASE_VENV_PATH: join(tempDir, "no-base-venv"),
+    const { sp, run } = installFixture({
+      live: (live) => {
+        writeDist(live, "pillow", "13.0.0", PIL13);
+        writeDist(live, "filelock", "4.2.7", FILELOCK_BASE);
       },
-      encoding: "utf8",
-      timeout: 30_000,
+      staged: (staged) => {
+        writeDist(staged, "pillow", "12.3.0", PIL12, false);
+        writeDist(staged, "filelock", "4.2.10", FILELOCK_NEW, false);
+        writeDist(staged, "diffusers", "0.31.0", { "diffusers/__init__.py": "# d\n" });
+      },
     });
 
-    expect(result.status, result.stderr).toBe(0);
+    expect(run.status, run.stderr).toBe(0);
     expect(distInfos(sp)).toEqual([
       "diffusers-0.31.0.dist-info",
       "filelock-4.2.7.dist-info",
@@ -186,7 +213,26 @@ describe("install_feature.py keeps metadata true to the installed files (#4740)"
     ]);
     expect(readFileSync(join(sp, "PIL", "__init__.py"), "utf8")).toBe(PIL13["PIL/__init__.py"]);
     expect(existsSync(join(sp, "diffusers", "__init__.py"))).toBe(true);
-    expect(result.stderr).toContain("pillow-12.3.0.dist-info");
+    expect(run.stderr).toContain("pillow-12.3.0.dist-info");
+  });
+
+  it("repairs a relabelled venv once an install succeeds, from the base venv", () => {
+    const { sp, run } = installFixture({
+      live: (live) => {
+        // What an earlier install of inpaint-hq left: 13's files, 12.3.0's metadata.
+        writeDist(live, "pillow", "12.3.0", PIL12, false);
+        for (const [rel, content] of Object.entries(PIL13)) {
+          mkdirSync(dirname(join(live, rel)), { recursive: true });
+          writeFileSync(join(live, rel), content);
+        }
+      },
+      base: (base) => writeDist(base, "pillow", "13.0.0", PIL13),
+      staged: (staged) => writeDist(staged, "rembg", "2.0.69", { "rembg/__init__.py": "# r\n" }),
+    });
+
+    expect(run.status, run.stderr).toBe(0);
+    expect(distInfos(sp)).toEqual(["pillow-13.0.0.dist-info", "rembg-2.0.69.dist-info"]);
+    expect(run.stderr).toContain("removed metadata that did not match the installed files");
   });
 
   it("drops orphan metadata from staging but keeps complete and partial distributions", () => {
@@ -212,6 +258,33 @@ describe("install_feature.py keeps metadata true to the installed files (#4740)"
       "rembg-2.0.69.dist-info",
       partial,
     ]);
+  });
+
+  it("judges orphans on package files only, not bytecode or scripts outside site-packages", () => {
+    const staging = join(tempDir, "staging");
+    const tool = writeDist(staging, "tool", "1.0", { "tool/__init__.py": "# t\n" });
+    writeFileSync(
+      join(staging, tool, "RECORD"),
+      [
+        "tool/__init__.py,,",
+        "tool/__pycache__/__init__.cpython-312.pyc,,",
+        "../../../bin/tool,,",
+        `${tool}/RECORD,,`,
+      ].join("\n"),
+    );
+    const scriptsOnly = writeDist(staging, "scripts-only", "1.0", {}, false);
+    writeFileSync(
+      join(staging, scriptsOnly, "RECORD"),
+      ["../../../bin/x,,", "x/__pycache__/a.cpython-312.pyc,,"].join("\n"),
+    );
+    rmSync(join(staging, "tool", "__init__.py"));
+
+    const dropped = runPython(
+      `print(json.dumps(mod.drop_orphan_dist_infos(${JSON.stringify(staging)})))`,
+    );
+
+    expect(dropped).toEqual([tool]);
+    expect(distInfos(staging)).toEqual([scriptsOnly]);
   });
 
   it("removes staged base packages with their files and leaves files other distributions own", () => {

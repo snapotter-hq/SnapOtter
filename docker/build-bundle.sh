@@ -501,10 +501,11 @@ done <<< "${DELTA_DIRS}"
 
 # The top-level diff above cannot see a distribution whose package directory
 # the base venv already had, so it may have staged metadata without files.
-# Drop basePackages from the delta and complete every other distribution from
+# Drop every distribution the base venv already has and complete the rest from
 # the build venv; fail rather than publish metadata without its package.
 echo "=== Reconciling staged distributions ==="
-python3 "${DELTA_HELPER}" "${SITE_PACKAGES}" "${BUILD_DIR}/site-packages" "${MANIFEST}"
+python3 "${DELTA_HELPER}" \
+  "${SITE_PACKAGES}" "${BUILD_DIR}/site-packages" /tmp/base-packages.txt "${MANIFEST}"
 
 # Copy models to build staging
 if [[ -d "${MODELS_DIR}" ]] && [[ -n "$(ls -A "${MODELS_DIR}" 2>/dev/null)" ]]; then

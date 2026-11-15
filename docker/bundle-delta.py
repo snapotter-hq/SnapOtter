@@ -1,9 +1,10 @@
 """Make a bundle's staged site-packages delta self-consistent (#4740).
 
-Usage: bundle-delta.py <site-packages> <staging-site-packages> <manifest>
+Usage: bundle-delta.py <site-packages> <staging-site-packages> <base-entries> <manifest>
 
   site-packages          the build venv's site-packages, after every install step
   staging-site-packages  the delta build-bundle.sh Step 6 copied out of it
+  base-entries           Step 1's listing of the base venv's top-level entries
   manifest               feature-manifest.json, for `basePackages`
 
 Step 6 diffs top-level names, so a build that upgrades a package the base venv
@@ -11,12 +12,14 @@ already has stages the new `<name>-<version>.dist-info` (a new name) without
 the package directory (an old name). Installed, that metadata relabels the
 venv's copy of the package. This pass enforces, for every staged distribution:
 
-  * A manifest `basePackages` entry is never shipped. The image pins those and
-    Step 4 re-pins them, so its metadata and any staged files are removed.
+  * A distribution the base venv already has, or a manifest `basePackages`
+    entry, is never shipped: its metadata and any of its files that were
+    staged are removed. The shared venv keeps the image's copy, which the
+    Dockerfile may have patched (setuptools is), so a bundle's `setuptools<75`
+    only shapes its own build. Each one is logged.
   * Any other distribution ships every file its RECORD lists. Files Step 6 left
-    out (they sat in a top-level directory the base venv already had) are
-    copied in from the build venv, so a version the bundle asked for, such as
-    photo-restoration's `setuptools<75`, really is the version it installs.
+    out (they sat in a top-level directory the base venv already had, such as a
+    namespace package) are copied in from the build venv.
 
 It exits 1 when a staged distribution still lacks files after that, so a build
 can never publish metadata without its package.
@@ -85,10 +88,10 @@ def staged_dist_infos(staging: str) -> list:
 
 
 def main(argv: list) -> int:
-    if len(argv) != 4:
+    if len(argv) != 5:
         print(__doc__.strip().splitlines()[2], file=sys.stderr)
         return 2
-    site_packages, staging, manifest_path = argv[1:]
+    site_packages, staging, base_entries_file, manifest_path = argv[1:]
 
     with open(manifest_path) as f:
         manifest = json.load(f)
@@ -97,6 +100,11 @@ def main(argv: list) -> int:
         m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
         if m:
             base_names.add(canonical(m.group(1)))
+    with open(base_entries_file) as f:
+        for line in f:
+            entry = os.path.basename(line.strip())
+            if entry.endswith(DIST_INFO):
+                base_names.add(dist_name(entry))
 
     dists = staged_dist_infos(staging)
     base_present = [d for d in dists if dist_name(d) in base_names]
@@ -114,7 +122,7 @@ def main(argv: list) -> int:
             removed += 1
         shutil.rmtree(os.path.join(staging, d))
         print(
-            f"  Dropped {d} (a basePackages entry; the image's pinned copy stays"
+            f"  Dropped {d} (the base venv has this package; its copy stays"
             + (f", removed {removed} staged file(s)" if removed else "")
             + ")"
         )

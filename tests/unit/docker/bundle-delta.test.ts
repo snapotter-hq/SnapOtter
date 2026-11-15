@@ -1,8 +1,17 @@
 // docker/bundle-delta.py is the build-bundle.sh pass that keeps a bundle from
 // shipping a dist-info without its files (#4740). Runs the real script against
-// scratch trees laid out like a build venv and its Step 6 delta.
+// scratch trees laid out like a build venv, its Step 1 listing and the Step 6
+// delta.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -13,12 +22,15 @@ let dir: string;
 let buildSp: string;
 let staging: string;
 let manifest: string;
+let baseEntries: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "bundle-delta-"));
   buildSp = join(dir, "site-packages");
   staging = join(dir, "staging");
   manifest = join(dir, "feature-manifest.json");
+  baseEntries = join(dir, "base-packages.txt");
+  writeFileSync(baseEntries, "");
   mkdirSync(buildSp, { recursive: true });
   mkdirSync(staging, { recursive: true });
   writeFileSync(manifest, JSON.stringify({ basePackages: ["Pillow==13.0.0", "numpy==1.26.4"] }));
@@ -47,7 +59,7 @@ function put(root: string, rel: string) {
 }
 
 function run() {
-  const result = spawnSync("python3", [SCRIPT, buildSp, staging, manifest], {
+  const result = spawnSync("python3", [SCRIPT, buildSp, staging, baseEntries, manifest], {
     encoding: "utf8",
   });
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
@@ -56,19 +68,42 @@ function run() {
 const entries = (root: string) => readdirSync(root).sort();
 
 describe("docker/bundle-delta.py", () => {
-  it("ships the files of an upgraded package whose directory the base venv already had", () => {
+  it("drops an upgraded base-venv package that Step 6 staged as metadata only", () => {
     // The build upgraded filelock 4.2.7 (base) to 4.2.10; filelock/ already
     // existed in the base venv, so Step 6 staged only the new dist-info.
+    writeFileSync(
+      baseEntries,
+      [join(buildSp, "filelock"), join(buildSp, "filelock-4.2.7.dist-info")].join("\n"),
+    );
     put(buildSp, "filelock/__init__.py");
-    put(buildSp, "filelock/_api.py");
-    dist("filelock", "4.2.10", ["filelock/__init__.py", "filelock/_api.py"], [buildSp, staging]);
+    dist("filelock", "4.2.10", ["filelock/__init__.py"], [buildSp, staging]);
 
     const r = run();
 
     expect(r.status, r.output).toBe(0);
-    expect(entries(staging)).toEqual(["filelock", "filelock-4.2.10.dist-info"]);
-    expect(entries(join(staging, "filelock"))).toEqual(["__init__.py", "_api.py"]);
-    expect(r.output).toContain("Completed filelock-4.2.10.dist-info: copied 2 file(s)");
+    expect(entries(staging)).toEqual([]);
+    expect(r.output).toContain("Dropped filelock-4.2.10.dist-info (the base venv has this package");
+  });
+
+  it("keeps the base venv's patched setuptools over a bundle's setuptools<75", () => {
+    // photo-restoration asks for setuptools<75; the image ships a patched 78.1.1.
+    writeFileSync(
+      baseEntries,
+      [join(buildSp, "setuptools"), join(buildSp, "setuptools-78.1.1.dist-info")].join("\n"),
+    );
+    put(staging, "_distutils_hack/__init__.py");
+    dist(
+      "setuptools",
+      "74.1.3",
+      ["setuptools/__init__.py", "_distutils_hack/__init__.py"],
+      [buildSp, staging],
+    );
+
+    const r = run();
+
+    expect(r.status, r.output).toBe(0);
+    expect(entries(staging)).toEqual([]);
+    expect(r.output).toContain("removed 1 staged file(s)");
   });
 
   it("drops a manifest base package and every staged file it owns", () => {
@@ -129,5 +164,20 @@ describe("docker/bundle-delta.py", () => {
 
     expect(r.status).toBe(1);
     expect(r.output).toContain("ERROR: ghost-1.0.dist-info lists 1 file(s)");
+  });
+});
+
+describe("build-bundle.sh wiring for bundle-delta.py", () => {
+  const builder = readFileSync(resolve("docker/build-bundle.sh"), "utf8");
+
+  it("re-pins basePackages without upgrading their dependencies", () => {
+    expect(builder).toContain("--force-reinstall --no-deps {pkgs}");
+  });
+
+  it("runs the delta pass after Step 6 copies the delta and before the archive", () => {
+    const call = builder.indexOf(`python3 "$\{DELTA_HELPER}"`);
+    expect(call).toBeGreaterThan(builder.indexOf("# Copy delta dirs to build staging"));
+    expect(call).toBeLessThan(builder.indexOf("=== Creating archive ==="));
+    expect(builder).toContain(`/tmp/base-packages.txt "$\{MANIFEST}"`);
   });
 });
