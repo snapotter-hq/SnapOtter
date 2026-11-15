@@ -46,6 +46,7 @@ vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) =>
 vi.mock("@snapotter/ai", () => ({
   colorize: aiMocks.colorize,
   enhanceFaces: aiMocks.enhanceFaces,
+  gpuMayBeAvailable: vi.fn(() => false),
   isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: aiMocks.isMemoryAllocError,
   noiseRemoval: aiMocks.noiseRemoval,

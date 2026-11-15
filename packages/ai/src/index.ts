@@ -19,6 +19,7 @@ export {
   buildOfflineInstallerEnv,
   getDispatcherStatus,
   getDocsDispatcher,
+  gpuMayBeAvailable,
   initDispatcher,
   isGpuAvailable,
   isNvidiaDevicePresent,

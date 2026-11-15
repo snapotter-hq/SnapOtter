@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   detectFaceLandmarks: vi.fn(),
   detectFaces: vi.fn(),
   enhanceFaces: vi.fn(),
+  gpuMayBeAvailable: vi.fn(() => false),
   isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: vi.fn(),
   noiseRemoval: vi.fn(),

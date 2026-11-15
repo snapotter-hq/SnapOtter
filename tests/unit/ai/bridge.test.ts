@@ -226,6 +226,70 @@ describe("bridge - isGpuAvailable", () => {
   });
 });
 
+describe("bridge - gpuMayBeAvailable (#4746, #4502)", () => {
+  let bridge: typeof import("../../../packages/ai/src/bridge.js");
+  const nvidiaNode = (path: string) => path === "/dev/nvidia0" || path === "/dev/nvidiactl";
+  const noNode = () => false;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+    vi.stubEnv("SNAPOTTER_GPU", "");
+    vi.stubEnv("CUDA_VISIBLE_DEVICES", undefined);
+    bridge = await import("../../../packages/ai/src/bridge.js");
+  });
+
+  afterEach(() => {
+    bridge.shutdownDispatcher();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("answers from the device node before the dispatcher has reported, so CPU-only gates don't refuse a GPU host", () => {
+    expect(bridge.isGpuAvailable("onnx")).toBe(false);
+    expect(bridge.gpuMayBeAvailable("onnx", nvidiaNode)).toBe(true);
+    expect(bridge.gpuMayBeAvailable("torch", noNode)).toBe(false);
+  });
+
+  it("uses the probed per-framework answer once the dispatcher is ready", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const initReady = bridge.initDispatcher();
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"ready": true, "gpu": true, "gpuFrameworks": {"torch": false, "onnx": true, "ctranslate2": false}}\n',
+      ),
+    );
+    await initReady;
+
+    expect(bridge.gpuMayBeAvailable("onnx", noNode)).toBe(true);
+    expect(bridge.gpuMayBeAvailable("torch", nvidiaNode)).toBe(false);
+  });
+
+  it("goes back to the device node after a shutdown clears the probe, e.g. a bundle install", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const initReady = bridge.initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await initReady;
+    expect(bridge.gpuMayBeAvailable("torch", nvidiaNode)).toBe(false);
+
+    bridge.shutdownDispatcher();
+    expect(bridge.gpuMayBeAvailable("torch", nvidiaNode)).toBe(true);
+  });
+
+  it("honours hidden GPUs before the probe", () => {
+    vi.stubEnv("CUDA_VISIBLE_DEVICES", "-1");
+    expect(bridge.gpuMayBeAvailable("onnx", nvidiaNode)).toBe(false);
+  });
+
+  it("honours SNAPOTTER_GPU=0 before the probe", () => {
+    vi.stubEnv("SNAPOTTER_GPU", "0");
+    expect(bridge.gpuMayBeAvailable("onnx", nvidiaNode)).toBe(false);
+  });
+});
+
 describe("bridge - shutdownDispatcher", () => {
   let shutdownDispatcher: () => void;
 

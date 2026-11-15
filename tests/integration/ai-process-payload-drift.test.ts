@@ -37,6 +37,7 @@ vi.mock("../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
 // Mock the AI module which calls Python
 vi.mock("@snapotter/ai", () => ({
   isGpuAvailable: vi.fn(() => false),
+  gpuMayBeAvailable: vi.fn(() => false),
   blurFaces: vi.fn().mockResolvedValue({
     buffer: Buffer.from("mock"),
     width: 100,
