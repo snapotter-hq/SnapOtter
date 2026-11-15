@@ -363,6 +363,14 @@ _CUDA_POISON_RE = re.compile(
     re.IGNORECASE,
 )
 
+# An allocation failure leaves the CUDA context usable: the failed session's
+# memory comes back once it is dropped. Without this, every ORT out-of-memory
+# matched "onnxruntimeerror" above and restarted the dispatcher (#4744).
+_ALLOC_FAILURE_RE = re.compile(
+    r"failed to allocate memory|out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed",
+    re.IGNORECASE,
+)
+
 _PRE_EXEC_GATE_ERRORS = frozenset(
     {"invalid_script_name", "script_not_allowed", "feature_not_installed"}
 )
@@ -403,7 +411,8 @@ def _extract_failure_detail(stdout_output, exit_code):
 
 def _is_cuda_poison_error(detail):
     """Whether an error string indicates a poisoned CUDA or ONNX Runtime context."""
-    return bool(_CUDA_POISON_RE.search(detail or ""))
+    detail = detail or ""
+    return bool(_CUDA_POISON_RE.search(detail)) and not _ALLOC_FAILURE_RE.search(detail)
 
 
 def _should_recycle_after_request(

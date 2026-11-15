@@ -568,6 +568,16 @@ const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
 const CUDA_POISON_RE =
   /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
 
+// An allocation failure leaves the CUDA context usable, so it must not count as
+// poison even though every ORT error string matches "onnxruntimeerror" (#4744).
+// Mirrors _ALLOC_FAILURE_RE in dispatcher.py.
+const ALLOC_FAILURE_RE =
+  /failed to allocate memory|out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed/i;
+
+function isCudaPoison(text: string): boolean {
+  return CUDA_POISON_RE.test(text) && !ALLOC_FAILURE_RE.test(text);
+}
+
 const PRE_EXEC_GATE_ERRORS = new Set([
   "invalid_script_name",
   "script_not_allowed",
@@ -601,14 +611,14 @@ function classifyDispatcherResponseFailure(
       exitCode !== 0 || parsed.success === false || (errVal.length > 0 && parsed.success !== true);
     if (!failed) return { status: "succeeded", cudaPoison: false };
     const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   if (exitCode !== 0) {
     if (extracted === "canceled" || PRE_EXEC_GATE_ERRORS.has(extracted)) {
       return { status: "ignored", cudaPoison: false };
     }
     const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   return { status: "succeeded", cudaPoison: false };
 }

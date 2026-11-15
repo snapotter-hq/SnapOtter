@@ -310,3 +310,26 @@ def test_auto_budget_is_forty_percent_of_vram_and_memoized(monkeypatch):
     assert session_cache._auto_budget() == 4_000 * MB
     session_cache._auto_budget()
     assert len(calls) == 1
+
+
+def test_free_vram_reads_memory_free_from_nvidia_smi(monkeypatch):
+    import subprocess
+    import types
+
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.setitem(sys.modules, "torch", None)
+    seen = []
+
+    def fake_run(cmd, **_k):
+        seen.append(cmd[1])
+        return types.SimpleNamespace(returncode=0, stdout="11520\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert session_cache.free_vram_bytes() == 11520 * MB
+    assert seen == ["--query-gpu=memory.free"]
+
+
+def test_free_vram_is_zero_when_gpus_are_hidden(monkeypatch):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "-1")
+    _fake_smi(monkeypatch, "11520\n")
+    assert session_cache.free_vram_bytes() == 0
