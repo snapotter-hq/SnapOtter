@@ -31,7 +31,10 @@
     "protobuf==7.36.2",
     "pyparsing==3.3.3",
     "python-dateutil==4.0.0",
-    "sounddevice==0.5.6"
+    "sounddevice==0.5.6",
+    "av==18.0.0",
+    "ctranslate2==4.8.1",
+    "faster-whisper==1.2.1"
   ],
   "bundleRepo": "deepsafe/feature-bundles",
   "bundles": {

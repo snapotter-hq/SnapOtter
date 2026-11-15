@@ -25,9 +25,18 @@ const SHARED_PINS = [
   "sounddevice==0.5.6",
 ];
 
+// faster-whisper 1.2.1 calls av.open(metadata_errors=...), which av 19 removed.
+// Unpinned, an amd64 rebuild (Python 3.12) took av 19.0.2 and transcription
+// failed on every file; arm64 (Python 3.11) can't install av 19 at all.
+const TRANSCRIPTION_PINS = ["av==18.0.0", "ctranslate2==4.8.1", "faster-whisper==1.2.1"];
+
 describe("bundle version pins", () => {
   it("pins every package the bundles used to ship at more than one version", () => {
     expect(manifest.constraints).toEqual(expect.arrayContaining(SHARED_PINS));
+  });
+
+  it("keeps transcription on the PyAV line faster-whisper works with", () => {
+    expect(manifest.constraints).toEqual(expect.arrayContaining(TRANSCRIPTION_PINS));
   });
 
   it("pins each package once, as an exact version", () => {
