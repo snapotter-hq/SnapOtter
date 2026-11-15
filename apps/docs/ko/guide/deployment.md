@@ -2,7 +2,7 @@
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 7d5cd09b73d9
+i18n_output_hash: 954e0bce2fe1
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ SnapOtter는 **55개 이상의 입력 형식**과 **14개의 출력 형식**을 
 | 마운트 / 볼륨 | 용도 | 필수 여부 |
 |---|---|---|
 | `/data` (app) | AI 모델, Python venv, 사용자 파일 | **필수** - 없으면 파일이 사라집니다 |
-| `/tmp/workspace` (app) | 임시 처리 파일 (자동 정리) | 권장 |
+| `/tmp/workspace` (app) | 임시 처리 파일과 작업 출력 (자동 정리). `/data` 아래에 저장되지 않으므로 이 경로를 마운트하지 않으면 컨테이너가 교체될 때 결과가 사라집니다 | 권장 |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL 데이터 디렉터리 (사용자, 설정, 파이프라인, 작업) | **필수** - 없으면 데이터가 사라집니다 |
 | `SnapOtter-redisdata` (redis) | 내구성 있는 작업 큐를 위한 Redis append-only 파일 | 권장 |
+
+### `docker run`에서 작업 출력 보존하기 {#keeping-job-output}
+
+작업 결과는 `/tmp/workspace`에 저장되며, 마운트하지 않으면 이 경로는 컨테이너 파일 시스템의 일부입니다. `-v SnapOtter-data:/data`만 지정하면 사용자, 설정, 파일은 유지되지만 이전 작업의 결과는 컨테이너가 교체되는 즉시 사라지고 다운로드 링크는 404를 반환합니다. 결과를 보존하려면 워크스페이스도 함께 마운트하세요.
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose 스택은 이미 `SnapOtter-workspace`를 마운트합니다.
 
 ### 바인드 마운트와 명명된 볼륨 {#bind-mounts-vs-named-volumes}
 

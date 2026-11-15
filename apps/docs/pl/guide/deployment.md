@@ -2,7 +2,7 @@
 description: "Wdrażanie SnapOtter w środowisku produkcyjnym z użyciem Docker. Wymagania sprzętowe, konfiguracja GPU i konfiguracje reverse proxy dla Nginx, Traefik i Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 0b24437c054d
+i18n_output_hash: 46d1ff06d734
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Szczegóły każdego obsługiwanego formatu, użytego dekodera i dostępnych opc
 | Punkt montowania / wolumen | Przeznaczenie | Wymagany? |
 |---|---|---|
 | `/data` (app) | Modele AI, venv Python, pliki użytkowników | **Tak** - bez niego utrata plików |
-| `/tmp/workspace` (app) | Tymczasowe pliki przetwarzania (czyszczone automatycznie) | Zalecany |
+| `/tmp/workspace` (app) | Tymczasowe pliki przetwarzania i wyniki zadań (czyszczone automatycznie). Nie są przechowywane w `/data`, więc po wymianie kontenera wyniki przepadają, jeśli ten katalog nie jest zamontowany | Zalecany |
 | `SnapOtter-pgdata` (postgres) | Katalog danych PostgreSQL (użytkownicy, ustawienia, potoki, zadania) | **Tak** - bez niego utrata danych |
 | `SnapOtter-redisdata` (redis) | Plik append-only Redis dla trwałych kolejek zadań | Zalecany |
+
+### Zachowywanie wyników zadań przy `docker run` {#keeping-job-output}
+
+Wyniki zadań trafiają do `/tmp/workspace`, który jest częścią systemu plików kontenera, dopóki go nie zamontujesz. Przy samym `-v SnapOtter-data:/data` użytkownicy, ustawienia i pliki są zachowane, ale wyniki wcześniejszych zadań znikają po wymianie kontenera, a ich linki do pobrania zwracają 404. Aby je zachować, zamontuj także workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Stosy Compose już montują `SnapOtter-workspace`.
 
 ### Bind mounty a wolumeny nazwane {#bind-mounts-vs-named-volumes}
 

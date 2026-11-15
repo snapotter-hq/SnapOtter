@@ -2,7 +2,7 @@
 description: "Despliegue de SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: f3d6477a9dee
+i18n_output_hash: 2025a6acf5a9
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Consulte la [lista completa de formatos](/es/guide/supported-formats) para ver l
 | Montaje / Volumen | Propósito | ¿Requerido? |
 |---|---|---|
 | `/data` (app) | Modelos de IA, venv de Python, archivos de usuario | **Sí**: sin él se pierden archivos |
-| `/tmp/workspace` (app) | Archivos temporales de procesamiento (se limpian automáticamente) | Recomendado |
+| `/tmp/workspace` (app) | Archivos temporales de procesamiento y resultados de los trabajos (se limpian automáticamente). No se guardan en `/data`, así que los resultados se pierden al reemplazar el contenedor si no se monta este directorio | Recomendado |
 | `SnapOtter-pgdata` (postgres) | Directorio de datos de PostgreSQL (usuarios, ajustes, pipelines, trabajos) | **Sí**: sin él se pierden datos |
 | `SnapOtter-redisdata` (redis) | Archivo append-only de Redis para colas de trabajos duraderas | Recomendado |
+
+### Conservar los resultados de los trabajos con `docker run` {#keeping-job-output}
+
+Los resultados de los trabajos viven en `/tmp/workspace`, que forma parte del sistema de archivos del contenedor salvo que lo montes. Con solo `-v SnapOtter-data:/data`, tus usuarios, ajustes y archivos se conservan, pero los resultados de trabajos anteriores desaparecen en cuanto se reemplaza el contenedor, y sus enlaces de descarga devuelven 404. Para conservarlos, monta también el workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Los stacks de Compose ya montan `SnapOtter-workspace`.
 
 ### Bind mounts frente a volúmenes con nombre {#bind-mounts-vs-named-volumes}
 

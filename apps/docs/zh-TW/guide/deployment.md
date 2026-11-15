@@ -2,7 +2,7 @@
 description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 與 Cloudflare 的反向代理設定。"
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 2551fd2fd653
+i18n_output_hash: 58f1da11511d
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ SnapOtter 支援 **55 種以上的輸入格式**與 **14 種輸出格式**，包
 | 掛載 / 磁碟區 | 用途 | 是否必要？ |
 |---|---|---|
 | `/data`（app） | AI 模型、Python venv、使用者檔案 | **是** - 沒有它會遺失檔案 |
-| `/tmp/workspace`（app） | 暫存處理檔案（自動清理） | 建議 |
+| `/tmp/workspace`（app） | 暫存處理檔案與工作輸出（自動清理）。不儲存在 `/data` 底下，因此除非掛載此目錄，否則容器被替換時結果會遺失 | 建議 |
 | `SnapOtter-pgdata`（postgres） | PostgreSQL 資料目錄（使用者、設定、管線、工作） | **是** - 沒有它會遺失資料 |
 | `SnapOtter-redisdata`（redis） | 供持久工作佇列使用的 Redis append-only 檔案 | 建議 |
+
+### 使用 `docker run` 保留工作輸出 {#keeping-job-output}
+
+工作結果存放在 `/tmp/workspace` 底下，除非掛載，否則它屬於容器本身的檔案系統。如果只使用 `-v SnapOtter-data:/data`，使用者、設定與檔案會保留，但先前工作的結果會在容器被替換後遺失，其下載連結會傳回 404。若要保留它們，請同時掛載工作區：
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose 堆疊已經掛載了 `SnapOtter-workspace`。
 
 ### 綁定掛載與具名磁碟區 {#bind-mounts-vs-named-volumes}
 

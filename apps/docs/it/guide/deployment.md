@@ -2,7 +2,7 @@
 description: "Distribuisca SnapOtter in produzione con Docker. Requisiti hardware, configurazione GPU e configurazioni di reverse proxy per Nginx, Traefik e Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: b66afa2dd513
+i18n_output_hash: f7e5b2df1da9
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Vedere l'[elenco completo dei formati](/it/guide/supported-formats) per i dettag
 | Mount / Volume | Scopo | Obbligatorio? |
 |---|---|---|
 | `/data` (app) | Modelli AI, venv Python, file utente | **Sì** - senza di esso si perdono i file |
-| `/tmp/workspace` (app) | File temporanei di elaborazione (puliti automaticamente) | Consigliato |
+| `/tmp/workspace` (app) | File temporanei di elaborazione e output dei job (puliti automaticamente). Non è memorizzato in `/data`, quindi i risultati vanno persi quando il container viene sostituito se questa cartella non è montata | Consigliato |
 | `SnapOtter-pgdata` (postgres) | Directory dati di PostgreSQL (utenti, impostazioni, pipeline, job) | **Sì** - senza di esso si perdono i dati |
 | `SnapOtter-redisdata` (redis) | File append-only di Redis per code di job durevoli | Consigliato |
+
+### Conservare l'output dei job con `docker run` {#keeping-job-output}
+
+I risultati dei job si trovano in `/tmp/workspace`, che fa parte del filesystem del container finché non lo monti. Con il solo `-v SnapOtter-data:/data`, utenti, impostazioni e file persistono, ma i risultati dei job precedenti spariscono non appena il container viene sostituito e i loro link di download restituiscono 404. Per conservarli, monta anche il workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Gli stack Compose montano già `SnapOtter-workspace`.
 
 ### Bind mount e volumi con nome {#bind-mounts-vs-named-volumes}
 

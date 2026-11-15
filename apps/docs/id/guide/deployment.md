@@ -2,7 +2,7 @@
 description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 793e62190df2
+i18n_output_hash: 1295afb31707
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Lihat [daftar format lengkap](/id/guide/supported-formats) untuk detail setiap f
 | Mount / Volume | Tujuan | Wajib? |
 |---|---|---|
 | `/data` (app) | Model AI, venv Python, file pengguna | **Ya** - file hilang tanpa ini |
-| `/tmp/workspace` (app) | File pemrosesan sementara (dibersihkan otomatis) | Direkomendasikan |
+| `/tmp/workspace` (app) | File pemrosesan sementara dan keluaran job (dibersihkan otomatis). Tidak disimpan di `/data`, jadi hasil hilang saat container diganti kecuali direktori ini di-mount | Direkomendasikan |
 | `SnapOtter-pgdata` (postgres) | Direktori data PostgreSQL (pengguna, pengaturan, pipeline, job) | **Ya** - data hilang tanpa ini |
 | `SnapOtter-redisdata` (redis) | File append-only Redis untuk antrean job yang tahan lama | Direkomendasikan |
+
+### Menyimpan keluaran job dengan `docker run` {#keeping-job-output}
+
+Hasil job berada di `/tmp/workspace`, yang merupakan bagian dari filesystem container kecuali Anda me-mount-nya. Dengan hanya `-v SnapOtter-data:/data`, pengguna, pengaturan, dan file Anda tetap ada, tetapi hasil job sebelumnya hilang begitu container diganti, dan tautan unduhnya mengembalikan 404. Untuk menyimpannya, mount juga workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Stack Compose sudah me-mount `SnapOtter-workspace`.
 
 ### Bind mount vs. named volume {#bind-mounts-vs-named-volumes}
 

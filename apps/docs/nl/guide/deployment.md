@@ -2,7 +2,7 @@
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse proxy-configuraties voor Nginx, Traefik en Cloudflare."
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 5c847ef3c81b
+i18n_output_hash: d5630f5f243e
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ Zie de [volledige formatenlijst](/nl/guide/supported-formats) voor details over 
 | Mount / Volume | Doel | Vereist? |
 |---|---|---|
 | `/data` (app) | AI-modellen, Python-venv, gebruikersbestanden | **Ja** - bestandsverlies zonder |
-| `/tmp/workspace` (app) | Tijdelijke verwerkingsbestanden (automatisch opgeschoond) | Aanbevolen |
+| `/tmp/workspace` (app) | Tijdelijke verwerkingsbestanden en taakuitvoer (automatisch opgeschoond). Niet opgeslagen onder `/data`, dus resultaten gaan verloren wanneer de container wordt vervangen, tenzij deze map is gekoppeld | Aanbevolen |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL-datamap (gebruikers, instellingen, pipelines, taken) | **Ja** - gegevensverlies zonder |
 | `SnapOtter-redisdata` (redis) | Redis append-only-bestand voor duurzame taakwachtrijen | Aanbevolen |
+
+### Taakuitvoer bewaren met `docker run` {#keeping-job-output}
+
+Taakresultaten staan onder `/tmp/workspace`, dat deel uitmaakt van het bestandssysteem van de container tenzij je het koppelt. Met alleen `-v SnapOtter-data:/data` blijven je gebruikers, instellingen en bestanden behouden, maar de resultaten van eerdere taken zijn weg zodra de container wordt vervangen, en hun downloadlinks geven een 404 terug. Koppel om ze te bewaren ook de workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+De Compose-stacks koppelen `SnapOtter-workspace` al.
 
 ### Bind mounts versus benoemde volumes {#bind-mounts-vs-named-volumes}
 

@@ -2,7 +2,7 @@
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
 i18n_source_hash: 0c8f078ebe75
 i18n_provenance: machine
-i18n_output_hash: 39c989a7fb79
+i18n_output_hash: 7b2b4e0313ca
 i18n_hash_version: 2
 ---
 
@@ -406,9 +406,19 @@ SnapOtter は **55 以上の入力フォーマット**と **14 の出力フォ�
 | マウント / ボリューム | 用途 | 必須か |
 |---|---|---|
 | `/data` (app) | AI モデル、Python venv、ユーザーファイル | **はい**。ないとファイルが失われます |
-| `/tmp/workspace` (app) | 一時的な処理用ファイル (自動でクリーンアップされます) | 推奨 |
+| `/tmp/workspace` (app) | 一時的な処理用ファイルとジョブの出力 (自動でクリーンアップされます)。`/data` には保存されないため、このディレクトリをマウントしていないとコンテナの置き換え時に結果が失われます | 推奨 |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL のデータディレクトリ (ユーザー、設定、パイプライン、ジョブ) | **はい**。ないとデータが失われます |
 | `SnapOtter-redisdata` (redis) | 永続的なジョブキューのための Redis の append-only ファイル | 推奨 |
+
+### `docker run` でジョブの出力を保持する {#keeping-job-output}
+
+ジョブの結果は `/tmp/workspace` に置かれます。マウントしない限り、これはコンテナのファイルシステムの一部です。`-v SnapOtter-data:/data` だけを指定した場合、ユーザー、設定、ファイルは保持されますが、以前のジョブの結果はコンテナが置き換えられると失われ、ダウンロードリンクは 404 を返します。保持するには、ワークスペースもマウントします。
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose スタックでは、すでに `SnapOtter-workspace` がマウントされています。
 
 ### バインドマウントと名前付きボリュームの違い {#bind-mounts-vs-named-volumes}
 
