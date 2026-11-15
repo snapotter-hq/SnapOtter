@@ -1,21 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 type RedisStub = {
   status: string;
   options: Record<string, unknown>;
-  ping: ReturnType<typeof vi.fn>;
-  quit: ReturnType<typeof vi.fn>;
-  connect: ReturnType<typeof vi.fn>;
-  disconnect: ReturnType<typeof vi.fn>;
-  duplicate: ReturnType<typeof vi.fn>;
-  defineCommand: ReturnType<typeof vi.fn>;
-  info: ReturnType<typeof vi.fn>;
-  getMaxListeners: ReturnType<typeof vi.fn>;
-  setMaxListeners: ReturnType<typeof vi.fn>;
-  once: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  off: ReturnType<typeof vi.fn>;
-  removeListener: ReturnType<typeof vi.fn>;
+  ping: Mock;
+  quit: Mock;
+  connect: Mock;
+  disconnect: Mock;
+  duplicate: Mock;
+  defineCommand: Mock;
+  info: Mock;
+  getMaxListeners: Mock;
+  setMaxListeners: Mock;
+  once: Mock;
+  on: Mock;
+  off: Mock;
+  removeListener: Mock;
   /** Fires the handler registered via once(), as ioredis would. */
   emitOnce: (event: string) => void;
   /** Fires every handler registered via on(). Throws if none exist, like an EventEmitter "error" would. */

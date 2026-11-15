@@ -11,7 +11,16 @@
  */
 
 import sharp from "sharp";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 
 const decoderMocks = vi.hoisted(() => ({
   heic: null as Error | null,
@@ -159,7 +168,7 @@ function withGoodPair(extra: { filename: string; contentType: string; content: B
   ];
 }
 
-function findDuplicatesWarns(spy: ReturnType<typeof vi.spyOn>) {
+function findDuplicatesWarns(spy: MockInstance) {
   return spy.mock.calls.filter(
     (call) => typeof call[1] === "string" && String(call[1]).startsWith("find-duplicates:"),
   );
