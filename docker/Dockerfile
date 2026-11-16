@@ -14,7 +14,7 @@ FROM mwader/static-ffmpeg:8.1.2@sha256:33f770f812cbfc3de96c547157fc9faf8bd95a364
 # Stage 0b: Static pdfcpu binary (pure Go, no CGO)
 # ============================================
 # CGO_ENABLED=0 produces a fully static binary; no cross-compiler needed.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS pdfcpu-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0 AS pdfcpu-builder
 ARG TARGETOS=linux
 ARG TARGETARCH
 WORKDIR /build
@@ -150,7 +150,7 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
 # on Apple Silicon when cross-compiling for linux/amd64.
 # caire imports gioui.org/app which requires CGO on Linux, so we use a
 # proper C cross-compiler instead of CGO_ENABLED=0.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS caire-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0 AS caire-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
