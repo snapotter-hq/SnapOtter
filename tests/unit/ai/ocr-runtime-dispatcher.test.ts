@@ -1410,3 +1410,83 @@ describe("OCR dispatcher readiness handoff", () => {
     await shutdown;
   }, 1_000);
 });
+
+describe("OCR runtime idle exit", () => {
+  it("ends the child after the idle window and respawns on the next request", async () => {
+    vi.stubEnv("AI_SIDECAR_IDLE_TIMEOUT", "30");
+    vi.useFakeTimers();
+    const first = createMockChild(50_001);
+    mockSpawn.mockReturnValueOnce(first.process);
+    await publishRuntime(first, aiDataDir);
+
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(first.stdinEnded).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_500);
+    await vi.waitFor(() => expect(first.stdinEnded).toHaveBeenCalledTimes(1));
+    first.close(0, null);
+
+    const second = createMockChild(50_002);
+    mockSpawn.mockReturnValueOnce(second.process);
+    const request = runOcrRuntime("ocr", ["/tmp/after-idle.png", "{}"], { aiDataDir });
+    await vi.waitFor(() => expect(parsedRequests(second)).toHaveLength(1));
+    expect(parsedRequests(second)[0]).toMatchObject({ script: "smoke" });
+    respondLine(second, 0, readinessResult());
+    await vi.waitFor(() => expect(parsedRequests(second)).toHaveLength(2));
+    respondLine(second, 1, { text: "after idle" });
+    await expect(request).resolves.toMatchObject({ result: { text: "after idle" } });
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+  }, 5_000);
+
+  it("a request that arrives while the idle child is still exiting gets a fresh child", async () => {
+    vi.stubEnv("AI_SIDECAR_IDLE_TIMEOUT", "30");
+    vi.useFakeTimers();
+    const first = createMockChild(50_011);
+    mockSpawn.mockReturnValueOnce(first.process);
+    await publishRuntime(first, aiDataDir);
+
+    await vi.advanceTimersByTimeAsync(30_500);
+    await vi.waitFor(() => expect(first.stdinEnded).toHaveBeenCalledTimes(1));
+    // The old child has not closed yet: the request must not be refused.
+    const second = createMockChild(50_012);
+    mockSpawn.mockReturnValueOnce(second.process);
+    const request = runOcrRuntime("ocr", ["/tmp/racing.png", "{}"], { aiDataDir });
+    await vi.waitFor(() => expect(parsedRequests(second)).toHaveLength(1));
+    respondLine(second, 0, readinessResult());
+    await vi.waitFor(() => expect(parsedRequests(second)).toHaveLength(2));
+    respondLine(second, 1, { text: "raced" });
+    await expect(request).resolves.toMatchObject({ result: { text: "raced" } });
+    expect(parsedRequests(first)).toHaveLength(1);
+    first.close(0, null);
+  }, 5_000);
+
+  it("does not exit while a request is in flight and restarts the window after it", async () => {
+    vi.stubEnv("AI_SIDECAR_IDLE_TIMEOUT", "30");
+    vi.useFakeTimers();
+    const child = createMockChild(50_021);
+    mockSpawn.mockReturnValue(child.process);
+    await publishRuntime(child, aiDataDir);
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    const request = runOcrRuntime("ocr", ["/tmp/slow.png", "{}"], { aiDataDir });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(child.stdinEnded).not.toHaveBeenCalled();
+    respondLine(child, 1, { text: "slow" });
+    await expect(request).resolves.toMatchObject({ result: { text: "slow" } });
+
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(child.stdinEnded).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_500);
+    await vi.waitFor(() => expect(child.stdinEnded).toHaveBeenCalledTimes(1));
+  }, 5_000);
+
+  it("never exits on idle when the timeout is 0", async () => {
+    vi.stubEnv("AI_SIDECAR_IDLE_TIMEOUT", "0");
+    vi.useFakeTimers();
+    const child = createMockChild(50_031);
+    mockSpawn.mockReturnValue(child.process);
+    await publishRuntime(child, aiDataDir);
+
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    expect(child.stdinEnded).not.toHaveBeenCalled();
+  }, 5_000);
+});
