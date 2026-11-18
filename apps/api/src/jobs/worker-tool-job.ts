@@ -30,7 +30,7 @@ import { deletePrefix, putObject, putObjectStream } from "../lib/object-storage.
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
 import { resolveCanonicalToolId } from "../lib/pool.js";
 import { setSettingIfAbsent } from "../lib/settings-helpers.js";
-import { timeoutMessage } from "../lib/timeout.js";
+import { type TimeoutSetting, timeoutMessage } from "../lib/timeout.js";
 import { emitWorkerToolAudit } from "../lib/tool-audit.js";
 import {
   cancelSingleJobGuarded,
@@ -85,13 +85,20 @@ function scratchRoot(): string {
   return env.SCRATCH_PATH || join(tmpdir(), "snapotter-scratch");
 }
 
-export function timeoutMsFor(pool: Pool, toolId?: string): number {
+/** Which env setting sets a job's deadline; the timeout message names it too. */
+export function timeoutSettingFor(pool: Pool, toolId?: string): TimeoutSetting {
   const canonicalId = toolId ? resolveCanonicalToolId(toolId) : undefined;
   const tool = canonicalId ? TOOLS.find((t) => t.id === canonicalId) : undefined;
   if (pool === "ai" || pool === "media" || tool?.executionHint === "long") {
-    return env.JOB_TIMEOUT_LONG_S * 1000;
+    return "JOB_TIMEOUT_LONG_S";
   }
-  return env.JOB_TIMEOUT_FAST_S * 1000;
+  return "JOB_TIMEOUT_FAST_S";
+}
+
+export function timeoutMsFor(pool: Pool, toolId?: string): number {
+  return timeoutSettingFor(pool, toolId) === "JOB_TIMEOUT_LONG_S"
+    ? env.JOB_TIMEOUT_LONG_S * 1000
+    : env.JOB_TIMEOUT_FAST_S * 1000;
 }
 
 /**
@@ -685,7 +692,11 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? timeoutMessage(deadline.timeoutMs())
+          ? timeoutMessage(
+              deadline.timeoutMs(),
+              data.pool,
+              timeoutSettingFor(data.pool, data.toolId),
+            )
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see
