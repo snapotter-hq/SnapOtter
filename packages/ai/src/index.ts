@@ -18,6 +18,7 @@ export {
   buildInstallerEnv,
   buildOfflineInstallerEnv,
   enableLazyAiDispatcher,
+  enableLazyDocsDispatcher,
   getDispatcherStatus,
   getDocsDispatcher,
   gpuMayBeAvailable,

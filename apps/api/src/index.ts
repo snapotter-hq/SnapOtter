@@ -4,7 +4,12 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
-import { enableLazyAiDispatcher, getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
+import {
+  enableLazyAiDispatcher,
+  enableLazyDocsDispatcher,
+  getDispatcherStatus,
+  isGpuAvailable,
+} from "@snapotter/ai";
 import { configureSharpConcurrency } from "@snapotter/image-engine";
 import { ANALYTICS_EVENTS, APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
@@ -772,9 +777,11 @@ void warmQueueEvents().catch((err) => {
 try {
   await app.listen({ port: env.PORT, host: env.HOST });
 
-  // The AI sidecar is not started here: it spawns on the first AI request and
-  // exits after AI_SIDECAR_IDLE_TIMEOUT, so an idle server holds no Python process.
+  // The AI and docs sidecars are not started here: each spawns on its first
+  // request and exits after AI_SIDECAR_IDLE_TIMEOUT, so an idle server holds no
+  // Python process.
   enableLazyAiDispatcher();
+  enableLazyDocsDispatcher();
   const gpuLine = gpuBootLine(gatherSystemProperties().gpu_present);
   // One entry per line: pino escapes newlines, so a joined banner would print
   // as a single unreadable JSON string.

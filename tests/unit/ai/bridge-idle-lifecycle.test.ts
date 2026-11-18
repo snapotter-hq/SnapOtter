@@ -263,3 +263,73 @@ describe("AI dispatcher lazy start and idle exit", () => {
     expect(child.stdinWrites).toHaveLength(0);
   });
 });
+
+describe("docs dispatcher lazy start and idle exit", () => {
+  let bridge: Bridge;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+    vi.useFakeTimers();
+    vi.stubEnv("AI_SIDECAR_IDLE_TIMEOUT", "60");
+    vi.stubEnv("PROCESSING_TIMEOUT_S", "0");
+    bridge = await import("../../../packages/ai/src/bridge.js");
+    bridge.enableLazyDocsDispatcher();
+  });
+
+  afterEach(async () => {
+    await bridge.shutdownDocsDispatcher();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("does not spawn anything until the first request", () => {
+    expect(spawn).not.toHaveBeenCalled();
+    expect(bridge.getDocsDispatcher().getStatus()).toMatchObject({ running: false, ready: false });
+  });
+
+  it("waits for the first start instead of spawning a per-request interpreter", async () => {
+    const child = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(child.process);
+
+    const result = bridge.runDocsScript("pdf_info", { path: "/tmp/a.pdf" });
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(child.stdinWrites).toHaveLength(0);
+
+    child.ready();
+    await vi.advanceTimersByTimeAsync(60);
+    expect(child.stdinWrites).toHaveLength(1);
+    child.respond(0, '{"pages":1}');
+
+    await expect(result).resolves.toBe('{"pages":1}');
+    expect(spawn).toHaveBeenCalledTimes(1);
+  });
+
+  it("exits the child after the idle window and respawns on the next request", async () => {
+    const first = createMockProcess();
+    vi.mocked(spawn).mockReturnValueOnce(first.process);
+    const run1 = bridge.runDocsScript("pdf_info", {});
+    first.ready();
+    await vi.advanceTimersByTimeAsync(60);
+    first.respond(0);
+    await run1;
+
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(first.process.kill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(first.process.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(bridge.getDocsDispatcher().getStatus()).toMatchObject({ running: false, ready: false });
+    first.exit(null, "SIGTERM");
+    expect(bridge.getDocsDispatcher().getStatus().consecutiveCrashes).toBe(0);
+
+    const second = createMockProcess();
+    vi.mocked(spawn).mockReturnValueOnce(second.process);
+    const run2 = bridge.runDocsScript("pdf_info", {});
+    second.ready();
+    await vi.advanceTimersByTimeAsync(60);
+    second.respond(0, '{"again":true}');
+    await expect(run2).resolves.toBe('{"again":true}');
+    expect(spawn).toHaveBeenCalledTimes(2);
+  });
+});

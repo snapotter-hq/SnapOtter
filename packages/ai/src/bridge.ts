@@ -1594,13 +1594,12 @@ export class PythonDispatcher {
         return this.runPerRequest(scriptName, args, options, budgetMs);
       };
 
-      // The AI dispatcher starts on first use and exits when idle, so a request
+      // A lazy dispatcher starts on first use and exits when idle, so a request
       // usually finds no ready child. Wait for the shared start instead of
       // spawning a one-shot interpreter that would load the same libraries
       // again. A failed or backing-off child still falls through to per-request.
       if (
         this.exitWhenIdle &&
-        this.profile === "ai" &&
         !this.childReady &&
         !this.childFailed &&
         Date.now() >= this.backoffEnd
@@ -1785,6 +1784,14 @@ export function getDocsDispatcher(): PythonDispatcher {
   if (!docsDispatcher)
     docsDispatcher = new PythonDispatcher({ profile: "docs", ...docsDispatcherOptions() });
   return docsDispatcher;
+}
+
+/**
+ * Switch the docs dispatcher to start on first use and exit when idle (see
+ * AI_SIDECAR_IDLE_TIMEOUT), the same lifecycle as enableLazyAiDispatcher.
+ */
+export function enableLazyDocsDispatcher(): void {
+  getDocsDispatcher().enableLazyLifecycle();
 }
 
 export async function runDocsScript(
