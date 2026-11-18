@@ -3519,7 +3519,7 @@ export const hi: TranslationKeys = {
       progressLabel: "संपीड़ित हो रहा है",
       bestEffortHint:
         "अधिकतम संभव प्रयास। छवि-आधारित PDF इसके करीब पहुंचती हैं; केवल-टेक्स्ट वाली PDF शायद इस आकार तक न सिकुड़ें।",
-      targetReached: "आपका {target} लक्ष्य पूरा हुआ (परिणाम: {size}).",
+      targetReached: "आपका {target} लक्ष्य पूरा हुआ (परिणाम: {size})।",
       targetMissed: "{target} तक नहीं पहुंच सके। सबसे छोटा संभव आकार {size} था।",
     },
     "rotate-pdf": {
