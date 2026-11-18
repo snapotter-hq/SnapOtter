@@ -15,6 +15,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
+import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { getActiveAndQueuedInstalls } from "../lib/feature-install-queue.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
@@ -38,6 +39,28 @@ export const SYSTEM_JOBS = {
 
 // -- Scheduling ---------------------------------------------------------------
 
+/**
+ * Register a repeatable job only when its feature is licensed, and remove a
+ * scheduler a previous boot left in Redis when it is not. The license is read
+ * once at boot (`initEnterprise` in index.ts) and cannot change while the
+ * process runs, so deciding here is enough: an unlicensed instance never pays
+ * a Redis round trip and a worker wakeup for a job that returns immediately.
+ */
+async function syncLicensedScheduler(
+  q: ReturnType<typeof getQueue>,
+  name: string,
+  licensed: boolean,
+  repeat: { every: number },
+): Promise<void> {
+  if (licensed) {
+    await q.upsertJobScheduler(name, repeat);
+    return;
+  }
+  await q.removeJobScheduler(name).catch((err) => {
+    logger.warn({ err, name }, "Failed to remove orphaned scheduler from Redis");
+  });
+}
+
 export async function scheduleSystemJobs(): Promise<void> {
   const q = getQueue("system");
   // 0 = disabled; skip storage TTL scheduler
@@ -54,7 +77,12 @@ export async function scheduleSystemJobs(): Promise<void> {
   }
   await q.upsertJobScheduler(SYSTEM_JOBS.sessionPurge, { every: 60 * 60_000 });
   await q.upsertJobScheduler(SYSTEM_JOBS.retention, { every: 6 * 60 * 60_000 });
-  await q.upsertJobScheduler(SYSTEM_JOBS.siemForward, { every: 30_000 });
+  await syncLicensedScheduler(
+    q,
+    SYSTEM_JOBS.siemForward,
+    await isEnterpriseFeatureEnabled("siem_forwarding", "boot"),
+    { every: 30_000 },
+  );
   // Monthly: 2:00 AM on the 1st of each month
   await q.upsertJobScheduler(SYSTEM_JOBS.auditArchive, {
     pattern: "0 2 1 * *",
@@ -63,14 +91,21 @@ export async function scheduleSystemJobs(): Promise<void> {
   await q.upsertJobScheduler(SYSTEM_JOBS.storageReconciliation, {
     pattern: "0 3 * * 0",
   });
-  // Alert evaluator: every 60 seconds
-  await q.upsertJobScheduler(SYSTEM_JOBS.alertEvaluator, { every: 60_000 });
-  // Stranded-job reconciliation: every 60 seconds. The interval is the recovery
-  // latency after a database outage swallows a terminal write, so it is short
-  // on purpose; the sweep is a single indexed query that normally matches
-  // nothing. Redis carries the schedule, so it survives the process that lost
-  // the write and fires again as soon as Postgres answers.
-  await q.upsertJobScheduler(SYSTEM_JOBS.jobReconciliation, { every: 60_000 });
+  // Alert evaluator: every 60 seconds, licensed instances only
+  await syncLicensedScheduler(
+    q,
+    SYSTEM_JOBS.alertEvaluator,
+    await isEnterpriseFeatureEnabled("admin_alerts", "boot"),
+    { every: 60_000 },
+  );
+  // Stranded-job reconciliation: every 5 minutes. The interval is the recovery
+  // latency after a database outage swallows a terminal write; a stranded row
+  // only ever shows the wrong status in job history, and anything stranded
+  // across a restart is settled at startup, so minutes are fine. The sweep is
+  // a single indexed query that normally matches nothing. Redis carries the
+  // schedule, so it survives the process that lost the write and fires again
+  // as soon as Postgres answers.
+  await q.upsertJobScheduler(SYSTEM_JOBS.jobReconciliation, { every: 5 * 60_000 });
 }
 
 /** Enqueue a one-shot system job (e.g. startup cleanup trigger). */

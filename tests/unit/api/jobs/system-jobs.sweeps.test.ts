@@ -214,6 +214,10 @@ async function loadSystemJobs(
   for (const fn of Object.values(loggerMock)) fn.mockClear();
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
+  vi.doMock("../../../../apps/api/src/lib/enterprise-feature.js", () => ({
+    isEnterpriseFeatureEnabled: vi.fn().mockResolvedValue(true),
+  }));
+
   return import("../../../../apps/api/src/jobs/system-jobs.js");
 }
 
