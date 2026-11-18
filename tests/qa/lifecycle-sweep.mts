@@ -46,6 +46,7 @@ const JPG = resolveFixture(".jpg", "image") as string;
 const MP4 = resolveFixture(".mp4", "video") as string;
 const MP3 = resolveFixture(".mp3", "audio") as string;
 const PDF = resolveFixture(".pdf", "document") as string;
+const CANCEL_MP4 = join(REPO, "tests", "fixtures", "video", "valid", "media-30s.mp4");
 
 interface Check {
   id: string;
@@ -230,11 +231,11 @@ async function checkSseReconnectAndIdempotency(): Promise<void> {
 /** Cancelling a queued job and an in-flight job must both reach a terminal state. */
 async function checkCancellation(): Promise<void> {
   for (const id of ["cancel-before-start", "cancel-in-flight"] as const) {
-    // Stabilization is two ffmpeg passes, so it stays in flight long enough
-    // for an in-flight cancel to land on a running job rather than a finished one.
+    // Two ffmpeg passes over a 13 KB clip finish in about 100 ms on a fast host,
+    // so use a 30 s clip to keep the job in flight long enough to cancel it.
     const submit = await client.submit({
       path: "/api/v1/tools/video/stabilize-video",
-      files: [{ field: "file", path: MP4 }],
+      files: [{ field: "file", path: CANCEL_MP4 }],
       settings: {},
       timeoutMs: 10_000,
       followAsync: false,
@@ -246,11 +247,19 @@ async function checkCancellation(): Promise<void> {
     }
     if (id === "cancel-in-flight") {
       let preState = "";
-      for (let attempt = 0; attempt < 60; attempt++) {
+      for (let attempt = 0; attempt < 300; attempt++) {
         preState = await sql(`select status from jobs where id = '${jobId}'`);
         if (["processing", "active"].includes(preState)) break;
         if (["completed", "failed", "cancelled", "canceled"].includes(preState)) break;
-        await sleep(250);
+        await sleep(50);
+      }
+      if (preState === "completed") {
+        report(
+          id,
+          "blocked",
+          `job ${jobId} completed before the poll saw it processing, so there was nothing in flight to cancel`,
+        );
+        continue;
       }
       if (!["processing", "active"].includes(preState)) {
         report(
