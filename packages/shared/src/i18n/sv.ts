@@ -2414,6 +2414,8 @@ export const sv: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Fixar transparens ({count} filer)",
+      hostMemoryTooLow:
+        "Den här värden har {available} GB minne. På en CPU-värd behöver högupplöst matting cirka {required} GB, så verktyget kan inte köras här.",
       description: "Ladda upp en PNG med falsk transparent bakgrund så fixar vi det med ett klick.",
       removeWatermark: "Ta bort vattenstämpel",
       removeWatermarkHelp: "Detektera och ta bort halvtransparenta vattenstämplar",

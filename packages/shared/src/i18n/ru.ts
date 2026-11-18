@@ -2423,6 +2423,8 @@ export const ru: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Исправление прозрачности ({count} файлов)",
+      hostMemoryTooLow:
+        "На этом хосте {available} ГБ памяти. На хосте с CPU для маттинга высокого разрешения нужно около {required} ГБ, поэтому этот инструмент здесь не работает.",
       description: "Загрузите PNG с ложной прозрачностью, и мы исправим его в один клик.",
       removeWatermark: "Удалить водяной знак",
       removeWatermarkHelp: "Обнаружение и удаление полупрозрачных водяных знаков",

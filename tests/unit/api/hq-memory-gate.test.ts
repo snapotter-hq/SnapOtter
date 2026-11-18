@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mockReadFileSync = vi.hoisted(() => vi.fn());
-const mockFreemem = vi.hoisted(() => vi.fn<() => number>());
+const mockTotalmem = vi.hoisted(() => vi.fn<() => number>());
+const mockAvailableSidecarMemoryBytes = vi.hoisted(() => vi.fn<() => number | null>());
 
 vi.mock("node:fs", () => ({
   readFileSync: mockReadFileSync,
 }));
 
 vi.mock("node:os", () => ({
-  freemem: mockFreemem,
+  totalmem: mockTotalmem,
+}));
+
+vi.mock("@snapotter/ai", () => ({
+  availableSidecarMemoryBytes: mockAvailableSidecarMemoryBytes,
 }));
 
 import {
@@ -16,8 +21,10 @@ import {
   containerMemoryLimitBytes,
   HR_MATTING_CPU_ESTIMATE_BYTES,
   HR_MATTING_MEMORY_MESSAGE,
+  hostMemoryCapacityBytes,
   hqCpuMemoryRefusal,
   hrMattingMemoryRefusal,
+  memoryUnavailableTools,
 } from "../../../apps/api/src/lib/hq-memory-gate.js";
 
 const GIB = 1024 ** 3;
@@ -31,7 +38,8 @@ function cgroupFiles(files: Record<string, string>) {
 
 afterEach(() => {
   mockReadFileSync.mockReset();
-  mockFreemem.mockReset();
+  mockTotalmem.mockReset();
+  mockAvailableSidecarMemoryBytes.mockReset();
 });
 
 describe("containerMemoryLimitBytes", () => {
@@ -98,6 +106,10 @@ describe("hrMattingMemoryRefusal", () => {
     expect(msg).not.toContain("16.3");
   });
 
+  it("allows the job when available memory is unknown", () => {
+    expect(hrMattingMemoryRefusal(false, null)).toBeNull();
+  });
+
   it("skips the check on a GPU host, whatever memory is free", () => {
     expect(hrMattingMemoryRefusal(true, 1 * GIB)).toBeNull();
   });
@@ -108,21 +120,43 @@ describe("hrMattingMemoryRefusal", () => {
 });
 
 describe("availableMemoryBytes", () => {
-  it("uses free memory when there is no container limit", () => {
-    cgroupFiles({});
-    mockFreemem.mockReturnValue(12 * GIB);
+  it("uses the sidecar estimate, which counts reclaimable page cache as free (#4808)", () => {
+    mockAvailableSidecarMemoryBytes.mockReturnValue(12 * GIB);
     expect(availableMemoryBytes()).toBe(12 * GIB);
   });
+});
 
-  it("caps free memory at the container limit", () => {
-    cgroupFiles({ "/sys/fs/cgroup/memory.max": `${8 * GIB}\n` });
-    mockFreemem.mockReturnValue(30 * GIB);
-    expect(availableMemoryBytes()).toBe(8 * GIB);
+describe("hostMemoryCapacityBytes", () => {
+  it("uses total memory when there is no container limit", () => {
+    cgroupFiles({});
+    mockTotalmem.mockReturnValue(16 * GIB);
+    expect(hostMemoryCapacityBytes()).toBe(16 * GIB);
   });
 
-  it("uses free memory when it is below the container limit", () => {
-    cgroupFiles({ "/sys/fs/cgroup/memory.max": `${32 * GIB}\n` });
-    mockFreemem.mockReturnValue(10 * GIB);
-    expect(availableMemoryBytes()).toBe(10 * GIB);
+  it("caps total memory at the container limit", () => {
+    cgroupFiles({ "/sys/fs/cgroup/memory.max": `${12 * GIB}\n` });
+    mockTotalmem.mockReturnValue(64 * GIB);
+    expect(hostMemoryCapacityBytes()).toBe(12 * GIB);
+  });
+});
+
+describe("memoryUnavailableTools", () => {
+  it("marks transparency-fixer unavailable on a CPU host under the floor", () => {
+    expect(memoryUnavailableTools(false, 16 * GIB)).toEqual([
+      {
+        toolId: "transparency-fixer",
+        reason: "insufficient-memory",
+        requiredMemoryBytes: HR_MATTING_CPU_ESTIMATE_BYTES,
+        hostMemoryBytes: 16 * GIB,
+      },
+    ]);
+  });
+
+  it("marks nothing when the host can reach the floor", () => {
+    expect(memoryUnavailableTools(false, HR_MATTING_CPU_ESTIMATE_BYTES)).toEqual([]);
+  });
+
+  it("marks nothing on a GPU host", () => {
+    expect(memoryUnavailableTools(true, 8 * GIB)).toEqual([]);
   });
 });

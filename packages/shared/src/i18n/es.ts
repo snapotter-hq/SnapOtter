@@ -2411,6 +2411,8 @@ export const es: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Corrigiendo transparencia ({count} archivos)",
+      hostMemoryTooLow:
+        "Este host tiene {available} GB de memoria. En un host con CPU, el recorte de alta resolución necesita unos {required} GB, así que esta herramienta no puede ejecutarse aquí.",
       description: "Sube un PNG con fondo transparente falso y lo corregimos en un clic.",
       removeWatermark: "Eliminar marca de agua",
       removeWatermarkHelp: "Detecta y elimina marcas de agua semitransparentes",

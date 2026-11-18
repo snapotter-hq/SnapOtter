@@ -2435,6 +2435,8 @@ export const de: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Transparenz wird repariert ({count} Dateien)",
+      hostMemoryTooLow:
+        "Dieser Host hat {available} GB Arbeitsspeicher. Auf einem CPU-Host braucht hochauflösendes Matting etwa {required} GB, daher kann dieses Werkzeug hier nicht laufen.",
       description:
         "Laden Sie ein PNG mit unechtem transparentem Hintergrund hoch. Wir reparieren es mit einem Klick.",
       removeWatermark: "Wasserzeichen entfernen",

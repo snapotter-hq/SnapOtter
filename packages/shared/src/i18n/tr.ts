@@ -2420,6 +2420,8 @@ export const tr: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Saydamlık düzeltiliyor ({count} dosya)",
+      hostMemoryTooLow:
+        "Bu sunucuda {available} GB bellek var. CPU sunucusunda yüksek çözünürlüklü maskeleme yaklaşık {required} GB gerektirir, bu yüzden bu araç burada çalışamaz.",
       description: "Sahte saydam arka planlı bir PNG yükleyin, tek tıkla düzeltelim.",
       removeWatermark: "Filigranı Kaldır",
       removeWatermarkHelp: "Yarı saydam filigranları algılayıp kaldırın",

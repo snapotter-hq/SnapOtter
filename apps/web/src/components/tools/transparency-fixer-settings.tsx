@@ -1,12 +1,16 @@
+import { TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import { ChevronDown, ChevronRight, Droplets } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
+import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 
 type OutputFormat = "png" | "webp";
+
+const GIB = 1024 ** 3;
 
 // ── Shared controls (used by both standalone page and pipeline steps) ──
 
@@ -131,6 +135,11 @@ export function TransparencyFixerSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("transparency-fixer");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const memoryBlock = useFeaturesStore((s) =>
+    s.bundles
+      .find((b) => b.id === TOOL_BUNDLE_MAP["transparency-fixer"])
+      ?.unavailableTools?.find((u) => u.toolId === "transparency-fixer"),
+  );
 
   const handleProcess = () => {
     if (files.length > 1) {
@@ -146,6 +155,18 @@ export function TransparencyFixerSettings() {
   return (
     <div className="space-y-4">
       <TransparencyFixerControls settings={settings} onChange={setSettings} />
+
+      {memoryBlock && (
+        <p
+          data-testid="transparency-fixer-memory-unavailable"
+          className="text-xs text-destructive-ink"
+        >
+          {format(t.toolSettings["transparency-fixer"].hostMemoryTooLow, {
+            available: Math.floor(memoryBlock.hostMemoryBytes / GIB),
+            required: Math.ceil(memoryBlock.requiredMemoryBytes / GIB),
+          })}
+        </p>
+      )}
 
       {/* Error */}
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
@@ -170,7 +191,7 @@ export function TransparencyFixerSettings() {
           type="button"
           data-testid="transparency-fixer-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !!memoryBlock}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple

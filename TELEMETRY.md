@@ -38,6 +38,7 @@ Emitted from `apps/api` through `trackEvent()`; properties are filtered by `anal
 | `auth_login` | A login succeeds | `method` (`password` or `oidc`) |
 | `auth_login_failed` | A login attempt fails | `method` (`password` or `oidc`) |
 | `tool_used` | A tool job finishes | `tool_id`, `status`, `duration_ms`, `category`, `is_ai_tool`, `is_batch`, `input_format`, `output_format`, `bytes_in`, `bytes_out`, `execution_hint`, `error_code`, `error_kind` |
+| `tool_refused` | A tool route turns a request away before it queues a job. Only `transparency-fixer` sends it, when a CPU host has too little free memory for high-resolution matting | `tool_id`, `reason` (`insufficient_memory`), `available_memory_gb` (free memory, rounded), `host_memory_gb` (total memory capped by the container limit, rounded) |
 | `pipeline_executed` | A pipeline run finishes | `step_count`, `tool_ids`, `is_batch`, `file_count`, `duration_ms`, `status` |
 | `ai_bundle_action` | An AI bundle is installed, uninstalled, reset, or imported | `bundle_id`, `action`, `duration_ms` |
 

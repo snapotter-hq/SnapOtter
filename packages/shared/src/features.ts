@@ -12,6 +12,14 @@ export type FeatureStatus = "not_installed" | "queued" | "installing" | "install
 
 export type FeatureCompatibility = "compatible" | "incompatible" | "invalid";
 
+/** A tool in a bundle's enablesTools that this host can never run (#4808). */
+export interface ToolUnavailability {
+  toolId: string;
+  reason: "insufficient-memory";
+  requiredMemoryBytes: number;
+  hostMemoryBytes: number;
+}
+
 export type OcrQualityTier = "fast" | "balanced" | "best";
 
 export interface FeatureBundleState {
@@ -38,6 +46,8 @@ export interface FeatureBundleState {
   requiredMemoryBytes?: number | null;
   effectiveMemoryBytes?: number | null;
   enablesTools: string[];
+  /** Absent when every tool in enablesTools can run on this host. */
+  unavailableTools?: ToolUnavailability[];
   progress: { percent: number; stage: string } | null;
   error: string | null;
 }

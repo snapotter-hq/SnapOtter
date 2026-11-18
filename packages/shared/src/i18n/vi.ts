@@ -2414,6 +2414,8 @@ export const vi: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Đang sửa trong suốt ({count} tệp)",
+      hostMemoryTooLow:
+        "Máy chủ này có {available} GB bộ nhớ. Trên máy chủ CPU, tách nền độ phân giải cao cần khoảng {required} GB, nên công cụ này không thể chạy ở đây.",
       description: "Tải lên PNG có nền giả trong suốt và chúng tôi sẽ sửa chỉ với một cú nhấp.",
       removeWatermark: "Xóa hình mờ",
       removeWatermarkHelp: "Phát hiện và xóa hình mờ bán trong suốt",

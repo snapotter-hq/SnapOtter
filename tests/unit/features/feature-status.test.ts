@@ -27,6 +27,11 @@ const ocrRuntime = vi.hoisted(() => ({
   selectTarget: vi.fn(),
 }));
 
+const hostMemory = vi.hoisted(() => ({
+  gpu: vi.fn<() => boolean>(),
+  capacity: vi.fn<() => number>(),
+}));
+
 const fsFaults = vi.hoisted(() => ({
   denyOwnerOnlyMutationPath: null as string | null,
   denyRecursiveRemovePath: null as string | null,
@@ -246,8 +251,14 @@ vi.mock("@snapotter/ai", () => ({
   }),
   getOcrRuntimeEffectiveMemoryBytes: ocrRuntime.getEffectiveMemory,
   getOcrRuntimeCapability: ocrRuntime.getCapability,
+  gpuMayBeAvailable: hostMemory.gpu,
   selectOcrRuntimeTarget: ocrRuntime.selectTarget,
   resolveAiVenvPath: () => process.env.PYTHON_VENV_PATH || "/opt/venv",
+}));
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  hostMemoryCapacityBytes: hostMemory.capacity,
 }));
 
 let mod: typeof import("../../../apps/api/src/lib/feature-status.js");
@@ -293,6 +304,8 @@ beforeEach(async () => {
     process.arch === "arm64" ? "linux-arm64-cpu-py311" : "linux-amd64-cpu-py312",
   );
   ocrRuntime.getEffectiveMemory.mockReturnValue(8 * 1024 ** 3);
+  hostMemory.gpu.mockReset().mockReturnValue(false);
+  hostMemory.capacity.mockReset().mockReturnValue(64 * 1024 ** 3);
   tempDir = mkdtempSync(join(tmpdir(), "snapotter-test-"));
   aiDir = join(tempDir, "ai");
   modelsDir = join(aiDir, "models");
@@ -1251,6 +1264,35 @@ describe("Feature status queries", () => {
 
   it("getFirstMissingBundleForTool returns null for non-AI tools", () => {
     expect(mod.getFirstMissingBundleForTool("resize")).toBeNull();
+  });
+});
+
+describe("Per-tool memory availability via getFeatureStates (#4808)", () => {
+  const GIB = 1024 ** 3;
+  const backgroundRemoval = () => mod.getFeatureStates().find((s) => s.id === "background-removal");
+
+  it("marks transparency-fixer unavailable on a CPU host under the HR matting floor", () => {
+    hostMemory.capacity.mockReturnValue(16 * GIB);
+    expect(backgroundRemoval()?.unavailableTools).toEqual([
+      {
+        toolId: "transparency-fixer",
+        reason: "insufficient-memory",
+        requiredMemoryBytes: 25 * GIB,
+        hostMemoryBytes: 16 * GIB,
+      },
+    ]);
+    const others = mod.getFeatureStates().filter((s) => s.id !== "background-removal");
+    expect(others.every((s) => s.unavailableTools === undefined)).toBe(true);
+  });
+
+  it("omits the field when the host has enough memory", () => {
+    expect(backgroundRemoval()).not.toHaveProperty("unavailableTools");
+  });
+
+  it("omits the field on a GPU host", () => {
+    hostMemory.capacity.mockReturnValue(8 * GIB);
+    hostMemory.gpu.mockReturnValue(true);
+    expect(backgroundRemoval()).not.toHaveProperty("unavailableTools");
   });
 });
 

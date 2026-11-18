@@ -2372,6 +2372,8 @@ export const ja: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "透過を修正中（{count}ファイル）",
+      hostMemoryTooLow:
+        "このホストのメモリは {available} GB です。CPU ホストでは高解像度マッティングに約 {required} GB が必要なため、ここではこのツールを実行できません。",
       description: "偽の透過背景のPNGをアップロードすると、ワンクリックで修正します。",
       removeWatermark: "ウォーターマーク除去",
       removeWatermarkHelp: "半透明ウォーターマークを検出して除去",
