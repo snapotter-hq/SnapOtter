@@ -112,6 +112,10 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
     },
   }));
 
+  vi.doMock("../../../../apps/api/src/lib/enterprise-feature.js", () => ({
+    isEnterpriseFeatureEnabled: vi.fn().mockResolvedValue(true),
+  }));
+
   return import("../../../../apps/api/src/jobs/system-jobs.js");
 }
 
