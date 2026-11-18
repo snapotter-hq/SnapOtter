@@ -283,10 +283,7 @@ describe("Worker timeout classification", () => {
       expect(finalRow?.attempts).toBe(2);
 
       // Terminal SSE replay key must exist with the timeout message
-      const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
-      const cached = await sharedRedis().get(terminalKeyName);
-      expect(cached).not.toBeNull();
-      const parsed = JSON.parse(cached ?? "{}");
+      const parsed = await terminalFrame(jobId);
       expect(parsed.phase).toBe("failed");
       expect(parsed.error).toMatch(/timed out after 1s/i);
       // Must NOT say "Canceled"
@@ -345,8 +342,7 @@ describe("Worker timeout classification", () => {
     expect(error.code).toBeUndefined();
     expect(error.httpStatus).toBeUndefined();
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-    const frame = JSON.parse(cached ?? "{}");
+    const frame = await terminalFrame(jobId);
     expect(frame.error).toMatch(/timed out after 1s/i);
     expect(frame.code).toBeUndefined();
     expect(frame.httpStatus).toBeUndefined();
@@ -572,8 +568,7 @@ describe("Worker timeout classification", () => {
       const error = finalRow?.error as { message: string };
       expect(error.message).toBe("injected storage outage");
 
-      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-      expect(JSON.parse(cached ?? "{}").error).toBe("injected storage outage");
+      expect((await terminalFrame(jobId)).error).toBe("injected storage outage");
 
       // The fault reached the error log under its own message, once per attempt.
       const logged = errorLog.mock.calls
@@ -622,8 +617,7 @@ describe("Worker timeout classification", () => {
       const error = finalRow?.error as { message: string };
       expect(error.message).toMatch(/timed out after 1s/i);
 
-      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-      expect(JSON.parse(cached ?? "{}").error).toMatch(/timed out after 1s/i);
+      expect((await terminalFrame(jobId)).error).toMatch(/timed out after 1s/i);
 
       const logged = errorLog.mock.calls.filter(
         ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
@@ -681,8 +675,7 @@ describe("Worker timeout classification", () => {
         expect(error.code).toBe("storage-write-failed");
         expect(error.httpStatus).toBe(503);
 
-        const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-        const frame = JSON.parse(cached ?? "{}");
+        const frame = await terminalFrame(jobId);
         expect(frame.error).toBe(error.message);
 
         const logged = errorLog.mock.calls.filter(
@@ -856,6 +849,23 @@ describe("Worker timeout classification", () => {
     }
   }, 25_000);
 });
+
+/**
+ * The terminal SSE replay frame. The worker commits the job row first and
+ * writes this key afterwards without awaiting it, so a row that has already
+ * settled doesn't mean the key exists yet (#4789).
+ */
+async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
+  let cached: string | null = null;
+  await vi.waitFor(
+    async () => {
+      cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(cached).not.toBeNull();
+    },
+    { timeout: 5_000 },
+  );
+  return JSON.parse(cached ?? "{}");
+}
 
 /** Poll the job row until it leaves queued/processing; undefined after ~20s. */
 async function terminalJobRow(
