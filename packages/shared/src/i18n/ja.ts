@@ -80,7 +80,7 @@ export const ja: TranslationKeys = {
     searchMissDiscussionsFallback:
       "記録できませんでした。Discussions でリクエストを開いてください。",
     offlineDescription:
-      "このインスタンスは分析が無効になっているため、フィードバックはここには記録されません。SnapOtter チームに直接連絡することもできます。",
+      "このインスタンスは現在フィードバックを記録できません。SnapOtter チームに直接連絡することもできます。",
     offlinePublicNote: "GitHub の Issue は公開されます。",
     offlineGithubButton: "GitHub で Issue を作成",
     offlineEmailButton: "メールで連絡",

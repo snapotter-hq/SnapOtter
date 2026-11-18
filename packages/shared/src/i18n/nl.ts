@@ -79,7 +79,7 @@ export const nl: TranslationKeys = {
     searchMissDiscussionsFallback:
       "We konden dit niet vastleggen. Open een verzoek in Discussions.",
     offlineDescription:
-      "Deze instantie heeft analyse uitgeschakeld, dus feedback wordt hier niet vastgelegd. Je kunt het SnapOtter-team nog steeds rechtstreeks bereiken.",
+      "Deze instantie kan op dit moment geen feedback vastleggen. Je kunt het SnapOtter-team nog steeds rechtstreeks bereiken.",
     offlinePublicNote: "GitHub-issues zijn openbaar.",
     offlineGithubButton: "Een GitHub-issue openen",
     offlineEmailButton: "Mail ons",

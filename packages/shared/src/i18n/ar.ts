@@ -77,7 +77,7 @@ export const ar: TranslationKeys = {
     searchMissContext: "لقد بحثت عن: {query}",
     searchMissDiscussionsFallback: "تعذّر تسجيل ذلك. افتح طلبًا في Discussions.",
     offlineDescription:
-      "التحليلات معطّلة في هذا المثيل، لذلك لا تُسجَّل الملاحظات هنا. لا يزال بإمكانك التواصل مباشرةً مع فريق SnapOtter.",
+      "لا يمكن لهذا المثيل تسجيل الملاحظات الآن. لا يزال بإمكانك التواصل مباشرةً مع فريق SnapOtter.",
     offlinePublicNote: "مشكلات GitHub علنية.",
     offlineGithubButton: "افتح مشكلة على GitHub",
     offlineEmailButton: "راسلنا",

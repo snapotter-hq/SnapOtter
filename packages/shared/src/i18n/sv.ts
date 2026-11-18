@@ -79,7 +79,7 @@ export const sv: TranslationKeys = {
     searchMissDiscussionsFallback:
       "Vi kunde inte registrera det. Öppna en förfrågan i Discussions.",
     offlineDescription:
-      "Den här instansen har stängt av analysen, så feedback registreras inte här. Du kan ändå nå SnapOtter-teamet direkt.",
+      "Den här instansen kan inte registrera feedback just nu. Du kan ändå nå SnapOtter-teamet direkt.",
     offlinePublicNote: "GitHub-ärenden är offentliga.",
     offlineGithubButton: "Öppna ett GitHub-ärende",
     offlineEmailButton: "Mejla oss",

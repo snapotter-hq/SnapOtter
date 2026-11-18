@@ -80,7 +80,7 @@ export const vi: TranslationKeys = {
     searchMissDiscussionsFallback:
       "Chúng tôi không ghi lại được. Mở một yêu cầu trong Discussions.",
     offlineDescription:
-      "Bản cài đặt này đã tắt phân tích, nên phản hồi không được ghi lại ở đây. Bạn vẫn có thể liên hệ trực tiếp với nhóm SnapOtter.",
+      "Bản cài đặt này hiện không thể ghi lại phản hồi. Bạn vẫn có thể liên hệ trực tiếp với nhóm SnapOtter.",
     offlinePublicNote: "Issue trên GitHub là công khai.",
     offlineGithubButton: "Mở một issue trên GitHub",
     offlineEmailButton: "Gửi email cho chúng tôi",

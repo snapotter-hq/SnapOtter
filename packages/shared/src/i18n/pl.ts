@@ -78,7 +78,7 @@ export const pl: TranslationKeys = {
     searchMissContext: "Szukano: {query}",
     searchMissDiscussionsFallback: "Nie udało się tego zapisać. Otwórz prośbę w Discussions.",
     offlineDescription:
-      "Ta instancja ma wyłączoną analitykę, więc opinie nie są tu zapisywane. Nadal możesz skontaktować się bezpośrednio z zespołem SnapOtter.",
+      "Ta instancja nie może teraz zapisywać opinii. Nadal możesz skontaktować się bezpośrednio z zespołem SnapOtter.",
     offlinePublicNote: "Zgłoszenia w GitHub są publiczne.",
     offlineGithubButton: "Otwórz zgłoszenie w GitHub",
     offlineEmailButton: "Napisz do nas",
