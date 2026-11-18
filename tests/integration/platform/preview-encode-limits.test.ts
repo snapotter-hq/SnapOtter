@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { ChildProcess, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type ClientRequest, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -94,6 +94,30 @@ function encodePid(): number | null {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Which kills the app sent, for a failure message. No SIGKILL to `pid` means
+ * the server never acted on the disconnect; one that was sent points at the
+ * process outliving it.
+ */
+function describeKills(kill: { mock: { calls: unknown[][]; contexts: unknown[] } }, pid: number) {
+  const sent = kill.mock.calls.map(
+    ([signal], i) =>
+      `${String(signal ?? "SIGTERM")} to ${(kill.mock.contexts[i] as ChildProcess).pid}`,
+  );
+  const hit = sent.some((entry) => entry.endsWith(` to ${pid}`));
+  return `${hit ? "the app did kill it" : "the app never killed it"} (kills sent: ${sent.join(", ") || "none"})`;
+}
+
+/** Linux process state ("Z" = killed but not yet reaped), or why it's unknown. */
+function processState(pid: number): string {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0] ?? "unparsed";
+  } catch {
+    return "unavailable";
   }
 }
 
@@ -197,14 +221,30 @@ describe("preview encode limits (#1406)", () => {
 
   it("kills an on-demand encode when the client disconnects", async () => {
     env.PREVIEW_TIMEOUT_S = 600;
-    const req = await openPreviewRequest("POST", "/api/v1/preview/generate", wavUpload());
+    // The app runs in this process, so the route's SIGKILL goes through here.
+    const kill = vi.spyOn(ChildProcess.prototype, "kill");
+    try {
+      const req = await openPreviewRequest("POST", "/api/v1/preview/generate", wavUpload());
 
-    await vi.waitFor(() => expect(encodePid()).not.toBeNull(), { timeout: 10_000 });
-    const pid = encodePid() as number;
-    expect(isAlive(pid)).toBe(true);
+      await vi.waitFor(() => expect(encodePid()).not.toBeNull(), { timeout: 10_000 });
+      const pid = encodePid() as number;
+      expect(isAlive(pid)).toBe(true);
 
-    req.destroy();
-    await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 5_000 });
+      req.destroy();
+      const hungUpAt = Date.now();
+      try {
+        await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 5_000 });
+      } catch (err) {
+        // Intermittent on loaded CI runners only (#4790): say which half was slow.
+        throw new Error(
+          `encode ${pid} still alive ${Date.now() - hungUpAt}ms after the client hung up; ` +
+            `${describeKills(kill, pid)}; process state: ${processState(pid)}`,
+          { cause: err },
+        );
+      }
+    } finally {
+      kill.mockRestore();
+    }
   });
 
   it("lets a stored-file encode finish into the cache after the client disconnects", async () => {
