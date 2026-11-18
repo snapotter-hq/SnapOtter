@@ -8,7 +8,7 @@ const {
   extractCommand,
   readInput,
   reportVerdict,
-  splitSegments,
+  splitCommands,
   strongestVerdict,
   tokenize,
   verdict,
@@ -21,8 +21,8 @@ const { publishTextVerdict } = require("./publish-text-guard.cjs");
 const { secretContentVerdict } = require("./secret-content-guard.cjs");
 
 function hasCommitBypass(command) {
-  for (const segment of splitSegments(command)) {
-    const tokens = tokenize(segment);
+  for (const { line } of splitCommands(command)) {
+    const tokens = tokenize(line);
     const commitAt = tokens.indexOf("commit");
     if (commitAt === -1 || !tokens.slice(0, commitAt).includes("git")) {
       continue;

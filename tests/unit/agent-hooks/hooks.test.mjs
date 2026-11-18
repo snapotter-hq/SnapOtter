@@ -8,7 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
 const HOOKS = path.resolve(import.meta.dirname, "../../../scripts/agent-hooks");
-const { gitSubcommand, splitSegments, tokenize } = require(path.join(HOOKS, "input.cjs"));
+const { gitSubcommand, splitCommands, splitSegments, tokenize } = require(
+  path.join(HOOKS, "input.cjs"),
+);
 const { envSecretVerdict, isSecretPath } = require(path.join(HOOKS, "env-secret-guard.cjs"));
 const { protectedCommandVerdict, writeTargets } = require(path.join(HOOKS, "protect-config.cjs"));
 const { publishTextVerdict } = require(path.join(HOOKS, "publish-text-guard.cjs"));
@@ -85,6 +87,16 @@ describe("input helpers", () => {
       "d",
       "e",
       "f",
+    ]);
+  });
+
+  it("keeps quoted separators and heredoc bodies with their command", () => {
+    const command = `grep -E 'a|git commit' f; git commit -m "x\n\ny; z"\ncat > b.md <<'EOF'\nline | one\nEOF\necho done`;
+    expect(splitCommands(command)).toEqual([
+      { line: "grep -E 'a|git commit' f", heredocs: [] },
+      { line: ` git commit -m "x\n\ny; z"`, heredocs: [] },
+      { line: "cat > b.md <<'EOF'", heredocs: ["line | one"] },
+      { line: "echo done", heredocs: [] },
     ]);
   });
 
@@ -290,6 +302,34 @@ describe("publish text guard", () => {
     expect(publishTextVerdict("gh pr create --body-file missing.md", scratch)?.level).toBe("ask");
   });
 
+  it("reads a body file through a variable set earlier in the command", () => {
+    expect(
+      publishTextVerdict(`S=${scratch} && gh pr create --title t --body-file $S/body-ok.md`, "/"),
+    ).toBeNull();
+    expect(
+      publishTextVerdict(`S=${scratch}; gh pr edit 5 --body-file "\${S}/body-dash.md"`, "/")?.level,
+    ).toBe("ask");
+  });
+
+  it("checks a body file written from a heredoc in the same command", () => {
+    const write = (text) =>
+      `S=${scratch}/not-yet\ncat > $S/pr.md <<'EOF'\n${text}\nEOF\ngh pr create --title t --body-file $S/pr.md`;
+    expect(publishTextVerdict(write("Plain summary."), scratch)).toBeNull();
+    expect(publishTextVerdict(write("A \u2014 B"), scratch)?.level).toBe("ask");
+  });
+
+  it("checks a commit message fed from a heredoc", () => {
+    const command = "git commit -F - <<'EOF'\nfix: a \u2014 b\nEOF";
+    expect(publishTextVerdict(command, scratch)?.level).toBe("ask");
+  });
+
+  it("ignores an em dash outside the outward command", () => {
+    const command = `git diff | /usr/bin/grep -n "\u2014" ; git commit -m "feat: x"`;
+    expect(publishTextVerdict(command, scratch)).toBeNull();
+    const script = `python3 - <<'EOF'\nprint("gh issue create \u2014")\nEOF`;
+    expect(publishTextVerdict(script, scratch)).toBeNull();
+  });
+
   it("checks the text when the repo flag precedes the subcommand", () => {
     const command = `gh -R owner/repo pr create --body "a \u2014 b"`;
     expect(publishTextVerdict(command, scratch)?.level).toBe("ask");
@@ -317,6 +357,13 @@ describe("command verdict composition", () => {
     expect(hasCommitBypass("git commit --no-verify -m x")).toBe(true);
     expect(hasCommitBypass("git commit -n -m x")).toBe(true);
     expect(hasCommitBypass(`git commit -m "x"`)).toBe(false);
+  });
+
+  it("ignores --no-verify quoted inside a commit message", () => {
+    expect(hasCommitBypass(`git commit -m "fix: x\n\nNo git commit --no-verify was used"`)).toBe(
+      false,
+    );
+    expect(hasCommitBypass("git commit -F - <<'EOF'\nfix: x\ngit commit -n\nEOF")).toBe(false);
   });
 
   it("lets a deny win over an ask in the same command", () => {
@@ -365,6 +412,15 @@ describe("guard-command end to end", () => {
     const result = runGuard("git switch -c scratch-branch", REPO_ROOT);
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision).toBe("ask");
+  });
+
+  it("does not read git words inside a grep pattern as a commit in the main checkout", () => {
+    const result = runGuard(
+      "sed -n 1p a.md | /usr/bin/grep -E 'FAIL|git commit|git add'",
+      REPO_ROOT,
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
   });
 
   it("fails open on malformed input", () => {
