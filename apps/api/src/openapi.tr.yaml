@@ -8577,6 +8577,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8586,6 +8589,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8647,12 +8651,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR çalışma zamanı uyumluluğu; eski paketlerde bulunmaz
+                          description: Ana makine uyumluluğu. OCR bunu her zaman bildirir. Eski bir paket, yalnızca bu ana makine onu çalıştıramıyorsa incompatible bildirir, aksi halde alanı göndermez.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR çalışma zamanı uyumluluk nedeni; eski paketlerde bulunmaz
+                          description: Paketin neden uyumsuz olduğu; örneğin x86-64 kitaplıkları AVX gerektirdiğinde ve bu işlemcide AVX olmadığında cpu-no-avx. Uyumlu eski paketlerde gönderilmez.
                         selectedTarget:
                           type:
                             - string
@@ -8823,7 +8827,7 @@ paths:
       description: Yayımlanan en yeni sürüm, çalışan sürümden daha yeniyse onu, değilse null döndürür. settings:write gerektirir.
       responses:
         '200':
-          description: Son sürüm. Bu örnek güncelse null
+          description: Daha yeni sürüm veya yayımlanmış daha yeni bir sürüm yoksa ya da bu örnekte analitik kapalıysa null (bu durumda sorgu yapılmaz)
           content:
             application/json:
               schema:
@@ -8832,10 +8836,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Kimlik doğrulama bilgisi eksik veya geçersiz
           content:
@@ -8957,6 +8975,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Aracın ihtiyaç duyduğu bir paket bu ana makineye kurulamıyor: OCR çalışma ortamı desteklenmiyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED). Hiçbir şey kuyruğa alınmaz.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9043,7 +9067,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Paket zaten kurulu veya OCR çalışma zamanı bu ana makinede desteklenmiyor
+          description: Paket zaten kurulu, OCR çalışma ortamı bu ana makinede desteklenmiyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED, herhangi bir indirmeden önce reddedilir)
           content:
             application/json:
               schema:
@@ -23880,7 +23904,7 @@ paths:
         '403':
           description: Yetersiz izinler
         '409':
-          description: İçe aktarma kilidi tutuluyor
+          description: İçe aktarma kilidi tutuluyor veya paket AVX gerektiriyor ve bu işlemcide AVX yok (kod FEATURE_CPU_UNSUPPORTED)
         '413':
           description: İçe aktarmadaki bir dosya 20 GiB'ı aşıyor. Bu rotanın kendi boyut sınırları vardır; `MAX_UPLOAD_SIZE_MB` bu rota için geçerli değildir.
         '507':
@@ -30781,13 +30805,13 @@ x-i18n:
       provenance: machine
       outputHash: fd72cca77be2
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 88deed3a1aab
+      outputHash: 97046ac924a3
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 24a51e408d16
+      outputHash: 53d96398a141
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30837,9 +30861,9 @@ x-i18n:
       provenance: machine
       outputHash: 753e98906b34
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 1b9bea076630
+      outputHash: a61722a0f8f2
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30880,6 +30904,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: df9565214459
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: e40c9936c09a
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30913,9 +30941,9 @@ x-i18n:
       provenance: machine
       outputHash: 8581e6b5175f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 7b7241c7fa85
+      outputHash: 1bdbdf580d9f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36257,9 +36285,9 @@ x-i18n:
       provenance: machine
       outputHash: 433a4db881fd
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 10d237b6eb3e
+      outputHash: 5f6d89c74184
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -4126,6 +4126,8 @@ export const id: TranslationKeys = {
     previewFailed: "Pembuatan pratinjau gagal",
     previewEncoderMissing:
       "ffmpeg di server ini tidak memiliki encoder {encoder}, jadi pratinjau tidak dapat dibuat. Hubungi administrator Anda.",
+    previewEngineUnavailable:
+      "ffmpeg tidak terpasang di server ini, jadi pratinjau tidak dapat dibuat. Minta administrator Anda untuk memasang ffmpeg atau mengatur FFMPEG_PATH.",
     previewProgressMessages: [
       "Berang-berang sedang pemanasan...",
       "Mengunyah piksel...",
@@ -5200,6 +5202,7 @@ export const id: TranslationKeys = {
       disabledCount: "{count} alat dinonaktifkan",
       disabledCountOne: "{count} alat dinonaktifkan",
       disabledCountOther: "{count} alat dinonaktifkan",
+      offWithBase: "Nonaktif karena {base} dinonaktifkan.",
     },
     experimental: {
       label: "Aktifkan Alat Eksperimental",
@@ -5653,6 +5656,8 @@ export const id: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "Peramban yang dibutuhkan alat ini sedang tidak tersedia.",
       DEPENDENCY_VALIDATION_FAILED:
         "Pengaturan ini bergantung pada pengaturan lain yang tidak valid.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Fitur ini memerlukan CPU yang mendukung AVX, dan CPU server ini tidak mendukungnya.",
       FEATURE_INCOMPATIBLE: "Fitur ini tidak dapat berjalan dengan pengaturan saat ini.",
       FST_REQ_FILE_TOO_LARGE: "File ini terlalu besar untuk diunggah.",
       IDLE_TIMEOUT: "Anda keluar karena tidak aktif. Masuk lagi.",
@@ -5700,6 +5705,40 @@ export const id: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Hasilnya tidak dapat mencapai ukuran target.",
       TOO_MANY_FRAMES: "File ini memiliki terlalu banyak frame untuk diproses.",
       CANCELED: "Operasi dibatalkan.",
+      PAGE_OUT_OF_RANGE: "Rentang halaman itu mencakup halaman yang tidak ada di PDF ini.",
+      INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Anda tidak bisa menghapus semua halaman. Sisakan setidaknya satu.",
+      NESTING_TOO_DEEP: "File ini bersarang terlalu dalam untuk dikonversi.",
+      DOCUMENT_UNREADABLE:
+        "Dokumen ini tidak dapat dibuka. Mungkin rusak, dilindungi kata sandi, atau bukan format yang ditunjukkan ekstensinya.",
+      PDF_DAMAGED: "PDF ini rusak. Proses dengan alat Perbaiki PDF, lalu coba lagi.",
+      PDF_PASSWORD_PROTECTED:
+        "PDF ini dilindungi kata sandi. Buka kuncinya dengan alat Buka Kunci PDF, lalu coba lagi.",
+      IMAGE_TOO_LARGE: "Gambar ini terlalu besar untuk diproses. Kurangi dimensinya dan coba lagi.",
+      RESULT_TOO_LARGE:
+        "Hasil dari pengaturan ini akan terlalu besar. Gunakan gambar yang lebih kecil atau pengaturan yang menghasilkan hasil lebih kecil.",
+      NO_AUDIO_TRACK:
+        "File ini tidak memiliki trek audio. Pilih file yang berisi audio dan coba lagi.",
+      IMAGE_UNDECODABLE:
+        "Gambar ini tidak dapat dibaca. File mungkin rusak atau memakai encoding yang tidak didukung alat ini.",
+      INVALID_SETTINGS:
+        "Pengaturan ini tidak cocok untuk file ini. Periksa nilainya dan coba lagi.",
+      CHART_DATA_INVALID:
+        "Pembuat Grafik tidak dapat membaca data grafik dari file ini. Gunakan CSV atau JSON dengan paling banyak 100 baris, masing-masing berisi label dan angka nol atau lebih.",
+      NO_FACE_DETECTED:
+        "Tidak ada wajah yang ditemukan. Unggah foto yang jelas, menghadap depan, dengan pencahayaan yang baik.",
+      TARGET_SIZE_UNREACHABLE:
+        "File ini tidak dapat diperkecil sampai ukuran target. Coba target yang lebih besar.",
+      TOO_MANY_PAGES:
+        "PDF ini memiliki terlalu banyak halaman untuk diproses sekaligus. Pilih lebih sedikit halaman dan coba lagi.",
+      METADATA_DAMAGED:
+        "Metadata yang ada pada gambar ini rusak, jadi tidak dapat diedit dengan aman.",
+      REMOTE_RESOURCES_DISABLED:
+        "File ini memuat gambar atau gaya dari internet, yang tidak diizinkan server ini. Sematkan ke dalam file dan coba lagi.",
+      TOO_MANY_PIXELS:
+        "Animasi ini memiliki terlalu banyak piksel di seluruh frame-nya. Gunakan lebih sedikit frame atau ukuran yang lebih kecil.",
+      MEDIA_UNDECODABLE:
+        "File ini tidak dapat dibaca. File mungkin rusak, tidak memiliki aliran audio atau video, atau memakai format yang tidak didukung alat ini.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",
@@ -5768,6 +5807,7 @@ export const id: TranslationKeys = {
     grid: "Kisi",
     automate: "Otomasi",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "File",
     help: "Bantuan",
     settings: "Pengaturan",

@@ -11,7 +11,7 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
   const webDistPath = root ?? resolve(__dirname, "../../../web/dist");
 
   if (!existsSync(webDistPath)) {
-    app.log.warn(`SPA dist not found at ${webDistPath} — skipping static file serving`);
+    app.log.warn(`SPA dist not found at ${webDistPath}; skipping static file serving`);
     return;
   }
 

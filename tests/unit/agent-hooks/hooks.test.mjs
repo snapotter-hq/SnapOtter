@@ -47,7 +47,7 @@ beforeAll(() => {
     path.join(scratch, "body-session.md"),
     "Claude-Session: https://claude.ai/code/session_1\n",
   );
-  fs.writeFileSync(path.join(scratch, "body-dash.md"), "Fixes a bug — see below.\n");
+  fs.writeFileSync(path.join(scratch, "body-dash.md"), "Fixes a bug \u2014 see below.\n");
   fs.writeFileSync(path.join(scratch, "body-hyphens.md"), "Fixes a bug -- see below.\n");
   fs.writeFileSync(
     path.join(scratch, "body-flags.md"),
@@ -154,6 +154,21 @@ describe("credential content guard", () => {
     expect(findCredential('token: "${TOKEN}"')).toBeNull();
   });
 
+  it("does not flag a variable reference followed by a comma or semicolon", () => {
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN,")).toBeNull();
+    expect(findCredential("token: env.SNAPOTTER_X_TOKEN;")).toBeNull();
+    expect(findCredential("const token = process.env.SNAPOTTER_X_TOKEN;")).toBeNull();
+  });
+
+  it("still flags a real credential followed by a comma or semicolon", () => {
+    const value = "correct-horse-battery-9";
+    expect(findCredential(["password: ", '"', value, '",'].join(""))).toMatch(
+      /credential assignment/,
+    );
+    expect(findCredential(["token=", value, ","].join(""))).toMatch(/credential assignment/);
+    expect(findCredential(["secret=", value, ";"].join(""))).toMatch(/credential assignment/);
+  });
+
   it("denies a token pasted into a command", () => {
     expect(secretContentVerdict(`echo ${FAKE_GH_TOKEN}`, scratch)?.level).toBe("deny");
   });
@@ -230,7 +245,7 @@ describe("publish text guard", () => {
   });
 
   it("asks on em dashes in an inline commit message and in a body file", () => {
-    expect(publishTextVerdict(`git commit -m "fix: a — b"`, scratch)?.level).toBe("ask");
+    expect(publishTextVerdict(`git commit -m "fix: a \u2014 b"`, scratch)?.level).toBe("ask");
     expect(
       publishTextVerdict("gh pr create --title t --body-file body-dash.md", scratch)?.level,
     ).toBe("ask");
@@ -276,7 +291,7 @@ describe("publish text guard", () => {
   });
 
   it("checks the text when the repo flag precedes the subcommand", () => {
-    const command = `gh -R owner/repo pr create --body "a — b"`;
+    const command = `gh -R owner/repo pr create --body "a \u2014 b"`;
     expect(publishTextVerdict(command, scratch)?.level).toBe("ask");
   });
 

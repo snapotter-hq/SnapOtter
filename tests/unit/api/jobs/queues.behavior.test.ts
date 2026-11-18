@@ -14,7 +14,7 @@ async function loadQueuesModule() {
   queueInstances.length = 0;
 
   vi.doMock("bullmq", () => ({
-    Queue: vi.fn((name: string, options: Record<string, unknown>) => {
+    Queue: vi.fn(function MockQueue(name: string, options: Record<string, unknown>) {
       const queue = {
         name,
         options,

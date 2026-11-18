@@ -417,6 +417,19 @@ describe("classifyError", () => {
   });
 });
 
+describe("classifyError codeless pg connection loss (#4653)", () => {
+  it("treats a drizzle-wrapped pg connection drop on an HTTP path as operational (NODE-AK)", () => {
+    const err = Object.assign(
+      new Error(
+        'Failed query: select "value" from "settings" limit $2\nparams: rateLimitPerUser,1',
+      ),
+      { cause: new Error("Connection terminated unexpectedly") },
+    );
+    expect(classifyError(err, "http")).toBe("operational");
+    expect(classifyError(err, "worker")).toBe("operational");
+  });
+});
+
 describe("classifyError undici", () => {
   // A firewalled upstream that drops packets surfaces through fetch as a
   // "fetch failed" TypeError whose cause carries undici's connect timeout (#1908).

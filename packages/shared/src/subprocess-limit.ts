@@ -1,3 +1,5 @@
+import { isSafeMessageError, SafeError } from "./tool-errors.js";
+
 /**
  * Optional per-subprocess address-space cap (RLIMIT_AS) for the native media and
  * document engines.
@@ -58,4 +60,63 @@ function assertSpawnable(bin: string): void {
 
 function spawnFailure(bin: string, code: string): NodeJS.ErrnoException {
   return Object.assign(new Error(`spawn ${bin} ${code}`), { code, syscall: "spawn", path: bin });
+}
+
+/**
+ * Signals that mean an engine crashed while running, not that it couldn't
+ * start or was killed for memory or time (SIGKILL and SIGTERM keep the spawn
+ * shape, #3829). SIGILL is an instruction the host CPU lacks (an environment
+ * fault); the rest are the engine or a library it links faulting.
+ */
+const CRASH_SIGNALS: ReadonlySet<string> = new Set([
+  "SIGSEGV",
+  "SIGBUS",
+  "SIGFPE",
+  "SIGABRT",
+  "SIGTRAP",
+  "SIGSYS",
+  "SIGILL",
+]);
+
+export const ENGINE_CRASHED_CODE = "ENGINE_CRASHED";
+
+/**
+ * The signal when a `close` event means the engine crashed mid-run, else null.
+ * Returns the signal rather than narrowing it, so a caller's `signal` keeps
+ * its SIGKILL and SIGTERM values for the branches after it.
+ */
+export function engineCrashSignal(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+): NodeJS.Signals | null {
+  return code === null && signal !== null && CRASH_SIGNALS.has(signal) ? signal : null;
+}
+
+/**
+ * A crash mid-run, kept apart from a spawn failure so the worker doesn't call
+ * it a missing binary (#4371, #4684). `message` must be a constant per engine;
+ * the signal and the output tail ride on the cause instead.
+ */
+export function engineCrashError(
+  message: string,
+  bin: string,
+  signal: NodeJS.Signals,
+  output: string,
+): SafeError {
+  const detail = output.slice(-1000).trim();
+  const cause = Object.assign(
+    new Error(detail ? `${bin} exited ${signal}: ${detail}` : `${bin} exited ${signal}`),
+    { signal },
+  );
+  return new SafeError(message, {
+    kind: signal === "SIGILL" ? "operational" : "bug",
+    code: ENGINE_CRASHED_CODE,
+    statusCode: 500,
+    cause,
+  });
+}
+
+/** True for an error built by `engineCrashError`, even after a module-boundary copy. */
+export function isEngineCrash(err: unknown): boolean {
+  return isSafeMessageError(err) && err.code === ENGINE_CRASHED_CODE;
 }

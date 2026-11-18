@@ -3847,6 +3847,8 @@ export const zhCN: TranslationKeys = {
     generatePreview: "生成预览",
     previewFailed: "预览生成失败",
     previewEncoderMissing: "此服务器的 ffmpeg 缺少 {encoder} 编码器，无法生成预览。请联系管理员。",
+    previewEngineUnavailable:
+      "此服务器未安装 ffmpeg，无法生成预览。请让管理员安装 ffmpeg 或设置 FFMPEG_PATH。",
     previewProgressMessages: [
       "水獭正在热身...",
       "正在嚼碎像素...",
@@ -4900,6 +4902,7 @@ export const zhCN: TranslationKeys = {
       disabledCount: "{count} 个工具已禁用",
       disabledCountOne: "{count} 个工具已禁用",
       disabledCountOther: "{count} 个工具已禁用",
+      offWithBase: "已禁用，因为{base}已禁用。",
     },
     experimental: {
       label: "启用实验性工具",
@@ -5332,6 +5335,7 @@ export const zhCN: TranslationKeys = {
       BROWSER_CRASHED: "渲染时浏览器崩溃。请重试。",
       BROWSER_NOT_AVAILABLE: "此工具所需的浏览器目前不可用。",
       DEPENDENCY_VALIDATION_FAILED: "此设置依赖的另一项设置无效。",
+      FEATURE_CPU_UNSUPPORTED: "此功能需要支持 AVX 的 CPU，但此服务器的 CPU 不支持。",
       FEATURE_INCOMPATIBLE: "此功能无法在当前设置下运行。",
       FST_REQ_FILE_TOO_LARGE: "此文件过大，无法上传。",
       IDLE_TIMEOUT: "由于长时间未操作，你已退出登录。请重新登录。",
@@ -5379,6 +5383,30 @@ export const zhCN: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "结果无法达到目标大小。",
       TOO_MANY_FRAMES: "此文件的帧数过多，无法处理。",
       CANCELED: "操作已取消。",
+      PAGE_OUT_OF_RANGE: "该页码范围包含此 PDF 中不存在的页面。",
+      INVALID_PAGE_RANGE: "该页码范围无效。请使用类似 1-3,5 的页码。",
+      CANNOT_REMOVE_ALL_PAGES: "不能删除所有页面。请至少保留一页。",
+      NESTING_TOO_DEEP: "此文件嵌套层级过深，无法转换。",
+      DOCUMENT_UNREADABLE:
+        "无法打开此文档。它可能已损坏、受密码保护，或者不是其扩展名所表示的格式。",
+      PDF_DAMAGED: "此 PDF 已损坏。请先用修复 PDF 工具处理，然后重试。",
+      PDF_PASSWORD_PROTECTED: "此 PDF 受密码保护。请先用解锁 PDF 工具解锁，然后重试。",
+      IMAGE_TOO_LARGE: "此图片太大，无法处理。请缩小尺寸后重试。",
+      RESULT_TOO_LARGE: "这些设置生成的结果太大。请使用更小的图片，或使用能生成更小结果的设置。",
+      NO_AUDIO_TRACK: "此文件没有音轨。请选择包含音频的文件后重试。",
+      IMAGE_UNDECODABLE: "无法读取此图片。文件可能已损坏，或使用了此工具不支持的编码。",
+      INVALID_SETTINGS: "这些设置不适用于此文件。请检查数值后重试。",
+      CHART_DATA_INVALID:
+        "图表制作器无法从此文件读取图表数据。请使用不超过 100 行的 CSV 或 JSON，每行包含一个标签和一个大于或等于零的数字。",
+      NO_FACE_DETECTED: "未检测到人脸。请上传一张光线充足、正面且清晰的照片。",
+      TARGET_SIZE_UNREACHABLE: "此文件无法缩小到目标大小。请尝试更大的目标。",
+      TOO_MANY_PAGES: "此 PDF 页数过多，无法一次处理。请选择更少的页面后重试。",
+      METADATA_DAMAGED: "此图片现有的元数据已损坏，无法安全编辑。",
+      REMOTE_RESOURCES_DISABLED:
+        "此文件会从互联网加载图片或样式，而此服务器不允许这样做。请将它们嵌入文件后重试。",
+      TOO_MANY_PIXELS: "此动画所有帧的像素总数过多。请使用更少的帧或更小的尺寸。",
+      MEDIA_UNDECODABLE:
+        "无法读取此文件。文件可能已损坏、没有音频或视频流，或使用了此工具不支持的格式。",
     },
     generic: "发生错误",
     offline: "您已离线",
@@ -5439,6 +5467,7 @@ export const zhCN: TranslationKeys = {
     grid: "网格",
     automate: "自动化",
     editor: "编辑器",
+    editorBadge: "测试版",
     files: "文件",
     help: "帮助",
     settings: "设置",

@@ -117,7 +117,7 @@ async function loadEnqueueModule(
   });
 
   vi.doMock("bullmq", () => ({
-    QueueEvents: vi.fn((name: string, opts: Record<string, unknown>) => {
+    QueueEvents: vi.fn(function MockQueueEvents(name: string, opts: Record<string, unknown>) {
       queueEventsCtor(name, opts);
       return {
         close: queueEventClose,
@@ -126,11 +126,13 @@ async function loadEnqueueModule(
         on: queueEventOn,
       };
     }),
-    FlowProducer: vi.fn(() => ({
-      add: flowProducerAdd,
-      close: flowProducerClose,
-      on: flowProducerOn,
-    })),
+    FlowProducer: vi.fn(function MockFlowProducer() {
+      return {
+        add: flowProducerAdd,
+        close: flowProducerClose,
+        on: flowProducerOn,
+      };
+    }),
   }));
 
   vi.doMock("@opentelemetry/api", () => ({
@@ -896,5 +898,47 @@ describe("alias claim outcomes (#895)", () => {
       { err: expect.any(Error), clientJobId: "reused-id" },
       "terminal replay key clear failed",
     );
+  });
+});
+
+// A FlowProducer.add() that rejects may still have been stored (#4714); the
+// batch route asks this before it cleans up, so each answer has to be right
+// and the probe can never outwait a dead Redis.
+describe("flowParentStored (#4714)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    getJob.mockReset();
+  });
+
+  it("answers true when the parent job exists and false when it doesn't", async () => {
+    const { mod } = await loadEnqueueModule();
+    getJob.mockResolvedValueOnce({ id: "parent-1" });
+    expect(await mod.flowParentStored("system", "parent-1")).toBe(true);
+    getJob.mockResolvedValueOnce(undefined);
+    expect(await mod.flowParentStored("system", "parent-2")).toBe(false);
+    expect(getJob).toHaveBeenCalledWith("parent-2");
+  });
+
+  it("answers null and logs when Redis rejects the lookup", async () => {
+    const { mod } = await loadEnqueueModule();
+    const fault = new Error("Connection is closed.");
+    getJob.mockRejectedValueOnce(fault);
+
+    expect(await mod.flowParentStored("system", "parent-3")).toBeNull();
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: fault, jobId: "parent-3" },
+      expect.stringContaining("could not check for a stored flow"),
+    );
+  });
+
+  it("answers null after 5s when Redis never replies", async () => {
+    const { mod } = await loadEnqueueModule();
+    vi.useFakeTimers();
+    getJob.mockReturnValueOnce(new Promise(() => {}));
+
+    const answer = mod.flowParentStored("system", "parent-4");
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(await answer).toBeNull();
   });
 });

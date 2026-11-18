@@ -111,6 +111,7 @@ async function buildApp(): Promise<FastifyInstance> {
   // A couple of terminal routes so requests that pass the hook reach a handler.
   app.get("/api/v1/ping", async () => ({ ok: true }));
   app.get("/health", async () => ({ ok: true }));
+  app.get("/api/v1/health", async () => ({ ok: true }));
   await app.ready();
   return app;
 }
@@ -158,6 +159,17 @@ describe("registerPerUserRateLimit", () => {
     app = await buildApp();
 
     const res = await app.inject({ method: "GET", url: "/health" });
+
+    expect(res.statusCode).toBe(200);
+    expect(redisMulti).not.toHaveBeenCalled();
+    expect(res.headers["x-ratelimit-limit"]).toBeUndefined();
+  });
+
+  it("skips the health probe without reading the setting, even when the DB is down (#4652)", async () => {
+    mockRateLimitError = new Error("connect ECONNREFUSED 127.0.0.1:5432");
+    app = await buildApp();
+
+    const res = await app.inject({ method: "GET", url: "/api/v1/health" });
 
     expect(res.statusCode).toBe(200);
     expect(redisMulti).not.toHaveBeenCalled();

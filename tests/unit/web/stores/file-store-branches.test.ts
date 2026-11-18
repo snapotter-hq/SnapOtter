@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const revokeObjectURL = vi.fn();
 const createObjectURL = vi.fn((_obj: Blob | MediaSource) => "blob:fake-url");
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL,
-  revokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL,
+    revokeObjectURL,
+  }),
+);
 
 const imagePreviewMock = vi.hoisted(() => ({
   needsServerPreview: vi.fn<(_file: File) => boolean>(() => false),

@@ -15,7 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { APP_VERSION } from "@snapotter/shared";
-import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { afterEach, describe, expect, it, type MockInstance, onTestFinished, vi } from "vitest";
 import { setAiLogger } from "../../../packages/ai/src/log.js";
 import type { OcrRuntimeTrustKey } from "../../../packages/ai/src/runtime-index.js";
 import {
@@ -926,7 +926,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
   const linuxX64 = { platform: "linux", arch: "x64" } as const;
   type Fixture = ReturnType<typeof createRuntimeFixture>;
 
-  function warnings(warn: ReturnType<typeof vi.spyOn>): string[] {
+  function warnings(warn: MockInstance): string[] {
     return warn.mock.calls.map((call) => String(call[0]));
   }
 

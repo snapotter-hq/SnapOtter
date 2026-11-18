@@ -43,22 +43,61 @@ export function isSafeMessageError(err: unknown): err is SafeError {
   return err instanceof Error && (err as { isSafeMessage?: unknown }).isSafeMessage === true;
 }
 
+/**
+ * The input has more pixels than a decoder will take (sharp's limitInputPixels,
+ * Pillow's decompression-bomb check). One sentence for every decoder, so the
+ * user reads the same reason whichever one refused the image.
+ */
+export const PIXEL_LIMIT_IMAGE_MESSAGE =
+  "This image is too large to process. Reduce its dimensions and try again.";
+
+/**
+ * `code` is a constant, machine-readable reason (DOCUMENT_UNREADABLE). It rides
+ * the failed job row and the 400 body, and the web app translates it from
+ * `errors.codes`; without one the user sees the generic failure text (#4679).
+ */
 export class ToolInputError extends Error {
   readonly isToolInputError = true;
   readonly statusCode = 400;
+  readonly code?: string;
 
-  constructor(message: string, opts?: { cause?: unknown }) {
+  constructor(message: string, opts?: { cause?: unknown; code?: string }) {
     super(message, opts?.cause !== undefined ? { cause: opts.cause } : undefined);
     this.name = "ToolInputError";
+    if (opts?.code !== undefined) this.code = opts.code;
   }
+}
+
+/** The input has more pixels than a decoder will take; see PIXEL_LIMIT_IMAGE_MESSAGE. */
+export function pixelLimitImageError(cause?: unknown): ToolInputError {
+  return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause, code: "IMAGE_TOO_LARGE" });
+}
+
+/**
+ * The code of a ToolInputError built with one, or the code markToolInputError
+ * gave a library's error. A marked error's own `code` is never read: it is
+ * whatever that library set (an errno, an exit status), not ours.
+ */
+export function toolInputErrorCode(err: unknown): string | undefined {
+  if (!isToolInputError(err)) return undefined;
+  const code =
+    err.name === "ToolInputError"
+      ? (err as { code?: unknown }).code
+      : (err as { toolInputCode?: unknown }).toolInputCode;
+  return typeof code === "string" && code.length > 0 ? code : undefined;
 }
 
 export function isToolInputError(err: unknown): err is Error & { isToolInputError: true } {
   return err instanceof Error && (err as { isToolInputError?: unknown }).isToolInputError === true;
 }
 
-export function markToolInputError<E extends Error>(err: E): E {
-  return Object.assign(err, { isToolInputError: true });
+/**
+ * Flags a library's error as the user's input fault in place. `code` is the
+ * translatable reason (IMAGE_UNDECODABLE); it rides `toolInputCode` so the
+ * library's own `code` stays as it was (#4734).
+ */
+export function markToolInputError<E extends Error>(err: E, code?: string): E {
+  return Object.assign(err, { isToolInputError: true }, code ? { toolInputCode: code } : {});
 }
 
 /**

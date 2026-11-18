@@ -8,7 +8,8 @@ const toastErrorSpy = vi.hoisted(() => vi.fn());
 const toastInfoSpy = vi.hoisted(() => vi.fn());
 
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
-vi.mock("../../../apps/web/node_modules/sonner", () => ({
+// It names the ESM entry the app imports: vitest 4 resolves the bare package directory to the CJS main.
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
   toast: {
     error: toastErrorSpy,
     info: toastInfoSpy,
@@ -369,6 +370,14 @@ describe("ToolPage document paste readiness gate (#2844)", () => {
     expect(toastErrorSpy).not.toHaveBeenCalled();
     expect(toastInfoSpy).not.toHaveBeenCalled();
     expect(useFileStore.getState().files).toEqual([]);
+  });
+
+  it("shows the disabled message on a preset whose base tool is disabled (#4462)", async () => {
+    useSettingsStore.setState({ disabledTools: ["convert"], loaded: true, loadError: false });
+    await act(async () => {
+      renderToolPage("/image/heic-to-jpg");
+    });
+    expect(screen.getByText(en.toolPage.disabledByAdmin)).toBeTruthy();
   });
 
   it("ignores file pastes while an AI tool is still loading feature bundle state", async () => {

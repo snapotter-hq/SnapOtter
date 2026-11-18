@@ -114,7 +114,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
     "/api/v1/enterprise/config/export",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFullAdmin(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("config_export_import");
@@ -186,7 +186,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
     "/api/v1/enterprise/config/import",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
       const user = await requireFullAdmin(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("config_export_import");

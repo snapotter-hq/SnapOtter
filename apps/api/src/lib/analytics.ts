@@ -14,6 +14,7 @@ import {
   type FeedbackSurveyId,
   type FeedbackType,
   type FeedbackUsageType,
+  POSTHOG_IP_PLACEHOLDER,
 } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { PostHog } from "posthog-node";
@@ -139,7 +140,14 @@ export async function trackEvent(
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),
       event,
-      properties: sanitizeEventProperties(event, properties),
+      // After the gates above, so opted-out instances send nothing. Spread last
+      // so a call site can't claim another release (#4215). $ip goes after the
+      // allowlist, which would drop it: without it PostHog stores the
+      // instance's public IP whenever the project keeps client IPs (#4583).
+      properties: {
+        ...sanitizeEventProperties(event, { ...properties, app_version: APP_VERSION }),
+        $ip: POSTHOG_IP_PLACEHOLDER,
+      },
     });
   } catch {
     // analytics must never throw
@@ -232,7 +240,7 @@ export async function captureFeedback(
     posthogClient.capture({
       distinctId: distinctId ?? (await getInstanceId()),
       event,
-      properties: cleanFeedbackProperties(properties),
+      properties: { ...cleanFeedbackProperties(properties), $ip: POSTHOG_IP_PLACEHOLDER },
     });
   } catch {
     // feedback capture must never throw

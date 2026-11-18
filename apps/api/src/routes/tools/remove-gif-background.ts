@@ -13,8 +13,10 @@ import {
   isToolInputError,
   SafeError,
   TOOL_BUNDLE_MAP,
+  ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
@@ -36,6 +38,7 @@ import {
   DecoderOutOfMemoryError,
   isDecoderUnavailable,
 } from "../../lib/format-decoders.js";
+import { animationFramePixels, gifBgWorkloadRejection } from "../../lib/gif-limits.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -120,7 +123,7 @@ const pipelineSettingsSchema = settingsShape
   .superRefine(requireBackgroundColors);
 
 // The worker also receives the staged background-image storage key (never
-// persisted to the audit row — passed via dbSettings redaction on enqueue).
+// persisted to the audit row, passed via dbSettings redaction on enqueue).
 const jobSettingsSchema = settingsShape
   .extend({ bgImageKey: z.string().optional() })
   .superRefine(requireBackgroundColors);
@@ -375,6 +378,13 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
             code: "TOO_MANY_FRAMES",
           });
         }
+        const budgetError = gifBgWorkloadRejection(
+          animationFramePixels(fileBuffer, validation.width, validation.height),
+          animation.frames,
+        );
+        if (budgetError) {
+          return reply.status(400).send({ error: budgetError, code: "TOO_MANY_PIXELS" });
+        }
 
         let settings: Settings;
         try {
@@ -486,6 +496,12 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
           try {
             const animation = await detectAnimation(inputBuffer, filename);
+            const meta = await sharp(inputBuffer).metadata();
+            const budgetError = gifBgWorkloadRejection(
+              animationFramePixels(inputBuffer, meta.width ?? 0, meta.height ?? 0),
+              animation.frames,
+            );
+            if (budgetError) throw new ToolInputError(budgetError, { code: "TOO_MANY_PIXELS" });
             result = await removeBackgroundAnimated(
               inputBuffer,
               scratchDir,

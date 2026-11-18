@@ -21,7 +21,9 @@ Anonymous Product Analytics is on by default and set for the whole instance by a
 - OCR output text
 - Image metadata (EXIF)
 - Extracted document text
-- Your IP address or account identity
+- Your account identity
+
+PostHog sees the IP address each request comes from, as any server does. Our PostHog project discards it instead of storing it, and SnapOtter's own server events send a placeholder in its place.
 
 ## Update notices {#update-notices}
 

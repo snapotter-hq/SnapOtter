@@ -95,11 +95,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
   beforeEach(() => {
     FakeXhr.instances = [];
     vi.stubGlobal("XMLHttpRequest", FakeXhr);
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn((blob: Blob) => `blob:${(blob as File).name ?? "mock"}`),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: vi.fn((blob: Blob) => `blob:${(blob as File).name ?? "mock"}`),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
     useFileStore.getState().reset();
   });
 

@@ -262,6 +262,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "convert",
       jobId: "job-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
     expect(loggerWarnMock).toHaveBeenCalledWith(
       {
@@ -316,6 +318,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: undefined,
       jobId: "job-only-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
   });
 
@@ -1032,6 +1036,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         pool: "system",
         toolId: "convert",
         jobId,
+        periodic: true,
+        job: "system:job-reconciliation",
       });
       expect(loggerErrorMock).toHaveBeenCalledWith(
         { err: reportedErr, jobId, toolId: "convert" },
@@ -1087,6 +1093,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         pool: "system",
         toolId: "compress",
         jobId,
+        periodic: true,
+        job: "system:job-reconciliation",
       });
       expect(loggerErrorMock).toHaveBeenCalledWith(
         { err: reportedErr, jobId, toolId: "compress" },
@@ -1193,6 +1201,8 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "rotate",
       jobId: "job-s3-db-fault",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
     expect(classifyError(dbConnErr, "worker")).toBe("operational");
 
@@ -1228,6 +1238,39 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       pool: "system",
       toolId: "compress",
       jobId: "job-local-sidecar-eio",
+      periodic: true,
+      job: "system:job-reconciliation",
+    });
+  });
+  it("tags a corrupt result payload sidecar report with the job's tool id (#4742)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+    dbSelectRows.rows = [
+      {
+        id: "job-corrupt-sidecar",
+        toolId: "compress",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 100,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+    listObjectsMock.mockResolvedValueOnce([
+      { key: "outputs/job-corrupt-sidecar/.result-payload.json", size: 64, mtimeMs: 1_000 },
+      { key: "outputs/job-corrupt-sidecar/out.jpg", size: 256, mtimeMs: 1_001 },
+    ]);
+    getObjectBufferMock.mockResolvedValueOnce(Buffer.from("{not json"));
+
+    await reconcileStrandedJobs({ graceMs: 0 });
+
+    expect(reportErrorMock).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      source: "worker",
+      pool: "system",
+      toolId: "compress",
+      jobId: "job-corrupt-sidecar",
+      periodic: true,
+      job: "system:job-reconciliation",
     });
   });
 });

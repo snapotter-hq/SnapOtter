@@ -1,4 +1,11 @@
-import { isSafeMessageError, isToolInputError, SafeError, ToolInputError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  isToolInputError,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  pixelLimitImageError,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import sharp from "sharp";
 import type { AiJobHandler } from "../jobs/ai-handlers.js";
 import { isPixelSafetyError } from "../modality/image-input.js";
@@ -15,8 +22,34 @@ import { logger } from "./logger.js";
 /** Short single-line messages so friendlyError() passes them to the client verbatim. */
 export const UNDECODABLE_IMAGE_MESSAGE =
   "This image can't be decoded. The file may be corrupt or use an unsupported encoding.";
-export const PIXEL_LIMIT_IMAGE_MESSAGE =
-  "This image is too large to process. Reduce its dimensions and try again.";
+export { PIXEL_LIMIT_IMAGE_MESSAGE };
+export const PIXEL_LIMIT_RESULT_MESSAGE =
+  "This image, or the result these settings would produce, is too large to process. Use a smaller image or settings that make a smaller result.";
+
+// libvips' per-side cap for an encoder, e.g. 16383 for WebP, 65535 for JPEG.
+const ENCODER_SIZE_LIMIT = /^Processed image is too large for the \w+ format$/;
+
+/**
+ * libvips refusing the size of an image: its read cap (16383 x 16383 pixels by
+ * default) or an encoder's per-side cap. The input already passed intake, so
+ * this is a canvas the settings built (a 100:1 pad, a huge border), or input
+ * the tool never probed: the request's size either way, not our bug.
+ */
+function isImageSizeLimitError(err: unknown): err is Error {
+  return isPixelSafetyError(err) || (err instanceof Error && ENCODER_SIZE_LIMIT.test(err.message));
+}
+
+/**
+ * The 400 a libvips size cap gets, or null for any other error. The wrappers
+ * below apply it; a custom route that answers from its own catch calls it
+ * there instead, before its generic 422 or rethrow (#4699).
+ */
+export function imageSizeLimitError(err: unknown): ToolInputError | null {
+  if (!isImageSizeLimitError(err)) return null;
+  // Classified as input, so this is the only line that keeps libvips' reason.
+  logger.info({ err, reason: err.message }, "oversized image result rejected");
+  return new ToolInputError(PIXEL_LIMIT_RESULT_MESSAGE, { cause: err, code: "RESULT_TOO_LARGE" });
+}
 
 /** User-facing reasons for an environmental errno, one constant per kind of fault. */
 export const DISK_ENVIRONMENT_MESSAGE =
@@ -87,6 +120,8 @@ function wrapEncodeFailure<T>(
     const code = String((err as NodeJS.ErrnoException).code);
     throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
   }
+  const tooLarge = imageSizeLimitError(err);
+  if (tooLarge) throw tooLarge;
   throw new SafeError(message, {
     kind: "bug",
     code: codeOf(settings),
@@ -192,9 +227,9 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
       "undecodable image input rejected",
     );
     if (isPixelSafetyError(probeErr)) {
-      return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
+      return pixelLimitImageError(err);
     }
-    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err });
+    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err, code: "IMAGE_UNDECODABLE" });
   }
   return err instanceof Error ? err : new Error(String(err));
 }

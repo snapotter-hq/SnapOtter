@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Bypass zustand persist middleware — it captures window.localStorage at import
+// Bypass zustand persist middleware, it captures window.localStorage at import
 // time before jsdom's storage is reliably available in the vitest fork pool.
 vi.mock("zustand/middleware", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -18,11 +18,13 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 const revokeObjectURL = vi.fn();
 const createObjectURL = vi.fn((_obj: Blob | MediaSource) => "blob:fake-url");
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL,
-  revokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL,
+    revokeObjectURL,
+  }),
+);
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -42,11 +44,11 @@ vi.stubGlobal("localStorage", {
 // Mock matchMedia for theme store
 vi.stubGlobal(
   "matchMedia",
-  vi.fn().mockReturnValue({
+  vi.fn(() => ({
     matches: false,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-  }),
+  })),
 );
 
 // ==========================================================================
@@ -945,11 +947,11 @@ describe("useThemeStore", () => {
     const originalMatchMedia = globalThis.matchMedia;
     vi.stubGlobal(
       "matchMedia",
-      vi.fn().mockReturnValue({
+      vi.fn(() => ({
         matches: true,
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
-      }),
+      })),
     );
     useThemeStore.getState().setTheme("system");
     const s = useThemeStore.getState();
@@ -1531,7 +1533,7 @@ describe("usePdfToImageStore", () => {
 // ==========================================================================
 
 // Mock the collage-templates module so we don't depend on real template data.
-// The store uses getDefaultTemplate() and COLLAGE_TEMPLATES — provide
+// The store uses getDefaultTemplate() and COLLAGE_TEMPLATES, provide
 // minimal stubs that return predictable values.
 vi.mock("@/lib/collage-templates", () => ({
   COLLAGE_TEMPLATES: [
@@ -2955,10 +2957,12 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockReturnValue({
-        onmessage: null,
-        onerror: null,
-        close: mockClose,
+      vi.fn(function FakeEventSource() {
+        return {
+          onmessage: null,
+          onerror: null,
+          close: mockClose,
+        };
       }),
     );
 
@@ -2996,10 +3000,12 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockReturnValue({
-        onmessage: null,
-        onerror: null,
-        close: mockClose,
+      vi.fn(function FakeEventSource() {
+        return {
+          onmessage: null,
+          onerror: null,
+          close: mockClose,
+        };
       }),
     );
     mockApiPost.mockResolvedValueOnce({ jobId: "job-456" });
@@ -3164,10 +3170,12 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockReturnValue({
-        onmessage: null,
-        onerror: null,
-        close: mockClose,
+      vi.fn(function FakeEventSource() {
+        return {
+          onmessage: null,
+          onerror: null,
+          close: mockClose,
+        };
       }),
     );
 
@@ -3191,7 +3199,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3229,7 +3237,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3263,7 +3271,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3296,7 +3304,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3335,7 +3343,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3396,7 +3404,7 @@ describe("useFeaturesStore", () => {
     const mockClose = vi.fn();
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,
@@ -3478,7 +3486,7 @@ describe("useFeaturesStore", () => {
     // Setup fast-completing EventSource
     vi.stubGlobal(
       "EventSource",
-      vi.fn().mockImplementation(() => {
+      vi.fn().mockImplementation(function FakeEventSource() {
         const es = {
           onmessage: null as ((event: MessageEvent) => void) | null,
           onerror: null as (() => void) | null,

@@ -1,0 +1,22 @@
+name: Install the ImageMagick EXR coder
+description: >-
+  Ubuntu's ImageMagick ships without an EXR coder, and the EXR decode tests
+  fail without one (#4749). The package name follows the ImageMagick major
+  the runner image carries, so both the 7 and 6 names are probed. Fails when
+  neither exists or when the coder still isn't registered afterwards. Every CI
+  job that needs EXR calls this, so an image move is one edit (#4777).
+runs:
+  using: composite
+  steps:
+    - name: Install the ImageMagick EXR coder and verify
+      shell: bash
+      run: |
+        if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
+          sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
+        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
+          sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
+        else
+          echo "No supported ImageMagick EXR coder package found" >&2
+          exit 1
+        fi
+        convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'

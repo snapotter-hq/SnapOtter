@@ -110,7 +110,13 @@ beforeEach(() => {
       dispatchEvent: vi.fn(),
     })),
   );
-  vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL: () => {} });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   const stored = new Map<string, string>();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => stored.get(k) ?? null,

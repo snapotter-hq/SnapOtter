@@ -81,11 +81,27 @@ def _our_frames(exc):
     return frames[-20:]
 
 
+def describe_exception(exc):
+    """A one-line reason for exc that still makes sense without its type.
+
+    str() of a KeyError or IndexError is only the bad key ("'tile'"), which
+    reads as nothing once it is the whole error message, so those keep their
+    type name. An empty message falls back to the type name.
+    """
+    exc_type = type(exc).__name__
+    detail = str(exc).strip()
+    if not detail:
+        return exc_type
+    if isinstance(exc, LookupError):
+        return f"{exc_type}: {detail}"
+    return detail
+
+
 def build_error_envelope(exc):
     """A JSON-serializable {type, message, frames} describing a caught exception."""
     exc_type = type(exc).__name__
     return {
         "type": exc_type,
-        "message": redact(str(exc).strip() or exc_type) or exc_type,
+        "message": redact(describe_exception(exc)) or exc_type,
         "frames": _our_frames(exc),
     }

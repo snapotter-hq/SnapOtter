@@ -34,7 +34,7 @@ describe("downloadBlob", () => {
     vi.useFakeTimers();
     const createObjectURL = vi.fn(() => "blob:fake");
     const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL }));
 
     const clicked = captureAnchorClicks();
 
@@ -48,7 +48,10 @@ describe("downloadBlob", () => {
   it("revokes the object URL only after the current tick", () => {
     vi.useFakeTimers();
     const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:fake", revokeObjectURL });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, { createObjectURL: () => "blob:fake", revokeObjectURL }),
+    );
 
     captureAnchorClicks();
 

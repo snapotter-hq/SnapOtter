@@ -2371,6 +2371,111 @@ describe("batch children and finalize", () => {
     expect((result.resultPayload as { canceled?: boolean }).canceled).toBe(true);
   });
 
+  it("fails a batch whose child output vanished as a missing file, not a storage write failure (#4664)", async () => {
+    const parentId = `bgone-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: parentId,
+      type: "batch",
+      status: "processing",
+      pool: "system",
+      inputRefs: [],
+      progress: { percent: 50, totalFiles: 1, completedFiles: 1, failedFiles: 0 } as JobProgress,
+    });
+    // The row names an output that was never stored (or was reclaimed).
+    await db.insert(schema.jobs).values({
+      id: `${parentId}-f0`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: [`uploads/${parentId}-f0/in0.png`],
+      outputRefs: [`outputs/${parentId}-f0/gone.png`],
+    });
+
+    await getQueue("system").add(
+      "batch-finalize",
+      toolJob({
+        jobId: parentId,
+        toolId: "wt-echo",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 1,
+        settings: { flowChildCount: 1 },
+        filename: "",
+      }),
+      { jobId: parentId, attempts: 1 },
+    );
+
+    const row = await terminalRow(parentId);
+    expect(row.status).toBe("failed");
+    const error = row.error as { message?: string; code?: string } | null;
+    expect(error?.code).toBe("batch-output-missing");
+    expect(error?.message).toBe(
+      "A processed file went missing before the batch could be packaged. Run the batch again.",
+    );
+    const failed = await failedQueueJob("system", parentId);
+    expect(failed?.failedReason).not.toMatch(/write to its storage/);
+  });
+
+  it("answers a re-run finalize from the stored ZIP after the first run reclaimed the children (#4664)", async () => {
+    const parentId = `bdup-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: parentId,
+      type: "batch",
+      status: "processing",
+      pool: "system",
+      inputRefs: [],
+      progress: { percent: 50, totalFiles: 1, completedFiles: 1, failedFiles: 0 } as JobProgress,
+    });
+    const childOutput = `outputs/${parentId}-f0/ok.png`;
+    await putObject(childOutput, Buffer.from("dup-bytes"));
+    await db.insert(schema.jobs).values({
+      id: `${parentId}-f0`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: [`uploads/${parentId}-f0/in0.png`],
+      outputRefs: [childOutput],
+    });
+    const finalize = toolJob({
+      jobId: parentId,
+      toolId: "wt-echo",
+      kind: "batch-finalize",
+      pool: "system",
+      totalFiles: 1,
+      settings: { flowChildCount: 1 },
+      filename: "",
+    });
+
+    await getQueue("system").add("batch-finalize", finalize, { jobId: parentId, attempts: 1 });
+    const first = await settledQueueJob("system", parentId);
+    expect(first.state).toBe("completed");
+    const committed = await terminalRow(parentId);
+    expect(committed.status).toBe("completed");
+    // The reclaim runs unawaited after the terminal write.
+    await waitFor(async () =>
+      (await getObjectSize(childOutput).catch(() => null)) === null ? true : undefined,
+    );
+
+    // A stall re-queue after a restart runs the same finalize again.
+    const rerunId = `${parentId}-rerun`;
+    await getQueue("system").add("batch-finalize", finalize, { jobId: rerunId, attempts: 1 });
+    const rerun = await settledQueueJob("system", rerunId);
+    expect(rerun.state).toBe("completed");
+    const firstZip = (first.returnvalue as { resultPayload?: { zip?: unknown } }).resultPayload
+      ?.zip;
+    expect(firstZip).toBeDefined();
+    expect((rerun.returnvalue as { resultPayload?: { zip?: unknown } }).resultPayload?.zip).toEqual(
+      firstZip,
+    );
+    const after = await jobRow(parentId);
+    expect(after?.status).toBe("completed");
+    expect(after?.outputRefs).toEqual(committed.outputRefs);
+    const zip = new AdmZip(await getObjectBuffer((after?.outputRefs ?? [])[0]));
+    expect(zip.getEntries().map((e) => e.entryName)).toEqual(["ok.png"]);
+  });
+
   it("rejects unknown jobs on the system pool and terminally fails them", async () => {
     const jobId = randomUUID();
 

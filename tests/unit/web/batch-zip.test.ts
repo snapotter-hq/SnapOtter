@@ -4,8 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The fflate chunk failing to load, as it can after a deploy. Every import of
 // it in this file fails; the hooks' tests cover the real unpack. fflate only
-// resolves from the web workspace, so the bare name would mock nothing.
-vi.mock("../../../apps/web/node_modules/fflate", () => {
+// resolves from the web workspace, so the bare name would mock nothing. The path
+// names the ESM entry the app loads; the package directory resolves to the CJS main.
+vi.mock("../../../apps/web/node_modules/fflate/esm/index.mjs", () => {
   throw new Error("chunk failed to load");
 });
 

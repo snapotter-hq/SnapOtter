@@ -9,6 +9,7 @@ import {
   type Section,
   TOOL_BUNDLE_MAP,
   TOOLS,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -52,6 +53,12 @@ export interface ToolProcessCtx {
   signal: AbortSignal;
   scratchDir: string;
   report: (percent: number, stage?: string) => void;
+  /**
+   * Ask for at least `ms` more before the job deadline fires, once the handler
+   * knows how much work its input needs. Never shortens the deadline, stops at
+   * a fixed ceiling, and does nothing when the job has none (#4719).
+   */
+  extendDeadline?: (ms: number) => void;
 }
 
 // ── V2 process contract (ref-based, multi-input) ──────────────
@@ -293,7 +300,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
     { config: { rateLimit: toolRateLimit } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = await requireToolAccess(request, reply, config.toolId);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       const jobId = randomUUID();
       const maxInputs = config.maxInputs ?? 1;
@@ -369,11 +376,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
       // Per-request scratch dir for input handlers that need temp files during
       // validation. MUST stay distinct from the worker's job scratch dir
-      // (worker.ts scratchRoot()/<jobId>): for "long" tools the factory returns
-      // 202 below and the `finally` rm's this dir immediately, which would race
-      // and delete the worker's input mid-job whenever SCRATCH_PATH is unset
-      // (both otherwise default to tmpdir()/snapotter-scratch/<jobId>). The
-      // "-prep" suffix keeps the two from colliding.
+      // (worker-tool-job.ts scratchRoot()/<jobId>-<attempt uuid>): for "long"
+      // tools the factory returns 202 below and the `finally` rm's this dir
+      // immediately, which would race and delete the worker's input mid-job if
+      // the two ever shared a path. The "-prep" suffix keeps them apart.
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
       try {
         await mkdir(scratchDir, { recursive: true });
@@ -550,8 +556,15 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         reportProgress(15, "Preparing...");
 
         // Parse and validate settings
-        if (settingsRaw && settingsRaw.length > 65536) {
-          return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
+        const settingsLimitKb = env.MAX_SETTINGS_PAYLOAD_KB;
+        if (
+          settingsRaw &&
+          settingsLimitKb > 0 &&
+          Buffer.byteLength(settingsRaw, "utf8") > settingsLimitKb * 1024
+        ) {
+          return reply
+            .status(400)
+            .send({ error: `Settings payload too large (max ${settingsLimitKb}KB)` });
         }
         let settings: T;
         try {
@@ -583,7 +596,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               return reply.status(err.statusCode).send(body);
             }
             if (isToolInputError(err)) {
-              return reply.status(400).send({ error: err.message });
+              const code = toolInputErrorCode(err);
+              return reply.status(400).send({ error: err.message, ...(code && { code }) });
             }
             throw err;
           }
@@ -756,6 +770,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
+                  toolId: config.toolId,
                   jobId,
                 });
                 return false;
@@ -778,6 +793,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                 source: "http",
                 route: request.routeOptions?.url,
                 method: request.method,
+                toolId: config.toolId,
                 jobId,
               });
               return null;

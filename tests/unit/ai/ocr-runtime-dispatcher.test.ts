@@ -814,7 +814,15 @@ describe("runOcrRuntime", () => {
       promise.finally(() => {
         settled = true;
       }),
-    ).rejects.toThrow(/Accurate OCR runtime timed out after \d+ms/);
+    ).rejects.toMatchObject({
+      // A slow host is operational, with a constant message (NODE-4Y).
+      kind: "operational",
+      code: "OCR_RUNTIME_TIMEOUT",
+      message: expect.stringMatching(/^Accurate OCR did not finish in time\./),
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/Accurate OCR runtime timed out after \d+ms/),
+      }),
+    });
 
     await vi.advanceTimersByTimeAsync(100);
     expect(child.kill).toHaveBeenNthCalledWith(1, "SIGTERM");
@@ -862,7 +870,10 @@ describe("runOcrRuntime", () => {
     monotonicNow.mockReturnValue(100);
     expect(candidate.kill).toHaveBeenCalledWith("SIGTERM");
     candidate.close(null, "SIGTERM");
-    await expect(request).rejects.toThrow("timed out after 40ms");
+    await expect(request).rejects.toMatchObject({
+      code: "OCR_RUNTIME_TIMEOUT",
+      cause: expect.objectContaining({ message: expect.stringContaining("timed out after 40ms") }),
+    });
 
     await vi.waitFor(() => expect(oldChild.stdinEnded).toHaveBeenCalledTimes(1));
     oldChild.close();

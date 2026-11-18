@@ -8577,6 +8577,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8586,6 +8589,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8647,12 +8651,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Zgodność środowiska uruchomieniowego OCR; pomijane w starszych pakietach
+                          description: Zgodność z hostem. OCR zawsze ją zgłasza. Starszy pakiet zgłasza incompatible tylko wtedy, gdy ten host nie może go uruchomić, a w przeciwnym razie pomija to pole.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Powód zgodności środowiska uruchomieniowego OCR; pomijany w starszych pakietach
+                          description: Dlaczego pakiet jest niezgodny, np. cpu-no-avx, gdy jego biblioteki x86-64 wymagają AVX, a ten procesor go nie ma. Pomijane dla zgodnych starszych pakietów.
                         selectedTarget:
                           type:
                             - string
@@ -8823,7 +8827,7 @@ paths:
       description: Zwraca najnowsze opublikowane wydanie, jeśli jest nowsze niż uruchomiona wersja, albo null. Wymaga uprawnienia settings:write.
       responses:
         '200':
-          description: Najnowsze wydanie albo null, gdy ta instancja jest aktualna
+          description: Nowsze wydanie lub null, gdy nie opublikowano nowszego wydania albo analityka jest wyłączona w tej instancji (wtedy nie jest wykonywane żadne zapytanie)
           content:
             application/json:
               schema:
@@ -8832,10 +8836,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Brak danych uwierzytelniających lub są nieprawidłowe
           content:
@@ -8957,6 +8975,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Pakietu wymaganego przez narzędzie nie można zainstalować na tym hoście: środowisko OCR nie jest obsługiwane albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED). Nic nie trafia do kolejki.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9043,7 +9067,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Pakiet jest już zainstalowany lub środowisko OCR nie jest obsługiwane na tym hoście
+          description: Pakiet jest już zainstalowany, środowisko OCR nie jest obsługiwane na tym hoście albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED, odrzucone przed jakimkolwiek pobieraniem)
           content:
             application/json:
               schema:
@@ -13337,7 +13361,7 @@ paths:
       tags:
         - PDF
       summary: Wielofunkcyjny PDF
-      description: Złóż plik PDF z jawnego planu stron — zmień kolejność, duplikuj, obracaj lub usuń strony i pobieraj strony z dodatkowych plików PDF w jednym przesłaniu.
+      description: Złóż plik PDF z jawnego planu stron, zmień kolejność, duplikuj, obracaj lub usuń strony i pobieraj strony z dodatkowych plików PDF w jednym przesłaniu.
       security:
         - bearerAuth: []
       requestBody:
@@ -23881,7 +23905,7 @@ paths:
         '403':
           description: Brak wystarczających uprawnień
         '409':
-          description: Blokada importu jest zajęta
+          description: Blokada importu jest zajęta albo pakiet wymaga AVX, a ten procesor go nie ma (kod FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Plik w imporcie przekracza 20 GiB. Ta trasa ma własne limity rozmiaru; `MAX_UPLOAD_SIZE_MB` się do niej nie stosuje.
         '507':
@@ -30782,13 +30806,13 @@ x-i18n:
       provenance: machine
       outputHash: 8e651d3ed8be
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: e4f3079281e4
+      outputHash: 249fff52370b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: a12fc3bf714e
+      outputHash: ad1084af7463
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30838,9 +30862,9 @@ x-i18n:
       provenance: machine
       outputHash: 23b4f8ba4dd6
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 565ff8b593da
+      outputHash: 2583d8497a05
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30881,6 +30905,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 0ec6e7d477f2
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 860a3ffbae61
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30914,9 +30942,9 @@ x-i18n:
       provenance: machine
       outputHash: 0e180c3c3ad1
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: bd873b18f09e
+      outputHash: bd8bc0e9bbcf
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36258,9 +36286,9 @@ x-i18n:
       provenance: machine
       outputHash: 344bae8f6c96
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: ee36d83d4a58
+      outputHash: 71f6cb3e7f82
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

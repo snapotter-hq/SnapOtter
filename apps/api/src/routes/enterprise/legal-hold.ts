@@ -19,7 +19,7 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
     "/api/v1/enterprise/legal-hold",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
       const user = await requirePermission("compliance:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("legal_hold");
@@ -81,7 +81,7 @@ export async function registerLegalHoldRoutes(app: FastifyInstance): Promise<voi
   // GET /api/v1/enterprise/legal-hold -- list current holds
   app.get("/api/v1/enterprise/legal-hold", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requirePermission("compliance:manage")(request, reply);
-    if (!user) return;
+    if (!user) return reply;
 
     // Enterprise feature gate
     const featureEnabled = await isEnterpriseFeatureEnabled("legal_hold");

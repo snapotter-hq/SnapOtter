@@ -21,13 +21,22 @@ import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.j
 import "../../../apps/api/src/routes/tools/transparency-fixer.js";
 
 const aiMocks = vi.hoisted(() => ({
+  gpuMayBeAvailable: vi.fn((_framework: string) => false),
   isMemoryAllocError: vi.fn(),
   removeBackground: vi.fn(),
 }));
 
 vi.mock("@snapotter/ai", () => ({
+  gpuMayBeAvailable: aiMocks.gpuMayBeAvailable,
+  isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: aiMocks.isMemoryAllocError,
   removeBackground: aiMocks.removeBackground,
+}));
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
 }));
 
 // Non-square on purpose, so a swapped width/height in a raw descriptor shows up.
@@ -170,6 +179,9 @@ beforeEach(() => {
 describe("transparency-fixer defringe", () => {
   it("keeps an opaque subject intact at the default setting", async () => {
     const { input, output } = await runDefringe({});
+
+    // The CPU memory gate asks the boot-safe GPU check, scoped to ONNX (#4746).
+    expect(aiMocks.gpuMayBeAvailable).toHaveBeenCalledWith("onnx");
 
     // Default defringe (30) blurs with radius 2 and trims corners at most.
     expectOnlyEdgeRingErased(input, output, 3);

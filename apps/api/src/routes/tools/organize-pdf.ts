@@ -1,8 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qpdfPagesSpec } from "@snapotter/doc-engine";
+import { qpdfPageCount, qpdfPagesSpec } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { assertPageSpecInRange } from "../../lib/page-spec.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const rangeField = z
@@ -28,6 +29,7 @@ export function registerOrganizePdf(app: FastifyInstance) {
       const inPath = join(ctx.scratchDir, `in-${input.filename.replace(/[^A-Za-z0-9._-]/g, "_")}`);
       await writeFile(inPath, input.buffer);
 
+      assertPageSpecInRange(settings.order, await qpdfPageCount(inPath, { signal: ctx.signal }));
       const outPath = join(ctx.scratchDir, `${base}_organized.pdf`);
       ctx.report(10, "Reordering pages");
       await qpdfPagesSpec(inPath, settings.order, outPath, { signal: ctx.signal });

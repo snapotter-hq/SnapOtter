@@ -21,6 +21,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -368,6 +369,8 @@ export function registerFavicon(app: FastifyInstance) {
       );
     } catch (err) {
       if (!reply.raw.headersSent) {
+        const tooLarge = imageSizeLimitError(err);
+        if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         request.log?.warn({ err, toolId: "favicon" }, "Favicon generation failed");
         return reply.status(422).send({
           error: "Favicon generation failed",

@@ -4,20 +4,10 @@ import { type ReactNode, useContext } from "react";
 import { UNSAFE_LocationContext, useParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
-import { BASE_PATH } from "@/lib/app-url";
+import { toolIdFromPathname } from "@/lib/tool-id-from-pathname";
 import { useFileStore } from "@/stores/file-store";
 
 const TOOL_IDS = new Set<string>(TOOLS.map((t) => t.id));
-const TOOL_IDS_BY_ROUTE = new Map<string, string>(TOOLS.map((t) => [t.route, t.id]));
-
-function toolIdFromPathname(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  const path = BASE_PATH && raw.startsWith(`${BASE_PATH}/`) ? raw.slice(BASE_PATH.length) : raw;
-  const normalized =
-    path.length > 1 && path.endsWith("/") ? path.slice(0, -1).toLowerCase() : path.toLowerCase();
-  return TOOL_IDS_BY_ROUTE.get(normalized);
-}
-
 function toolIdFromTestId(testId: string | undefined): string | undefined {
   if (!testId?.endsWith("-download")) return undefined;
   const candidate = testId.slice(0, -"-download".length);
@@ -87,9 +77,11 @@ export function ResultDownloadLink({
             typeof window !== "undefined" ? window.location?.pathname : undefined,
           ) ||
           toolIdFromTestId(testId);
-        if (resolvedToolId) {
-          track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: resolvedToolId });
-        }
+        // A download with no resolvable tool still counts; only the id is absent (#4216).
+        track(
+          ANALYTICS_EVENTS.RESULT_DOWNLOADED,
+          resolvedToolId ? { tool_id: resolvedToolId } : {},
+        );
         const store = useFileStore.getState();
         if (claimEntryId !== undefined) {
           store.markClaimedById(claimEntryId);

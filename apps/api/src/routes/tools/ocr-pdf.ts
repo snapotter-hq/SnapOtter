@@ -83,6 +83,7 @@ registerAiPathJobHandler("ocr-pdf", async (input, data, ctx) => {
       pages: settings.pages,
       enhance: settings.enhance ?? quality === "best",
       signal: ctx.signal,
+      onTimeBudget: ctx.extendDeadline,
     },
     (percent, stage) => ctx.report(percent, stage),
   );
@@ -121,7 +122,7 @@ export function registerOcrPdf(app: FastifyInstance) {
   app.post("/api/v1/tools/pdf/ocr-pdf", async (request: FastifyRequest, reply: FastifyReply) => {
     const toolId = "ocr-pdf";
     const authUser = await requireToolAccess(request, reply, toolId);
-    if (!authUser) return;
+    if (!authUser) return reply;
     const userId = authUser.id;
     const jobId = randomUUID();
     let filename = "document.pdf";

@@ -11,6 +11,7 @@ const reconcileStrandedJobsMock = vi.hoisted(() => vi.fn());
 const gdprExportJobMock = vi.hoisted(() => vi.fn());
 const evaluateAlertsMock = vi.hoisted(() => vi.fn());
 const loggerInfoMock = vi.hoisted(() => vi.fn());
+const loggerWarnMock = vi.hoisted(() => vi.fn());
 
 async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   vi.resetModules();
@@ -26,6 +27,7 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   gdprExportJobMock.mockReset();
   evaluateAlertsMock.mockReset();
   loggerInfoMock.mockReset();
+  loggerWarnMock.mockReset();
 
   vi.doMock("drizzle-orm", () => ({
     and: vi.fn((...conds: unknown[]) => ({ op: "and", conds })),
@@ -104,7 +106,7 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({
     logger: {
       info: loggerInfoMock,
-      warn: vi.fn(),
+      warn: loggerWarnMock,
       error: vi.fn(),
       debug: vi.fn(),
     },
@@ -227,6 +229,36 @@ describe("system jobs behavior", () => {
     await expect(runSystemJob({ name: "system:unknown" } as never)).rejects.toThrow(
       "Unknown system job: system:unknown",
     );
+  });
+
+  it("skips a scheduler tick for a system job this version doesn't know, warning once (#4655)", async () => {
+    const { runSystemJob } = await loadSystemJobs();
+    // What a rollback leaves behind: a newer version's scheduler still in Redis.
+    const tick = {
+      name: "system:from-a-newer-version",
+      repeatJobKey: "system:from-a-newer-version",
+    } as never;
+
+    await expect(runSystemJob(tick)).resolves.toEqual({ skipped: "unknown-system-job" });
+    await expect(runSystemJob(tick)).resolves.toEqual({ skipped: "unknown-system-job" });
+
+    expect(loggerWarnMock).toHaveBeenCalledTimes(1);
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { jobName: "system:from-a-newer-version" },
+      expect.stringContaining("newer version"),
+    );
+  });
+
+  it("still fails an unknown system job that no scheduler produced (#4655)", async () => {
+    const { runSystemJob } = await loadSystemJobs();
+    await expect(runSystemJob({ name: "system:unknown" } as never)).rejects.toThrow(
+      "Unknown system job: system:unknown",
+    );
+    // A misrouted tool job carries no system: prefix, scheduler key or not.
+    await expect(runSystemJob({ name: "resize", repeatJobKey: "resize" } as never)).rejects.toThrow(
+      "Unknown system job: resize",
+    );
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
   it("marks a GDPR export canceled rather than completed when gdprExportJob bails out (#1496)", async () => {

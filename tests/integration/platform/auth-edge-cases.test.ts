@@ -1,5 +1,5 @@
 /**
- * Auth route edge-case tests — login failures, session expiry,
+ * Auth route edge-case tests, login failures, session expiry,
  * password-change side effects, register validation.
  */
 

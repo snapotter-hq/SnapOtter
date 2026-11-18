@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(async () => {}),
   failBatchJob: vi.fn(async () => true),
   flowAdd: vi.fn(async () => {}),
+  flowParentStored: vi.fn(async (): Promise<boolean | null> => false),
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
   getToolConfig: vi.fn((_toolId?: string) => ({ settingsSchema: z.record(z.unknown()) })),
   insertValues: vi.fn((_row: Record<string, unknown>) => Promise.resolve()),
@@ -38,7 +39,10 @@ const mocks = vi.hoisted(() => ({
   requireToolAccess: vi.fn(async () => ({ id: "user-1" })),
   rm: vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}),
   spoolMultipartFile: vi.fn(),
-  storeValidatedOcrPdf: vi.fn<(...args: unknown[]) => Promise<number>>(async () => 42),
+  // No default implementation: vitest 4's mockReset() restores the vi.fn()
+  // implementation rather than clearing it, and the passthrough below routes
+  // to the real storeValidatedOcrPdf only when no implementation is set.
+  storeValidatedOcrPdf: vi.fn<(...args: unknown[]) => Promise<number>>(),
   updateJobProgress: vi.fn(),
   validateImageBuffer: vi.fn<
     (_buf: Buffer, _name: string) => Promise<{ valid: boolean; format: string }>
@@ -178,6 +182,7 @@ vi.mock("../../../apps/api/src/lib/auto-orient.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
+  flowParentStored: mocks.flowParentStored,
   getFlowProducer: () => ({ add: mocks.flowAdd }),
   injectTraceContext: vi.fn(),
   waitForJob: mocks.waitForJob,
@@ -658,6 +663,57 @@ describe("batch route spooled multipart ingress (#1239)", () => {
 
     expect(reply.statusCode).toBe(202);
     expect(events).toEqual(["read:0-scan.png", "rm:0-scan.png", "validate"]);
+  });
+
+  it("streams a spooled file over readFile's 2 GiB limit instead of failing ERR_FS_FILE_TOO_LARGE (#4660)", async () => {
+    const {
+      mkdtemp,
+      writeFile,
+      rm: rmReal,
+    } = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const dir = await mkdtemp(resolve(tmpdir(), "batch-large-"));
+    try {
+      // The bytes stay small; the spooled size is what decides the read path.
+      const spooled = resolve(dir, "0-big.mp4");
+      await writeFile(spooled, Buffer.from("large-video-bytes"));
+      mocks.spoolMultipartFile.mockImplementation(async () => ({
+        path: spooled,
+        filename: "big.mp4",
+        size: 3 * 1024 ** 3,
+      }));
+      mocks.readFile.mockImplementation(async () => {
+        throw Object.assign(new RangeError("File size (3221225472) is greater than 2 GiB"), {
+          code: "ERR_FS_FILE_TOO_LARGE",
+        });
+      });
+      const uploaded: string[] = [];
+      mocks.putObject.mockImplementation(async (_key: string, data: Buffer) => {
+        uploaded.push(data.toString());
+      });
+      const inputHandler = await import("../../../apps/api/src/modality/input-handler.js");
+      const prepareSpy = vi.spyOn(inputHandler, "inputHandlerFor").mockReturnValue({
+        prepare: vi.fn(async (buffer: Buffer, filename: string) => ({ buffer, filename })),
+      } as never);
+      try {
+        const reply = await invokeBatchRoute({
+          section: "video",
+          toolId: "webm-to-mp4",
+          parts: [
+            { type: "file", filename: "big.mp4", content: Buffer.from("x") },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ],
+        });
+
+        expect(reply.statusCode).toBe(202);
+        expect(mocks.readFile).not.toHaveBeenCalled();
+        expect(uploaded).toEqual(["large-video-bytes"]);
+      } finally {
+        prepareSpy.mockRestore();
+      }
+    } finally {
+      await rmReal(dir, { recursive: true, force: true });
+    }
   });
 
   it("removes empty spooled files without calling readFile and preserves slot alignment", async () => {
@@ -1416,6 +1472,90 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       ],
       message: "Queue service unavailable",
       code: "queue-unavailable",
+    });
+  });
+
+  // FlowProducer.add sends the whole tree as one MULTI, and a connection lost
+  // after Redis ran EXEC still rejects the call. The cleanup used to run
+  // anyway, deleting the inputs and child rows of jobs Redis had queued, so
+  // they failed later with "input no longer available" (#4714).
+  describe("a flow add that rejects after Redis may have stored the flow (#4714)", () => {
+    const lostReply = Object.assign(new Error("Command aborted due to connection close"), {
+      name: "AbortError",
+    });
+    const parts = (clientJobId: string) => [
+      { type: "file" as const, filename: "a.png", content: Buffer.from("valid-png") },
+      { type: "field" as const, fieldname: "settings", value: "{}" },
+      { type: "field" as const, fieldname: "clientJobId", value: clientJobId },
+    ];
+
+    it("carries on as enqueued when Redis has the parent job", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(true);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        log,
+        parts: parts("batch-4714-stored"),
+      });
+
+      expect(mocks.flowParentStored).toHaveBeenCalledWith("system", lastBatchParentId());
+      expect(reply.statusCode).toBe(202);
+      expect(reply.payload).toMatchObject({ jobId: "batch-4714-stored", async: true });
+      expect(mocks.waitForJob).toHaveBeenCalledWith("system", lastBatchParentId(), 30 * 60_000);
+      expect(mocks.deleteObject).not.toHaveBeenCalled();
+      expect(mocks.failBatchJob).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("Redis stored the flow"),
+      );
+    });
+
+    it("leaves rows and uploads to reconciliation and the TTL sweep when Redis can't be asked", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(null);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          log,
+          parts: parts("batch-4714-unknown"),
+        }),
+      ).rejects.toBe(lostReply);
+
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: lostReply, jobId: lastBatchParentId() }),
+        expect.stringContaining("leaving cleanup to reconciliation"),
+      );
+
+      expect(mocks.waitForJob).not.toHaveBeenCalled();
+      expect(mocks.deleteObject).not.toHaveBeenCalled();
+      expect(mocks.failBatchJob).not.toHaveBeenCalled();
+    });
+
+    it("still cleans up when Redis confirms the flow was never stored", async () => {
+      mocks.flowAdd.mockRejectedValueOnce(lostReply);
+      mocks.flowParentStored.mockResolvedValueOnce(false);
+
+      await expect(
+        invokeBatchRoute({ section: "image", toolId: "resize", parts: parts("batch-4714-absent") }),
+      ).rejects.toBe(lostReply);
+
+      const parentId = lastBatchParentId();
+      expect(mocks.deleteObject).toHaveBeenCalledWith(`uploads/${parentId}-f0/a.png`);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: parentId, message: "Internal server error" }),
+      );
+    });
+
+    it("never probes Redis when the add succeeds", async () => {
+      await invokeBatchRoute({ section: "image", toolId: "resize", parts: parts("batch-4714-ok") });
+
+      expect(mocks.flowParentStored).not.toHaveBeenCalled();
     });
   });
 

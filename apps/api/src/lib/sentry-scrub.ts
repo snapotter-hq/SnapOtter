@@ -24,6 +24,8 @@ const TAG_ALLOWLIST = new Set([
   "status_code",
   "input_format",
   "job_id",
+  // One of four fixed queue-age buckets (lt_10s ... gte_24h), set by reportError.
+  "job_age",
   "instance_id",
 ]);
 

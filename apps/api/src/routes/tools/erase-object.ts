@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { inpaint, isGpuAvailable } from "@snapotter/ai";
+import { gpuMayBeAvailable, inpaint } from "@snapotter/ai";
 import {
   FEATURE_BUNDLES,
   getBundleForTool,
@@ -229,7 +229,10 @@ export function registerEraseObject(app: FastifyInstance) {
         // inference; the alternative is an OOM-killed dispatcher ~40s in and a
         // "try a smaller image" hint that cannot help (#670).
         if (qualityMode === "hq") {
-          const refusal = hqCpuMemoryRefusal(isGpuAvailable("torch"), containerMemoryLimitBytes());
+          const refusal = hqCpuMemoryRefusal(
+            gpuMayBeAvailable("torch"),
+            containerMemoryLimitBytes(),
+          );
           if (refusal) {
             return reply
               .status(422)

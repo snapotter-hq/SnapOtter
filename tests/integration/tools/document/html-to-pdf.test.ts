@@ -103,7 +103,10 @@ describe.skipIf(!hasWeasyprint)("html-to-pdf (requires weasyprint)", () => {
       convertToPdf("lower.html", lowerPage),
       convertToPdf("upper.html", upperPage),
     ]);
-    const imageObjRe = /<<[^\n]*\/Subtype \/Image[\s\S]*?\nendobj/g;
+    // The worker's Producer scrub rewrites WeasyPrint's output with PyMuPDF
+    // when it's installed, and MuPDF writes "/Subtype/Image" where pydyf
+    // writes "/Subtype /Image", so the space has to be optional (#4737).
+    const imageObjRe = /<<[^\n]*\/Subtype\s*\/Image[\s\S]*?\nendobj/g;
     const lowerImages = lowerPdf.buffer.toString("latin1").match(imageObjRe);
     const upperImages = upperPdf.buffer.toString("latin1").match(imageObjRe);
     expect(lowerImages).not.toBeNull();

@@ -40,6 +40,7 @@ const hoisted = vi.hoisted(() => {
     spawnOptions: { stdio?: unknown[]; env?: Record<string, string | undefined> };
     stdout: ReturnType<typeof makeEmitter>;
     stderr: ReturnType<typeof makeEmitter>;
+    stdin: { writes: string[]; write: (s: string) => boolean; on: () => unknown };
     kill: ReturnType<typeof vi.fn>;
     on: (event: string, cb: (...a: unknown[]) => void) => unknown;
     emit: (event: string, ...args: unknown[]) => void;
@@ -57,6 +58,17 @@ const hoisted = vi.hoisted(() => {
       base.spawnOptions = options;
       base.stdout = makeEmitter();
       base.stderr = makeEmitter();
+      const writes: string[] = [];
+      base.stdin = {
+        writes,
+        write(s: string) {
+          writes.push(s);
+          return true;
+        },
+        on() {
+          return this;
+        },
+      };
       base.kill = vi.fn();
       spawnCalls.push(base);
       return base;
@@ -249,6 +261,7 @@ const { OcrRuntimeImportValidationError } = await import(
 );
 const { env } = await import("../../../apps/api/src/config.js");
 const { createMultipartPayload, loginAsAdmin } = await import("../test-server.js");
+const realVenvLock = await import("../../../packages/ai/src/venv-lock.js");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -409,11 +422,126 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     await waitFor(() => hoisted.spawnCalls.length === 1);
     expect(hoisted.spawnCalls[0].bundleId).toBe("transcription");
     expect(hoisted.spawnCalls[0].spawnOptions.stdio).toEqual([
-      "ignore",
+      "pipe",
       "pipe",
       "pipe",
       expect.any(Number),
     ]);
+  });
+
+  function emitInstallerLine(child: (typeof hoisted.spawnCalls)[number], frame: object) {
+    child.stderr.emit("data", Buffer.from(`${JSON.stringify(frame)}\n`));
+  }
+
+  it("holds the venv lock only while the installer writes the venv (#4201)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
+    const res = await postInstall("transcription");
+    expect(res.statusCode).toBe(202);
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    // The download and extract leave the venv alone, so jobs keep running.
+    emitInstallerLine(child, { progress: 40, stage: "Downloading... 1.0 GB" });
+    const jobDuringDownload = realVenvLock.tryAcquireVenvRead();
+    expect(jobDuringDownload).not.toBeNull();
+
+    // The installer reaches its first venv write while that job still runs.
+    emitInstallerLine(child, { venvLock: "acquire" });
+    await tick();
+    expect(child.stdin.writes).toEqual([]);
+    expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+    jobDuringDownload?.();
+    await waitFor(() => child.stdin.writes.length === 1);
+    expect(child.stdin.writes).toEqual(["granted\n"]);
+    expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+    child.emit("close", 0);
+    const jobAfterInstall = realVenvLock.tryAcquireVenvRead();
+    expect(jobAfterInstall).not.toBeNull();
+    jobAfterInstall?.();
+    expect(child.spawnOptions.env?.SNAPOTTER_VENV_LOCK_HANDSHAKE).toBe("1");
+  });
+
+  it("hands the venv lock back when the installer releases it early (#4201)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementation(realVenvLock.acquireVenvLock);
+    try {
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+
+      // A drifted venv gets its download client pip-installed under the lock.
+      emitInstallerLine(child, { venvLock: "acquire" });
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await waitFor(() => child.stdin.writes.length === 1);
+      await tick();
+      expect(child.stdin.writes).toEqual(["granted\n"]);
+      expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+      // The download that follows runs with jobs, then the merge locks again.
+      emitInstallerLine(child, { venvLock: "release" });
+      const jobDuringDownload = realVenvLock.tryAcquireVenvRead();
+      expect(jobDuringDownload).not.toBeNull();
+      jobDuringDownload?.();
+
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await waitFor(() => child.stdin.writes.length === 2);
+      expect(realVenvLock.tryAcquireVenvRead()).toBeNull();
+
+      child.emit("close", 0);
+      const jobAfterInstall = realVenvLock.tryAcquireVenvRead();
+      expect(jobAfterInstall).not.toBeNull();
+      jobAfterInstall?.();
+    } finally {
+      hoisted.acquireVenvLockMock.mockImplementation(async () => () => {});
+    }
+  });
+
+  it("frees the venv lock when the installer exits while it waits for it (#4201)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    const runningJob = realVenvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+    emitInstallerLine(child, { venvLock: "acquire" });
+    await tick();
+    child.emit("close", 1);
+
+    runningJob?.();
+    await tick();
+    expect(child.stdin.writes).toEqual([]);
+    const nextJob = realVenvLock.tryAcquireVenvRead();
+    expect(nextJob).not.toBeNull();
+    nextJob?.();
+  });
+
+  it("drops a dead installer's queued venv lock request before running jobs finish (#4608)", async () => {
+    hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    const runningJob = realVenvLock.tryAcquireVenvRead();
+    expect(runningJob).not.toBeNull();
+    emitInstallerLine(child, { venvLock: "acquire" });
+    await waitFor(() => realVenvLock.tryAcquireVenvRead() === null);
+    // The close handler runs synchronously inside emit, so its teardown is
+    // done by the next line.
+    child.emit("close", 1);
+
+    try {
+      // The running job still holds its read; a new job must not queue behind
+      // the dead installer's request.
+      const nextJob = realVenvLock.tryAcquireVenvRead();
+      expect(nextJob).not.toBeNull();
+      nextJob?.();
+    } finally {
+      runningJob?.();
+    }
+    await tick();
+    expect(child.stdin.writes).toEqual([]);
   });
 
   it("spawns the installer with an allowlisted env, not the API's secrets (#4311)", async () => {
@@ -475,6 +603,41 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     );
     expect(hoisted.spawnMock).not.toHaveBeenCalled();
     expect(hoisted.acquireVenvLockMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed OCR download-cache purge through the logger and still completes (#4176)", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const { purgeOcrRuntimeDownloads } = await import(
+      "../../../apps/api/src/lib/ocr-runtime-install.js"
+    );
+    const { db, schema } = await import("../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    const warnSpy = vi.spyOn(logger, "warn");
+    const consoleSpy = vi.spyOn(console, "warn");
+    const purgeError = new Error("download cache busy");
+    vi.mocked(purgeOcrRuntimeDownloads).mockRejectedValueOnce(purgeError);
+
+    try {
+      const res = await postInstall("ocr");
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          { err: purgeError, bundleId: "ocr", jobId },
+          "[ocr-runtime] Unable to purge verified download cache",
+        );
+      });
+      await waitFor(() => queue.getActiveBundleId() === null);
+      await vi.waitFor(async () => {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        expect(row?.status).toBe("completed");
+      });
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+      consoleSpy.mockRestore();
+    }
   });
 
   it("shares one monotonic deadline across OCR download and activation", async () => {
@@ -715,7 +878,10 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
 
     // (4) Check that the OCR install failure is reported
     expect(hoisted.reportErrorMock).toHaveBeenCalledTimes(1);
-    expect(hoisted.reportErrorMock.mock.calls[0][1]).toEqual({ source: "ai-install" });
+    expect(hoisted.reportErrorMock.mock.calls[0][1]).toEqual({
+      source: "ai-install",
+      subsystem: "ocr-runtime",
+    });
   });
 
   it("returns 500 when the offline OCR installer fails after validation", async () => {

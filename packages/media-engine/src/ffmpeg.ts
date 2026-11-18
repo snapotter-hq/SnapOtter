@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
-import { markToolInputError, SafeError, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  markToolInputError,
+  SafeError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 import { type FfmpegProgress, parseProgressBlock } from "./progress.js";
 
@@ -39,13 +45,21 @@ function storageFullError(message: string, stderr: string): NodeJS.ErrnoExceptio
   return Object.assign(new Error(message), { code: hit[1], syscall: "write" });
 }
 
+/** The code the web app translates an unreadable media input from (#4734). */
+const MEDIA_UNDECODABLE = "MEDIA_UNDECODABLE";
+
 /**
  * Applies the isToolInputError marker (see @snapotter/shared tool-errors.ts)
  * when the captured stderr matches a known input-failure shape.
  */
 export function markIfInputError<E extends Error>(err: E, stderr: string): E {
-  return INPUT_ERROR_PATTERNS.some((re) => re.test(stderr)) ? markToolInputError(err) : err;
+  return INPUT_ERROR_PATTERNS.some((re) => re.test(stderr))
+    ? markToolInputError(err, MEDIA_UNDECODABLE)
+    : err;
 }
+
+export const ENGINE_CRASHED_MESSAGE =
+  "The media engine (ffmpeg) crashed while processing this file.";
 
 function ffmpegSpawnFailure(
   bin: string,
@@ -147,6 +161,11 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       cleanup();
       if (code === 0) {
         resolvePromise(stderrTail);
+        return;
+      }
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(ENGINE_CRASHED_MESSAGE, "ffmpeg", crashSignal, stderrTail));
         return;
       }
       if (code === null || code === 126 || code === 127) {

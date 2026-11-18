@@ -6,6 +6,7 @@ import {
   isToolInputError,
   markToolInputError,
   SafeError,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Sharp } from "sharp";
@@ -17,6 +18,7 @@ import {
   DESCRIPTOR_ENVIRONMENT_MESSAGE,
   DISK_ENVIRONMENT_MESSAGE,
   PIXEL_LIMIT_IMAGE_MESSAGE,
+  PIXEL_LIMIT_RESULT_MESSAGE,
   UNDECODABLE_IMAGE_MESSAGE,
   withAiImageEncodeContext,
   withImageEncodeContext,
@@ -77,6 +79,12 @@ import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.
 import { registerVignette } from "../../../apps/api/src/routes/tools/vignette.js";
 import { registerWatermarkText } from "../../../apps/api/src/routes/tools/watermark-text.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/feature-status.js")>()),
@@ -163,6 +171,35 @@ describe("withImageEncodeContext", () => {
     );
     await expect(wrapped(input, settings, "in.png")).rejects.toBe(valErr);
   });
+
+  it.each([
+    "Input image exceeds pixel limit",
+    "Processed image is too large for the WebP format",
+    "Processed image is too large for the JPEG format",
+  ])(
+    "turns libvips' size cap (%s) on a canvas the settings built into a ToolInputError, not a bug (NODE-A9, #4404)",
+    async (reason) => {
+      const sharpErr = new Error(reason);
+      const wrapped = withImageEncodeContext(
+        "Image padding failed",
+        () => "blur",
+        async () => {
+          throw sharpErr;
+        },
+      );
+      let caught: unknown;
+      try {
+        await wrapped(input, settings, "in.png");
+      } catch (e) {
+        caught = e;
+      }
+      expect(isToolInputError(caught)).toBe(true);
+      expect(isSafeMessageError(caught)).toBe(false);
+      expect((caught as Error).message).toBe(PIXEL_LIMIT_RESULT_MESSAGE);
+      expect((caught as Error).cause).toBe(sharpErr);
+      expect(classifyError(caught, "worker")).toBe("expected");
+    },
+  );
 
   it("converts V8 buffer allocation RangeError, SIGKILL, libheif OOM, and thread creation failures into DecoderOutOfMemoryError instead of a bug-kind SafeError (#3789)", async () => {
     for (const rawOom of [
@@ -532,6 +569,8 @@ describe("asInputErrorIfUndecodable", () => {
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toBe(UNDECODABLE_IMAGE_MESSAGE);
     expect(err.cause).toBe(sharpErr);
+    // The web app translates the reason from the code (#4727).
+    expect(toolInputErrorCode(err)).toBe("IMAGE_UNDECODABLE");
   });
 
   it("logs the probe's libvips reason as a string, since pino serializes only the err key", async () => {

@@ -1,8 +1,8 @@
 ---
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 39c989a7fb79
+i18n_output_hash: d7039e8cda27
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ SnapOtter は **55 以上の入力フォーマット**と **14 の出力フォ�
 - **アップスケール**は、小さな画像を超えると CPU ではタイムアウトします。実用には GPU が必要です。
 - **CodeFormer** による顔補正は GFPGAN よりも大幅に遅くなります (GPU で 53 秒に対して 2 秒)。ほとんどの用途では GFPGAN を推奨します。
 
+### 複数レプリカでの AI バンドルのインストール {#ai-bundle-installs-with-several-replicas}
+
+AI バンドルを変更するときは、レプリカを 1 つだけ起動した状態にしてください。バンドルのインストール、オフラインでのインポート、AI 環境のリセットはいずれも、`/data/ai/venv` にある共有の Python 環境を書き換えます。インストールは自分のレプリカの AI ジョブの完了を待ち、これらの操作はいずれも終了後にそのレプリカのサイドカーを再起動しますが、他のレプリカの AI ジョブは見えません。他のレプリカのサイドカーは、そのディレクトリが書き換えられている間も torch と ONNX Runtime をそこから読み込んだままなので、ジョブの途中でクラッシュすることがあります。デプロイを 1 レプリカまでスケールダウンするか他のレプリカを停止し、変更を行ってから、元の数にスケールアップしてください。
+
 ## ボリューム {#volumes}
 
 | マウント / ボリューム | 用途 | 必須か |
 |---|---|---|
 | `/data` (app) | AI モデル、Python venv、ユーザーファイル | **はい**。ないとファイルが失われます |
-| `/tmp/workspace` (app) | 一時的な処理用ファイル (自動でクリーンアップされます) | 推奨 |
+| `/tmp/workspace` (app) | 一時的な処理用ファイルとジョブの出力 (自動でクリーンアップされます)。`/data` には保存されないため、このディレクトリをマウントしていないとコンテナの置き換え時に結果が失われます | 推奨 |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL のデータディレクトリ (ユーザー、設定、パイプライン、ジョブ) | **はい**。ないとデータが失われます |
 | `SnapOtter-redisdata` (redis) | 永続的なジョブキューのための Redis の append-only ファイル | 推奨 |
+
+### `docker run` でジョブの出力を保持する {#keeping-job-output}
+
+ジョブの結果は `/tmp/workspace` に置かれます。マウントしない限り、これはコンテナのファイルシステムの一部です。`-v SnapOtter-data:/data` だけを指定した場合、ユーザー、設定、ファイルは保持されますが、以前のジョブの結果はコンテナが置き換えられると失われ、ダウンロードリンクは 404 を返します。保持するには、ワークスペースもマウントします。
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose スタックでは、すでに `SnapOtter-workspace` がマウントされています。
 
 ### バインドマウントと名前付きボリュームの違い {#bind-mounts-vs-named-volumes}
 

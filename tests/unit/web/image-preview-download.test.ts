@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const revokeObjectURL = vi.fn();
 const createObjectURL = vi.fn((_obj: Blob | MediaSource) => "blob:preview-url");
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL,
-  revokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL,
+    revokeObjectURL,
+  }),
+);
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);

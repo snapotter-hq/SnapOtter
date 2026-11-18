@@ -105,6 +105,7 @@ export async function editMetadata(
       ) {
         throw new ToolInputError(
           "Cannot safely edit metadata because existing EXIF data is invalid",
+          { code: "METADATA_DAMAGED" },
         );
       }
       if (parsed.Image) {

@@ -150,7 +150,7 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", MockEventSource);
   vi.stubGlobal(
     "XMLHttpRequest",
-    vi.fn(() => {
+    vi.fn(function FakeXhr() {
       const xhr: MockXhr = {
         status: 0,
         responseText: "",

@@ -765,6 +765,43 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
   });
 });
 
+describe("media previews when ffmpeg crashes (#4683)", () => {
+  beforeEach(async () => {
+    await writeFile(join(testDir, "stored-audio.mp3"), "mp3-bytes");
+    fileRows.set("aud-1", {
+      id: "aud-1",
+      userId: "user-1",
+      originalName: "song.mp3",
+      storedName: "stored-audio.mp3",
+      mimeType: "audio/mpeg",
+    });
+  });
+
+  it("answers GET preview with a reported 500, not a 422 that reads as a bad upload", async () => {
+    const { SafeError } = await import("@snapotter/shared");
+    previewMocks.runFfmpeg.mockRejectedValue(
+      new SafeError("The media engine (ffmpeg) crashed while processing this file.", {
+        kind: "bug",
+        code: "ENGINE_CRASHED",
+        statusCode: 500,
+        cause: Object.assign(new Error("ffmpeg exited SIGSEGV"), { signal: "SIGSEGV" }),
+      }),
+    );
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    const app = Fastify();
+    await filePreviewRoutes(app);
+    await app.ready();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/aud-1/preview" });
+      expect(res.statusCode).toBe(500);
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 describe("media previews when ffmpeg is missing (#1576)", () => {
   const ENGINE_MSG =
     "Media processing is unavailable on this server because ffmpeg is not installed.";
@@ -996,6 +1033,53 @@ describe("preview encodes on a full disk (#4148)", () => {
       await expectReportedStorageFull();
       const { readdir } = await import("node:fs/promises");
       expect(await readdir(previewDir)).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each(["EACCES", "EPERM", "EROFS"])(
+    "answers GET preview for an office document with 503 storage-not-writable when LibreOffice can't create its output (%s), and reports it (#4529)",
+    async (code) => {
+      previewMocks.convertDocument.mockRejectedValue(
+        Object.assign(new Error("LibreOffice produced no pdf output for input.docx"), {
+          code,
+          syscall: "open",
+          path: "/data/files/.previews/doc-1-x",
+        }),
+      );
+      const app = await routeApp();
+      try {
+        const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toEqual({
+          error: NOT_WRITABLE_MSG,
+          code: "storage-not-writable",
+          requestId: expect.any(String),
+        });
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+        const [reported, ctx] = previewMocks.reportError.mock.calls[0];
+        expect(ctx).toMatchObject({ source: "http", statusCode: 503 });
+        expect(classifyError(reported, ctx.source)).toBe("operational");
+      } finally {
+        await app.close();
+      }
+    },
+  );
+
+  it("keeps a LibreOffice spawn EACCES a reported 500, not a storage fault", async () => {
+    previewMocks.convertDocument.mockRejectedValue(
+      Object.assign(new Error("spawn /usr/bin/soffice EACCES"), {
+        code: "EACCES",
+        syscall: "spawn /usr/bin/soffice",
+      }),
+    );
+    const app = await routeApp();
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toMatchObject({ error: "Could not generate document preview" });
     } finally {
       await app.close();
     }

@@ -5,6 +5,7 @@ import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
+import { gifCanvasRejection, readGifCanvasSize } from "./gif-limits.js";
 import { isSvgBuffer, SVG_SNIFF_BYTES } from "./svg-sanitize.js";
 
 /** Formats we accept as input. */
@@ -170,7 +171,7 @@ export interface ValidationError {
 /** Camera RAW extensions that share TIFF magic bytes. */
 const RAW_EXTENSIONS = new Set(CAMERA_RAW_INPUTS.map((ext) => ext.slice(1)));
 
-/** Formats that Sharp cannot decode natively — skip dimension check. */
+/** Formats that Sharp cannot decode natively; skip dimension check. */
 const CLI_DECODED_FORMATS = new Set([
   "raw",
   "ico",
@@ -241,6 +242,7 @@ export function validatedImageMime(validation: ValidationResult, filename?: stri
  * 2. Magic bytes match a known image format
  * 3. Format is in the supported input formats list
  * 4. Image dimensions do not exceed MAX_MEGAPIXELS
+ * 5. A GIF's canvas stays inside the GIF canvas caps (gif-limits.ts)
  *
  * @param buffer - The image file buffer
  * @param filename - Optional original filename, used for extension-based
@@ -255,7 +257,7 @@ export async function validateImageBuffer(
     return { valid: false, reason: "File is empty" };
   }
 
-  // Reject buffers that are entirely null bytes — they are not valid images
+  // Reject buffers that are entirely null bytes; they are not valid images
   // and would pass the length check but crash Sharp.
   if (isNullByteBuffer(buffer)) {
     return { valid: false, reason: "File contains no image data" };
@@ -268,7 +270,7 @@ export async function validateImageBuffer(
   let detectedFormat =
     detectMagicBytes(buffer) || (isSvgBuffer(buffer) ? "svg" : null) || detectHdrText(buffer);
 
-  // RAW formats share TIFF magic bytes — differentiate by extension
+  // RAW formats share TIFF magic bytes; differentiate by extension
   if (detectedFormat === "tiff" && ext && isRawExtension(ext)) {
     detectedFormat = "raw";
   }
@@ -337,7 +339,16 @@ export async function validateImageBuffer(
     }
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
-    const megapixels = (width * height) / 1_000_000;
+    let pixels = width * height;
+    // Pillow (the animated background-removal sidecar) sizes a GIF by its
+    // header, not by what sharp decodes, so limit whichever is larger.
+    const gifCanvas = detectedFormat === "gif" ? readGifCanvasSize(buffer) : null;
+    if (gifCanvas) {
+      const reason = gifCanvasRejection(gifCanvas, width, height);
+      if (reason) return { valid: false, reason };
+      pixels = Math.max(pixels, gifCanvas.width * gifCanvas.height);
+    }
+    const megapixels = pixels / 1_000_000;
 
     if (env.MAX_MEGAPIXELS > 0 && megapixels > env.MAX_MEGAPIXELS) {
       return {

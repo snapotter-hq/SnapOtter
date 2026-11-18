@@ -8537,6 +8537,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8546,6 +8549,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8606,12 +8610,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR 執行階段相容性；舊版套件省略此欄位
+                          description: 主機相容性。OCR 一律會回報此欄位。舊版功能套件只有在此主機無法執行時才回報 incompatible，否則會省略此欄位。
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR 執行階段相容性原因；舊版套件省略此欄位
+                          description: 功能套件不相容的原因，例如其 x86-64 程式庫需要 AVX 而此 CPU 不支援時為 cpu-no-avx。相容的舊版功能套件會省略此欄位。
                         selectedTarget:
                           type:
                             - string
@@ -8782,7 +8786,7 @@ paths:
       description: 當已發布的最新版本比目前執行的版本更新時回傳該版本，否則回傳 null。需要 settings:write 權限。
       responses:
         '200':
-          description: 最新版本；若此執行個體已是最新版本則為 null
+          description: 較新的版本；當沒有發布更新的版本，或此執行個體已關閉分析時為 null（此時不會進行查詢）
           content:
             application/json:
               schema:
@@ -8791,10 +8795,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: 缺少或無效的憑證
           content:
@@ -8916,6 +8934,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 工具所需的功能套件無法安裝在此主機上：不支援 OCR 執行環境，或功能套件需要 AVX 而此 CPU 不支援（代碼 FEATURE_CPU_UNSUPPORTED）。不會有任何項目加入佇列。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -8987,7 +9011,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: 套件已安裝，或此主機不支援 OCR 執行階段
+          description: 功能套件已安裝、此主機不支援 OCR 執行環境，或功能套件需要 AVX 而此 CPU 不支援（代碼 FEATURE_CPU_UNSUPPORTED，在任何下載前即拒絕）
           content:
             application/json:
               schema:
@@ -13264,7 +13288,7 @@ paths:
       tags:
         - PDF
       summary: PDF 多功能工具
-      description: 依明確的頁面計畫組裝 PDF——重新排序、複製、旋轉或刪除頁面，並在單次提交中從其他 PDF 拉入頁面。
+      description: 依明確的頁面計畫組裝 PDF，重新排序、複製、旋轉或刪除頁面，並在單次提交中從其他 PDF 拉入頁面。
       security:
         - bearerAuth: []
       requestBody:
@@ -23792,7 +23816,7 @@ paths:
         '403':
           description: 權限不足
         '409':
-          description: 匯入鎖定中
+          description: 匯入鎖定中，或功能套件需要 AVX 而此 CPU 不支援（代碼 FEATURE_CPU_UNSUPPORTED）
         '413':
           description: 匯入中的某個檔案超過 20 GiB。此路由有自己的大小限制；`MAX_UPLOAD_SIZE_MB` 不適用於此路由。
         '507':
@@ -30692,13 +30716,13 @@ x-i18n:
       provenance: machine
       outputHash: a58f5fa5ba12
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: a36970609206
+      outputHash: 1e501ff0d57c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 8f363f8df99b
+      outputHash: 350907bc9043
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30748,9 +30772,9 @@ x-i18n:
       provenance: machine
       outputHash: 9494ac6f9456
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: cfad880797d0
+      outputHash: 1107f24c3627
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30791,6 +30815,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 7c4a628752d7
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 462dfaea1482
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30824,9 +30852,9 @@ x-i18n:
       provenance: machine
       outputHash: 71fe03644399
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 4d12480b0fb8
+      outputHash: 4172253d4d3e
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36168,9 +36196,9 @@ x-i18n:
       provenance: machine
       outputHash: eb28a63446b9
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 46b59b253567
+      outputHash: 70192ae4ed24
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -44,6 +44,20 @@ _MODEL_LOAD_ERROR_MARKERS = (
 )
 
 
+def background_removal_import_message(detail):
+    """The error for a background-removal import failure, with the fix.
+
+    The dispatcher only runs this script once the bundle is recorded as
+    installed, so a failed import means the install is partial or broken, not
+    missing (NODE-4W). Reinstalling is the fix the user can act on.
+    """
+    return (
+        f"Background removal is installed but its libraries did not load ({detail}). "
+        "Reinstall Background Removal from Settings > AI Features, or use Reset AI "
+        "Environment if that does not help."
+    )
+
+
 def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
@@ -155,6 +169,49 @@ ALLOWED_MODELS = {
     "birefnet-matting",
     "birefnet-hr-matting",
 }
+
+# Free VRAM a model needs on CUDA, for the models that outgrow common cards.
+# HR matting takes a fixed 2048x2048 fp32 input. On a 12 GB RTX 4070 it fails
+# after filling about 11.6 GB whatever the provider options (arena strategy,
+# cuDNN search, workspace cap, graph optimization level), and one CPU-provider
+# run peaks at 21.5 GB RSS (#4744). 16 GiB is a floor from that evidence, not a
+# measured CUDA peak (#4747): a bigger card that still runs short gets a plain
+# allocation error, which the caller handles the same way.
+_MIN_FREE_VRAM_BYTES = {"birefnet-hr-matting": 16 * 1024**3}
+
+
+def _gpu_memory_shortfall(model, providers):
+    """(needed, free) bytes when `model` cannot fit in free VRAM, else None.
+
+    Evicts cached sessions first when that could make the difference, so a
+    session kept from an earlier request never forces a lighter model. VRAM
+    that can't be read returns None and the load is attempted as before.
+    """
+    needed = _MIN_FREE_VRAM_BYTES.get(model)
+    if not needed or "CUDAExecutionProvider" not in providers:
+        return None
+    from session_cache import device_vram_bytes, evict_all
+
+    total, free = device_vram_bytes()
+    if total <= 0 or free >= needed:
+        return None
+    if total < needed:
+        return needed, free
+    if evict_all(f"making room for {model}"):
+        total, free = device_vram_bytes()
+        if total <= 0 or free >= needed:
+            return None
+    return needed, free
+
+
+def _gpu_memory_shortfall_message(model, needed, free):
+    # "out of memory" is what the API's isMemoryAllocError keys its lighter-model
+    # retry on, and nothing here matches the dispatcher's CUDA-poison check.
+    return (
+        f"GPU out of memory: {model} needs about {needed / 1024**3:.0f} GB of free VRAM "
+        f"and {free / 1024**3:.1f} GB is available"
+    )
+
 
 _matting_registered = False
 
@@ -287,6 +344,12 @@ def main():
 
         providers, device = onnx_providers()
         model_path = os.path.join(model_home, f"{model}.onnx")
+        shortfall = _gpu_memory_shortfall(model, providers)
+        if shortfall is not None:
+            from gpu import emit_info
+            message = _gpu_memory_shortfall_message(model, *shortfall)
+            emit_info(f"[remove-bg] {message}; not loading it so the caller can pick a lighter model")
+            raise RuntimeError(message)
         try:
             session = get_session(
                 model,
@@ -406,7 +469,7 @@ def main():
         result = json.dumps(
             {
                 "success": False,
-                "error": f"rembg import failed: {detail}",
+                "error": background_removal_import_message(detail),
             }
         )
     except Exception as e:

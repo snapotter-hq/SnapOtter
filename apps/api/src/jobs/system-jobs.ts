@@ -294,10 +294,41 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
       return evaluateAlerts();
     }
     default:
+      if (isForeignSchedulerTick(job)) return skipForeignSchedulerTick(job.name);
       // batch-finalize runs on the system pool too but is routed by the
       // worker before calling runSystemJob. Anything else is a bug.
       throw new Error(`Unknown system job: ${job.name}`);
   }
+}
+
+const warnedForeignSchedulers = new Set<string>();
+
+/**
+ * A job scheduler outlives the process that registered it, so after a rollback
+ * (or with two versions on one Redis) this worker gets ticks for a system job
+ * it doesn't know. That is the deployment's state, not a bug, and failing every
+ * tick floods Sentry (NODE-AX, #4655). The scheduler is left alone: in a
+ * rolling update the newer instance still owns it, though any tick this worker
+ * picks up during the overlap is skipped rather than run.
+ */
+function isForeignSchedulerTick(job: Job): boolean {
+  return (
+    typeof job.repeatJobKey === "string" &&
+    job.name.startsWith("system:") &&
+    // A name of ours that reached the default branch is a missing case: a bug.
+    !(Object.values(SYSTEM_JOBS) as string[]).includes(job.name)
+  );
+}
+
+function skipForeignSchedulerTick(name: string): { skipped: "unknown-system-job" } {
+  if (!warnedForeignSchedulers.has(name)) {
+    warnedForeignSchedulers.add(name);
+    logger.warn(
+      { jobName: name },
+      "Skipping a scheduled system job this version doesn't know. A newer version probably registered it and is still in Redis (rollback, or two versions sharing one Redis). Ticks are skipped until that version runs again or the scheduler is removed.",
+    );
+  }
+  return { skipped: "unknown-system-job" };
 }
 
 // -- Storage TTL sweep --------------------------------------------------------

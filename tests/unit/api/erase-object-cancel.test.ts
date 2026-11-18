@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   getObjectBuffer: vi.fn(),
   inpaint: vi.fn(),
   insertToolJobAlias: vi.fn(),
-  isGpuAvailable: vi.fn<(framework?: string) => boolean>(() => false),
+  gpuMayBeAvailable: vi.fn<(framework?: string) => boolean>(() => false),
   isStorageServiceFault: vi.fn<(_err: unknown) => boolean>(() => false),
   isToolInstalled: vi.fn(),
   putObject: vi.fn(),
@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@snapotter/ai", () => ({
   inpaint: mocks.inpaint,
-  isGpuAvailable: mocks.isGpuAvailable,
+  gpuMayBeAvailable: mocks.gpuMayBeAvailable,
 }));
 
 vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
@@ -94,7 +94,7 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.containerMemoryLimitBytes.mockReturnValue(null);
-  mocks.isGpuAvailable.mockImplementation(() => false);
+  mocks.gpuMayBeAvailable.mockImplementation(() => false);
   mocks.isStorageServiceFault.mockReturnValue(false);
   mocks.isToolInstalled.mockReturnValue(true);
   mocks.getObjectBuffer.mockResolvedValue(MASK);
@@ -364,7 +364,7 @@ describe("erase-object route disconnect handling (#2238)", () => {
     expect(mocks.requestCancel).toHaveBeenCalledWith(enqueuedJobId);
   });
 
-  it("queries isGpuAvailable('torch') before hqCpuMemoryRefusal so an ONNX-only GPU does not bypass the 8 GB CPU container floor (issue #2576)", async () => {
+  it("queries gpuMayBeAvailable('torch') before hqCpuMemoryRefusal so an ONNX-only GPU does not bypass the 8 GB CPU container floor (issue #2576)", async () => {
     mocks.getObjectBuffer.mockResolvedValue(PNG);
     mocks.receiveUpload
       .mockResolvedValueOnce({
@@ -377,8 +377,8 @@ describe("erase-object route disconnect handling (#2238)", () => {
         filename: "mask.png",
         size: PNG.length,
       });
-    // Simulate ONNX-only GPU: unscoped isGpuAvailable() returns true, but isGpuAvailable("torch") returns false.
-    mocks.isGpuAvailable.mockImplementation((framework?: string) => framework !== "torch");
+    // Simulate ONNX-only GPU: only the torch-scoped answer is false.
+    mocks.gpuMayBeAvailable.mockImplementation((framework?: string) => framework !== "torch");
     mocks.containerMemoryLimitBytes.mockReturnValue(6 * 1024 ** 3);
 
     const request = {
@@ -407,7 +407,7 @@ describe("erase-object route disconnect handling (#2238)", () => {
 
     await routeHandler?.(request, reply);
 
-    expect(mocks.isGpuAvailable).toHaveBeenCalledWith("torch");
+    expect(mocks.gpuMayBeAvailable).toHaveBeenCalledWith("torch");
     expect(reply.statusCode).toBe(422);
     expect(reply.payload).toMatchObject({
       error: "Not enough memory for HQ mode",

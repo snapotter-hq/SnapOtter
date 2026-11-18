@@ -14,6 +14,12 @@ TMP=/data/postgres.bootstrapping   # same filesystem as PGDATA so the mv is atom
 # Clean any interrupted previous bootstrap.
 rm -rf "$TMP"
 
+# A tmpfs on /run, the usual companion of a read-only root, hides the socket
+# directory the postgresql package ships, and nothing else recreates it. So
+# make it on every boot, with the owner and mode from the package's own
+# tmpfiles.d entry, before the existing-data-dir branch below exits early.
+install -d -o postgres -g postgres -m 2775 /run/postgresql
+
 if [ -f "$PGDATA/PG_VERSION" ]; then
   check_pg_version "$PGDATA" "$INSTALLED_MAJOR" || exit 1
   echo "Embedded Postgres: existing data dir OK (major $INSTALLED_MAJOR)."

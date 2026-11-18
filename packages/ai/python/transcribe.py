@@ -12,6 +12,45 @@ MODELS_PATH = os.environ.get(
 )
 
 
+# Most to least preferred. Pascal and older GPUs report CUDA but cannot run
+# float16 efficiently, and CTranslate2 refuses float16 there outright (NODE-49).
+CUDA_COMPUTE_PREFERENCE = ("float16", "int8_float16", "int8_float32", "int8", "float32")
+CPU_COMPUTE_PREFERENCE = ("int8", "int8_float32", "float32")
+
+
+def pick_compute_type(device, supported):
+    """The preferred compute type the device supports, or None when none match.
+
+    `supported` is what ctranslate2.get_supported_compute_types(device) returned.
+    """
+    preference = CUDA_COMPUTE_PREFERENCE if device == "cuda" else CPU_COMPUTE_PREFERENCE
+    available = set(supported or ())
+    for compute_type in preference:
+        if compute_type in available:
+            return compute_type
+    return None
+
+
+def select_device_and_compute_type(ct2, cuda_available):
+    """Pick (device, compute_type) for faster-whisper from what CTranslate2 reports.
+
+    A GPU that supports none of the CUDA types falls back to the CPU instead of
+    failing the job. "default" lets CTranslate2 choose when the probe itself fails.
+    """
+    if cuda_available:
+        try:
+            compute_type = pick_compute_type("cuda", ct2.get_supported_compute_types("cuda"))
+        except Exception:
+            compute_type = None
+        if compute_type:
+            return "cuda", compute_type
+    try:
+        compute_type = pick_compute_type("cpu", ct2.get_supported_compute_types("cpu"))
+    except Exception:
+        compute_type = None
+    return "cpu", compute_type or "default"
+
+
 def emit_progress(percent, stage):
     """Emit structured progress to stderr for bridge.ts to capture."""
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
@@ -42,10 +81,10 @@ def main():
         if not os.path.isdir(model_dir):
             ensure_download_allowed("Whisper transcription model (faster-whisper-small)")
 
-        if ctranslate2_gpu_available():
-            device, compute_type = "cuda", "float16"
-        else:
-            device, compute_type = "cpu", "int8"
+        import ctranslate2
+        device, compute_type = select_device_and_compute_type(
+            ctranslate2, ctranslate2_gpu_available()
+        )
 
         model = WhisperModel(
             model_dir,

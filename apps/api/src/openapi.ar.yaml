@@ -8579,6 +8579,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8588,6 +8591,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8649,12 +8653,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: توافق بيئة تشغيل OCR؛ يُحذف للحزم القديمة
+                          description: توافق المضيف. يُبلغ OCR عنه دائمًا. تُبلغ الحزمة القديمة عن incompatible فقط عندما يتعذر على هذا المضيف تشغيلها، وتحذف الحقل في غير ذلك.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: سبب توافق بيئة تشغيل OCR؛ يُحذف للحزم القديمة
+                          description: سبب عدم توافق الحزمة، مثل cpu-no-avx عندما تحتاج مكتبات x86-64 الخاصة بها إلى AVX ولا يدعمه هذا المعالج. يُحذف للحزم القديمة المتوافقة.
                         selectedTarget:
                           type:
                             - string
@@ -8825,7 +8829,7 @@ paths:
       description: يُرجع أحدث إصدار منشور عندما يكون أحدث من الإصدار المشغَّل، أو null. يتطلب settings:write.
       responses:
         '200':
-          description: أحدث إصدار، أو null إذا كان هذا المثيل محدّثًا
+          description: الإصدار الأحدث، أو null عندما لا يوجد إصدار أحدث منشور أو عندما تكون التحليلات معطلة على هذه النسخة (لا يتم أي استعلام حينها)
           content:
             application/json:
               schema:
@@ -8834,10 +8838,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: بيانات اعتماد مفقودة أو غير صالحة
           content:
@@ -8959,6 +8977,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'لا يمكن تثبيت حزمة تحتاجها الأداة على هذا المضيف: بيئة تشغيل OCR غير مدعومة، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED). لا يُضاف شيء إلى قائمة الانتظار.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9045,7 +9069,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: الحزمة مثبتة بالفعل أو بيئة تشغيل OCR غير مدعومة على هذا المضيف
+          description: الحزمة مثبتة بالفعل، أو بيئة تشغيل OCR غير مدعومة على هذا المضيف، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED، يُرفض قبل أي تنزيل)
           content:
             application/json:
               schema:
@@ -23883,7 +23907,7 @@ paths:
         '403':
           description: صلاحيات غير كافية
         '409':
-          description: قفل الاستيراد مُستخدَم حاليًا
+          description: قفل الاستيراد مُستخدَم حاليًا، أو تحتاج الحزمة إلى AVX ولا يدعمه هذا المعالج (الرمز FEATURE_CPU_UNSUPPORTED)
         '413':
           description: ملف في الاستيراد يتجاوز 20 GiB. لهذا المسار حدود حجم خاصة به، ولا تنطبق عليه `MAX_UPLOAD_SIZE_MB`.
         '507':
@@ -30784,13 +30808,13 @@ x-i18n:
       provenance: machine
       outputHash: f58e4ceca712
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 75c08f8e8188
+      outputHash: 44d1069bcc37
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: abc378ca3739
+      outputHash: f3fe431b2839
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30840,9 +30864,9 @@ x-i18n:
       provenance: machine
       outputHash: 4af06428d3ee
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: e42c7ff7bae4
+      outputHash: c10e569cf865
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30883,6 +30907,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 15d8033c1725
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 7ac2cd903f5f
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30916,9 +30944,9 @@ x-i18n:
       provenance: machine
       outputHash: 7ac2edaaf370
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 5a6f9b7c61ca
+      outputHash: 0866e437bc2a
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36260,9 +36288,9 @@ x-i18n:
       provenance: machine
       outputHash: 37a286c579fa
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: b7183d214004
+      outputHash: 190e20ee431f
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

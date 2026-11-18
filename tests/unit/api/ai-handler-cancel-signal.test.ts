@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   detectFaceLandmarks: vi.fn(),
   detectFaces: vi.fn(),
   enhanceFaces: vi.fn(),
+  gpuMayBeAvailable: vi.fn(() => false),
+  isGpuAvailable: vi.fn(() => false),
   isMemoryAllocError: vi.fn(),
   noiseRemoval: vi.fn(),
   outpaint: vi.fn(),
@@ -18,6 +20,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@snapotter/ai", () => mocks);
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  // Host memory is not what these tests exercise; the gate has its own tests.
+  availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/feature-status.js")>()),

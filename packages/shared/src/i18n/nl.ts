@@ -4142,6 +4142,8 @@ export const nl: TranslationKeys = {
     previewFailed: "Voorbeeld genereren mislukt",
     previewEncoderMissing:
       "De ffmpeg van deze server mist de encoder {encoder}, dus het voorbeeld kan niet worden gemaakt. Neem contact op met je beheerder.",
+    previewEngineUnavailable:
+      "ffmpeg is niet geïnstalleerd op deze server, dus het voorbeeld kan niet worden gemaakt. Vraag je beheerder om ffmpeg te installeren of FFMPEG_PATH in te stellen.",
     previewProgressMessages: [
       "De otter warmt op...",
       "Pixels worden vermalen...",
@@ -5220,6 +5222,7 @@ export const nl: TranslationKeys = {
       disabledCount: "{count} tool(s) uitgeschakeld",
       disabledCountOne: "{count} tool uitgeschakeld",
       disabledCountOther: "{count} tools uitgeschakeld",
+      offWithBase: "Uitgeschakeld omdat {base} is uitgeschakeld.",
     },
     experimental: {
       label: "Experimentele tools inschakelen",
@@ -5676,6 +5679,8 @@ export const nl: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "De browser die dit hulpprogramma nodig heeft is nu niet beschikbaar.",
       DEPENDENCY_VALIDATION_FAILED:
         "Deze instelling hangt af van een andere instelling die niet geldig is.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Deze functie heeft een processor met AVX-ondersteuning nodig, en de processor van deze server heeft dat niet.",
       FEATURE_INCOMPATIBLE: "Deze functie kan niet draaien met de huidige instellingen.",
       FST_REQ_FILE_TOO_LARGE: "Dit bestand is te groot om te uploaden.",
       IDLE_TIMEOUT: "Je bent afgemeld wegens inactiviteit. Log opnieuw in.",
@@ -5725,6 +5730,42 @@ export const nl: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Het resultaat kan de doelgrootte niet halen.",
       TOO_MANY_FRAMES: "Dit bestand heeft te veel frames om te verwerken.",
       CANCELED: "De bewerking is geannuleerd.",
+      PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
+      INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Je kunt niet alle pagina's verwijderen. Houd er minstens één over.",
+      NESTING_TOO_DEEP: "Dit bestand is te diep genest om te converteren.",
+      DOCUMENT_UNREADABLE:
+        "Dit document kon niet worden geopend. Het is mogelijk beschadigd, met een wachtwoord beveiligd of niet het formaat dat de extensie aangeeft.",
+      PDF_DAMAGED:
+        "Deze PDF is beschadigd. Haal hem door de tool PDF repareren en probeer het opnieuw.",
+      PDF_PASSWORD_PROTECTED:
+        "Deze PDF is met een wachtwoord beveiligd. Ontgrendel hem met de tool PDF ontgrendelen en probeer het opnieuw.",
+      IMAGE_TOO_LARGE:
+        "Deze afbeelding is te groot om te verwerken. Verklein de afmetingen en probeer het opnieuw.",
+      RESULT_TOO_LARGE:
+        "Het resultaat van deze instellingen zou te groot worden. Gebruik een kleinere afbeelding of instellingen die een kleiner resultaat geven.",
+      NO_AUDIO_TRACK:
+        "Dit bestand heeft geen audiospoor. Kies een bestand met audio en probeer het opnieuw.",
+      IMAGE_UNDECODABLE:
+        "Deze afbeelding kan niet worden gelezen. Het bestand is mogelijk beschadigd of gebruikt een codering die deze tool niet ondersteunt.",
+      INVALID_SETTINGS:
+        "Deze instellingen werken niet met dit bestand. Controleer de waarden en probeer het opnieuw.",
+      CHART_DATA_INVALID:
+        "Grafiekmaker kon geen grafiekgegevens uit dit bestand lezen. Gebruik CSV of JSON met maximaal 100 rijen, elk met een label en een getal van nul of meer.",
+      NO_FACE_DETECTED:
+        "Er is geen gezicht gevonden. Upload een scherpe foto van voren met goede belichting.",
+      TARGET_SIZE_UNREACHABLE:
+        "Dit bestand kan niet klein genoeg worden gemaakt voor de doelgrootte. Probeer een groter doel.",
+      TOO_MANY_PAGES:
+        "Deze pdf heeft te veel pagina's om in één keer te verwerken. Kies minder pagina's en probeer het opnieuw.",
+      METADATA_DAMAGED:
+        "De bestaande metadata van deze afbeelding zijn beschadigd, dus ze kunnen niet veilig worden bewerkt.",
+      REMOTE_RESOURCES_DISABLED:
+        "Dit bestand laadt afbeeldingen of stijlen van internet, wat deze server niet toestaat. Sluit ze in het bestand in en probeer het opnieuw.",
+      TOO_MANY_PIXELS:
+        "Deze animatie heeft over al haar frames te veel pixels. Gebruik minder frames of een kleiner formaat.",
+      MEDIA_UNDECODABLE:
+        "Dit bestand kan niet worden gelezen. Het is mogelijk beschadigd, heeft geen audio- of videostream of gebruikt een formaat dat deze tool niet ondersteunt.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",
@@ -5796,6 +5837,7 @@ export const nl: TranslationKeys = {
     grid: "Raster",
     automate: "Automatiseren",
     editor: "Editor",
+    editorBadge: "Bèta",
     files: "Bestanden",
     help: "Help",
     settings: "Instellingen",

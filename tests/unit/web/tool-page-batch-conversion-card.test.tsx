@@ -49,11 +49,13 @@ function renderToolPage(path: string) {
 beforeEach(() => {
   storageMap.clear();
   vi.stubGlobal("localStorage", localStorageMock);
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:original-input",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:original-input",
+      revokeObjectURL: () => {},
+    }),
+  );
   vi.stubGlobal(
     "fetch",
     vi.fn(() =>

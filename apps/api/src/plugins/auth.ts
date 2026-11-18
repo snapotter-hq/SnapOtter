@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  type AuthLoginFailureReason,
   isPasswordRuleEnabled,
   PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
@@ -23,6 +24,7 @@ import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
+import { isHealthProbe } from "../lib/health-probe.js";
 import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
 import { logger } from "../lib/logger.js";
 import {
@@ -641,6 +643,11 @@ async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
 
 // ── Auth routes ────────────────────────────────────────────────────
 
+/** One place to emit a password login failure, so every path forwards a bounded reason (#4216). */
+function trackPasswordFailure(reason: AuthLoginFailureReason): void {
+  void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password", reason });
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/auth/login
   app.post(
@@ -664,6 +671,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           const rawBody = request.body as Record<string, unknown> | null;
           const rawUsername = typeof rawBody?.username === "string" ? rawBody.username : "";
 
+          trackPasswordFailure("other");
           await audit("LOGIN_FAILED", {
             username: sanitizeAuditInput(rawUsername),
             reason: "password_too_long",
@@ -702,6 +710,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const throttleConfig = await getLoginThrottleConfig();
       const throttle = await checkLoginThrottle(redis, body.username, throttleConfig);
       if (throttle.throttled) {
+        trackPasswordFailure("rate_limited");
         reply.header("Retry-After", String(throttle.retryAfterS));
         return reply.status(429).send({
           error: "Too many failed login attempts. Try again later.",
@@ -741,7 +750,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // response timing doesn't reveal whether the username exists.
         await verifyUserPassword(body.password, DUMMY_HASH);
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure(
+          ssoRefused
+            ? "sso_enforced"
+            : user && isDisabledRole(user.role)
+              ? "disabled"
+              : "bad_credentials",
+        );
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           ...(ssoRefused && user && { userId: user.id }),
@@ -761,7 +776,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const { valid, legacy } = await verifyUserPassword(body.password, user.passwordHash);
       if (!valid) {
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure(isDisabledRole(user.role) ? "disabled" : "bad_credentials");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: isDisabledRole(user.role) ? "disabled_user" : "bad_password",
@@ -781,6 +796,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // disabled account record throttle failures via the 401 path above.
       if (isDisabledRole(user.role)) {
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("disabled");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "disabled_user",
@@ -874,6 +890,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           return reply.status(200).send({ requiresMfaEnrollment: true, ...enrollment });
         }
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("mfa");
         await audit("LOGIN_FAILED", {
           userId: user.id,
           username: user.username,
@@ -893,7 +910,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // ones were challenged above); the distinct retryable code beats
         // minting a policy-exempt session off a transient settings fault.
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure("policy_unavailable");
         await audit("LOGIN_FAILED", {
           userId: user.id,
           username: user.username,
@@ -969,6 +986,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (inserted.status === "user_disabled") {
         authAttempts.inc({ method: "password", result: "failure" });
+        trackPasswordFailure("disabled");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason: "disabled_user",
@@ -978,7 +996,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (inserted.status !== "ok") {
         authAttempts.inc({ method: "password", result: "failure" });
-        void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
+        trackPasswordFailure("other");
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason:
@@ -1189,7 +1207,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       const parsed = changePasswordSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1294,7 +1312,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/auth/users (admin only)
   app.get("/api/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("users:manage")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const users = await db
       .select({
@@ -1338,7 +1356,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const parsed = registerSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1548,13 +1566,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // PUT /api/auth/users/:id (admin only — update role/team)
+  // PUT /api/auth/users/:id (admin only; updates role/team)
   app.put(
     "/api/auth/users/:id",
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
       if (isAnonymousUserId(id)) {
@@ -1789,7 +1807,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
       if (isAnonymousUserId(id)) {
@@ -1913,7 +1931,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: AUTH_BODY_LIMIT_BYTES },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const admin = await requirePermission("users:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { id } = request.params;
 
@@ -2097,9 +2115,9 @@ export const PUBLIC_PATHS = [
 ];
 
 export function isPublicRoute(url: string): boolean {
-  // Non-API routes are public (SPA static files — auth is handled client-side)
+  // Non-API routes are public (SPA static files; auth is handled client-side)
   if (!url.startsWith("/api/")) return true;
-  // Download URLs use unguessable UUIDs as capability tokens — no auth needed
+  // Download URLs use unguessable UUIDs as capability tokens; no auth needed
   return PUBLIC_PATHS.some((path) => url.startsWith(path));
 }
 
@@ -2126,10 +2144,20 @@ async function shouldAuditApiKeyAuthFailure(prefix: string, ip: string): Promise
 }
 
 export async function authMiddleware(app: FastifyInstance): Promise<void> {
-  app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
+  // preParsing is the last hook before Fastify reads the body. A preHandler
+  // let an anonymous caller make any protected JSON route buffer and parse up
+  // to the upload-sized bodyLimit before the 401 (#4543). onRequest would be
+  // too early: @fastify/rate-limit adds its check as a route-level onRequest
+  // hook, which runs after every instance-level one, so anonymous 401s would
+  // never be counted. Cookies are parsed by now (@fastify/cookie, onRequest).
+  // Returning undefined keeps the payload stream; `return reply` stops the chain.
+  app.addHook("preParsing", async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip the session DB lookup for bundle assets: they are served on every
     // page load and an unreachable DB must not 500 them (Sentry NODE-1D).
     if (isStaticAssetRequest(request.method, request.url)) return;
+    // The health probe needs no identity; a session lookup here would 500 it
+    // whenever Postgres is down instead of letting it answer 503 (#4652).
+    if (isHealthProbe(request)) return;
 
     if (!env.AUTH_ENABLED) {
       (request as FastifyRequest & { user?: AuthUser }).user = {

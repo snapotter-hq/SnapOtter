@@ -1,7 +1,7 @@
 /**
  * Integration tests for the Teams API routes.
  *
- * Uses the same test server infrastructure as api.test.ts — a real Fastify
+ * Uses the same test server infrastructure as api.test.ts, a real Fastify
  * app backed by an isolated temp SQLite DB, exercised via `app.inject()`.
  */
 
@@ -405,7 +405,7 @@ describe("PUT /api/v1/teams/:id", () => {
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { name: "OldName" },
     });
-    // Should succeed — same team, same name
+    // Should succeed: same team, same name
     expect(res.statusCode).toBe(200);
   });
 

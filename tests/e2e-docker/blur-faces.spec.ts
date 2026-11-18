@@ -26,7 +26,7 @@ test.describe("Blur Faces - HEIC fix and no-face warning", () => {
 
     await page.getByTestId("blur-faces-submit").click();
 
-    // Wait for processing to complete — download button proves it worked
+    // Wait for processing to complete, download button proves it worked
     await expect(page.getByTestId("blur-faces-download")).toBeVisible({ timeout: 120_000 });
 
     // The old bug showed "cannot identify image" or "Face blur failed"

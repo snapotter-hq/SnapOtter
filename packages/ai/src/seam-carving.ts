@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -91,6 +92,7 @@ export async function seamCarve(
     if (megapixels > MAX_MP) {
       throw new ToolInputError(
         `Image is too large for content-aware resize (${formatExceededMp(megapixels, MAX_MP)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
+        { code: "IMAGE_TOO_LARGE" },
       );
     }
 
@@ -107,6 +109,7 @@ export async function seamCarve(
     if (targetW * targetH > MAX_PIXELS) {
       throw new ToolInputError(
         `Target size ${targetW} x ${targetH} is over the ${MAX_PIXELS} pixel (${MAX_MP} MP) limit for content-aware resize`,
+        { code: "RESULT_TOO_LARGE" },
       );
     }
 
@@ -117,6 +120,7 @@ export async function seamCarve(
     ) {
       throw new ToolInputError(
         `Content-aware resize can enlarge each side by at most ${MAX_ENLARGE_RATIO}x (requested ${targetW} x ${targetH} from ${width} x ${height})`,
+        { code: "INVALID_SETTINGS" },
       );
     }
 
@@ -143,7 +147,7 @@ export async function seamCarve(
     const processBuffer = await sharp(preResizedBuffer).jpeg({ quality: 95 }).toBuffer();
     const cairePath = await findCaire();
 
-    await writeFile(inputPath, processBuffer);
+    await writeScratchInput("seam-carve", inputPath, processBuffer);
 
     const args = ["-in", inputPath, "-out", outputPath, "-preview=false"];
 
@@ -191,7 +195,7 @@ export async function seamCarve(
       throw err;
     }
 
-    const buffer = await readFile(outputPath);
+    const buffer = await readScratchOutput("seam-carve", outputPath);
     const outMeta = await sharp(buffer).metadata();
 
     return {

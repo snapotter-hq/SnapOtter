@@ -1,4 +1,4 @@
-import { unlink, writeFile } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -8,6 +8,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { writeScratchInput } from "./scratch-io.js";
 
 export interface FaceLandmarkPoint {
   x: number;
@@ -47,7 +48,7 @@ export async function detectFaceLandmarks(
 
   try {
     const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-    await writeFile(inputPath, pngBuffer);
+    await writeScratchInput("face-landmarks", inputPath, pngBuffer);
     const { stdout } = await runPythonWithProgress(
       "face_landmarks.py",
       [inputPath, "unused", "{}"],

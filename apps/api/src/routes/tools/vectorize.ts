@@ -10,7 +10,11 @@ import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
-import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  imageSizeLimitError,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -177,6 +181,8 @@ export function registerVectorize(app: FastifyInstance) {
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log?.warn({ err, toolId: "vectorize" }, "Vectorization failed");
       return reply.status(422).send({
         error: "Vectorization failed",

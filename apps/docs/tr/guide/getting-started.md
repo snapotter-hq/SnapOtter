@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutta kurun. Docker Compose kurulumunu, kaynak koddan derlemeyi ve özelliklere tam bir genel bakışı içerir."
-i18n_source_hash: aa8428189808
+i18n_source_hash: 288f6c9218f6
 i18n_provenance: machine
-i18n_output_hash: e4aafd013db2
+i18n_output_hash: 2b3adeca8c2d
 i18n_hash_version: 2
 ---
 
@@ -19,6 +19,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [kanonik Docker Compose yığınını](#docker-compose) kullanın. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır.
+
+İş sonuçları veri biriminde tutulmaz, bu yüzden kapsayıcı değiştirildiğinde (örneğin bir imaj yükseltmesinde) kaybolur ve indirme bağlantıları çalışmaz hale gelir. Dağıtım kılavuzunun Birimler bölümü bunları nasıl koruyacağınızı açıklar.
 
 Raspberry Pi, eski bir dizüstü bilgisayar veya küçük bir VPS üzerine mi kuruyorsunuz? Ayarlanmış bir adım adım kurulum ve kısıtlı donanımdan ne bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) sayfasına bakın.
 

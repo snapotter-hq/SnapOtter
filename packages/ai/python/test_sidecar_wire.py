@@ -83,7 +83,9 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
         src = sf.read()
     assert '{"error": str(e)}' not in src, f"{script_file} still emits bare str(e) without success: False"
     assert '"error": str(e)}' not in src, f"{script_file} still formats caught exception with bare str(e)"
-    assert "type(e).__name__" in src, f"{script_file} does not fall back to type(e).__name__"
+    assert "type(e).__name__" in src or "describe_exception(e)" in src, (
+        f"{script_file} does not fall back to type(e).__name__"
+    )
 
 import colorize  # noqa: E402
 import enhance_faces  # noqa: E402

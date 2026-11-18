@@ -119,9 +119,11 @@ describe("analytics lib (baked model)", () => {
         expect.objectContaining({
           api_host: "https://ph.test",
           autocapture: false,
-          ip: false,
         }),
       );
+      // posthog-js ignores the deprecated ip option, so it must not look like a control (#4583).
+      const [, options] = mockInit.mock.calls[0] as unknown as [string, Record<string, unknown>];
+      expect(options).not.toHaveProperty("ip");
     });
 
     it("initializes Sentry with the web DSN when sentryDsnWeb is provided", async () => {
@@ -543,5 +545,29 @@ describe("privacy invariants (#1022)", () => {
     expect(result.properties.$session_entry_referrer).toBe("https://ref.test/page");
     expect(result.properties.$initial_current_url).toBe("https://x.test/a");
     expect(result.properties.$initial_referrer).toBe("https://ref.test/c");
+  });
+
+  // Without the proxy the browser posts to PostHog itself, so the connection IP
+  // is the visitor's. A non-empty $ip stops PostHog falling back to it (#4583).
+  it("pins $ip to the placeholder when the browser talks to PostHog directly (#4583)", async () => {
+    await mod.initAnalytics({ ...enabledConfig, posthogProxyPath: "" });
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({ event: "tool_opened", properties: { tool_id: "resize" } });
+    expect(result.properties.$ip).toBe("0.0.0.0");
+  });
+
+  // Through /ingest PostHog only sees the instance's IP, which the project
+  // discards after GeoIP, so events keep their instance-level location.
+  it("leaves $ip unset when events go through the instance's /ingest proxy (#4583)", async () => {
+    await mod.initAnalytics({ ...enabledConfig, posthogProxyPath: "/ingest" });
+    const [, options] = mockInit.mock.calls[0] as unknown as [
+      string,
+      { before_send: (e: unknown) => { properties: Record<string, unknown> } },
+    ];
+    const result = options.before_send({ event: "tool_opened", properties: { tool_id: "resize" } });
+    expect(result.properties).not.toHaveProperty("$ip");
   });
 });

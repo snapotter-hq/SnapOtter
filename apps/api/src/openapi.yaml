@@ -8447,6 +8447,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8456,6 +8459,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
 
   # --- Features ------------------------------------------------------------
 
@@ -8510,10 +8514,16 @@ paths:
                         compatibility:
                           type: string
                           enum: [compatible, incompatible, invalid]
-                          description: OCR runtime compatibility; omitted for legacy bundles
+                          description: >-
+                            Host compatibility. OCR always reports it. A legacy
+                            bundle reports incompatible only when this host
+                            can't run it, and omits the field otherwise.
                         compatibilityReason:
                           type: [string, "null"]
-                          description: OCR runtime compatibility reason; omitted for legacy bundles
+                          description: >-
+                            Why the bundle is incompatible, such as cpu-no-avx
+                            when its x86-64 libraries need AVX and this CPU
+                            lacks it. Omitted for compatible legacy bundles.
                         selectedTarget:
                           type: [string, "null"]
                           description: Selected OCR runtime target, such as linux-amd64-cpu-py312
@@ -8664,7 +8674,7 @@ paths:
       description: Returns the newest published release when it is newer than the running version, or null. Requires settings:write.
       responses:
         "200":
-          description: Latest release, or null when this instance is current
+          description: The newer release, or null when no newer release is published or analytics is off on this instance (no lookup is made then)
           content:
             application/json:
               schema:
@@ -8672,10 +8682,20 @@ paths:
                 required: [latest]
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type: [object, "null"]
+                    required: [version, url]
+                    properties:
+                      version:
+                        type: string
+                        example: "2.3.0"
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: "2.3.0"
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         "401":
           description: Missing or invalid credentials
           content:
@@ -8797,6 +8817,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: >-
+            A bundle the tool needs can't be installed on this host: the OCR
+            runtime is unsupported, or the bundle needs AVX and this CPU lacks
+            it (code FEATURE_CPU_UNSUPPORTED). Nothing is queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/admin/features/{bundleId}/install:
     post:
@@ -8885,7 +8914,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: Bundle already installed or OCR runtime unsupported on this host
+          description: >-
+            Bundle already installed, OCR runtime unsupported on this host, or
+            the bundle needs AVX and this CPU lacks it (code
+            FEATURE_CPU_UNSUPPORTED, refused before any download)
           content:
             application/json:
               schema:
@@ -11073,7 +11105,7 @@ paths:
       operationId: videoMetadata
       tags: [Video]
       summary: Clean Video Metadata
-      description: Strip metadata from a video and report what was found.
+      description: Strip metadata from a video and report what was found. The `metadata.removed` array lists the names of the format tags that were removed (values are not returned). An empty array means no tags were removed.
       security:
         - bearerAuth: []
       requestBody:
@@ -23484,7 +23516,9 @@ paths:
         "403":
           description: Insufficient permissions
         "409":
-          description: Import lock is held
+          description: >-
+            Import lock is held, or the bundle needs AVX and this CPU lacks it
+            (code FEATURE_CPU_UNSUPPORTED)
         "413":
           description: >-
             A file in the import is over 20 GiB. This route has its own size

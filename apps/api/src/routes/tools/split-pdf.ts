@@ -5,6 +5,7 @@ import { qpdfPageCount, qpdfSplitRanges } from "@snapotter/doc-engine";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { assertPageSpecInRange } from "../../lib/page-spec.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z
@@ -40,9 +41,11 @@ export function registerSplitPdf(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
 
       if (settings.mode === "range") {
+        const range = settings.range ?? "";
+        assertPageSpecInRange(range, await qpdfPageCount(inPath, { signal: ctx.signal }));
         const outPath = join(ctx.scratchDir, `${base}_pages.pdf`);
         ctx.report(20, "Extracting pages");
-        await qpdfSplitRanges(inPath, settings.range ?? "", outPath, { signal: ctx.signal });
+        await qpdfSplitRanges(inPath, range, outPath, { signal: ctx.signal });
         return {
           scratchPath: outPath,
           filename: `${base}_pages.pdf`,

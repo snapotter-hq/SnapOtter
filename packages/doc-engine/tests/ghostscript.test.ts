@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { isSafeMessageError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -42,16 +43,44 @@ describe("runGs error handling (via gsGrayscalePdf)", () => {
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
     h.nextClose({ stderr: "boom\n", code: null, signal: "SIGSEGV" });
+    const err = await import("../src/ghostscript.js")
+      .then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (Ghostscript) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "gs exited SIGSEGV: boom",
+      signal: "SIGSEGV",
+    });
+  });
+
+  it("reports SIGILL as an operational ENGINE_CRASHED SafeError (#4684)", async () => {
+    h.nextClose({ stderr: "", code: null, signal: "SIGILL" });
+    const err = await import("../src/ghostscript.js")
+      .then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toMatchObject({ kind: "operational", code: "ENGINE_CRASHED", statusCode: 500 });
+    expect((err as Error).cause).toMatchObject({ message: "gs exited SIGILL", signal: "SIGILL" });
+  });
+
+  it("keeps the spawn shape for a SIGTERM kill (#3829)", async () => {
+    h.nextClose({ stderr: "terminated\n", code: null, signal: "SIGTERM" });
     await expect(
       import("../src/ghostscript.js").then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf")),
     ).rejects.toMatchObject({
-      message: "gs exited SIGSEGV: boom",
+      message: "gs exited SIGTERM: terminated",
       code: "ENOMEM",
       syscall: "spawn",
       path: "/usr/bin/gs",
-      signal: "SIGSEGV",
+      signal: "SIGTERM",
     });
   });
 

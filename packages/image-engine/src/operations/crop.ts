@@ -27,20 +27,26 @@ export async function crop(image: Sharp, options: CropOptions): Promise<Sharp> {
   }
 
   if (width <= 0 || height <= 0) {
-    throw new ToolInputError("Crop width and height must be greater than 0");
+    throw new ToolInputError("Crop width and height must be greater than 0", {
+      code: "INVALID_SETTINGS",
+    });
   }
   if (left < 0 || top < 0) {
-    throw new ToolInputError("Crop left and top must be non-negative");
+    throw new ToolInputError("Crop left and top must be non-negative", {
+      code: "INVALID_SETTINGS",
+    });
   }
 
   if (left + width > imgWidth) {
     throw new ToolInputError(
       `Crop region exceeds image width: left(${left}) + width(${width}) > ${imgWidth}`,
+      { code: "INVALID_SETTINGS" },
     );
   }
   if (top + height > imgHeight) {
     throw new ToolInputError(
       `Crop region exceeds image height: top(${top}) + height(${height}) > ${imgHeight}`,
+      { code: "INVALID_SETTINGS" },
     );
   }
 

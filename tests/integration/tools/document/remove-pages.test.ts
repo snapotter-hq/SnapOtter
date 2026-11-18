@@ -94,18 +94,21 @@ describe.skipIf(!qpdfAvailable())("remove-pages (requires qpdf)", () => {
     }
   }, 60_000);
 
-  it("rejects removing every page (1-z) with 422", async () => {
+  // Sentry NODE-A5: both are the user's input, so a coded 400, not a bug.
+  it("rejects removing every page (1-z) with a coded 400", async () => {
     const res = await runTool({ pages: "1-z" });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details || body.error || body.message).toMatch(/every page/i);
+    expect(body.code).toBe("CANNOT_REMOVE_ALL_PAGES");
+    expect(body.error).toMatch(/every page/i);
   }, 60_000);
 
-  it("rejects out-of-range page with 422", async () => {
+  it("rejects an out-of-range page with a coded 400", async () => {
     const res = await runTool({ pages: "9" });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details || body.error || body.message).toMatch(/out of range/i);
+    expect(body.code).toBe("PAGE_OUT_OF_RANGE");
+    expect(body.error).toBe("Page 9 is out of range for a 3-page document");
   }, 60_000);
 
   it("rejects a password-protected PDF up front with a clear message", async () => {

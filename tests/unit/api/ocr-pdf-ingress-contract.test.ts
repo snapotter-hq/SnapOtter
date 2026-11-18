@@ -21,7 +21,7 @@ describe("OCR PDF route streaming contract", () => {
     expect(batchRoute).toContain("spoolMultipartFile");
     expect(batchRoute).not.toContain("Buffer.concat(chunks)");
     expect(batchRoute).toMatch(
-      /if \(toolId === "ocr-pdf"\)[\s\S]*storeValidatedOcrPdf[\s\S]*else \{[\s\S]*readFile\(file\.path\)/,
+      /if \(toolId === "ocr-pdf"\)[\s\S]*storeValidatedOcrPdf[\s\S]*else \{[\s\S]*readSpooledFile\(file\)/,
     );
   });
 

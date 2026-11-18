@@ -4134,6 +4134,8 @@ export const ptBR: TranslationKeys = {
     previewFailed: "Falha ao gerar pré-visualização",
     previewEncoderMissing:
       "O ffmpeg deste servidor não tem o codificador {encoder}, por isso não é possível gerar a pré-visualização. Entre em contato com o administrador.",
+    previewEngineUnavailable:
+      "O ffmpeg não está instalado neste servidor, por isso não é possível gerar a pré-visualização. Peça ao administrador para instalar o ffmpeg ou definir FFMPEG_PATH.",
     previewProgressMessages: [
       "A lontra está se aquecendo...",
       "Triturando pixels...",
@@ -5213,6 +5215,7 @@ export const ptBR: TranslationKeys = {
       disabledCount: "{count} ferramenta(s) desativada(s)",
       disabledCountOne: "{count} ferramenta desativada",
       disabledCountOther: "{count} ferramentas desativadas",
+      offWithBase: "Desativada porque a ferramenta {base} está desativada.",
     },
     experimental: {
       label: "Ativar ferramentas experimentais",
@@ -5671,6 +5674,8 @@ export const ptBR: TranslationKeys = {
         "O navegador de que esta ferramenta precisa não está disponível no momento.",
       DEPENDENCY_VALIDATION_FAILED:
         "Esta configuração depende de outra configuração que não é válida.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Este recurso precisa de um processador com suporte a AVX, e o processador deste servidor não tem.",
       FEATURE_INCOMPATIBLE: "Este recurso não pode ser executado com as configurações atuais.",
       FST_REQ_FILE_TOO_LARGE: "Este arquivo é grande demais para ser enviado.",
       IDLE_TIMEOUT: "Você foi desconectado por inatividade. Entre novamente.",
@@ -5721,6 +5726,43 @@ export const ptBR: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "O resultado não consegue atingir o tamanho desejado.",
       TOO_MANY_FRAMES: "Este arquivo tem quadros demais para processar.",
       CANCELED: "A operação foi cancelada.",
+      PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
+      INVALID_PAGE_RANGE:
+        "Esse intervalo de páginas não é válido. Use números de página como 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Você não pode remover todas as páginas. Mantenha pelo menos uma.",
+      NESTING_TOO_DEEP: "Este arquivo tem aninhamento profundo demais para ser convertido.",
+      DOCUMENT_UNREADABLE:
+        "Não foi possível abrir este documento. Ele pode estar danificado, protegido por senha ou não estar no formato que a extensão indica.",
+      PDF_DAMAGED:
+        "Este PDF está danificado. Passe-o pela ferramenta Reparar PDF e tente novamente.",
+      PDF_PASSWORD_PROTECTED:
+        "Este PDF está protegido por senha. Desbloqueie-o com a ferramenta Desbloquear PDF e tente novamente.",
+      IMAGE_TOO_LARGE:
+        "Esta imagem é grande demais para ser processada. Reduza as dimensões e tente novamente.",
+      RESULT_TOO_LARGE:
+        "O resultado dessas configurações seria grande demais. Use uma imagem menor ou configurações que gerem um resultado menor.",
+      NO_AUDIO_TRACK:
+        "Este arquivo não tem faixa de áudio. Escolha um arquivo com áudio e tente novamente.",
+      IMAGE_UNDECODABLE:
+        "Não foi possível ler esta imagem. O arquivo pode estar danificado ou usar uma codificação que esta ferramenta não suporta.",
+      INVALID_SETTINGS:
+        "Estas configurações não funcionam com este arquivo. Verifique os valores e tente novamente.",
+      CHART_DATA_INVALID:
+        "O Criador de Gráficos não conseguiu ler dados deste arquivo. Use CSV ou JSON com até 100 linhas, cada uma com um rótulo e um número igual ou maior que zero.",
+      NO_FACE_DETECTED:
+        "Nenhum rosto foi encontrado. Envie uma foto nítida, de frente e com boa iluminação.",
+      TARGET_SIZE_UNREACHABLE:
+        "Não é possível reduzir este arquivo até o tamanho desejado. Tente um tamanho maior.",
+      TOO_MANY_PAGES:
+        "Este PDF tem páginas demais para processar de uma vez. Escolha menos páginas e tente novamente.",
+      METADATA_DAMAGED:
+        "Os metadados atuais desta imagem estão danificados, então não podem ser editados com segurança.",
+      REMOTE_RESOURCES_DISABLED:
+        "Este arquivo carrega imagens ou estilos da internet, o que este servidor não permite. Incorpore-os ao arquivo e tente novamente.",
+      TOO_MANY_PIXELS:
+        "Esta animação tem pixels demais somando todos os quadros. Use menos quadros ou um tamanho menor.",
+      MEDIA_UNDECODABLE:
+        "Não foi possível ler este arquivo. Ele pode estar danificado, não ter faixa de áudio ou vídeo ou usar um formato que esta ferramenta não suporta.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",
@@ -5791,6 +5833,7 @@ export const ptBR: TranslationKeys = {
     grid: "Grade",
     automate: "Automatizar",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Arquivos",
     help: "Ajuda",
     settings: "Configurações",

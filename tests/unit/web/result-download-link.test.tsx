@@ -34,11 +34,13 @@ function swallowNavigation(e: Event) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   document.addEventListener("click", swallowNavigation, true);
   window.history.replaceState({}, "", "/");
   useFileStore.getState().reset();

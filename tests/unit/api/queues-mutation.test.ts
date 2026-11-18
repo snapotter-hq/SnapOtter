@@ -25,7 +25,7 @@ async function loadQueuesModule() {
   vi.resetModules();
   queueInstances.length = 0;
   queueCtor.mockReset();
-  queueCtor.mockImplementation((name: string, options: Record<string, unknown>) => {
+  queueCtor.mockImplementation(function MockQueue(name: string, options: Record<string, unknown>) {
     const queue: FakeQueue = {
       name,
       options,

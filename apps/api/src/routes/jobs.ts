@@ -24,6 +24,9 @@ import { hasEffectivePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import { canReadJob } from "./progress.js";
 
+// Cancel takes no body; the web callers send none.
+const CANCEL_BODY_LIMIT_BYTES = 1024;
+
 export function registerJobRoutes(app: FastifyInstance): void {
   // Poll alternative to the SSE stream. `status` is the stored job status:
   // queued, processing, completed, failed, or canceled. A canceled job can
@@ -34,7 +37,7 @@ export function registerJobRoutes(app: FastifyInstance): void {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { jobId } = request.params;
 
@@ -89,10 +92,19 @@ export function registerJobRoutes(app: FastifyInstance): void {
 
   app.post(
     "/api/v1/jobs/:jobId/cancel",
-    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    {
+      config: { rateLimit: { max: 300, timeWindow: "1 minute" } },
+      bodyLimit: CANCEL_BODY_LIMIT_BYTES,
+      // The route takes no body; refuse anonymous requests before Fastify
+      // buffers one up to the upload-sized bodyLimit (#4632). Runs after
+      // the instance-level auth hook, so request.user is already set.
+      preParsing: async (request, reply) => {
+        if (!requireAuth(request, reply)) return reply;
+      },
+    },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { jobId } = request.params;
 

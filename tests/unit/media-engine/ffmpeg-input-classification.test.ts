@@ -1,3 +1,4 @@
+import { toolInputErrorCode } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { markIfInputError } from "../../../packages/media-engine/src/ffmpeg.js";
 
@@ -25,6 +26,8 @@ describe("markIfInputError", () => {
     for (const stderr of shapes) {
       const marked = markIfInputError(new Error("ffmpeg exited 1: x"), stderr) as MaybeMarked;
       expect(marked.isToolInputError, stderr).toBe(true);
+      // The web app translates the reason from this code (#4734).
+      expect(toolInputErrorCode(marked), stderr).toBe("MEDIA_UNDECODABLE");
     }
   });
 

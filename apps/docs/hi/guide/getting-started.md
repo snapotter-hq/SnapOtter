@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter को Docker के साथ एक ही कमांड में इंस्टॉल करें। इसमें Docker Compose सेटअप, source से build, और फ़ीचर्स का पूरा अवलोकन शामिल है।"
-i18n_source_hash: aa8428189808
+i18n_source_hash: 288f6c9218f6
 i18n_provenance: machine
-i18n_output_hash: e435fe851d57
+i18n_output_hash: effb9b0317e5
 i18n_hash_version: 2
 ---
 
@@ -19,6 +19,8 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 ```
 
 यह एक container वह सब कुछ चलाता है जिसकी उसे ज़रूरत है: `DATABASE_URL` सेट न होने पर यह loopback interface पर अपना PostgreSQL और Redis शुरू करता है (embedded मोड) और सारा डेटा `SnapOtter-data` volume में रखता है। SnapOtter को आज़माने या homelab पर self-host करने का यह सबसे तेज़ तरीका है। Production के लिए [canonical Docker Compose stack](#docker-compose) का उपयोग करें, जिसमें PostgreSQL और Redis अपने अलग containers में रहते हैं। Embedded मोड root के रूप में चलता है (डिफ़ॉल्ट) और `DATABASE_URL` सेट करते ही अपने आप बंद हो जाता है।
+
+जॉब के नतीजे डेटा वॉल्यूम में नहीं रखे जाते, इसलिए कंटेनर बदलने पर (जैसे इमेज अपग्रेड के समय) वे गायब हो जाते हैं और उनके डाउनलोड लिंक काम करना बंद कर देते हैं। उन्हें कैसे सुरक्षित रखें, यह डिप्लॉयमेंट गाइड के वॉल्यूम सेक्शन में बताया गया है।
 
 Raspberry Pi, पुराने laptop, या छोटे VPS पर इंस्टॉल कर रहे हैं? ट्यून किए गए walkthrough और सीमित hardware से क्या उम्मीद रखें, यह जानने के लिए [Low-Resource Setups](/hi/guide/low-resource) देखें।
 

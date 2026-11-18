@@ -8577,6 +8577,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8586,6 +8589,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8647,12 +8651,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibilidade do runtime de OCR; omitido em pacotes legados
+                          description: Compatibilidade com o host. O OCR sempre a informa. Um pacote legado informa incompatible somente quando este host não consegue executá-lo e omite o campo nos demais casos.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Motivo da compatibilidade do runtime de OCR; omitido em pacotes legados
+                          description: Por que o pacote é incompatível, como cpu-no-avx quando suas bibliotecas x86-64 precisam de AVX e esta CPU não tem. Omitido para pacotes legados compatíveis.
                         selectedTarget:
                           type:
                             - string
@@ -8823,7 +8827,7 @@ paths:
       description: Retorna a versão publicada mais recente, quando ela for mais nova que a versão em execução, ou null. Requer settings:write.
       responses:
         '200':
-          description: Última versão, ou null quando esta instância já está atualizada
+          description: A versão mais recente, ou null quando não há versão mais nova publicada ou a análise está desativada nesta instância (nesse caso nenhuma consulta é feita)
           content:
             application/json:
               schema:
@@ -8832,10 +8836,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Credenciais ausentes ou inválidas
           content:
@@ -8957,6 +8975,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Um pacote de que a ferramenta precisa não pode ser instalado neste host: o runtime de OCR não é compatível, ou o pacote precisa de AVX e esta CPU não tem (código FEATURE_CPU_UNSUPPORTED). Nada é colocado na fila.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9043,7 +9067,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Pacote já instalado ou runtime de OCR não suportado neste host
+          description: Pacote já instalado, runtime de OCR não compatível com este host, ou o pacote precisa de AVX e esta CPU não tem (código FEATURE_CPU_UNSUPPORTED, recusado antes de qualquer download)
           content:
             application/json:
               schema:
@@ -23881,7 +23905,7 @@ paths:
         '403':
           description: Permissões insuficientes
         '409':
-          description: Bloqueio de importação em uso
+          description: Bloqueio de importação em uso, ou o pacote precisa de AVX e esta CPU não tem (código FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Um arquivo da importação excede 20 GiB. Esta rota tem limites de tamanho próprios; `MAX_UPLOAD_SIZE_MB` não se aplica a ela.
         '507':
@@ -30782,13 +30806,13 @@ x-i18n:
       provenance: machine
       outputHash: 98ad15fe6b73
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 7efece408396
+      outputHash: 160f8c3d833d
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: db3e37e3484a
+      outputHash: 7cf36f9d953b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30838,9 +30862,9 @@ x-i18n:
       provenance: machine
       outputHash: 7eb4c0e00539
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 19d40ac52f6d
+      outputHash: b26426cea3ee
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30881,6 +30905,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 3da1b3c793f9
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: ee9b457bb064
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30914,9 +30942,9 @@ x-i18n:
       provenance: machine
       outputHash: 0c34229e47e9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 2ce9664e5a30
+      outputHash: fbfe87099184
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36258,9 +36286,9 @@ x-i18n:
       provenance: machine
       outputHash: b4aec01448a8
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 7dbfcc51c890
+      outputHash: b87197e5e0e4
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

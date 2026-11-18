@@ -1,9 +1,9 @@
 /**
  * Application settings routes (key-value store).
  *
- * GET  /api/v1/settings      — Get all settings as a key-value object
- * PUT  /api/v1/settings      — Save settings (admin only)
- * GET  /api/v1/settings/:key — Get a specific setting
+ * GET  /api/v1/settings: Get all settings as a key-value object
+ * PUT  /api/v1/settings: Save settings (admin only)
+ * GET  /api/v1/settings/:key: Get a specific setting
  */
 
 import { SafeError } from "@snapotter/shared";
@@ -83,13 +83,13 @@ async function decryptIfNeeded(
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
-  // GET /api/v1/settings — Get all settings as a key-value object
+  // GET /api/v1/settings: Get all settings as a key-value object
   app.get(
     "/api/v1/settings",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePermission("settings:read")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const effectivePermissions = new Set<string>(await getEffectivePermissions(user));
       const fullAdmin = await isFullEffectiveAdmin(user);
@@ -113,10 +113,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // PUT /api/v1/settings — Save settings (admin only)
+  // PUT /api/v1/settings: Save settings (admin only)
   const updateSettings = async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("settings:write")(request, reply);
-    if (!admin) return;
+    if (!admin) return reply;
 
     const parsed = settingsBodySchema.safeParse(request.body);
     if (!parsed.success) {
@@ -302,13 +302,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     updateSettings,
   );
 
-  // GET /api/v1/settings/:key — Get a specific setting
+  // GET /api/v1/settings/:key: Get a specific setting
   app.get(
     "/api/v1/settings/:key",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { key: string } }>, reply: FastifyReply) => {
       const user = await requirePermission("settings:read")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { key } = request.params;
       const policy = getSettingPolicy(key);

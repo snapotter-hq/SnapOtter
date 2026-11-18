@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: aa3bcbf1132a
+i18n_output_hash: a9a07b980608
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ Desteklenen her biçim, kullanılan çözücü ve mevcut kalite denetimleri hakk
 - **Büyütme**, küçük görüntülerin ötesinde her şeyde CPU'da zaman aşımına uğrar. Pratik kullanım için GPU gerekir.
 - **CodeFormer** yüz iyileştirmesi GFPGAN'dan belirgin biçimde yavaştır (GPU'da 53 sn'ye karşı 2 sn). Çoğu kullanım için GFPGAN önerilir.
 
+### Birden fazla replikada AI paketi kurulumu {#ai-bundle-installs-with-several-replicas}
+
+AI paketlerini yalnızca tek bir replika çalışırken değiştirin. Bir paketi kurmak, çevrimdışı içe aktarmak veya AI ortamını sıfırlamak, `/data/ai/venv` içindeki paylaşılan Python ortamını yeniden yazar. Kurulum kendi replikasındaki AI işlerini bekler ve bu işlemlerin her biri sonrasında o replikanın sidecar'ını yeniden başlatır, ancak hiçbiri diğer replikalardaki AI işlerini göremez. Onların sidecar'ları, dizin yeniden yazılırken torch ve ONNX Runtime'ı o dizinden yüklü tutar ve iş ortasında çökebilir. Dağıtımı tek replikaya düşürün (veya diğerlerini durdurun), değişikliği yapın, sonra tekrar ölçeklendirin.
+
 ## Birimler {#volumes}
 
 | Bağlama / Birim | Amaç | Gerekli mi? |
 |---|---|---|
 | `/data` (uygulama) | AI modelleri, Python venv, kullanıcı dosyaları | **Evet** - onsuz dosya kaybı olur |
-| `/tmp/workspace` (uygulama) | Geçici işleme dosyaları (otomatik temizlenir) | Önerilir |
+| `/tmp/workspace` (uygulama) | Geçici işleme dosyaları ve iş çıktıları (otomatik temizlenir). `/data` altında saklanmaz, bu yüzden bu dizin bağlanmadıkça kapsayıcı değiştirildiğinde sonuçlar kaybolur | Önerilir |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL veri dizini (kullanıcılar, ayarlar, işlem hatları, işler) | **Evet** - onsuz veri kaybı olur |
 | `SnapOtter-redisdata` (redis) | Dayanıklı iş kuyrukları için Redis yalnızca-ekleme dosyası | Önerilir |
+
+### `docker run` ile iş çıktısını korumak {#keeping-job-output}
+
+İş sonuçları `/tmp/workspace` altında bulunur ve bağlamadığınız sürece kapsayıcının dosya sisteminin bir parçasıdır. Yalnızca `-v SnapOtter-data:/data` ile kullanıcılarınız, ayarlarınız ve dosyalarınız korunur, ancak önceki işlerin sonuçları kapsayıcı değiştirilir değiştirilmez kaybolur ve indirme bağlantıları 404 döndürür. Bunları korumak için workspace'i de bağlayın:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose yığınları `SnapOtter-workspace` birimini zaten bağlar.
 
 ### Bind mount'lar ve adlandırılmış birimler {#bind-mounts-vs-named-volumes}
 

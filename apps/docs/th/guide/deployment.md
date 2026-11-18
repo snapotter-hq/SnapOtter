@@ -1,8 +1,8 @@
 ---
 description: "ติดตั้ง SnapOtter ในระบบจริงด้วย Docker ครอบคลุมความต้องการด้านฮาร์ดแวร์ การตั้งค่า GPU และการกำหนดค่า reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: f5293d0da6bb
+i18n_output_hash: a55184e665f6
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ SnapOtter รองรับ **รูปแบบอินพุตมากก�
 - **การขยายภาพ** หมดเวลาบน CPU สำหรับภาพที่ใหญ่กว่าขนาดเล็ก ต้องใช้ GPU จึงจะใช้งานได้จริง
 - **CodeFormer** สำหรับปรับปรุงใบหน้าช้ากว่า GFPGAN อย่างมาก (53 วินาทีเทียบกับ 2 วินาทีบน GPU) แนะนำ GFPGAN สำหรับกรณีใช้งานส่วนใหญ่
 
+### การติดตั้งชุด AI เมื่อมีหลายเรพลิกา {#ai-bundle-installs-with-several-replicas}
+
+เปลี่ยนชุด AI เมื่อมีเรพลิกาทำงานอยู่เพียงตัวเดียวเท่านั้น การติดตั้งชุด การนำเข้าชุดแบบออฟไลน์ หรือการรีเซ็ตสภาพแวดล้อม AI จะเขียนสภาพแวดล้อม Python ที่ใช้ร่วมกันใน `/data/ai/venv` ใหม่ การติดตั้งจะรองานของ AI บนเรพลิกาของตัวเองเท่านั้น และทุกการดำเนินการเหล่านี้จะรีสตาร์ท sidecar ของเรพลิกานั้นในภายหลัง แต่ไม่มีการดำเนินการใดมองเห็นงานของ AI บนเรพลิกาอื่น sidecar ของเรพลิกาเหล่านั้นยังคงโหลด torch และ ONNX Runtime จากไดเรกทอรีนั้นไว้ขณะที่ถูกเขียนใหม่ และอาจล่มกลางงานได้ ให้ลดการติดตั้งใช้งานเหลือหนึ่งเรพลิกา (หรือหยุดตัวอื่น) ทำการเปลี่ยนแปลง แล้วค่อยขยายกลับ
+
 ## วอลุ่ม {#volumes}
 
 | จุดเมานต์ / วอลุ่ม | วัตถุประสงค์ | จำเป็นหรือไม่ |
 |---|---|---|
 | `/data` (app) | โมเดล AI, Python venv, ไฟล์ของผู้ใช้ | **จำเป็น** - ไฟล์จะสูญหายหากไม่มี |
-| `/tmp/workspace` (app) | ไฟล์ประมวลผลชั่วคราว (ล้างอัตโนมัติ) | แนะนำ |
+| `/tmp/workspace` (app) | ไฟล์ประมวลผลชั่วคราวและเอาต์พุตของงาน (ล้างอัตโนมัติ) ไม่ได้เก็บไว้ใน `/data` ผลลัพธ์จึงหายไปเมื่อเปลี่ยนคอนเทนเนอร์ หากไม่ได้เมานต์ไดเรกทอรีนี้ | แนะนำ |
 | `SnapOtter-pgdata` (postgres) | ไดเรกทอรีข้อมูล PostgreSQL (ผู้ใช้ การตั้งค่า ไปป์ไลน์ งาน) | **จำเป็น** - ข้อมูลจะสูญหายหากไม่มี |
 | `SnapOtter-redisdata` (redis) | ไฟล์ append-only ของ Redis สำหรับคิวงานที่คงทน | แนะนำ |
+
+### เก็บเอาต์พุตของงานไว้เมื่อใช้ `docker run` {#keeping-job-output}
+
+ผลลัพธ์ของงานอยู่ใต้ `/tmp/workspace` ซึ่งเป็นส่วนหนึ่งของระบบไฟล์ของคอนเทนเนอร์ หากคุณไม่ได้เมานต์ไว้ เมื่อใช้เพียง `-v SnapOtter-data:/data` ผู้ใช้ การตั้งค่า และไฟล์ของคุณจะยังอยู่ แต่ผลลัพธ์ของงานก่อนหน้าจะหายไปทันทีที่เปลี่ยนคอนเทนเนอร์ และลิงก์ดาวน์โหลดจะตอบกลับ 404 หากต้องการเก็บไว้ ให้เมานต์ workspace เพิ่มด้วย:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+สแตก Compose เมานต์ `SnapOtter-workspace` ไว้แล้ว
 
 ### Bind mount เทียบกับ named volume {#bind-mounts-vs-named-volumes}
 

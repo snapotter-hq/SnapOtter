@@ -122,10 +122,14 @@ const SUBSCRIBER_PING_INTERVAL_MS = 10_000;
  * so without this handler a Redis restart kills the whole API process
  * (Sentry NODE-30). Reconnecting is ioredis's job via its retryStrategy;
  * the listener only has to exist and say what happened.
+ *
+ * Every connection logs the same message, so `name` is what tells a stuck
+ * cancel subscriber apart from a stuck SSE one in a support bundle (#4552).
+ * Callers attach no listener of their own: it would log each reconnect twice.
  */
-function swallowConnectionErrors(connection: Redis): Redis {
+function swallowConnectionErrors(connection: Redis, name: string | undefined): Redis {
   connection.on("error", (err: Error) => {
-    logger.error({ err }, "[redis] connection error");
+    logger.error({ err, connection: name }, "[redis] connection error");
   });
   return connection;
 }
@@ -135,13 +139,14 @@ function swallowConnectionErrors(connection: Redis): Redis {
  * Each caller gets an independent connection (BullMQ requires separate
  * connections for Queue, Worker, and QueueEvents).
  */
-export function createRedisConnection(): Redis {
+export function createRedisConnection(name?: string): Redis {
   return swallowConnectionErrors(
     new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: true,
       socketTimeout: SOCKET_TIMEOUT_MS,
     }),
+    name,
   );
 }
 
@@ -150,13 +155,14 @@ export function createRedisConnection(): Redis {
  * Subscriber sockets cannot run regular commands once subscribed, so disable
  * ioredis ready checks that issue INFO during reconnects.
  */
-export function createRedisSubscriberConnection(): Redis {
+export function createRedisSubscriberConnection(name?: string): Redis {
   const connection = swallowConnectionErrors(
     new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       socketTimeout: SOCKET_TIMEOUT_MS,
     }),
+    name,
   );
   keepSubscriberSocketProbed(connection);
   return connection;
@@ -200,7 +206,7 @@ let _shared: Redis | null = null;
  */
 export function sharedRedis(): Redis {
   if (!_shared) {
-    _shared = createRedisConnection();
+    _shared = createRedisConnection("shared");
   }
   return _shared;
 }

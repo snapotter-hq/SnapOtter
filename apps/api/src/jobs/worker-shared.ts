@@ -1,4 +1,10 @@
-import { hasServerErrorStatus, isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  SafeError,
+  toolInputErrorCode,
+} from "@snapotter/shared";
 import type { Job } from "bullmq";
 import { reportError, safeFormatTag } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -55,6 +61,10 @@ export function validationErrorFields(err: unknown): { code?: string; details?: 
   if (isSafeMessageError(err) && hasServerErrorStatus(err)) {
     return typeof err.code === "string" ? { code: err.code } : {};
   }
+  // An engine package can't import InputValidationError, so its input faults
+  // arrive as ToolInputErrors; their code reaches the row the same way (#4679).
+  const inputCode = toolInputErrorCode(err);
+  if (inputCode) return { code: inputCode };
   if (!(err instanceof Error) || err.name !== "InputValidationError") return {};
   const { code, details } = err as { code?: unknown; details?: unknown };
   return {
@@ -103,7 +113,7 @@ export function reportToolJobFailure(
   const failedErr =
     err instanceof Error && err.name === "UnrecoverableError" && err.cause instanceof Error
       ? err.cause
-      : err;
+      : namedStallError(err);
   const pf = (failedErr as { pythonFrames?: unknown } | null)?.pythonFrames;
   if (Array.isArray(pf) && pf.length) {
     logger.error({ pool, jobId, pythonFrames: pf }, "sidecar failure");
@@ -117,4 +127,109 @@ export function reportToolJobFailure(
     settings: data?.settings,
     jobAgeMs: jobAgeMs(job),
   });
+}
+
+// BullMQ's own failure for a job whose lock was lost past maxStalledCount
+// (set by moveStalledJobsToWait as deferredFailure, then thrown by the worker
+// run loop). maxStartedAttempts produces the "started" variant.
+const BULLMQ_STALL_MESSAGE = /^job (stalled|started) more than allowable limit$/;
+
+/**
+ * Give BullMQ's cause-less stall failure a constant SafeError so the Sentry
+ * event names it. The scrubber keeps only rebuilt values, and a plain BullMQ
+ * error has none, so it arrived as "UnrecoverableError: UnrecoverableError"
+ * (Sentry NODE-4J). Still operational and throttled, as before (NODE-27).
+ */
+function namedStallError(err: unknown): unknown {
+  if (!(err instanceof Error) || err.name !== "UnrecoverableError") return err;
+  if (!BULLMQ_STALL_MESSAGE.test(err.message)) return err;
+  return new SafeError(
+    "The job was interrupted more times than the queue allows. Its worker lost the job lock, usually because the process restarted or ran short of memory or CPU.",
+    { kind: "operational", code: "JOB_STALLED", cause: err },
+  );
+}
+
+interface ProgressTarget {
+  id?: string;
+  updateProgress(progress: { percent: number; stage?: string }): Promise<void>;
+}
+
+/**
+ * Best-effort BullMQ progress writes for one job attempt. The job hash can
+ * vanish under a running processor, and BullMQ then rejects every write with
+ * "Missing key for job"; fired with `void`, each one escaped as an unhandled
+ * rejection, one Sentry event per percent (Sentry NODE-AT). Clients follow the
+ * pub/sub frame and the jobs row, never this hash, so the first failure is
+ * logged and the rest of the attempt's writes are skipped.
+ */
+export function createJobProgressSink(
+  job: ProgressTarget,
+  toolId?: string,
+): (progress: { percent: number; stage?: string }) => void {
+  let failed = false;
+  return (progress) => {
+    if (failed) return;
+    // Through a resolved promise so a synchronous throw takes the same path.
+    Promise.resolve()
+      .then(() => job.updateProgress(progress))
+      .catch((err: unknown) => {
+        if (failed) return;
+        failed = true;
+        logger.warn(
+          { err, jobId: job.id, toolId },
+          "BullMQ job progress update failed; skipping the rest of this attempt's progress writes",
+        );
+      });
+  };
+}
+
+/**
+ * How far a handler can push a job's deadline with `extendDeadline`. Accurate
+ * PDF OCR, the one caller, needs at most 30 minutes of page preparation plus
+ * 50 pages at 5 minutes each (#4719); the ceiling stops a bad estimate from
+ * taking the deadline away altogether. An operator's own JOB_TIMEOUT_*_S above
+ * it still wins.
+ */
+export const MAX_EXTENDED_JOB_TIMEOUT_MS = 6 * 3600_000;
+
+export interface JobDeadline {
+  /** The deadline in ms from the start, as it stands now. 0 means none. */
+  readonly timeoutMs: () => number;
+  /** Make the deadline at least `ms` from now, up to the ceiling. Never shortens it. */
+  readonly extend: (ms: number) => void;
+  readonly clear: () => void;
+}
+
+/**
+ * One job attempt's deadline timer. `timeoutMs` 0 (or less) arms nothing and
+ * ignores every extension, so JOB_TIMEOUT_*_S=0 stays unlimited.
+ */
+export function createJobDeadline(
+  timeoutMs: number,
+  onExpire: () => void,
+  now: () => number = Date.now,
+): JobDeadline {
+  const startedAt = now();
+  let current = timeoutMs > 0 ? timeoutMs : 0;
+  let expired = false;
+  const fire = () => {
+    expired = true;
+    onExpire();
+  };
+  let handle = current > 0 ? setTimeout(fire, current) : undefined;
+  const ceiling = Math.max(MAX_EXTENDED_JOB_TIMEOUT_MS, current);
+  return {
+    timeoutMs: () => current,
+    extend: (ms) => {
+      // A deadline that already fired has aborted the handler; moving it now
+      // would only change what the timeout message claims.
+      if (current === 0 || expired || !Number.isFinite(ms) || ms <= 0) return;
+      const wanted = Math.min(now() - startedAt + ms, ceiling);
+      if (wanted <= current) return;
+      current = wanted;
+      clearTimeout(handle);
+      handle = setTimeout(fire, current - (now() - startedAt));
+    },
+    clear: () => clearTimeout(handle),
+  };
 }

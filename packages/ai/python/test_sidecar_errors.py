@@ -2,7 +2,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sidecar_errors import build_error_envelope, redact  # noqa: E402
+from sidecar_errors import build_error_envelope, describe_exception, redact  # noqa: E402
 
 
 def test_redact_masks_paths_and_files():
@@ -53,10 +53,24 @@ def test_envelope_falls_back_to_exception_type_when_message_is_empty():
     assert env["message"] == "MemoryError"
 
 
+def test_lookup_errors_keep_their_type_in_the_message():
+    try:
+        {}["tile"]
+    except KeyError as exc:
+        env = build_error_envelope(exc)
+    assert env["message"] == "KeyError: 'tile'", env["message"]
+    assert describe_exception(IndexError("list index out of range")) == (
+        "IndexError: list index out of range"
+    )
+    assert describe_exception(RuntimeError("CUDA out of memory")) == "CUDA out of memory"
+    assert describe_exception(KeyError()) == "KeyError"
+
+
 if __name__ == "__main__":
     test_redact_masks_paths_and_files()
     test_redact_masks_every_root_the_node_redactor_masks()
     test_redact_masks_the_formats_the_node_redactor_masks()
     test_envelope_shape_and_frames()
     test_envelope_falls_back_to_exception_type_when_message_is_empty()
+    test_lookup_errors_keep_their_type_in_the_message()
     print("ok")

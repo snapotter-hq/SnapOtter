@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface EnhanceFacesOptions {
   model?: "auto" | "gfpgan" | "codeformer";
@@ -35,7 +35,7 @@ export async function enhanceFaces(
   const outputPath = join(outputDir, "output_enhance_faces.png");
 
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("face-enhance", inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "enhance_faces.py",
     [inputPath, outputPath, JSON.stringify(sidecarOptions)],
@@ -47,7 +47,7 @@ export async function enhanceFaces(
     throw toSidecarError(result.error, "Face enhancement failed");
   }
 
-  const buffer = await readFile(outputPath);
+  const buffer = await readScratchOutput("face-enhance", outputPath);
   return {
     buffer,
     facesDetected: result.facesDetected,

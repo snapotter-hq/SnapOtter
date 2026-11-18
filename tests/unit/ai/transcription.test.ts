@@ -1,4 +1,8 @@
+import { spawnSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../packages/ai/src/bridge.js")>()),
@@ -293,5 +297,52 @@ describe("transcribeAudio", () => {
         expect.objectContaining({ signal: controller.signal }),
       );
     });
+  });
+});
+
+describe.skipIf(!hasPython)("transcribe.py compute type selection (NODE-49)", () => {
+  const pyDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/ai/python");
+
+  it("uses a compute type the device supports and falls back to the CPU when the GPU has none", () => {
+    const script = `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+gpu_mod = types.ModuleType("gpu")
+gpu_mod.ctranslate2_gpu_available = lambda: False
+sys.modules["gpu"] = gpu_mod
+spec = importlib.util.spec_from_file_location("transcribe_mod", os.path.join(py_dir, "transcribe.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def fake_ct2(cuda, cpu):
+    def supported(device):
+        types_for = cuda if device == "cuda" else cpu
+        if isinstance(types_for, Exception):
+            raise types_for
+        return set(types_for)
+    return types.SimpleNamespace(get_supported_compute_types=supported)
+
+cpu = {"int8", "int8_float32", "float32"}
+# A modern GPU keeps float16.
+assert mod.select_device_and_compute_type(fake_ct2({"float16", "int8_float16", "float32"}, cpu), True) == ("cuda", "float16")
+# A Pascal-era GPU without efficient float16 uses int8 on the GPU instead of failing.
+assert mod.select_device_and_compute_type(fake_ct2({"int8_float32", "int8", "float32"}, cpu), True) == ("cuda", "int8_float32")
+# A GPU reporting nothing usable, or a failing probe, falls back to the CPU.
+assert mod.select_device_and_compute_type(fake_ct2(set(), cpu), True) == ("cpu", "int8")
+assert mod.select_device_and_compute_type(fake_ct2(RuntimeError("no CUDA"), cpu), True) == ("cpu", "int8")
+# No GPU: int8 on the CPU, or CTranslate2's own default when the CPU probe fails.
+assert mod.select_device_and_compute_type(fake_ct2({"float16"}, cpu), False) == ("cpu", "int8")
+assert mod.select_device_and_compute_type(fake_ct2(set(), {"float32"}), False) == ("cpu", "float32")
+assert mod.select_device_and_compute_type(fake_ct2(set(), RuntimeError("probe failed")), False) == ("cpu", "default")
+print("COMPUTE_TYPE_OK")
+`;
+    const res = spawnSync(pythonBin as string, ["-c", script], {
+      encoding: "utf8",
+      timeout: 15_000,
+    });
+    expect(res.status, res.stderr).toBe(0);
+    expect(res.stdout).toContain("COMPUTE_TYPE_OK");
   });
 });

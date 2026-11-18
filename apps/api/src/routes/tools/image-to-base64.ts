@@ -14,6 +14,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -272,9 +273,9 @@ export function registerImageToBase64(app: FastifyInstance) {
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           errors.push({
             filename,
-            error: stripInternalPaths(
-              err instanceof Error ? err.message : "Failed to process image",
-            ),
+            error:
+              imageSizeLimitError(err)?.message ??
+              stripInternalPaths(err instanceof Error ? err.message : "Failed to process image"),
           });
         }
       }

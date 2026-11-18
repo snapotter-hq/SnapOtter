@@ -4145,6 +4145,8 @@ export const fr: TranslationKeys = {
     previewFailed: "Échec de la génération de l'aperçu",
     previewEncoderMissing:
       "Il manque l'encodeur {encoder} au ffmpeg de ce serveur, l'aperçu ne peut donc pas être généré. Contactez votre administrateur.",
+    previewEngineUnavailable:
+      "ffmpeg n'est pas installé sur ce serveur, l'aperçu ne peut donc pas être généré. Demandez à votre administrateur d'installer ffmpeg ou de définir FFMPEG_PATH.",
     previewProgressMessages: [
       "La loutre s'échauffe...",
       "On mouline les pixels...",
@@ -5230,6 +5232,7 @@ export const fr: TranslationKeys = {
       disabledCount: "{count} outil(s) désactivé(s)",
       disabledCountOne: "{count} outil désactivé",
       disabledCountOther: "{count} outils désactivés",
+      offWithBase: "Désactivé, car l'outil {base} est désactivé.",
     },
     experimental: {
       label: "Activer les outils expérimentaux",
@@ -5691,6 +5694,8 @@ export const fr: TranslationKeys = {
         "Le navigateur dont cet outil a besoin n'est pas disponible pour le moment.",
       DEPENDENCY_VALIDATION_FAILED:
         "Ce paramètre dépend d'un autre paramètre qui n'est pas valide.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Cette fonctionnalité nécessite un processeur compatible AVX, et celui de ce serveur ne l'est pas.",
       FEATURE_INCOMPATIBLE:
         "Cette fonctionnalité ne peut pas s'exécuter avec les paramètres actuels.",
       FST_REQ_FILE_TOO_LARGE: "Ce fichier est trop volumineux pour être téléversé.",
@@ -5745,6 +5750,43 @@ export const fr: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Le résultat ne peut pas atteindre la taille cible.",
       TOO_MANY_FRAMES: "Ce fichier contient trop d'images pour être traité.",
       CANCELED: "L'opération a été annulée.",
+      PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
+      INVALID_PAGE_RANGE:
+        "Cette plage de pages n'est pas valide. Utilisez des numéros comme 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES:
+        "Vous ne pouvez pas supprimer toutes les pages. Gardez-en au moins une.",
+      NESTING_TOO_DEEP: "Ce fichier est trop profondément imbriqué pour être converti.",
+      DOCUMENT_UNREADABLE:
+        "Impossible d'ouvrir ce document. Il est peut-être endommagé, protégé par mot de passe ou pas au format qu'indique son extension.",
+      PDF_DAMAGED: "Ce PDF est endommagé. Passez-le dans l'outil Réparer un PDF, puis réessayez.",
+      PDF_PASSWORD_PROTECTED:
+        "Ce PDF est protégé par mot de passe. Déverrouillez-le avec l'outil Déverrouiller un PDF, puis réessayez.",
+      IMAGE_TOO_LARGE:
+        "Cette image est trop grande pour être traitée. Réduisez ses dimensions et réessayez.",
+      RESULT_TOO_LARGE:
+        "Le résultat produit par ces réglages serait trop grand. Utilisez une image plus petite ou des réglages qui donnent un résultat plus petit.",
+      NO_AUDIO_TRACK:
+        "Ce fichier n'a pas de piste audio. Choisissez un fichier avec de l'audio et réessayez.",
+      IMAGE_UNDECODABLE:
+        "Impossible de lire cette image. Le fichier est peut-être endommagé ou utilise un encodage que cet outil ne prend pas en charge.",
+      INVALID_SETTINGS:
+        "Ces paramètres ne conviennent pas à ce fichier. Vérifiez les valeurs et réessayez.",
+      CHART_DATA_INVALID:
+        "Le Créateur de graphiques n'a pas pu lire de données dans ce fichier. Utilisez un CSV ou un JSON de 100 lignes au maximum, chacune avec un libellé et un nombre supérieur ou égal à zéro.",
+      NO_FACE_DETECTED:
+        "Aucun visage n'a été trouvé. Importez une photo nette, de face et bien éclairée.",
+      TARGET_SIZE_UNREACHABLE:
+        "Ce fichier ne peut pas être assez réduit pour atteindre la taille cible. Essayez une cible plus grande.",
+      TOO_MANY_PAGES:
+        "Ce PDF a trop de pages pour être traité en une fois. Choisissez moins de pages et réessayez.",
+      METADATA_DAMAGED:
+        "Les métadonnées existantes de cette image sont endommagées, elles ne peuvent donc pas être modifiées en toute sécurité.",
+      REMOTE_RESOURCES_DISABLED:
+        "Ce fichier charge des images ou des styles depuis Internet, ce que ce serveur n'autorise pas. Intégrez-les au fichier et réessayez.",
+      TOO_MANY_PIXELS:
+        "Cette animation compte trop de pixels sur l'ensemble de ses images. Utilisez moins d'images ou une taille plus petite.",
+      MEDIA_UNDECODABLE:
+        "Impossible de lire ce fichier. Il est peut-être endommagé, sans flux audio ou vidéo, ou dans un format que cet outil ne prend pas en charge.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",
@@ -5815,6 +5857,7 @@ export const fr: TranslationKeys = {
     grid: "Grille",
     automate: "Automatiser",
     editor: "Éditeur",
+    editorBadge: "Bêta",
     files: "Fichiers",
     help: "Aide",
     settings: "Paramètres",

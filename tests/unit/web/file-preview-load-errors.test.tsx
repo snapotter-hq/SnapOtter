@@ -25,11 +25,13 @@ beforeEach(() => {
     removeItem: (k: string) => void storage.delete(k),
     clear: () => storage.clear(),
   });
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: vi.fn(() => "blob:loaded"),
-    revokeObjectURL: vi.fn(),
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: vi.fn(() => "blob:loaded"),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
 });
 
 afterEach(() => {

@@ -8579,6 +8579,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8588,6 +8591,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8649,12 +8653,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Совместимость среды выполнения OCR; не указывается для устаревших наборов
+                          description: Совместимость с хостом. OCR всегда её сообщает. Устаревший пакет сообщает incompatible, только если этот хост не может его запустить, и в остальных случаях опускает поле.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Причина несовместимости среды выполнения OCR; не указывается для устаревших наборов
+                          description: Причина несовместимости пакета, например cpu-no-avx, когда его библиотекам x86-64 нужен AVX, а этот процессор его не поддерживает. Опускается для совместимых устаревших пакетов.
                         selectedTarget:
                           type:
                             - string
@@ -8825,7 +8829,7 @@ paths:
       description: Возвращает последний опубликованный релиз, если он новее запущенной версии, или null. Требует settings:write.
       responses:
         '200':
-          description: Последний релиз или null, если этот экземпляр актуален
+          description: Более новый релиз или null, если более нового релиза нет или аналитика отключена на этом экземпляре (в этом случае запрос не выполняется)
           content:
             application/json:
               schema:
@@ -8834,10 +8838,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Отсутствуют или недействительны учётные данные
           content:
@@ -8959,6 +8977,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Пакет, нужный инструменту, нельзя установить на этом хосте: среда OCR не поддерживается, или пакету нужен AVX, а этот процессор его не поддерживает (код FEATURE_CPU_UNSUPPORTED). Ничего не ставится в очередь.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -8976,7 +9000,7 @@ paths:
         организовал неизменяемую генерацию и атомарно активировал ее. OCR
         среда выполнения использует CPU, даже если контейнер имеет доступ NVIDIA GPU.
         для точного времени выполнения требуется не менее 4 GiB эффективной памяти (
-        настроенный лимит контейнера cgroup, в противном случае — память хоста). Системы ниже этого подписаны
+        настроенный лимит контейнера cgroup, в противном случае, память хоста). Системы ниже этого подписаны
         минимум совместимости отклоняются перед загрузкой с
         compatibilityReason=insufficient-memory. Fast Tesseract OCR не является
         при условии соблюдения этого требования.
@@ -9045,7 +9069,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Набор уже установлен или среда выполнения OCR не поддерживается на этом хосте
+          description: Пакет уже установлен, среда OCR не поддерживается на этом хосте, или пакету нужен AVX, а этот процессор его не поддерживает (код FEATURE_CPU_UNSUPPORTED, отказ до любой загрузки)
           content:
             application/json:
               schema:
@@ -12695,7 +12719,7 @@ paths:
         Сжать PDF до целевого размера 100 КБ (100 КБ, где 1 КБ = 1000 байт).
         Это специализированный эндпоинт пресета сжатия на основе `compress-pdf` в режиме targetSize.
         По возможности: PDF, состоящий в основном из текста, может не достичь целевого размера. Тогда результат задания содержит
-        `targetMet: false` вместе с `targetKb`, а файл — наименьший из возможных.
+        `targetMet: false` вместе с `targetKb`, а файл, наименьший из возможных.
         Исходные байты возвращаются, если сжатие увеличило бы файл.
       security:
         - bearerAuth: []
@@ -12778,7 +12802,7 @@ paths:
         Сжать PDF до целевого размера 200 КБ (200 КБ, где 1 КБ = 1000 байт).
         Это специализированный эндпоинт пресета сжатия на основе `compress-pdf` в режиме targetSize.
         По возможности: PDF, состоящий в основном из текста, может не достичь целевого размера. Тогда результат задания содержит
-        `targetMet: false` вместе с `targetKb`, а файл — наименьший из возможных.
+        `targetMet: false` вместе с `targetKb`, а файл, наименьший из возможных.
         Исходные байты возвращаются, если сжатие увеличило бы файл.
       security:
         - bearerAuth: []
@@ -12861,7 +12885,7 @@ paths:
         Сжать PDF до целевого размера 500 КБ (500 КБ, где 1 КБ = 1000 байт).
         Это специализированный эндпоинт пресета сжатия на основе `compress-pdf` в режиме targetSize.
         По возможности: PDF, состоящий в основном из текста, может не достичь целевого размера. Тогда результат задания содержит
-        `targetMet: false` вместе с `targetKb`, а файл — наименьший из возможных.
+        `targetMet: false` вместе с `targetKb`, а файл, наименьший из возможных.
         Исходные байты возвращаются, если сжатие увеличило бы файл.
       security:
         - bearerAuth: []
@@ -12944,7 +12968,7 @@ paths:
         Сжать PDF до целевого размера 1 МБ (1000 КБ, где 1 КБ = 1000 байт).
         Это специализированный эндпоинт пресета сжатия на основе `compress-pdf` в режиме targetSize.
         По возможности: PDF, состоящий в основном из текста, может не достичь целевого размера. Тогда результат задания содержит
-        `targetMet: false` вместе с `targetKb`, а файл — наименьший из возможных.
+        `targetMet: false` вместе с `targetKb`, а файл, наименьший из возможных.
         Исходные байты возвращаются, если сжатие увеличило бы файл.
       security:
         - bearerAuth: []
@@ -13027,7 +13051,7 @@ paths:
         Сжать PDF до целевого размера 2 МБ (2000 КБ, где 1 КБ = 1000 байт).
         Это специализированный эндпоинт пресета сжатия на основе `compress-pdf` в режиме targetSize.
         По возможности: PDF, состоящий в основном из текста, может не достичь целевого размера. Тогда результат задания содержит
-        `targetMet: false` вместе с `targetKb`, а файл — наименьший из возможных.
+        `targetMet: false` вместе с `targetKb`, а файл, наименьший из возможных.
         Исходные байты возвращаются, если сжатие увеличило бы файл.
       security:
         - bearerAuth: []
@@ -13339,7 +13363,7 @@ paths:
       tags:
         - PDF
       summary: PDF Мульти-инструмент
-      description: Собрать PDF из явного плана страниц — переупорядочить, дублировать, повернуть или удалить страницы и подтянуть страницы из дополнительных PDF в рамках одной отправки.
+      description: Собрать PDF из явного плана страниц, переупорядочить, дублировать, повернуть или удалить страницы и подтянуть страницы из дополнительных PDF в рамках одной отправки.
       security:
         - bearerAuth: []
       requestBody:
@@ -23883,7 +23907,7 @@ paths:
         '403':
           description: Недостаточно прав
         '409':
-          description: Импорт заблокирован
+          description: Импорт заблокирован, или пакету нужен AVX, а этот процессор его не поддерживает (код FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Файл в импорте превышает 20 GiB. У этого маршрута свои ограничения размера; `MAX_UPLOAD_SIZE_MB` на него не распространяется.
         '507':
@@ -30784,13 +30808,13 @@ x-i18n:
       provenance: machine
       outputHash: 0baac0669172
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 5119ed97c085
+      outputHash: aa146f1ea50c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 5e959989577e
+      outputHash: 543912d11b0f
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30840,9 +30864,9 @@ x-i18n:
       provenance: machine
       outputHash: 10a4016f97ac
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: c8561f7db2cf
+      outputHash: 77633faf1592
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30883,6 +30907,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: a8780e844cec
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 6ac326c9dd08
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30916,9 +30944,9 @@ x-i18n:
       provenance: machine
       outputHash: cbac620d5213
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 6f13f4801121
+      outputHash: ea72f21fe732
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36260,9 +36288,9 @@ x-i18n:
       provenance: machine
       outputHash: 6a6dc189e914
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 8fa20cce0100
+      outputHash: d7e6d7ecf3b9
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

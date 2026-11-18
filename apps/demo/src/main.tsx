@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { installTranslatorDomGuard } from "@/lib/translator-dom-guard";
 import { DemoBanner } from "./demo-banner";
 import { installMocks } from "./mock-api";
 import "./styles/globals.css";
@@ -40,6 +41,9 @@ function patchDemoErrors(root: Element) {
   });
   observer.observe(root, { childList: true, subtree: true, characterData: true });
 }
+
+// Same guard as the web entry (#4685): page translators rewrite text React owns.
+installTranslatorDomGuard();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");

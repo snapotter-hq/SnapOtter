@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
 import { getSettingString, upsertSetting } from "../lib/settings-helpers.js";
 import { db } from "./index.js";
 import {
@@ -150,7 +151,9 @@ async function writeImportMarker(marker: ImportMarker): Promise<void> {
 /**
  * Boot entry point. Resolves the source, evaluates the state, and acts, keeping
  * the "import before any seeding" ordering the caller relies on. Never deletes
- * the source. Returns the resolved state for logging.
+ * the source. Returns the resolved state for logging. Logs through pino so the
+ * outcome reaches LOG_DIR and the support bundle; the CLI below stays on the
+ * console because an operator reads it in a terminal.
  */
 export async function runBootImport(env: {
   SQLITE_MIGRATE_PATH: string;
@@ -164,7 +167,10 @@ export async function runBootImport(env: {
 
   if (state === "import" && source) {
     try {
-      const result = await migrateFromSqlite(source, { force: false });
+      const result = await migrateFromSqlite(source, {
+        force: false,
+        warn: (message) => logger.warn(message),
+      });
       const blobs = await countLibraryBlobs(source, env.FILES_STORAGE_PATH);
       await writeImportMarker({
         status: "completed",
@@ -174,13 +180,13 @@ export async function runBootImport(env: {
         sourcePath: source,
         at: new Date().toISOString(),
       });
-      console.log(
+      logger.info(
         `Imported 1.x SQLite database: ${JSON.stringify({ tables: result.tables, blobs })}${detachedSummarySuffix(result.detached.length)}`,
       );
     } catch (err) {
       if (err instanceof TargetNonEmptyError) {
         // Another replica imported first; benign.
-        console.log("1.x import skipped: another instance populated the database first.");
+        logger.info("1.x import skipped: another instance populated the database first.");
         return "leftover";
       }
       console.error(
@@ -189,13 +195,13 @@ export async function runBootImport(env: {
       process.exit(1);
     }
   } else if (state === "locked" && source) {
-    console.warn(
+    logger.warn(
       `WARNING: a 1.x database was found at ${source} but this instance already has data, so it was NOT imported. ` +
         "Importing 1.x data requires an empty instance. See the upgrade guide.",
     );
     await writeImportMarker({ status: "detected_locked", sourcePath: source });
   } else if (state === "leftover" && source) {
-    console.log(`1.x import already applied; you may delete ${source}.`);
+    logger.info(`1.x import already applied; you may delete ${source}.`);
   }
   return state;
 }

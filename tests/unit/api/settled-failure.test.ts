@@ -163,4 +163,16 @@ describe("settledFailureResponse (#2180)", () => {
     expect(isUpstreamError(dbErr)).toBe(true);
     expect(classifyError(dbErr, "http")).toBe("operational");
   });
+
+  it("tags the report with the caller's tool id when the row can't be read (#4742)", async () => {
+    state.result = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+
+    await settledFailureResponse("parent", log, "resize");
+
+    expect(state.reportError).toHaveBeenCalledWith(state.result, {
+      source: "http",
+      toolId: "resize",
+      jobId: "parent",
+    });
+  });
 });

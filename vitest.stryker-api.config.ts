@@ -7,7 +7,11 @@ import rootConfig from "./vitest.config";
 // the testcontainer global-setup and the per-fork DB cloning: the tests/unit/api
 // suite is pure logic (0 of 140 build a real app), so it needs no Postgres or
 // Redis. A tiny env stub supplies the values a few src modules read at import.
+// The root env block carries over because the api tests assert against its
+// limits (MAX_BATCH_SIZE, MAX_UPLOAD_SIZE_MB); without it the lane's dry run
+// fails before any mutant runs (#4749).
 const rootResolve = (rootConfig as { resolve?: Record<string, unknown> }).resolve;
+const rootEnv = rootConfig.test?.env;
 
 export default defineConfig({
   esbuild: { jsx: "automatic" },
@@ -22,6 +26,10 @@ export default defineConfig({
     exclude: [
       "tests/unit/api/settings-helpers.test.ts",
       "tests/unit/api/tool-routes-boot-log.test.ts",
+      // Same tier: the login throttle runs against real Redis, and the
+      // pdf-to-image batch case inserts a jobs row (#4749).
+      "tests/unit/api/login-throttle.test.ts",
+      "tests/unit/api/pdf-to-image-failed-run-cleanup.test.ts",
       // Source-drift guards that readFileSync a source file and regex its text.
       // Stryker instruments the source, changing its text, so those assertions
       // fail under mutation. They stay in the normal suite; behavioral coverage
@@ -31,6 +39,7 @@ export default defineConfig({
       "tests/unit/api/alert-evaluator.test.ts",
       "tests/unit/api/storage-reconciliation.test.ts",
     ],
+    env: rootEnv,
     setupFiles: ["tests/setup/stryker-api-env.ts"],
     pool: "forks",
     testTimeout: 30_000,

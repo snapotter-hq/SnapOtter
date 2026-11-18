@@ -193,7 +193,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
         lines.push("**Parameters:**");
         for (const p of op.parameters) {
           lines.push(
-            `- \`${p.name}\` (${p.in}${p.required ? ", required" : ""}) — ${p.schema?.type || "string"}`,
+            `- \`${p.name}\` (${p.in}${p.required ? ", required" : ""}): ${p.schema?.type || "string"}`,
           );
         }
         lines.push("");
@@ -206,7 +206,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
         if (schema?.properties) {
           for (const [name, prop] of Object.entries(schema.properties)) {
             const required = schema.required?.includes(name) ? " (required)" : "";
-            const desc = prop.description ? ` — ${prop.description.split("\n")[0]}` : "";
+            const desc = prop.description ? `: ${prop.description.split("\n")[0]}` : "";
             lines.push(`- \`${name}\`${required}: ${prop.type || "string"}${desc}`);
           }
         }
@@ -219,7 +219,7 @@ export function generateLlmsFullTxt(spec: OpenAPISpec): string {
           // A shared response is a $ref; its text lives under components.responses.
           const shared = res.$ref?.match(/^#\/components\/responses\/(.+)$/)?.[1];
           const resolved = shared ? spec.components?.responses?.[shared] : res;
-          lines.push(`- \`${code}\` — ${resolved?.description || ""}`);
+          lines.push(`- \`${code}\`: ${resolved?.description || ""}`);
         }
         lines.push("");
       }
@@ -278,12 +278,15 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const llmsTxt = generateLlmsTxt(spec);
   const llmsFullTxt = generateLlmsFullTxt(spec);
 
+  // These async handlers return the reply after send(). Resolving undefined
+  // instead lets Fastify send a second time while the app's async onSend hooks
+  // run, and that second writeHead throws ERR_HTTP_HEADERS_SENT.
   app.get("/llms.txt", async (_request, reply) => {
-    reply.type("text/plain; charset=utf-8").send(llmsTxt);
+    return reply.type("text/plain; charset=utf-8").send(llmsTxt);
   });
 
   app.get("/llms-full.txt", async (_request, reply) => {
-    reply.type("text/plain; charset=utf-8").send(llmsFullTxt);
+    return reply.type("text/plain; charset=utf-8").send(llmsFullTxt);
   });
 
   app.get<{ Querystring: { lang?: string } }>(
@@ -299,7 +302,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
       // guarantee; localized files are UTF-8 and only served with ?lang.
       const body =
         file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"), file);
-      reply.type("text/yaml; charset=utf-8").send(body);
+      return reply.type("text/yaml; charset=utf-8").send(body);
     },
   );
 
@@ -337,7 +340,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
           ),
           toolStrings,
         });
-        reply.type("text/plain; charset=utf-8").send(body);
+        return reply.type("text/plain; charset=utf-8").send(body);
       },
     );
   }

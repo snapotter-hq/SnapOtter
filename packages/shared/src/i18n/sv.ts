@@ -4122,6 +4122,8 @@ export const sv: TranslationKeys = {
     previewFailed: "Förhandsgranskning misslyckades",
     previewEncoderMissing:
       "Serverns ffmpeg saknar kodaren {encoder}, så förhandsvisningen kan inte skapas. Kontakta din administrator.",
+    previewEngineUnavailable:
+      "ffmpeg är inte installerat på servern, så förhandsvisningen kan inte skapas. Be din administratör att installera ffmpeg eller ange FFMPEG_PATH.",
     previewProgressMessages: [
       "Uttern värmer upp...",
       "Tuggar pixlar...",
@@ -5198,6 +5200,7 @@ export const sv: TranslationKeys = {
       disabledCount: "{count} verktyg inaktiverade",
       disabledCountOne: "{count} verktyg inaktiverat",
       disabledCountOther: "{count} verktyg inaktiverade",
+      offWithBase: "Inaktiverat eftersom verktyget {base} är inaktiverat.",
     },
     experimental: {
       label: "Aktivera experimentella verktyg",
@@ -5649,6 +5652,8 @@ export const sv: TranslationKeys = {
         "Webbläsaren som det här verktyget behöver är inte tillgänglig just nu.",
       DEPENDENCY_VALIDATION_FAILED:
         "Den här inställningen beror på en annan inställning som inte är giltig.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Den här funktionen kräver en processor med AVX-stöd, och den här serverns processor saknar det.",
       FEATURE_INCOMPATIBLE: "Den här funktionen kan inte köras med de nuvarande inställningarna.",
       FST_REQ_FILE_TOO_LARGE: "Filen är för stor för att laddas upp.",
       IDLE_TIMEOUT: "Du loggades ut efter att ha varit inaktiv. Logga in igen.",
@@ -5699,6 +5704,41 @@ export const sv: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Resultatet kan inte nå målstorleken.",
       TOO_MANY_FRAMES: "Den här filen har för många bildrutor för att bearbetas.",
       CANCELED: "Åtgärden avbröts.",
+      PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
+      INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Du kan inte ta bort alla sidor. Behåll minst en.",
+      NESTING_TOO_DEEP: "Den här filen är för djupt nästlad för att konverteras.",
+      DOCUMENT_UNREADABLE:
+        "Det gick inte att öppna dokumentet. Det kan vara skadat, lösenordsskyddat eller inte i det format som filändelsen anger.",
+      PDF_DAMAGED:
+        "Den här PDF-filen är skadad. Kör den genom verktyget Reparera PDF och försök sedan igen.",
+      PDF_PASSWORD_PROTECTED:
+        "Den här PDF-filen är lösenordsskyddad. Lås upp den med verktyget Lås upp PDF och försök sedan igen.",
+      IMAGE_TOO_LARGE:
+        "Bilden är för stor för att bearbetas. Minska dess dimensioner och försök igen.",
+      RESULT_TOO_LARGE:
+        "Resultatet av de här inställningarna skulle bli för stort. Använd en mindre bild eller inställningar som ger ett mindre resultat.",
+      NO_AUDIO_TRACK: "Den här filen har inget ljudspår. Välj en fil med ljud och försök igen.",
+      IMAGE_UNDECODABLE:
+        "Bilden kan inte läsas. Filen kan vara skadad eller använda en kodning som det här verktyget inte stöder.",
+      INVALID_SETTINGS:
+        "De här inställningarna fungerar inte med den här filen. Kontrollera värdena och försök igen.",
+      CHART_DATA_INVALID:
+        "Diagramskaparen kunde inte läsa diagramdata från filen. Använd CSV eller JSON med högst 100 rader, var och en med en etikett och ett tal som är noll eller större.",
+      NO_FACE_DETECTED:
+        "Inget ansikte hittades. Ladda upp ett skarpt foto taget rakt framifrån i bra ljus.",
+      TARGET_SIZE_UNREACHABLE:
+        "Filen kan inte göras tillräckligt liten för målstorleken. Prova ett större mål.",
+      TOO_MANY_PAGES:
+        "Den här PDF-filen har för många sidor för att bearbetas på en gång. Välj färre sidor och försök igen.",
+      METADATA_DAMAGED:
+        "Bildens befintliga metadata är skadade, så de kan inte redigeras på ett säkert sätt.",
+      REMOTE_RESOURCES_DISABLED:
+        "Filen laddar bilder eller stilar från internet, vilket den här servern inte tillåter. Bädda in dem i filen och försök igen.",
+      TOO_MANY_PIXELS:
+        "Animeringen har för många pixlar sammanlagt över sina bildrutor. Använd färre bildrutor eller en mindre storlek.",
+      MEDIA_UNDECODABLE:
+        "Filen kan inte läsas. Den kan vara skadad, sakna ljud- eller videoström eller använda ett format som det här verktyget inte stöder.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",
@@ -5766,6 +5806,7 @@ export const sv: TranslationKeys = {
     grid: "Rutnät",
     automate: "Automatisera",
     editor: "Redigerare",
+    editorBadge: "Beta",
     files: "Filer",
     help: "Hjälp",
     settings: "Inställningar",

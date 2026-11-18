@@ -4153,6 +4153,8 @@ export const de: TranslationKeys = {
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
     previewEncoderMissing:
       "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
+    previewEngineUnavailable:
+      "Auf diesem Server ist ffmpeg nicht installiert, daher kann keine Vorschau erzeugt werden. Bitten Sie Ihren Administrator, ffmpeg zu installieren oder FFMPEG_PATH zu setzen.",
     previewProgressMessages: [
       "Der Otter wärmt sich auf...",
       "Pixel werden zerkaut...",
@@ -5239,6 +5241,7 @@ export const de: TranslationKeys = {
       disabledCount: "{count} Werkzeug(e) deaktiviert",
       disabledCountOne: "{count} Werkzeug deaktiviert",
       disabledCountOther: "{count} Werkzeuge deaktiviert",
+      offWithBase: "Deaktiviert, weil {base} deaktiviert ist.",
     },
     experimental: {
       label: "Experimentelle Werkzeuge aktivieren",
@@ -5705,6 +5708,8 @@ export const de: TranslationKeys = {
         "Der Browser, den dieses Werkzeug benötigt, ist derzeit nicht verfügbar.",
       DEPENDENCY_VALIDATION_FAILED:
         "Diese Einstellung hängt von einer anderen Einstellung ab, die nicht gültig ist.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Diese Funktion braucht einen Prozessor mit AVX-Unterstützung, und der Prozessor dieses Servers hat sie nicht.",
       FEATURE_INCOMPATIBLE:
         "Diese Funktion kann mit den aktuellen Einstellungen nicht ausgeführt werden.",
       FST_REQ_FILE_TOO_LARGE: "Diese Datei ist zu groß zum Hochladen.",
@@ -5759,6 +5764,45 @@ export const de: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Das Ergebnis kann die Zielgröße nicht erreichen.",
       TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
+      PAGE_OUT_OF_RANGE:
+        "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",
+      INVALID_PAGE_RANGE:
+        "Dieser Seitenbereich ist ungültig. Verwenden Sie Seitenzahlen wie 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES:
+        "Sie können nicht alle Seiten entfernen. Behalten Sie mindestens eine.",
+      NESTING_TOO_DEEP: "Diese Datei ist zu tief verschachtelt, um sie zu konvertieren.",
+      DOCUMENT_UNREADABLE:
+        "Dieses Dokument konnte nicht geöffnet werden. Es ist möglicherweise beschädigt, passwortgeschützt oder hat nicht das Format, das seine Endung angibt.",
+      PDF_DAMAGED:
+        "Dieses PDF ist beschädigt. Lass es durch das Tool „PDF reparieren“ laufen und versuche es dann erneut.",
+      PDF_PASSWORD_PROTECTED:
+        "Dieses PDF ist passwortgeschützt. Entsperre es mit dem Tool „PDF entsperren“ und versuche es dann erneut.",
+      IMAGE_TOO_LARGE:
+        "Dieses Bild ist zu groß für die Verarbeitung. Verringere seine Abmessungen und versuche es erneut.",
+      RESULT_TOO_LARGE:
+        "Das Ergebnis dieser Einstellungen wäre zu groß. Verwende ein kleineres Bild oder Einstellungen, die ein kleineres Ergebnis erzeugen.",
+      NO_AUDIO_TRACK:
+        "Diese Datei hat keine Audiospur. Wähle eine Datei mit Audio und versuche es erneut.",
+      IMAGE_UNDECODABLE:
+        "Dieses Bild kann nicht gelesen werden. Die Datei ist möglicherweise beschädigt oder nutzt eine Kodierung, die dieses Werkzeug nicht unterstützt.",
+      INVALID_SETTINGS:
+        "Diese Einstellungen passen nicht zu dieser Datei. Prüfe die Werte und versuche es erneut.",
+      CHART_DATA_INVALID:
+        "Der Diagramm-Ersteller konnte aus dieser Datei keine Diagrammdaten lesen. Verwende CSV oder JSON mit höchstens 100 Zeilen, jeweils mit einer Beschriftung und einer Zahl von null oder mehr.",
+      NO_FACE_DETECTED:
+        "Es wurde kein Gesicht gefunden. Lade ein klares Foto von vorne mit guter Beleuchtung hoch.",
+      TARGET_SIZE_UNREACHABLE:
+        "Diese Datei lässt sich nicht auf die Zielgröße verkleinern. Versuche eine größere Zielgröße.",
+      TOO_MANY_PAGES:
+        "Dieses PDF hat zu viele Seiten, um sie auf einmal zu verarbeiten. Wähle weniger Seiten aus und versuche es erneut.",
+      METADATA_DAMAGED:
+        "Die vorhandenen Metadaten dieses Bildes sind beschädigt, daher können sie nicht sicher bearbeitet werden.",
+      REMOTE_RESOURCES_DISABLED:
+        "Diese Datei lädt Bilder oder Stile aus dem Internet, was dieser Server nicht erlaubt. Bette sie in die Datei ein und versuche es erneut.",
+      TOO_MANY_PIXELS:
+        "Diese Animation hat über alle Frames hinweg zu viele Pixel. Verwende weniger Frames oder eine kleinere Größe.",
+      MEDIA_UNDECODABLE:
+        "Diese Datei kann nicht gelesen werden. Sie ist möglicherweise beschädigt, hat keine Audio- oder Videospur oder nutzt ein Format, das dieses Werkzeug nicht unterstützt.",
     },
     generic: "Ein Fehler ist aufgetreten",
     offline: "Sie sind offline",
@@ -5835,6 +5879,7 @@ export const de: TranslationKeys = {
     grid: "Raster",
     automate: "Automatisieren",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Dateien",
     help: "Hilfe",
     settings: "Einstellungen",

@@ -6,7 +6,7 @@
  * redactMessage. Frame paths keep the host-less pathname so debug-id source maps
  * still resolve.
  */
-import { httpStatusTag, rebuildErrorValue, redactMessage } from "@snapotter/shared";
+import { DEPLOY_MODES, httpStatusTag, rebuildErrorValue, redactMessage } from "@snapotter/shared";
 
 export const IGNORE_ERRORS: (string | RegExp)[] = [
   /^AbortError/,
@@ -69,6 +69,37 @@ function hasDevServerFrames(event: AnyEvent): boolean {
   return false;
 }
 
+/**
+ * Page translators (Google Translate's <font> wrappers, Yandex's <ya-tr-span>)
+ * replace text nodes React still owns, and React's next insertBefore or
+ * removeChild next to one throws NotFoundError (WEB-2V/2T/2N/1G,
+ * facebook/react#11538). A real portal bug throws the same error, so the
+ * error alone isn't enough (#845): drop it only when a translator left its
+ * mark, in the click breadcrumbs or on <html>.
+ */
+const TRANSLATOR_SELECTOR = /(^|[\s>])(font|ya-tr-span)([\s>.#[:]|$)/;
+const TRANSLATED_HTML_CLASSES = ["translated-ltr", "translated-rtl"];
+
+function isTranslatorDomCrash(event: AnyEvent, error: unknown): boolean {
+  // Any NotFoundError: Safari words it "The object can not be found here.",
+  // naming neither method. The translator trace is what narrows it.
+  if (!(error instanceof Error) || error.name !== "NotFoundError") return false;
+  const html = typeof document === "undefined" ? undefined : document.documentElement;
+  if (html && TRANSLATED_HTML_CLASSES.some((c) => html.classList.contains(c))) return true;
+  const crumbs = event.breadcrumbs;
+  const list = Array.isArray(crumbs) ? crumbs : asObj(crumbs)?.values;
+  if (!Array.isArray(list)) return false;
+  return list.some((entry) => {
+    const crumb = asObj(entry);
+    return (
+      typeof crumb?.category === "string" &&
+      crumb.category.startsWith("ui.") &&
+      typeof crumb.message === "string" &&
+      TRANSLATOR_SELECTOR.test(crumb.message)
+    );
+  });
+}
+
 export const DENY_URLS: RegExp[] = [
   /^chrome-extension:\/\//,
   /^moz-extension:\/\//,
@@ -83,7 +114,14 @@ const HOUR_MS = 3600_000;
 // status_code (the API's name for the same tag) carries a SafeError's HTTP
 // status, since its message stays constant (#1351). It's the one tag whose
 // value comes from a response, so beforeSend also checks it's a bare status.
-const TAG_ALLOWLIST = new Set(["route", "tool_id", "locale", "error_class", "status_code"]);
+const TAG_ALLOWLIST = new Set([
+  "route",
+  "tool_id",
+  "locale",
+  "error_class",
+  "status_code",
+  "deploy_mode",
+]);
 
 // Sentry event/hint are typed loosely on purpose: this module must not import
 // @sentry/react (analytics.ts loads the SDK lazily and passes events through).
@@ -145,6 +183,7 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
     if (hasDevServerFrames(event)) return null;
+    if (isTranslatorDomCrash(event, hint?.originalException)) return null;
 
     // Dropped: these surfaces can carry user data or PII.
     event.message = undefined;
@@ -169,9 +208,17 @@ export function buildWebBeforeSend(isActive: () => boolean) {
         if (status) tags.status_code = status;
         else delete tags.status_code;
       }
+      // A fixed enum, so a value that isn't one of the install types is dropped.
+      if (
+        "deploy_mode" in tags &&
+        !(DEPLOY_MODES as readonly unknown[]).includes(tags.deploy_mode)
+      ) {
+        delete tags.deploy_mode;
+      }
     }
 
     const rebuilt = rebuildErrorValue(hint?.originalException);
+    const errorless = hint?.originalException == null;
 
     const values = asObj(event.exception)?.values;
     if (Array.isArray(values)) {
@@ -179,8 +226,14 @@ export function buildWebBeforeSend(isActive: () => boolean) {
         const ex = asObj(values[i]);
         if (!ex) continue;
         // The last entry is the original error; linked/outer wrappers get type-only.
-        ex.value = i === values.length - 1 && rebuilt ? rebuilt : ex.type;
+        const isOriginal = i === values.length - 1;
         const frames = asObj(ex.stacktrace)?.frames;
+        ex.value =
+          isOriginal && rebuilt
+            ? rebuilt
+            : isOriginal && errorless && isGlobalOnerror(ex)
+              ? (errorEventValue(ex.value, frames) ?? ex.type)
+              : ex.type;
         if (Array.isArray(frames)) {
           for (const entry of frames) {
             const frame = asObj(entry);
@@ -204,6 +257,36 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     }
     return event;
   };
+}
+
+function isGlobalOnerror(ex: AnyEvent): boolean {
+  const type = asObj(ex.mechanism)?.type;
+  return typeof type === "string" && type.includes("global_handlers.onerror");
+}
+
+/**
+ * window.onerror hands Sentry a bare ErrorEvent with no Error object when a
+ * worker script throws (pdf.js's worker, WEB-1A): there is no originalException
+ * for rebuildErrorValue, and falling back to the type alone left 360 events
+ * titled "Error: Error". The message the browser reported goes through the
+ * same redactor as every other value, and the throwing script's basename and
+ * line number follow it, never its path or query string.
+ */
+function errorEventValue(message: unknown, frames: unknown): string | null {
+  const text = typeof message === "string" ? redactMessage(message).trim() : "";
+  const top = Array.isArray(frames) ? asObj(frames[frames.length - 1]) : null;
+  const file = typeof top?.filename === "string" ? scriptBasename(top.filename) : "";
+  const line = typeof top?.lineno === "number" ? top.lineno : null;
+  const where = file ? `${file}${line === null ? "" : `:${line}`}` : "";
+  if (text && where) return `${text} (${where})`;
+  return text || (where ? `Script error (${where})` : null);
+}
+
+// blob: and data: URLs name no file, and a blob id is unique per session.
+function scriptBasename(filename: string): string {
+  if (/^(blob|data):/i.test(filename)) return "";
+  const path = scrubFramePath(filename.split(/[?#]/)[0]);
+  return path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1);
 }
 
 // App bundle frames are http(s) URLs: keep the host-less pathname so Sentry can

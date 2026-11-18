@@ -31,11 +31,13 @@ describe("NonNativePreview failure states", () => {
   beforeEach(() => {
     vi.mocked(captureHandledError).mockClear();
     // jsdom has no object URLs; a valid preview must not fail on that alone.
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: () => "blob:preview",
-      revokeObjectURL: () => {},
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: () => "blob:preview",
+        revokeObjectURL: () => {},
+      }),
+    );
   });
 
   afterEach(() => {

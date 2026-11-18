@@ -176,7 +176,7 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
       // /api/v1/upload does, so it takes the same file permission. This route
       // sits outside /api/v1/tools/, where the tool-access gate applies.
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Validate body
       const parsed = fetchUrlsSchema.safeParse(request.body);

@@ -65,11 +65,14 @@ describe.skipIf(!qpdfAvailable())("unlock-pdf (requires qpdf)", () => {
     }
   }, 60_000);
 
-  it("rejects wrong password with 422", async () => {
+  // Sentry NODE-A4 (unlock-pdf events): a wrong password is the user's input.
+  it("rejects a wrong password with a coded 400 that leaves qpdf out", async () => {
     const res = await runTool({ password: "wrongPassword" });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/password|invalid/i);
+    expect(body.code).toBe("INVALID_PASSWORD");
+    expect(body.error).toBe("The password for this PDF isn't correct.");
+    expect(JSON.stringify(body)).not.toMatch(/qpdf/);
   }, 60_000);
 
   it("persists redacted password in the jobs row", async () => {

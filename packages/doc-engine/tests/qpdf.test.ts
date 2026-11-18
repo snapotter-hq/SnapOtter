@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isSafeMessageError, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
@@ -150,6 +151,25 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
     });
   });
 
+  it("reports a crash signal as a bug-kind ENGINE_CRASHED SafeError, not a spawn failure (#4684)", async () => {
+    nextChild({ stderr: "", stdout: "partial", code: null, signal: "SIGSEGV" });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfCheck("/doc.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (qpdf) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "qpdf exited SIGSEGV: partial",
+      signal: "SIGSEGV",
+    });
+  });
+
   it("rejects exit codes 126 and 127 as errno-coded spawn failures (#2920)", async () => {
     nextChild({ stderr: "sh: exec format error\n", code: 126 });
     await expect(
@@ -193,6 +213,40 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).toBe("qpdf exited 2: unable to find trailer dictionary");
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
+  // Sentry NODE-A4: a page past the end and a wrong decrypt password both exit
+  // 2, like real damage, and used to be reported as our bug (#4415, #4418).
+  it.each([
+    [
+      "parsing numeric range for /doc.pdf: error at * in numeric range *13: number 13 out of range\n",
+      "page-range",
+      "PAGE_OUT_OF_RANGE",
+    ],
+    ["error at * in numeric range *1z: invalid range syntax\n", "page-range", "INVALID_PAGE_RANGE"],
+    ["/doc.pdf: invalid password\n", "invalid-password", "PDF_PASSWORD_PROTECTED"],
+  ])("rejects qpdf's %j as a user-input error tagged %s", async (stderr, fault, code) => {
+    nextChild({ stderr, code: 2 });
+    const m = await import("../src/qpdf.js");
+    const err = await m.qpdfCheck("/doc.pdf").catch((e: unknown) => e);
+    expect(isToolInputError(err)).toBe(true);
+    expect(m.qpdfInputFault(err)).toBe(fault);
+    expect(toolInputErrorCode(err)).toBe(code);
+    expect((err as Error).message).not.toContain("/doc.pdf");
+    expect(((err as Error).cause as Error).message).toBe(`qpdf exited 2: ${stderr}`);
+  });
+
+  it("keeps structural damage and other exit codes out of the input-fault mapping", async () => {
+    nextChild({ stderr: "unable to find trailer dictionary", code: 2 });
+    nextChild({ stderr: "/doc.pdf: invalid password", code: 1 });
+    const m = await import("../src/qpdf.js");
+    for (let i = 0; i < 2; i++) {
+      const err = await m.qpdfCheck("/doc.pdf").catch((e: unknown) => e);
+      expect(isToolInputError(err)).toBe(false);
+      expect(m.qpdfInputFault(err)).toBeUndefined();
+    }
+    expect(m.qpdfInputFault(null)).toBeUndefined();
+    expect(m.qpdfInputFault(Object.assign(new Error("x"), { qpdfFault: "other" }))).toBeUndefined();
   });
 
   it("rejects with the spawn error object on an error event", async () => {
@@ -396,6 +450,25 @@ describe("qpdfRequiresPassword", () => {
       syscall: "spawn",
       path: QPDF_STUB,
       signal: "SIGKILL",
+    });
+  });
+
+  it("reports a crash signal from the password probe as ENGINE_CRASHED (#4684)", async () => {
+    nextChild({ stderr: "abort\n", code: null, signal: "SIGABRT" });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfRequiresPassword("/enc.pdf"))
+      .catch((e: unknown) => e);
+    expect(isSafeMessageError(err)).toBe(true);
+    expect(err).toMatchObject({
+      message: "The document engine (qpdf) crashed while processing this file.",
+      kind: "bug",
+      code: "ENGINE_CRASHED",
+      statusCode: 500,
+    });
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+    expect((err as Error).cause).toMatchObject({
+      message: "qpdf exited SIGABRT: abort",
+      signal: "SIGABRT",
     });
   });
 

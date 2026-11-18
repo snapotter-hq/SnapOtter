@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 306ca03c89bd
+i18n_output_hash: 47e1f262cc33
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ SnapOtter **55+ इनपुट फ़ॉर्मेट** और **14 आउट
 - **Upscale** CPU पर छोटी इमेज से बड़ी किसी भी चीज़ के लिए टाइमआउट हो जाता है। व्यावहारिक उपयोग के लिए GPU आवश्यक है।
 - **CodeFormer** फ़ेस एन्हांसमेंट GFPGAN से काफ़ी धीमा है (GPU पर 53s बनाम 2s)। अधिकांश उपयोग के लिए GFPGAN की सिफ़ारिश की जाती है।
 
+### कई रेप्लिका के साथ AI बंडल इंस्टॉल {#ai-bundle-installs-with-several-replicas}
+
+AI बंडल तभी बदलें जब केवल एक रेप्लिका चल रही हो। बंडल इंस्टॉल करने, ऑफ़लाइन इम्पोर्ट करने या AI एनवायरनमेंट रीसेट करने पर `/data/ai/venv` में मौजूद साझा Python एनवायरनमेंट दोबारा लिखा जाता है। इंस्टॉल केवल अपनी रेप्लिका के AI जॉब का इंतज़ार करता है, और इनमें से हर क्रिया के बाद उसी रेप्लिका का साइडकार (sidecar) रीस्टार्ट होता है, लेकिन इनमें से कोई भी दूसरी रेप्लिका के AI जॉब नहीं देख सकती। उन रेप्लिका के साइडकार उस डायरेक्टरी से torch और ONNX Runtime लोड रखे रहते हैं जबकि वह दोबारा लिखी जा रही होती है, और जॉब के बीच में क्रैश हो सकते हैं। डिप्लॉयमेंट को घटाकर एक रेप्लिका पर ले आएँ (या बाकी को रोक दें), बदलाव करें, फिर दोबारा बढ़ा दें।
+
 ## वॉल्यूम {#volumes}
 
 | माउंट / वॉल्यूम | उद्देश्य | आवश्यक? |
 |---|---|---|
 | `/data` (app) | AI मॉडल, Python venv, उपयोगकर्ता फ़ाइलें | **हाँ** - इसके बिना फ़ाइलें खो जाती हैं |
-| `/tmp/workspace` (app) | अस्थायी प्रोसेसिंग फ़ाइलें (अपने आप साफ़ होती हैं) | अनुशंसित |
+| `/tmp/workspace` (app) | अस्थायी प्रोसेसिंग फ़ाइलें और जॉब आउटपुट (अपने आप साफ़ होते हैं)। यह `/data` में संग्रहीत नहीं होता, इसलिए इसे माउंट न करने पर कंटेनर बदलते ही नतीजे खो जाते हैं | अनुशंसित |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL डेटा डायरेक्टरी (उपयोगकर्ता, सेटिंग, पाइपलाइन, जॉब) | **हाँ** - इसके बिना डेटा खो जाता है |
 | `SnapOtter-redisdata` (redis) | टिकाऊ जॉब क्यू के लिए Redis append-only फ़ाइल | अनुशंसित |
+
+### `docker run` के साथ जॉब आउटपुट सुरक्षित रखना {#keeping-job-output}
+
+जॉब के नतीजे `/tmp/workspace` में रहते हैं, जो माउंट न करने पर कंटेनर के फ़ाइल सिस्टम का हिस्सा है। केवल `-v SnapOtter-data:/data` देने पर आपके उपयोगकर्ता, सेटिंग और फ़ाइलें बनी रहती हैं, लेकिन पिछले जॉब के नतीजे कंटेनर बदलते ही चले जाते हैं और उनके डाउनलोड लिंक 404 लौटाते हैं। उन्हें सुरक्षित रखने के लिए वर्कस्पेस को भी माउंट करें:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose स्टैक पहले से `SnapOtter-workspace` माउंट करते हैं।
 
 ### बाइंड माउंट बनाम नामित वॉल्यूम {#bind-mounts-vs-named-volumes}
 

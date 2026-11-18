@@ -2,7 +2,8 @@
 description: "Конвертуйте зображення в data URI у форматі base64 для вбудовування в HTML, CSS тощо."
 i18n_source_hash: ba4b8f3b4ece
 i18n_provenance: human
-i18n_output_hash: dd739347bafc
+i18n_output_hash: 38515004e193
+i18n_hash_version: 2
 ---
 
 # Зображення в Base64 {#image-to-base64}
@@ -89,7 +90,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/image-to-base64 \
 ## Примітки {#notes}
 
 - Кодування base64 зазвичай збільшує розмір приблизно на 33% порівняно з бінарним файлом. Поле `overheadPercent` показує фактичну різницю.
-- Коли `outputFormat` — `"original"`, файли HEIC/HEIF конвертуються в JPEG (оскільки браузери не можуть показувати HEIC у data URI).
+- Коли `outputFormat`, `"original"`, файли HEIC/HEIF конвертуються в JPEG (оскільки браузери не можуть показувати HEIC у data URI).
 - Параметри `maxWidth` та `maxHeight` змінюють розмір за допомогою `fit: inside` з `withoutEnlargement`, тож зображення, менші за вказані розміри, не збільшуються.
 - В одному запиті можна обробити кілька файлів. Кожен файл обробляється незалежно, і збої не заважають успішній обробці інших файлів.
 - Файли SVG передаються як `image/svg+xml` без повторного кодування (якщо не запитано конвертацію формату).

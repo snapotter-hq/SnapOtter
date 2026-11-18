@@ -294,7 +294,7 @@ describe("Info", () => {
       body,
     });
 
-    // HEIC might need system decoder — skip if 422
+    // HEIC might need system decoder, skip if 422
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);

@@ -11,7 +11,7 @@
  * already pin at the source.
  */
 import { randomUUID } from "node:crypto";
-import { SafeError } from "@snapotter/shared";
+import { engineCrashError, SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -310,6 +310,33 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
         details: expect.stringContaining("QPDF_PATH"),
       });
       expect(engineReports("sign-pdf")).toHaveLength(1);
+    } finally {
+      docSpy.mockRestore();
+    }
+  });
+
+  it("sign-pdf lets a qpdf crash reach the error handler as a 500 instead of Invalid PDF (#4684)", async () => {
+    const crash = engineCrashError(
+      "The document engine (qpdf) crashed while processing this file.",
+      "qpdf",
+      "SIGSEGV",
+      "",
+    );
+    const docSpy = vi.spyOn(DocumentInputHandler.prototype, "prepare").mockRejectedValueOnce(crash);
+    try {
+      const res = await post("/api/v1/tools/pdf/sign-pdf", [
+        pdfPart("in.pdf"),
+        { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+        },
+      ]);
+      // The test app has no error handler of its own, so Fastify's default
+      // answers; what matters is that the crash reached it rather than the
+      // route's own 400.
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toMatchObject({ code: "ENGINE_CRASHED", message: crash.message });
     } finally {
       docSpy.mockRestore();
     }

@@ -60,6 +60,7 @@ vi.mock("@snapotter/doc-engine", () => ({
   qpdfCheck: vi.fn(),
   qpdfDecrypt: vi.fn(),
   qpdfEncrypt: vi.fn(),
+  qpdfInputFault: (err: unknown) => (err as { qpdfFault?: string } | null)?.qpdfFault,
   qpdfLinearize: vi.fn(),
   qpdfMerge: vi.fn(),
   qpdfPageCount: vi.fn(),
@@ -1397,6 +1398,7 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         { signal: mergeCtx.signal },
       );
 
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
       const splitRangeCtx = {
         ...createCtx(scratchDir, "doc.pdf"),
         settings: { mode: "range", range: "1-2" },
@@ -1430,6 +1432,7 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         { signal: splitEveryCtx.signal },
       );
 
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
       const rotateCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { angle: 90 } };
       await getToolConfig("rotate-pdf")?.processV2?.(rotateCtx);
       expect(qpdfRotate).toHaveBeenCalledWith(
@@ -1478,6 +1481,7 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         { signal: linCtx.signal },
       );
 
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
       const orgCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { order: "2,1" } };
       await getToolConfig("organize-pdf")?.processV2?.(orgCtx);
       expect(qpdfPagesSpec).toHaveBeenLastCalledWith(
@@ -1487,6 +1491,7 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         { signal: orgCtx.signal },
       );
 
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
       const extCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { range: "1-2" } };
       await getToolConfig("extract-pages")?.processV2?.(extCtx);
       expect(qpdfPagesSpec).toHaveBeenLastCalledWith(
@@ -1569,6 +1574,80 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
       expect(qpdfAssemblePages).toHaveBeenCalledTimes(1);
       expect(qpdfRotatePages).not.toHaveBeenCalled();
       expect(multiCtx.report).not.toHaveBeenCalledWith(90, "Done");
+    });
+  });
+});
+
+// Sentry NODE-A4 and NODE-A5: page ranges and passwords are the user's input,
+// so each must reach the worker as a coded 400 InputValidationError, which it
+// classifies as expected and keeps out of Sentry (#4415, #4418).
+describe("qpdf routes reject the user's own input as coded 400s", () => {
+  it.each([
+    ["extract-pages", { range: "13" }],
+    ["organize-pdf", { order: "2,13" }],
+    ["rotate-pdf", { angle: 90, range: "13" }],
+    ["split-pdf", { mode: "range", range: "12-13" }],
+    ["remove-pages", { pages: "13" }],
+  ])("%s refuses a page past the end before qpdf runs", async (toolId, settings) => {
+    registerExtractPages(createMockApp());
+    registerOrganizePdf(createMockApp());
+    registerRotatePdf(createMockApp());
+    registerSplitPdf(createMockApp());
+    registerRemovePages(createMockApp());
+    await withScratch(async (scratchDir) => {
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(12);
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings };
+      await expect(getToolConfig(toolId)?.processV2?.(ctx)).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        code: "PAGE_OUT_OF_RANGE",
+        message: "Page 13 is out of range for a 12-page document",
+      });
+      expect(qpdfPagesSpec).not.toHaveBeenCalled();
+      expect(qpdfRotate).not.toHaveBeenCalled();
+      expect(qpdfSplitRanges).not.toHaveBeenCalled();
+      expect(qpdfPagesSpecUnchecked).not.toHaveBeenCalled();
+    });
+  });
+
+  it("remove-pages refuses to remove every page with its own code", async () => {
+    registerRemovePages(createMockApp());
+    await withScratch(async (scratchDir) => {
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: { pages: "1-z" } };
+      await expect(getToolConfig("remove-pages")?.processV2?.(ctx)).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        code: "CANNOT_REMOVE_ALL_PAGES",
+      });
+      expect(qpdfPagesSpecUnchecked).not.toHaveBeenCalled();
+    });
+  });
+
+  it("unlock-pdf turns qpdf's wrong-password fault into INVALID_PASSWORD", async () => {
+    registerUnlockPdf(createMockApp());
+    await withScratch(async (scratchDir) => {
+      vi.mocked(qpdfDecrypt).mockRejectedValueOnce(
+        Object.assign(new Error("The password for this PDF isn't correct."), {
+          qpdfFault: "invalid-password",
+        }),
+      );
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: { password: "nope" } };
+      await expect(getToolConfig("unlock-pdf")?.processV2?.(ctx)).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        code: "INVALID_PASSWORD",
+      });
+    });
+  });
+
+  it("unlock-pdf rethrows any other qpdf failure untouched", async () => {
+    registerUnlockPdf(createMockApp());
+    await withScratch(async (scratchDir) => {
+      const damage = new Error("qpdf exited 2: unable to find trailer dictionary");
+      vi.mocked(qpdfDecrypt).mockRejectedValueOnce(damage);
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: { password: "pw" } };
+      await expect(getToolConfig("unlock-pdf")?.processV2?.(ctx)).rejects.toBe(damage);
     });
   });
 });

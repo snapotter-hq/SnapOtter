@@ -336,7 +336,13 @@ function canonicalDisabledScimRole(role: string): string {
 
 // ── SCIM Bearer Token Auth ───────────────────────────────────────
 
+// preParsing verifies the token once per request; handlers re-enter scimAuth
+// after the body is parsed and must not pay for a second verification.
+const scimAuthOk = new WeakSet<FastifyRequest>();
+
 async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  if (scimAuthOk.has(request)) return true;
+
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     reply.status(401).send(scimError(401, "Bearer token required"));
@@ -377,6 +383,7 @@ async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<b
     return false;
   }
 
+  scimAuthOk.add(request);
   return true;
 }
 
@@ -508,8 +515,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFullAdmin(request, reply);
-      if (!user) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!user) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const token = `${SCIM_TOKEN_PREFIX}${randomBytes(32).toString("hex")}`;
       const hash = await hashPassword(token);
@@ -535,8 +542,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFullAdmin(request, reply);
-      if (!user) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!user) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
 
@@ -557,6 +564,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.log.info("Enterprise SCIM 2.0 routes registered");
 }
 
+export const SCIM_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
+
 async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
   // Scoped to /api/v1/scim/v2/* so an unhandled throw answers the RFC 7644
   // Error envelope Okta and Entra ID expect rather than the app's { error }
@@ -567,6 +576,30 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     const detail =
       statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message);
     reply.status(statusCode).send(scimError(statusCode, detail));
+  });
+
+  // The global bodyLimit tracks the upload size (up to 1 GiB). SCIM documents
+  // are small JSON; this still fits a full-membership group PUT with tens of
+  // thousands of member references (#4632).
+  app.addHook("onRoute", (routeOptions) => {
+    routeOptions.bodyLimit ??= SCIM_BODY_LIMIT_BYTES;
+  });
+
+  // scimAuth otherwise runs as the first line of each handler, after
+  // Fastify has buffered and parsed a body of up to the upload-sized
+  // bodyLimit. Verify the bearer token in preParsing so an anonymous
+  // request is refused before its body is read (#4632). The three
+  // discovery endpoints stay anonymous by design.
+  app.addHook("preParsing", async (request: FastifyRequest, reply: FastifyReply) => {
+    const path = request.url.split("?", 1)[0];
+    if (
+      path === "/api/v1/scim/v2/ServiceProviderConfig" ||
+      path === "/api/v1/scim/v2/ResourceTypes" ||
+      path === "/api/v1/scim/v2/Schemas"
+    ) {
+      return;
+    }
+    if (!(await scimAuth(request, reply))) return reply;
   });
 
   // ── Discovery Endpoints (no auth required) ─────────────────────
@@ -649,8 +682,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const parsed = parseScimBody(scimUserBody, request.body);
       if (!parsed.ok) return scimInvalid(request, reply, parsed);
@@ -762,8 +795,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Users/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       if (id === "anonymous") {
@@ -794,8 +827,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply,
     ) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const filter = (request.query as Record<string, string>).filter;
       const startIndex = Math.max(
@@ -863,8 +896,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Users/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       if (id === "anonymous") {
@@ -971,8 +1004,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Users/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       if (id === "anonymous") {
@@ -1120,8 +1153,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Users/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       if (id === "anonymous") {
@@ -1210,8 +1243,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const parsed = parseScimBody(scimGroupBody, request.body);
       if (!parsed.ok) return scimInvalid(request, reply, parsed);
@@ -1309,8 +1342,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Groups/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
@@ -1338,8 +1371,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply,
     ) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const filter = (request.query as Record<string, string>).filter;
       const startIndex = Math.max(
@@ -1399,8 +1432,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Groups/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       const [existing] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
@@ -1554,8 +1587,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Groups/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
       const [existing] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
@@ -1731,8 +1764,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/scim/v2/Groups/:id",
     { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      if (!(await scimAuth(request, reply))) return;
-      if (!(await requireScimFeature(reply))) return;
+      if (!(await scimAuth(request, reply))) return reply;
+      if (!(await requireScimFeature(reply))) return reply;
 
       const { id } = request.params;
 

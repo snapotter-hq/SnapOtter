@@ -17,6 +17,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { SafeError } from "@snapotter/shared";
 import { aiLog, describeUnexpectedExit } from "./log.js";
 import {
   type ActiveRuntimeDescriptor,
@@ -537,8 +538,22 @@ interface PendingRequest extends PreparedRequest {
   reject: (error: Error) => void;
 }
 
+/**
+ * A slow host, not a defect: accurate OCR on CPU can take minutes a page. The
+ * message is constant so it groups as one operational issue and stays short
+ * enough for the job error to reach the user; the budget stays on the cause.
+ */
 function timeoutError(timeoutMs: number): Error {
-  return new Error(`Accurate OCR runtime timed out after ${timeoutMs}ms`);
+  return new SafeError(
+    "Accurate OCR did not finish in time. It runs much slower on CPU than on a GPU; " +
+      "try a smaller input or fewer pages, Balanced instead of Best, or Fast OCR.",
+    {
+      kind: "operational",
+      code: "OCR_RUNTIME_TIMEOUT",
+      statusCode: 504,
+      cause: new Error(`Accurate OCR runtime timed out after ${timeoutMs}ms`),
+    },
+  );
 }
 
 function resolveTimeoutMs(options: OcrRuntimeRunOptions): number {

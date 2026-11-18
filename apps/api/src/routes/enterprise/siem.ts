@@ -55,7 +55,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/enterprise/siem/config",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("siem_forwarding");
@@ -92,7 +92,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
     "/api/v1/enterprise/siem/config",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
       const user = await requirePermission("webhooks:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("siem_forwarding");
@@ -110,7 +110,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const config = { ...parsed.data };
-      if (!(await validateSiemWebhookUrl(config.webhookUrl, reply))) return;
+      if (!(await validateSiemWebhookUrl(config.webhookUrl, reply))) return reply;
 
       const [existing] = await db
         .select()

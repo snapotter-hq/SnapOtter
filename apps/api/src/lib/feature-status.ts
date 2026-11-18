@@ -29,6 +29,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
+  acquireVenvLock,
   buildInstallerEnv,
   buildOfflineInstallerEnv,
   getOcrRuntimeCapability,
@@ -44,6 +45,7 @@ import {
   SafeError,
 } from "@snapotter/shared";
 import * as tar from "tar";
+import { hostLacksAvx } from "./cpu-features.js";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
 import { logger } from "./logger.js";
 
@@ -1031,6 +1033,8 @@ interface ManifestBundle {
   archives?: Record<string, ManifestArchive>;
   targets?: Record<string, ManifestTarget>;
   smokeImports?: string[];
+  /** The bundle's x86-64 wheels need AVX; arm64 builds never do (#4680). */
+  requiresAvx?: boolean;
 }
 
 interface Manifest {
@@ -1430,6 +1434,17 @@ function causeChain(error: unknown): string {
   return messages.join(": ");
 }
 
+/** Why this host can't run a bundle at all, or null when it can (#4680). */
+export type BundleHostUnsupportedReason = "cpu-no-avx";
+
+export function getBundleHostUnsupportedReason(
+  bundleId: string,
+  manifest: Manifest | null = readManifest(),
+): BundleHostUnsupportedReason | null {
+  if (manifest?.bundles[bundleId]?.requiresAvx && hostLacksAvx()) return "cpu-no-avx";
+  return null;
+}
+
 export function getFeatureStates(): FeatureBundleState[] {
   const installed = readInstalled();
   const lock = getInstallingBundle();
@@ -1598,7 +1613,12 @@ export function getFeatureStates(): FeatureBundleState[] {
       error,
     };
 
-    if (bundle.id !== "ocr") return baseState;
+    const hostUnsupportedReason = getBundleHostUnsupportedReason(bundle.id, manifest);
+    const hostUnsupported = hostUnsupportedReason
+      ? { compatibility: "incompatible" as const, compatibilityReason: hostUnsupportedReason }
+      : {};
+
+    if (bundle.id !== "ocr") return { ...baseState, ...hostUnsupported };
 
     const compatibility = !ocrCapability.available
       ? ocrCapability.status === "invalid"
@@ -1622,6 +1642,7 @@ export function getFeatureStates(): FeatureBundleState[] {
       availableQualities: ["fast", ...(ocrCapability.available ? ocrCapability.qualities : [])],
       requiredMemoryBytes: requiredOcrMemoryBytes,
       effectiveMemoryBytes: effectiveOcrMemoryBytes,
+      ...hostUnsupported,
     };
   });
 }
@@ -1800,6 +1821,12 @@ export async function importBundleArchive(
         "Legacy OCR bundle archives are no longer supported. Import the signed OCR v3 index and matching runtime archive instead.",
       );
     }
+    // Same refusal as the install routes (#4724): an imported bundle that
+    // can't run here would only fail at its first job.
+    const hostUnsupportedReason = getBundleHostUnsupportedReason(descriptor.bundleId, manifest);
+    if (hostUnsupportedReason) {
+      throw new ImportHostUnsupportedError(descriptor.bundleId, hostUnsupportedReason);
+    }
 
     // Resolve where site-packages and fixup wheels must land before moving
     // anything: a rejected import must not leave models or site-packages
@@ -1821,6 +1848,11 @@ export async function importBundleArchive(
     const sitePackagesDir = touchesVenv ? resolveVenvSitePackages(venvPath) : "";
     const venvPython = join(venvPath, "bin", "python3");
 
+    // Everything below rewrites files running AI jobs load (site-packages,
+    // fixup wheels, model weights), so it waits for those jobs and holds new
+    // ones off until the import and any rollback are done, like an install's
+    // venv write (#4615). Extraction above runs alongside jobs.
+    const releaseVenv = await acquireVenvLock();
     const venvRollbackActions: Array<() => void> = [];
     const modelsRollbackActions: Array<() => void> = [];
     const installedFixupPackages: string[] = [];
@@ -2007,6 +2039,8 @@ export async function importBundleArchive(
         err.message = `${err.message} (rollback warnings: ${rollbackErrors.join("; ")})`;
       }
       throw err;
+    } finally {
+      releaseVenv();
     }
 
     markInstalled(descriptor.bundleId, descriptor.version, descriptor.models);
@@ -2390,6 +2424,20 @@ export class ImportValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ImportValidationError";
+  }
+}
+
+export const CPU_NO_AVX_INSTALL_MESSAGE =
+  "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.";
+
+/** An offline import of a bundle this host can't run (#4724). */
+export class ImportHostUnsupportedError extends Error {
+  constructor(
+    readonly bundleId: string,
+    readonly reason: BundleHostUnsupportedReason,
+  ) {
+    super(CPU_NO_AVX_INSTALL_MESSAGE);
+    this.name = "ImportHostUnsupportedError";
   }
 }
 

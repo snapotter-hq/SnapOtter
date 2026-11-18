@@ -342,11 +342,13 @@ function routeFor(toolId: string): string {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   useFileStore.getState().reset();
   useEditorStore.setState({ isDirty: false });
   useToolResultClaims.getState().reset();

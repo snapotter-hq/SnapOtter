@@ -55,3 +55,10 @@ export function resolvePostHogClientHosts(input: {
   }
   return { apiHost: posthogHost };
 }
+
+// Sent as `$ip` so PostHog never stores the connection's IP: ingestion only
+// fills `$ip` from the connection when the event's own value is empty, so null
+// or "" would not work. 0.0.0.0 geolocates to nothing. Not 127.0.0.1 or
+// 192.168.*: PostHog's GeoIP transformation swaps those for a real public test
+// address, which would put a made-up location on the event (#4583).
+export const POSTHOG_IP_PLACEHOLDER = "0.0.0.0";

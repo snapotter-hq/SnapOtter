@@ -30,7 +30,11 @@ vi.mock("../../../packages/ai/src/tesseract-pdf.js", () => ({
   runTesseractPdf: vi.fn(),
 }));
 
-import { extractPdfText, extractText } from "../../../packages/ai/src/ocr.js";
+import {
+  accuratePdfRuntimeTimeoutMs,
+  extractPdfText,
+  extractText,
+} from "../../../packages/ai/src/ocr.js";
 import { runOcrRuntime } from "../../../packages/ai/src/ocr-runtime-dispatcher.js";
 import { runAdaptiveTesseract } from "../../../packages/ai/src/tesseract.js";
 import { preparePdfOcrPages, runTesseractPdf } from "../../../packages/ai/src/tesseract-pdf.js";
@@ -283,6 +287,87 @@ describe("extractPdfText tier routing", () => {
       ],
       expect.any(Object),
     );
+  });
+
+  it("scales the accurate runtime timeout with page count and quality (#4439)", async () => {
+    // NODE-4Y: 17 Best pages got what was left of a flat 30-minute deadline.
+    const pages = Array.from({ length: 17 }, (_, index) => ({
+      page: index + 1,
+      path: `/tmp/job/page-${index + 1}.png`,
+    }));
+    vi.mocked(preparePdfOcrPages).mockResolvedValue({
+      pages,
+      totalPages: 17,
+      remainingTimeoutMs: () => 1_791_908,
+      cleanup: vi.fn().mockResolvedValue(undefined),
+    });
+    for (const quality of ["best", "balanced"] as const) {
+      vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+        runtimeResponse({
+          success: true,
+          text: "Long PDF text",
+          pages: 17,
+          engine: "rapidocr-onnx",
+          requestedQuality: quality,
+          actualQuality: quality,
+          device: "cpu",
+          provider: "CPUExecutionProvider",
+          degraded: false,
+          warnings: [],
+        }),
+      );
+      await extractPdfText("/tmp/job/document.pdf", { quality, pages: "1-17" });
+    }
+
+    expect(vi.mocked(runOcrRuntime).mock.calls.map((call) => call[2]?.timeoutMs)).toEqual([
+      17 * 5 * 60_000,
+      17 * 2 * 60_000,
+    ]);
+  });
+
+  it("reports the runtime budget so the job deadline can follow it (#4719)", async () => {
+    // 30 Best pages need 150 minutes, past the default 2-hour job deadline.
+    const pages = Array.from({ length: 30 }, (_, index) => ({
+      page: index + 1,
+      path: `/tmp/job/page-${index + 1}.png`,
+    }));
+    vi.mocked(preparePdfOcrPages).mockResolvedValue({
+      pages,
+      totalPages: 30,
+      remainingTimeoutMs: () => 1_700_000,
+      cleanup: vi.fn().mockResolvedValue(undefined),
+    });
+    const budgets: number[] = [];
+    vi.mocked(runOcrRuntime).mockImplementationOnce(async () => {
+      // The deadline has to move before the runtime starts, not after.
+      expect(budgets).toHaveLength(1);
+      return runtimeResponse({
+        success: true,
+        text: "Long PDF text",
+        pages: 30,
+        engine: "rapidocr-onnx",
+        requestedQuality: "best",
+        actualQuality: "best",
+        device: "cpu",
+        provider: "CPUExecutionProvider",
+        degraded: false,
+        warnings: [],
+      });
+    });
+    await extractPdfText("/tmp/job/document.pdf", {
+      quality: "best",
+      pages: "all",
+      onTimeBudget: (ms) => budgets.push(ms),
+    });
+
+    // The runtime's own budget plus a minute, so its timeout fires first.
+    expect(budgets).toEqual([30 * 5 * 60_000 + 60_000]);
+    expect(vi.mocked(runOcrRuntime).mock.calls.at(-1)?.[2]?.timeoutMs).toBe(30 * 5 * 60_000);
+  });
+
+  it("keeps the remaining preparation budget when it exceeds the per-page budget", () => {
+    expect(accuratePdfRuntimeTimeoutMs(1, "best", 1_500_000)).toBe(1_500_000);
+    expect(accuratePdfRuntimeTimeoutMs(50, "best", 1_500_000)).toBe(50 * 5 * 60_000);
   });
 
   it("keeps accurate PDF preparation alive while Ghostscript is quiet", async () => {

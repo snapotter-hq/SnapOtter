@@ -18,10 +18,10 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "^9.6.1",
-    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "typescript": "^5.7.0",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.12"
   },
   "license": "AGPL-3.0"
 }

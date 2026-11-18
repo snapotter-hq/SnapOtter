@@ -1,5 +1,10 @@
 import { extname } from "node:path";
-import { hasServerErrorStatus, markToolInputError, ToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  markToolInputError,
+  pixelLimitImageError,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { InputValidationError } from "../modality/contract.js";
@@ -13,7 +18,7 @@ import {
   needsCliDecode,
 } from "./format-decoders.js";
 import { decodeHeic } from "./heic-converter.js";
-import { asInputErrorIfUndecodable, PIXEL_LIMIT_IMAGE_MESSAGE } from "./image-error.js";
+import { asInputErrorIfUndecodable } from "./image-error.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
 import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "./svg-sanitize.js";
 
@@ -87,7 +92,9 @@ export async function prepareRouteImage(
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       opts.log?.warn({ err }, "Decode failed");
-      throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
+      throw err instanceof Error
+        ? markToolInputError(err, "IMAGE_UNDECODABLE")
+        : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
     }
   }
 
@@ -120,12 +127,12 @@ export async function prepareRouteImage(
           throw decodeErr;
         }
         if (isPixelSafetyError(err)) {
-          throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
+          throw pixelLimitImageError(err);
         }
         opts.log?.warn({ err: decodeErr }, "Decode failed");
         throw decodeErr instanceof Error
-          ? markToolInputError(decodeErr)
-          : new ToolInputError(String(decodeErr));
+          ? markToolInputError(decodeErr, "IMAGE_UNDECODABLE")
+          : new ToolInputError(String(decodeErr), { code: "IMAGE_UNDECODABLE" });
       }
     }
   }

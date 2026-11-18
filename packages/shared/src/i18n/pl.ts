@@ -4134,6 +4134,8 @@ export const pl: TranslationKeys = {
     previewFailed: "Generowanie podglądu nie powiodło się",
     previewEncoderMissing:
       "W ffmpeg na tym serwerze brakuje kodera {encoder}, więc nie można wygenerować podglądu. Skontaktuj się z administratorem.",
+    previewEngineUnavailable:
+      "Na tym serwerze nie zainstalowano ffmpeg, więc nie można wygenerować podglądu. Poproś administratora o zainstalowanie ffmpeg lub ustawienie FFMPEG_PATH.",
     previewProgressMessages: [
       "Wydra się rozgrzewa...",
       "Mielimy piksele...",
@@ -5217,6 +5219,7 @@ export const pl: TranslationKeys = {
       disabledCount: "Wyłączono {count} narzędzi",
       disabledCountOne: "Wyłączono {count} narzędzie",
       disabledCountOther: "Wyłączono {count} narzędzi",
+      offWithBase: "Wyłączone, ponieważ narzędzie {base} jest wyłączone.",
     },
     experimental: {
       label: "Włącz eksperymentalne narzędzia",
@@ -5673,6 +5676,8 @@ export const pl: TranslationKeys = {
       BROWSER_NOT_AVAILABLE: "Przeglądarka potrzebna temu narzędziu jest teraz niedostępna.",
       DEPENDENCY_VALIDATION_FAILED:
         "To ustawienie zależy od innego ustawienia, które jest nieprawidłowe.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Ta funkcja wymaga procesora z obsługą AVX, a procesor tego serwera jej nie ma.",
       FEATURE_INCOMPATIBLE: "Ta funkcja nie może działać z bieżącymi ustawieniami.",
       FST_REQ_FILE_TOO_LARGE: "Ten plik jest zbyt duży, aby go przesłać.",
       IDLE_TIMEOUT: "Wylogowano Cię z powodu braku aktywności. Zaloguj się ponownie.",
@@ -5724,6 +5729,41 @@ export const pl: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Wynik nie może osiągnąć docelowego rozmiaru.",
       TOO_MANY_FRAMES: "Ten plik ma zbyt wiele klatek, aby go przetworzyć.",
       CANCELED: "Operację anulowano.",
+      PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
+      INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Nie możesz usunąć wszystkich stron. Zostaw co najmniej jedną.",
+      NESTING_TOO_DEEP: "Ten plik jest zbyt głęboko zagnieżdżony, aby go przekonwertować.",
+      DOCUMENT_UNREADABLE:
+        "Nie udało się otworzyć tego dokumentu. Może być uszkodzony, chroniony hasłem albo nie mieć formatu wskazanego przez rozszerzenie.",
+      PDF_DAMAGED:
+        "Ten plik PDF jest uszkodzony. Przepuść go przez narzędzie Napraw PDF i spróbuj ponownie.",
+      PDF_PASSWORD_PROTECTED:
+        "Ten plik PDF jest chroniony hasłem. Odblokuj go narzędziem Odblokuj PDF i spróbuj ponownie.",
+      IMAGE_TOO_LARGE:
+        "Ten obraz jest za duży do przetworzenia. Zmniejsz jego wymiary i spróbuj ponownie.",
+      RESULT_TOO_LARGE:
+        "Wynik tych ustawień byłby za duży. Użyj mniejszego obrazu lub ustawień, które dają mniejszy wynik.",
+      NO_AUDIO_TRACK: "Ten plik nie ma ścieżki audio. Wybierz plik z dźwiękiem i spróbuj ponownie.",
+      IMAGE_UNDECODABLE:
+        "Nie można odczytać tego obrazu. Plik może być uszkodzony lub używać kodowania, którego to narzędzie nie obsługuje.",
+      INVALID_SETTINGS:
+        "Te ustawienia nie pasują do tego pliku. Sprawdź wartości i spróbuj ponownie.",
+      CHART_DATA_INVALID:
+        "Kreator wykresów nie mógł odczytać danych z tego pliku. Użyj pliku CSV lub JSON z maksymalnie 100 wierszami, z których każdy ma etykietę i liczbę równą zero lub większą.",
+      NO_FACE_DETECTED:
+        "Nie znaleziono twarzy. Prześlij wyraźne zdjęcie zrobione od przodu przy dobrym oświetleniu.",
+      TARGET_SIZE_UNREACHABLE:
+        "Tego pliku nie da się zmniejszyć do docelowego rozmiaru. Spróbuj większego celu.",
+      TOO_MANY_PAGES:
+        "Ten plik PDF ma zbyt wiele stron, aby przetworzyć je naraz. Wybierz mniej stron i spróbuj ponownie.",
+      METADATA_DAMAGED:
+        "Istniejące metadane tego obrazu są uszkodzone, więc nie można ich bezpiecznie edytować.",
+      REMOTE_RESOURCES_DISABLED:
+        "Ten plik wczytuje obrazy lub style z internetu, na co ten serwer nie pozwala. Osadź je w pliku i spróbuj ponownie.",
+      TOO_MANY_PIXELS:
+        "Ta animacja ma zbyt wiele pikseli we wszystkich klatkach. Użyj mniej klatek lub mniejszego rozmiaru.",
+      MEDIA_UNDECODABLE:
+        "Nie można odczytać tego pliku. Może być uszkodzony, nie mieć strumienia audio ani wideo lub używać formatu, którego to narzędzie nie obsługuje.",
     },
     generic: "Wystąpił błąd",
     offline: "Jesteś offline",
@@ -5794,6 +5834,7 @@ export const pl: TranslationKeys = {
     grid: "Siatka",
     automate: "Automatyzacja",
     editor: "Edytor",
+    editorBadge: "Beta",
     files: "Pliki",
     help: "Pomoc",
     settings: "Ustawienia",

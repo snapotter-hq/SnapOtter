@@ -22,6 +22,15 @@ interface ErrLike {
 const NODE_CODE = /^E[A-Z0-9_]+$/;
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 const PG_CONNECTIVITY = /^(08|57P0[123])/;
+// pg and pg-pool raise these with no code when the server drops or never
+// answers the connection (pg lib/client.js, pg-pool index.js). Exact matches
+// only. Left out: a bare "Connection terminated" (pg says that when we end the
+// pool) and "timeout exceeded when trying to connect" (pool exhaustion from a
+// leaked client raises it against a healthy server).
+const PG_CONNECTION_LOSS_MESSAGES = new Set([
+  "Connection terminated unexpectedly",
+  "Connection terminated due to connection timeout",
+]);
 const PG_ROUTINE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const REPLY_TOKEN = /^[A-Z][A-Z0-9_]{1,19}$/;
 const SAFE_NAME = /^[A-Za-z][A-Za-z0-9_$]{0,63}$/;
@@ -273,11 +282,18 @@ export function rebuildErrorValue(err: unknown): string | null {
       return redactMessage(top.message);
     }
 
-    // 5. Empty message with a stack: derive a title from the first in-app frame.
+    // 5. Empty wrapper (BullMQ, a rethrow with no text): the detail sits one
+    //    or more causes down. Redacted like any other message (#4214).
+    for (let i = 1; i < links.length; i++) {
+      const m = links[i].message;
+      if (typeof m === "string" && m.trim().length > 0) return redactMessage(m);
+    }
+
+    // 6. Empty message with a stack: derive a title from the first in-app frame.
     const hint = frameHint(err);
     if (hint) return hint;
 
-    // 6. Nothing safe to surface: type-only.
+    // 7. Nothing safe to surface: type-only.
     return null;
   } catch {
     return null;
@@ -332,6 +348,11 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
     );
     const hasNetCode = links.some((l) => typeof l.code === "string" && NET_CODES.has(l.code));
     if (hasPgState || (hasNetCode && looksLikePg(links))) return "pg-unavailable";
+    if (
+      links.some((l) => typeof l.message === "string" && PG_CONNECTION_LOSS_MESSAGES.has(l.message))
+    ) {
+      return "pg-unavailable";
+    }
     if (hasNetCode || links.some((l) => l.name === "TimeoutError" && "$metadata" in l)) {
       return "net-unavailable";
     }
@@ -363,6 +384,38 @@ export function isEnvironmentalDbError(err: unknown): boolean {
       }
       return ENVIRONMENTAL_PG_CLASS.test(l.code) || l.code === "42501";
     });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True for a wrapper with an empty message whose cause chain holds a pg client
+ * error but no SQLSTATE: the shape behind NODE-58 ("Error: Error" from a
+ * broken database). With no code and no text there is nothing to classify on,
+ * so callers use this only where the job context already says the database
+ * is the suspect (a scheduled system job). A chain that carries a SQLSTATE is
+ * excluded, so a real query bug (42P01 and friends) is never hidden by it.
+ */
+export function isEmptyPgClientError(err: unknown): boolean {
+  try {
+    const links = chain(err);
+    if (links.length < 2) return false;
+    const top = links[0].message;
+    if (typeof top !== "string" || top.trim() !== "") return false;
+    const hasSqlState = links.some(
+      (l) => typeof l.code === "string" && SQLSTATE.test(l.code) && !NODE_CODE.test(l.code),
+    );
+    if (hasSqlState) return false;
+    return links
+      .slice(1)
+      .some(
+        (l) =>
+          l.severity !== undefined ||
+          l.name === "PostgresError" ||
+          l.name === "DatabaseError" ||
+          l.name === "DrizzleQueryError",
+      );
   } catch {
     return false;
   }

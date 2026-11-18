@@ -235,6 +235,7 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 vi.mock("@snapotter/ai", () => ({
+  acquireVenvLock: async () => () => {},
   buildInstallerEnv: (extra: Record<string, string> = {}) => ({
     PATH: process.env.PATH ?? "",
     ...extra,

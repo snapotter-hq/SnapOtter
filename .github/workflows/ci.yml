@@ -143,7 +143,9 @@ jobs:
 
   test-unit:
     name: Unit (${{ matrix.shard }}/2)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest became 26.04, which has no libmagickcore-6 EXR
+    # package. Move to 26.04 with the ImageMagick 7 names (#4768).
+    runs-on: ubuntu-24.04
     # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
     # ladder's worst case is ~34m since #1971 (120s update, two 360s
     # post-swap updates, three 300s installs, a shared 300s dpkg wait), plus
@@ -165,17 +167,7 @@ jobs:
         with:
           packages: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
 
-      - name: Install the ImageMagick EXR coder and verify
-        run: |
-          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
-          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
-          else
-            echo "No supported ImageMagick EXR coder package found" >&2
-            exit 1
-          fi
-          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
+      - uses: ./.github/actions/imagemagick-exr
 
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
@@ -212,7 +204,9 @@ jobs:
 
   test-integration:
     name: Integration (${{ matrix.shard }}/6)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest became 26.04, which has no libmagickcore-6 EXR
+    # package. Move to 26.04 with the ImageMagick 7 names (#4768).
+    runs-on: ubuntu-24.04
     # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
     # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
     # grace), plus the rest of a shard, which took up to ~8m on main. Re-derive
@@ -239,18 +233,10 @@ jobs:
             tesseract-ocr-fra tesseract-ocr-spa
             tesseract-ocr-chi-sim tesseract-ocr-jpn
 
-      - name: Install the ImageMagick EXR coder and verify the format toolchain
-        run: |
-          if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra
-          elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then
-            sudo timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-6-extra
-          else
-            echo "No supported ImageMagick EXR coder package found" >&2
-            exit 1
-          fi
-          convert -list format | grep -Eq '^[[:space:]]*EXR([*[:space:]]|$)'
+      - uses: ./.github/actions/imagemagick-exr
 
+      - name: Verify the Fast OCR language payload
+        run: |
           sudo rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
           test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
 
@@ -309,6 +295,8 @@ jobs:
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -363,12 +351,14 @@ jobs:
         if: failure()
         with:
           name: e2e-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-mobile-smoke:
     name: E2E Mobile Smoke (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-mobile-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -419,12 +409,14 @@ jobs:
         if: failure()
         with:
           name: e2e-mobile-smoke-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-mobile-smoke/playwright-report/
           retention-days: 7
 
   test-e2e-landing:
     name: E2E Landing (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-landing
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -457,12 +449,14 @@ jobs:
         if: failure()
         with:
           name: e2e-landing-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-landing/landing/playwright-report/
           retention-days: 7
 
   test-e2e-docs:
     name: E2E Docs (Chromium)
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_RUN_ID: e2e-docs
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
     # which the config allows up to 10 minutes for on a loaded machine. The
     # extra 10 is degraded-apt-mirror headroom (#876).
@@ -496,7 +490,7 @@ jobs:
         if: failure()
         with:
           name: e2e-docs-report
-          path: playwright-report/
+          path: test-results/e2e-runs/e2e-docs/docs/playwright-report/
           retention-days: 7
 
   pip-audit:

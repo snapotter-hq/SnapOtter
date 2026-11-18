@@ -72,3 +72,37 @@ describe("sanitizeEventProperties", () => {
     expect(out).not.toHaveProperty("hostname");
   });
 });
+
+describe("app_version (#4215)", () => {
+  it.each([
+    "tool_used",
+    "pipeline_executed",
+    "ai_bundle_action",
+    "instance_started",
+    "auth_login",
+    "auth_login_failed",
+  ])("survives the allowlist on %s", (event) => {
+    expect(sanitizeEventProperties(event, { app_version: "2.3.0" })).toEqual({
+      app_version: "2.3.0",
+    });
+  });
+});
+
+describe("auth_login_failed reason (#4216)", () => {
+  it("keeps a closed-set reason and drops free text keys", () => {
+    expect(
+      sanitizeEventProperties("auth_login_failed", {
+        method: "password",
+        reason: "bad_credentials",
+        username: "alice",
+        detail: "bad_password",
+      }),
+    ).toEqual({ method: "password", reason: "bad_credentials" });
+  });
+
+  it("drops a reason outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("auth_login_failed", { method: "password", reason: "alice" }),
+    ).toEqual({ method: "password" });
+  });
+});
