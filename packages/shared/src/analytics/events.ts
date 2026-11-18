@@ -2,6 +2,9 @@ import type { DeployMode } from "./types.js";
 
 export const ANALYTICS_EVENTS = {
   TOOL_USED: "tool_used",
+  // A tool route turned a request away before it queued a job, so tool_used
+  // never fires for it (#4808).
+  TOOL_REFUSED: "tool_refused",
   TOOL_OPENED: "tool_opened",
   FILE_ADDED: "file_added",
   TOOL_STARTED: "tool_started",

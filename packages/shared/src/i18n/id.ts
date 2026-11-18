@@ -2415,6 +2415,8 @@ export const id: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Memperbaiki transparansi ({count} file)",
+      hostMemoryTooLow:
+        "Host ini memiliki memori {available} GB. Pada host CPU, matting resolusi tinggi membutuhkan sekitar {required} GB, jadi alat ini tidak dapat berjalan di sini.",
       description:
         "Unggah PNG dengan latar transparan palsu dan kami akan memperbaikinya dalam satu klik.",
       removeWatermark: "Hapus Watermark",

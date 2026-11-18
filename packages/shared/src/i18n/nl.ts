@@ -2429,6 +2429,8 @@ export const nl: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Transparantie repareren ({count} bestanden)",
+      hostMemoryTooLow:
+        "Deze host heeft {available} GB geheugen. Op een CPU-host heeft matting in hoge resolutie ongeveer {required} GB nodig, dus deze tool kan hier niet draaien.",
       description:
         "Upload een PNG met een nep-transparante achtergrond en we repareren het met een klik.",
       removeWatermark: "Watermerk verwijderen",

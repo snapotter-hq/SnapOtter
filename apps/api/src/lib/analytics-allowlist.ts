@@ -30,6 +30,13 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "error_code",
     "app_version",
   ]),
+  tool_refused: new Set([
+    "tool_id",
+    "reason",
+    "available_memory_gb",
+    "host_memory_gb",
+    "app_version",
+  ]),
   ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "app_version"]),
   instance_started: new Set(["arch", "os_platform", "deploy_mode", "gpu_present", "app_version"]),
   auth_login: new Set(["method", "app_version"]),
@@ -40,6 +47,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
 // string passed by mistake is dropped instead of forwarded (#4216).
 const ALLOWED_VALUES: Record<string, Record<string, ReadonlySet<string>>> = {
   auth_login_failed: { reason: new Set<string>(AUTH_LOGIN_FAILURE_REASONS) },
+  tool_refused: { reason: new Set(["insufficient_memory"]) },
 };
 
 function isAllowedValue(value: unknown): boolean {

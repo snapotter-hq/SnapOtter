@@ -34,6 +34,7 @@ import {
   buildOfflineInstallerEnv,
   getOcrRuntimeCapability,
   getOcrRuntimeEffectiveMemoryBytes,
+  gpuMayBeAvailable,
   resolveAiVenvPath,
   selectOcrRuntimeTarget,
 } from "@snapotter/ai";
@@ -47,6 +48,7 @@ import {
 import * as tar from "tar";
 import { hostLacksAvx } from "./cpu-features.js";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
+import { hostMemoryCapacityBytes, memoryUnavailableTools } from "./hq-memory-gate.js";
 import { logger } from "./logger.js";
 
 // ── Paths ───────────────────────────────────────────────────────────────
@@ -1451,6 +1453,10 @@ export function getFeatureStates(): FeatureBundleState[] {
   const manifest = readManifest();
   const arch = bundleArchKey();
   const queuedIds = new Set(getQueuedBundleIds());
+  const memoryUnavailable = memoryUnavailableTools(
+    gpuMayBeAvailable("onnx"),
+    hostMemoryCapacityBytes(),
+  );
   const ocrCapability = getOcrRuntimeCapability({ aiDataDir: AI_DIR });
   const selectedOcrTarget = ocrCapability.available
     ? ocrCapability.descriptor.artifact.target
@@ -1612,6 +1618,11 @@ export function getFeatureStates(): FeatureBundleState[] {
       progress,
       error,
     };
+
+    const unavailableTools = memoryUnavailable.filter((tool) =>
+      bundle.enablesTools.includes(tool.toolId),
+    );
+    if (unavailableTools.length > 0) baseState.unavailableTools = unavailableTools;
 
     const hostUnsupportedReason = getBundleHostUnsupportedReason(bundle.id, manifest);
     const hostUnsupported = hostUnsupportedReason

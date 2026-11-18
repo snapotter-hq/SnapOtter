@@ -2371,6 +2371,8 @@ export const th: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "กำลังแก้ไขความโปร่งใส ({count} ไฟล์)",
+      hostMemoryTooLow:
+        "โฮสต์นี้มีหน่วยความจำ {available} GB บนโฮสต์ CPU การตัดพื้นหลังความละเอียดสูงต้องใช้ประมาณ {required} GB จึงใช้เครื่องมือนี้ที่นี่ไม่ได้",
       description: "อัปโหลด PNG ที่มีพื้นหลังโปร่งใสปลอม แล้วเราจะแก้ไขให้ในคลิกเดียว",
       removeWatermark: "ลบลายน้ำ",
       removeWatermarkHelp: "ตรวจจับและลบลายน้ำกึ่งโปร่งใส",

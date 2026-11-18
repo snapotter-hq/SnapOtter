@@ -81,6 +81,7 @@ describe("app_version (#4215)", () => {
     "instance_started",
     "auth_login",
     "auth_login_failed",
+    "tool_refused",
   ])("survives the allowlist on %s", (event) => {
     expect(sanitizeEventProperties(event, { app_version: "2.3.0" })).toEqual({
       app_version: "2.3.0",
@@ -104,5 +105,33 @@ describe("auth_login_failed reason (#4216)", () => {
     expect(
       sanitizeEventProperties("auth_login_failed", { method: "password", reason: "alice" }),
     ).toEqual({ method: "password" });
+  });
+});
+
+describe("tool_refused (#4808)", () => {
+  it("keeps the memory figures and a closed-set reason", () => {
+    expect(
+      sanitizeEventProperties("tool_refused", {
+        tool_id: "transparency-fixer",
+        reason: "insufficient_memory",
+        available_memory_gb: 11,
+        host_memory_gb: 16,
+        filename: "secret.png",
+      }),
+    ).toEqual({
+      tool_id: "transparency-fixer",
+      reason: "insufficient_memory",
+      available_memory_gb: 11,
+      host_memory_gb: 16,
+    });
+  });
+
+  it("drops a reason outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("tool_refused", {
+        tool_id: "transparency-fixer",
+        reason: "free text",
+      }),
+    ).toEqual({ tool_id: "transparency-fixer" });
   });
 });

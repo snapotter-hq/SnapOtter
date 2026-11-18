@@ -2394,6 +2394,8 @@ export const ar: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "جاري إصلاح الشفافية ({count} ملف)",
+      hostMemoryTooLow:
+        "يحتوي هذا المضيف على {available} غيغابايت من الذاكرة. على مضيف يعمل بالمعالج فقط، يحتاج القص عالي الدقة إلى حوالي {required} غيغابايت، لذا لا يمكن تشغيل هذه الأداة هنا.",
       description: "ارفع ملف PNG بخلفية شفافة مزيفة وسنصلحه بنقرة واحدة.",
       removeWatermark: "إزالة العلامة المائية",
       removeWatermarkHelp: "اكتشاف وإزالة العلامات المائية شبه الشفافة",

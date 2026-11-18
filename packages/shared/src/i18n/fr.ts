@@ -2433,6 +2433,8 @@ export const fr: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Correction de la transparence ({count} fichiers)",
+      hostMemoryTooLow:
+        "Cet hôte dispose de {available} Go de mémoire. Sur un hôte CPU, le détourage haute résolution demande environ {required} Go, donc cet outil ne peut pas fonctionner ici.",
       description:
         "Importez un PNG avec un faux fond transparent et nous le corrigeons en un clic.",
       removeWatermark: "Supprimer le filigrane",

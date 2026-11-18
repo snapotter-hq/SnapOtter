@@ -2152,6 +2152,8 @@ export const zhCN: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "正在修复透明度（{count} 个文件）",
+      hostMemoryTooLow:
+        "此主机有 {available} GB 内存。在 CPU 主机上，高分辨率抠图需要约 {required} GB，因此此工具无法在此运行。",
       description: "上传一张伪透明 PNG 图片，一键修复透明背景。",
       removeWatermark: "移除水印",
       removeWatermarkHelp: "检测并移除半透明水印",

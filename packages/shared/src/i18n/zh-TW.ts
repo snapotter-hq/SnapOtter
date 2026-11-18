@@ -2152,6 +2152,8 @@ export const zhTW: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "正在修復透明度（{count}個檔案）",
+      hostMemoryTooLow:
+        "此主機有 {available} GB 記憶體。在 CPU 主機上，高解析度去背需要約 {required} GB，因此此工具無法在此執行。",
       description: "上傳帶有偽透明背景的PNG，我們將一鍵修復。",
       removeWatermark: "移除浮水印",
       removeWatermarkHelp: "偵測並移除半透明浮水印",

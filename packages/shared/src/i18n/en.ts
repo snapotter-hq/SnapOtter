@@ -2358,6 +2358,8 @@ export const en = {
     },
     "transparency-fixer": {
       progressLabelBatch: "Fixing transparency ({count} files)",
+      hostMemoryTooLow:
+        "This host has {available} GB of memory. On a CPU host, high-resolution matting needs about {required} GB, so this tool cannot run here.",
       webp: "WebP",
       description: "Upload a PNG with a fake transparent background and we'll fix it in one click.",
       removeWatermark: "Remove Watermark",

@@ -2348,6 +2348,8 @@ export const ko: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "투명도 수정 중 ({count}개 파일)",
+      hostMemoryTooLow:
+        "이 호스트의 메모리는 {available}GB입니다. CPU 호스트에서 고해상도 매팅에는 약 {required}GB가 필요하므로 여기서는 이 도구를 실행할 수 없습니다.",
       description: "가짜 투명 배경의 PNG를 업로드하면 원클릭으로 수정해 드립니다.",
       removeWatermark: "워터마크 제거",
       removeWatermarkHelp: "반투명 워터마크 감지 및 제거",

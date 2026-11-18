@@ -2425,6 +2425,8 @@ export const uk: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "Виправлення прозорості ({count} файлів)",
+      hostMemoryTooLow:
+        "На цьому хості {available} ГБ пам'яті. На хості з CPU для матування високої роздільності потрібно близько {required} ГБ, тому цей інструмент тут не працює.",
       description: "Завантажте PNG з хибною прозорістю, і ми виправимо його в один клік.",
       removeWatermark: "Видалити водяний знак",
       removeWatermarkHelp: "Виявлення та видалення напівпрозорих водяних знаків",

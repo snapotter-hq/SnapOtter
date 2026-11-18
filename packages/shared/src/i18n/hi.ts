@@ -2222,6 +2222,8 @@ export const hi: TranslationKeys = {
     "transparency-fixer": {
       webp: "WebP",
       progressLabelBatch: "ट्रांसपेरेंसी ठीक हो रही है ({count} फाइलें)",
+      hostMemoryTooLow:
+        "इस होस्ट में {available} GB मेमोरी है। CPU होस्ट पर हाई-रिज़ॉल्यूशन मैटिंग के लिए लगभग {required} GB चाहिए, इसलिए यह टूल यहाँ नहीं चल सकता।",
       description: "नकली पारदर्शी बैकग्राउंड वाला PNG अपलोड करें और हम इसे एक क्लिक में ठीक कर देंगे।",
       removeWatermark: "वॉटरमार्क हटाएं",
       removeWatermarkHelp: "अर्ध-पारदर्शी वॉटरमार्क डिटेक्ट करें और हटाएं",

@@ -2,8 +2,8 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 28 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(28);
+  it("has exactly 29 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(29);
   });
 
   it("contains the expected keys", () => {
@@ -35,6 +35,11 @@ describe("ANALYTICS_EVENTS", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_PROMPT_SHOWN");
     expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_PROMPT_DISMISSED");
     expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_RUN_DEGRADED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("TOOL_REFUSED");
+  });
+
+  it("TOOL_REFUSED has the correct snake_case value", () => {
+    expect(ANALYTICS_EVENTS.TOOL_REFUSED).toBe("tool_refused");
   });
 
   it("TOOL_RUN_DEGRADED has the correct snake_case value", () => {

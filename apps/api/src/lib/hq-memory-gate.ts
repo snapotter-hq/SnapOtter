@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-import { freemem } from "node:os";
+import { totalmem } from "node:os";
+import { availableSidecarMemoryBytes } from "@snapotter/ai";
+import type { ToolUnavailability } from "@snapotter/shared";
 
 // Measured on an amd64 CPU host (#670): SD1.5 inpainting is OOM-killed at the
 // stock 6g compose limit and completes at 8g (503s). GPU hosts run it in VRAM,
@@ -54,21 +56,47 @@ export const HR_MATTING_MEMORY_MESSAGE =
   "High-resolution matting needs about 25 GB of free memory on a CPU host, so use a larger host.";
 
 /**
- * Memory this process can still use: free memory, capped by the container limit
- * when there is one. The cap is a ceiling, not current usage, so it can overstate
- * what is free when other processes share the cgroup.
+ * Memory a new sidecar job can still use: host MemAvailable and the remaining
+ * cgroup budget, with reclaimable page cache counted as free (#4808). Null
+ * when neither can be read.
  */
-export function availableMemoryBytes(): number {
-  const free = freemem();
+export function availableMemoryBytes(): number | null {
+  return availableSidecarMemoryBytes();
+}
+
+/** The most memory a job can ever get here: physical memory, capped by the container limit. */
+export function hostMemoryCapacityBytes(): number {
+  const total = totalmem();
   const limit = containerMemoryLimitBytes();
-  return limit === null ? free : Math.min(free, limit);
+  return limit === null ? total : Math.min(total, limit);
 }
 
 /** Refusal for high-resolution matting that would not fit in available memory, else null. */
 export function hrMattingMemoryRefusal(
   gpuAvailable: boolean,
-  availableBytes: number,
+  availableBytes: number | null,
 ): string | null {
-  if (gpuAvailable || availableBytes >= HR_MATTING_CPU_ESTIMATE_BYTES) return null;
+  if (gpuAvailable || availableBytes === null) return null;
+  if (availableBytes >= HR_MATTING_CPU_ESTIMATE_BYTES) return null;
   return HR_MATTING_MEMORY_MESSAGE;
+}
+
+/**
+ * Tools this host can never run because its total memory is under the tool's
+ * CPU floor, so the UI can disable them before an upload (#4808). A host with
+ * enough total memory but too little free memory still gets the 422 at run time.
+ */
+export function memoryUnavailableTools(
+  gpuAvailable: boolean,
+  capacityBytes: number,
+): ToolUnavailability[] {
+  if (gpuAvailable || capacityBytes >= HR_MATTING_CPU_ESTIMATE_BYTES) return [];
+  return [
+    {
+      toolId: "transparency-fixer",
+      reason: "insufficient-memory",
+      requiredMemoryBytes: HR_MATTING_CPU_ESTIMATE_BYTES,
+      hostMemoryBytes: capacityBytes,
+    },
+  ];
 }

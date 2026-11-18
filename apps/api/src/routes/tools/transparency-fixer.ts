@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gpuMayBeAvailable, isMemoryAllocError, removeBackground } from "@snapotter/ai";
 import {
+  ANALYTICS_EVENTS,
   getBundleForTool,
   hasServerErrorStatus,
   isToolInputError,
@@ -21,12 +22,17 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { trackEvent } from "../../lib/analytics.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
-import { availableMemoryBytes, hrMattingMemoryRefusal } from "../../lib/hq-memory-gate.js";
+import {
+  availableMemoryBytes,
+  hostMemoryCapacityBytes,
+  hrMattingMemoryRefusal,
+} from "../../lib/hq-memory-gate.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -354,11 +360,19 @@ export function registerTransparencyFixer(app: FastifyInstance) {
 
         // The HR matting model always takes a 2048x2048 input, so a CPU host short
         // on memory is SIGKILLed partway through. Refuse before any decode (#4510).
-        const memoryRefusal = hrMattingMemoryRefusal(
-          gpuMayBeAvailable("onnx"),
-          availableMemoryBytes(),
-        );
+        const availableBytes = availableMemoryBytes();
+        const memoryRefusal = hrMattingMemoryRefusal(gpuMayBeAvailable("onnx"), availableBytes);
         if (memoryRefusal) {
+          void trackEvent(
+            ANALYTICS_EVENTS.TOOL_REFUSED,
+            {
+              tool_id: TOOL_ID,
+              reason: "insufficient_memory",
+              available_memory_gb: Math.round((availableBytes ?? 0) / 1024 ** 3),
+              host_memory_gb: Math.round(hostMemoryCapacityBytes() / 1024 ** 3),
+            },
+            request.headers["x-posthog-distinct-id"] as string | undefined,
+          );
           return reply
             .status(422)
             .send({ error: "Not enough memory for this image", details: memoryRefusal });
