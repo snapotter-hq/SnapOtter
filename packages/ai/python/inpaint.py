@@ -31,6 +31,11 @@ DILATE_MIN = 6
 DILATE_MAX = 96
 MARGIN_FRAC = 0.5  # context margin around the dilated mask, fraction of its max side
 MARGIN_MIN = 32
+# Outward feather width for the seam blend (#141). Measured on a real photo with
+# a foreign object erased: 16 cut seam MAE ~19% versus the old feather (2 to 7 px
+# on those masks), with no change inside the mask. Wider (24) helped the seam
+# more but softened the background further.
+BLEND_FEATHER_PX = 16
 
 
 def _mask_bbox(mask_bin):
@@ -66,11 +71,14 @@ def compute_crop_box(mask_dil, image_shape, margin_frac, margin_min):
     )
 
 
-def composite(original, inpainted_crop, mask_dil_native, crop_box, feather):
+def composite(original, inpainted_crop, mask_dil_native, crop_box, feather, core_native=None):
     """Blend the inpainted crop into a copy of the full-res original.
 
     Only the crop_box region is written, and within it only where the feathered
     dilated mask has alpha > 0. Pixels beyond the feather stay byte-identical.
+    core_native (the user's erase mask, crop-sized) is forced to alpha 1 so the
+    feather only ramps outward into the margin and never leaks original pixels
+    back into the erased object.
     """
     import cv2
     import numpy as np
@@ -79,7 +87,10 @@ def composite(original, inpainted_crop, mask_dil_native, crop_box, feather):
     result = original.copy()
     ksize = 2 * feather + 1
     alpha = cv2.GaussianBlur((mask_dil_native > 0).astype(np.float32), (ksize, ksize), 0)
-    alpha = np.clip(alpha, 0.0, 1.0)[:, :, np.newaxis]
+    alpha = np.clip(alpha, 0.0, 1.0)
+    if core_native is not None:
+        alpha = np.maximum(alpha, (core_native > 127).astype(np.float32))
+    alpha = alpha[:, :, np.newaxis]
     region = result[y0:y1, x0:x1].astype(np.float32)
     blended = region * (1.0 - alpha) + inpainted_crop.astype(np.float32) * alpha
     result[y0:y1, x0:x1] = np.clip(blended, 0, 255).astype(np.uint8)
@@ -123,10 +134,14 @@ def inpaint_array(img_array, mask_array, run_model, progress=None):
     inpainted_crop = run_model(crop_img, crop_mask)
 
     _p(75, "Compositing")
-    side = max(bx1 - bx0, by1 - by0)
-    feather = int(np.clip(round(0.01 * side), 2, 12))
-    feather = min(feather, max(1, d // 2))
-    return composite(img_array, inpainted_crop, crop_mask, (bx0, by0, bx1, by1), feather)
+    return composite(
+        img_array,
+        inpainted_crop,
+        crop_mask,
+        (bx0, by0, bx1, by1),
+        BLEND_FEATHER_PX,
+        core_native=mask_bin[by0:by1, bx0:bx1],
+    )
 
 
 def _get_model_path():

@@ -6,10 +6,12 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  revokeObjectURL: vi.fn(),
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    revokeObjectURL: vi.fn(),
+  }),
+);
 
 import { dashStyleToArray, hexToRgba, useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, SelectionState } from "@/types/editor";

@@ -1,6 +1,7 @@
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { engineCrashError } from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
@@ -880,6 +881,38 @@ describe("qpdf spawn failures", () => {
         await expectEngineUnavailable(
           validatePdfPath(inputPath, { rejectPasswordProtected: true }),
           cause,
+        );
+      } finally {
+        env.MAX_PDF_PAGES = original;
+      }
+    },
+  );
+});
+
+describe("qpdf crashes (#4684)", () => {
+  const crash = () =>
+    engineCrashError(
+      "The document engine (qpdf) crashed while processing this file.",
+      "qpdf",
+      "SIGSEGV",
+      "",
+    );
+
+  it.each(["requiresPassword", "check", "pageCount"] as const)(
+    "passes a qpdf crash in the %s probe through as a reported 500, not a Damaged PDF",
+    async (probe) => {
+      const inputPath = join(scratchDir, "fine.pdf");
+      writeFileSync(inputPath, "%PDF-path-backed");
+      const err = crash();
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockResolvedValueOnce(undefined);
+      qpdf[probe].mockReset();
+      qpdf[probe].mockRejectedValueOnce(err);
+      const original = env.MAX_PDF_PAGES;
+      env.MAX_PDF_PAGES = 5;
+      try {
+        await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toBe(
+          err,
         );
       } finally {
         env.MAX_PDF_PAGES = original;

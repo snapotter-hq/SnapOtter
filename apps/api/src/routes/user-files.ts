@@ -1,13 +1,13 @@
 /**
  * User file library CRUD routes.
  *
- * GET    /api/v1/files              — List latest files (one per version chain)
- * POST   /api/v1/files/upload       — Upload one or more image files
- * GET    /api/v1/files/:id          — File details + full version history
- * GET    /api/v1/files/:id/download — Stream file as attachment
- * GET    /api/v1/files/:id/thumbnail — 300px JPEG thumbnail on-the-fly
- * DELETE /api/v1/files              — Bulk delete entire version chains
- * POST   /api/v1/files/save-result  — Save a tool processing result (new version)
+ * GET    /api/v1/files: List latest files (one per version chain)
+ * POST   /api/v1/files/upload: Upload one or more image files
+ * GET    /api/v1/files/:id: File details + full version history
+ * GET    /api/v1/files/:id/download: Stream file as attachment
+ * GET    /api/v1/files/:id/thumbnail: 300px JPEG thumbnail on-the-fly
+ * DELETE /api/v1/files: Bulk delete entire version chains
+ * POST   /api/v1/files/save-result: Save a tool processing result (new version)
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
@@ -243,9 +243,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    * A file is "latest" if its id is not referenced as a parentId by any other file.
    *
    * Query params:
-   *   search  — filter on originalName (SQL LIKE)
-   *   limit   — default 50
-   *   offset  — default 0
+   *   search: filter on originalName (SQL LIKE)
+   *   limit: default 50
+   *   offset: default 0
    */
   app.get(
     "/api/v1/files",
@@ -257,7 +257,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const limit = parseInt(request.query.limit ?? "50", 10) || 50;
       const offset = parseInt(request.query.offset ?? "0", 10) || 0;
@@ -318,7 +318,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
       const userId = user.id;
 
       // Refuse an account already over quota before reading the body.
@@ -576,7 +576,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -668,7 +668,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -718,7 +718,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -898,7 +898,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requireFileAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const parsed = deleteFilesSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1014,13 +1014,13 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    *
    * Save the output of a tool as a new version linked to a parent file.
    * Multipart fields:
-   *   file     — the processed image
-   *   parentId — id of the parent user file record
-   *   toolId   — the tool that produced this result
+   *   file: the processed image
+   *   parentId: id of the parent user file record
+   *   toolId: the tool that produced this result
    */
   app.post("/api/v1/files/save-result", async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireFileAccess(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const userId = user.id;
 
     // Enforce per-user storage quota before saving results

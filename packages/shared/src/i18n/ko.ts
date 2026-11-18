@@ -78,7 +78,7 @@ export const ko: TranslationKeys = {
     searchMissContext: "검색한 내용: {query}",
     searchMissDiscussionsFallback: "기록하지 못했습니다. Discussions에서 요청을 열어 주세요.",
     offlineDescription:
-      "이 인스턴스는 분석이 꺼져 있어 피드백이 여기에 기록되지 않습니다. 그래도 SnapOtter 팀에 직접 연락할 수 있습니다.",
+      "이 인스턴스는 지금 피드백을 기록할 수 없습니다. 그래도 SnapOtter 팀에 직접 연락할 수 있습니다.",
     offlinePublicNote: "GitHub 이슈는 공개됩니다.",
     offlineGithubButton: "GitHub 이슈 열기",
     offlineEmailButton: "이메일 보내기",
@@ -4053,6 +4053,8 @@ export const ko: TranslationKeys = {
     previewFailed: "미리보기 생성 실패",
     previewEncoderMissing:
       "이 서버의 ffmpeg에 {encoder} 인코더가 없어 미리보기를 생성할 수 없습니다. 관리자에게 문의하세요.",
+    previewEngineUnavailable:
+      "이 서버에 ffmpeg가 설치되어 있지 않아 미리보기를 생성할 수 없습니다. 관리자에게 ffmpeg 설치 또는 FFMPEG_PATH 설정을 요청하세요.",
     previewProgressMessages: [
       "수달이 몸을 푸는 중...",
       "픽셀을 씹어 먹는 중...",
@@ -5119,6 +5121,7 @@ export const ko: TranslationKeys = {
       disabledCount: "{count}개 도구 비활성화됨",
       disabledCountOne: "{count}개 도구 비활성화됨",
       disabledCountOther: "{count}개 도구 비활성화됨",
+      offWithBase: "{base} 도구가 비활성화되어 이 도구도 비활성화됩니다.",
     },
     experimental: {
       label: "실험적 도구 활성화",
@@ -5560,6 +5563,8 @@ export const ko: TranslationKeys = {
       BROWSER_CRASHED: "렌더링 중 브라우저가 종료되었습니다. 다시 시도하세요.",
       BROWSER_NOT_AVAILABLE: "이 도구에 필요한 브라우저를 지금은 사용할 수 없습니다.",
       DEPENDENCY_VALIDATION_FAILED: "이 설정이 의존하는 다른 설정이 올바르지 않습니다.",
+      FEATURE_CPU_UNSUPPORTED:
+        "이 기능에는 AVX를 지원하는 CPU가 필요하지만 이 서버의 CPU는 AVX를 지원하지 않습니다.",
       FEATURE_INCOMPATIBLE: "현재 설정에서는 이 기능을 실행할 수 없습니다.",
       FST_REQ_FILE_TOO_LARGE: "파일이 너무 커서 업로드할 수 없습니다.",
       IDLE_TIMEOUT: "활동이 없어 로그아웃되었습니다. 다시 로그인하세요.",
@@ -5608,6 +5613,38 @@ export const ko: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "결과물이 목표 크기에 도달할 수 없습니다.",
       TOO_MANY_FRAMES: "이 파일은 프레임이 너무 많아 처리할 수 없습니다.",
       CANCELED: "작업이 취소되었습니다.",
+      PAGE_OUT_OF_RANGE: "이 페이지 범위에 이 PDF에 없는 페이지가 포함되어 있습니다.",
+      INVALID_PAGE_RANGE: "이 페이지 범위는 올바르지 않습니다. 1-3,5처럼 페이지 번호를 입력하세요.",
+      CANNOT_REMOVE_ALL_PAGES: "모든 페이지를 삭제할 수는 없습니다. 최소 한 페이지는 남겨 두세요.",
+      NESTING_TOO_DEEP: "이 파일은 중첩이 너무 깊어 변환할 수 없습니다.",
+      DOCUMENT_UNREADABLE:
+        "이 문서를 열 수 없습니다. 손상되었거나, 비밀번호로 보호되어 있거나, 확장자가 나타내는 형식이 아닐 수 있습니다.",
+      PDF_DAMAGED: "이 PDF가 손상되었습니다. PDF 복구 도구로 복구한 다음 다시 시도하세요.",
+      PDF_PASSWORD_PROTECTED:
+        "이 PDF는 비밀번호로 보호되어 있습니다. PDF 잠금 해제 도구로 잠금을 해제한 다음 다시 시도하세요.",
+      IMAGE_TOO_LARGE: "이 이미지는 너무 커서 처리할 수 없습니다. 크기를 줄이고 다시 시도하세요.",
+      RESULT_TOO_LARGE:
+        "이 설정으로 만들어질 결과가 너무 큽니다. 더 작은 이미지나 더 작은 결과를 만드는 설정을 사용하세요.",
+      NO_AUDIO_TRACK:
+        "이 파일에는 오디오 트랙이 없습니다. 오디오가 있는 파일을 선택하고 다시 시도하세요.",
+      IMAGE_UNDECODABLE:
+        "이 이미지를 읽을 수 없습니다. 파일이 손상되었거나 이 도구가 지원하지 않는 인코딩을 사용할 수 있습니다.",
+      INVALID_SETTINGS: "이 설정은 이 파일에 사용할 수 없습니다. 값을 확인하고 다시 시도하세요.",
+      CHART_DATA_INVALID:
+        "차트 만들기 도구가 이 파일에서 차트 데이터를 읽지 못했습니다. 각 행에 레이블과 0 이상의 숫자가 있는 최대 100행의 CSV 또는 JSON을 사용하세요.",
+      NO_FACE_DETECTED:
+        "얼굴을 찾지 못했습니다. 조명이 좋은 곳에서 정면으로 찍은 선명한 사진을 업로드하세요.",
+      TARGET_SIZE_UNREACHABLE:
+        "이 파일은 목표 크기만큼 줄일 수 없습니다. 더 큰 목표 크기를 시도하세요.",
+      TOO_MANY_PAGES:
+        "이 PDF는 페이지가 너무 많아 한 번에 처리할 수 없습니다. 페이지를 줄이고 다시 시도하세요.",
+      METADATA_DAMAGED: "이 이미지의 기존 메타데이터가 손상되어 안전하게 편집할 수 없습니다.",
+      REMOTE_RESOURCES_DISABLED:
+        "이 파일은 인터넷에서 이미지나 스타일을 불러오는데, 이 서버에서는 허용되지 않습니다. 파일에 포함한 뒤 다시 시도하세요.",
+      TOO_MANY_PIXELS:
+        "이 애니메이션은 전체 프레임의 픽셀 수가 너무 많습니다. 프레임 수를 줄이거나 크기를 작게 하세요.",
+      MEDIA_UNDECODABLE:
+        "이 파일을 읽을 수 없습니다. 파일이 손상되었거나, 오디오나 비디오 스트림이 없거나, 이 도구가 지원하지 않는 형식일 수 있습니다.",
     },
     generic: "오류가 발생했습니다",
     offline: "오프라인 상태입니다",
@@ -5674,6 +5711,7 @@ export const ko: TranslationKeys = {
     grid: "그리드",
     automate: "자동화",
     editor: "에디터",
+    editorBadge: "베타",
     files: "파일",
     help: "도움말",
     settings: "설정",

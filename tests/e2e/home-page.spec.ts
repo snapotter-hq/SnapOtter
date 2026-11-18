@@ -15,7 +15,7 @@ test.describe("Home Page", () => {
   test("modality tabs are visible", async ({ loggedInPage: page }) => {
     // 2.0 home page has modality tabs: All, Image, Video, Audio, PDF, Files
     // Tab buttons render label + a count span, so the accessible name is e.g.
-    // "Image5" (no word boundary before the digit) — match on the label prefix.
+    // "Image5" (no word boundary before the digit), match on the label prefix.
     await expect(page.getByRole("button", { name: /^All/ }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Image/ }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Video/ }).first()).toBeVisible();

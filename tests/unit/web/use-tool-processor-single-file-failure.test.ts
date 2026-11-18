@@ -105,18 +105,20 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(captureHandledError).mockClear();
   vi.mocked(track).mockClear();
-  vi.stubGlobal("URL", {
-    ...globalThis.URL,
-    createObjectURL: vi.fn(() => "blob:fake-url"),
-    revokeObjectURL: vi.fn(),
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: vi.fn(() => "blob:fake-url"),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
   useFileStore.getState().reset();
   xhrs = [];
   MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
   vi.stubGlobal(
     "XMLHttpRequest",
-    vi.fn(() => {
+    vi.fn(function FakeXhr() {
       const xhr: MockXhr = {
         status: 0,
         responseText: "",
@@ -2038,7 +2040,7 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     const file = clipFile();
     useFileStore.getState().setFiles([file]);
     const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
-    vi.mocked(XMLHttpRequest).mockImplementationOnce(() => {
+    vi.mocked(XMLHttpRequest).mockImplementationOnce(function FakeXhr() {
       const xhr: MockXhr = {
         status: 0,
         responseText: "",

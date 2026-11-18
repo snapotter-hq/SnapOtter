@@ -154,7 +154,7 @@ describe("OCR v3 runtime artifact contract", () => {
     const systemDependencyLines =
       integrationJob
         ?.match(
-          /^ {6}- name: Install the ImageMagick EXR coder and verify the format toolchain\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
+          /^ {6}- name: Verify the Fast OCR language payload\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
         )
         ?.groups?.run?.split("\n") ?? [];
     expect(systemDependencyLines.length).toBeGreaterThan(0);

@@ -358,10 +358,17 @@ MAX_CONSECUTIVE_FAILURES = _env_non_negative_int("DISPATCHER_MAX_CONSECUTIVE_FAI
 _CUDA_POISON_RE = re.compile(
     r"cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|"
     r"cublas_status_(?:not_initialized|internal_error|execution_failed)|"
-    r"ort_runtime_exception|onnxruntimeerror|device-side\s+assert|"
-    r"illegal\s+memory\s+access|unspecified\s+launch\s+failure",
+    r"device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure",
     re.IGNORECASE,
 )
+
+# Every ONNX Runtime error carries one of these wrappers, including an arena
+# allocation failure, which leaves the CUDA context usable: the failed
+# session's memory comes back once it is dropped. So the wrapper alone only
+# counts as poison when the error isn't an allocation failure; the specific
+# CUDA signatures above count whatever else the output says (#4744).
+_ORT_WRAPPER_RE = re.compile(r"ort_runtime_exception|onnxruntimeerror", re.IGNORECASE)
+_ALLOC_FAILURE_RE = re.compile(r"failed to allocate memory|out of memory", re.IGNORECASE)
 
 _PRE_EXEC_GATE_ERRORS = frozenset(
     {"invalid_script_name", "script_not_allowed", "feature_not_installed"}
@@ -403,7 +410,10 @@ def _extract_failure_detail(stdout_output, exit_code):
 
 def _is_cuda_poison_error(detail):
     """Whether an error string indicates a poisoned CUDA or ONNX Runtime context."""
-    return bool(_CUDA_POISON_RE.search(detail or ""))
+    detail = detail or ""
+    if _CUDA_POISON_RE.search(detail):
+        return True
+    return bool(_ORT_WRAPPER_RE.search(detail)) and not _ALLOC_FAILURE_RE.search(detail)
 
 
 def _should_recycle_after_request(

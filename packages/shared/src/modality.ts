@@ -119,6 +119,54 @@ export const AUDIO_INPUTS = [
   ".amr",
   ".ac3",
 ];
+/**
+ * What POST /api/v1/preview/generate transcodes (video to MP4, audio to MP3),
+ * without the dot. It answers 400 for anything else, so the web app checks
+ * here before asking it for a preview (#4666). "ogg" is in both: the route
+ * tries it as video first.
+ */
+export const MEDIA_PREVIEW_VIDEO_EXTS: ReadonlySet<string> = new Set([
+  "avi",
+  "mkv",
+  "wmv",
+  "flv",
+  "mov",
+  "mpg",
+  "mpeg",
+  "m4v",
+  "3gp",
+  "3g2",
+  "ts",
+  "mts",
+  "m2ts",
+  "vob",
+  "divx",
+  "asf",
+  "rm",
+  "rmvb",
+  "f4v",
+  "ogv",
+  "mp4",
+  "webm",
+  "ogg",
+]);
+export const MEDIA_PREVIEW_AUDIO_EXTS: ReadonlySet<string> = new Set([
+  "wav",
+  "flac",
+  "aac",
+  "wma",
+  "ogg",
+  "oga",
+  "opus",
+  "m4a",
+  "aiff",
+  "aif",
+  "amr",
+  "ape",
+  "ac3",
+  "dts",
+  "mp3",
+]);
 export const SUBTITLE_INPUTS = [".srt", ".vtt", ".ass"] as const;
 export const DOCUMENT_INPUTS = [
   ".pdf",

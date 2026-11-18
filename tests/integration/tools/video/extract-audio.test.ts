@@ -12,6 +12,8 @@ import {
 } from "../../test-server.js";
 
 const MP4 = readFixture(fixtures.video.tiny("mp4"));
+// H.264 with no audio stream.
+const VIDEO_ONLY_MP4 = readFixture(fixtures.video.withMeta);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -25,14 +27,18 @@ afterAll(async () => {
   await testApp.cleanup();
 });
 
-async function runTool(settings: Record<string, unknown>) {
+async function runTool(
+  settings: Record<string, unknown>,
+  content: Buffer = MP4,
+  toolId = "extract-audio",
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
+    { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
     method: "POST",
-    url: "/api/v1/tools/video/extract-audio",
+    url: `/api/v1/tools/video/${toolId}`,
     headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
     body,
   });
@@ -100,4 +106,18 @@ describe.skipIf(!ffmpegAvailable())("extract-audio (requires ffmpeg)", () => {
       rmSync(tmpDir, { recursive: true, force: true });
     }
   }, 60_000);
+
+  // #4411 (Sentry NODE-A7): ffmpeg exited 234 and the client got a generic 422.
+  it.each([
+    ["extract-audio", { format: "mp3" }],
+    ["mp4-to-mp3", {}],
+  ])(
+    "%s answers 400 with a no-audio message for a video-only mp4",
+    async (toolId, settings) => {
+      const res = await runTool(settings, VIDEO_ONLY_MP4, toolId);
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toContain("no audio track");
+    },
+    60_000,
+  );
 });

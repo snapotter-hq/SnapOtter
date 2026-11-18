@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { TOOLS, toolSection } from "@snapotter/shared";
+import { parseLatestRelease, TOOLS, toolSection } from "@snapotter/shared";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
@@ -99,5 +99,30 @@ describe("openapi.yaml contract", () => {
       if (!op.tags?.includes(sectionTag[section])) misses.push(`${path} tags ${op.tags}`);
     }
     expect(misses).toEqual([]);
+  });
+
+  // The route answers { latest: { version, url } } or { latest: null } (#4585).
+  // OpenAPI 3.1 has no `nullable`, so the type is a list.
+  it("types the latest-release body as a nullable { version, url } object", () => {
+    const ok = spec.paths["/api/v1/admin/latest-release"]?.get?.responses as Record<
+      string,
+      {
+        description: string;
+        content: {
+          "application/json": {
+            schema: { properties: { latest: Record<string, unknown> } };
+            example: { latest: unknown };
+          };
+        };
+      }
+    >;
+    const json = ok["200"].content["application/json"];
+    const latest = json.schema.properties.latest;
+    expect(latest.type).toEqual(["object", "null"]);
+    expect(latest).not.toHaveProperty("nullable");
+    expect(latest.required).toEqual(["version", "url"]);
+    expect(Object.keys(latest.properties as object).sort()).toEqual(["url", "version"]);
+    expect(parseLatestRelease(json.example.latest)).toEqual(json.example.latest);
+    expect(ok["200"].description).toMatch(/analytics is off/);
   });
 });

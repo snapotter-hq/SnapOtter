@@ -8538,6 +8538,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8547,6 +8550,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8607,12 +8611,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: OCR ランタイムの互換性。レガシーバンドルでは省略されます
+                          description: ホストとの互換性。OCR は常にこれを返します。レガシーバンドルは、このホストで実行できない場合にのみ incompatible を返し、それ以外ではこのフィールドを省略します。
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: OCR ランタイムの互換性の理由。レガシーバンドルでは省略されます
+                          description: バンドルが非互換である理由。たとえば、x86-64 ライブラリが AVX を必要とし、この CPU に AVX がない場合は cpu-no-avx です。互換性のあるレガシーバンドルでは省略されます。
                         selectedTarget:
                           type:
                             - string
@@ -8783,7 +8787,7 @@ paths:
       description: 公開済みの最新リリースが実行中のバージョンより新しい場合はそのリリースを返し、そうでない場合は null を返します。settings:write が必要です。
       responses:
         '200':
-          description: 最新リリースです。このインスタンスが最新の場合は null です。
+          description: より新しいリリース。新しいリリースが公開されていない場合、またはこのインスタンスでアナリティクスが無効な場合は null（その場合は検索を行いません）
           content:
             application/json:
               schema:
@@ -8792,10 +8796,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: 認証情報がないか無効です
           content:
@@ -8917,6 +8935,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: ツールに必要なバンドルをこのホストにインストールできません。OCR ランタイムがサポートされていないか、バンドルが AVX を必要とし、この CPU に AVX がありません（コード FEATURE_CPU_UNSUPPORTED）。キューには何も追加されません。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9003,7 +9027,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: バンドルは既にインストールされているか、このホストでは OCR ランタイムがサポートされていません
+          description: バンドルがすでにインストール済み、このホストで OCR ランタイムがサポートされていない、またはバンドルが AVX を必要とし、この CPU に AVX がない（コード FEATURE_CPU_UNSUPPORTED、ダウンロード前に拒否）
           content:
             application/json:
               schema:
@@ -13281,7 +13305,7 @@ paths:
       tags:
         - PDF
       summary: PDF マルチツール
-      description: 明示的なページ計画から PDF を組み立てます — ページの並べ替え、複製、回転、削除、および 1 回の送信で他の PDF からページを取り込みます。
+      description: 明示的なページ計画から PDF を組み立てます。ページの並べ替え、複製、回転、削除、および 1 回の送信で他の PDF からページを取り込みます。
       security:
         - bearerAuth: []
       requestBody:
@@ -23810,7 +23834,7 @@ paths:
         '403':
           description: 権限が不足しています
         '409':
-          description: インポートのロックが保持されています
+          description: インポートのロックが保持されているか、バンドルが AVX を必要とし、この CPU に AVX がありません（コード FEATURE_CPU_UNSUPPORTED）
         '413':
           description: インポート内のファイルのいずれかが 20 GiB を超えています。このルートには独自のサイズ上限があり、`MAX_UPLOAD_SIZE_MB` は適用されません。
         '507':
@@ -30711,13 +30735,13 @@ x-i18n:
       provenance: machine
       outputHash: 0bcd4e1c67bc
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: ec493a614b70
+      outputHash: 26c29335bb0c
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: acbe39336baa
+      outputHash: 302b41eba2ee
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30767,9 +30791,9 @@ x-i18n:
       provenance: machine
       outputHash: a3dc3df40fe3
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 5889fd269d83
+      outputHash: c7fbdeb25937
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30810,6 +30834,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: cac1b840aafc
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: d445c37c7bb6
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30843,9 +30871,9 @@ x-i18n:
       provenance: machine
       outputHash: cf1a2ced6408
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 9b18aefff84d
+      outputHash: 67acb3a494ad
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36187,9 +36215,9 @@ x-i18n:
       provenance: machine
       outputHash: d452a12f8f32
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 947d536542d1
+      outputHash: 03da7d87cf0e
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -1,7 +1,9 @@
 import {
   type AnalyticsConfig,
+  APP_VERSION,
   httpStatusTag,
   isSafeMessageError,
+  POSTHOG_IP_PLACEHOLDER,
   resolvePostHogClientHosts,
   SafeError,
 } from "@snapotter/shared";
@@ -44,12 +46,19 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   tool_opened: new Set(["tool_id", "category", "modality"]),
   file_added: new Set(["tool_id", "count", "file_count"]),
   tool_started: new Set(["tool_id", "is_batch", "file_count"]),
-  tool_client_error: new Set(["error_name"]),
+  tool_client_error: new Set(["error_name", "tool_id", "phase"]),
   result_downloaded: new Set(["tool_id"]),
   result_saved: new Set(["tool_id"]),
   search: new Set(["results_count", "clicked_tool_id"]),
   ai_bundle_prompted: new Set(["bundle_id"]),
-  batch_processed: new Set(["tool_id", "file_count", "status", "reason", "total_bytes"]),
+  batch_processed: new Set([
+    "tool_id",
+    "file_count",
+    "status",
+    "reason",
+    "total_bytes",
+    "failed_count",
+  ]),
   editor_opened: new Set<string>([]),
   editor_tool_used: new Set(["editor_tool"]),
   editor_exported: new Set(["output_format", "status", "reason"]),
@@ -212,7 +221,6 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           capture_pageview: "history_change",
           capture_pageleave: true,
           disable_session_recording: true,
-          ip: false,
           persistence: "localStorage",
           person_profiles: "identified_only",
           // Last-line PII boundary at the SDK, independent of track()'s per-call
@@ -228,11 +236,20 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
             if (!enabled) return null;
             const props = event?.properties;
             if (props) {
+              // Stamped here, not only as a super property: register() runs
+              // after an await, and a $pageview captured before it carried no
+              // version (#4215).
+              props.app_version = APP_VERSION;
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
               for (const key of URL_PROPERTIES) {
                 if (key in props) props[key] = strip(props[key]);
               }
               removeCampaignProperties(props);
+              // Without the proxy the connection IP is the visitor's own, and
+              // PostHog stores it whenever the project keeps client IPs. Through
+              // /ingest it's the instance's IP, left alone so the project's
+              // discard setting can still geolocate the event first (#4583).
+              if (!config.posthogProxyPath) props.$ip = POSTHOG_IP_PLACEHOLDER;
               // $web_vitals_*_event objects nest their own $current_url, which
               // skips the top-level strip above, so walk them too (#1022).
               for (const key of Object.keys(props)) {
@@ -276,7 +293,7 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     // uniq(). Omitted when empty so we never register a blank value.
     try {
       const superProps: Record<string, string> = {
-        app_version: (await import("@snapotter/shared")).APP_VERSION,
+        app_version: APP_VERSION,
       };
       if (config.instanceId) superProps.instance_id = config.instanceId;
       // Registered even if an opt-out landed meanwhile: it only stores them
@@ -338,6 +355,7 @@ async function startSentry(config: AnalyticsConfig): Promise<void> {
       // Capture the breadcrumb trail (default 100). beforeSend (sentry-scrub.ts)
       // sanitizes each breadcrumb before send: urls/paths redacted, data dropped.
       beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
+      ...(config.deployMode ? { initialScope: { tags: { deploy_mode: config.deployMode } } } : {}),
     });
     sentryRunning = true;
     // Everything recorded while the client was missing goes out now, tags

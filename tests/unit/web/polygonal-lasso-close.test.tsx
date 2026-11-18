@@ -9,7 +9,10 @@ vi.mock("@/lib/analytics", async () => {
 
 const toastError = vi.hoisted(() => vi.fn());
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
-vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+// It names the ESM entry the app imports: vitest 4 resolves the bare package directory to the CJS main.
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
+  toast: { error: toastError },
+}));
 
 // The shortcut hook reaches the stage through this module; the stage is not needed.
 vi.mock("@/components/editor/editor-canvas", () => ({

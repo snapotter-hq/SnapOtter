@@ -49,6 +49,13 @@ import { clearTerminalReplayKey } from "../routes/progress.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, RESULT_PAYLOAD_FILENAME } from "./types.js";
 
+/**
+ * Reconcile runs on a timer, so a broken database repeats the same fault for
+ * every row on every sweep (#4213). The literal matches SYSTEM_JOBS.jobReconciliation;
+ * importing system-jobs here would close an import cycle.
+ */
+const PERIODIC_REPORT = { periodic: true, job: "system:job-reconciliation" } as const;
+
 /** DB statuses a reconciler may resolve. Terminal rows are never touched. */
 const NON_TERMINAL = ["queued", "processing"] as const;
 
@@ -149,6 +156,7 @@ function isResultPayloadKey(key: string): boolean {
  */
 async function readResultPayload(
   jobId: string,
+  toolId: string | null,
   objects: ObjectInfo[],
 ): Promise<Record<string, unknown> | undefined> {
   const sidecar = objects.find((object) => isResultPayloadKey(object.key));
@@ -171,13 +179,25 @@ async function readResultPayload(
       { err: shapeErr, jobId, key: sidecar.key },
       "Result payload sidecar is not a JSON object; ignoring",
     );
-    void reportError(shapeErr, { source: "worker", pool: "system", jobId });
+    void reportError(shapeErr, {
+      source: "worker",
+      pool: "system",
+      toolId: toolId ?? undefined,
+      jobId,
+      ...PERIODIC_REPORT,
+    });
   } catch (err) {
     logger.error(
       { err, jobId, key: sidecar.key },
       "Failed to parse result payload sidecar during job reconciliation; continuing without tool payload",
     );
-    void reportError(err, { source: "worker", pool: "system", jobId });
+    void reportError(err, {
+      source: "worker",
+      pool: "system",
+      toolId: toolId ?? undefined,
+      jobId,
+      ...PERIODIC_REPORT,
+    });
   }
   return undefined;
 }
@@ -314,7 +334,7 @@ async function recoverFromOutputs(
   const preview = objects.find((object) => isPreviewKey(object.key));
   const originalSize = await resolveOriginalSize(row);
   const outputRefs = artifacts.map((artifact) => artifact.key);
-  const toolPayload = await readResultPayload(row.id, objects);
+  const toolPayload = await readResultPayload(row.id, row.toolId, objects);
 
   const result: Record<string, unknown> = {
     ...toolPayload,
@@ -564,6 +584,7 @@ export async function reconcileStrandedJobs(
         pool: "system",
         toolId: row.toolId ?? undefined,
         jobId: row.id,
+        ...PERIODIC_REPORT,
       });
     }
   }

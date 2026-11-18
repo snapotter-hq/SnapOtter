@@ -78,7 +78,7 @@ export const tr: TranslationKeys = {
     searchMissContext: "Şunu aradın: {query}",
     searchMissDiscussionsFallback: "Bunu kaydedemedik. Discussions'ta bir istek aç.",
     offlineDescription:
-      "Bu örnekte analiz kapalı, bu yüzden geri bildirim burada kaydedilmez. Yine de SnapOtter ekibine doğrudan ulaşabilirsin.",
+      "Bu örnek şu anda geri bildirim kaydedemiyor. Yine de SnapOtter ekibine doğrudan ulaşabilirsin.",
     offlinePublicNote: "GitHub issue'ları herkese açıktır.",
     offlineGithubButton: "GitHub'da issue aç",
     offlineEmailButton: "Bize e-posta gönder",
@@ -4128,6 +4128,8 @@ export const tr: TranslationKeys = {
     previewFailed: "Önizleme oluşturulamadı",
     previewEncoderMissing:
       "Bu sunucudaki ffmpeg'de {encoder} kodlayıcısı yok, bu yüzden önizleme oluşturulamıyor. Yöneticinizle iletişime geçin.",
+    previewEngineUnavailable:
+      "Bu sunucuda ffmpeg yüklü değil, bu yüzden önizleme oluşturulamıyor. Yöneticinizden ffmpeg'i yüklemesini veya FFMPEG_PATH'i ayarlamasını isteyin.",
     previewProgressMessages: [
       "Su samuru ısınıyor...",
       "Pikseller öğütülüyor...",
@@ -5208,6 +5210,7 @@ export const tr: TranslationKeys = {
       disabledCount: "{count} araç devre dışı",
       disabledCountOne: "{count} araç devre dışı",
       disabledCountOther: "{count} araç devre dışı",
+      offWithBase: "{base} aracı devre dışı olduğu için kapalı.",
     },
     experimental: {
       label: "Deneysel Araçları Etkinleştir",
@@ -5659,6 +5662,8 @@ export const tr: TranslationKeys = {
       BROWSER_CRASHED: "Tarayıcı oluşturma sırasında çöktü. Yeniden deneyin.",
       BROWSER_NOT_AVAILABLE: "Bu aracın ihtiyaç duyduğu tarayıcı şu anda kullanılamıyor.",
       DEPENDENCY_VALIDATION_FAILED: "Bu ayar, geçerli olmayan başka bir ayara bağlı.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Bu özellik AVX destekli bir işlemci gerektirir ve bu sunucunun işlemcisinde bu destek yok.",
       FEATURE_INCOMPATIBLE: "Bu özellik mevcut ayarlarla çalışamaz.",
       FST_REQ_FILE_TOO_LARGE: "Bu dosya yüklenemeyecek kadar büyük.",
       IDLE_TIMEOUT: "Hareketsiz kaldığınız için oturumunuz kapatıldı. Yeniden giriş yapın.",
@@ -5707,6 +5712,36 @@ export const tr: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Sonuç hedef boyuta ulaşamıyor.",
       TOO_MANY_FRAMES: "Bu dosyada işlenemeyecek kadar çok kare var.",
       CANCELED: "İşlem iptal edildi.",
+      PAGE_OUT_OF_RANGE: "Bu sayfa aralığı, bu PDF'de olmayan bir sayfa içeriyor.",
+      INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",
+      CANNOT_REMOVE_ALL_PAGES: "Tüm sayfaları kaldıramazsınız. En az bir sayfa bırakın.",
+      NESTING_TOO_DEEP: "Bu dosya dönüştürülemeyecek kadar derin iç içe geçmiş.",
+      DOCUMENT_UNREADABLE:
+        "Bu belge açılamadı. Hasarlı, parola korumalı veya uzantısının belirttiği biçimde olmayabilir.",
+      PDF_DAMAGED: "Bu PDF hasarlı. PDF Onar aracından geçirip tekrar deneyin.",
+      PDF_PASSWORD_PROTECTED:
+        "Bu PDF parola korumalı. PDF Kilidini Aç aracıyla kilidini açıp tekrar deneyin.",
+      IMAGE_TOO_LARGE: "Bu görüntü işlenemeyecek kadar büyük. Boyutlarını küçültüp tekrar deneyin.",
+      RESULT_TOO_LARGE:
+        "Bu ayarların üreteceği sonuç çok büyük. Daha küçük bir görüntü veya daha küçük sonuç veren ayarlar kullanın.",
+      NO_AUDIO_TRACK: "Bu dosyada ses parçası yok. Ses içeren bir dosya seçip tekrar deneyin.",
+      IMAGE_UNDECODABLE:
+        "Bu görüntü okunamıyor. Dosya bozuk olabilir veya bu aracın desteklemediği bir kodlama kullanıyor olabilir.",
+      INVALID_SETTINGS: "Bu ayarlar bu dosyayla çalışmıyor. Değerleri kontrol edip tekrar deneyin.",
+      CHART_DATA_INVALID:
+        "Grafik Oluşturucu bu dosyadan grafik verisi okuyamadı. Her satırında bir etiket ve sıfır ya da daha büyük bir sayı olan, en fazla 100 satırlık bir CSV veya JSON kullanın.",
+      NO_FACE_DETECTED: "Yüz bulunamadı. İyi ışıkta, önden çekilmiş net bir fotoğraf yükleyin.",
+      TARGET_SIZE_UNREACHABLE:
+        "Bu dosya hedef boyuta kadar küçültülemiyor. Daha büyük bir hedef deneyin.",
+      TOO_MANY_PAGES:
+        "Bu PDF'de tek seferde işlenemeyecek kadar çok sayfa var. Daha az sayfa seçip tekrar deneyin.",
+      METADATA_DAMAGED: "Bu görüntünün mevcut meta verileri bozuk, bu yüzden güvenle düzenlenemez.",
+      REMOTE_RESOURCES_DISABLED:
+        "Bu dosya internetten görüntü veya stil yüklüyor ve bu sunucu buna izin vermiyor. Bunları dosyanın içine gömüp tekrar deneyin.",
+      TOO_MANY_PIXELS:
+        "Bu animasyonun tüm karelerindeki toplam piksel sayısı çok fazla. Daha az kare veya daha küçük bir boyut kullanın.",
+      MEDIA_UNDECODABLE:
+        "Bu dosya okunamıyor. Dosya bozuk olabilir, ses veya video akışı içermiyor olabilir ya da bu aracın desteklemediği bir biçimde olabilir.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",
@@ -5774,6 +5809,7 @@ export const tr: TranslationKeys = {
     grid: "Izgara",
     automate: "Otomatikleştir",
     editor: "Düzenleyici",
+    editorBadge: "Beta",
     files: "Dosyalar",
     help: "Yardım",
     settings: "Ayarlar",

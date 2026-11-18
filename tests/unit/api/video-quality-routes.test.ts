@@ -350,7 +350,7 @@ describe("compress-video and convert-video on a VAAPI host (#3977)", () => {
     expect(pass2.slice(0, 2)).toEqual(["-vaapi_device", "/dev/dri/renderD128"]);
     expect(pass2.filter((a) => a === "-vf")).toHaveLength(1);
     expect(flagValue(pass2, "-vf")).toMatch(
-      /^vidstabtransform=input=.*:smoothing=15,format=nv12,hwupload$/,
+      /^copy,vidstabtransform=input=.*:smoothing=15,format=nv12,hwupload$/,
     );
     expect(flagValue(pass2, "-c:v")).toBe("h264_vaapi");
     expect(pass2).not.toContain("-pix_fmt");

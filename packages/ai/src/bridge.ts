@@ -4,7 +4,14 @@ import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { isSafeMessageError, nvidiaDeviceVisible, SafeError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  isToolInputError,
+  nvidiaDeviceVisible,
+  pixelLimitImageError,
+  SafeError,
+  type ToolInputError,
+} from "@snapotter/shared";
 import {
   type GpuFramework,
   type GpuFrameworks,
@@ -228,21 +235,77 @@ function checkFsError(message: string): string | undefined {
 }
 
 /**
+ * A sidecar failure caused by the host or the input rather than our code. Each
+ * gets a constant message the user can act on, in place of library text that
+ * is either too long for friendlyError (CUDA's OOM dump) or meaningless to them.
+ */
+export const GPU_OUT_OF_MEMORY_MESSAGE =
+  "The GPU ran out of memory on this image. Try a smaller image, or set SNAPOTTER_GPU=false to run AI tools on the CPU.";
+export const CPU_LACKS_AVX_MESSAGE =
+  "This CPU doesn't support the AVX instructions the AI libraries need. Run SnapOtter on a CPU with AVX support.";
+
+const GPU_OOM_TEXT = /cuda out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed/i;
+// TensorFlow Lite and MediaPipe abort with this before running anything (NODE-AC).
+const CPU_LACKS_AVX_TEXT = /compiled with avx\w* enabled, but this feature is not available/i;
+// Pillow's DecompressionBombError: the input has more pixels than Pillow will
+// decode, so it is the same input fault as sharp's pixel limit (NODE-AR).
+// Pillow prints the same text as a DecompressionBombWarning for smaller
+// images, which is not the failure.
+const PIL_PIXEL_LIMIT_TEXT = /Image size \(\d+ pixels\) exceeds limit of \d+ pixels/;
+const PIL_PIXEL_WARNING_TEXT = /DecompressionBombWarning/;
+// remove_bg.py's import failure. The gate already confirmed the bundle is
+// recorded as installed, so this is a partial or broken install (NODE-4W). A
+// bare "No module named" stays a bug: it can be an import no bundle ships.
+const BROKEN_INSTALL_TEXT = /is installed but its libraries did not load/i;
+// offline_guard.ensure_download_allowed: a weight the bundle ships is gone.
+const MISSING_WEIGHT_TEXT = /is missing and automatic downloads are disabled/i;
+
+/**
+ * Turn a sidecar's failure reason into the error to throw. Host and input
+ * faults are classified here, in one place, for both the exit path and the
+ * `{success: false}` path; everything else is a bug that keeps its reason.
+ */
+function sidecarFailure(message: string, exitCode: string | undefined): SafeError | ToolInputError {
+  if (PIL_PIXEL_LIMIT_TEXT.test(message) && !PIL_PIXEL_WARNING_TEXT.test(message)) {
+    return pixelLimitImageError();
+  }
+  if (CPU_LACKS_AVX_TEXT.test(message)) {
+    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+  }
+  if (GPU_OOM_TEXT.test(message)) {
+    return new SafeError(GPU_OUT_OF_MEMORY_MESSAGE, { kind: "operational", code: "gpu-oom" });
+  }
+  const fsCode = checkFsError(message);
+  if (fsCode) return new SafeError(message, { kind: "operational", code: fsCode });
+  if (OOM_EXIT_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: exitCode });
+  }
+  if (BROKEN_INSTALL_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: "ai-module-missing" });
+  }
+  if (MISSING_WEIGHT_TEXT.test(message)) {
+    return new SafeError(message, { kind: "operational", code: "model-weight-missing" });
+  }
+  return new SafeError(message, { kind: "bug", code: exitCode });
+}
+
+/**
  * Build the error to reject a non-zero Python exit with. The extracted reason is
  * kept as the message (it is already surfaced to callers) but wrapped in a
  * SafeError so it survives the API's Sentry scrubber, which otherwise reduces a
  * plain Error to "Error: Error" (NODE-24). Classification is deliberate: a kill
  * signal / OS OOM (SIGKILL, exit 137) and a segfault (SIGSEGV, exit 139) are
  * operational, and their constant messages keep the "out of memory" text so
- * memory-aware callers still retry on a lighter model. Any other non-zero exit
- * is a bug, with the extracted reason (or an OOM reported in-band) preserved.
+ * memory-aware callers still retry on a lighter model. SIGILL (exit 132) is a
+ * CPU missing an instruction set the wheels were built for. Any other non-zero
+ * exit goes through sidecarFailure.
  */
 function pythonExitError(
   code: number | null,
   signal: string | null,
   extracted: string,
   info?: PythonErrorInfo | null,
-): SafeError {
+): SafeError | ToolInputError {
   if (signal === "SIGSEGV" || code === 139) {
     return new SafeError("Process crashed (segmentation fault)", {
       kind: "operational",
@@ -255,13 +318,12 @@ function pythonExitError(
       code: `exit-${code ?? signal ?? "unknown"}`,
     });
   }
+  if (signal === "SIGILL" || code === 132) {
+    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+  }
   const message = extracted || `Python script exited with code ${code}`;
-  const fsCode = checkFsError(message);
-  const err = new SafeError(message, {
-    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: fsCode || `exit-${code ?? "unknown"}`,
-  });
-  if (info) {
+  const err = sidecarFailure(message, `exit-${code ?? "unknown"}`);
+  if (info && isSafeMessageError(err)) {
     Object.assign(err, { pythonType: info.type, pythonFrames: info.frames });
   }
   return err;
@@ -273,18 +335,15 @@ function pythonExitError(
  * scrubber, which reduces a plain Error to "Error: Error" (NODE-24, NODE-2N,
  * NODE-1R). The specific sidecar reason is kept as the message, matching
  * pythonExitError; an empty reason falls back to the tool's constant message.
- * Memory-allocation reasons classify as operational (the deployment's
- * hardware), everything else as a bug. Errors we already author (the bridge's
- * SafeError timeout/OOM) pass through unchanged so their kind is not masked.
+ * Host and input faults classify through sidecarFailure, everything else as a
+ * bug. Errors we already author (the bridge's SafeError timeout/OOM, or an
+ * input error) pass through unchanged so their kind is not masked.
  */
 export function toSidecarError(reason: unknown, fallback: string): Error {
-  if (isSafeMessageError(reason)) return reason;
+  if (isSafeMessageError(reason) || isToolInputError(reason)) return reason;
   const message = (reason instanceof Error ? reason.message : String(reason ?? "")).trim();
-  const fsCode = checkFsError(message);
-  return new SafeError(message || fallback, {
-    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: fsCode,
-  });
+  if (!message) return new SafeError(fallback, { kind: "bug" });
+  return sidecarFailure(message, undefined);
 }
 
 function parsePythonJsonCandidates(output: string): Array<Record<string, unknown>> {
@@ -474,6 +533,10 @@ function pythonAbortError(): Error {
   return error;
 }
 
+function pythonTimeoutError(): Error {
+  return new SafeError("Python script timed out", { kind: "operational", code: "timeout" });
+}
+
 function isTimeoutAbortReason(reason: unknown): boolean {
   if (reason === "timeout") return true;
   return (
@@ -503,7 +566,20 @@ const EXIT_STDERR_TAIL_LINES = 20;
 const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
 
 const CUDA_POISON_RE =
-  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+
+// Every ONNX Runtime error carries one of these wrappers, including an arena
+// allocation failure, which leaves the CUDA context usable. So the wrapper alone
+// only counts as poison when the error isn't an allocation failure; the specific
+// CUDA signatures above count whatever else the output says (#4744). Mirrors
+// _is_cuda_poison_error in dispatcher.py.
+const ORT_WRAPPER_RE = /ort_runtime_exception|onnxruntimeerror/i;
+const ALLOC_FAILURE_RE = /failed to allocate memory|out of memory/i;
+
+function isCudaPoison(text: string): boolean {
+  if (CUDA_POISON_RE.test(text)) return true;
+  return ORT_WRAPPER_RE.test(text) && !ALLOC_FAILURE_RE.test(text);
+}
 
 const PRE_EXEC_GATE_ERRORS = new Set([
   "invalid_script_name",
@@ -538,14 +614,14 @@ function classifyDispatcherResponseFailure(
       exitCode !== 0 || parsed.success === false || (errVal.length > 0 && parsed.success !== true);
     if (!failed) return { status: "succeeded", cudaPoison: false };
     const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   if (exitCode !== 0) {
     if (extracted === "canceled" || PRE_EXEC_GATE_ERRORS.has(extracted)) {
       return { status: "ignored", cudaPoison: false };
     }
     const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
-    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+    return { status: "failed", cudaPoison: isCudaPoison(combined) };
   }
   return { status: "succeeded", cudaPoison: false };
 }
@@ -969,6 +1045,7 @@ export class PythonDispatcher {
     scriptName: string,
     args: string[],
     options: PythonRunOptions = {},
+    timeoutOverride?: number,
   ): Promise<{ stdout: string; stderr: string }> | null {
     if (options.signal?.aborted) return Promise.reject(pythonAbortError());
     const proc = this.getChild();
@@ -976,7 +1053,7 @@ export class PythonDispatcher {
     if (!proc || !stdin || !this.childReady) return null;
 
     const id = randomUUID();
-    const timeout = resolvePythonTimeout(options.timeout);
+    const timeout = timeoutOverride ?? resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1009,12 +1086,7 @@ export class PythonDispatcher {
           if (!proc.killed) {
             proc.kill("SIGTERM");
           }
-          wrappedReject(
-            new SafeError("Python script timed out", {
-              kind: "operational",
-              code: "timeout",
-            }),
-          );
+          wrappedReject(pythonTimeoutError());
         }, timeout);
       }
 
@@ -1083,6 +1155,7 @@ export class PythonDispatcher {
     scriptName: string,
     args: string[],
     options: PythonRunOptions = {},
+    timeoutOverride?: number,
   ): Promise<{ stdout: string; stderr: string }> {
     if (options.signal?.aborted) return Promise.reject(pythonAbortError());
     // Mirror the dispatcher's feature gate. The persistent dispatcher rejects
@@ -1099,7 +1172,7 @@ export class PythonDispatcher {
       );
     }
     const scriptPath = resolve(PYTHON_DIR, scriptName);
-    const timeout = resolvePythonTimeout(options.timeout);
+    const timeout = timeoutOverride ?? resolvePythonTimeout(options.timeout);
 
     return new Promise((resolvePromise, rejectPromise) => {
       let activeAttempt = 0;
@@ -1224,9 +1297,7 @@ export class PythonDispatcher {
           }
 
           if (timedOut) {
-            rejectOnce(
-              new SafeError("Python script timed out", { kind: "operational", code: "timeout" }),
-            );
+            rejectOnce(pythonTimeoutError());
             return;
           }
 
@@ -1266,6 +1337,21 @@ export class PythonDispatcher {
       return this.gpuFrameworks?.[framework] ?? this.gpuAvail;
     }
     return this.gpuAvail;
+  }
+
+  /**
+   * For CPU-only refusals: whether a GPU could be doing this work. Until the
+   * dispatcher reports (boot, or a shutdown after a bundle install, until the
+   * next AI request respawns it) the probe fields still hold their defaults, so
+   * this answers from the device node, the same fallback the memory gate in
+   * run() uses (#4746, #4502). A device node whose framework has no CUDA can
+   * pass one request in that window; refusing every GPU host instead was worse.
+   */
+  gpuMayBeAvailable(
+    framework: GpuFramework,
+    deviceExists: (path: string) => boolean = existsSync,
+  ): boolean {
+    return this.gpuProbed ? this.isGpuAvailable(framework) : isNvidiaDevicePresent(deviceExists);
   }
 
   getStatus(): DispatcherStatus {
@@ -1368,7 +1454,9 @@ export class PythonDispatcher {
         })
       : null;
 
-    const doRun = (): Promise<{ stdout: string; stderr: string }> => {
+    // timeoutOverride is what is left of the call's budget after a venv lock
+    // wait; undefined means the full budget from resolvePythonTimeout.
+    const doRun = (timeoutOverride?: number): Promise<{ stdout: string; stderr: string }> => {
       if (this.profile === "ai") {
         const gpuAvailable =
           options.memoryOptions?.gpuAvailable ??
@@ -1398,7 +1486,7 @@ export class PythonDispatcher {
       }
 
       // Try persistent dispatcher first
-      const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
+      const dispatcherPromise = this.dispatcherRun(scriptName, args, options, timeoutOverride);
       if (dispatcherPromise) {
         return dispatcherPromise.catch((err: Error) => {
           if (
@@ -1408,22 +1496,28 @@ export class PythonDispatcher {
             aiLog.warn(
               `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
             );
-            return this.runPerRequest(scriptName, args, options).then((result) => ({
-              ...result,
-              stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
-            }));
+            return this.runPerRequest(scriptName, args, options, timeoutOverride).then(
+              (result) => ({
+                ...result,
+                stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
+              }),
+            );
           }
           throw err;
         });
       }
 
       // Fall back to per-request spawning
-      return this.runPerRequest(scriptName, args, options);
+      return this.runPerRequest(scriptName, args, options, timeoutOverride);
     };
 
-    const runWithSpan = (): Promise<{ stdout: string; stderr: string }> => {
-      if (!span) return doRun();
-      return doRun().then(
+    // Wraps the call's final promise, so a call rejected while it waits for
+    // the venv lock ends its span too, not only one that reached the script.
+    const endSpan = (
+      call: Promise<{ stdout: string; stderr: string }>,
+    ): Promise<{ stdout: string; stderr: string }> => {
+      if (!span) return call;
+      return call.then(
         (result) => {
           span.end();
           return result;
@@ -1445,10 +1539,52 @@ export class PythonDispatcher {
     // segfaults the sidecar. In the common case the lock is free, so acquire it
     // synchronously and run inline (no microtask deferral, preserving the prior
     // call timing); only when an install holds it do we await.
-    if (!this.takesVenvLock) return runWithSpan();
+    if (!this.takesVenvLock) return endSpan(doRun());
     const release = tryAcquireVenvRead();
-    if (release) return runWithSpan().finally(release);
-    return acquireVenvRead().then((r) => runWithSpan().finally(r));
+    if (release) return endSpan(doRun().finally(release));
+    return endSpan(this.waitForVenvThenRun(options, doRun));
+  }
+
+  /**
+   * Slow path of run(): an install holds or awaits the venv lock. The call's
+   * timeout covers the wait too, so a call never waits out an install and
+   * then gets its whole budget again (#4601). An unlimited budget
+   * (PROCESSING_TIMEOUT_S=0) never times the wait out.
+   */
+  private waitForVenvThenRun(
+    options: PythonRunOptions,
+    doRun: (timeoutOverride?: number) => Promise<{ stdout: string; stderr: string }>,
+  ): Promise<{ stdout: string; stderr: string }> {
+    if (options.signal?.aborted) return Promise.reject(pythonAbortError());
+    const budget = resolvePythonTimeout(options.timeout);
+    const waitStartedAt = Date.now();
+    const wait = new AbortController();
+    let timedOut = false;
+    const timer =
+      budget === undefined
+        ? undefined
+        : setTimeout(() => {
+            timedOut = true;
+            wait.abort();
+          }, budget);
+    const forwardAbort = () => wait.abort();
+    options.signal?.addEventListener("abort", forwardAbort, { once: true });
+    const stopWaiting = () => {
+      if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", forwardAbort);
+    };
+    return acquireVenvRead(wait.signal).then(
+      (r) => {
+        stopWaiting();
+        const remaining =
+          budget === undefined ? undefined : Math.max(1, budget - (Date.now() - waitStartedAt));
+        return doRun(remaining).finally(r);
+      },
+      () => {
+        stopWaiting();
+        return Promise.reject(timedOut ? pythonTimeoutError() : pythonAbortError());
+      },
+    );
   }
 }
 
@@ -1467,6 +1603,18 @@ function getAiDispatcher(): PythonDispatcher {
  */
 export function isGpuAvailable(framework?: GpuFramework): boolean {
   return getAiDispatcher().isGpuAvailable(framework);
+}
+
+/**
+ * Whether a GPU could run work for `framework`. Use this, not isGpuAvailable,
+ * to decide a CPU-only refusal: before the dispatcher's first probe it answers
+ * from the device node instead of "no GPU".
+ */
+export function gpuMayBeAvailable(
+  framework: GpuFramework,
+  deviceExists?: (path: string) => boolean,
+): boolean {
+  return getAiDispatcher().gpuMayBeAvailable(framework, deviceExists);
 }
 
 export function getDispatcherStatus(): DispatcherStatus {

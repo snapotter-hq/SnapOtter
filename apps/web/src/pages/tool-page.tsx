@@ -2,6 +2,7 @@ import {
   ANALYTICS_EVENTS,
   COMPRESS_PRESET_BY_ID,
   getRequiredBundlesForTool,
+  isToolDisabled,
   PYTHON_SIDECAR_TOOLS,
   SECTIONS,
   TOOLS,
@@ -55,7 +56,7 @@ import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { showUnsupportedFileType } from "@/lib/intake-notice";
 import { withAnalytics } from "@/lib/lazy-analytics";
-import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
+import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import {
@@ -114,7 +115,7 @@ const BROWSER_PREVIEWABLE_EXTS = new Set([
 ]);
 
 function canBrowserPreview(url: string, filename?: string | null): boolean {
-  // Blob URLs are always renderable in <img> tags — no extension to check
+  // Blob URLs are always renderable in <img> tags; no extension to check
   if (url.startsWith("blob:")) return true;
   // For batch results, check the stored filename (has extension) rather than the blob URL
   const source = filename ?? url;
@@ -795,12 +796,12 @@ function ToolPageContent({
   );
 
   // Document-level paste handler (only when an active, installed tool workspace with a dropzone is rendered)
-  const isToolDisabled = Boolean(tool && disabledTools.includes(tool.id));
+  const disabledByAdmin = Boolean(tool && isToolDisabled(tool.id, disabledTools));
   const canAcceptPaste = Boolean(
     tool &&
       registryEntry &&
       registryEntry.displayMode !== "no-dropzone" &&
-      !isToolDisabled &&
+      !disabledByAdmin &&
       (!isAiTool || (featuresLoaded && (toolInstalled || !featureBundle))),
   );
   useEffect(() => {
@@ -849,14 +850,12 @@ function ToolPageContent({
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
-    if (toolId) {
-      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
-    }
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, toolId ? { tool_id: toolId } : {});
     downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
     useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename, toolId]);
 
-  if (isToolDisabled) {
+  if (disabledByAdmin) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
@@ -1098,31 +1097,33 @@ function ToolPageContent({
           );
         }
       }
-      // Tools that convert video to a non-video format (gif, webp, frames):
-      // after processing, show the result as an image instead of a video player
-      if (hasProcessed && processedUrl) {
-        const outName = currentEntry?.processedFilename ?? processedFileName;
-        const ext = outName.split(".").pop()?.toLowerCase();
-        if (ext && ["gif", "webp", "png", "jpg", "jpeg", "apng"].includes(ext)) {
+      const currentFileName = hasProcessed
+        ? (currentEntry?.processedFilename ?? processedFileName ?? "")
+        : (currentEntry?.file?.name ?? "");
+      const view = videoAreaView(currentFileName);
+      // A GIF input (gif-to-video) or an image result (video-to-gif, -webp):
+      // the browser shows those itself.
+      if (view === "image") {
+        const imageSrc = hasProcessed ? processedUrl : originalBlobUrl;
+        if (imageSrc) {
           return (
             <ImageViewer
-              src={processedUrl}
-              filename={outName}
-              fileSize={currentEntry?.processedSize ?? null}
-              resultContext={{ toolId }}
+              src={imageSrc}
+              filename={currentFileName}
+              fileSize={
+                hasProcessed
+                  ? (currentEntry?.processedSize ?? null)
+                  : (currentEntry?.file?.size ?? 0)
+              }
+              resultContext={hasProcessed ? { toolId } : undefined}
             />
           );
         }
       }
-      // Check if the current file is browser-playable
-      const currentFileName = hasProcessed
-        ? (currentEntry?.processedFilename ?? processedFileName ?? "")
-        : (currentEntry?.file?.name ?? "");
-      const currentExt = currentFileName.split(".").pop()?.toLowerCase() ?? "";
-      const nativeVideoExts = new Set(["mp4", "webm", "ogg", "ogv", "m4v", "mov"]);
-      const isNativeVideo = nativeVideoExts.has(currentExt);
-
-      if (!isNativeVideo && currentExt) {
+      // A ZIP of frames or a subtitle file: neither the browser nor the
+      // preview transcode can show it, and the transcode answers 400 (#4666).
+      if (view === "no-preview" && hasProcessed) return conversionCompleteCard;
+      if (view === "server-preview") {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
         const previewSrc = hasProcessed
           ? (processedUrl ?? originalBlobUrl ?? undefined)
@@ -1607,7 +1608,7 @@ function ToolPageContent({
           </button>
         )}
 
-        {/* Batch download — shown right after settings for easy access */}
+        {/* Batch download: shown right after settings for easy access */}
         {entries.length > 1 && hasProcessed && batchZipBlob && !docCanvas && (
           <button
             type="button"

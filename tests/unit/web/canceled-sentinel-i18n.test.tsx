@@ -75,11 +75,13 @@ describe("Canceled sentinel translation across pipeline processor, preview cards
   beforeEach(() => {
     storageMap.clear();
     vi.stubGlobal("localStorage", localStorageMock);
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn(() => "blob:test-input"),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: vi.fn(() => "blob:test-input"),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {

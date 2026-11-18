@@ -31,6 +31,6 @@ describe("legacy sqlite fixture builder", () => {
       (r) => r.status,
     );
     s.close();
-    expect(statuses).toContain("error"); // not a 2.x enum member — must be mapped on import
+    expect(statuses).toContain("error"); // not a 2.x enum member, must be mapped on import
   });
 });

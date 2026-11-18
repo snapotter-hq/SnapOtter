@@ -8537,6 +8537,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8546,6 +8549,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8606,12 +8610,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: ความเข้ากันได้ของรันไทม์ OCR จะไม่มีสำหรับชุดแบบเดิม
+                          description: ความเข้ากันได้กับโฮสต์ OCR รายงานค่านี้เสมอ บันเดิลรุ่นเก่าจะรายงาน incompatible เฉพาะเมื่อโฮสต์นี้รันบันเดิลไม่ได้ และจะไม่ส่งฟิลด์นี้ในกรณีอื่น
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: เหตุผลความเข้ากันได้ของรันไทม์ OCR จะไม่มีสำหรับชุดแบบเดิม
+                          description: เหตุผลที่บันเดิลเข้ากันไม่ได้ เช่น cpu-no-avx เมื่อไลบรารี x86-64 ของบันเดิลต้องใช้ AVX แต่ CPU นี้ไม่มี จะไม่ส่งสำหรับบันเดิลรุ่นเก่าที่เข้ากันได้
                         selectedTarget:
                           type:
                             - string
@@ -8782,7 +8786,7 @@ paths:
       description: คืนรีลีสที่เผยแพร่ล่าสุดเมื่อใหม่กว่าเวอร์ชันที่กำลังทำงาน มิฉะนั้นคืน null ต้องใช้สิทธิ์ settings:write
       responses:
         '200':
-          description: เวอร์ชันล่าสุด หรือ null เมื่ออินสแตนซ์นี้เป็นเวอร์ชันปัจจุบันแล้ว
+          description: รุ่นที่ใหม่กว่า หรือ null เมื่อไม่มีรุ่นที่ใหม่กว่าเผยแพร่ หรือปิดการวิเคราะห์ไว้บนอินสแตนซ์นี้ (จะไม่มีการค้นหาในกรณีนั้น)
           content:
             application/json:
               schema:
@@ -8791,10 +8795,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: ไม่มีข้อมูลยืนยันตัวตนหรือข้อมูลไม่ถูกต้อง
           content:
@@ -8916,6 +8934,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: ติดตั้งบันเดิลที่เครื่องมือต้องใช้บนโฮสต์นี้ไม่ได้ เพราะไม่รองรับรันไทม์ OCR หรือบันเดิลต้องใช้ AVX แต่ CPU นี้ไม่มี (รหัส FEATURE_CPU_UNSUPPORTED) จะไม่มีสิ่งใดเข้าคิว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9002,7 +9026,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: ติดตั้งชุดแล้ว หรือรันไทม์ OCR ไม่รองรับบนโฮสต์นี้
+          description: ติดตั้งบันเดิลแล้ว ไม่รองรับรันไทม์ OCR บนโฮสต์นี้ หรือบันเดิลต้องใช้ AVX แต่ CPU นี้ไม่มี (รหัส FEATURE_CPU_UNSUPPORTED ถูกปฏิเสธก่อนการดาวน์โหลดใดๆ)
           content:
             application/json:
               schema:
@@ -23808,7 +23832,7 @@ paths:
         '403':
           description: สิทธิ์ไม่เพียงพอ
         '409':
-          description: มีการล็อกการนำเข้าอยู่
+          description: มีการล็อกการนำเข้าอยู่ หรือบันเดิลต้องใช้ AVX แต่ CPU นี้ไม่มี (รหัส FEATURE_CPU_UNSUPPORTED)
         '413':
           description: ไฟล์ในการนำเข้ามีขนาดเกิน 20 GiB เส้นทางนี้มีขีดจำกัดขนาดของตัวเอง `MAX_UPLOAD_SIZE_MB` ไม่มีผลกับเส้นทางนี้
         '507':
@@ -30709,13 +30733,13 @@ x-i18n:
       provenance: machine
       outputHash: b57bf10b8f2d
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 9f32acb3d53e
+      outputHash: 96605baa6af9
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: cf69e53440b0
+      outputHash: 7dc47c5c715b
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30765,9 +30789,9 @@ x-i18n:
       provenance: machine
       outputHash: 70d21f2c7c11
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: b8cdbaa491a0
+      outputHash: 324c0ce2c0e0
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30808,6 +30832,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 842aa8d8e7df
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 24d7bf291ccd
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30841,9 +30869,9 @@ x-i18n:
       provenance: machine
       outputHash: 4a4812643df7
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 846abbbd5e24
+      outputHash: 14232c673767
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36185,9 +36213,9 @@ x-i18n:
       provenance: machine
       outputHash: 93ba20f8b72b
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: ddf9a8eed524
+      outputHash: 441d8fd3c549
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

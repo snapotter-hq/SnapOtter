@@ -1,21 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 type RedisStub = {
   status: string;
   options: Record<string, unknown>;
-  ping: ReturnType<typeof vi.fn>;
-  quit: ReturnType<typeof vi.fn>;
-  connect: ReturnType<typeof vi.fn>;
-  disconnect: ReturnType<typeof vi.fn>;
-  duplicate: ReturnType<typeof vi.fn>;
-  defineCommand: ReturnType<typeof vi.fn>;
-  info: ReturnType<typeof vi.fn>;
-  getMaxListeners: ReturnType<typeof vi.fn>;
-  setMaxListeners: ReturnType<typeof vi.fn>;
-  once: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  off: ReturnType<typeof vi.fn>;
-  removeListener: ReturnType<typeof vi.fn>;
+  ping: Mock;
+  quit: Mock;
+  connect: Mock;
+  disconnect: Mock;
+  duplicate: Mock;
+  defineCommand: Mock;
+  info: Mock;
+  getMaxListeners: Mock;
+  setMaxListeners: Mock;
+  once: Mock;
+  on: Mock;
+  off: Mock;
+  removeListener: Mock;
   /** Fires the handler registered via once(), as ioredis would. */
   emitOnce: (event: string) => void;
   /** Fires every handler registered via on(). Throws if none exist, like an EventEmitter "error" would. */
@@ -353,6 +353,40 @@ describe("Redis connection factory", () => {
     ).not.toThrow();
     expect(loggerMock.error).toHaveBeenCalledWith(
       { err: expect.objectContaining({ message: expect.stringContaining("ECONNREFUSED") }) },
+      "[redis] connection error",
+    );
+  });
+
+  it("labels connection errors with the connection name it was given (#4552)", async () => {
+    const { createRedisConnection, createRedisSubscriberConnection } = await freshModule();
+
+    const command = createRedisConnection("login-throttle") as unknown as RedisStub;
+    const subscriber = createRedisSubscriberConnection("cancel") as unknown as RedisStub;
+    const err = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+    command.emitOn("error", err);
+    subscriber.emitOn("error", err);
+
+    // Every connection logs the same message, so the label is the only way a
+    // support bundle can tell which one is reconnecting.
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "login-throttle" },
+      "[redis] connection error",
+    );
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "cancel" },
+      "[redis] connection error",
+    );
+  });
+
+  it("labels the shared command connection as shared", async () => {
+    const { sharedRedis } = await freshModule();
+
+    const conn = sharedRedis() as unknown as RedisStub;
+    const err = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+    conn.emitOn("error", err);
+
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { err, connection: "shared" },
       "[redis] connection error",
     );
   });

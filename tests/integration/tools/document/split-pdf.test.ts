@@ -99,4 +99,20 @@ describe.skipIf(!qpdfAvailable())("split-pdf (requires qpdf)", () => {
     const parsed = JSON.parse(res.body);
     expect(parsed.error).toBe("Invalid settings");
   });
+
+  // Sentry NODE-A4: a page past the end used to reach qpdf, exit 2, and come
+  // back as a 422 "Processing failed" reported as our bug (#4415).
+  it("rejects a page past the end with a coded 400 before qpdf runs", async () => {
+    const res = await runTool({ mode: "range", range: "8-9" });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("PAGE_OUT_OF_RANGE");
+    expect(body.error).toMatch(/out of range for a 3-page document/);
+  }, 60_000);
+
+  it("rejects page syntax qpdf can't parse with a coded 400", async () => {
+    const res = await runTool({ mode: "range", range: "1z" });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("INVALID_PAGE_RANGE");
+  }, 60_000);
 });

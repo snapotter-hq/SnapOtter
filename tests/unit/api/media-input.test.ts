@@ -1,6 +1,7 @@
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { engineCrashError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediaEngine = vi.hoisted(() => ({
@@ -305,6 +306,24 @@ describe("ffprobe spawn failures (#3716)", () => {
         expect((err as Error).message).toMatch(/ffmpeg is not installed/i);
         expect((err as { details?: string }).details).toMatch(/FFMPEG_PATH and FFPROBE_PATH/);
       }
+      expect(readdirSync(scratchDir)).toEqual([]);
+    },
+  );
+
+  it.each(["SIGSEGV", "SIGILL"] as const)(
+    "passes an ffprobe crash (%s) through as a 500 instead of calling the file unrecognized (#4684)",
+    async (signal) => {
+      const crash = engineCrashError(
+        "The media engine (ffprobe) crashed while processing this file.",
+        "ffprobe",
+        signal,
+        "",
+      );
+      mediaEngine.probeMedia.mockRejectedValueOnce(crash);
+
+      await expect(
+        new MediaInputHandler("video").prepare(Buffer.from("fake-mp4"), "clip.mp4", { scratchDir }),
+      ).rejects.toBe(crash);
       expect(readdirSync(scratchDir)).toEqual([]);
     },
   );

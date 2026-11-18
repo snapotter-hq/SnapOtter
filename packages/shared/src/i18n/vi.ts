@@ -80,7 +80,7 @@ export const vi: TranslationKeys = {
     searchMissDiscussionsFallback:
       "Chúng tôi không ghi lại được. Mở một yêu cầu trong Discussions.",
     offlineDescription:
-      "Bản cài đặt này đã tắt phân tích, nên phản hồi không được ghi lại ở đây. Bạn vẫn có thể liên hệ trực tiếp với nhóm SnapOtter.",
+      "Bản cài đặt này hiện không thể ghi lại phản hồi. Bạn vẫn có thể liên hệ trực tiếp với nhóm SnapOtter.",
     offlinePublicNote: "Issue trên GitHub là công khai.",
     offlineGithubButton: "Mở một issue trên GitHub",
     offlineEmailButton: "Gửi email cho chúng tôi",
@@ -4119,6 +4119,8 @@ export const vi: TranslationKeys = {
     previewFailed: "Tạo xem trước thất bại",
     previewEncoderMissing:
       "ffmpeg trên máy chủ này thiếu bộ mã hóa {encoder} nên không thể tạo xem trước. Liên hệ quản trị viên.",
+    previewEngineUnavailable:
+      "Máy chủ này chưa cài ffmpeg nên không thể tạo xem trước. Hãy nhờ quản trị viên cài ffmpeg hoặc đặt FFMPEG_PATH.",
     previewProgressMessages: [
       "Rái cá đang khởi động...",
       "Đang nghiền điểm ảnh...",
@@ -5188,6 +5190,7 @@ export const vi: TranslationKeys = {
       disabledCount: "{count} công cụ bị tắt",
       disabledCountOne: "{count} công cụ bị tắt",
       disabledCountOther: "{count} công cụ bị tắt",
+      offWithBase: "Đang tắt vì công cụ {base} bị tắt.",
     },
     experimental: {
       label: "Bật công cụ thử nghiệm",
@@ -5633,6 +5636,8 @@ export const vi: TranslationKeys = {
       BROWSER_CRASHED: "Trình duyệt đã gặp sự cố khi kết xuất. Hãy thử lại.",
       BROWSER_NOT_AVAILABLE: "Trình duyệt mà công cụ này cần hiện không khả dụng.",
       DEPENDENCY_VALIDATION_FAILED: "Cài đặt này phụ thuộc vào một cài đặt khác không hợp lệ.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Tính năng này cần CPU hỗ trợ AVX, nhưng CPU của máy chủ này không hỗ trợ.",
       FEATURE_INCOMPATIBLE: "Tính năng này không thể chạy với các cài đặt hiện tại.",
       FST_REQ_FILE_TOO_LARGE: "Tệp này quá lớn để tải lên.",
       IDLE_TIMEOUT: "Bạn đã bị đăng xuất do không hoạt động. Hãy đăng nhập lại.",
@@ -5681,6 +5686,39 @@ export const vi: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "Kết quả không thể đạt kích thước mục tiêu.",
       TOO_MANY_FRAMES: "Tệp này có quá nhiều khung hình để xử lý.",
       CANCELED: "Thao tác đã bị hủy.",
+      PAGE_OUT_OF_RANGE: "Phạm vi trang đó có một trang mà PDF này không có.",
+      INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "Bạn không thể xóa tất cả các trang. Hãy giữ lại ít nhất một trang.",
+      NESTING_TOO_DEEP: "Tệp này lồng nhau quá sâu để chuyển đổi.",
+      DOCUMENT_UNREADABLE:
+        "Không thể mở tài liệu này. Tài liệu có thể bị hỏng, được bảo vệ bằng mật khẩu hoặc không đúng định dạng như phần mở rộng cho biết.",
+      PDF_DAMAGED: "PDF này bị hỏng. Hãy xử lý nó bằng công cụ Sửa chữa PDF rồi thử lại.",
+      PDF_PASSWORD_PROTECTED:
+        "PDF này được bảo vệ bằng mật khẩu. Hãy mở khóa bằng công cụ Mở khóa PDF rồi thử lại.",
+      IMAGE_TOO_LARGE: "Hình ảnh này quá lớn để xử lý. Hãy giảm kích thước rồi thử lại.",
+      RESULT_TOO_LARGE:
+        "Kết quả từ các cài đặt này sẽ quá lớn. Hãy dùng hình ảnh nhỏ hơn hoặc cài đặt cho kết quả nhỏ hơn.",
+      NO_AUDIO_TRACK: "Tệp này không có bản âm thanh. Hãy chọn tệp có âm thanh rồi thử lại.",
+      IMAGE_UNDECODABLE:
+        "Không thể đọc hình ảnh này. Tệp có thể bị hỏng hoặc dùng kiểu mã hóa mà công cụ này không hỗ trợ.",
+      INVALID_SETTINGS:
+        "Các cài đặt này không dùng được với tệp này. Hãy kiểm tra các giá trị rồi thử lại.",
+      CHART_DATA_INVALID:
+        "Công cụ Tạo biểu đồ không đọc được dữ liệu biểu đồ từ tệp này. Hãy dùng CSV hoặc JSON có tối đa 100 hàng, mỗi hàng gồm một nhãn và một số từ 0 trở lên.",
+      NO_FACE_DETECTED:
+        "Không tìm thấy khuôn mặt. Hãy tải lên ảnh chụp chính diện, rõ nét và đủ sáng.",
+      TARGET_SIZE_UNREACHABLE:
+        "Không thể thu nhỏ tệp này đến kích thước mục tiêu. Hãy thử mục tiêu lớn hơn.",
+      TOO_MANY_PAGES:
+        "Tệp PDF này có quá nhiều trang để xử lý cùng lúc. Hãy chọn ít trang hơn rồi thử lại.",
+      METADATA_DAMAGED:
+        "Siêu dữ liệu hiện có của hình ảnh này bị hỏng nên không thể chỉnh sửa an toàn.",
+      REMOTE_RESOURCES_DISABLED:
+        "Tệp này tải hình ảnh hoặc kiểu dáng từ internet, điều mà máy chủ này không cho phép. Hãy nhúng chúng vào tệp rồi thử lại.",
+      TOO_MANY_PIXELS:
+        "Ảnh động này có quá nhiều điểm ảnh trên tất cả các khung hình. Hãy dùng ít khung hình hơn hoặc kích thước nhỏ hơn.",
+      MEDIA_UNDECODABLE:
+        "Không thể đọc tệp này. Tệp có thể bị hỏng, không có luồng âm thanh hoặc video, hoặc dùng định dạng mà công cụ này không hỗ trợ.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",
@@ -5748,6 +5786,7 @@ export const vi: TranslationKeys = {
     grid: "Lưới",
     automate: "Tự động hóa",
     editor: "Chỉnh sửa",
+    editorBadge: "Beta",
     files: "Tệp",
     help: "Trợ giúp",
     settings: "Cài đặt",

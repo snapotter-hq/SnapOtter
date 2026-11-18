@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -71,6 +72,8 @@ import {
 import { loadToolInputs } from "./worker-inputs.js";
 import {
   buildLegacyResultPayload,
+  createJobDeadline,
+  createJobProgressSink,
   failureStatus,
   jobAgeMs,
   validationErrorFields,
@@ -201,12 +204,16 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
     const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
+    // A handler that knows how long its input needs can push this out through
+    // ctx.extendDeadline (accurate PDF OCR, #4719).
     const timeoutMs = timeoutMsFor(data.pool, data.toolId);
-    const timeoutHandle =
-      timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
+    const deadline = createJobDeadline(timeoutMs, () => ac.abort("timeout"));
 
-    // Per-job scratch directory
-    const scratchDir = join(scratchRoot(), jobId);
+    // Per-attempt scratch directory. BullMQ re-runs a stalled job under the
+    // same id while the first attempt may still be running, so a dir keyed on
+    // the id alone was shared, and whichever attempt finished first removed it
+    // from under the other mid-sidecar (#4217).
+    const scratchDir = join(scratchRoot(), `${jobId}-${randomUUID()}`);
 
     // Read by the catch below (#2144): once the handler has returned, the
     // deadline can't be the cause of a later error.
@@ -269,6 +276,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       // ffmpeg run, or a sidecar with its own scale) cannot send the client's
       // progress bar backwards. One reporter per attempt, so retries restart.
       const progressJobId = data.clientJobId ?? jobId;
+      const writeJobProgress = createJobProgressSink(job, data.toolId);
       const report = createMonotonicReporter((percent: number, stage?: string) => {
         void updateSingleFileProgress({
           jobId: progressJobId,
@@ -277,14 +285,19 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
           stage,
           ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
-        void job.updateProgress({ percent, stage });
+        writeJobProgress({ percent, stage });
       });
 
       // Check for cancellation before dispatching
       if (signal.aborted) throw new Error("Canceled");
 
       // Build the process context
-      const ctx: ToolProcessCtx = { signal, scratchDir, report };
+      const ctx: ToolProcessCtx = {
+        signal,
+        scratchDir,
+        report,
+        extendDeadline: deadline.extend,
+      };
 
       // Dispatch: AI handler or standard tool registry
       let resultBuffer: Buffer | null = null;
@@ -585,7 +598,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       // this line is what an operator tuning JOB_TIMEOUT_*_S has (#2144).
       if (signal.aborted && signal.reason === "timeout") {
         logger.warn(
-          { jobId, toolId: data.toolId, timeoutMs, durationMs },
+          { jobId, toolId: data.toolId, timeoutMs: deadline.timeoutMs(), durationMs },
           "handler returned after the job deadline; result kept",
         );
       }
@@ -672,7 +685,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       const finalError = isCanceled
         ? "Canceled"
         : isTimeout
-          ? timeoutMessage(timeoutMs)
+          ? timeoutMessage(deadline.timeoutMs())
           : errorMessage;
 
       // Log genuine processing faults at error level (clients only ever see
@@ -811,6 +824,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
               void reportError(aliasErr, {
                 source: "worker",
                 pool: data.pool,
+                toolId: data.toolId,
                 jobId: progressJobId,
               });
             }
@@ -935,7 +949,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
       throw thrownErr;
     } finally {
       if (span) span.end();
-      clearTimeout(timeoutHandle);
+      deadline.clear();
       unregisterCancelable(jobId);
       // Clean up scratch directory
       await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

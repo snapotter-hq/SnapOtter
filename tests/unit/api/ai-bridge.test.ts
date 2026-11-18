@@ -836,7 +836,7 @@ describe("AI Bridge - progress event parsing", () => {
 
     proc._pushStdout(`${JSON.stringify({ id: request.id, stdout: "", exitCode: 1 })}\n`);
 
-    await expect(resultPromise).rejects.toThrow("CUDA out of memory");
+    await expect(resultPromise).rejects.toThrow(/^The GPU ran out of memory/);
   });
 
   it("forwards {info} shaped stderr JSON to the logger instead of dropping it", async () => {

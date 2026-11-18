@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { isSafeMessageError } from "@snapotter/shared";
+import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { Job } from "bullmq";
 import { and, eq, notInArray } from "drizzle-orm";
@@ -148,6 +148,26 @@ export async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobR
 // renewing the lock of an "active" job, so stall detection never fires.
 const BATCH_ZIP_TIMEOUT_MS = 15 * 60_000;
 
+export const BATCH_OUTPUT_MISSING_MESSAGE =
+  "A processed file went missing before the batch could be packaged. Run the batch again.";
+
+/**
+ * A child output that is gone by packaging time. Nothing failed to write, so
+ * it must not reach putObjectStream as a bare ENOENT, which localWriteFault
+ * would report as "couldn't write to its storage" (#4664). Carrying a status
+ * makes localWriteFault pass it through unchanged. Classed as a bug: re-runs
+ * of a batch that already kept its ZIP are answered from it, so what's left
+ * is a file deleted under a batch nobody had finished.
+ */
+function batchOutputMissing(cause: unknown): SafeError {
+  return new SafeError(BATCH_OUTPUT_MISSING_MESSAGE, {
+    kind: "bug",
+    code: "batch-output-missing",
+    statusCode: 500,
+    cause,
+  });
+}
+
 /**
  * Stream every successful child output through one archiver pass into a
  * durable ZIP object. A source stream that fails after opening never rejects
@@ -185,6 +205,7 @@ async function buildBatchZip(
   archive.pipe(passthrough);
   const upload = putObjectStream(zipKey, passthrough);
   const normalizeSourceError = (err: unknown): Error => {
+    if (isMissingObjectError(err)) return batchOutputMissing(err);
     const normalized = isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err;
     return normalized instanceof Error ? normalized : new Error(String(normalized));
   };
@@ -338,6 +359,43 @@ async function fallbackPipelineChildError(
 }
 
 /**
+ * The result a finalize already committed, when this run is a duplicate: a
+ * stalled finalize that BullMQ re-queued after a restart, say. The first run
+ * reclaims the child outputs right after its terminal write, so zipping
+ * again would find them gone (#4664). Only a parent that kept a ZIP counts.
+ * A failed or empty-handed one has nothing to return, and re-running it is
+ * harmless because the terminal writes are guarded.
+ */
+async function storedBatchZipResult(parentId: string): Promise<ToolJobResult | null> {
+  const [parent] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+  if (parent?.type !== "batch") return null;
+  if (parent.status !== "completed" && parent.status !== "canceled") return null;
+  const zipKey = parent.outputRefs?.[0];
+  const result = (parent.progress as { result?: Record<string, unknown> } | null)?.result;
+  const zipFilename = result?.zipFilename;
+  if (!zipKey || typeof zipFilename !== "string") return null;
+  const size = parent.bytesOut ?? 0;
+  return {
+    outputRefs: [zipKey],
+    filename: zipFilename,
+    contentType: "application/zip",
+    originalSize: 0,
+    processedSize: size,
+    resultPayload: {
+      manifest: [],
+      ...(parent.status === "canceled" ? { canceled: true } : {}),
+      zip: {
+        key: zipKey,
+        filename: zipFilename,
+        size,
+        fileResults: (result?.fileResults ?? {}) as Record<string, string>,
+        fileNotes: (result?.fileNotes ?? {}) as Record<string, BatchFileNotes>,
+      },
+    },
+  };
+}
+
+/**
  * Assembles the ordered manifest from child DB rows after all batch
  * children have completed, packages the successful outputs into a durable
  * ZIP under outputs/<parentId>/, commits the terminal parent-row state, and
@@ -352,6 +410,14 @@ async function fallbackPipelineChildError(
 export async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
   const startTime = Date.now();
+  const stored = await storedBatchZipResult(data.jobId);
+  if (stored) {
+    logger.warn(
+      { jobId: data.jobId, bullJobId: job.id },
+      "batch-finalize re-ran for a batch that already committed its ZIP; returning the stored result",
+    );
+    return stored;
+  }
   const settings = (data.settings ?? {}) as {
     flowChildCount?: number;
     fileIndexMap?: number[];
@@ -669,6 +735,19 @@ export async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJ
     );
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
+    // A stall-evicted original can still be running when its re-run passes
+    // the guard at the top; it commits the ZIP and reclaims the children
+    // mid-packaging. Its committed result is this run's answer too.
+    if ((err as { code?: unknown } | null)?.code === "batch-output-missing") {
+      const committed = await storedBatchZipResult(data.jobId);
+      if (committed) {
+        logger.warn(
+          { jobId: data.jobId, bullJobId: job.id },
+          "batch-finalize lost the race to a concurrent run that committed the ZIP; returning its result",
+        );
+        return committed;
+      }
+    }
     // A SafeError's message names what to do (the workspace cap is the one
     // that fills after a large batch, #1161); it still goes through the same
     // sanitizer as every other worker error, since the AI bridge's SafeErrors

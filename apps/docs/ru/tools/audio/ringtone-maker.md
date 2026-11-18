@@ -2,7 +2,8 @@
 description: "Создание клипа рингтона из любого аудиофайла."
 i18n_source_hash: 8fcdcc545fbc
 i18n_provenance: human
-i18n_output_hash: c8be61fcc18c
+i18n_output_hash: 09178b8d13d7
+i18n_hash_version: 2
 ---
 
 # Создание рингтона {#ringtone-maker}
@@ -45,5 +46,5 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/ringtone-maker \
 ## Примечания {#notes}
 
 - Вывод всегда в формате M4R, совместимом с рингтонами iPhone.
-- Максимальная длительность рингтона — 30 секунд (ограничение Apple).
+- Максимальная длительность рингтона, 30 секунд (ограничение Apple).
 - В качестве входа можно использовать любой аудиоформат.

@@ -7,10 +7,10 @@
  * tab under the user's files.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 describe("withAnalytics", () => {
-  let reload: ReturnType<typeof vi.fn>;
+  let reload: Mock<() => void>;
   let uninstall: () => void;
 
   beforeEach(async () => {

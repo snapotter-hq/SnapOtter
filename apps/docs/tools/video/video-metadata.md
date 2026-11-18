@@ -39,13 +39,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` lists the names of the container tags that were removed. Values are not returned. An empty array means nothing was removed.
 - Metadata stripped includes creation timestamps, GPS/location data, camera/device info, and software tags.
 - The video and audio streams are copied without re-encoding, so there is no quality loss.
 - Useful for privacy before sharing videos publicly.

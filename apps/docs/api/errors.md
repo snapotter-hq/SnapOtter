@@ -72,6 +72,7 @@ A failed job keeps `error.code` only when the failure is an input error or a ser
 | `CANCELED` | The job was canceled by a user. It is not an HTTP status. Progress events carry `phase: failed` with this code. | Treat it as a user cancel. Do not retry it automatically. |
 | `INPUT_MISSING` | The input was removed before the job ran. | Upload the file again. |
 | `ENGINE_UNAVAILABLE` | A required engine could not start on the server. | Retry after an administrator repairs the install. |
+| `JOB_STALLED` | Not returned to clients; it labels the server's error report. The worker lost the job's lock more times than the queue allows, usually because the server restarted or ran short of memory or CPU. The job fails with a message saying it was interrupted. | Retry. If it keeps happening, give the server more memory or lower `CONCURRENT_JOBS`. |
 
 ## Authentication and MFA {#mfa-codes}
 
@@ -133,8 +134,9 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 
 | `code` | Status | Meaning | What to do |
 |--------|--------|---------|------------|
-| `FEATURE_NOT_INSTALLED` | 501 | The tool, or one step of a pipeline or batch, needs a bundle that is not installed. The body includes `feature` (the bundle ID) and `featureName`. | Install the bundle in Settings, then retry. |
-| `FEATURE_INCOMPATIBLE` | 501 | The installed feature cannot do the requested quality or language. | Change the setting, or install a bundle that supports it. |
+| `FEATURE_NOT_INSTALLED` | 501, or 400 from Smart Crop's face mode | The tool, or one step of a pipeline or batch, needs a bundle that is not installed. The body includes `feature` (the bundle ID) and `featureName`. | Install the bundle in Settings, then retry. |
+| `FEATURE_CPU_UNSUPPORTED` | 409 | An install or offline import was refused because the bundle's x86-64 libraries need AVX and this server's CPU doesn't have it. Nothing was downloaded or installed. The body includes `feature` (the bundle ID) and `reason` (`cpu-no-avx`). `GET /api/v1/features` reports the same bundle with `compatibility: "incompatible"` and `compatibilityReason: "cpu-no-avx"`. | Run SnapOtter on a CPU with AVX, or on arm64. Other bundles still install. |
+| `FEATURE_INCOMPATIBLE` | 501, or 400 when Fast OCR gets a language it can't read | The installed feature cannot do the requested quality or language. | Change the setting, or install a bundle that supports it. |
 | `ENGINE_UNAVAILABLE` | 503 | A required engine could not start, or an OCR runtime was removed after the request was validated. | Retry after an administrator repairs or reinstalls the feature. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium is not installed, so HTML to image cannot run. | Ask an administrator to install the browser. |
 | `BROWSER_CRASHED` | 503 | The screenshot browser crashed while rendering. | Retry the request. |
@@ -148,6 +150,26 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `BACKGROUND_REMOVAL_EXPIRED` | 410 | The background removal result expired before the follow-up step. | Remove the background again. |
 | `NOT_ANIMATED` | 400 | Remove GIF Background received a still image. | Use Remove Background for still images. |
 | `TOO_MANY_FRAMES` | 400 | The animation has more frames than the server allows (`GIF_BG_MAX_FRAMES`). | Send a shorter animation, or ask an administrator to raise the limit. |
+| `TOO_MANY_PIXELS` | 400 | The animation's canvas times its frame count is over the server's limit: 268,402,689 pixels (16383 x 16383) for Remove GIF Background, or the GIF workload cap for other animated tools. | Send fewer frames or a smaller animation. |
+| `IMAGE_TOO_LARGE` | 400 | The image has more pixels than the decoder accepts. | Send a smaller image. |
+| `RESULT_TOO_LARGE` | 400 | The settings would produce an image larger than the encoder or pixel limit allows. | Use a smaller image or settings that make a smaller result. |
+| `DOCUMENT_UNREADABLE` | 400 | LibreOffice or pandoc couldn't open the document. It may be damaged, password-protected, or not the format its extension says. | Check the file opens in an office app, then send it again. |
+| `PDF_DAMAGED` | 400 | The PDF engine found broken document structure. | Run the file through Repair PDF, then retry. |
+| `PDF_PASSWORD_PROTECTED` | 400 | The PDF is encrypted and this tool can't open it. | Unlock it with Unlock PDF first. |
+| `NO_AUDIO_TRACK` | 400 | The file has no audio stream for an audio tool to use. | Send a file that has audio. |
+| `MEDIA_UNDECODABLE` | 400 | ffmpeg couldn't read the audio or video: it found no packets, no codec parameters, no `moov` atom, or data it can't parse. | Check the file plays in a media player, or re-export it, then retry. |
+| `PAGE_OUT_OF_RANGE` | 400 | The page range names a page the PDF doesn't have. | Check the page count and send a range inside it. |
+| `INVALID_PAGE_RANGE` | 400 | The page range isn't valid syntax. | Use page numbers like `1-3,5`. |
+| `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages was asked to remove every page. | Keep at least one page. |
+| `NESTING_TOO_DEEP` | 400 | The JSON or XML is nested more than 100 levels deep. | Flatten the document, then convert it. |
+| `IMAGE_UNDECODABLE` | 400 | The image can't be decoded, or its dimensions can't be read. The file may be damaged or use an encoding the decoder doesn't support. | Re-export the image from another app, or convert it to PNG or JPEG first. |
+| `INVALID_SETTINGS` | 400 | A setting is out of range or doesn't fit this file: a crop outside the image, a resize of zero, a GIF frame the animation doesn't have, a passport spec that doesn't exist. The `error` text names the setting. | Fix the setting named in `error`, then retry. |
+| `CHART_DATA_INVALID` | 400 | Chart Maker couldn't read chart data from the file: the CSV or JSON doesn't parse, has no numeric column, has more than 100 rows, or has a negative value. The `error` text says which. | Send CSV or JSON with up to 100 rows, each a label and a number of zero or more. |
+| `NO_FACE_DETECTED` | 400 | Passport Photo found no face in the image. | Send a clear, front-facing photo with good lighting. |
+| `TARGET_SIZE_UNREACHABLE` | 400 | Compression, or a passport photo's size limit, can't get the file under the requested size, even after scaling it down. | Ask for a larger target size, or crop the image first. |
+| `TOO_MANY_PAGES` | 400 | OCR was asked for more pages than it processes in one job. | Select fewer pages with the page range. |
+| `METADATA_DAMAGED` | 400 | Edit Metadata found the image's existing EXIF data damaged, so it can't rewrite it safely. | Strip the metadata with Remove Image Metadata first, then edit. |
+| `REMOTE_RESOURCES_DISABLED` | 400 | HTML or Markdown to PDF found a reference to an image, stylesheet, or font on the network, which the server doesn't fetch. | Embed the resource in the file (for example as a `data:` URI), then retry. |
 
 ## Files {#file-codes}
 
@@ -197,3 +219,5 @@ These codes exist in the server source for logs, telemetry, or Fastify's own err
 | `ETIMEDOUT` | Set on the timeout error for a GDPR export. The export fails, and it can be requested again. |
 | `FST_REQ_FILE_TOO_LARGE` | Fastify's code for an upload over the limit. Clients get a 413 with `PAYLOAD_TOO_LARGE`, or the route's own 413 message. |
 | `TARGET_SIZE_EXCEEDED` | Thrown when a target-size compression misses its target. The error has no status or code, so clients get a generic failure. |
+| `OCR_CACHE_PERMISSIONS` | Reported to error tracking as an operational fault when the AI data volume leaves the OCR runtime cache world-writable. The install job fails with a message that names the storage problem. |
+| `OCR_RUNTIME_UNREACHABLE` | Reported to error tracking as an operational fault when the server never reached huggingface.co to download the OCR runtime. The install job fails with a message about network access, `HTTPS_PROXY`, and offline import. |

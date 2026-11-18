@@ -15,7 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const toastError = vi.hoisted(() => vi.fn());
 // sonner only resolves from apps/web, so a bare "sonner" here would mock a
 // different module than the one stage-capture imports.
-vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+vi.mock("../../../apps/web/node_modules/sonner/dist/index.mjs", () => ({
+  toast: { error: toastError },
+}));
 
 const DOC = { width: 200, height: 200 };
 const DOC_AREA = DOC.width * DOC.height;

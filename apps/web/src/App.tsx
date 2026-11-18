@@ -134,7 +134,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Single page-level loading fallback — shown while JS for a route downloads.
+// Single page-level loading fallback, shown while JS for a route downloads.
 function PageLoader() {
   return (
     <div className="flex h-dvh items-center justify-center bg-background text-foreground">

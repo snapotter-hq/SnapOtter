@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
-import { wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  ToolInputError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolveQpdf } from "./binaries.js";
 
 /**
@@ -13,6 +18,8 @@ export class QpdfTimeoutError extends Error {
     this.name = "QpdfTimeoutError";
   }
 }
+
+const QPDF_CRASHED_MESSAGE = "The document engine (qpdf) crashed while processing this file.";
 
 function qpdfSpawnFailure(
   bin: string,
@@ -29,6 +36,67 @@ function qpdfSpawnFailure(
     path: bin,
     ...(signal ? { signal } : {}),
   });
+}
+
+/**
+ * qpdf failures caused by what the user asked for rather than by the file or
+ * by us: a page range that doesn't fit the document ("error at * in numeric
+ * range *13: number 13 out of range", or "invalid range syntax") and a wrong
+ * decrypt password. Both exit 2, the same code as real damage, so stderr is
+ * the only tell.
+ */
+export type QpdfInputFault = "page-range" | "invalid-password";
+
+interface QpdfInputFaultRule {
+  pattern: RegExp;
+  fault: QpdfInputFault;
+  message: string;
+  /** The code the web app translates the failure from (#4679). */
+  code: string;
+}
+
+// First match wins: a page past the end, then any other range qpdf rejects
+// (bad syntax), so each gets the code that says which.
+const QPDF_INPUT_FAULTS: ReadonlyArray<QpdfInputFaultRule> = [
+  {
+    pattern: /\bin numeric range\b.*\bout of range\b/,
+    fault: "page-range",
+    message: "The page range doesn't match this PDF's pages.",
+    code: "PAGE_OUT_OF_RANGE",
+  },
+  {
+    pattern: /\bin numeric range\b/,
+    fault: "page-range",
+    message: "The page range doesn't match this PDF's pages.",
+    code: "INVALID_PAGE_RANGE",
+  },
+  // Neutral wording: most callers never take a password, so "wrong password"
+  // would blame the user for one they didn't give. unlock-pdf says it itself.
+  {
+    pattern: /: invalid password\s*$/m,
+    fault: "invalid-password",
+    message: "This PDF is password-protected.",
+    code: "PDF_PASSWORD_PROTECTED",
+  },
+];
+
+function qpdfInputError(code: number, detail: string): ToolInputError | undefined {
+  if (code !== 2) return undefined;
+  const rule = QPDF_INPUT_FAULTS.find(({ pattern }) => pattern.test(detail));
+  if (!rule) return undefined;
+  return Object.assign(
+    new ToolInputError(rule.message, {
+      cause: new Error(`qpdf exited ${code}: ${detail}`),
+      code: rule.code,
+    }),
+    { qpdfFault: rule.fault },
+  );
+}
+
+/** The input fault a runQpdf rejection was classified as, if any. */
+export function qpdfInputFault(err: unknown): QpdfInputFault | undefined {
+  const fault = (err as { qpdfFault?: unknown } | null)?.qpdfFault;
+  return fault === "page-range" || fault === "invalid-password" ? fault : undefined;
 }
 
 export interface QpdfOptions {
@@ -101,11 +169,16 @@ export function runQpdf(
         return;
       }
       const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, detail));
+        return;
+      }
       if (code === null || code === 126 || code === 127) {
         reject(qpdfSpawnFailure(bin, code, signal, detail));
         return;
       }
-      reject(new Error(`qpdf exited ${code}: ${detail}`));
+      reject(qpdfInputError(code, detail) ?? new Error(`qpdf exited ${code}: ${detail}`));
     });
     abortSignal?.addEventListener("abort", onAbort, { once: true });
   });
@@ -181,6 +254,11 @@ export async function qpdfRequiresPassword(
       }
       if (code === 2 || code === 3) {
         resolvePromise(false);
+        return;
+      }
+      const crashSignal = engineCrashSignal(code, signal);
+      if (crashSignal) {
+        reject(engineCrashError(QPDF_CRASHED_MESSAGE, "qpdf", crashSignal, err));
         return;
       }
       if (code === null || code === 126 || code === 127) {

@@ -913,6 +913,100 @@ describe("Dropzone", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // File chooser input stays attached while open (#4647)
+  // ---------------------------------------------------------------------------
+  describe("attached file chooser input (#4647)", () => {
+    /** Records whether each clicked file input was in the document at click time. */
+    function spyAttachedFileInputs() {
+      const clicks: Array<{ input: HTMLInputElement; connected: boolean }> = [];
+      vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+        this: HTMLInputElement,
+      ) {
+        if (this.type === "file") clicks.push({ input: this, connected: this.isConnected });
+      });
+      return clicks;
+    }
+
+    function pickFiles(input: HTMLInputElement, files: File[]) {
+      Object.defineProperty(input, "files", { value: files, configurable: true });
+      act(() => {
+        input.dispatchEvent(new Event("change"));
+      });
+    }
+
+    it("attaches the upload input before clicking and removes it after a pick", () => {
+      const onFiles = vi.fn();
+      const clicks = spyAttachedFileInputs();
+      render(<Dropzone onFiles={onFiles} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
+      expect(clicks).toHaveLength(1);
+      const { input, connected } = clicks[0];
+      expect(connected).toBe(true);
+      expect(input.hidden).toBe(true);
+
+      const file = makeFile("photo.png");
+      pickFiles(input, [file]);
+
+      expect(onFiles).toHaveBeenCalledWith([file]);
+      expect(input.isConnected).toBe(false);
+    });
+
+    it("removes the input when the chooser is cancelled", () => {
+      const onFiles = vi.fn();
+      const clicks = spyAttachedFileInputs();
+      render(<Dropzone onFiles={onFiles} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
+      const { input } = clicks[0];
+      expect(input.isConnected).toBe(true);
+
+      act(() => {
+        input.dispatchEvent(new Event("cancel"));
+      });
+
+      expect(input.isConnected).toBe(false);
+      expect(onFiles).not.toHaveBeenCalled();
+    });
+
+    it("drops a leftover input when the picker opens again", () => {
+      const clicks = spyAttachedFileInputs();
+      render(<Dropzone />);
+      const upload = screen.getByRole("button", { name: "Upload from computer" });
+
+      fireEvent.click(upload);
+      fireEvent.click(upload);
+
+      expect(clicks).toHaveLength(2);
+      expect(clicks[0].input.isConnected).toBe(false);
+      expect(clicks[1].input.isConnected).toBe(true);
+      expect(document.querySelectorAll('input[type="file"]')).toHaveLength(1);
+      act(() => {
+        clicks[1].input.dispatchEvent(new Event("cancel"));
+      });
+    });
+
+    it("attaches the camera input and keeps capture=environment", () => {
+      stubPointer(true);
+      const onFiles = vi.fn();
+      const clicks = spyAttachedFileInputs();
+      render(<Dropzone cameraCapture onFiles={onFiles} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
+      expect(clicks).toHaveLength(1);
+      const { input, connected } = clicks[0];
+      expect(connected).toBe(true);
+      expect(input.getAttribute("capture")).toBe("environment");
+
+      const photo = makeFile("capture.jpg", "image/jpeg");
+      pickFiles(input, [photo]);
+
+      expect(onFiles).toHaveBeenCalledWith([photo]);
+      expect(input.isConnected).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Bulk URL import modal filtering (#2842)
   // ---------------------------------------------------------------------------
   describe("bulk URL import modal filtering (#2842)", () => {

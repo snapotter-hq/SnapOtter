@@ -55,7 +55,7 @@ import { hotkeysModIsMeta } from "@/lib/platform";
 import { useEditorStore } from "@/stores/editor-store";
 // sonner only resolves under apps/web, so reach the copy the app imports; a
 // bare-specifier import or vi.mock from here would get a different instance.
-import { Toaster } from "../../../apps/web/node_modules/sonner";
+import { Toaster } from "../../../apps/web/node_modules/sonner/dist/index.mjs";
 
 const COPY_FAILED = en.editor.ui.exportDialog.copyFailed;
 const INITIAL_STATE = useEditorStore.getState();

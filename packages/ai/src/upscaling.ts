@@ -1,14 +1,15 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
+  gpuMayBeAvailable,
   isGpuAvailable,
   type ProgressCallback,
   parseStdoutJson,
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 /**
  * Maximum input megapixels accepted for CPU-only upscaling (#2513).
@@ -73,30 +74,33 @@ export async function upscale(
   const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
   const scale = pythonOptions.scale ?? 2;
   const effectiveMp = megapixels * scale ** 2;
-  const gpu = isGpuAvailable("torch");
-
-  if (!gpu) {
+  // The refusal asks whether a GPU could run this (a device node counts until
+  // the dispatcher reports, #4758); the timeout keeps the probed answer, so a
+  // pre-probe run gets the generous CPU budget.
+  if (!gpuMayBeAvailable("torch")) {
     const maxCpuMp = resolveMaxCpuUpscaleMp();
     if (maxCpuMp > 0) {
       if (pythonOptions.model !== "lanczos" && megapixels > maxCpuMp) {
         throw new ToolInputError(
           `Image is too large for CPU upscaling (${formatExceededMp(megapixels, maxCpuMp)} MP, max ${maxCpuMp} MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.`,
+          { code: "IMAGE_TOO_LARGE" },
         );
       }
       const maxCpuOutputMp = maxCpuMp * (MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP);
       if (effectiveMp > maxCpuOutputMp) {
         throw new ToolInputError(
           `Upscaled output is too large for CPU upscaling (${formatExceededMp(effectiveMp, maxCpuOutputMp)} MP at ${scale}x, max ${maxCpuOutputMp} MP on CPU). Use a smaller image, lower scale factor, or a GPU host.`,
+          { code: "RESULT_TOO_LARGE" },
         );
       }
     }
   }
 
   const pngBuffer = await image.png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("upscale", inputPath, pngBuffer);
 
   // CPU inference is ~50-100x slower than GPU; be generous for self-hosted NAS hardware
-  const rateMs = gpu ? 30_000 : 180_000;
+  const rateMs = isGpuAvailable("torch") ? 30_000 : 180_000;
   const timeout = Math.max(600_000, effectiveMp * rateMs);
 
   const { stdout } = await runPythonWithProgress(
@@ -112,7 +116,7 @@ export async function upscale(
 
   // Python may write to a different path when the output format changes
   const actualOutputPath = result.output_path || outputPath;
-  const buffer = await readFile(actualOutputPath);
+  const buffer = await readScratchOutput("upscale", actualOutputPath);
   return {
     buffer,
     width: result.width,

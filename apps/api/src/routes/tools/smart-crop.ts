@@ -122,7 +122,9 @@ async function processSubject(
   // can produce a cover intermediate over the 64 MP limit (#2203).
   const { width: srcW, height: srcH } = await sharp(inputBuffer).metadata();
   if (!srcW || !srcH) {
-    throw new ToolInputError("Cannot determine image dimensions for smart crop");
+    throw new ToolInputError("Cannot determine image dimensions for smart crop", {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
   const coverScale = Math.max(resizeW / srcW, resizeH / srcH);
   const coverW = Math.round(srcW * coverScale);
@@ -130,6 +132,7 @@ async function processSubject(
   if (coverW * coverH > MAX_STEP_PIXELS) {
     throw new ToolInputError(
       `Covering ${resizeW} x ${resizeH} from a ${srcW} x ${srcH} image scales it to ${coverW} x ${coverH}, over the ${MAX_STEP_PIXELS} pixel limit`,
+      { code: "RESULT_TOO_LARGE" },
     );
   }
 
@@ -162,6 +165,7 @@ async function processFace(
   if (!isFeatureInstalled(FACE_BUNDLE_ID)) {
     throw new ToolInputError(
       "Face mode needs the Face Detection feature bundle. Install it, or use another mode.",
+      { code: "FEATURE_NOT_INSTALLED" },
     );
   }
   const result = await detectFaces(inputBuffer, {
@@ -230,6 +234,7 @@ async function processTrim(
   if (width < 3 || height < 3) {
     throw new ToolInputError(
       `The image is too small to trim (${width} x ${height} pixels). Both sides have to be at least 3 pixels.`,
+      { code: "INVALID_SETTINGS" },
     );
   }
 
@@ -248,6 +253,7 @@ async function processTrim(
     if (target * target > MAX_STEP_PIXELS) {
       throw new ToolInputError(
         `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_TRIM_SQUARE_SIDE} or less.`,
+        { code: "RESULT_TOO_LARGE" },
       );
     }
     const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));

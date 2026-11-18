@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。包含硬件要求、GPU 设置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 8fbccd003cac
+i18n_output_hash: cb1d9f41ad17
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ SnapOtter 支持 **55 种以上输入格式**和 **14 种输出格式**，包括
 - **放大**在 CPU 上处理稍大的图像就会超时。实际使用需要 GPU。
 - **CodeFormer** 人脸增强明显慢于 GFPGAN（GPU 上为 53 秒对 2 秒）。大多数场景推荐使用 GFPGAN。
 
+### 多副本部署下安装 AI 功能包 {#ai-bundle-installs-with-several-replicas}
+
+更改 AI 功能包时，只保留一个副本运行。安装功能包、离线导入功能包或重置 AI 环境，都会重写 `/data/ai/venv` 中共享的 Python 环境。安装会等待自身副本上的 AI 任务完成，这些操作随后都会重启该副本的 sidecar，但它们都看不到其他副本上的 AI 任务。其他副本的 sidecar 在该目录被重写期间，仍保持从中加载的 torch 和 ONNX Runtime，可能在任务中途崩溃。请先把部署缩减到一个副本（或停止其他副本），完成更改后再扩容回去。
+
 ## 卷 {#volumes}
 
 | 挂载 / 卷 | 用途 | 是否必需？ |
 |---|---|---|
 | `/data`（应用） | AI 模型、Python venv、用户文件 | **是**，缺少它会丢失文件 |
-| `/tmp/workspace`（应用） | 临时处理文件（自动清理） | 推荐 |
+| `/tmp/workspace`（应用） | 临时处理文件和任务输出（自动清理）。不存储在 `/data` 下，因此除非挂载此目录，否则容器被替换时结果会丢失 | 推荐 |
 | `SnapOtter-pgdata`（postgres） | PostgreSQL 数据目录（用户、设置、流水线、任务） | **是**，缺少它会丢失数据 |
 | `SnapOtter-redisdata`（redis） | 用于持久化任务队列的 Redis 仅追加文件 | 推荐 |
+
+### 使用 `docker run` 保留任务输出 {#keeping-job-output}
+
+任务结果存放在 `/tmp/workspace` 下，除非挂载，否则它属于容器自身的文件系统。如果只使用 `-v SnapOtter-data:/data`，用户、设置和文件会保留，但之前任务的结果会在容器被替换后丢失，其下载链接会返回 404。要保留它们，请同时挂载工作区：
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Compose 堆栈已经挂载了 `SnapOtter-workspace`。
 
 ### 绑定挂载与命名卷 {#bind-mounts-vs-named-volumes}
 

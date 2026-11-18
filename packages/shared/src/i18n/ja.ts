@@ -80,7 +80,7 @@ export const ja: TranslationKeys = {
     searchMissDiscussionsFallback:
       "記録できませんでした。Discussions でリクエストを開いてください。",
     offlineDescription:
-      "このインスタンスは分析が無効になっているため、フィードバックはここには記録されません。SnapOtter チームに直接連絡することもできます。",
+      "このインスタンスは現在フィードバックを記録できません。SnapOtter チームに直接連絡することもできます。",
     offlinePublicNote: "GitHub の Issue は公開されます。",
     offlineGithubButton: "GitHub で Issue を作成",
     offlineEmailButton: "メールで連絡",
@@ -4078,6 +4078,8 @@ export const ja: TranslationKeys = {
     previewFailed: "プレビューの生成に失敗しました",
     previewEncoderMissing:
       "このサーバーの ffmpeg に {encoder} エンコーダーがないため、プレビューを生成できません。管理者にお問い合わせください。",
+    previewEngineUnavailable:
+      "このサーバーに ffmpeg がインストールされていないため、プレビューを生成できません。ffmpeg のインストールまたは FFMPEG_PATH の設定を管理者に依頼してください。",
     previewProgressMessages: [
       "カワウソが準備運動中...",
       "ピクセルを噛み砕いています...",
@@ -5149,6 +5151,7 @@ export const ja: TranslationKeys = {
       disabledCount: "{count}個のツールが無効",
       disabledCountOne: "{count}個のツールが無効",
       disabledCountOther: "{count}個のツールが無効",
+      offWithBase: "{base}が無効のため、このツールも無効です。",
     },
     experimental: {
       label: "実験的ツールを有効化",
@@ -5599,6 +5602,8 @@ export const ja: TranslationKeys = {
       BROWSER_CRASHED: "レンダリング中にブラウザがクラッシュしました。もう一度お試しください。",
       BROWSER_NOT_AVAILABLE: "このツールに必要なブラウザは現在利用できません。",
       DEPENDENCY_VALIDATION_FAILED: "この設定は、無効な別の設定に依存しています。",
+      FEATURE_CPU_UNSUPPORTED:
+        "この機能には AVX に対応した CPU が必要ですが、このサーバーの CPU は対応していません。",
       FEATURE_INCOMPATIBLE: "この機能は現在の設定では実行できません。",
       FST_REQ_FILE_TOO_LARGE: "このファイルはサイズが大きすぎるためアップロードできません。",
       IDLE_TIMEOUT:
@@ -5653,6 +5658,42 @@ export const ja: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "結果を目標サイズに収めることができません。",
       TOO_MANY_FRAMES: "このファイルはフレーム数が多すぎて処理できません。",
       CANCELED: "操作はキャンセルされました。",
+      PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
+      INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",
+      CANNOT_REMOVE_ALL_PAGES:
+        "すべてのページを削除することはできません。少なくとも1ページは残してください。",
+      NESTING_TOO_DEEP: "このファイルは入れ子が深すぎるため変換できません。",
+      DOCUMENT_UNREADABLE:
+        "このドキュメントを開けませんでした。破損している、パスワードで保護されている、または拡張子が示す形式ではない可能性があります。",
+      PDF_DAMAGED:
+        "このPDFは破損しています。PDF 修復ツールで修復してから、もう一度お試しください。",
+      PDF_PASSWORD_PROTECTED:
+        "このPDFはパスワードで保護されています。PDF ロック解除ツールでロックを解除してから、もう一度お試しください。",
+      IMAGE_TOO_LARGE:
+        "この画像は大きすぎて処理できません。サイズを小さくしてもう一度お試しください。",
+      RESULT_TOO_LARGE:
+        "この設定で生成される結果は大きすぎます。より小さい画像か、結果が小さくなる設定を使用してください。",
+      NO_AUDIO_TRACK:
+        "このファイルには音声トラックがありません。音声を含むファイルを選んでもう一度お試しください。",
+      IMAGE_UNDECODABLE:
+        "この画像を読み込めません。ファイルが破損しているか、このツールが対応していないエンコードが使われている可能性があります。",
+      INVALID_SETTINGS:
+        "この設定はこのファイルでは使えません。値を確認してもう一度お試しください。",
+      CHART_DATA_INVALID:
+        "チャート作成ツールはこのファイルからグラフのデータを読み取れませんでした。各行にラベルと0以上の数値を持つ、100行以内のCSVまたはJSONを使ってください。",
+      NO_FACE_DETECTED:
+        "顔が見つかりませんでした。明るい場所で正面から撮った鮮明な写真をアップロードしてください。",
+      TARGET_SIZE_UNREACHABLE:
+        "このファイルは目標サイズまで小さくできません。目標サイズを大きくしてお試しください。",
+      TOO_MANY_PAGES:
+        "このPDFはページ数が多すぎて一度に処理できません。ページを減らしてもう一度お試しください。",
+      METADATA_DAMAGED: "この画像の既存のメタデータが破損しているため、安全に編集できません。",
+      REMOTE_RESOURCES_DISABLED:
+        "このファイルはインターネットから画像やスタイルを読み込みますが、このサーバーでは許可されていません。ファイルに埋め込んでからもう一度お試しください。",
+      TOO_MANY_PIXELS:
+        "このアニメーションは全フレームのピクセル数が多すぎます。フレーム数を減らすか、サイズを小さくしてください。",
+      MEDIA_UNDECODABLE:
+        "このファイルを読み込めません。破損しているか、音声や映像のストリームがないか、このツールが対応していない形式の可能性があります。",
     },
     generic: "エラーが発生しました",
     offline: "オフラインです",
@@ -5722,6 +5763,7 @@ export const ja: TranslationKeys = {
     grid: "グリッド",
     automate: "自動化",
     editor: "エディター",
+    editorBadge: "ベータ",
     files: "ファイル",
     help: "ヘルプ",
     settings: "設定",

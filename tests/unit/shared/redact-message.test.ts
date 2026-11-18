@@ -306,3 +306,43 @@ describe("redactMessage paths with spaces, unknown roots, and UNC (#4093)", () =
     expect(redactMessage("failed in vite.config.mts")).toBe("failed in vite.config.mts");
   });
 });
+
+describe("redactMessage drizzle query params (#4653)", () => {
+  const sessionId = "bd55ccbc-97b3-41d4-8693-e0cea29f65c9";
+  const drizzle = `Failed query: select "id", "user_id" from "sessions" where "sessions"."id" = $1\nparams: ${sessionId}`;
+
+  it("drops the params tail so a session token never leaves the process", () => {
+    const out = redactMessage(drizzle);
+    expect(out).not.toContain(sessionId);
+    expect(out).not.toContain("params");
+    expect(out).toBe('Failed query: select "<value>" where "sessions"."id" = $1');
+  });
+
+  it("drops the params tail in raw diagnostic mode too", () => {
+    expect(redactMessage(drizzle, { raw: true })).not.toContain(sessionId);
+  });
+
+  it("drops a params tail whose newline was already flattened to a space", () => {
+    const flat = `Failed query: select 1 params: ${sessionId},alice`;
+    expect(redactMessage(flat)).toBe("Failed query: select 1");
+  });
+
+  it("drops the params tail when a wrapper embeds the drizzle message", () => {
+    expect(redactMessage(`Export failed: Failed query: select 1\nparams: ${sessionId}`)).toBe(
+      "Export failed: Failed query: select 1",
+    );
+  });
+
+  it("leaves a message that only mentions params alone", () => {
+    expect(redactMessage("invalid params: width")).toBe("invalid params: width");
+  });
+});
+
+describe("redactMessage drizzle params hostile input (#4653)", () => {
+  it("stays fast on a huge whitespace-heavy Failed query message", () => {
+    const msg = `Failed query: ${" ".repeat(200_000)}x`;
+    const start = performance.now();
+    redactMessage(msg);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+});

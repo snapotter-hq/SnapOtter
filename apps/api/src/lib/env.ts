@@ -182,6 +182,7 @@ const envSchema = z
     MAX_PIPELINE_STEP_PIXELS: z.coerce.number().default(67_108_864),
     MAX_CANVAS_PIXELS: z.coerce.number().default(0),
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
+    MAX_SETTINGS_PAYLOAD_KB: z.coerce.number().int().min(0).default(64),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),

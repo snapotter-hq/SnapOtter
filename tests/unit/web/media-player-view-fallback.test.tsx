@@ -18,11 +18,13 @@ const PREVIEW_GENERATE_URL = "/api/v1/preview/generate";
 
 beforeEach(() => {
   useFileStore.getState().reset();
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:preview",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:preview",
+      revokeObjectURL: () => {},
+    }),
+  );
   // Some Node versions put a method-less localStorage over jsdom's, and
   // I18nProvider reads the stored locale on mount.
   const stored = new Map<string, string>();
@@ -183,11 +185,13 @@ describe("MediaPlayerView transcode fallback (#1503)", () => {
 describe("MediaPlayerView fallback across selections (#1709)", () => {
   function loadTwo() {
     let n = 0;
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: () => `blob:file-${++n}`,
-      revokeObjectURL: () => {},
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: () => `blob:file-${++n}`,
+        revokeObjectURL: () => {},
+      }),
+    );
     useFileStore
       .getState()
       .setFiles([

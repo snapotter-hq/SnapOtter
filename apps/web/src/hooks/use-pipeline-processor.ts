@@ -19,7 +19,12 @@ import {
   parseResultBody,
   reportMalformedResult,
 } from "@/lib/progress-frames";
-import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
+import {
+  asNotesMap,
+  parseFileNotesHeader,
+  pickPipelineResultNotes,
+  pickResultNotes,
+} from "@/lib/result-notes";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { generateId } from "@/lib/utils";
@@ -630,6 +635,8 @@ export function usePipelineProcessor() {
                   status: "completed",
                   originalSize: result.originalSize,
                   processedSize: result.processedSize,
+                  // What the steps reported, such as a missed compress target.
+                  resultNotes: pickPipelineResultNotes(result),
                   ...(result.savedFileId && saveModeRef.current === "overwrite"
                     ? { serverFileId: result.savedFileId }
                     : {}),
@@ -1027,6 +1034,7 @@ export function usePipelineProcessor() {
                     status: "completed",
                     originalSize: result.originalSize,
                     processedSize: result.processedSize,
+                    resultNotes: pickPipelineResultNotes(result),
                     ...(result.savedFileId && saveModeRef.current === "overwrite"
                       ? { serverFileId: result.savedFileId }
                       : {}),

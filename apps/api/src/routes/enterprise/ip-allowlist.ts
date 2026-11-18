@@ -52,7 +52,7 @@ export async function registerIpAllowlistRoutes(app: FastifyInstance): Promise<v
     "/api/v1/enterprise/ip-allowlist",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePermission("security:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("ip_allowlist");
@@ -77,7 +77,7 @@ export async function registerIpAllowlistRoutes(app: FastifyInstance): Promise<v
     "/api/v1/enterprise/ip-allowlist",
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
       const user = await requirePermission("security:manage")(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Enterprise feature gate
       const featureEnabled = await isEnterpriseFeatureEnabled("ip_allowlist");

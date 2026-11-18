@@ -58,15 +58,18 @@ import {
 import {
   acquireInstallLock,
   advanceAiMutationEpoch,
+  CPU_NO_AVX_INSTALL_MESSAGE,
   cleanupInterruptedFeatureImports,
   getAiDir,
   getAiMutationEpoch,
+  getBundleHostUnsupportedReason,
   getFeatureStates,
   getInstallingBundle,
   getInstallLockFdForChild,
   getInstallScriptPath,
   getManifestPath,
   getModelsDir,
+  ImportHostUnsupportedError,
   ImportLockError,
   ImportValidationError,
   importBundleArchive,
@@ -250,7 +253,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
       try {
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
       } catch (error) {
-        console.warn("[ocr-runtime] Unable to purge verified download cache:", error);
+        logger.warn(
+          { err: error, bundleId, jobId },
+          "[ocr-runtime] Unable to purge verified download cache",
+        );
       }
       if (!finalize()) return;
       invalidateCache();
@@ -285,7 +291,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         { err: error, bundleId, jobId },
         "[ocr-runtime] OCR install failed",
       );
-      void reportError(error, { source: "ai-install" });
+      // This install often starts from pump() after an earlier bundle's install
+      // finishes, so the event inherits that earlier request's transaction (a
+      // background-removal install, say). The subsystem tag names the real one.
+      void reportError(error, { source: "ai-install", subsystem: "ocr-runtime" });
       const errorMessage = error instanceof Error ? error.message : String(error);
       setInstallProgress(bundleId, null, errorMessage);
       try {
@@ -337,17 +346,23 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // attempt of this bundle, so a retry never shows the old failure.
     setInstallProgress(bundleId, { percent: 0, stage: "" }, null);
 
-    // Hold the venv lock across the whole install so no AI tool job loads
-    // native libs from the venv while pip is rewriting them (that segfaults
-    // the sidecar). This awaits any in-flight AI job before the installer
-    // starts; the lock is released when the installer process exits.
-    const releaseVenv = await acquireVenvLock();
-    let venvReleased = false;
+    // The installer asks for the venv writer lock on stderr when it reaches
+    // its first venv write and waits for "granted" on stdin. Taking it then,
+    // not before spawning, lets AI jobs keep running through the download and
+    // extract, which can take minutes; only the phase that rewrites the native
+    // libs they load has to exclude them (that overlap segfaults the sidecar).
+    // Once granted, the lock is held until the installer sends "release" or
+    // exits (#4201).
+    let releaseVenv: (() => void) | null = null;
+    // Aborted on teardown so a dead installer's queued request leaves the
+    // lock queue instead of holding new AI jobs off (#4608).
+    const venvLockRequest = new AbortController();
+    let venvLockRequested = false;
+    let waitingForVenvLock = false;
     const releaseVenvOnce = () => {
-      if (!venvReleased) {
-        venvReleased = true;
-        releaseVenv();
-      }
+      const release = releaseVenv;
+      releaseVenv = null;
+      release?.();
     };
 
     // A failed spawn fires BOTH "error" and "close", so both handlers funnel
@@ -381,6 +396,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       if (finalized) return false;
       finalized = true;
       clearWatchdog();
+      venvLockRequest.abort();
       releaseVenvOnce();
       releaseInstallLock();
       clearActive();
@@ -388,17 +404,46 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     };
 
     const child = spawn(pythonPath, [scriptPath, bundleId, manifestPath, modelsDir], {
-      stdio: ["ignore", "pipe", "pipe", installLockFd],
+      stdio: ["pipe", "pipe", "pipe", installLockFd],
       env: buildInstallerEnv({
         BUNDLE_ID: bundleId,
         PIP_CACHE_DIR: join(getAiDir(), "pip-cache"),
+        SNAPOTTER_VENV_LOCK_HANDSHAKE: "1",
       }),
     });
+    // A write to an installer that already exited fails with EPIPE; its close
+    // handler does the teardown, so the stream error has nothing left to do.
+    child.stdin?.on("error", () => {});
+
+    const grantVenvLock = () => {
+      if (venvLockRequested) return;
+      venvLockRequested = true;
+      waitingForVenvLock = true;
+      acquireVenvLock(venvLockRequest.signal).then(
+        (release) => {
+          waitingForVenvLock = false;
+          lastProgressAt = Date.now();
+          // The installer died while waiting; nothing will write the venv.
+          if (finalized) {
+            release();
+            return;
+          }
+          releaseVenv = release;
+          child.stdin?.write("granted\n");
+        },
+        () => {
+          // Only finalizeOnce aborts the request, so the installer is gone.
+          waitingForVenvLock = false;
+        },
+      );
+    };
 
     const stallMs = env.INSTALL_STALL_MS;
     const maxMs = env.INSTALL_MAX_MS;
     if (stallMs > 0 || maxMs > 0) {
       watchdog = setInterval(() => {
+        // Waiting on running AI jobs is not a stall: the installer is idle by design.
+        if (waitingForVenvLock) lastProgressAt = Date.now();
         const verdict = evaluateInstallWatchdog(
           Date.now(),
           lastProgressAt,
@@ -453,7 +498,24 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
         if (lastStderrLines.length > 20) lastStderrLines.shift();
 
         try {
-          const parsed = JSON.parse(trimmed) as { progress?: number; stage?: string };
+          const parsed = JSON.parse(trimmed) as {
+            progress?: number;
+            stage?: string;
+            venvLock?: string;
+          };
+          if (parsed.venvLock === "acquire") {
+            grantVenvLock();
+            continue;
+          }
+          if (parsed.venvLock === "release") {
+            // The installer blocks until granted, so a release mid-wait is not
+            // a real one; honouring it would let a second acquire leak the lock.
+            if (!waitingForVenvLock) {
+              releaseVenvOnce();
+              venvLockRequested = false;
+            }
+            continue;
+          }
           if (typeof parsed.progress === "number") {
             lastProgressAt = Date.now();
             setInstallProgress(
@@ -590,7 +652,10 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     try {
       acquired = acquireInstallLock("__ocr_gc__");
     } catch (error) {
-      console.warn("[ocr-runtime] Deferred generation cleanup could not acquire its lease:", error);
+      logger.warn(
+        { err: error },
+        "[ocr-runtime] Deferred generation cleanup could not acquire its lease",
+      );
       scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       return;
     }
@@ -601,7 +666,7 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
     const installLockFd = getInstallLockFdForChild();
     void runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd })
       .catch((error) => {
-        console.warn("[ocr-runtime] Deferred generation cleanup failed:", error);
+        logger.warn({ err: error }, "[ocr-runtime] Deferred generation cleanup failed");
         scheduleOcrRuntimeGc(OCR_RUNTIME_GC_DELAY_MS);
       })
       .finally(() => {
@@ -806,6 +871,29 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
 }
 
 /**
+ * Refuse to install a bundle this host can't run, before anything is
+ * downloaded (#4680).
+ * Returns true when it sent the refusal.
+ */
+function refuseHostUnsupportedBundle(bundleId: string, reply: FastifyReply): boolean {
+  // A healthy install from before the gate keeps its usual answer (already
+  // installed, or skipped by a tool install): that request downloads nothing.
+  // A broken one would be downloaded again, so it is refused like a new one.
+  if (isFeatureInstalled(bundleId) && (bundleId === "ocr" || !verifyBundleModels(bundleId))) {
+    return false;
+  }
+  const reason = getBundleHostUnsupportedReason(bundleId);
+  if (!reason) return false;
+  reply.status(409).send({
+    error: CPU_NO_AVX_INSTALL_MESSAGE,
+    code: "FEATURE_CPU_UNSUPPORTED",
+    feature: bundleId,
+    reason,
+  });
+  return true;
+}
+
+/**
  * Drop an install reservation nothing will use. A failure here leaves a stray
  * queued row until the startup sweep, which is no reason to fail the request.
  */
@@ -979,7 +1067,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       return reply.send({ bundles: getFeatureStates() });
     },
@@ -991,13 +1079,15 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { bundleId } = request.params;
 
       if (!FEATURE_BUNDLES[bundleId]) {
         return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
       }
+
+      if (refuseHostUnsupportedBundle(bundleId, reply)) return reply;
 
       if (bundleId === "ocr") {
         const preflightError = getOcrInstallPreflightError();
@@ -1026,7 +1116,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: ToolIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { toolId } = request.params;
       const requiredBundles = getRequiredBundlesForTool(toolId);
@@ -1035,6 +1125,11 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         requiredBundles.length > 0 ? requiredBundles : optionalBundle ? [optionalBundle.id] : [];
       if (installBundles.length === 0) {
         return reply.status(404).send({ error: `No feature bundles required for tool: ${toolId}` });
+      }
+
+      // Check every bundle first so a refusal never leaves the others queued.
+      for (const bundleId of installBundles) {
+        if (refuseHostUnsupportedBundle(bundleId, reply)) return reply;
       }
 
       const bundles: ToolBundleInstallResult[] = [];
@@ -1063,7 +1158,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const { bundleId } = request.params;
 
@@ -1175,7 +1270,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (_request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(_request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       if (!acquireInstallLock("__reset__")) {
         const installing = getInstallingBundle();
@@ -1193,10 +1288,18 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         await drainOcrDispatcher();
         await runOcrRuntimeMaintenance("gc", { aiDataDir: getAiDir(), installLockFd });
         await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
-        ({ venvReseeded } = resetAiEnvironment({
-          installLockHeld: true,
-          mutationEpochAdvanced: true,
-        }));
+        // Running AI jobs load native libs from the venv and weights from the
+        // models dir, so the wipe and reseed wait for them to finish, and new
+        // jobs wait for the reset, the same as an install's venv write (#4615).
+        const releaseVenv = await acquireVenvLock();
+        try {
+          ({ venvReseeded } = resetAiEnvironment({
+            installLockHeld: true,
+            mutationEpochAdvanced: true,
+          }));
+        } finally {
+          releaseVenv();
+        }
       } catch (err) {
         return reply.status(409).send({
           error: err instanceof Error ? err.message : "Reset failed",
@@ -1226,7 +1329,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     "/api/v1/admin/features/disk-usage",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       const totalBytes = getDirSize(getAiDir());
       return reply.send({ totalBytes });
@@ -1242,7 +1345,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const admin = await requirePermission("features:manage")(request, reply);
-      if (!admin) return;
+      if (!admin) return reply;
 
       let uploadDirectory: string | null = null;
       let legacyResult: Awaited<ReturnType<typeof importBundleArchive>> | null = null;
@@ -1432,6 +1535,19 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         ) {
           reply.status(409);
           return { error: errorMessage };
+        }
+        if (
+          err instanceof ImportHostUnsupportedError ||
+          (err instanceof Error && err.name === "ImportHostUnsupportedError")
+        ) {
+          const { bundleId, reason } = err as ImportHostUnsupportedError;
+          reply.status(409);
+          return {
+            error: CPU_NO_AVX_INSTALL_MESSAGE,
+            code: "FEATURE_CPU_UNSUPPORTED",
+            feature: bundleId,
+            reason,
+          };
         }
         if (
           err instanceof ImportValidationError ||

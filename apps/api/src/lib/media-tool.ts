@@ -238,7 +238,7 @@ export async function runMediaTool(
   argsFor: (
     inPath: string,
     outPath: string,
-    info: { durationS: number | null; audioSampleRate: number | null },
+    info: { durationS: number | null; audioSampleRate: number | null; hasAudio: boolean },
   ) => string[],
   opts: { timeoutMs?: number } = {},
 ): Promise<MediaRunResult> {
@@ -248,11 +248,13 @@ export async function runMediaTool(
   await writeFile(inPath, ctx.inputs[0].buffer);
   const info = await probeMedia(inPath);
   const outPath = join(dir, outName);
+  const audio = info.streams.find((s) => s.type === "audio");
   await runFfmpegWithProgress(
     ctx,
     argsFor(inPath, outPath, {
       durationS: info.durationS,
-      audioSampleRate: info.streams.find((s) => s.type === "audio")?.sampleRate ?? null,
+      audioSampleRate: audio?.sampleRate ?? null,
+      hasAudio: audio !== undefined,
     }),
     info.durationS,
     opts,

@@ -123,9 +123,9 @@ function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
   return [raw[1], raw[2], raw[3]];
 }
 
-// ─── Optimize for Web — Extended ───────────────────────────────────
+// ─── Optimize for Web: Extended ───────────────────────────────────
 
-test.describe("Optimize for Web — extended", () => {
+test.describe("Optimize for Web: extended", () => {
   test("optimize with aggressive quality (20)", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
@@ -211,9 +211,9 @@ test.describe("Optimize for Web — extended", () => {
   });
 });
 
-// ─── Bulk Rename — Extended Patterns ───────────────────────────────
+// ─── Bulk Rename: Extended Patterns ───────────────────────────────
 
-test.describe("Bulk Rename — extended", () => {
+test.describe("Bulk Rename: extended", () => {
   test("rename with date-based pattern", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
@@ -287,9 +287,9 @@ test.describe("Bulk Rename — extended", () => {
   });
 });
 
-// ─── Favicon — Extended ────────────────────────────────────────────
+// ─── Favicon: Extended ────────────────────────────────────────────
 
-test.describe("Favicon — extended", () => {
+test.describe("Favicon: extended", () => {
   test("generate favicon from WebP", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },
@@ -352,9 +352,9 @@ test.describe("Favicon — extended", () => {
   });
 });
 
-// ─── Image to PDF — Extended ───────────────────────────────────────
+// ─── Image to PDF: Extended ───────────────────────────────────────
 
-test.describe("Image to PDF — extended", () => {
+test.describe("Image to PDF: extended", () => {
   test("convert 3 images to multi-page PDF", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -588,9 +588,9 @@ test.describe("Replace Color: extended", () => {
   });
 });
 
-// ─── Edit Metadata — Extended ──────────────────────────────────────
+// ─── Edit Metadata: Extended ──────────────────────────────────────
 
-test.describe("Edit Metadata — extended", () => {
+test.describe("Edit Metadata: extended", () => {
   test("set all EXIF fields at once", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/edit-metadata", {
       headers: { Authorization: `Bearer ${token}` },
@@ -655,9 +655,9 @@ test.describe("Edit Metadata — extended", () => {
   });
 });
 
-// ─── Strip Metadata — Extended ────────────────────────────────────
+// ─── Strip Metadata: Extended ────────────────────────────────────
 
-test.describe("Strip Metadata — extended", () => {
+test.describe("Strip Metadata: extended", () => {
   test("strip metadata from JPEG with EXIF preserves dimensions", async ({ request }) => {
     const jpgExif = fixture("test-with-exif.jpg");
     const res = await request.post("/api/v1/tools/image/strip-metadata", {
@@ -811,7 +811,7 @@ test.describe("Image Enhancement: extended", () => {
 
 // ─── Content-Aware Resize ─────────────────────────────────────────
 
-test.describe("Content-Aware Resize — extended", () => {
+test.describe("Content-Aware Resize: extended", () => {
   test("content-aware resize to smaller width", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
@@ -877,9 +877,9 @@ test.describe("Content-Aware Resize — extended", () => {
   });
 });
 
-// ─── Content-Aware Resize — HEIC & Edge Cases ───────────────────
+// ─── Content-Aware Resize: HEIC & Edge Cases ───────────────────
 
-test.describe("Content-Aware Resize — HEIC & edge cases", () => {
+test.describe("Content-Aware Resize: HEIC & edge cases", () => {
   test("content-aware resize HEIC image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/content-aware-resize", {
       headers: { Authorization: `Bearer ${token}` },
@@ -923,9 +923,9 @@ test.describe("Content-Aware Resize — HEIC & edge cases", () => {
   });
 });
 
-// ─── Optimize for Web — Output Verification ─────────────────────
+// ─── Optimize for Web: Output Verification ─────────────────────
 
-test.describe("Optimize for Web — output verification", () => {
+test.describe("Optimize for Web: output verification", () => {
   test("optimized file can be downloaded and is valid", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/optimize-for-web", {
       headers: { Authorization: `Bearer ${token}` },
@@ -949,9 +949,9 @@ test.describe("Optimize for Web — output verification", () => {
   });
 });
 
-// ─── Favicon — Output Verification ──────────────────────────────
+// ─── Favicon: Output Verification ──────────────────────────────
 
-test.describe("Favicon — output verification", () => {
+test.describe("Favicon: output verification", () => {
   test("favicon output can be downloaded", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/favicon", {
       headers: { Authorization: `Bearer ${token}` },

@@ -3,7 +3,7 @@ import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 vi.mock("@/lib/image-preview", () => ({
   needsServerPreview: vi.fn(() => false),
@@ -163,7 +163,7 @@ function textOf(id: string | null): string | undefined {
  * Registration is the assertion, not just behaviour: a listener that is always
  * attached and returns early can disqualify the page from bfcache.
  */
-function calls(spy: ReturnType<typeof vi.spyOn>): unknown[][] {
+function calls(spy: MockInstance): unknown[][] {
   return spy.mock.calls.filter((call) => call[0] === "beforeunload");
 }
 

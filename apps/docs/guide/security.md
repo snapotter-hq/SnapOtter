@@ -24,7 +24,7 @@ For an internet-facing deployment, bind port 1349 to loopback and terminate TLS 
 
 ### Why `read_only` Is Not Set {#why-read-only-is-not-set}
 
-`read_only: true` is not set because PUID/PGID remapping writes to `/etc/passwd` and `/etc/group` at startup. If you use Docker's `--user` flag or Kubernetes `runAsUser` instead of PUID/PGID, you can safely enable a read-only root filesystem.
+`read_only: true` is not set because PUID/PGID remapping writes to `/etc/passwd` and `/etc/group` at startup. If you use Docker's `--user` flag or Kubernetes `runAsUser` instead of PUID/PGID, you can safely enable a read-only root filesystem. The all-in-one image also runs with a read-only root when PUID and PGID are unset, as long as /run and /tmp are tmpfs mounts and /run allows exec, because s6-overlay starts its supervisor from there.
 
 ## Network Isolation {#network-isolation}
 
@@ -88,7 +88,7 @@ Docker Compose secrets (without Swarm) require Compose v2.23 or later.
 
 ## Kubernetes Deployment {#kubernetes-deployment}
 
-The entrypoint detects when the container is already running as non-root (e.g., via Kubernetes `runAsUser`) and skips the gosu privilege drop automatically. In that case it cannot chown the mounted volumes itself, so it verifies they are writable and exits early with actionable guidance if they are not — see [Storage permissions](/guide/deployment#storage-permissions) for `fsGroup` and foreign-UID setups (TrueNAS, OpenShift).
+The entrypoint detects when the container is already running as non-root (e.g., via Kubernetes `runAsUser`) and skips the gosu privilege drop automatically. In that case it cannot chown the mounted volumes itself, so it verifies they are writable and exits early with actionable guidance if they are not. See [Storage permissions](/guide/deployment#storage-permissions) for `fsGroup` and foreign-UID setups (TrueNAS, OpenShift).
 
 **Recommended Pod SecurityContext:**
 

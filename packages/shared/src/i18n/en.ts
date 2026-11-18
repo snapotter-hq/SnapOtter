@@ -75,7 +75,7 @@ export const en = {
     searchMissContext: "You searched for: {query}",
     searchMissDiscussionsFallback: "We couldn't record that. Open a request in Discussions.",
     offlineDescription:
-      "This instance has analytics turned off, so feedback isn't recorded here. You can still reach the SnapOtter team directly.",
+      "This instance can't record feedback right now. You can still reach the SnapOtter team directly.",
     offlinePublicNote: "GitHub issues are public.",
     offlineGithubButton: "Open a GitHub issue",
     offlineEmailButton: "Email us",
@@ -4062,6 +4062,8 @@ export const en = {
     previewFailed: "Preview generation failed",
     previewEncoderMissing:
       "This server's ffmpeg is missing the {encoder} encoder, so the preview can't be generated. Contact your administrator.",
+    previewEngineUnavailable:
+      "ffmpeg isn't installed on this server, so the preview can't be generated. Ask your administrator to install ffmpeg or set FFMPEG_PATH.",
     previewProgressMessages: [
       "Warming up the otter...",
       "Crunching pixels...",
@@ -5130,6 +5132,7 @@ export const en = {
       disabledCount: "{count} tool(s) disabled",
       disabledCountOne: "{count} tool disabled",
       disabledCountOther: "{count} tools disabled",
+      offWithBase: "Off because {base} is disabled.",
     },
     experimental: {
       label: "Enable Experimental Tools",
@@ -5573,6 +5576,8 @@ export const en = {
       BROWSER_CRASHED: "The browser crashed while rendering. Try again.",
       BROWSER_NOT_AVAILABLE: "The browser this tool needs isn't available right now.",
       DEPENDENCY_VALIDATION_FAILED: "This setting depends on another setting that isn't valid.",
+      FEATURE_CPU_UNSUPPORTED:
+        "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.",
       FEATURE_INCOMPATIBLE: "This feature can't run with the current settings.",
       FST_REQ_FILE_TOO_LARGE: "This file is too large to upload.",
       IDLE_TIMEOUT: "You were signed out after being idle. Sign in again.",
@@ -5622,6 +5627,36 @@ export const en = {
       TARGET_SIZE_EXCEEDED: "The result can't reach the target size.",
       TOO_MANY_FRAMES: "This file has too many frames to process.",
       CANCELED: "The operation was canceled.",
+      PAGE_OUT_OF_RANGE: "That page range includes a page this PDF doesn't have.",
+      INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "You can't remove every page. Keep at least one.",
+      NESTING_TOO_DEEP: "This file is nested too deeply to convert.",
+      DOCUMENT_UNREADABLE:
+        "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.",
+      PDF_DAMAGED: "This PDF is damaged. Run it through the Repair PDF tool, then try again.",
+      PDF_PASSWORD_PROTECTED:
+        "This PDF is password-protected. Unlock it with the Unlock PDF tool, then try again.",
+      IMAGE_TOO_LARGE: "This image is too large to process. Reduce its dimensions and try again.",
+      RESULT_TOO_LARGE:
+        "The result these settings would produce is too large. Use a smaller image or settings that make a smaller result.",
+      NO_AUDIO_TRACK: "This file has no audio track. Choose a file with audio and try again.",
+      IMAGE_UNDECODABLE:
+        "This image can't be read. The file may be damaged or use an encoding this tool doesn't support.",
+      INVALID_SETTINGS: "These settings don't work with this file. Check the values and try again.",
+      CHART_DATA_INVALID:
+        "Chart Maker couldn't read chart data from this file. Use CSV or JSON with up to 100 rows, each with a label and a number of zero or more.",
+      NO_FACE_DETECTED: "No face was found. Upload a clear, front-facing photo with good lighting.",
+      TARGET_SIZE_UNREACHABLE:
+        "This file can't be made small enough for the target size. Try a larger target.",
+      TOO_MANY_PAGES:
+        "This PDF has too many pages to process at once. Choose fewer pages and try again.",
+      METADATA_DAMAGED: "This image's existing metadata is damaged, so it can't be edited safely.",
+      REMOTE_RESOURCES_DISABLED:
+        "This file loads images or styles from the internet, which this server doesn't allow. Embed them in the file and try again.",
+      TOO_MANY_PIXELS:
+        "This animation has too many pixels across its frames. Use fewer frames or a smaller size.",
+      MEDIA_UNDECODABLE:
+        "This file can't be read. It may be damaged, have no audio or video stream, or use a format this tool doesn't support.",
     },
     generic: "An error occurred",
     offline: "You're offline",
@@ -5688,6 +5723,7 @@ export const en = {
     grid: "Grid",
     automate: "Automate",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Files",
     sponsor: "Support us",
     help: "Help",

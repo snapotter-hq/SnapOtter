@@ -8577,6 +8577,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8586,6 +8589,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8647,12 +8651,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Kompatibilitas runtime OCR; dihilangkan untuk paket lama
+                          description: Kompatibilitas host. OCR selalu melaporkannya. Bundle lama melaporkan incompatible hanya jika host ini tidak dapat menjalankannya, dan menghilangkan field ini jika tidak.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Alasan kompatibilitas runtime OCR; dihilangkan untuk paket lama
+                          description: Alasan bundle tidak kompatibel, misalnya cpu-no-avx saat pustaka x86-64-nya memerlukan AVX dan CPU ini tidak memilikinya. Dihilangkan untuk bundle lama yang kompatibel.
                         selectedTarget:
                           type:
                             - string
@@ -8823,7 +8827,7 @@ paths:
       description: Mengembalikan rilis terbaru yang sudah dipublikasikan jika lebih baru dari versi yang berjalan, atau null. Memerlukan settings:write.
       responses:
         '200':
-          description: Rilis terbaru, atau null jika instance ini sudah yang terbaru
+          description: Rilis yang lebih baru, atau null jika tidak ada rilis yang lebih baru atau analitik dimatikan pada instans ini (tidak ada pencarian yang dilakukan saat itu)
           content:
             application/json:
               schema:
@@ -8832,10 +8836,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Kredensial tidak ada atau tidak valid
           content:
@@ -8957,6 +8975,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Bundle yang diperlukan alat tidak dapat dipasang di host ini: runtime OCR tidak didukung, atau bundle memerlukan AVX dan CPU ini tidak memilikinya (kode FEATURE_CPU_UNSUPPORTED). Tidak ada yang dimasukkan ke antrean.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9043,7 +9067,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Paket sudah terpasang atau runtime OCR tidak didukung di host ini
+          description: Bundle sudah terpasang, runtime OCR tidak didukung di host ini, atau bundle memerlukan AVX dan CPU ini tidak memilikinya (kode FEATURE_CPU_UNSUPPORTED, ditolak sebelum unduhan apa pun)
           content:
             application/json:
               schema:
@@ -23881,7 +23905,7 @@ paths:
         '403':
           description: Izin tidak mencukupi
         '409':
-          description: Kunci impor sedang dipegang
+          description: Kunci impor sedang dipegang, atau bundle memerlukan AVX dan CPU ini tidak memilikinya (kode FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Sebuah berkas dalam impor melebihi 20 GiB. Rute ini memiliki batas ukurannya sendiri; `MAX_UPLOAD_SIZE_MB` tidak berlaku untuknya.
         '507':
@@ -30782,13 +30806,13 @@ x-i18n:
       provenance: machine
       outputHash: 527009fa126e
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 626cd43c8da6
+      outputHash: 1f04b28cdbf6
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 9ef3a216caa0
+      outputHash: dcd31b46bb32
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30838,9 +30862,9 @@ x-i18n:
       provenance: machine
       outputHash: a1420f60fb63
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 5d42720a6306
+      outputHash: 557bcd667a9a
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30881,6 +30905,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: ca6f46db7e50
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 15e7435f92f6
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30914,9 +30942,9 @@ x-i18n:
       provenance: machine
       outputHash: 901f5f51d41a
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: c79f7c55dc44
+      outputHash: e72674505800
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36258,9 +36286,9 @@ x-i18n:
       provenance: machine
       outputHash: a7212ecc6757
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 23c5472773e6
+      outputHash: fc689297ff98
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

@@ -23,14 +23,26 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
 import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
-import { connectivityClass, isClientAbort, isSafeMessageError, SafeError } from "@snapotter/shared";
+import {
+  connectivityClass,
+  isClientAbort,
+  isEngineCrash,
+  isSafeMessageError,
+  MEDIA_PREVIEW_AUDIO_EXTS,
+  MEDIA_PREVIEW_VIDEO_EXTS,
+  SafeError,
+} from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
-import { reportError, STORAGE_FULL_CODES } from "../lib/error-report.js";
+import {
+  reportError,
+  STORAGE_FULL_CODES,
+  STORAGE_NOT_WRITABLE_CODES,
+} from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
@@ -220,9 +232,12 @@ function abortOnDisconnect(request: FastifyRequest, reply: FastifyReply) {
  * couldn't read. That is a server fault to report as a 500, not a document or
  * media file the engine rejected. LibreOffice's own failures (a non-zero exit,
  * no output, its timeout, the memory cap killing it) and ffmpeg's carry no
- * `syscall` and stay a 422 (#1439).
+ * `syscall` and stay a 422 (#1439). An engine crash (SIGSEGV and the like) is
+ * the engine's fault too, and lost its `syscall` when it stopped posing as a
+ * failed spawn (#4683, #4684).
  */
 function isServerFault(err: unknown): boolean {
+  if (isEngineCrash(err)) return true;
   return typeof (err as { syscall?: unknown } | null)?.syscall === "string";
 }
 
@@ -235,6 +250,17 @@ function isServerFault(err: unknown): boolean {
 function isStorageFull(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === "string" && STORAGE_FULL_CODES.has(code);
+}
+
+/**
+ * convertDocument tags an output it couldn't create on a volume with room
+ * EACCES on open: the preview directory isn't writable, answered as the 503
+ * storage-not-writable. A spawn EACCES (an unexecutable soffice) is not this
+ * and stays a server fault (#4529).
+ */
+function isUnwritableOutput(err: unknown): boolean {
+  const { code, syscall } = (err ?? {}) as NodeJS.ErrnoException;
+  return typeof code === "string" && STORAGE_NOT_WRITABLE_CODES.has(code) && syscall === "open";
 }
 
 /** Log and report a preview failure that is the server's, not the file's. */
@@ -343,7 +369,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = requireAuth(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -469,7 +495,9 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch (err) {
           await cleanupTempDir();
-          if (isStorageFull(err)) throw normalizeOperationalWriteError(err);
+          if (isStorageFull(err) || isUnwritableOutput(err)) {
+            throw normalizeOperationalWriteError(err);
+          }
           if (isServerFault(err)) {
             reportPreviewFault(err, request, { fileId: id }, "Document preview could not run");
             return reply.status(500).send({ error: "Could not generate document preview" });
@@ -628,7 +656,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       // the same grant as running a tool. This used to call getAuthUser and discard
       // the result, leaving it open to any authenticated principal no matter what
       // the operator had scoped them down to.
-      if (!(await requirePermission("tools:use")(request, reply))) return;
+      if (!(await requirePermission("tools:use")(request, reply))) return reply;
 
       const parts = request.parts();
       let fileBuffer: Buffer | null = null;
@@ -646,51 +674,8 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const ext = extname(filename).toLowerCase().replace(/^\./, "");
-      const videoExts = new Set([
-        "avi",
-        "mkv",
-        "wmv",
-        "flv",
-        "mov",
-        "mpg",
-        "mpeg",
-        "m4v",
-        "3gp",
-        "3g2",
-        "ts",
-        "mts",
-        "m2ts",
-        "vob",
-        "divx",
-        "asf",
-        "rm",
-        "rmvb",
-        "f4v",
-        "ogv",
-        "mp4",
-        "webm",
-        "ogg",
-      ]);
-      const audioExts = new Set([
-        "wav",
-        "flac",
-        "aac",
-        "wma",
-        "ogg",
-        "oga",
-        "opus",
-        "m4a",
-        "aiff",
-        "aif",
-        "amr",
-        "ape",
-        "ac3",
-        "dts",
-        "mp3",
-      ]);
-
-      const isVideo = videoExts.has(ext);
-      const isAudio = audioExts.has(ext);
+      const isVideo = MEDIA_PREVIEW_VIDEO_EXTS.has(ext);
+      const isAudio = MEDIA_PREVIEW_AUDIO_EXTS.has(ext);
 
       if (!isVideo && !isAudio) {
         return reply.status(400).send({ error: "Unsupported file type for preview" });

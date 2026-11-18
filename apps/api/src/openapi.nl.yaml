@@ -8538,6 +8538,9 @@ paths:
                     type: number
                   instanceId:
                     type: string
+                  deployMode:
+                    type: string
+                    enum: [embedded, external, native]
               example:
                 enabled: true
                 posthogApiKey: example
@@ -8547,6 +8550,7 @@ paths:
                 sentryDsnWeb: example
                 posthogSampleRate: 1
                 instanceId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                deployMode: embedded
   /api/v1/features:
     get:
       operationId: listFeatures
@@ -8607,12 +8611,12 @@ paths:
                             - compatible
                             - incompatible
                             - invalid
-                          description: Compatibiliteit van de OCR-runtime; weggelaten voor verouderde bundels
+                          description: Hostcompatibiliteit. OCR meldt die altijd. Een legacy-bundel meldt incompatible alleen als deze host hem niet kan draaien, en laat het veld anders weg.
                         compatibilityReason:
                           type:
                             - string
                             - 'null'
-                          description: Reden voor compatibiliteit van de OCR-runtime; weggelaten voor verouderde bundels
+                          description: Waarom de bundel incompatibel is, zoals cpu-no-avx wanneer de x86-64-bibliotheken AVX nodig hebben en deze CPU dat mist. Weggelaten voor compatibele legacy-bundels.
                         selectedTarget:
                           type:
                             - string
@@ -8783,7 +8787,7 @@ paths:
       description: Geeft de nieuwste gepubliceerde release terug wanneer die nieuwer is dan de draaiende versie, anders null. Vereist settings:write.
       responses:
         '200':
-          description: Nieuwste release, of null wanneer deze instantie al actueel is.
+          description: De nieuwere release, of null wanneer er geen nieuwere release is gepubliceerd of analytics op deze instantie is uitgeschakeld (er wordt dan niets opgezocht)
           content:
             application/json:
               schema:
@@ -8792,10 +8796,24 @@ paths:
                   - latest
                 properties:
                   latest:
-                    type: string
-                    nullable: true
+                    type:
+                      - object
+                      - 'null'
+                    required:
+                      - version
+                      - url
+                    properties:
+                      version:
+                        type: string
+                        example: 2.3.0
+                      url:
+                        type: string
+                        format: uri
+                        example: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
               example:
-                latest: example
+                latest:
+                  version: 2.3.0
+                  url: https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0
         '401':
           description: Ontbrekende of ongeldige inloggegevens
           content:
@@ -8917,6 +8935,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Een bundel die de tool nodig heeft, kan niet op deze host worden geïnstalleerd: de OCR-runtime wordt niet ondersteund, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED). Er wordt niets in de wachtrij gezet.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/features/{bundleId}/install:
     post:
       operationId: installFeature
@@ -9003,7 +9027,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bundel al geïnstalleerd of OCR-runtime niet ondersteund op deze host
+          description: Bundel al geïnstalleerd, OCR-runtime niet ondersteund op deze host, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED, geweigerd vóór elke download)
           content:
             application/json:
               schema:
@@ -23809,7 +23833,7 @@ paths:
         '403':
           description: Onvoldoende rechten
         '409':
-          description: Importvergrendeling is actief
+          description: Importvergrendeling is actief, of de bundel heeft AVX nodig en deze CPU mist dat (code FEATURE_CPU_UNSUPPORTED)
         '413':
           description: Een bestand in de import is groter dan 20 GiB. Voor deze route gelden eigen groottelimieten; `MAX_UPLOAD_SIZE_MB` is hier niet van toepassing.
         '507':
@@ -30710,13 +30734,13 @@ x-i18n:
       provenance: machine
       outputHash: 3f741e22bcdb
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibility/description:
-      sourceHash: 59fe13e038b6
+      sourceHash: c7a7cce50692
       provenance: machine
-      outputHash: 401bd8d2e52b
+      outputHash: 9ac4fc03be48
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/compatibilityReason/description:
-      sourceHash: 379434b8d06e
+      sourceHash: c5540a10a8a0
       provenance: machine
-      outputHash: 1249e1da833e
+      outputHash: 7db84913f150
     ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/bundles/items/properties/selectedTarget/description:
       sourceHash: 2a52a90e57cd
       provenance: machine
@@ -30766,9 +30790,9 @@ x-i18n:
       provenance: machine
       outputHash: e07665a35d47
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/200/description:
-      sourceHash: 9031d1af7020
+      sourceHash: c3ebf120c043
       provenance: machine
-      outputHash: 1827b3c85d47
+      outputHash: b72afd94ccaf
     ptr:/paths/~1api~1v1~1admin~1latest-release/get/responses/401/description:
       sourceHash: b77d04ce5605
       provenance: machine
@@ -30809,6 +30833,10 @@ x-i18n:
       sourceHash: e1208d06faa8
       provenance: machine
       outputHash: 94536647e321
+    ptr:/paths/~1api~1v1~1admin~1tools~1{toolId}~1features~1install/post/responses/409/description:
+      sourceHash: 5ad4fa25fc32
+      provenance: machine
+      outputHash: 0ef02e733eb9
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/parameters/0/description:
       sourceHash: f4ef455540f6
       provenance: machine
@@ -30842,9 +30870,9 @@ x-i18n:
       provenance: machine
       outputHash: 68764de8214c
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/409/description:
-      sourceHash: a259ff58dc6f
+      sourceHash: ffd9efe267b7
       provenance: machine
-      outputHash: 01027b104c37
+      outputHash: 40269169290d
     ptr:/paths/~1api~1v1~1admin~1features~1{bundleId}~1install/post/responses/503/description:
       sourceHash: 783ef89b31fb
       provenance: machine
@@ -36186,9 +36214,9 @@ x-i18n:
       provenance: machine
       outputHash: 43f5c6285959
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/409/description:
-      sourceHash: 3cc6cac4b3b7
+      sourceHash: 34eeb8faa441
       provenance: machine
-      outputHash: 876d09e3a8d8
+      outputHash: 686d9d6e7e5d
     ptr:/paths/~1api~1v1~1admin~1features~1import/post/responses/413/description:
       sourceHash: 60f054f4c2ad
       provenance: machine

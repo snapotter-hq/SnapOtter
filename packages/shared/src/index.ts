@@ -13,6 +13,7 @@ export * from "./colors.js";
 export * from "./compress-presets.js";
 export * from "./constants.js";
 export * from "./conversion-presets.js";
+export * from "./disabled-tools.js";
 export * from "./features.js";
 export * from "./gpu-devices.js";
 export * from "./i18n/index.js";

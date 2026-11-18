@@ -1,4 +1,9 @@
-import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
+import {
+  BASE_CONFIG,
+  COMPRESS_PRESETS,
+  CONVERSION_PRESETS,
+  isToolDisabled,
+} from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute, getToolConfig } from "../tool-factory.js";
@@ -29,10 +34,24 @@ function presetSchema(base: string) {
  * MUST be registered after the base tools (ensured by index.ts ordering). The
  * three custom ZIP bases (image-to-pdf, pdf-to-image, svg-to-raster) reuse their
  * own parameterized registrars.
+ *
+ * A preset is skipped when `skipTools` holds its own id or its base id, so
+ * disabling a tool closes every route that runs it. The ZIP registrars and
+ * any preset disabled by its own id would otherwise stay live.
+ * `skippedByPolicy` counts those; presets lost to a missing base are not in it.
  */
-export function registerConversionPresets(app: FastifyInstance): number {
+export function registerConversionPresets(
+  app: FastifyInstance,
+  skipTools: ReadonlySet<string> = new Set(),
+): { registered: number; skippedByPolicy: number } {
   let skipped = 0;
+  let skippedByPolicy = 0;
+  const isSkipped = (preset: { id: string }) => isToolDisabled(preset.id, skipTools);
   for (const preset of CONVERSION_PRESETS) {
+    if (isSkipped(preset)) {
+      skippedByPolicy++;
+      continue;
+    }
     const cfg = BASE_CONFIG[preset.base];
     if (cfg.group === "image-to-pdf") {
       registerImageToPdfPreset(app, preset.id, preset.sourceInputs);
@@ -78,6 +97,10 @@ export function registerConversionPresets(app: FastifyInstance): number {
   }
 
   for (const preset of COMPRESS_PRESETS) {
+    if (isSkipped(preset)) {
+      skippedByPolicy++;
+      continue;
+    }
     const baseConfig = getToolConfig(preset.base);
     if (!baseConfig) {
       app.log.error(
@@ -103,5 +126,8 @@ export function registerConversionPresets(app: FastifyInstance): number {
     });
   }
 
-  return CONVERSION_PRESETS.length + COMPRESS_PRESETS.length - skipped;
+  return {
+    registered: CONVERSION_PRESETS.length + COMPRESS_PRESETS.length - skipped - skippedByPolicy,
+    skippedByPolicy,
+  };
 }

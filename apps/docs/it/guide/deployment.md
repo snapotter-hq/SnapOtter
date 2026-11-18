@@ -1,8 +1,8 @@
 ---
 description: "Distribuisca SnapOtter in produzione con Docker. Requisiti hardware, configurazione GPU e configurazioni di reverse proxy per Nginx, Traefik e Cloudflare."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: b66afa2dd513
+i18n_output_hash: ce57ea80ed20
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ Vedere l'[elenco completo dei formati](/it/guide/supported-formats) per i dettag
 - L'**upscaling** va in timeout su CPU per qualsiasi immagine oltre le piccole dimensioni. Per un uso pratico è necessaria una GPU.
 - Il miglioramento dei volti con **CodeFormer** è significativamente più lento di GFPGAN (53s contro 2s su GPU). GFPGAN è consigliato nella maggior parte dei casi.
 
+### Installazione dei bundle AI con più repliche {#ai-bundle-installs-with-several-replicas}
+
+Modifica i bundle AI solo con una replica in esecuzione. Installare un bundle, importarne uno offline o reimpostare l'ambiente AI riscrive l'ambiente Python condiviso in `/data/ai/venv`. Un'installazione attende i job AI della propria replica e ognuna di queste azioni riavvia poi il sidecar di quella replica, ma nessuna può vedere i job AI sulle altre repliche. I loro sidecar mantengono torch e ONNX Runtime caricati da quella directory mentre viene riscritta e possono andare in crash a metà job. Riduci il deployment a una replica (o ferma le altre), fai la modifica, poi riporta il numero di repliche al valore precedente.
+
 ## Volumi {#volumes}
 
 | Mount / Volume | Scopo | Obbligatorio? |
 |---|---|---|
 | `/data` (app) | Modelli AI, venv Python, file utente | **Sì** - senza di esso si perdono i file |
-| `/tmp/workspace` (app) | File temporanei di elaborazione (puliti automaticamente) | Consigliato |
+| `/tmp/workspace` (app) | File temporanei di elaborazione e output dei job (puliti automaticamente). Non è memorizzato in `/data`, quindi i risultati vanno persi quando il container viene sostituito se questa cartella non è montata | Consigliato |
 | `SnapOtter-pgdata` (postgres) | Directory dati di PostgreSQL (utenti, impostazioni, pipeline, job) | **Sì** - senza di esso si perdono i dati |
 | `SnapOtter-redisdata` (redis) | File append-only di Redis per code di job durevoli | Consigliato |
+
+### Conservare l'output dei job con `docker run` {#keeping-job-output}
+
+I risultati dei job si trovano in `/tmp/workspace`, che fa parte del filesystem del container finché non lo monti. Con il solo `-v SnapOtter-data:/data`, utenti, impostazioni e file persistono, ma i risultati dei job precedenti spariscono non appena il container viene sostituito e i loro link di download restituiscono 404. Per conservarli, monta anche il workspace:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Gli stack Compose montano già `SnapOtter-workspace`.
 
 ### Bind mount e volumi con nome {#bind-mounts-vs-named-volumes}
 

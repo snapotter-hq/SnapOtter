@@ -246,7 +246,7 @@ export async function throwWithMessage(res: Response): Promise<never> {
     const parsed = await res.json();
     if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
   } catch (error) {
-    // response wasn't JSON — use the default message, but keep the parse
+    // response wasn't JSON; use the default message, but keep the parse
     // failure visible for proxies and gateways that answer with HTML (#4062)
     console.warn(`Failed to parse non-2xx API response (status: ${res.status}):`, error);
   }

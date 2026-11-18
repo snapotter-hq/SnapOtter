@@ -21,11 +21,13 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 const revokeObjectURL = vi.fn();
 const createObjectURL = vi.fn((_obj: Blob | MediaSource) => "blob:fake-url");
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL,
-  revokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL,
+    revokeObjectURL,
+  }),
+);
 
 vi.stubGlobal("fetch", vi.fn());
 

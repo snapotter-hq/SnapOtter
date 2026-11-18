@@ -6,7 +6,7 @@
  * system jobs are routed to the system-jobs module.
  *
  * Each tool job gets:
- *   - A per-job scratch directory (cleaned up in finally)
+ *   - A per-attempt scratch directory (cleaned up in finally)
  *   - An AbortController registered for cooperative cancellation
  *   - A timeout guard that aborts the signal with reason "timeout"
  *   - Durable DB row updates at each lifecycle stage
@@ -37,11 +37,17 @@ import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
-import { cancelSingleJobGuarded, failBatchJob, failSingleJobGuarded } from "../routes/progress.js";
+import {
+  cancelSingleJobGuarded,
+  type FailSingleJobArgs,
+  failBatchJob,
+  failSingleJobGuarded,
+} from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
 import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import { POOLS, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
 import { processBatchChild, processBatchFinalize } from "./worker-batch.js";
+import { createWorkerErrorBackoff } from "./worker-error-backoff.js";
 import { createWorkerErrorLogger } from "./worker-error-log.js";
 import {
   isCanceledPipelineFlow,
@@ -69,6 +75,58 @@ export {
 
 const workers: Worker[] = [];
 
+const ON_DEMAND_SYSTEM_JOBS: ReadonlySet<string> = new Set([SYSTEM_JOBS.gdprExport]);
+const SCHEDULED_SYSTEM_JOBS: ReadonlySet<string> = new Set(
+  Object.values(SYSTEM_JOBS).filter((name) => !ON_DEMAND_SYSTEM_JOBS.has(name)),
+);
+
+// An allowlist, not "everything but the exports": the system pool also carries
+// user-triggered batch-finalize and pipeline-finalize jobs (#4213).
+function isScheduledSystemJob(name: string | undefined): boolean {
+  return name !== undefined && SCHEDULED_SYSTEM_JOBS.has(name);
+}
+
+const INTERRUPTED_JOB_MESSAGE =
+  "Processing stopped unexpectedly before the job finished. Please try again.";
+
+function isSingleToolJob(data: ToolJobData): boolean {
+  return data.kind === "tool" || data.kind === "ai-tool";
+}
+
+// A user cancel ends the run as UnrecoverableError("Canceled") and its own
+// terminal write (or requestCancel's repair path) owns the outcome. The stall
+// net must not replace it, even when the durable alias write faulted and the
+// alias row is still unsettled (#4622).
+function isUserCancelFailure(err: Error): boolean {
+  return err.name === "UnrecoverableError" && err.message === "Canceled";
+}
+
+// BullMQ emits "failed" for every failed attempt, including ones it will retry.
+// Mirrors the gdpr-export listener's finality check.
+function isFinalAttempt(job: Job<ToolJobData>): boolean {
+  return Boolean(job.finishedOn) || (job.attemptsMade ?? 1) >= (job.opts?.attempts ?? 1);
+}
+
+// A tool job whose worker died or lost its lock never reaches its own catch,
+// so nothing writes its terminal row or frame. BullMQ fails it here once the
+// stall limit or the attempts run out (#4509). The guarded write leaves a row
+// the handler already settled alone.
+function settleInterruptedSingleJob(data: ToolJobData): void {
+  const frameId = data.clientJobId ?? data.jobId;
+  const aliased = frameId !== data.jobId;
+  const settle = (args: FailSingleJobArgs) =>
+    failSingleJobGuarded(args).catch((netErr) => {
+      logger.error({ err: netErr, jobId: data.jobId }, "interrupted job safety net failed");
+      void reportError(netErr, { source: "worker", toolId: data.toolId, jobId: data.jobId });
+    });
+  void settle({
+    jobId: frameId,
+    message: INTERRUPTED_JOB_MESSAGE,
+    ...(aliased && { expectedArtifactJobId: data.jobId }),
+  });
+  if (aliased) void settle({ jobId: data.jobId, message: INTERRUPTED_JOB_MESSAGE });
+}
+
 export function startWorkers(): void {
   const workerThreads = resolveWorkerThreads(env);
   sharp.concurrency(workerThreads);
@@ -94,6 +152,7 @@ export function startWorkers(): void {
       });
 
       worker.on("error", createWorkerErrorLogger(pool));
+      worker.on("error", createWorkerErrorBackoff(worker, pool));
 
       worker.on("failed", (job, err) => {
         if (!job) return;
@@ -118,7 +177,12 @@ export function startWorkers(): void {
             // The net itself failing means a degraded client may hang on a
             // row that never goes terminal; that must reach the operator.
             logger.error({ err: netErr, jobId: data.jobId }, "batch-finalize safety net failed");
-            void reportError(netErr, { source: "worker", pool, jobId: data.jobId });
+            void reportError(netErr, {
+              source: "worker",
+              pool,
+              toolId: data.toolId,
+              jobId: data.jobId,
+            });
           });
         }
         // When a GDPR export exhausts its retry budget, settle the durable row
@@ -176,6 +240,11 @@ export function startWorkers(): void {
           pool,
           toolId: data?.toolId ?? (job.name === SYSTEM_JOBS.gdprExport ? "gdpr-export" : undefined),
           jobId: job.id,
+          // Scheduler ticks repeat the same environmental fault forever. The
+          // system pool also runs on-demand jobs a user triggered (a GDPR export,
+          // batch and pipeline finalizes), which keep the hourly rule.
+          periodic: isScheduledSystemJob(job.name),
+          job: job.name,
         });
       });
 
@@ -198,6 +267,7 @@ export function startWorkers(): void {
     });
 
     worker.on("error", createWorkerErrorLogger(pool));
+    worker.on("error", createWorkerErrorBackoff(worker, pool));
 
     worker.on("failed", (job, err) => {
       if (!job) return;
@@ -233,7 +303,12 @@ export function startWorkers(): void {
               { err: probeErr, jobId: data.jobId },
               "pipeline-finalize safety net step probe failed; falling back to failed label",
             );
-            void reportError(probeErr, { source: "worker", pool, jobId: data.jobId });
+            void reportError(probeErr, {
+              source: "worker",
+              pool,
+              toolId: data.toolId,
+              jobId: data.jobId,
+            });
             return false;
           })
           .then((canceled) => {
@@ -251,12 +326,15 @@ export function startWorkers(): void {
                   })
               ).catch((netErr) => {
                 logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
-                void reportError(netErr, { source: "worker", pool, jobId });
+                void reportError(netErr, { source: "worker", pool, toolId: data.toolId, jobId });
               });
             const frameId = data.clientJobId ?? data.jobId;
             void netSettle(frameId, frameId !== data.jobId ? data.jobId : undefined);
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
+      }
+      if (data && isSingleToolJob(data) && isFinalAttempt(job) && !isUserCancelFailure(err)) {
+        settleInterruptedSingleJob(data);
       }
       reportToolJobFailure(job, failedErr, pool);
     });

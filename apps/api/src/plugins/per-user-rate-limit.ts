@@ -7,6 +7,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { sharedRedis } from "../jobs/connection.js";
+import { isHealthProbe } from "../lib/health-probe.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { getAuthUser } from "./auth.js";
 
@@ -14,6 +15,10 @@ const WINDOW_MS = 60_000; // 1-minute sliding window
 
 export async function registerPerUserRateLimit(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
+    // With AUTH_ENABLED=false every request carries a user, including the
+    // Docker healthcheck, and the settings read below would 500 it while
+    // Postgres is down (#4652).
+    if (isHealthProbe(request)) return;
     const user = getAuthUser(request);
     if (!user) return; // Anonymous/public requests skip per-user limits
 

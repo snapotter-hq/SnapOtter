@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { POOLS, queueName } from "../../../../apps/api/src/jobs/types.js";
 import { isBinarySpawnFailure } from "../../../../apps/api/src/lib/binary-overrides.js";
+import { drainDoMockQueue } from "../../../helpers/mock-queue.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const initialSharpConcurrency = sharp.concurrency();
@@ -74,10 +76,15 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     UnrecoverableError: class UnrecoverableError extends Error {
       name = "UnrecoverableError";
     },
-    Worker: vi.fn(() => ({
-      on: vi.fn(),
-      close: vi.fn().mockResolvedValue(undefined),
-    })),
+    Worker: vi.fn(function MockWorker() {
+      return {
+        on: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        isPaused: vi.fn(() => false),
+        pause: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn(),
+      };
+    }),
   }));
 
   vi.doMock("drizzle-orm", () => ({
@@ -146,6 +153,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),
+    failSingleJobGuarded: vi.fn(async () => undefined),
     updateSingleFileProgressAtomically: vi.fn(
       async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
         const { db } = await import("../../../../apps/api/src/db/index.js");
@@ -204,6 +212,8 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     },
   }));
 
+  // An extraMocks override of a path mocked above must not race the default.
+  await drainDoMockQueue();
   extraMocks?.();
 
   return import("../../../../apps/api/src/jobs/worker.js");
@@ -513,6 +523,7 @@ describe("worker result payload behavior", () => {
           isClientAbort,
           isSafeMessageError: () => false,
           isToolInputError: () => false,
+          toolInputErrorCode: () => undefined,
           hasServerErrorStatus: () => false,
           ANALYTICS_EVENTS: {},
           TOOLS: [],
@@ -1626,17 +1637,23 @@ describe("worker result payload behavior", () => {
       });
       getGenericObjectStream.mockRejectedValueOnce(noSuchKey);
       failBatchJobMock.mockClear();
-      const caughtMissing = await processor(batchJob).catch((err: unknown) => err);
-      expect(caughtMissing).toBe(noSuchKey);
+      const caughtMissing = (await processor(batchJob).catch((err: unknown) => err)) as Error & {
+        code?: string;
+      };
+      // A vanished child output is named as such, not as a storage fault (#4664).
+      expect(caughtMissing.code).toBe("batch-output-missing");
+      expect(caughtMissing.cause).toBe(noSuchKey);
       expect(classifyError(caughtMissing, "worker")).toBe("bug");
+      const missingMessage =
+        "A processed file went missing before the batch could be packaged. Run the batch again.";
       expect(failBatchJobMock).toHaveBeenCalledWith({
         jobId: "batch-s3-1",
         totalFiles: 1,
         completedFiles: 1,
         failedFiles: 0,
-        message: "Failed to package batch results",
-        code: undefined,
-        errors: [{ filename: "", error: "Failed to package batch results" }],
+        message: missingMessage,
+        code: "batch-output-missing",
+        errors: [{ filename: "", error: missingMessage }],
       });
 
       getGenericObjectStream.mockRejectedValueOnce("raw-string-stream-fault");
@@ -2439,6 +2456,18 @@ describe("pipelineExecutedProps", () => {
       ),
     ).toMatchObject({ is_batch: false, file_count: 1, status: "failed" });
   });
+
+  it("adds error_code only when the failing step had one (#4216)", async () => {
+    const { pipelineExecutedProps } = await loadWorker();
+    const base = { kind: "pipeline-finalize" } as const;
+
+    expect(pipelineExecutedProps(base, 2, ["a", "b"], 5, "failed", "FILE_TOO_LARGE")).toMatchObject(
+      { error_code: "FILE_TOO_LARGE" },
+    );
+    expect(pipelineExecutedProps(base, 2, ["a", "b"], 5, "failed")).not.toHaveProperty(
+      "error_code",
+    );
+  });
 });
 
 // #1414: a failure event carried no job age, so Sentry could not tell an
@@ -2534,6 +2563,58 @@ describe("worker failure reports carry the job age (#1414)", () => {
     expect(ctx.jobAgeMs).toBeUndefined();
   });
 
+  it("marks scheduler ticks on the system pool as periodic, with the job name (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "sys-2", name: "system:storage-ttl", data: { kind: "other" } };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ pool: "system", periodic: true, job: "system:storage-ttl" }),
+    );
+  });
+
+  it("does not mark a user-requested GDPR export as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = {
+      id: "sys-3",
+      name: "system:gdpr-export",
+      data: { kind: "other" },
+      attemptsMade: 1,
+      opts: { attempts: 3 },
+    };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ periodic: false }),
+    );
+  });
+
+  it("does not mark a user's batch or pipeline finalize as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    for (const kind of ["batch-finalize", "pipeline-finalize"]) {
+      reportErrorMock.mockClear();
+      // A parentId and a non-finalize kind keep the safety nets out of this case.
+      const job = { id: `fin-${kind}`, name: kind, data: { kind: "other", parentId: "p" } };
+      listenerFor(listeners, "system")(job, new Error("boom"));
+      const ctx = reportErrorMock.mock.calls.at(-1)?.[1] as { periodic?: boolean };
+      expect(ctx.periodic).toBe(false);
+    }
+  });
+
+  it("never marks a tool pool as periodic (#4213)", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "img-1", name: "resize", data: { toolId: "resize" } };
+
+    listenerFor(listeners, "image")(job, new Error("boom"));
+
+    const ctx = reportErrorMock.mock.calls[0][1] as { periodic?: boolean };
+    expect(ctx.periodic).toBeUndefined();
+  });
+
   it("leaves the wait unset when the job never became active", async () => {
     const listeners = await failedListeners();
     const job = { id: "job-2", data: { toolId: "resize" }, timestamp: 1_000 };
@@ -2582,6 +2663,145 @@ describe("worker failure reports carry the job age (#1414)", () => {
       stalled,
       expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
     );
+  });
+
+  describe("tool jobs whose worker stopped before finishing (#4509)", () => {
+    const STALL_MESSAGE =
+      "Processing stopped unexpectedly before the job finished. Please try again.";
+    const stallError = () => new Error("job stalled more than allowable limit");
+
+    it("settles a final-attempt stall as failed with a constant message", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        processedOn: 2_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s1" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s1",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("tags the report with the tool id when the safety net's own write fails (#4742)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const writeErr = new Error("postgres write failed");
+      vi.mocked(failSingleJobGuarded).mockRejectedValueOnce(writeErr);
+      const job = {
+        id: "job-s4",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s4" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+      await vi.waitFor(() =>
+        expect(reportErrorMock).toHaveBeenCalledWith(writeErr, expect.anything()),
+      );
+
+      expect(reportErrorMock).toHaveBeenCalledWith(writeErr, {
+        source: "worker",
+        toolId: "transparency-fixer",
+        jobId: "job-s4",
+      });
+    });
+
+    it("leaves a stall that BullMQ will retry to the next attempt", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s2",
+        attemptsMade: 0,
+        opts: { attempts: 3 },
+        timestamp: 1_000,
+        data: { kind: "tool", toolId: "transparency-fixer", jobId: "job-s2" },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("writes the terminal frame to the client channel and the row when they differ", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s3",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-s3",
+          clientJobId: "client-s3",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, stallError());
+
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "client-s3",
+        message: STALL_MESSAGE,
+        expectedArtifactJobId: "job-s3",
+      });
+      expect(failSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "job-s3",
+        message: STALL_MESSAGE,
+      });
+    });
+
+    it("does not touch pipeline steps, which report through their finalize", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const job = {
+        id: "job-s4",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: { kind: "pipeline-step", toolId: "resize", jobId: "job-s4", parentId: "flow-1" },
+      };
+
+      listenerFor(listeners, "image")(job, stallError());
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite a canceled run's failed event with the stall message (#4622)", async () => {
+      const listeners = await failedListeners();
+      const { failSingleJobGuarded } = await import("../../../../apps/api/src/routes/progress.js");
+      const { UnrecoverableError } = await import("bullmq");
+      const job = {
+        id: "job-c1",
+        attemptsMade: 1,
+        opts: { attempts: 1 },
+        finishedOn: 9_000,
+        timestamp: 1_000,
+        data: {
+          kind: "ai-tool",
+          toolId: "transparency-fixer",
+          jobId: "job-c1",
+          clientJobId: "client-c1",
+        },
+      };
+
+      listenerFor(listeners, "ai")(job, new UnrecoverableError("Canceled"));
+
+      expect(failSingleJobGuarded).not.toHaveBeenCalled();
+    });
   });
 
   describe("GDPR export failure handling on the system pool (#1495)", () => {
@@ -3237,6 +3457,244 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       message: "All files failed processing",
       errors: counter100,
     });
+  });
+
+  it("names a child output that vanished before packaging as missing, not as a storage write failure (#4664)", async () => {
+    objectStorageMocks.getObjectStream.mockRejectedValueOnce(
+      enoent("/data/workspace/outputs/batch-gone-f0/a.png"),
+    );
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    // Drains the archive like the real upload, so the feed's failure reaches
+    // it as the source error.
+    objectStorageMocks.putObjectStream.mockImplementationOnce(
+      async (_key: string, source: AsyncIterable<Buffer>) => {
+        for await (const _chunk of source) {
+          // drain
+        }
+        return 0;
+      },
+    );
+    const { processor, failBatchJobMock, completeBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-gone-f0": {
+          id: "batch-gone-f0",
+          status: "completed",
+          inputRefs: ["uploads/batch-gone-f0/a.png"],
+          outputRefs: ["outputs/batch-gone-f0/a.png"],
+        },
+      },
+    });
+
+    const err = (await processor({
+      id: "batch-gone",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-gone",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    }).catch((e: unknown) => e)) as { code?: string; statusCode?: number; message?: string };
+
+    expect(err.code).toBe("batch-output-missing");
+    expect(err.statusCode).toBe(500);
+    expect(err.message).not.toMatch(/write to its storage/);
+    expect(completeBatchJobMock).not.toHaveBeenCalled();
+    expect(failBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "batch-gone", code: "batch-output-missing" }),
+    );
+  });
+
+  it.each([
+    ["completed", {}],
+    ["canceled", { canceled: true }],
+  ] as const)(
+    "a re-run finalize for a %s parent that kept its ZIP returns the stored result without repackaging (#4664)",
+    async (status, extra) => {
+      objectStorageMocks.getObjectStream.mockReset();
+      objectStorageMocks.putObject.mockReset();
+      objectStorageMocks.putObjectStream.mockReset();
+      const zipKey = "outputs/batch-dup/batch-resize-batch-du.zip";
+      const { processor, failBatchJobMock, completeBatchJobMock, cancelBatchJobMock } =
+        await setupSystemProcessor({
+          rowsById: {
+            "batch-dup": {
+              id: "batch-dup",
+              type: "batch",
+              status,
+              outputRefs: [zipKey],
+              bytesOut: 42,
+              progress: {
+                percent: 100,
+                totalFiles: 1,
+                completedFiles: 1,
+                failedFiles: 0,
+                result: {
+                  zipFilename: "batch-resize-batch-du.zip",
+                  fileResults: { "0": "a.png" },
+                  fileNotes: { "0": { resizedTo: "10x10" } },
+                  processedSize: 42,
+                },
+              },
+            },
+            // The first run reclaimed this output, so a repackage would fail.
+            "batch-dup-f0": {
+              id: "batch-dup-f0",
+              status: "completed",
+              inputRefs: ["uploads/batch-dup-f0/a.png"],
+              outputRefs: ["outputs/batch-dup-f0/a.png"],
+            },
+          },
+        });
+
+      const result = await processor({
+        id: "batch-dup",
+        name: "batch-finalize",
+        data: {
+          kind: "batch-finalize",
+          jobId: "batch-dup",
+          toolId: "resize",
+          userId: null,
+          pool: "system",
+          totalFiles: 1,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: 1, fileIndexMap: [0] },
+        },
+      });
+
+      expect(result).toEqual({
+        outputRefs: [zipKey],
+        filename: "batch-resize-batch-du.zip",
+        contentType: "application/zip",
+        originalSize: 0,
+        processedSize: 42,
+        resultPayload: {
+          manifest: [],
+          ...extra,
+          zip: {
+            key: zipKey,
+            filename: "batch-resize-batch-du.zip",
+            size: 42,
+            fileResults: { "0": "a.png" },
+            fileNotes: { "0": { resizedTo: "10x10" } },
+          },
+        },
+      });
+      expect(objectStorageMocks.getObjectStream).not.toHaveBeenCalled();
+      expect(objectStorageMocks.putObjectStream).not.toHaveBeenCalled();
+      expect(objectStorageMocks.putObject).not.toHaveBeenCalled();
+      expect(completeBatchJobMock).not.toHaveBeenCalled();
+      expect(cancelBatchJobMock).not.toHaveBeenCalled();
+      expect(failBatchJobMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns the ZIP a concurrent run committed while this one was packaging (#4664)", async () => {
+    const zipKey = "outputs/batch-race/batch-resize-batch-ra.zip";
+    const rowsById: Record<string, Record<string, unknown> | undefined> = {
+      "batch-race": { id: "batch-race", type: "batch", status: "processing" },
+      "batch-race-f0": {
+        id: "batch-race-f0",
+        status: "completed",
+        inputRefs: ["uploads/batch-race-f0/a.png"],
+        outputRefs: ["outputs/batch-race-f0/a.png"],
+      },
+    };
+    // The stall-evicted original commits and reclaims between this run's
+    // guard and its read of the child output.
+    objectStorageMocks.getObjectStream.mockImplementationOnce(async () => {
+      rowsById["batch-race"] = {
+        id: "batch-race",
+        type: "batch",
+        status: "completed",
+        outputRefs: [zipKey],
+        bytesOut: 7,
+        progress: {
+          result: { zipFilename: "batch-resize-batch-ra.zip", fileResults: { "0": "a.png" } },
+        },
+      };
+      throw enoent("/data/workspace/outputs/batch-race-f0/a.png");
+    });
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.putObjectStream.mockImplementationOnce(
+      async (_key: string, source: AsyncIterable<Buffer>) => {
+        for await (const _chunk of source) {
+          // drain
+        }
+        return 0;
+      },
+    );
+    const { processor, failBatchJobMock, completeBatchJobMock } = await setupSystemProcessor({
+      rowsById,
+    });
+
+    const result = (await processor({
+      id: "batch-race-rerun",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-race",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { outputRefs?: string[]; resultPayload?: { zip?: { key?: string; size?: number } } };
+
+    expect(result.outputRefs).toEqual([zipKey]);
+    expect(result.resultPayload?.zip).toEqual(expect.objectContaining({ key: zipKey, size: 7 }));
+    expect(failBatchJobMock).not.toHaveBeenCalled();
+    expect(completeBatchJobMock).not.toHaveBeenCalled();
+  });
+
+  it("still runs the finalize for a terminal parent that kept no ZIP (#4664)", async () => {
+    const { processor, failBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-nozip": {
+          id: "batch-nozip",
+          type: "batch",
+          status: "failed",
+          outputRefs: [],
+          error: { message: "All files failed processing" },
+        },
+        "batch-nozip-f0": {
+          id: "batch-nozip-f0",
+          status: "failed",
+          inputRefs: ["uploads/batch-nozip-f0/a.png"],
+          error: { message: "corrupt" },
+        },
+      },
+    });
+
+    const result = (await processor({
+      id: "batch-nozip",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-nozip",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { resultPayload?: { allFailed?: boolean } };
+
+    expect(result.resultPayload?.allFailed).toBe(true);
+    expect(failBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "batch-nozip" }),
+    );
   });
 
   it("retains per-file errors on partial failure, cancel, and packaging failure when Redis counters are empty", async () => {
@@ -4226,6 +4684,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-batch-f0",
     });
     expect(recordChildOutcomeMock).toHaveBeenCalledWith(
@@ -4572,6 +5031,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-batch-ok",
     });
     expect(recordChildOutcomeMock).toHaveBeenCalledWith("bp-ok", 2, "out.png");
@@ -4742,6 +5202,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(singleWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-1",
     });
 
@@ -4800,11 +5261,13 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     expect(reportErrorMock).toHaveBeenCalledWith(dbWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-batch-f0",
     });
     expect(reportErrorMock).toHaveBeenCalledWith(outcomeWriteErr, {
       source: "worker",
       pool: "image",
+      toolId: "pipeline",
       jobId: "pf-copy-batch-f0",
     });
     expect(trackEventMock).toHaveBeenCalledTimes(1);
@@ -5006,10 +5469,15 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { TOOLS } = await vi.importActual<
       typeof import("../../../../packages/shared/src/constants.js")
     >("../../../../packages/shared/src/constants.js");
-    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-        "../../../../packages/shared/src/tool-errors.js",
-      );
+    const {
+      SafeError,
+      isSafeMessageError,
+      isToolInputError,
+      hasServerErrorStatus,
+      toolInputErrorCode,
+    } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
@@ -5019,6 +5487,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         SafeError,
         isSafeMessageError,
         isToolInputError,
+        toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
         ANALYTICS_EVENTS: {},
@@ -5059,6 +5528,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         SafeError,
         isSafeMessageError,
         isToolInputError,
+        toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
         ANALYTICS_EVENTS: {},
@@ -5086,10 +5556,15 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { TOOLS } = await vi.importActual<
       typeof import("../../../../packages/shared/src/constants.js")
     >("../../../../packages/shared/src/constants.js");
-    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-        "../../../../packages/shared/src/tool-errors.js",
-      );
+    const {
+      SafeError,
+      isSafeMessageError,
+      isToolInputError,
+      hasServerErrorStatus,
+      toolInputErrorCode,
+    } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
@@ -5123,6 +5598,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           SafeError,
           isSafeMessageError,
           isToolInputError,
+          toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
           ANALYTICS_EVENTS: {},
@@ -5519,10 +5995,15 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
       const { TOOLS } = await vi.importActual<
         typeof import("../../../../packages/shared/src/constants.js")
       >("../../../../packages/shared/src/constants.js");
-      const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-        await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-          "../../../../packages/shared/src/tool-errors.js",
-        );
+      const {
+        SafeError,
+        isSafeMessageError,
+        isToolInputError,
+        hasServerErrorStatus,
+        toolInputErrorCode,
+      } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+        "../../../../packages/shared/src/tool-errors.js",
+      );
       const { IMAGE_EXT_TO_MIME } = await vi.importActual<
         typeof import("../../../../packages/shared/src/image-mime.js")
       >("../../../../packages/shared/src/image-mime.js");
@@ -5540,6 +6021,7 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
           SafeError,
           isSafeMessageError,
           isToolInputError,
+          toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
           ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
@@ -7200,5 +7682,174 @@ describe("Worker error log throttle (#4360)", () => {
 
     system(misconf());
     expect(logsWith(loggerError, "Worker error")).toHaveLength(2);
+  });
+});
+
+describe("Worker error burst backoff wiring (#4530)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  interface MockedWorker {
+    on: { mock: { calls: unknown[][] } };
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
+    isPaused: ReturnType<typeof vi.fn>;
+  }
+
+  /** Start the workers against mocks and return each queue's worker mock. */
+  async function startedWorkers(): Promise<Map<string, MockedWorker>> {
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: MockedWorker }[] };
+    };
+    return new Map(
+      workerMock.mock.calls.map((call, i) => [call[0] as string, workerMock.mock.results[i].value]),
+    );
+  }
+
+  function emitError(worker: MockedWorker, err: Error): void {
+    for (const [event, listener] of worker.on.mock.calls) {
+      if (event === "error") (listener as (e: Error) => void)(err);
+    }
+  }
+
+  it("pauses every pool's worker on a burst of Redis reply errors and resumes it later", async () => {
+    vi.useFakeTimers();
+    const workers = await startedWorkers();
+    expect(workers.size).toBe(POOLS.length);
+
+    for (const worker of workers.values()) {
+      for (let i = 0; i < 1_000; i++) {
+        emitError(
+          worker,
+          Object.assign(new Error("MISCONF Errors writing to the AOF file"), {
+            name: "ReplyError",
+          }),
+        );
+      }
+      expect(worker.pause).toHaveBeenCalledExactlyOnceWith(true);
+    }
+
+    for (const worker of workers.values()) worker.isPaused.mockReturnValue(true);
+    vi.advanceTimersByTime(5_000);
+    for (const worker of workers.values()) expect(worker.resume).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("per-attempt job scratch dir (#4217)", () => {
+  it("gives a stalled job's second attempt its own scratch dir, so neither removes the other's", async () => {
+    const processV2Mock = vi.fn();
+    const rmMock = vi.fn().mockResolvedValue(undefined);
+    const mkdirMock = vi.fn().mockResolvedValue(undefined);
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: mkdirMock,
+        readFile: vi.fn(),
+        rm: rmMock,
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    // BullMQ re-runs a stalled job under the same id while the first attempt
+    // may still be running, so both attempts are live at once.
+    const makeJob = (attemptsMade: number) => ({
+      id: "job-stalled",
+      attemptsMade,
+      opts: { attempts: 2 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId: "job-stalled",
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/job-stalled/in.jpg"],
+        filename: "in.jpg",
+        settings: {},
+        kind: "tool",
+      },
+    });
+    const output = { buffer: Buffer.from("out"), filename: "out.jpg", contentType: "image/jpeg" };
+
+    let releaseFirst: (value: typeof output) => void = () => {};
+    processV2Mock
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+      .mockResolvedValueOnce(output);
+
+    const first = processor(makeJob(0));
+    await vi.waitFor(() => expect(processV2Mock).toHaveBeenCalledTimes(1));
+    await processor(makeJob(1));
+
+    const firstDir = (processV2Mock.mock.calls[0][0] as { scratchDir: string }).scratchDir;
+    const secondDir = (processV2Mock.mock.calls[1][0] as { scratchDir: string }).scratchDir;
+    expect(firstDir).not.toBe(secondDir);
+    for (const dir of [firstDir, secondDir]) {
+      expect(dir.startsWith(`${join(tmpdir(), "snapotter-scratch", "job-stalled")}-`)).toBe(true);
+    }
+    // The second attempt finished first and cleaned up only its own dir.
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir]);
+
+    releaseFirst(output);
+    await first;
+    expect(rmMock.mock.calls.map(([dir]) => dir)).toEqual([secondDir, firstDir]);
+    expect(mkdirMock.mock.calls.map(([dir]) => dir)).toEqual([firstDir, secondDir]);
   });
 });

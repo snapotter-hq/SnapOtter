@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const revokeObjectURL = vi.fn();
 const createObjectURL = vi.fn((_obj: Blob | MediaSource) => "blob:fake-url");
 
-vi.stubGlobal("URL", {
-  ...globalThis.URL,
-  createObjectURL,
-  revokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(class extends URL {}, {
+    createObjectURL,
+    revokeObjectURL,
+  }),
+);
 
 // fetch is mocked per-test; start with a stub so the module can load
 const fetchMock = vi.fn();
@@ -850,7 +852,7 @@ describe("API lib", () => {
 // useAuth security
 // ==========================================================================
 
-describe("useAuth security — network error", () => {
+describe("useAuth security: network error", () => {
   beforeEach(() => {
     fetchMock.mockReset();
   });
@@ -866,7 +868,7 @@ describe("useAuth security — network error", () => {
     // Flush the async checkAuth() call
     await act(async () => {});
 
-    // loading stays true — setState was never called
+    // loading stays true: setState was never called
     expect(result.current.loading).toBe(true);
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.role).toBeNull();

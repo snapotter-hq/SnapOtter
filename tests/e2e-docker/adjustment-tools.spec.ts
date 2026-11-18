@@ -628,9 +628,9 @@ test.describe("Color Blindness Simulation", () => {
   });
 });
 
-// ─── Color Adjustments — Additional ────────────────────────────────
+// ─── Color Adjustments: Additional ────────────────────────────────
 
-test.describe("Color Adjustments — additional", () => {
+test.describe("Color Adjustments: additional", () => {
   test("adjust hue rotation", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/adjust-colors", {
       headers: { Authorization: `Bearer ${token}` },

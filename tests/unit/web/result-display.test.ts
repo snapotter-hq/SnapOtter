@@ -1,5 +1,6 @@
+import { MEDIA_PREVIEW_AUDIO_EXTS, MEDIA_PREVIEW_VIDEO_EXTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
-import { shouldShowConversionCard } from "@/lib/result-display";
+import { shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 
 /**
  * #746: a non-previewable result (TIFF/JXL) whose server preview also failed has
@@ -119,6 +120,34 @@ describe("shouldShowConversionCard (#746)", () => {
           processedUrl: null,
         }),
       ).toBe(false);
+    }
+  });
+});
+
+// #4666 (Sentry WEB-2M): only names the preview transcode accepts may go to it.
+describe("videoAreaView (#4666)", () => {
+  it.each([
+    ["clip.mp4", "player"],
+    ["clip.WEBM", "player"],
+    ["clip.mov", "player"],
+    ["no-extension", "player"],
+    ["", "player"],
+    ["loop.gif", "image"],
+    ["clip.webp", "image"],
+    ["frame.png", "image"],
+    ["clip.mkv", "server-preview"],
+    ["clip.avi", "server-preview"],
+    ["track.mp3", "server-preview"],
+    ["clip-frames.zip", "no-preview"],
+    ["clip.srt", "no-preview"],
+    ["clip.vtt", "no-preview"],
+  ])("%s -> %s", (name, view) => {
+    expect(videoAreaView(name)).toBe(view);
+  });
+
+  it("sends nothing to the transcode that it would refuse", () => {
+    for (const ext of ["zip", "srt", "vtt", "gif", "png", "json"]) {
+      expect(MEDIA_PREVIEW_VIDEO_EXTS.has(ext) || MEDIA_PREVIEW_AUDIO_EXTS.has(ext)).toBe(false);
     }
   });
 });

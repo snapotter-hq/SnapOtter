@@ -287,6 +287,90 @@ describe("Feature manifest: architecture parity", () => {
   });
 });
 
+describe("Feature manifest: requiresAvx (#4680)", () => {
+  // Measured under qemu-x86_64 with a CPU model that has no AVX (#4723):
+  // MediaPipe 1.x aborts face detection there ("compiled with avx enabled"),
+  // while 0.10.35 and earlier run it. onnxruntime, onnxruntime-gpu, torch and
+  // ctranslate2 run too (#4680). The amd64 bundles pin mediapipe 0.10.35, so
+  // nothing needs the flag. Flag a bundle again only after measuring that a
+  // wheel it ships needs AVX.
+  const flagged = Object.entries(bundles)
+    .filter(([, bundle]) => (bundle as { requiresAvx?: unknown }).requiresAvx === true)
+    .map(([id]) => id)
+    .sort();
+
+  it("is a boolean wherever it is set", () => {
+    for (const [id, bundle] of Object.entries(bundles)) {
+      const value = (bundle as { requiresAvx?: unknown }).requiresAvx;
+      expect(value === undefined || typeof value === "boolean", id).toBe(true);
+    }
+  });
+
+  it("flags no bundle while amd64 pins a mediapipe that runs without AVX", () => {
+    expect(flagged).toEqual([]);
+  });
+});
+
+describe("Feature manifest: mediapipe pin (#4723)", () => {
+  // A range let each rebuild pick up whatever MediaPipe was newest that day,
+  // and 1.x silently stopped running on CPUs without AVX. Linux aarch64 has no
+  // 0.10.35 wheel, so arm64 pins the 1.0.0 the published arm64 bundles carry.
+  const EXPECTED = { amd64: "mediapipe==0.10.35", arm64: "mediapipe==1.0.0" } as const;
+  const repoRoot = join(import.meta.dirname, "../../..");
+
+  for (const arch of ["amd64", "arm64"] as const) {
+    it(`every ${arch} bundle that ships mediapipe pins ${EXPECTED[arch]}`, () => {
+      const specs = Object.entries<Record<string, unknown>>(bundles).flatMap(([id, bundle]) =>
+        ((bundle.packages as Record<string, string[]>)[arch] ?? [])
+          .filter((p) => p.startsWith("mediapipe"))
+          .map((p) => `${id}: ${p}`),
+      );
+      expect(specs.length).toBeGreaterThan(0);
+      for (const spec of specs) expect(spec.endsWith(`: ${EXPECTED[arch]}`), spec).toBe(true);
+    });
+  }
+
+  for (const file of ["requirements.txt", "requirements-gpu.txt"]) {
+    it(`packages/ai/python/${file} pins the same mediapipe per machine`, () => {
+      const lines = readFileSync(join(repoRoot, "packages/ai/python", file), "utf-8")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("mediapipe"));
+      expect(lines).toEqual([
+        `${EXPECTED.amd64}; platform_machine != "aarch64"`,
+        `${EXPECTED.arm64}; platform_machine == "aarch64"`,
+      ]);
+    });
+  }
+});
+
+describe("Feature manifest: torch dependents install after the pinned torch (#4752)", () => {
+  // build-bundle.sh installs common packages first, then the arch list in
+  // order. A torch dependent installed before the pinned torch resolves the
+  // newest PyPI torch and its CUDA 13 wheels; the cu126 torch then replaces
+  // torch but leaves cuDNN cu13 and friends behind (inpaint-hq shipped both).
+  // pipFlags --no-deps entries (codeformer-pip) pull nothing, so they may stay in common.
+  const TORCH_DEPENDENTS = ["accelerate", "lpips", "basicsr", "realesrgan", "gfpgan"];
+  const name = (spec: string) => spec.split(/[=<>!\s[]/)[0].toLowerCase();
+
+  for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+    const pkgs = bundle.packages as Record<string, string[]>;
+    for (const arch of ["amd64", "arm64"] as const) {
+      const list = pkgs[arch] ?? [];
+      const torchAt = list.findIndex((p) => name(p) === "torch");
+      if (torchAt < 0) continue;
+      it(`${id} (${arch}) installs every torch dependent after torch`, () => {
+        for (const spec of pkgs.common ?? []) {
+          expect(TORCH_DEPENDENTS.includes(name(spec)), `${spec} is in common`).toBe(false);
+        }
+        list.forEach((spec, i) => {
+          if (TORCH_DEPENDENTS.includes(name(spec))) expect(i, spec).toBeGreaterThan(torchAt);
+        });
+      });
+    }
+  }
+});
+
 describe("Feature manifest: enablesTools consistency with shared features", () => {
   it("manifest enablesTools matches features.ts for each bundle", async () => {
     const { FEATURE_BUNDLES } = await import("@snapotter/shared");

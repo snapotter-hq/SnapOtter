@@ -70,6 +70,35 @@ export function isAbortedByLeaving(error: unknown): boolean {
   return typeof error === "object" && error !== null && abortedByLeaving.has(error);
 }
 
+// Errors the handler is reloading the page for. Vite rethrows the payload
+// into the import, so the error boundary still catches it a moment before the
+// reload lands; reportRenderError leaves these out. Calling preventDefault()
+// instead made Vite resolve the import with undefined, and React's lazy()
+// then crashed on "reading 'default'" and reported that (WEB-2P, #4668).
+const reloadingFor = new WeakSet<object>();
+
+/** True for a chunk error the page is already reloading to recover from. */
+export function isReloadingFor(error: unknown): boolean {
+  return typeof error === "object" && error !== null && reloadingFor.has(error);
+}
+
+// Each engine's wording for "the chunk never arrived", plus Vite's own for a
+// stylesheet. A module that arrived and then threw while evaluating (WEB-2Q)
+// has its own message and stays a crash worth reporting.
+const LOAD_FAILURE_MESSAGE =
+  /^(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS)/;
+const loadFailures = new WeakSet<object>();
+
+/**
+ * True for a chunk that could not be fetched: the server was unreachable or
+ * restarting, or the tab outlived an upgrade and the reload guard was spent
+ * (WEB-2R, WEB-8, WEB-1). The error screen still shows; it just isn't a bug
+ * in our code to send to Sentry (#4668).
+ */
+export function isChunkLoadFailure(error: unknown): boolean {
+  return typeof error === "object" && error !== null && loadFailures.has(error);
+}
+
 // Vite fires vite:preloadError before the importer's catch runs and gives the
 // event no way to name the failing import, so quietImport counts the imports
 // in flight instead. A route chunk failing during one is left to the error
@@ -121,19 +150,19 @@ export function installChunkReloadHandler(
     if (event.persisted) leavingAt = Number.NEGATIVE_INFINITY;
   };
   const onPreloadError = (event: Event) => {
-    // Not preventDefault'd: Vite must reject the import so the caller's catch runs.
+    // Never preventDefault'd: Vite then resolves the import with undefined
+    // instead of rejecting it, and every caller crashes on the missing module.
+    const { payload } = event as Event & { payload?: unknown };
+    const error = payload instanceof Error ? payload : null;
+    if (error && LOAD_FAILURE_MESSAGE.test(error.message)) loadFailures.add(error);
     if (quietImportsInFlight > 0) return;
-    // Unhandled on purpose: if the leave is cancelled after all, the error
-    // boundary shows the real chunk error rather than an undefined module.
     if (Date.now() - leavingAt < LEAVING_WINDOW_MS) {
-      const { payload } = event as Event & { payload?: unknown };
       if (typeof payload === "object" && payload !== null) abortedByLeaving.add(payload);
       return;
     }
     if (Date.now() - readLastReloadAt() < CHUNK_RELOAD_GUARD_MS) return;
     markReloadedNow();
-    // Handled here: stop Vite from rethrowing into the error boundary.
-    event.preventDefault();
+    if (typeof payload === "object" && payload !== null) reloadingFor.add(payload);
     reload();
   };
   window.addEventListener("beforeunload", onBeforeUnload);

@@ -77,29 +77,37 @@ for bundle_id in ${BUNDLE_IDS}; do
   mkdir -p "${staging}"
   tar -xzf "${archive}" -C "${staging}"
   if [[ -d "${staging}/site-packages" ]]; then
-    # Layer through the REAL installer merge (reconcile + move_tree), not a raw
-    # cp: install_feature.py reconciles the ONNX Runtime flavor between bundles
-    # (#490), and this script must verify the state users actually end up with.
+    # Layer through the REAL installer merge, not a raw cp: plan_bundle_merge
+    # is what install_feature.py runs (ONNX Runtime flavor #490, OpenCV #1248,
+    # base-package and orphan metadata #4740, then one version per
+    # distribution), followed by the same supersede and move. This script must
+    # verify the state users actually end up with.
     # INSTALL_FEATURE_PY can point at a repo checkout mounted over an older
     # image (same pattern as the install_runtime.py mounts in ai-bundles.yml).
-    "${VENV}/bin/python3" - "${staging}/site-packages" "${SITE_PACKAGES}" <<'PYMERGE'
-import importlib.util, os, sys
+    "${VENV}/bin/python3" - "${staging}/site-packages" "${SITE_PACKAGES}" "${MANIFEST}" <<'PYMERGE'
+import importlib.util, json, os, shutil, sys
 
 script = os.environ.get("INSTALL_FEATURE_PY", "/app/packages/ai/python/install_feature.py")
 spec = importlib.util.spec_from_file_location("installer_under_verify", script)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-if not hasattr(mod, "reconcile_onnxruntime"):
-    print(f"FAIL: {script} has no reconcile_onnxruntime; mount the current "
+if not hasattr(mod, "plan_bundle_merge"):
+    print(f"FAIL: {script} has no plan_bundle_merge; mount the current "
           "packages/ai/python/install_feature.py into the container "
           "(-v $PWD/packages/ai/python/install_feature.py:/app/packages/ai/python/install_feature.py:ro)",
           file=sys.stderr)
     sys.exit(1)
-staging_sp, site_packages = sys.argv[1], sys.argv[2]
-mod.reconcile_onnxruntime(staging_sp, site_packages)
-if hasattr(mod, "reconcile_opencv"):
-    mod.reconcile_opencv(staging_sp, site_packages)
+staging_sp, site_packages, manifest_path = sys.argv[1:4]
+with open(manifest_path) as f:
+    manifest = json.load(f)
+quarantine = os.path.join(os.path.dirname(staging_sp), "superseded")
+plan = mod.plan_bundle_merge(
+    staging_sp, site_packages, quarantine, base_names=mod.base_package_names(manifest)
+)
+mod.supersede_distributions(site_packages, plan, quarantine)
 mod.move_tree(staging_sp, site_packages)
+# A real install drops the quarantine once its smoke imports pass.
+shutil.rmtree(quarantine, ignore_errors=True)
 PYMERGE
   fi
   rm -rf "${staging}"
@@ -227,6 +235,38 @@ if [[ ${ANYVER_RC} -ne 0 ]]; then
   fi
   echo "  (warning only; triage each entry by consumer strictness before publishing)"
 fi
+
+log "Checking every dist-info against the files on disk"
+
+# pip list, importlib.metadata and vulnerability scanners all read dist-info.
+# A dist-info whose files are missing, or a package with two of them, makes
+# the venv report versions that are not what imports (#4740). Hash mismatches
+# are only reported: two distributions can write the same files, and one
+# RECORD then describes the other. inpaint-hq amd64 r1 did that with cuDNN cu12
+# and cu13 (#4752); the amd64 set is clean since r2, but the arm64 archives
+# have not been audited, so this stays a warning until they are.
+"${VENV}/bin/python3" - "${SITE_PACKAGES}" <<'PYAUDIT' || fail "Installed metadata does not match the installed files" 2
+import importlib.util, os, sys
+
+script = os.environ.get("INSTALL_FEATURE_PY", "/app/packages/ai/python/install_feature.py")
+spec = importlib.util.spec_from_file_location("installer_under_verify", script)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+report = mod.audit_distribution_metadata(sys.argv[1])
+problems = []
+for name, dist_infos in sorted(report["duplicates"].items()):
+    problems.append(f"{name}: {len(dist_infos)} dist-info directories {dist_infos}")
+for dist_info in report["orphans"]:
+    problems.append(f"{dist_info}: none of the files its RECORD lists is installed")
+for dist_info in report["mismatched"]:
+    print(f"  WARNING: {dist_info}: most installed files differ from its RECORD hashes")
+if problems:
+    print("  Metadata that does not describe the installed files:", file=sys.stderr)
+    for line in problems:
+        print(f"    - {line}", file=sys.stderr)
+    sys.exit(1)
+print("  Every dist-info has its files installed, one per package")
+PYAUDIT
 
 log "Checking ONNX Runtime flavor consistency"
 

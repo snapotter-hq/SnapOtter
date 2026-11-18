@@ -27,7 +27,11 @@ import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
-import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  imageSizeLimitError,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
@@ -631,6 +635,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           if (cropped.length > targetBytes) {
             throw new ToolInputError(
               `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
+              { code: "TARGET_SIZE_UNREACHABLE" },
             );
           }
         }
@@ -691,6 +696,8 @@ export function registerPassportPhoto(app: FastifyInstance) {
         return reply.send(response);
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
+        const tooLarge = imageSizeLimitError(err);
+        if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         if (!isToolInputError(err)) {
           request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
         }
@@ -724,7 +731,10 @@ export function registerPassportPhoto(app: FastifyInstance) {
         if (!countrySpec) throw new ToolInputError(`Unknown country code: ${s.countryCode}`);
 
         const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
-        if (!docSpec) throw new ToolInputError(`No ${s.documentType} spec for ${s.countryCode}`);
+        if (!docSpec)
+          throw new ToolInputError(`No ${s.documentType} spec for ${s.countryCode}`, {
+            code: "INVALID_SETTINGS",
+          });
 
         const orientedBuffer = await autoOrient(inputBuffer);
 
@@ -741,6 +751,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
           throw new ToolInputError(
             "No face detected. Please upload a clear, front-facing photo with good lighting.",
+            { code: "NO_FACE_DETECTED" },
           );
         }
 

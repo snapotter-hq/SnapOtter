@@ -146,7 +146,7 @@ OIDC, SSO, S3 storage, and the full variable reference are documented in [Config
 | Path | Purpose |
 |------|---------|
 | `/data` | AI models and persistent user files; in single-container mode also the embedded PostgreSQL and Redis data. Back this up. |
-| `/tmp/workspace` | Temporary processing files (auto-cleaned). |
+| `/tmp/workspace` | Temporary processing files and job output (auto-cleaned). Not part of `/data`: without a mount here, results are lost when the container is replaced. |
 
 In the Compose stack, PostgreSQL and Redis keep their own volumes (`SnapOtter-pgdata`, `SnapOtter-redisdata`).
 

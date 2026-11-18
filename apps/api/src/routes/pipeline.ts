@@ -27,7 +27,12 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { claimBatchAlias } from "../jobs/batch-alias.js";
 import { clearBatchCanceled, recordChildOutcome } from "../jobs/batch-progress.js";
-import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
+import {
+  flowParentStored,
+  getFlowProducer,
+  injectTraceContext,
+  waitForJob,
+} from "../jobs/enqueue.js";
 import {
   INVALID_CLIENT_JOB_ID_ERROR,
   type Pool,
@@ -358,7 +363,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       return withRouteScratch("pipeline", async (scratchDir) => {
         const ingressAbort = new AbortController();
@@ -902,11 +907,30 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the flow tree
           injectTraceContextIntoFlow(tree);
 
-          // Add the flow to BullMQ
+          // Add the flow to BullMQ. add() can reject after Redis stored the
+          // flow (a connection lost mid-reply); deleting the upload then
+          // would starve the queued steps of their input (#4715), so ask
+          // Redis first, the way the batch route does (#4714).
           try {
             await getFlowProducer().add(tree);
           } catch (err) {
-            throw markUpstreamError(err);
+            const stored = await flowParentStored(pipelinePool, jobId);
+            if (stored !== true) {
+              if (stored === null) {
+                // Can't tell. Leave the upload to the storage TTL sweep,
+                // which keeps it while a job that owns it is in flight.
+                request.log.warn(
+                  { err, jobId },
+                  "pipeline enqueue failed and Redis could not confirm whether the flow was stored; leaving the upload to the TTL sweep",
+                );
+                uncommittedUploadKey = undefined;
+              }
+              throw markUpstreamError(err);
+            }
+            request.log.warn(
+              { err, jobId },
+              "pipeline enqueue reported a failure but Redis stored the flow; continuing",
+            );
           }
           uncommittedUploadKey = undefined;
 
@@ -931,6 +955,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
+                  toolId: "pipeline",
                   jobId,
                 });
                 return null;
@@ -1020,7 +1045,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const body = request.body as unknown;
       const result = savePipelineSchema.safeParse(body);
@@ -1109,7 +1134,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       // Admins see all pipelines; regular users see their own + legacy (no owner)
       const allRows = await db.select().from(schema.pipelines);
@@ -1139,7 +1164,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = await requirePipelineAccess(request, reply);
-      if (!user) return;
+      if (!user) return reply;
 
       const { id } = request.params;
 
@@ -1192,7 +1217,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authUser = requireAuth(request, reply);
-      if (!authUser) return;
+      if (!authUser) return reply;
 
       return withRouteScratch("pipeline-batch", async (scratchDir) => {
         const ingressAbort = new AbortController();
@@ -1995,10 +2020,30 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
+          // Same lost-reply check as the single-file path above (#4715).
           try {
             await getFlowProducer().add(batchTree);
           } catch (err) {
-            throw markUpstreamError(err);
+            const stored = await flowParentStored("system", parentId);
+            if (stored !== true) {
+              if (stored === null) {
+                // Can't tell. Leave the rows to job reconciliation, which
+                // settles them within a minute if BullMQ has no such job, and
+                // the uploads to the storage TTL sweep, which keeps them while
+                // a job that owns them is in flight.
+                request.log.warn(
+                  { err, jobId: parentId },
+                  "pipeline batch enqueue failed and Redis could not confirm whether the flow was stored; leaving cleanup to reconciliation",
+                );
+                uncommittedOcrKeys.clear();
+                stagedBatch = null;
+              }
+              throw markUpstreamError(err);
+            }
+            request.log.warn(
+              { err, jobId: parentId },
+              "pipeline batch enqueue reported a failure but Redis stored the flow; continuing",
+            );
           }
           uncommittedOcrKeys.clear();
           stagedBatch = null;
@@ -2011,7 +2056,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // As in batch.ts: a failed finalize settles the parent row with
             // its reason, which the sync client must see instead of the
             // masked rejection (#2180).
-            const failure = await settledFailureResponse(parentId, request.log);
+            const failure = await settledFailureResponse(parentId, request.log, "pipeline-batch");
             if (!failure) throw markQueueEventsJobFailure(err);
             return reply.status(failure.status).send(failure.body);
           }

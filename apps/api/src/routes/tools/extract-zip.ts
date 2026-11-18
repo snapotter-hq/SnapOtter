@@ -4,6 +4,7 @@ import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { type Entry, fromBuffer, type ZipFile } from "yauzl";
 import { z } from "zod";
+import { sanitizeFilename } from "../../lib/filename.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -203,7 +204,9 @@ export function registerExtractZip(app: FastifyInstance) {
         ctx.report(90, "Done");
         return {
           buffer: buf,
-          filename: basename(entry.fileName),
+          // The entry name becomes the output's storage key, which refuses
+          // "..", NULs, and the reserved staging name (Sentry NODE-AZ, #4663).
+          filename: sanitizeFilename(entry.fileName),
           contentType: "application/octet-stream",
           resultPayload: { entries: entriesPayload },
         };

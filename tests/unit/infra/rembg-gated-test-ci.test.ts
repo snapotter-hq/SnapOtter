@@ -220,7 +220,7 @@ describe("rembg test pins", () => {
     }
   });
 
-  it("pins OpenTelemetry packages to 1.45.1 across sidecar requirements (#3639)", () => {
+  it("pins OpenTelemetry packages to 1.45.2 across sidecar requirements (#3639, #4651)", () => {
     const otelPackages = [
       "opentelemetry-api",
       "opentelemetry-sdk",
@@ -235,9 +235,12 @@ describe("rembg test pins", () => {
         .map((line) => line.replace(/#.*/, "").trim())
         .filter(Boolean);
       for (const pkg of otelPackages) {
-        expect(lines, `${relPath} must pin ${pkg}==1.45.1`).toContain(`${pkg}==1.45.1`);
+        expect(lines, `${relPath} must pin ${pkg}==1.45.2`).toContain(`${pkg}==1.45.2`);
         expect(lines, `${relPath} must not retain vulnerable ${pkg}==1.28.2`).not.toContain(
           `${pkg}==1.28.2`,
+        );
+        expect(lines, `${relPath} must not retain vulnerable ${pkg}==1.45.1`).not.toContain(
+          `${pkg}==1.45.1`,
         );
       }
     }

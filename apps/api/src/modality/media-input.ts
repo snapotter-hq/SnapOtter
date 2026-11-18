@@ -2,10 +2,19 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { FfprobeTimeoutError, probeMedia } from "@snapotter/media-engine";
-import { SUBTITLE_INPUTS } from "@snapotter/shared";
+import { isEngineCrash, SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
+
+const NO_AUDIO_TRACK = "NO_AUDIO_TRACK";
+export const NO_AUDIO_TRACK_MESSAGE =
+  "This file has no audio track (no audio stream). Choose a file with audio and try again.";
+
+/** Shared with tools that take a video but need its audio (extract-audio). */
+export function noAudioTrackError(): InputValidationError {
+  return new InputValidationError(NO_AUDIO_TRACK_MESSAGE, 400, undefined, NO_AUDIO_TRACK);
+}
 
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
 
@@ -82,6 +91,9 @@ export class MediaInputHandler implements InputHandler {
           converted.cause = err;
           throw converted;
         }
+        // ffprobe crashing is the engine's fault, not proof the upload is bad,
+        // so it stays a reported 500 (#4684).
+        if (isEngineCrash(err)) throw err;
         if (isFfprobeTimeout(err)) {
           throw new InputValidationError(
             `Could not inspect this ${this.kind} file within the time limit. It may be malformed; try a different file.`,
@@ -124,9 +136,7 @@ export class MediaInputHandler implements InputHandler {
         throw new InputValidationError("File is a still image, not a video");
       }
       if (this.kind === "audio" && !hasAudio) {
-        throw new InputValidationError(
-          "This file has no audio track (no audio stream). Choose a file with audio and try again.",
-        );
+        throw noAudioTrackError();
       }
       const durationCap =
         this.kind === "video" ? env.MAX_VIDEO_DURATION_S : env.MAX_AUDIO_DURATION_S;

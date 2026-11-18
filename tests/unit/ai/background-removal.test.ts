@@ -543,6 +543,69 @@ describe("removeBackground", () => {
       expect(onProgress).toHaveBeenCalledWith(5, expect.stringContaining("u2net"));
     });
 
+    it("drops HR matting to birefnet-general first, not straight to u2net (#4753)", async () => {
+      const onFallbackModel = vi.fn();
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(
+          new Error("GPU out of memory: birefnet-hr-matting needs about 16 GB"),
+        )
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+        model: "birefnet-hr-matting",
+        onFallbackModel,
+      });
+
+      const models = vi
+        .mocked(runPythonWithProgress)
+        .mock.calls.map((call) => JSON.parse(call[1][2]).model);
+      expect(models).toEqual(["birefnet-hr-matting", "birefnet-general"]);
+      expect(onFallbackModel).toHaveBeenCalledExactlyOnceWith("birefnet-general");
+      // The callback is for the caller, never part of the sidecar's settings.
+      expect(JSON.parse(vi.mocked(runPythonWithProgress).mock.calls[1][1][2])).not.toHaveProperty(
+        "onFallbackModel",
+      );
+    });
+
+    it("keeps stepping down to u2net when birefnet-general runs out of memory too", async () => {
+      const onFallbackModel = vi.fn();
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(
+          new Error("GPU out of memory: birefnet-hr-matting needs about 16 GB"),
+        )
+        .mockRejectedValueOnce(new Error("Failed to allocate memory for requested buffer"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+        model: "birefnet-hr-matting",
+        onFallbackModel,
+      });
+
+      const models = vi
+        .mocked(runPythonWithProgress)
+        .mock.calls.map((call) => JSON.parse(call[1][2]).model);
+      expect(models).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
+      expect(onFallbackModel.mock.calls).toEqual([["birefnet-general"], ["u2net"]]);
+    });
+
+    it("treats an explicit oomFallbackModel as a single step", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValue(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+          model: "birefnet-hr-matting",
+          oomFallbackModel: "birefnet-portrait",
+        }),
+      ).rejects.toThrow("out of memory");
+
+      const models = vi
+        .mocked(runPythonWithProgress)
+        .mock.calls.map((call) => JSON.parse(call[1][2]).model);
+      expect(models).toEqual(["birefnet-hr-matting", "birefnet-portrait"]);
+    });
+
     it("does not retry when already using u2net", async () => {
       vi.mocked(runPythonWithProgress).mockRejectedValue(
         new Error("Process killed (out of memory)"),

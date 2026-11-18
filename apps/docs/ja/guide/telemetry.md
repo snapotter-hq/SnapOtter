@@ -1,8 +1,9 @@
 ---
 description: "SnapOtterが収集する匿名の使用データ、それが送信されるタイミング、インスタンス全体の製品アナリティクスをオフにする方法。"
-i18n_source_hash: 875ed3efcabd
-i18n_provenance: human
-i18n_output_hash: 98607316afbb
+i18n_source_hash: 1a68d9371570
+i18n_provenance: machine
+i18n_output_hash: a9e36fe9da95
+i18n_hash_version: 2
 ---
 
 # SnapOtterが収集するもの {#what-snapotter-collects}
@@ -15,7 +16,7 @@ i18n_output_hash: 98607316afbb
 - pipeline_executed: ステップ数、ツールID、バッチフラグ、ファイル数、所要時間、ステータス。
 - ai_bundle_action: バンドルID、アクション、所要時間。
 - フロントエンドの使用状況: どのツールページを開いたか、追加されたファイル(数のみ)、ツールの開始、ダウンロード、保存、検索(結果数のみ)、バッチ処理。
-- クラッシュレポート: エラータイプと、ファイルのベース名のみを含むソーススタック。
+- クラッシュレポート: エラータイプ、マスク済みのエラーメッセージ（ファイル名、パス、メールアドレス、引用符で囲まれた値を除去）、ファイルのベース名を含むソーススタック、そして AI ツールの場合はファイルのベース名のみを含む Python トレースバック。
 
 ## 決して収集しないもの {#what-we-never-collect}
 
@@ -24,7 +25,9 @@ i18n_output_hash: 98607316afbb
 - OCRの出力テキスト
 - 画像メタデータ(EXIF)
 - 抽出されたドキュメントテキスト
-- IPアドレスやアカウントの識別情報
+- アカウントの識別情報
+
+どのサーバーでもそうであるように、PostHog には各リクエストの送信元 IP アドレスが見えます。私たちの PostHog プロジェクトはそれを保存せずに破棄し、SnapOtter 自身のサーバーイベントは IP アドレスの代わりにプレースホルダーを送信します。
 
 ## 更新のお知らせ {#update-notices}
 
@@ -33,3 +36,5 @@ i18n_output_hash: 98607316afbb
 ## オフにする方法 {#turning-it-off}
 
 管理者: Settings > System > Privacyで「Anonymous Product Analytics」をオフに切り替えます。即座に、インスタンス全体で停止します。決してデータを送信できないイメージをビルドするには、`SNAPOTTER_ANALYTICS=off`ビルド引数を設定します。
+
+最初から分析をオフにした状態で新しいインスタンスを起動するには、初回起動の前にサーバーの環境変数に `SNAPOTTER_ANALYTICS_DEFAULT=off` を追加します。Docker Compose では、アプリサービスの `environment:` の下に記述してください。`.env` に設定するだけではコンテナに渡されません。

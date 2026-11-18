@@ -5,6 +5,7 @@ import {
   hasServerErrorStatus,
   isToolInputError,
   markToolInputError,
+  pixelLimitImageError,
   ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
@@ -24,7 +25,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import {
   asInputErrorIfUndecodable,
-  PIXEL_LIMIT_IMAGE_MESSAGE,
+  imageSizeLimitError,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
@@ -161,7 +162,9 @@ async function prepareMemeImage(
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       log?.warn({ err, toolId: "meme-generator" }, "Decode failed");
-      throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
+      throw err instanceof Error
+        ? markToolInputError(err, "IMAGE_UNDECODABLE")
+        : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
     }
   }
   let fallbackFormat: string | undefined;
@@ -188,12 +191,12 @@ async function prepareMemeImage(
         if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
         if (isPixelSafetyError(rawProbeErr)) {
-          throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawProbeErr });
+          throw pixelLimitImageError(rawProbeErr);
         }
         log?.warn({ err: decodeErr, toolId: "meme-generator" }, "Decode failed");
         throw decodeErr instanceof Error
-          ? markToolInputError(decodeErr)
-          : new ToolInputError(String(decodeErr));
+          ? markToolInputError(decodeErr, "IMAGE_UNDECODABLE")
+          : new ToolInputError(String(decodeErr), { code: "IMAGE_UNDECODABLE" });
       }
     }
   }
@@ -442,6 +445,8 @@ export function registerMemeGenerator(app: FastifyInstance) {
           error: err.message,
         });
       }
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       if (!isToolInputError(err)) {
         request.log?.error({ err, toolId: "meme-generator" }, "Meme generation failed");
       }

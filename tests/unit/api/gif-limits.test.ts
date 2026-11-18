@@ -34,6 +34,39 @@ describe("GIF workload limits", () => {
   it("marks limit failures as user input errors", () => {
     expect(() => assertGifWorkload({ width: 0, height: 10, pages: 1 })).toThrow(ToolInputError);
   });
+
+  // The web app translates these from the code (#4727).
+  it("codes each limit so the web app can say which one tripped", () => {
+    const codeOf = (fn: () => unknown) => {
+      try {
+        fn();
+      } catch (err) {
+        return (err as ToolInputError).code;
+      }
+      return undefined;
+    };
+    expect(codeOf(() => assertGifWorkload({ width: 0, height: 10, pages: 1 }))).toBe(
+      "IMAGE_UNDECODABLE",
+    );
+    expect(
+      codeOf(() => assertGifWorkload({ width: 1, height: 1, pages: MAX_GIF_FRAMES + 1 })),
+    ).toBe("TOO_MANY_FRAMES");
+    expect(codeOf(() => assertGifWorkload({ width: 8_192, height: 8_192, pages: 2 }))).toBe(
+      "TOO_MANY_PIXELS",
+    );
+    expect(codeOf(() => assertGifWorkload({ width: 20_000, height: 10, pages: 1 }))).toBe(
+      "IMAGE_TOO_LARGE",
+    );
+    expect(
+      codeOf(() =>
+        assertGifWorkload(
+          { width: 20_000, height: 10, pages: 1 },
+          "GIF resize output",
+          "RESULT_TOO_LARGE",
+        ),
+      ),
+    ).toBe("RESULT_TOO_LARGE");
+  });
 });
 
 describe("GIF resize dimension resolution", () => {

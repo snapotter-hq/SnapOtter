@@ -81,7 +81,7 @@ describe("Zero-byte / empty file uploads", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1x1 PIXEL IMAGE — MINIMUM DIMENSION
+// 1x1 PIXEL IMAGE: MINIMUM DIMENSION
 // ═══════════════════════════════════════════════════════════════════════════
 describe("1x1 pixel image handling", () => {
   it("resizes a 1x1 image without crashing", async () => {
@@ -143,7 +143,7 @@ describe("1x1 pixel image handling", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WRONG EXTENSION — FORMAT DETECTION
+// WRONG EXTENSION: FORMAT DETECTION
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Wrong file extension (magic byte detection)", () => {
   it("detects actual PNG format when filename says .jpg", async () => {
@@ -262,7 +262,7 @@ describe("Extreme filenames", () => {
       body,
     });
 
-    // Should succeed — filename gets sanitized by sanitizeFilename()
+    // Should succeed: filename gets sanitized by sanitizeFilename()
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     // Download URL should not contain path traversal
@@ -388,7 +388,7 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Zod default behavior strips unknown keys — should succeed
+    // Zod default behavior strips unknown keys, should succeed
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.processedSize).toBeGreaterThan(0);
@@ -397,7 +397,7 @@ describe("Settings field edge cases", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1x1 PIXEL IMAGE — EXTENDED TOOL COVERAGE
+// 1x1 PIXEL IMAGE: EXTENDED TOOL COVERAGE
 // ═══════════════════════════════════════════════════════════════════════════
 describe("1x1 pixel image through additional tools", () => {
   it("compresses a 1x1 image without crashing", async () => {
@@ -549,7 +549,7 @@ describe("Unicode and special filenames", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ZERO-BYTE FILES — ADDITIONAL TOOLS
+// ZERO-BYTE FILES: ADDITIONAL TOOLS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Zero-byte file to info and border tools", () => {
   it("rejects a zero-byte file to /api/v1/tools/image/info with 400", async () => {
@@ -589,7 +589,7 @@ describe("Zero-byte file to info and border tools", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1x1 IMAGE — FLIP AND INFO
+// 1x1 IMAGE: FLIP AND INFO
 // ═══════════════════════════════════════════════════════════════════════════
 describe("1x1 pixel image through rotate with flip", () => {
   it("rotates and flips a 1x1 image horizontally", async () => {
@@ -666,7 +666,7 @@ describe("1x1 pixel image through rotate with flip", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MULTIPART WITHOUT FILE PART — ONLY SETTINGS
+// MULTIPART WITHOUT FILE PART: ONLY SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Missing file part in multipart request", () => {
   it("rejects resize request with only settings and no file", async () => {
@@ -709,9 +709,9 @@ describe("Missing file part in multipart request", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WRONG EXTENSION — ADDITIONAL FORMAT MISMATCHES
+// WRONG EXTENSION: ADDITIONAL FORMAT MISMATCHES
 // ═══════════════════════════════════════════════════════════════════════════
-describe("Wrong extension — additional format mismatches", () => {
+describe("Wrong extension: additional format mismatches", () => {
   it("handles JPEG data uploaded with .webp extension gracefully", async () => {
     const jpgBuffer = readFixture(fixtures.image.base.jpg100);
 

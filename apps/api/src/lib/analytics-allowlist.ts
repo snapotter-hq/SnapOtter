@@ -1,3 +1,5 @@
+import { AUTH_LOGIN_FAILURE_REASONS } from "@snapotter/shared";
+
 // Defense in depth: only these keys may leave the server per event, and only as
 // primitives. Free-text fields (error_message, params, search query) are never
 // allow-listed, so tool settings and filenames cannot reach PostHog.
@@ -16,6 +18,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "execution_hint",
     "error_code",
     "error_kind",
+    "app_version",
   ]),
   pipeline_executed: new Set([
     "step_count",
@@ -24,11 +27,19 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "file_count",
     "duration_ms",
     "status",
+    "error_code",
+    "app_version",
   ]),
-  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms"]),
+  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "app_version"]),
   instance_started: new Set(["arch", "os_platform", "deploy_mode", "gpu_present", "app_version"]),
-  auth_login: new Set(["method"]),
-  auth_login_failed: new Set(["method"]),
+  auth_login: new Set(["method", "app_version"]),
+  auth_login_failed: new Set(["method", "reason", "app_version"]),
+};
+
+// Keys whose value must come from a closed set, so a username or an audit
+// string passed by mistake is dropped instead of forwarded (#4216).
+const ALLOWED_VALUES: Record<string, Record<string, ReadonlySet<string>>> = {
+  auth_login_failed: { reason: new Set<string>(AUTH_LOGIN_FAILURE_REASONS) },
 };
 
 function isAllowedValue(value: unknown): boolean {
@@ -47,7 +58,10 @@ export function sanitizeEventProperties(
   if (!allow) return {};
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {
-    if (allow.has(key) && isAllowedValue(value)) out[key] = value;
+    if (!allow.has(key) || !isAllowedValue(value)) continue;
+    const closed = ALLOWED_VALUES[event]?.[key];
+    if (closed && !(typeof value === "string" && closed.has(value))) continue;
+    out[key] = value;
   }
   return out;
 }

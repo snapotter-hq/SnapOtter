@@ -35,7 +35,11 @@ def extract_key_points(lms):
     nose_x, nose_y = lms[NOSE_INDEX]
 
     forehead_chin_dist = chin_y - forehead_y
-    crown_y = forehead_y - (forehead_chin_dist * 0.15)
+    # The face mesh has no hair points, so the crown is estimated above the
+    # hairline. Half the forehead-to-chin distance matches the hair top in
+    # tests/fixtures/image/valid/portrait-color.jpg (measured 0.51). A bald or
+    # heavily covered head will still differ from this estimate.
+    crown_y = forehead_y - (forehead_chin_dist * 0.5)
     crown_x = forehead_x
 
     face_center_x = (nose_x + eye_center_x) / 2

@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface RestorePhotoOptions {
   scratchRemoval?: boolean;
@@ -41,7 +41,7 @@ export async function restorePhoto(
 
   const { signal, ...sidecarOptions } = options;
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("restore", inputPath, pngBuffer);
   const { stdout } = await runPythonWithProgress(
     "restore.py",
     [inputPath, outputPath, JSON.stringify(sidecarOptions)],
@@ -54,7 +54,7 @@ export async function restorePhoto(
   }
 
   const actualOutputPath = result.output_path || outputPath;
-  const buffer = await readFile(actualOutputPath);
+  const buffer = await readScratchOutput("restore", actualOutputPath);
   return {
     buffer,
     width: result.width,

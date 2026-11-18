@@ -598,6 +598,7 @@ describe("surface Playwright harness isolation", () => {
     expect(api.command).toContain(
       "node tests/playwright-api-lifecycle.mjs noauth_contract noauth -- pnpm",
     );
+    expect(api.command).not.toContain("e2e-pg-create-db.cjs");
     expect(api.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
     for (const key of ["DATA_DIR", "FILES_STORAGE_PATH", "WORKSPACE_PATH"]) {
       expect(api.env[key]).toContain(path.join("noauth_contract", "noauth"));
@@ -606,9 +607,12 @@ describe("surface Playwright harness isolation", () => {
     expect(web.reuseExistingServer).toBe(false);
     const webBuildAt = web.command.indexOf("vite build");
     const webServeAt = web.command.indexOf("vite preview");
-    expect(webBuildAt).toBeGreaterThanOrEqual(0);
-    expect(webServeAt).toBeGreaterThan(webBuildAt);
-    expect(web.command).toContain("--strictPort");
+    expect(webBuildAt, "noauth harness never builds the web app").toBeGreaterThanOrEqual(0);
+    expect(webServeAt, "noauth harness never previews its build").toBeGreaterThan(webBuildAt);
+    expect(web.command).not.toContain("vite dev");
+    expect(web.command).toContain("&& exec pnpm");
+    expect(web.command).toContain(path.join("noauth_contract", "noauth", "web-dist"));
+    expect(web.command).toContain("--host 127.0.0.1 --port 45150 --strictPort");
     expect(web.env.VITE_API_URL).toBe("http://127.0.0.1:44192");
   });
 

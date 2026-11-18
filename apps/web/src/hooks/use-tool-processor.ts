@@ -1782,12 +1782,19 @@ export function useToolProcessor(toolId: string) {
       // input size, so a failure rate can be read against the cause and the
       // upload size instead of file_count alone (#1161).
       const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-      const trackBatch = (status: "completed" | "failed" | "canceled", reason?: string) =>
+      const trackBatch = (
+        status: "completed" | "failed" | "canceled",
+        reason?: string,
+        failedCount?: number,
+      ) =>
         track(ANALYTICS_EVENTS.BATCH_PROCESSED, {
           tool_id: toolId,
           file_count: files.length,
           status,
           ...(reason ? { reason } : {}),
+          // Files the server left without a result in a run that still finished,
+          // so a partial failure reads differently from a clean batch (#4216).
+          ...(failedCount ? { failed_count: failedCount } : {}),
           total_bytes: totalBytes,
         });
 
@@ -2042,6 +2049,7 @@ export function useToolProcessor(toolId: string) {
             setBatchZip(zipBlob, `batch-${toolId}.zip`);
           }
 
+          let missingResults = 0;
           for (let i = 0; i < capturedEntries.length; i++) {
             const captured = capturedEntries[i];
             if (
@@ -2088,6 +2096,7 @@ export function useToolProcessor(toolId: string) {
             } else {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure.
+              if (!canceledByUser) missingResults += 1;
               updateEntryById(entryId, {
                 // Clear the result so hasProcessed goes false and the failure
                 // screen (guarded by !hasProcessed) renders instead of a stale
@@ -2105,6 +2114,7 @@ export function useToolProcessor(toolId: string) {
           trackBatch(
             canceledByUser ? "canceled" : "completed",
             canceledByUser ? "canceled" : undefined,
+            missingResults,
           );
           // Every entry has settled, so settleOrFail passes this on to the
           // global handler instead of failing the run.

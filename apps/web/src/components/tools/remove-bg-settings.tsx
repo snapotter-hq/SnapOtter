@@ -1260,20 +1260,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       return;
     }
 
-    // Custom XHR to capture the extended response (jobId, maskUrl)
-    const formData = new FormData();
-    formData.append("file", files[0]);
-
-    const cleanSettings = { ...settings };
-    delete cleanSettings._bgImageFile;
-    formData.append("settings", JSON.stringify({ model: cleanSettings.model }));
-
-    const clientJobId = `bg-${Date.now()}`;
-    formData.append("clientJobId", clientJobId);
-
-    // Use processFiles for the progress/SSE flow - it handles everything
-    // But we need the extended response. Override via a fetch after processFiles completes.
-    // Actually, let's use processFiles and then fetch the job info.
     // Phase 1 is always an intermediate here: the Phase 2 effects request owns
     // the library save (#565), so never auto-save the transparent result.
     // The sidecar options ride on this request: Phase 2 can't apply them.

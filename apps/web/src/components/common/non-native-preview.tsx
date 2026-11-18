@@ -6,8 +6,11 @@ import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
-import { format } from "@/lib/format";
-import { previewFailureEncoder } from "@/lib/preview-error";
+import {
+  type PreviewFailureReason,
+  previewFailureMessage,
+  previewFailureReason,
+} from "@/lib/preview-error";
 import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 
@@ -32,8 +35,9 @@ export function NonNativePreview({
   const { t } = useTranslation();
   const [state, setState] = useState<PreviewState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  // Set when the server's ffmpeg lacks the encoder this preview needs (#1290).
-  const [missingEncoder, setMissingEncoder] = useState<string | null>(null);
+  // Set when the server names why the preview failed: its ffmpeg lacks the
+  // encoder this preview needs (#1290), or it has no ffmpeg at all (#4149).
+  const [failureReason, setFailureReason] = useState<PreviewFailureReason | null>(null);
   // Set when the upload is over the server's size limit (#1280).
   const [tooLarge, setTooLarge] = useState(false);
   // Set when the result to preview is gone from the server (#1350).
@@ -57,7 +61,7 @@ export function NonNativePreview({
   useEffect(() => {
     abortRef.current?.abort();
     setState("idle");
-    setMissingEncoder(null);
+    setFailureReason(null);
     setTooLarge(false);
     setSourceExpired(false);
     setPreviewUrl((prev) => {
@@ -88,7 +92,7 @@ export function NonNativePreview({
 
     const controller = new AbortController();
     abortRef.current = controller;
-    let encoder: string | null = null;
+    let reason: PreviewFailureReason | null = null;
     let expired = false;
     let sourceStatus: string | undefined;
 
@@ -127,7 +131,7 @@ export function NonNativePreview({
       });
 
       if (!response.ok) {
-        encoder = await previewFailureEncoder(response);
+        reason = await previewFailureReason(response);
         // The message stays constant; captureHandledError tags the
         // statusCode as status_code (#1351).
         throw new SafeError("Media preview generation failed", {
@@ -159,7 +163,7 @@ export function NonNativePreview({
       // was being read surfaces as an ordinary failure.
       if (!controller.signal.aborted) {
         const status = isSafeMessageError(err) ? err.statusCode : undefined;
-        setMissingEncoder(encoder);
+        setFailureReason(reason);
         setTooLarge(status === 413);
         setSourceExpired(expired);
         setState("error");
@@ -264,9 +268,7 @@ export function NonNativePreview({
               ? t.toolPage.resultExpired
               : tooLarge
                 ? t.errors.fileTooLarge
-                : missingEncoder
-                  ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
-                  : t.toolPage.previewFailed}
+                : previewFailureMessage(failureReason, t, t.toolPage.previewFailed)}
           </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}

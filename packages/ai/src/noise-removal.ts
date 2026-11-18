@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import {
@@ -7,6 +6,7 @@ import {
   runPythonWithProgress,
   toSidecarError,
 } from "./bridge.js";
+import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 export interface NoiseRemovalOptions {
   tier?: string;
@@ -38,7 +38,7 @@ export async function noiseRemoval(
   const outputPath = join(outputDir, "output_denoise.png");
 
   const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-  await writeFile(inputPath, pngBuffer);
+  await writeScratchInput("denoise", inputPath, pngBuffer);
 
   const meta = await sharp(pngBuffer).metadata();
   const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
@@ -56,7 +56,7 @@ export async function noiseRemoval(
   }
 
   const actualOutputPath = result.output_path || outputPath;
-  const buffer = await readFile(actualOutputPath);
+  const buffer = await readScratchOutput("denoise", actualOutputPath);
   return {
     buffer,
     width: result.width,

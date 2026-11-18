@@ -1,6 +1,7 @@
 ---
 description: "Wyodrębnij lokalnie tekst ze zeskanowanych plików PDF za pomocą wbudowanego Tesseract lub opcjonalnego, bardzo dokładnego środowiska wykonawczego RapidOCR."
-i18n_output_hash: d4e2a591634d
+i18n_output_hash: 32941326d6e8
+i18n_hash_version: 2
 i18n_source_hash: b38be1c1cfcf
 i18n_provenance: human
 ---
@@ -59,7 +60,7 @@ Zwraca `202 Accepted`. Śledź postęp przez SSE pod `/api/v1/jobs/{jobId}/progr
 - Akceptowany format wejściowy: `.pdf`.
 - `fast` jest wbudowany i dodaje około 25 MiB do oficjalnego obrazu. `balanced` i `best` wymagają opcjonalnego, dokładnego pakietu OCR (około 208-234 MiB do pobrania i 409-488 MiB zainstalowanego, w zależności od celu).
 - Dokładny pakiet obsługuje Linux amd64 i arm64 i używa ONNX Runtime na CPU, w tym na hostach NVIDIA.
-— Wyraźnie żądany poziom nigdy nie jest dyskretnie obniżany. Jeśli `balanced` lub `best` jest niedostępne, API zwraca `501` z `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE`.
+Wyraźnie żądany poziom nigdy nie jest dyskretnie obniżany. Jeśli `balanced` lub `best` jest niedostępne, API zwraca `501` z `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE`.
 - Strony PDF są rasteryzowane w wysokiej rozdzielczości przed OCR. `best` obsługuje modele średniej wielkości PP-OCRv6 o wyższej dokładności i ocenia warianty orientacji i ulepszeń, poprawiając rozpoznawanie kosztem szybkości.
 - Ustawienie języka `auto` umożliwia rozpoznawanie w obrębie obsługiwanego zestawu skryptów; wyraźna wskazówka może poprawić wyniki w przypadku znanego języka dokumentu.
 - Możesz wskazać konkretne strony za pomocą zakresów (`"1-3"`), list rozdzielonych przecinkami (`"1,3,5"`) lub `"all"` dla każdej strony.

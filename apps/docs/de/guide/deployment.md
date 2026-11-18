@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter in der Produktion mit Docker bereitstellen. Hardwareanforderungen, GPU-Einrichtung und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare."
-i18n_source_hash: 3821f105f4ba
+i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: ed4aa5fa75bf
+i18n_output_hash: d89fe8681f4a
 i18n_hash_version: 2
 ---
 
@@ -58,6 +58,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -66,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -160,6 +164,10 @@ services:
       - QPDF_PATH=${QPDF_PATH:-}
       - SOFFICE_PATH=${SOFFICE_PATH:-}
       - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - GS_PATH=${GS_PATH:-}
+      - PANDOC_PATH=${PANDOC_PATH:-}
+      - SNAPOTTER_FONT_FILE=${SNAPOTTER_FONT_FILE:-}
+      - SNAPOTTER_FONT_FAMILY=${SNAPOTTER_FONT_FAMILY:-}
       - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
@@ -168,7 +176,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1349/api/v1/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$${PORT:-1349}/api/v1/health"]
       interval: 30s
       timeout: 5s
       start_period: 60s
@@ -401,14 +409,28 @@ Die [vollständige Formatliste](/de/guide/supported-formats) enthält Details zu
 - **Hochskalierung** läuft auf der CPU bei allem über kleinen Bildern in ein Timeout. Für den praktischen Einsatz ist eine GPU erforderlich.
 - Die Gesichtsverbesserung mit **CodeFormer** ist deutlich langsamer als GFPGAN (53 s gegenüber 2 s auf der GPU). GFPGAN wird für die meisten Anwendungsfälle empfohlen.
 
+### KI-Bundle-Installationen mit mehreren Replikaten {#ai-bundle-installs-with-several-replicas}
+
+Ändern Sie KI-Bundles nur, wenn genau ein Replikat läuft. Das Installieren eines Bundles, der Offline-Import eines Bundles oder das Zurücksetzen der KI-Umgebung schreibt die gemeinsame Python-Umgebung in `/data/ai/venv` neu. Eine Installation wartet auf KI-Aufträge des eigenen Replikats, und jede dieser Aktionen startet danach den Sidecar dieses Replikats neu, doch keine davon sieht KI-Aufträge auf den anderen Replikaten. Deren Sidecars halten torch und ONNX Runtime weiter aus diesem Verzeichnis geladen, während es neu geschrieben wird, und können mitten im Auftrag abstürzen. Skalieren Sie das Deployment auf ein Replikat herunter (oder stoppen Sie die anderen), nehmen Sie die Änderung vor und skalieren Sie dann wieder hoch.
+
 ## Volumes {#volumes}
 
 | Mount / Volume | Zweck | Erforderlich? |
 |---|---|---|
 | `/data` (app) | KI-Modelle, Python-venv, Benutzerdateien | **Ja**, ohne es gehen Dateien verloren |
-| `/tmp/workspace` (app) | Temporäre Verarbeitungsdateien (werden automatisch bereinigt) | Empfohlen |
+| `/tmp/workspace` (app) | Temporäre Verarbeitungsdateien und Auftragsausgaben (werden automatisch bereinigt). Nicht unter `/data` gespeichert, daher gehen Ergebnisse beim Ersetzen des Containers verloren, wenn dieses Verzeichnis nicht eingebunden ist | Empfohlen |
 | `SnapOtter-pgdata` (postgres) | PostgreSQL-Datenverzeichnis (Benutzer, Einstellungen, Pipelines, Jobs) | **Ja**, ohne es gehen Daten verloren |
 | `SnapOtter-redisdata` (redis) | Redis-Append-only-Datei für dauerhafte Job-Warteschlangen | Empfohlen |
+
+### Auftragsausgaben mit `docker run` behalten {#keeping-job-output}
+
+Auftragsergebnisse liegen unter `/tmp/workspace`. Das ist Dateisystem des Containers, solange Sie es nicht einbinden. Mit nur `-v SnapOtter-data:/data` bleiben Ihre Benutzer, Einstellungen und Dateien erhalten, doch die Ergebnisse früherer Aufträge sind weg, sobald der Container ersetzt wird, und ihre Download-Links liefern 404. Um sie zu behalten, binden Sie zusätzlich den Workspace ein:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter-workspace:/tmp/workspace snapotter/snapotter:latest
+```
+
+Die Compose-Stacks binden `SnapOtter-workspace` bereits ein.
 
 ### Bind-Mounts und benannte Volumes {#bind-mounts-vs-named-volumes}
 

@@ -74,7 +74,7 @@ export function fastLanguageUnsupportedReason(language: string | undefined): str
 function assertFastLanguageSupported(quality: OcrQuality, language: string | undefined): void {
   const reason = quality === "fast" ? fastLanguageUnsupportedReason(language) : undefined;
   if (reason) {
-    throw new ToolInputError(reason);
+    throw new ToolInputError(reason, { code: "FEATURE_INCOMPATIBLE" });
   }
 }
 
@@ -195,16 +195,20 @@ export async function extractText(
   const height = meta.height ?? 0;
   const pixels = width * height;
   if (!Number.isSafeInteger(pixels) || pixels <= 0) {
-    throw new ToolInputError("OCR input has invalid image dimensions");
+    throw new ToolInputError("OCR input has invalid image dimensions", {
+      code: "IMAGE_UNDECODABLE",
+    });
   }
   if (width > MAX_OCR_INPUT_DIMENSION || height > MAX_OCR_INPUT_DIMENSION) {
     throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_DIMENSION.toLocaleString("en-US")} pixel dimension safety limit`,
+      { code: "IMAGE_TOO_LARGE" },
     );
   }
   if (pixels > MAX_OCR_INPUT_PIXELS) {
     throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_PIXELS.toLocaleString("en-US")} pixel safety limit`,
+      { code: "IMAGE_TOO_LARGE" },
     );
   }
   let recognitionImage: ReturnType<typeof sharp> | undefined;
@@ -369,6 +373,36 @@ export interface PdfOcrOptions {
   pages?: string;
   enhance?: boolean;
   signal?: AbortSignal;
+  /**
+   * Called once the accurate runtime's budget is known, just before it starts,
+   * with how long the rest of the call may take. The worker moves the job
+   * deadline out to it, so JOB_TIMEOUT_LONG_S doesn't cut a long Best run
+   * short (#4719).
+   */
+  onTimeBudget?: (ms: number) => void;
+}
+
+// Room past the runtime's own timeout, so that timeout (with its own
+// operational message) fires before the job deadline does.
+const RUNTIME_SETTLE_MS = 60_000;
+
+/**
+ * Wall-clock budget per page for the accurate runtime. QA measured Best at
+ * about 40 s a page on a plain scan and 175 s with enhancement on CPU, and a
+ * 17-page Best job on 2.3.0 ran past a flat 30 minutes (NODE-4Y, #4439). The
+ * job deadline follows it through `onTimeBudget` (#4719).
+ */
+const ACCURATE_PDF_PAGE_BUDGET_MS: Record<Exclude<OcrQuality, "fast">, number> = {
+  balanced: 2 * 60_000,
+  best: 5 * 60_000,
+};
+
+export function accuratePdfRuntimeTimeoutMs(
+  pageCount: number,
+  quality: Exclude<OcrQuality, "fast">,
+  remainingMs: number,
+): number {
+  return Math.max(remainingMs, pageCount * ACCURATE_PDF_PAGE_BUDGET_MS[quality]);
 }
 
 export interface PdfOcrResult extends OcrExecutionMetadata {
@@ -422,6 +456,12 @@ export async function extractPdfText(
     "Preparing accurate PDF OCR",
   );
   try {
+    const runtimeTimeoutMs = accuratePdfRuntimeTimeoutMs(
+      prepared.pages.length,
+      quality,
+      prepared.remainingTimeoutMs(),
+    );
+    opts.onTimeBudget?.(runtimeTimeoutMs + RUNTIME_SETTLE_MS);
     onProgress?.(50, "Starting accurate PDF OCR");
     const { result } = await withProgressHeartbeat(
       () =>
@@ -435,10 +475,7 @@ export async function extractPdfText(
               enhance: opts.enhance ?? quality === "best",
             }),
           ],
-          {
-            timeoutMs: prepared.remainingTimeoutMs(),
-            signal: opts.signal,
-          },
+          { timeoutMs: runtimeTimeoutMs, signal: opts.signal },
         ),
       onProgress,
       50,

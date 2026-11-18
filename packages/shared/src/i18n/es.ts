@@ -79,7 +79,7 @@ export const es: TranslationKeys = {
     searchMissContext: "Buscaste: {query}",
     searchMissDiscussionsFallback: "No pudimos registrarlo. Abre una solicitud en Discussions.",
     offlineDescription:
-      "Esta instancia tiene la analítica desactivada, así que los comentarios no se registran aquí. Aún puedes contactar directamente con el equipo de SnapOtter.",
+      "Esta instancia no puede registrar comentarios ahora. Aún puedes contactar directamente con el equipo de SnapOtter.",
     offlinePublicNote: "Las incidencias de GitHub son públicas.",
     offlineGithubButton: "Abrir una incidencia en GitHub",
     offlineEmailButton: "Escríbenos",
@@ -4122,6 +4122,8 @@ export const es: TranslationKeys = {
     previewFailed: "Error al generar la vista previa",
     previewEncoderMissing:
       "Al ffmpeg de este servidor le falta el codificador {encoder}, así que no se puede generar la vista previa. Contacta a tu administrador.",
+    previewEngineUnavailable:
+      "ffmpeg no está instalado en este servidor, así que no se puede generar la vista previa. Pide a tu administrador que instale ffmpeg o configure FFMPEG_PATH.",
     previewProgressMessages: [
       "La nutria está entrando en calor...",
       "Triturando píxeles...",
@@ -5206,6 +5208,7 @@ export const es: TranslationKeys = {
       disabledCount: "{count} herramienta(s) desactivada(s)",
       disabledCountOne: "{count} herramienta desactivada",
       disabledCountOther: "{count} herramientas desactivadas",
+      offWithBase: "Desactivada porque la herramienta {base} está desactivada.",
     },
     experimental: {
       label: "Activar herramientas experimentales",
@@ -5665,6 +5668,8 @@ export const es: TranslationKeys = {
       BROWSER_NOT_AVAILABLE:
         "El navegador que necesita esta herramienta no está disponible en este momento.",
       DEPENDENCY_VALIDATION_FAILED: "Este ajuste depende de otro ajuste que no es válido.",
+      FEATURE_CPU_UNSUPPORTED:
+        "Esta función necesita un procesador compatible con AVX, y el procesador de este servidor no lo es.",
       FEATURE_INCOMPATIBLE: "Esta función no se puede ejecutar con los ajustes actuales.",
       FST_REQ_FILE_TOO_LARGE: "Este archivo es demasiado grande para subirlo.",
       IDLE_TIMEOUT: "Se cerró tu sesión por inactividad. Vuelve a iniciar sesión.",
@@ -5719,6 +5724,42 @@ export const es: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "El resultado no puede alcanzar el tamaño objetivo.",
       TOO_MANY_FRAMES: "Este archivo tiene demasiados fotogramas para procesarlo.",
       CANCELED: "Se canceló la operación.",
+      PAGE_OUT_OF_RANGE: "Ese rango incluye una página que este PDF no tiene.",
+      INVALID_PAGE_RANGE: "Ese rango de páginas no es válido. Usa números de página como 1-3,5.",
+      CANNOT_REMOVE_ALL_PAGES: "No puedes quitar todas las páginas. Deja al menos una.",
+      NESTING_TOO_DEEP: "Este archivo tiene demasiados niveles de anidación para convertirlo.",
+      DOCUMENT_UNREADABLE:
+        "No se pudo abrir este documento. Puede estar dañado, protegido con contraseña o no tener el formato que indica su extensión.",
+      PDF_DAMAGED:
+        "Este PDF está dañado. Pásalo por la herramienta Reparar PDF y vuelve a intentarlo.",
+      PDF_PASSWORD_PROTECTED:
+        "Este PDF está protegido con contraseña. Desbloquéalo con la herramienta Desbloquear PDF y vuelve a intentarlo.",
+      IMAGE_TOO_LARGE:
+        "Esta imagen es demasiado grande para procesarla. Reduce sus dimensiones y vuelve a intentarlo.",
+      RESULT_TOO_LARGE:
+        "El resultado que producirían estos ajustes es demasiado grande. Usa una imagen más pequeña o ajustes que den un resultado más pequeño.",
+      NO_AUDIO_TRACK:
+        "Este archivo no tiene pista de audio. Elige un archivo con audio y vuelve a intentarlo.",
+      IMAGE_UNDECODABLE:
+        "No se puede leer esta imagen. Puede que el archivo esté dañado o use una codificación que esta herramienta no admite.",
+      INVALID_SETTINGS:
+        "Estos ajustes no funcionan con este archivo. Revisa los valores y vuelve a intentarlo.",
+      CHART_DATA_INVALID:
+        "El Creador de gráficos no pudo leer datos de este archivo. Usa CSV o JSON con un máximo de 100 filas, cada una con una etiqueta y un número igual o mayor que cero.",
+      NO_FACE_DETECTED:
+        "No se encontró ninguna cara. Sube una foto nítida, de frente y con buena iluminación.",
+      TARGET_SIZE_UNREACHABLE:
+        "Este archivo no se puede reducir lo suficiente para el tamaño objetivo. Prueba con un objetivo mayor.",
+      TOO_MANY_PAGES:
+        "Este PDF tiene demasiadas páginas para procesarlas a la vez. Elige menos páginas y vuelve a intentarlo.",
+      METADATA_DAMAGED:
+        "Los metadatos actuales de esta imagen están dañados, así que no se pueden editar de forma segura.",
+      REMOTE_RESOURCES_DISABLED:
+        "Este archivo carga imágenes o estilos de internet, algo que este servidor no permite. Incrústalos en el archivo y vuelve a intentarlo.",
+      TOO_MANY_PIXELS:
+        "Esta animación tiene demasiados píxeles entre todos sus fotogramas. Usa menos fotogramas o un tamaño menor.",
+      MEDIA_UNDECODABLE:
+        "No se puede leer este archivo. Puede que esté dañado, no tenga pista de audio ni de vídeo o use un formato que esta herramienta no admite.",
     },
     generic: "Ocurrió un error",
     offline: "Estás sin conexión",
@@ -5791,6 +5832,7 @@ export const es: TranslationKeys = {
     grid: "Cuadrícula",
     automate: "Automatizar",
     editor: "Editor",
+    editorBadge: "Beta",
     files: "Archivos",
     help: "Ayuda",
     settings: "Configuración",

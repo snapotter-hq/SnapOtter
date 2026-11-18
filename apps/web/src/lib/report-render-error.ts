@@ -1,8 +1,14 @@
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type ToolClientErrorProperties } from "@snapotter/shared";
 import type { ErrorInfo } from "react";
 import { getRenderErrorDestination, isAnalyticsActive, track } from "@/lib/analytics";
-import { isAbortedByLeaving, LEAVING_WINDOW_MS } from "@/lib/chunk-reload";
+import {
+  isAbortedByLeaving,
+  isChunkLoadFailure,
+  isReloadingFor,
+  LEAVING_WINDOW_MS,
+} from "@/lib/chunk-reload";
 import { bufferRenderError } from "@/lib/early-errors";
+import { toolIdFromPathname } from "@/lib/tool-id-from-pathname";
 
 /**
  * The one place render crashes turn into telemetry. Both boundaries that can
@@ -11,6 +17,8 @@ import { bufferRenderError } from "@/lib/early-errors";
  */
 export function reportRenderError(error: unknown, errorInfo?: ErrorInfo): void {
   console.error("Uncaught render error:", error, errorInfo?.componentStack);
+  // The page is already reloading to recover; nothing crashed for good (#4668).
+  if (isReloadingFor(error)) return;
   if (isAbortedByLeaving(error)) {
     // An import the browser aborted on the way out is not a crash (#1480).
     // A document that unloads never runs this timer; one still here after
@@ -27,10 +35,21 @@ function sendRenderError(error: unknown, errorInfo?: ErrorInfo): void {
   // PostHog key still reports the crash to Sentry (#1115), and a PostHog-only
   // instance still gets the event even though there is no Sentry client.
   if (isAnalyticsActive()) {
-    track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, {
+    // The route says which tool crashed; off a tool route the id is simply absent (#4216).
+    const toolId = toolIdFromPathname(
+      typeof window !== "undefined" ? window.location?.pathname : undefined,
+    );
+    const props: ToolClientErrorProperties = {
       error_name: error instanceof Error ? error.name : typeof error,
-    });
+      phase: isChunkLoadFailure(error) ? "chunk-load" : "render",
+    };
+    if (toolId) props.tool_id = toolId;
+    track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, { ...props });
   }
+  // A chunk that never arrived (server unreachable or restarting, or the tab
+  // outlived an upgrade and its one reload was spent) still counts as a crash
+  // the user saw, but it isn't a bug in our code for Sentry (#4668).
+  if (isChunkLoadFailure(error)) return;
   const destination = getRenderErrorDestination();
   if (destination === "drop") return; // runtime opt-out or no web Sentry DSN
   if (destination === "buffer") {

@@ -24,11 +24,13 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
   isGpuAvailable: vi.fn().mockReturnValue(false),
+  gpuMayBeAvailable: vi.fn().mockReturnValue(false),
 }));
 
 import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
+  gpuMayBeAvailable,
   isGpuAvailable,
   parseStdoutJson,
   runPythonWithProgress,
@@ -66,6 +68,11 @@ beforeEach(() => {
       }) as unknown as ReturnType<typeof sharp>,
   );
   vi.mocked(isGpuAvailable).mockReturnValue(false);
+  // After the dispatcher's probe the two agree; tests of the pre-probe window
+  // override this to diverge.
+  vi.mocked(gpuMayBeAvailable).mockImplementation((framework) =>
+    vi.mocked(isGpuAvailable)(framework),
+  );
 });
 
 afterEach(() => {
@@ -507,7 +514,7 @@ describe("upscale", () => {
       expect(runPythonWithProgress).not.toHaveBeenCalled();
     });
 
-    it("queries isGpuAvailable('torch') so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
+    it("scopes the GPU checks to torch so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
       const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
       vi.mocked(sharp).mockImplementation(
         () =>
@@ -524,7 +531,7 @@ describe("upscale", () => {
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).rejects.toThrow(
         /12\.0 MP.*max 4 MP on CPU/i,
       );
-      expect(isGpuAvailable).toHaveBeenCalledWith("torch");
+      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
       expect(runPythonWithProgress).not.toHaveBeenCalled();
 
       // For a 2 MP input at 2x (8 MP effective), CPU rate (180s/MP -> 1,440,000ms) is used instead of GPU rate (600,000ms floor).
@@ -560,6 +567,51 @@ describe("upscale", () => {
         height: 1200,
       });
       expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not refuse a GPU host before the dispatcher's GPU probe, and keeps the CPU timeout until it reports (#4758)", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      // Boot, or a shutdown after a bundle install: no probe yet, so the
+      // probed answer is still "no GPU" while a device node is visible.
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+      vi.mocked(gpuMayBeAvailable).mockReturnValue(true);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toMatchObject({
+        width: 1600,
+      });
+      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
+      // 12 MP at 4x is 192 MP, past the 64 MP CPU output cap too, so neither
+      // refusal ran. The timeout uses the CPU rate, which only errs long.
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "upscale.py",
+        expect.any(Array),
+        expect.objectContaining({ timeout: 192 * 180_000 }),
+      );
+    });
+
+    it("still refuses a 12 MP input on CPU when no GPU device is visible before the probe", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+      vi.mocked(gpuMayBeAvailable).mockReturnValue(false);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        /max 4 MP on CPU/i,
+      );
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
     });
 
     it("rejects CPU upscale when output megapixels exceed MAX_CPU_UPSCALE_OUTPUT_MP (e.g. 3 MP at 8x = 192 MP)", async () => {
@@ -839,12 +891,14 @@ with tempfile.TemporaryDirectory() as tmp:
     fail_first = {"active": True, "face_oom": False, "exc": RuntimeError("DefaultCPUAllocator: not enough memory: tried to allocate 600MB"), "face_exc": RuntimeError("DefaultCPUAllocator: not enough memory")}
     class FakeRealESRGANer:
         def __init__(self, **kw):
-            self.tile = kw["tile"]
+            # realesrgan 0.3.0 stores the tile as tile_size; there is no .tile.
+            self.tile_size = kw["tile"]
+            self.model = kw["model"]
             self.half = kw["half"]
             self.device = kw["device"]
-            recorded.append({"init_tile": self.tile, "half": self.half, "device": self.device, "enhance_tiles": []})
+            recorded.append({"init_tile": self.tile_size, "half": self.half, "device": self.device, "enhance_tiles": []})
         def enhance(self, img_array, outscale=2):
-            recorded[-1]["enhance_tiles"].append(self.tile)
+            recorded[-1]["enhance_tiles"].append(self.tile_size)
             if fail_first["active"] and len(recorded[-1]["enhance_tiles"]) == 1:
                 raise fail_first["exc"]
             return ("out_arr", None)
@@ -858,7 +912,7 @@ with tempfile.TemporaryDirectory() as tmp:
             self.bg_upsampler = kw["bg_upsampler"]
             face_recorded.append({"enhance_tiles": []})
         def enhance(self, img_array, **kw):
-            face_recorded[-1]["enhance_tiles"].append(self.bg_upsampler.tile)
+            face_recorded[-1]["enhance_tiles"].append(self.bg_upsampler.tile_size)
             if fail_first["face_oom"] and len(face_recorded[-1]["enhance_tiles"]) == 1:
                 raise fail_first["face_exc"]
             return (None, None, "face_out_arr")
@@ -869,6 +923,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     offline_mod = types.ModuleType("offline_guard")
     offline_mod.prepare_gfpgan_helper_weights = lambda base: None
+    offline_mod.library_workdir = __import__("contextlib").nullcontext
     sys.modules["offline_guard"] = offline_mod
 
     in_path = os.path.join(tmp, "in.png")
@@ -1008,6 +1063,134 @@ print("TILE_OK")
       });
       expect(res.status, res.stderr).toBe(0);
       expect(res.stdout).toContain("TILE_OK");
+    });
+
+    it("stops realesrgan's tile loop on a model error and retries a smaller tile instead of crashing on output_tile (NODE-AJ)", () => {
+      const script = `
+import contextlib, importlib.util, io, json, os, sys, tempfile, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+spec = importlib.util.spec_from_file_location("upscale_mod", os.path.join(py_dir, "upscale.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as tmp:
+    weights_path = os.path.join(tmp, "RealESRGAN_x4plus.pth")
+    with open(weights_path, "wb") as f:
+        f.write(b"weights")
+    mod.REALESRGAN_MODEL_PATH = weights_path
+
+    pil_mod = types.ModuleType("PIL")
+    class FakeImageObj:
+        width = 64
+        height = 64
+        size = (128, 128)
+        def convert(self, mode, **kw): return self
+        def save(self, path, **kw):
+            with open(path, "wb") as f: f.write(b"png")
+    class FakeImageMod:
+        ADAPTIVE = 1
+        LANCZOS = 1
+        @staticmethod
+        def open(path): return FakeImageObj()
+        @staticmethod
+        def fromarray(arr): return FakeImageObj()
+    pil_mod.Image = FakeImageMod
+    sys.modules["PIL"] = pil_mod
+    np_mod = types.ModuleType("numpy")
+    np_mod.array = lambda img: "fake_rgb_array"
+    sys.modules["numpy"] = np_mod
+
+    model_errors = []
+    class FakeNet:
+        def __call__(self, tile):
+            if model_errors:
+                raise model_errors.pop(0)
+            return "out_tile"
+    for name in ("basicsr", "basicsr.archs"):
+        sys.modules[name] = types.ModuleType(name)
+    rrdb = types.ModuleType("basicsr.archs.rrdbnet_arch")
+    rrdb.RRDBNet = lambda **kw: FakeNet()
+    sys.modules["basicsr.archs.rrdbnet_arch"] = rrdb
+
+    torch_mod = types.ModuleType("torch")
+    torch_mod.device = lambda name: name
+    torch_mod.cuda = types.SimpleNamespace(empty_cache=lambda: None)
+    sys.modules["torch"] = torch_mod
+    gpu_mod = types.ModuleType("gpu")
+    gpu_mod.torch_gpu_available = lambda: False
+    sys.modules["gpu"] = gpu_mod
+
+    tiles = []
+    class RealisticRealESRGANer:
+        """Mirrors realesrgan 0.3.0: tile_size, and tile_process swallowing RuntimeError."""
+        def __init__(self, **kw):
+            self.tile_size = kw["tile"]
+            self.model = kw["model"]
+        def enhance(self, img, outscale=None):
+            tiles.append(self.tile_size)
+            try:
+                output_tile = self.model("tile")
+            except RuntimeError as error:
+                print("Error", error)
+            return (output_tile, None)
+    realesrgan_mod = types.ModuleType("realesrgan")
+    realesrgan_mod.RealESRGANer = RealisticRealESRGANer
+    sys.modules["realesrgan"] = realesrgan_mod
+
+    in_path = os.path.join(tmp, "in.png")
+    out_path = os.path.join(tmp, "out.png")
+    with open(in_path, "wb") as f:
+        f.write(b"in")
+
+    def run(settings):
+        sys.argv = ["upscale.py", in_path, out_path, json.dumps(settings)]
+        buf = io.StringIO()
+        orig_stdout, orig_dunder = sys.stdout, sys.__stdout__
+        sys.stdout = sys.__stdout__ = buf
+        code = 0
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                mod.main()
+        except SystemExit as exc:
+            code = exc.code
+        finally:
+            sys.stdout, sys.__stdout__ = orig_stdout, orig_dunder
+        return code, json.loads(buf.getvalue().strip().splitlines()[-1])
+
+    # An OOM inside the tile loop reaches the retry and succeeds at a smaller tile.
+    model_errors[:] = [RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")]
+    code, payload = run({"scale": 2, "model": "realesrgan"})
+    assert code == 0, payload
+    assert payload["success"] is True and payload["method"] == "realesrgan", payload
+    assert tiles == [256, 128], tiles
+
+    # A non-OOM model error surfaces as itself, not as the unbound output_tile.
+    tiles.clear()
+    model_errors[:] = [RuntimeError("Input type (float) and weight type (half) should be the same")]
+    code, payload = run({"scale": 2, "model": "realesrgan"})
+    assert code == 1, payload
+    assert "weight type" in payload["error"], payload
+    assert "output_tile" not in payload["error"], payload
+    assert tiles == [256], tiles
+
+    # A KeyError anywhere keeps its type, so the message is not just "'tile'".
+    tiles.clear()
+    model_errors[:] = []
+    realesrgan_mod.RealESRGANer = lambda **kw: (_ for _ in ()).throw(KeyError("tile"))
+    code, payload = run({"scale": 2, "model": "realesrgan"})
+    assert code == 1, payload
+    assert payload["error"] == "KeyError: 'tile'", payload
+
+print("TILE_LOOP_OK")
+`;
+      const res = spawnSync(pythonBin as string, ["-c", script], {
+        encoding: "utf8",
+        timeout: 15_000,
+      });
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("TILE_LOOP_OK");
     });
 
     it("scopes Pillow ImportError to PIL import so Image.open and result.save ImportErrors are not misreported as missing Pillow (issue #3640)", () => {

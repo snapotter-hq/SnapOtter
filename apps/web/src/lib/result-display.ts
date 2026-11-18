@@ -1,3 +1,5 @@
+import { MEDIA_PREVIEW_AUDIO_EXTS, MEDIA_PREVIEW_VIDEO_EXTS } from "@snapotter/shared";
+
 /**
  * The claim handler for a media player's download link, or undefined when the
  * player is showing the original upload.
@@ -79,4 +81,28 @@ export function shouldShowConversionCard(state: {
     state.hasImageWrapperStyle &&
     state.originalBlobUrl != null;
   return !wysiwygCanRender;
+}
+
+// What <video> plays without help; the media player shows these directly.
+const BROWSER_VIDEO_EXTS = new Set(["mp4", "webm", "ogg", "ogv", "m4v", "mov"]);
+// A GIF input (gif-to-video) or an image result (video-to-gif, video-to-webp).
+const IMAGE_EXTS = new Set(["gif", "webp", "png", "jpg", "jpeg", "apng"]);
+
+export type VideoAreaView = "player" | "image" | "server-preview" | "no-preview";
+
+/**
+ * How the media-player area shows a file, by its name: the native player, an
+ * image, the server's preview transcode, or nothing. Only names the transcode
+ * accepts go to it; anything else drew a 400 and a "preview failed" panel
+ * (WEB-2M, #4666).
+ */
+export function videoAreaView(filename: string): VideoAreaView {
+  const dot = filename.lastIndexOf(".");
+  const ext = dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
+  if (!ext || BROWSER_VIDEO_EXTS.has(ext)) return "player";
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (MEDIA_PREVIEW_VIDEO_EXTS.has(ext) || MEDIA_PREVIEW_AUDIO_EXTS.has(ext)) {
+    return "server-preview";
+  }
+  return "no-preview";
 }

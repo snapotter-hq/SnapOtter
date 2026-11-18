@@ -104,7 +104,7 @@ function PdfPagePreview({
             transition: "width 0.2s ease, height 0.2s ease",
           }}
         >
-          {/* Margin area — dashed inner border */}
+          {/* Margin area: dashed inner border */}
           {margin > 0 && (
             <div
               className="absolute border border-dashed border-blue-300/60"

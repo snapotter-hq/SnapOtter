@@ -66,18 +66,18 @@ test.describe("Red Eye Removal tool", () => {
 
     const qualityText = page.locator("p", { hasText: "Quality" }).last();
 
-    // Original — quality hidden
+    // Original: quality hidden
     await expect(qualityText).not.toBeVisible();
 
-    // JPEG — quality visible
+    // JPEG: quality visible
     await page.getByRole("button", { name: "JPEG" }).click();
     await expect(qualityText).toBeVisible();
 
-    // WEBP — quality visible
+    // WEBP: quality visible
     await page.getByRole("button", { name: "WEBP" }).click();
     await expect(qualityText).toBeVisible();
 
-    // PNG — quality hidden
+    // PNG: quality hidden
     await page.getByRole("button", { name: "PNG" }).click();
     await expect(qualityText).not.toBeVisible();
   });

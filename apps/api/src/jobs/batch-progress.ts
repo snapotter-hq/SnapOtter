@@ -13,6 +13,7 @@
  */
 
 import { stripInternalPaths } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 import { updateJobProgress } from "../routes/progress.js";
 import { sharedRedis } from "./connection.js";
 import { bullPrefix } from "./types.js";
@@ -84,18 +85,26 @@ export async function clearBatchCanceled(parentId: string): Promise<void> {
   await sharedRedis().del(canceledKey(parentId));
 }
 
+let cancelFlagReadFailing = false;
+
 /** Whether a cooperative batch cancel was requested. A Redis read fault
  * reports false: keep-working is the safe direction, and a Redis outage has
  * already stopped the queues themselves. The swallowed error is still
- * logged. Only the queued-work skips read this flag (#809 moved the
- * finalize's terminal label onto durable canceled rows), so a false here
- * means the child or step processes normally and the run settles as a
- * too-late cancel. */
+ * logged, once per run of failed reads: every queued child and step reads
+ * this flag, so a line per read would flood the log in an outage. Only the
+ * queued-work skips read this flag (#809 moved the finalize's terminal label
+ * onto durable canceled rows), so a false here means the child or step
+ * processes normally and the run settles as a too-late cancel. */
 export async function isBatchCanceled(parentId: string): Promise<boolean> {
   try {
-    return (await sharedRedis().exists(canceledKey(parentId))) === 1;
+    const canceled = (await sharedRedis().exists(canceledKey(parentId))) === 1;
+    cancelFlagReadFailing = false;
+    return canceled;
   } catch (err) {
-    console.error("batch cancel flag read failed", parentId, err);
+    if (!cancelFlagReadFailing) {
+      cancelFlagReadFailing = true;
+      logger.warn({ err, parentId }, "batch cancel flag read failed");
+    }
     return false;
   }
 }

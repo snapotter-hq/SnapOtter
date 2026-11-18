@@ -1,4 +1,4 @@
-import { isSafeMessageError } from "@snapotter/shared";
+import { isSafeMessageError, toolInputErrorCode } from "@snapotter/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { markUpstreamError, reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
@@ -136,11 +136,15 @@ export function registerErrorHandler(app: FastifyInstance): void {
       return;
     }
     const safe = isSafeMessageError(error) && error.statusCode !== undefined;
+    // An input fault raised outside a job (intake decode, say) keeps its code
+    // too, so the web app can translate it (#4679).
+    const inputCode = statusCode < 500 ? toolInputErrorCode(error) : undefined;
     reply.status(statusCode).send({
       error:
         statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message),
       ...(statusCode < 500 && { details: stripInternalPaths(error.message) }),
       ...(safe && error.code ? { code: error.code } : {}),
+      ...(inputCode && { code: inputCode }),
     });
   });
 }

@@ -9,7 +9,7 @@ import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 // comparisons) in the right pane instead of a clean dropzone.
 //
 // Root cause hypothesis: the global Zustand file-store is not reset when
-// the user navigates between tool routes — the previous tool's entries,
+// the user navigates between tool routes, the previous tool's entries,
 // processedUrl, and blob URLs persist into the next tool's view.
 // ---------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ test.describe("State bleed between tools", () => {
     await page.goto("/image/rotate");
     await page.waitForLoadState("networkidle");
 
-    // Step 3: The right pane should be in a clean state — dropzone visible
+    // Step 3: The right pane should be in a clean state, dropzone visible
     await expect(page.getByText("Upload from computer")).toBeVisible({ timeout: 5_000 });
 
     // Step 4: No stale download link from resize should be present
@@ -157,7 +157,7 @@ test.describe("State bleed between tools", () => {
     await page.goto("/image/convert");
     await page.waitForLoadState("networkidle");
 
-    // Should show clean state — no leftover files or processed results
+    // Should show clean state, no leftover files or processed results
     await expect(page.getByText("Upload from computer")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole("link", { name: /download/i })).not.toBeVisible();
 

@@ -1,6 +1,7 @@
 ---
 description: "Wyodrębnij lokalnie tekst z obrazów za pomocą wbudowanego Tesseract lub opcjonalnego środowiska wykonawczego RapidOCR o wysokiej dokładności."
-i18n_output_hash: c79924df54eb
+i18n_output_hash: 91a26ef7dbaa
+i18n_hash_version: 2
 i18n_source_hash: 1e098dbb5a20
 i18n_provenance: human
 ---
@@ -92,6 +93,6 @@ Błędy przetwarzania są przekazywane w polu `error` końcowego zdarzenia `fail
 - Pomyślne końcowe `result` zawiera zarówno wyodrębniony tekst w `text`, jak i artefakt `.txt` do pobrania w `downloadUrl`.
 - SnapOtter honoruje wyraźnie żądany poziom. Jeśli `balanced` lub `best` jest niedostępne, API zwraca `501` z `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE`; nigdy po cichu nie obniża poziomu żądania do innego poziomu.
 - Pomyślny pusty wynik pozostaje pustym wynikiem. Błędy w czasie wykonywania zwracają błąd zamiast ponawiania próby z aparatem o niższej jakości.
-— Pomyślne końcowe `result` podaje zarówno `requestedQuality`, jak i `actualQuality`, a także wersję silnika, urządzenia, dostawcy, środowiska wykonawczego i modelu oraz wszelkie ostrzeżenia.
+Pomyślne końcowe `result` podaje zarówno `requestedQuality`, jak i `actualQuality`, a także wersję silnika, urządzenia, dostawcy, środowiska wykonawczego i modelu oraz wszelkie ostrzeżenia.
 - Obsługuje formaty wejściowe HEIC/HEIF, RAW, TGA, PSD, EXR i HDR poprzez automatyczne dekodowanie.
 - Ponadwymiarowe zakodowane wejścia zwracają `413`. Obrazy o rozdzielczości powyżej 40 megapikseli i odpowiedzi OCR przekraczające ograniczone limity wyjściowe są odrzucane zamiast częściowo przetwarzane.

@@ -19,6 +19,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import {
@@ -154,6 +155,8 @@ export function registerInfo(app: FastifyInstance) {
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       return reply.status(422).send({
         error: "Failed to read image metadata",
         details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -217,6 +220,8 @@ export function registerInfo(app: FastifyInstance) {
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      const tooLarge = imageSizeLimitError(err);
+      if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       return reply.status(422).send({
         error: "Failed to read image metadata",
         details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

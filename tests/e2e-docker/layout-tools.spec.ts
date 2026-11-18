@@ -123,9 +123,9 @@ function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
   return [raw[1], raw[2], raw[3]];
 }
 
-// ─── Collage — Extended Templates ──────────────────────────────────
+// ─── Collage: Extended Templates ──────────────────────────────────
 
-test.describe("Collage — extended", () => {
+test.describe("Collage: extended", () => {
   test("3-image collage with vertical layout", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -361,9 +361,9 @@ test.describe("Collage — extended", () => {
   });
 });
 
-// ─── Stitch — Extended ─────────────────────────────────────────────
+// ─── Stitch: Extended ─────────────────────────────────────────────
 
-test.describe("Stitch — extended", () => {
+test.describe("Stitch: extended", () => {
   test("stitch 4 images horizontally", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -501,9 +501,9 @@ test.describe("Stitch — extended", () => {
   });
 });
 
-// ─── Split — Extended ──────────────────────────────────────────────
+// ─── Split: Extended ──────────────────────────────────────────────
 
-test.describe("Split — extended", () => {
+test.describe("Split: extended", () => {
   test("split into 1x3 columns (vertical strips)", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/split", {
       headers: { Authorization: `Bearer ${token}` },
@@ -618,9 +618,9 @@ test.describe("Split — extended", () => {
   });
 });
 
-// ─── Border — Extended ─────────────────────────────────────────────
+// ─── Border: Extended ─────────────────────────────────────────────
 
-test.describe("Border — extended", () => {
+test.describe("Border: extended", () => {
   test("border on HEIC image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },
@@ -715,9 +715,9 @@ test.describe("Border — extended", () => {
   });
 });
 
-// ─── Collage — Output Verification ──────────────────────────────
+// ─── Collage: Output Verification ──────────────────────────────
 
-test.describe("Collage — output verification", () => {
+test.describe("Collage: output verification", () => {
   test("collage output can be downloaded", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -810,9 +810,9 @@ test.describe("Collage — output verification", () => {
   });
 });
 
-// ─── Stitch — Output Verification ───────────────────────────────
+// ─── Stitch: Output Verification ───────────────────────────────
 
-test.describe("Stitch — output verification", () => {
+test.describe("Stitch: output verification", () => {
   test("stitched image can be downloaded", async ({ request }) => {
     const { body, contentType } = buildMultipart(
       [
@@ -838,9 +838,9 @@ test.describe("Stitch — output verification", () => {
   });
 });
 
-// ─── Border — Output Verification ───────────────────────────────
+// ─── Border: Output Verification ───────────────────────────────
 
-test.describe("Border — output verification", () => {
+test.describe("Border: output verification", () => {
   test("bordered image can be downloaded and is larger", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/border", {
       headers: { Authorization: `Bearer ${token}` },

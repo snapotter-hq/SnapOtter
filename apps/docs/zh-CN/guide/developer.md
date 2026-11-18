@@ -2,7 +2,7 @@
 description: "本地开发环境搭建、命令、代码约定，以及如何为 SnapOtter 添加新工具。"
 i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 4973f06e3a93
+i18n_output_hash: 32163672a160
 i18n_hash_version: 2
 ---
 
@@ -83,7 +83,7 @@ pnpm test:coverage      # tests with coverage report
 
 ## 数据库 {#database}
 
-通过 Drizzle ORM（pg-core）使用 PostgreSQL 17。本地开发需要运行 Postgres 和 Redis——用以下命令启动它们：
+通过 Drizzle ORM（pg-core）使用 PostgreSQL 17。本地开发需要运行 Postgres 和 Redis，用以下命令启动它们：
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d

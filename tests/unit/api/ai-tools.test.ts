@@ -67,6 +67,9 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   runPythonWithProgress: mockRunPythonWithProgress,
   parseStdoutJson: mockParseStdoutJson,
   isGpuAvailable: mockIsGpuAvailable,
+  // Pinned so a GPU host running the suite (a visible /dev/nvidia*) cannot
+  // skip upscale's CPU refusal before the probe.
+  gpuMayBeAvailable: vi.fn(() => false),
 }));
 
 vi.mock("../../../packages/ai/src/ocr-runtime-dispatcher.js", () => ({

@@ -136,18 +136,20 @@ function completedTerminalFrame() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("URL", {
-    ...globalThis.URL,
-    createObjectURL: vi.fn(() => "blob:fake-url"),
-    revokeObjectURL: vi.fn(),
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: vi.fn(() => "blob:fake-url"),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
   useFileStore.getState().reset();
   xhrs = [];
   MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
   vi.stubGlobal(
     "XMLHttpRequest",
-    vi.fn(() => {
+    vi.fn(function FakeXhr() {
       const xhr: MockXhr = {
         status: 0,
         responseText: "",
@@ -247,6 +249,33 @@ describe("useToolProcessor batch recovery (#750)", () => {
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().batchZipBlob).not.toBeNull();
+
+    unmount();
+  });
+
+  it("reports failed_count when a finished batch left a file without a result (#4216)", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results"
+          ? encodeURIComponent(JSON.stringify({ "0": ZIP_NAMES["0"] }))
+          : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("failed");
+    });
+    const batchEvents = vi
+      .mocked(track)
+      .mock.calls.filter(([event]) => event === "batch_processed");
+    expect(batchEvents).toHaveLength(1);
+    expect(batchEvents[0][1]).toMatchObject({ status: "completed", failed_count: 1 });
 
     unmount();
   });
@@ -2300,6 +2329,7 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805, #1929)", () => {
           tool_id: "resize",
           file_count: 2,
           status: "completed",
+          failed_count: 2,
           total_bytes: 32,
         },
       ],

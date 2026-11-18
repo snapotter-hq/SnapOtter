@@ -28,6 +28,7 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   runPythonWithProgress: vi.fn(),
   parseStdoutJson: vi.fn(),
   isGpuAvailable: vi.fn(() => false),
+  gpuMayBeAvailable: vi.fn(() => false),
   shutdownDispatcher: vi.fn(),
 }));
 
@@ -1326,7 +1327,7 @@ describe("custom error messages from Python result", () => {
     });
 
     await expect(removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-      "CUDA out of memory",
+      /^The GPU ran out of memory/,
     );
   });
 

@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";
 import { hasFeedbackSink } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
+import { deployMode } from "../lib/deploy-mode.js";
 import { posthogProxyEnabled } from "../lib/posthog-proxy.js";
 
 export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
@@ -42,6 +43,7 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       sentryDsnWeb: ANALYTICS_BAKED.sentryDsnWeb,
       posthogSampleRate: ANALYTICS_BAKED.posthogSampleRate,
       instanceId: row?.value ?? "",
+      deployMode: deployMode(),
     };
   });
 }

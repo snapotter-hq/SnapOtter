@@ -529,11 +529,13 @@ describe("FileLibraryModal import (#1948)", () => {
 
 describe("FileLibraryModal AuthImage (#2957)", () => {
   beforeEach(() => {
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn(() => "blob:thumb"),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends URL {}, {
+        createObjectURL: vi.fn(() => "blob:thumb"),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
   });
 
   it("resets failed state when src changes from a failing thumbnail URL to a working one", async () => {

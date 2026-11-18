@@ -30,11 +30,13 @@ beforeEach(() => {
   analyticsMock.track.mockClear();
   analyticsMock.captureHandledError.mockClear();
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.stubGlobal("URL", {
-    ...URL,
-    createObjectURL: () => "blob:fake",
-    revokeObjectURL: () => {},
-  });
+  vi.stubGlobal(
+    "URL",
+    Object.assign(class extends URL {}, {
+      createObjectURL: () => "blob:fake",
+      revokeObjectURL: () => {},
+    }),
+  );
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
   useFileStore.getState().updateEntry(0, { processedUrl: RESULT_URL });

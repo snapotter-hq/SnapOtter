@@ -339,6 +339,7 @@ sys.modules["gpu"] = fake_gpu
 
 fake_offline = types.ModuleType("offline_guard")
 fake_offline.prepare_codeformer_weights = lambda _b: None
+fake_offline.library_workdir = __import__("contextlib").nullcontext
 sys.modules["offline_guard"] = fake_offline
 
 fake_cf_pkg = types.ModuleType("codeformer")
@@ -608,6 +609,7 @@ sys.modules["gpu"] = fake_gpu
 
 fake_offline = types.ModuleType("offline_guard")
 fake_offline.prepare_codeformer_weights = lambda _b: None
+fake_offline.library_workdir = __import__("contextlib").nullcontext
 sys.modules["offline_guard"] = fake_offline
 
 fake_cf_pkg = types.ModuleType("codeformer")
@@ -786,6 +788,7 @@ sys.modules["gpu"] = fake_gpu
 fake_offline = types.ModuleType("offline_guard")
 fake_offline.prepare_codeformer_weights = lambda _b: None
 fake_offline.prepare_gfpgan_helper_weights = lambda _b: None
+fake_offline.library_workdir = __import__("contextlib").nullcontext
 sys.modules["offline_guard"] = fake_offline
 
 fake_cv2 = types.ModuleType("cv2")
@@ -1127,6 +1130,7 @@ try:
 
     fake_offline = types.ModuleType("offline_guard")
     fake_offline.prepare_gfpgan_helper_weights = lambda _b: None
+    fake_offline.library_workdir = __import__("contextlib").nullcontext
     sys.modules["offline_guard"] = fake_offline
 
     enhance_return = [None]
