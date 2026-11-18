@@ -17,9 +17,8 @@
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
-import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -65,21 +64,6 @@ afterAll(async () => {
     env.BASE_PATH = originalBasePath;
   }
 });
-
-/** Poll the Redis terminal replay key until the terminal frame appears. */
-async function waitForTerminalFrame(
-  jobId: string,
-  timeoutMs = 30_000,
-): Promise<Record<string, unknown>> {
-  const key = `${bullPrefix()}:terminal:${jobId}`;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const raw = await sharedRedis().get(key);
-    if (raw) return JSON.parse(raw) as Record<string, unknown>;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`No terminal frame for ${jobId} within ${timeoutMs}ms`);
-}
 
 describe("202 result URLs under a deployment prefix", () => {
   it("settles a 202 tool run with a root-relative downloadUrl that resolves under the prefix", async () => {

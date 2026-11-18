@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 
 // Injects a bounded fault into the step skip's flag read so the fall-through
 // contract (a failing skip must not wedge the step) is testable. Bounded by
@@ -173,14 +174,6 @@ async function terminalRow(jobId: string, timeoutMs = 25_000): Promise<JobRow> {
     const row = await jobRow(jobId);
     return row && row.status !== "queued" && row.status !== "processing" ? row : undefined;
   }, timeoutMs);
-}
-
-async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
-  const raw = await waitFor(async () => {
-    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-    return value ?? undefined;
-  }, 25_000);
-  return JSON.parse(raw) as Record<string, unknown>;
 }
 
 /** Collect ids published on the cancel channel for the duration of `fn`. */
@@ -645,7 +638,7 @@ describe("cooperative step skip and canceled finalize", () => {
 
     // Live SSE clients settle from the terminal frame on the alias channel;
     // a reconnecting client replays the same canceled outcome.
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.type).toBe("single");
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
@@ -679,7 +672,7 @@ describe("cooperative step skip and canceled finalize", () => {
     try {
       expect(await requestCancel(clientJobId)).toBe(true);
 
-      const frame = await terminalFrame(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.phase).toBe("failed");
       expect(frame.error).toBe("Canceled");
 
@@ -739,7 +732,7 @@ describe("cooperative step skip and canceled finalize", () => {
 
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.error).toBe("Canceled");
   });
 
@@ -939,7 +932,7 @@ describe("cooperative step skip and canceled finalize", () => {
 
     const flow = await terminalRow(flowId);
     expect(flow.status).toBe("completed");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("complete");
     expect((frame.result as Record<string, unknown>).downloadUrl).toContain(
       `/api/v1/download/${flowId}/`,
@@ -971,7 +964,7 @@ describe("cooperative step skip and canceled finalize", () => {
 
     const alias = await terminalRow(clientJobId);
     expect(alias.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
   });
@@ -1044,7 +1037,7 @@ describe("pipeline-batch cancel", () => {
     // The finished file's whole pipeline completed, so it lands in the ZIP
     // (#767's file-level partial semantics); the canceled file reads
     // "Canceled".
-    const frame = await terminalFrame(parentId);
+    const frame = await waitForTerminalFrame(parentId);
     expect(frame.status).toBe("completed");
     const result = frame.result as { downloadUrl?: string; fileResults?: Record<string, string> };
     expect(result.downloadUrl).toContain(`/api/v1/download/${parentId}/`);
@@ -1091,7 +1084,7 @@ describe("pipeline-batch cancel", () => {
     expect(parent.status).toBe("canceled");
     expect(parent.outputRefs ?? []).toEqual([]);
 
-    const frame = await terminalFrame(parentId);
+    const frame = await waitForTerminalFrame(parentId);
     expect(frame.status).toBe("failed");
     const errors = frame.errors as Array<{ filename: string; error: string }>;
     expect(errors[0]).toEqual({ filename: "", error: "Canceled" });

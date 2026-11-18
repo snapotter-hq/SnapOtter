@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 
 // Injects a fault into the skip path's outcome recording so the fall-through
 // contract (a failing skip must not wedge the child) is testable.
@@ -128,14 +129,6 @@ async function terminalRow(jobId: string, timeoutMs = 25_000): Promise<JobRow> {
     const row = await jobRow(jobId);
     return row && row.status !== "queued" && row.status !== "processing" ? row : undefined;
   }, timeoutMs);
-}
-
-async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
-  const raw = await waitFor(async () => {
-    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-    return value ?? undefined;
-  }, 25_000);
-  return JSON.parse(raw) as Record<string, unknown>;
 }
 
 /**
@@ -486,7 +479,7 @@ describe("cooperative child skip and canceled finalize", () => {
     expect(parent.outputRefs?.length).toBe(1);
     const zipKey = parent.outputRefs?.[0] as string;
 
-    const frame = await terminalFrame(parentId);
+    const frame = await waitForTerminalFrame(parentId);
     expect(frame.status).toBe("completed");
     const result = frame.result as { downloadUrl?: string; fileResults?: Record<string, string> };
     expect(result.downloadUrl).toContain(`/api/v1/download/${parentId}/`);
@@ -554,7 +547,7 @@ describe("cooperative child skip and canceled finalize", () => {
 
     const parent = await terminalRow(parentId);
     expect(parent.status).toBe("completed");
-    const frame = await terminalFrame(parentId);
+    const frame = await waitForTerminalFrame(parentId);
     expect(frame.status).toBe("completed");
     const result = frame.result as { fileResults?: Record<string, string> };
     expect(Object.keys(result.fileResults ?? {})).toEqual(["0", "1"]);
@@ -572,7 +565,7 @@ describe("cooperative child skip and canceled finalize", () => {
     expect(parent.status).toBe("canceled");
     expect(parent.outputRefs ?? []).toEqual([]);
 
-    const frame = await terminalFrame(parentId);
+    const frame = await waitForTerminalFrame(parentId);
     expect(frame.status).toBe("failed");
     const errors = frame.errors as Array<{ filename: string; error: string }>;
     expect(errors[0]).toEqual({ filename: "", error: "Canceled" });

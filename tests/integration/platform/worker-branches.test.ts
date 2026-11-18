@@ -128,6 +128,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 
 // The jobs.progress column is typed without the batch counters the worker
 // persists into the same jsonb value; the cast lets a seed row carry them.
@@ -342,15 +343,6 @@ async function terminalRow(jobId: string, timeoutMs = 20_000): Promise<JobRow> {
   }, timeoutMs);
 }
 
-/** Redis terminal replay frame (set by the worker's terminal publications). */
-async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
-  const raw = await waitFor(async () => {
-    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-    return value ?? undefined;
-  }, 10_000);
-  return JSON.parse(raw) as Record<string, unknown>;
-}
-
 /**
  * Batch outcome counters as recordChildOutcome leaves them. The worker
  * writes them after the child's own jobs row has settled, so a bare read
@@ -525,7 +517,7 @@ describe("tool job success path", () => {
     // No fileId on the job, so no library auto-save happened.
     expect(result).not.toHaveProperty("savedFileId");
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("complete");
     expect(frame.percent).toBe(100);
 
@@ -605,7 +597,7 @@ describe("tool job failure paths", () => {
     expect(row.attempts).toBe(2);
     expect(row.error?.message).toBe("Tool wt-no-output returned neither buffer nor scratchPath");
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Tool wt-no-output returned neither buffer nor scratchPath");
 
@@ -837,7 +829,7 @@ describe("tool job failure paths", () => {
     // UnrecoverableError: canceled jobs are never retried.
     expect(row.attempts).toBe(1);
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
 
@@ -933,7 +925,7 @@ describe("pipeline finalize", () => {
     expect(row.status).toBe("failed");
     expect(row.error?.message).toBe("Step 1: Step 1 row not found");
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Step 1: Step 1 row not found");
     expect(
@@ -979,7 +971,7 @@ describe("pipeline finalize", () => {
     expect(row.status).toBe("canceled");
     expect(row.error?.message).toBe("Canceled");
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
 
@@ -1019,7 +1011,7 @@ describe("pipeline finalize", () => {
     expect(row.status).toBe("canceled");
     expect(row.error?.message).toBe("Canceled");
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
 
@@ -1231,7 +1223,7 @@ describe("pipeline finalize", () => {
     // A degraded or 202 client is riding the SSE under clientJobId; without
     // a terminal frame it spins forever (#766 safety net, the pipeline twin
     // of the batch-finalize net from #750).
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.type).toBe("single");
     expect(frame.phase).toBe("failed");
     expect(String(frame.error).length).toBeGreaterThan(0);
@@ -1309,7 +1301,7 @@ describe("pipeline finalize", () => {
         { jobId, attempts: 1 },
       );
 
-      const frame = await terminalFrame(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.type).toBe("single");
       expect(frame.phase).toBe("failed");
       expect(frame.error).toBe("Canceled");
@@ -1382,7 +1374,7 @@ describe("pipeline finalize", () => {
         { jobId, attempts: 1 },
       );
 
-      const frame = await terminalFrame(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.phase).toBe("failed");
       expect(frame.error).toBe("Pipeline processing failed");
 
@@ -1447,7 +1439,7 @@ describe("pipeline finalize", () => {
       { jobId: singleJobId, attempts: 1 },
     );
 
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame).toMatchObject({
       jobId: clientJobId,
       type: "single",
@@ -1797,7 +1789,7 @@ describe("pipeline finalize", () => {
       { jobId: batchParent, attempts: 1 },
     );
 
-    const parentFrame = await terminalFrame(batchParent);
+    const parentFrame = await waitForTerminalFrame(batchParent);
     expect(parentFrame.status).toBe("completed");
     expect(parentFrame.failedFiles).toBe(0);
     const frameResult = (parentFrame.result ?? {}) as Record<string, unknown>;
@@ -1889,7 +1881,7 @@ describe("batch children and finalize", () => {
       { jobId: parentId, attempts: 1 },
     );
 
-    const parentFrame = await terminalFrame(parentId);
+    const parentFrame = await waitForTerminalFrame(parentId);
     expect(parentFrame.status).toBe("completed"); // one success => batch completed
     expect(parentFrame.totalFiles).toBe(2);
     expect(parentFrame.completedFiles).toBe(2);
@@ -2038,7 +2030,7 @@ describe("batch children and finalize", () => {
         message: "1 file(s) failed",
         details: [{ filename: "b.png", error: "boom" }],
       });
-      const parentFrame = await terminalFrame(parentId);
+      const parentFrame = await waitForTerminalFrame(parentId);
       expect(parentFrame.errors).toEqual([{ filename: "b.png", error: "boom" }]);
       const zipKey = (parentRow.outputRefs ?? [])[0];
       const entries = new AdmZip(await getObjectBuffer(zipKey)).getEntries();
@@ -2112,7 +2104,7 @@ describe("batch children and finalize", () => {
         ],
       });
 
-      const parentFrame = await terminalFrame(parentId);
+      const parentFrame = await waitForTerminalFrame(parentId);
       expect(parentFrame.status).toBe("failed");
       expect(parentFrame.errors).toEqual([
         { filename: "a.png", error: "boom" },
@@ -2164,7 +2156,7 @@ describe("batch children and finalize", () => {
 
       // Without the net nobody publishes a terminal frame: the crash happens
       // before the finalize's own failure handling.
-      const frame = await terminalFrame(parentId);
+      const frame = await waitForTerminalFrame(parentId);
       expect(frame.type).toBe("batch");
       expect(frame.status).toBe("failed");
       // The blank-name synthetic entry is what the client displays; without
@@ -2301,7 +2293,7 @@ describe("batch children and finalize", () => {
     expect(row.status).toBe("canceled");
     expect(row.outputRefs ?? []).toEqual([]);
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.status).toBe("failed");
     const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
     expect(errors[0]).toEqual({ filename: "", error: "Canceled" });
@@ -2359,7 +2351,7 @@ describe("batch children and finalize", () => {
     const zip = new AdmZip(await getObjectBuffer((row.outputRefs ?? [])[0]));
     expect(zip.getEntries().map((e) => e.entryName)).toEqual(["ok.png"]);
 
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.status).toBe("completed");
     const frameResult = (frame.result ?? {}) as { downloadUrl?: string };
     expect(frameResult.downloadUrl).toContain(`/api/v1/download/${jobId}/`);

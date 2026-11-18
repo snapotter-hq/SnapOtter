@@ -13,10 +13,9 @@
 import { randomUUID } from "node:crypto";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
-import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import { batchJobIdFor } from "../batch-alias.js";
 import {
   buildTestApp,
@@ -49,21 +48,6 @@ const JPG = readFixture(fixtures.image.base.jpg100);
 let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
-
-/** Poll the Redis terminal replay key until the terminal frame appears. */
-async function waitForTerminalFrame(
-  jobId: string,
-  timeoutMs = 30_000,
-): Promise<Record<string, unknown>> {
-  const key = `${bullPrefix()}:terminal:${jobId}`;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const raw = await sharedRedis().get(key);
-    if (raw) return JSON.parse(raw) as Record<string, unknown>;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`No terminal frame for ${jobId} within ${timeoutMs}ms`);
-}
 
 beforeAll(async () => {
   testApp = await buildTestApp();

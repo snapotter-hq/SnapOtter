@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -88,22 +89,15 @@ describe("Tool async window (sync-wait path)", () => {
     expect(dlRes.rawPayload.length).toBeGreaterThan(0);
 
     // (c) Terminal SSE replay key exists in Redis with phase:"complete"
-    const jobId = result.jobId;
-    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
-
-    // The worker emits the terminal frame; give Redis a moment to propagate
-    let cached: string | null = null;
-    for (let i = 0; i < 20; i++) {
-      cached = await sharedRedis().get(terminalKeyName);
-      if (cached) break;
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    expect(cached).not.toBeNull();
-    const parsed = JSON.parse(cached!);
+    const parsed = (await waitForTerminalFrame(result.jobId)) as {
+      type?: string;
+      phase?: string;
+      result?: { downloadUrl?: string };
+    };
     expect(parsed.type).toBe("single");
     expect(parsed.phase).toBe("complete");
     expect(parsed.result).toBeDefined();
-    expect(parsed.result.downloadUrl).toBeDefined();
+    expect(parsed.result?.downloadUrl).toBeDefined();
   });
 
   it("includes originalSize and processedSize in the envelope", async () => {

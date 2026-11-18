@@ -20,9 +20,8 @@
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import { batchJobIdFor } from "../batch-alias.js";
 import {
   buildTestApp,
@@ -277,9 +276,7 @@ describe("Pipeline batch ZIP delivery", () => {
       details: [{ filename: "", error: "Internal server error" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${batchJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(batchJobId)).toMatchObject({
       jobId: batchJobId,
       type: "batch",
       status: "failed",
