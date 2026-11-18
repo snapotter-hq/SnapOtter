@@ -856,15 +856,15 @@ describe("Worker timeout classification", () => {
  * settled doesn't mean the key exists yet (#4789).
  */
 async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
-  let cached: string | null = null;
-  await vi.waitFor(
+  const cached = await vi.waitFor(
     async () => {
-      cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-      expect(cached).not.toBeNull();
+      const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(value).not.toBeNull();
+      return value as string;
     },
     { timeout: 5_000 },
   );
-  return JSON.parse(cached ?? "{}");
+  return JSON.parse(cached);
 }
 
 /** Poll the job row until it leaves queued/processing; undefined after ~20s. */
