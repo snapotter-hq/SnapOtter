@@ -66,6 +66,10 @@ print(' '.join(m['bundles'].keys()))
 
 log "Installing every bundle for ${ARCH} into one shared venv: ${BUNDLE_IDS}"
 
+# What each bundle actually places, after the installer's drops, for the
+# cross-bundle version scan below.
+PLACED_DIR="$(mktemp -d /tmp/compat-placed.XXXXXX)"
+
 for bundle_id in ${BUNDLE_IDS}; do
   archive="${BUNDLES_DIR}/${bundle_id}-${ARCH}.tar.gz"
   if [[ ! -f "${archive}" ]]; then
@@ -84,7 +88,8 @@ for bundle_id in ${BUNDLE_IDS}; do
     # verify the state users actually end up with.
     # INSTALL_FEATURE_PY can point at a repo checkout mounted over an older
     # image (same pattern as the install_runtime.py mounts in ai-bundles.yml).
-    "${VENV}/bin/python3" - "${staging}/site-packages" "${SITE_PACKAGES}" "${MANIFEST}" <<'PYMERGE'
+    "${VENV}/bin/python3" - "${staging}/site-packages" "${SITE_PACKAGES}" "${MANIFEST}" \
+      "${PLACED_DIR}/${bundle_id}.json" <<'PYMERGE'
 import importlib.util, json, os, shutil, sys
 
 script = os.environ.get("INSTALL_FEATURE_PY", "/app/packages/ai/python/install_feature.py")
@@ -97,13 +102,19 @@ if not hasattr(mod, "plan_bundle_merge"):
           "(-v $PWD/packages/ai/python/install_feature.py:/app/packages/ai/python/install_feature.py:ro)",
           file=sys.stderr)
     sys.exit(1)
-staging_sp, site_packages, manifest_path = sys.argv[1:4]
+staging_sp, site_packages, manifest_path, placed_path = sys.argv[1:5]
 with open(manifest_path) as f:
     manifest = json.load(f)
 quarantine = os.path.join(os.path.dirname(staging_sp), "superseded")
 plan = mod.plan_bundle_merge(
     staging_sp, site_packages, quarantine, base_names=mod.base_package_names(manifest)
 )
+with open(placed_path, "w") as f:
+    json.dump(
+        {name: sorted(v for v, _di in copies)[-1]
+         for name, copies in mod.list_distributions(staging_sp).items()},
+        f,
+    )
 mod.supersede_distributions(site_packages, plan, quarantine)
 mod.move_tree(staging_sp, site_packages)
 # A real install drops the quarantine once its smoke imports pass.
@@ -193,48 +204,34 @@ print()
 print('All constrained packages present in exactly one, correct version.')
 " || fail "Constrained-package consistency check failed -- see violations above" 2
 
-log "Scanning every package for multi-version disagreement (not just constrained)"
+log "Scanning every package for versions the bundles disagree on"
 
-# The tokenizers conflict behind #669 lived outside the constraints list, so
-# the constrained check above sailed past it. This scan reports ANY package
-# left at more than one version after layering. Default is a warning (patch
-# drift like filelock is normal); set COMPAT_STRICT_ANY=1 to make it fatal.
-set +e
-"${VENV}/bin/python3" - "${SITE_PACKAGES}" "${MANIFEST}" <<'PYANYVER'
-import json, os, re, sys
+# Bundles overlay one shared venv, last writer wins, so a package two bundles
+# ship at different versions ends up at whichever version was installed last:
+# the tokenizers conflict behind #669, and protobuf, numba and python-dateutil
+# across the arm64 set (#4739). After layering the venv only ever holds one
+# copy, so the check compares what each bundle places. Any disagreement fails;
+# pin the package in the manifest's "constraints" and rebuild.
+"${VENV}/bin/python3" - "${PLACED_DIR}" <<'PYANYVER' || fail "Bundles ship different versions of the same package" 2
+import json, os, sys
 
-sp, manifest_path = sys.argv[1], sys.argv[2]
-with open(manifest_path) as f:
-    constrained = {re.sub(r"[-_.]+", "_", c.split("==")[0]).lower()
-                   for c in json.load(f).get("constraints", [])}
+placed = {}
+for entry in sorted(os.listdir(sys.argv[1])):
+    with open(os.path.join(sys.argv[1], entry)) as f:
+        for name, version in json.load(f).items():
+            placed.setdefault(name, {})[entry[: -len(".json")]] = version
 
-by_name = {}
-for entry in os.listdir(sp):
-    m = re.match(r"(.+)-([0-9][^-]*)\.dist-info$", entry)
-    if not m:
-        continue
-    key = re.sub(r"[-_.]+", "_", m.group(1)).lower()
-    by_name.setdefault(key, set()).add(m.group(2))
-
-offenders = {k: sorted(v) for k, v in by_name.items()
-             if len(v) > 1 and k not in constrained}
+offenders = {name: by_bundle for name, by_bundle in placed.items()
+             if len(set(by_bundle.values())) > 1}
 if not offenders:
-    print("  No unconstrained package is present at more than one version.")
+    print("  No package is shipped at more than one version across the bundles.")
     sys.exit(0)
-
-print("  WARNING: unconstrained packages at multiple versions after layering:")
-for pkg, vers in sorted(offenders.items()):
-    print(f"    {pkg}: {vers}")
-sys.exit(3)
+print("  Packages the bundles ship at different versions:", file=sys.stderr)
+for name, by_bundle in sorted(offenders.items()):
+    detail = ", ".join(f"{b} {v}" for b, v in sorted(by_bundle.items()))
+    print(f"    {name}: {detail}", file=sys.stderr)
+sys.exit(1)
 PYANYVER
-ANYVER_RC=$?
-set -e
-if [[ ${ANYVER_RC} -ne 0 ]]; then
-  if [[ "${COMPAT_STRICT_ANY:-0}" == "1" ]]; then
-    fail "Unconstrained multi-version packages present and COMPAT_STRICT_ANY=1" 2
-  fi
-  echo "  (warning only; triage each entry by consumer strictness before publishing)"
-fi
 
 log "Checking every dist-info against the files on disk"
 
