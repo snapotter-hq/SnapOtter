@@ -3,169 +3,8 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";
 import { logger } from "../../lib/logger.js";
-import { registerColorAdjustments } from "./adjust-colors.js";
-import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
-import { registerAspectPad } from "./aspect-pad.js";
-import { registerAudioChannels } from "./audio-channels.js";
-import { registerAudioMetadata } from "./audio-metadata.js";
-import { registerAudioSpeed } from "./audio-speed.js";
-import { registerAutoSubtitles } from "./auto-subtitles.js";
-import { registerBackgroundReplace } from "./background-replace.js";
-import { registerBarcodeGenerate } from "./barcode-generate.js";
-import { registerBarcodeRead } from "./barcode-read.js";
-import { registerBeautify } from "./beautify.js";
-import { registerBlurBackground } from "./blur-background.js";
-import { registerBlurFaces } from "./blur-faces.js";
-import { registerBlurPad } from "./blur-pad.js";
-import { registerBookletPdf } from "./booklet-pdf.js";
-import { registerBorder } from "./border.js";
-import { registerBulkRename } from "./bulk-rename.js";
-import { registerBurnSubtitles } from "./burn-subtitles.js";
-import { registerChangeFps } from "./change-fps.js";
-import { registerChartMaker } from "./chart-maker.js";
-import { registerCircleCrop } from "./circle-crop.js";
-import { registerCollage } from "./collage.js";
-import { registerColorBlindness } from "./color-blindness.js";
-import { registerColorPalette } from "./color-palette.js";
-import { registerColorize } from "./colorize.js";
-import { registerCompare } from "./compare.js";
-import { registerCompose } from "./compose.js";
-import { registerCompress } from "./compress.js";
-import { registerCompressPdf } from "./compress-pdf.js";
-import { registerCompressVideo } from "./compress-video.js";
-import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConversionPresets } from "./conversion-presets.js";
-import { registerConvert } from "./convert.js";
-import { registerConvertAudio } from "./convert-audio.js";
-import { registerConvertDocument } from "./convert-document.js";
-import { registerConvertPresentation } from "./convert-presentation.js";
-import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
-import { registerConvertVideo } from "./convert-video.js";
-import { registerCreateZip } from "./create-zip.js";
-import { registerCrop } from "./crop.js";
-import { registerCropPdf } from "./crop-pdf.js";
-import { registerCropVideo } from "./crop-video.js";
-import { registerCsvExcel } from "./csv-excel.js";
-import { registerCsvJson } from "./csv-json.js";
-import { registerDuotone } from "./duotone.js";
-import { registerEditMetadata } from "./edit-metadata.js";
-import { registerEmbedSubtitles } from "./embed-subtitles.js";
-import { registerEnhanceFaces } from "./enhance-faces.js";
-import { registerEpubConvert } from "./epub-convert.js";
-import { registerEraseObject } from "./erase-object.js";
-import { registerExcelToPdf } from "./excel-to-pdf.js";
-import { registerExtractAudio } from "./extract-audio.js";
-import { registerExtractPages } from "./extract-pages.js";
-import { registerExtractSubtitles } from "./extract-subtitles.js";
-import { registerExtractZip } from "./extract-zip.js";
-import { registerFadeAudio } from "./fade-audio.js";
-import { registerFavicon } from "./favicon.js";
-import { registerFindDuplicates } from "./find-duplicates.js";
-import { registerFlattenPdf } from "./flatten-pdf.js";
-import { registerGifToVideo } from "./gif-to-video.js";
-import { registerGifTools } from "./gif-tools.js";
-import { registerGifWebp } from "./gif-webp.js";
-import { registerGrayscalePdf } from "./grayscale-pdf.js";
-import { registerHistogram } from "./histogram.js";
-import { registerHtmlToImage } from "./html-to-image.js";
-import { registerHtmlToPdf } from "./html-to-pdf.js";
-import { registerImageEnhancement } from "./image-enhancement.js";
-import { registerImagePad } from "./image-pad.js";
-import { registerImageToBase64 } from "./image-to-base64.js";
-import { registerImageToPdf } from "./image-to-pdf.js";
-import { registerImagesToVideo } from "./images-to-video.js";
-import { registerInfo } from "./info.js";
-import { registerJsonXml } from "./json-xml.js";
-import { registerLinearizePdf } from "./linearize-pdf.js";
-import { registerLqipPlaceholder } from "./lqip-placeholder.js";
-import { registerMarkdownToDocx } from "./markdown-to-docx.js";
-import { registerMarkdownToHtml } from "./markdown-to-html.js";
-import { registerMarkdownToPdf } from "./markdown-to-pdf.js";
-import { registerMemeGenerator } from "./meme-generator.js";
-import { registerMergeAudio } from "./merge-audio.js";
-import { registerMergeCsvs } from "./merge-csvs.js";
-import { registerMergePdf } from "./merge-pdf.js";
-import { registerMergeVideos } from "./merge-videos.js";
-import { registerMultiToolPdf } from "./multi-tool-pdf.js";
-import { registerMuteVideo } from "./mute-video.js";
-import { registerNoiseReduction } from "./noise-reduction.js";
-import { registerNoiseRemoval } from "./noise-removal.js";
-import { registerNormalizeAudio } from "./normalize-audio.js";
-import { registerNupPdf } from "./nup-pdf.js";
-import { registerOcr } from "./ocr.js";
-import { registerOcrPdf } from "./ocr-pdf.js";
-import { registerOptimizeForWeb } from "./optimize-for-web.js";
-import { registerOrganizePdf } from "./organize-pdf.js";
-import { registerPassportPhoto } from "./passport-photo.js";
-import { registerPdfMetadata } from "./pdf-metadata.js";
-import { registerPdfPageNumbers } from "./pdf-page-numbers.js";
-import { registerPdfToImage } from "./pdf-to-image.js";
-import { registerPdfToText } from "./pdf-to-text.js";
-import { registerPdfToWord } from "./pdf-to-word.js";
-import { registerPdfaConvert } from "./pdfa-convert.js";
-import { registerPitchShift } from "./pitch-shift.js";
-import { registerPixelate } from "./pixelate.js";
 import { registerPopularTools } from "./popular.js";
-import { registerPowerpointToPdf } from "./powerpoint-to-pdf.js";
-import { registerProtectPdf } from "./protect-pdf.js";
-import { registerQrGenerate } from "./qr-generate.js";
-import { registerRedEyeRemoval } from "./red-eye-removal.js";
-import { registerRedactPdf } from "./redact-pdf.js";
-import { registerRemoveBackground } from "./remove-background.js";
-import { registerRemoveGifBackground } from "./remove-gif-background.js";
-import { registerRemovePages } from "./remove-pages.js";
-import { registerRepairPdf } from "./repair-pdf.js";
-import { registerReplaceAudio } from "./replace-audio.js";
-import { registerReplaceColor } from "./replace-color.js";
-import { registerResize } from "./resize.js";
-import { registerResizeVideo } from "./resize-video.js";
-import { registerRestorePhoto } from "./restore-photo.js";
-import { registerReverseAudio } from "./reverse-audio.js";
-import { registerReverseVideo } from "./reverse-video.js";
-import { registerRingtoneMaker } from "./ringtone-maker.js";
-import { registerRotate } from "./rotate.js";
-import { registerRotatePdf } from "./rotate-pdf.js";
-import { registerRotateVideo } from "./rotate-video.js";
-import { registerRoundedCrop } from "./rounded-crop.js";
-import { registerSharpening } from "./sharpening.js";
-import { registerSignPdf } from "./sign-pdf.js";
-import { registerSilenceRemoval } from "./silence-removal.js";
-import { registerSmartCrop } from "./smart-crop.js";
-import { registerSplit } from "./split.js";
-import { registerSplitAudio } from "./split-audio.js";
-import { registerSplitCsv } from "./split-csv.js";
-import { registerSplitPdf } from "./split-pdf.js";
-import { registerSpriteSheet } from "./sprite-sheet.js";
-import { registerStabilizeVideo } from "./stabilize-video.js";
-import { registerStitch } from "./stitch.js";
-import { registerStripMetadata } from "./strip-metadata.js";
-import { registerSvgToRaster } from "./svg-to-raster.js";
-import { registerTextOverlay } from "./text-overlay.js";
-import { registerToEpub } from "./to-epub.js";
-import { registerTranscribeAudio } from "./transcribe-audio.js";
-import { registerTransparencyFixer } from "./transparency-fixer.js";
-import { registerTrimAudio } from "./trim-audio.js";
-import { registerTrimVideo } from "./trim-video.js";
-import { registerUnlockPdf } from "./unlock-pdf.js";
-import { registerUpscale } from "./upscale.js";
-import { registerVectorize } from "./vectorize.js";
-import { registerVideoColor } from "./video-color.js";
-import { registerVideoLoudnorm } from "./video-loudnorm.js";
-import { registerVideoMetadata } from "./video-metadata.js";
-import { registerVideoSpeed } from "./video-speed.js";
-import { registerVideoToFrames } from "./video-to-frames.js";
-import { registerVideoToGif } from "./video-to-gif.js";
-import { registerVideoToWebp } from "./video-to-webp.js";
-import { registerVignette } from "./vignette.js";
-import { registerVolumeAdjust } from "./volume-adjust.js";
-import { registerWatermarkImage } from "./watermark-image.js";
-import { registerWatermarkPdf } from "./watermark-pdf.js";
-import { registerWatermarkText } from "./watermark-text.js";
-import { registerWatermarkVideo } from "./watermark-video.js";
-import { registerWaveformImage } from "./waveform-image.js";
-import { registerWordToPdf } from "./word-to-pdf.js";
-import { registerXmlToCsv } from "./xml-to-csv.js";
-import { registerYamlJson } from "./yaml-json.js";
 
 const DISABLED_TOOLS_KEY = "disabledTools";
 
@@ -224,204 +63,220 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   // Build skip set
   const skipTools = new Set([...disabledTools, ...(enableExperimental ? [] : experimentalToolIds)]);
 
-  const toolRegistrations: Array<{
-    id: string;
-    register: (app: FastifyInstance) => void;
-  }> = [
+  // Loaders, not static imports: a skipped tool never loads its module, so it
+  // adds nothing to boot time.
+  const toolLoaders: Record<string, () => Promise<(app: FastifyInstance) => void>> = {
     // Essentials
-    { id: "resize", register: registerResize },
-    { id: "crop", register: registerCrop },
-    { id: "rotate", register: registerRotate },
-    { id: "convert", register: registerConvert },
-    { id: "compress", register: registerCompress },
-    { id: "strip-metadata", register: registerStripMetadata },
-    { id: "edit-metadata", register: registerEditMetadata },
-    { id: "adjust-colors", register: registerColorAdjustments },
-    { id: "sharpening", register: registerSharpening },
+    resize: () => import("./resize.js").then((m) => m.registerResize),
+    crop: () => import("./crop.js").then((m) => m.registerCrop),
+    rotate: () => import("./rotate.js").then((m) => m.registerRotate),
+    convert: () => import("./convert.js").then((m) => m.registerConvert),
+    compress: () => import("./compress.js").then((m) => m.registerCompress),
+    "strip-metadata": () => import("./strip-metadata.js").then((m) => m.registerStripMetadata),
+    "edit-metadata": () => import("./edit-metadata.js").then((m) => m.registerEditMetadata),
+    "adjust-colors": () => import("./adjust-colors.js").then((m) => m.registerColorAdjustments),
+    sharpening: () => import("./sharpening.js").then((m) => m.registerSharpening),
 
     // Watermark & Overlay
-    { id: "watermark-text", register: registerWatermarkText },
-    { id: "watermark-image", register: registerWatermarkImage },
-    { id: "text-overlay", register: registerTextOverlay },
-    { id: "compose", register: registerCompose },
-    { id: "meme-generator", register: registerMemeGenerator },
+    "watermark-text": () => import("./watermark-text.js").then((m) => m.registerWatermarkText),
+    "watermark-image": () => import("./watermark-image.js").then((m) => m.registerWatermarkImage),
+    "text-overlay": () => import("./text-overlay.js").then((m) => m.registerTextOverlay),
+    compose: () => import("./compose.js").then((m) => m.registerCompose),
+    "meme-generator": () => import("./meme-generator.js").then((m) => m.registerMemeGenerator),
 
     // Utilities
-    { id: "info", register: registerInfo },
-    { id: "compare", register: registerCompare },
-    { id: "find-duplicates", register: registerFindDuplicates },
-    { id: "color-palette", register: registerColorPalette },
-    { id: "qr-generate", register: registerQrGenerate },
-    { id: "html-to-image", register: registerHtmlToImage },
-    { id: "barcode-generate", register: registerBarcodeGenerate },
-    { id: "barcode-read", register: registerBarcodeRead },
-    { id: "image-to-base64", register: registerImageToBase64 },
+    info: () => import("./info.js").then((m) => m.registerInfo),
+    compare: () => import("./compare.js").then((m) => m.registerCompare),
+    "find-duplicates": () => import("./find-duplicates.js").then((m) => m.registerFindDuplicates),
+    "color-palette": () => import("./color-palette.js").then((m) => m.registerColorPalette),
+    "qr-generate": () => import("./qr-generate.js").then((m) => m.registerQrGenerate),
+    "html-to-image": () => import("./html-to-image.js").then((m) => m.registerHtmlToImage),
+    "barcode-generate": () =>
+      import("./barcode-generate.js").then((m) => m.registerBarcodeGenerate),
+    "barcode-read": () => import("./barcode-read.js").then((m) => m.registerBarcodeRead),
+    "image-to-base64": () => import("./image-to-base64.js").then((m) => m.registerImageToBase64),
 
     // Layout & Composition
-    { id: "collage", register: registerCollage },
-    { id: "stitch", register: registerStitch },
-    { id: "split", register: registerSplit },
-    { id: "border", register: registerBorder },
-    { id: "beautify", register: registerBeautify },
-    { id: "circle-crop", register: registerCircleCrop },
-    { id: "rounded-crop", register: registerRoundedCrop },
-    { id: "duotone", register: registerDuotone },
-    { id: "histogram", register: registerHistogram },
-    { id: "image-pad", register: registerImagePad },
-    { id: "lqip-placeholder", register: registerLqipPlaceholder },
-    { id: "pixelate", register: registerPixelate },
-    { id: "sprite-sheet", register: registerSpriteSheet },
-    { id: "vignette", register: registerVignette },
+    collage: () => import("./collage.js").then((m) => m.registerCollage),
+    stitch: () => import("./stitch.js").then((m) => m.registerStitch),
+    split: () => import("./split.js").then((m) => m.registerSplit),
+    border: () => import("./border.js").then((m) => m.registerBorder),
+    beautify: () => import("./beautify.js").then((m) => m.registerBeautify),
+    "circle-crop": () => import("./circle-crop.js").then((m) => m.registerCircleCrop),
+    "rounded-crop": () => import("./rounded-crop.js").then((m) => m.registerRoundedCrop),
+    duotone: () => import("./duotone.js").then((m) => m.registerDuotone),
+    histogram: () => import("./histogram.js").then((m) => m.registerHistogram),
+    "image-pad": () => import("./image-pad.js").then((m) => m.registerImagePad),
+    "lqip-placeholder": () =>
+      import("./lqip-placeholder.js").then((m) => m.registerLqipPlaceholder),
+    pixelate: () => import("./pixelate.js").then((m) => m.registerPixelate),
+    "sprite-sheet": () => import("./sprite-sheet.js").then((m) => m.registerSpriteSheet),
+    vignette: () => import("./vignette.js").then((m) => m.registerVignette),
 
     // Format & Conversion
-    { id: "svg-to-raster", register: registerSvgToRaster },
-    { id: "vectorize", register: registerVectorize },
-    { id: "gif-tools", register: registerGifTools },
-    { id: "gif-webp", register: registerGifWebp },
-    { id: "pdf-to-image", register: registerPdfToImage },
+    "svg-to-raster": () => import("./svg-to-raster.js").then((m) => m.registerSvgToRaster),
+    vectorize: () => import("./vectorize.js").then((m) => m.registerVectorize),
+    "gif-tools": () => import("./gif-tools.js").then((m) => m.registerGifTools),
+    "gif-webp": () => import("./gif-webp.js").then((m) => m.registerGifWebp),
+    "pdf-to-image": () => import("./pdf-to-image.js").then((m) => m.registerPdfToImage),
 
     // Optimization extras
-    { id: "bulk-rename", register: registerBulkRename },
-    { id: "favicon", register: registerFavicon },
-    { id: "image-to-pdf", register: registerImageToPdf },
-    { id: "optimize-for-web", register: registerOptimizeForWeb },
+    "bulk-rename": () => import("./bulk-rename.js").then((m) => m.registerBulkRename),
+    favicon: () => import("./favicon.js").then((m) => m.registerFavicon),
+    "image-to-pdf": () => import("./image-to-pdf.js").then((m) => m.registerImageToPdf),
+    "optimize-for-web": () => import("./optimize-for-web.js").then((m) => m.registerOptimizeForWeb),
 
     // Adjustments extra
-    { id: "replace-color", register: registerReplaceColor },
-    { id: "color-blindness", register: registerColorBlindness },
+    "replace-color": () => import("./replace-color.js").then((m) => m.registerReplaceColor),
+    "color-blindness": () => import("./color-blindness.js").then((m) => m.registerColorBlindness),
 
     // Video
-    { id: "aspect-pad", register: registerAspectPad },
-    { id: "blur-pad", register: registerBlurPad },
-    { id: "burn-subtitles", register: registerBurnSubtitles },
-    { id: "change-fps", register: registerChangeFps },
-    { id: "compress-video", register: registerCompressVideo },
-    { id: "convert-video", register: registerConvertVideo },
-    { id: "crop-video", register: registerCropVideo },
-    { id: "embed-subtitles", register: registerEmbedSubtitles },
-    { id: "extract-subtitles", register: registerExtractSubtitles },
-    { id: "gif-to-video", register: registerGifToVideo },
-    { id: "images-to-video", register: registerImagesToVideo },
-    { id: "merge-videos", register: registerMergeVideos },
-    { id: "mute-video", register: registerMuteVideo },
-    { id: "replace-audio", register: registerReplaceAudio },
-    { id: "resize-video", register: registerResizeVideo },
-    { id: "reverse-video", register: registerReverseVideo },
-    { id: "rotate-video", register: registerRotateVideo },
-    { id: "stabilize-video", register: registerStabilizeVideo },
-    { id: "trim-video", register: registerTrimVideo },
-    { id: "video-color", register: registerVideoColor },
-    { id: "video-loudnorm", register: registerVideoLoudnorm },
-    { id: "video-metadata", register: registerVideoMetadata },
-    { id: "video-speed", register: registerVideoSpeed },
-    { id: "video-to-frames", register: registerVideoToFrames },
-    { id: "video-to-gif", register: registerVideoToGif },
-    { id: "video-to-webp", register: registerVideoToWebp },
-    { id: "watermark-video", register: registerWatermarkVideo },
+    "aspect-pad": () => import("./aspect-pad.js").then((m) => m.registerAspectPad),
+    "blur-pad": () => import("./blur-pad.js").then((m) => m.registerBlurPad),
+    "burn-subtitles": () => import("./burn-subtitles.js").then((m) => m.registerBurnSubtitles),
+    "change-fps": () => import("./change-fps.js").then((m) => m.registerChangeFps),
+    "compress-video": () => import("./compress-video.js").then((m) => m.registerCompressVideo),
+    "convert-video": () => import("./convert-video.js").then((m) => m.registerConvertVideo),
+    "crop-video": () => import("./crop-video.js").then((m) => m.registerCropVideo),
+    "embed-subtitles": () => import("./embed-subtitles.js").then((m) => m.registerEmbedSubtitles),
+    "extract-subtitles": () =>
+      import("./extract-subtitles.js").then((m) => m.registerExtractSubtitles),
+    "gif-to-video": () => import("./gif-to-video.js").then((m) => m.registerGifToVideo),
+    "images-to-video": () => import("./images-to-video.js").then((m) => m.registerImagesToVideo),
+    "merge-videos": () => import("./merge-videos.js").then((m) => m.registerMergeVideos),
+    "mute-video": () => import("./mute-video.js").then((m) => m.registerMuteVideo),
+    "replace-audio": () => import("./replace-audio.js").then((m) => m.registerReplaceAudio),
+    "resize-video": () => import("./resize-video.js").then((m) => m.registerResizeVideo),
+    "reverse-video": () => import("./reverse-video.js").then((m) => m.registerReverseVideo),
+    "rotate-video": () => import("./rotate-video.js").then((m) => m.registerRotateVideo),
+    "stabilize-video": () => import("./stabilize-video.js").then((m) => m.registerStabilizeVideo),
+    "trim-video": () => import("./trim-video.js").then((m) => m.registerTrimVideo),
+    "video-color": () => import("./video-color.js").then((m) => m.registerVideoColor),
+    "video-loudnorm": () => import("./video-loudnorm.js").then((m) => m.registerVideoLoudnorm),
+    "video-metadata": () => import("./video-metadata.js").then((m) => m.registerVideoMetadata),
+    "video-speed": () => import("./video-speed.js").then((m) => m.registerVideoSpeed),
+    "video-to-frames": () => import("./video-to-frames.js").then((m) => m.registerVideoToFrames),
+    "video-to-gif": () => import("./video-to-gif.js").then((m) => m.registerVideoToGif),
+    "video-to-webp": () => import("./video-to-webp.js").then((m) => m.registerVideoToWebp),
+    "watermark-video": () => import("./watermark-video.js").then((m) => m.registerWatermarkVideo),
 
     // Audio
-    { id: "audio-channels", register: registerAudioChannels },
-    { id: "audio-metadata", register: registerAudioMetadata },
-    { id: "audio-speed", register: registerAudioSpeed },
-    { id: "convert-audio", register: registerConvertAudio },
-    { id: "extract-audio", register: registerExtractAudio },
-    { id: "fade-audio", register: registerFadeAudio },
-    { id: "merge-audio", register: registerMergeAudio },
-    { id: "noise-reduction", register: registerNoiseReduction },
-    { id: "normalize-audio", register: registerNormalizeAudio },
-    { id: "pitch-shift", register: registerPitchShift },
-    { id: "reverse-audio", register: registerReverseAudio },
-    { id: "ringtone-maker", register: registerRingtoneMaker },
-    { id: "silence-removal", register: registerSilenceRemoval },
-    { id: "split-audio", register: registerSplitAudio },
-    { id: "trim-audio", register: registerTrimAudio },
-    { id: "volume-adjust", register: registerVolumeAdjust },
-    { id: "waveform-image", register: registerWaveformImage },
+    "audio-channels": () => import("./audio-channels.js").then((m) => m.registerAudioChannels),
+    "audio-metadata": () => import("./audio-metadata.js").then((m) => m.registerAudioMetadata),
+    "audio-speed": () => import("./audio-speed.js").then((m) => m.registerAudioSpeed),
+    "convert-audio": () => import("./convert-audio.js").then((m) => m.registerConvertAudio),
+    "extract-audio": () => import("./extract-audio.js").then((m) => m.registerExtractAudio),
+    "fade-audio": () => import("./fade-audio.js").then((m) => m.registerFadeAudio),
+    "merge-audio": () => import("./merge-audio.js").then((m) => m.registerMergeAudio),
+    "noise-reduction": () => import("./noise-reduction.js").then((m) => m.registerNoiseReduction),
+    "normalize-audio": () => import("./normalize-audio.js").then((m) => m.registerNormalizeAudio),
+    "pitch-shift": () => import("./pitch-shift.js").then((m) => m.registerPitchShift),
+    "reverse-audio": () => import("./reverse-audio.js").then((m) => m.registerReverseAudio),
+    "ringtone-maker": () => import("./ringtone-maker.js").then((m) => m.registerRingtoneMaker),
+    "silence-removal": () => import("./silence-removal.js").then((m) => m.registerSilenceRemoval),
+    "split-audio": () => import("./split-audio.js").then((m) => m.registerSplitAudio),
+    "trim-audio": () => import("./trim-audio.js").then((m) => m.registerTrimAudio),
+    "volume-adjust": () => import("./volume-adjust.js").then((m) => m.registerVolumeAdjust),
+    "waveform-image": () => import("./waveform-image.js").then((m) => m.registerWaveformImage),
 
     // PDF & Documents
-    { id: "convert-document", register: registerConvertDocument },
-    { id: "convert-presentation", register: registerConvertPresentation },
-    { id: "convert-spreadsheet", register: registerConvertSpreadsheet },
-    { id: "epub-convert", register: registerEpubConvert },
-    { id: "excel-to-pdf", register: registerExcelToPdf },
-    { id: "merge-pdf", register: registerMergePdf },
-    { id: "split-pdf", register: registerSplitPdf },
-    { id: "compress-pdf", register: registerCompressPdf },
-    { id: "rotate-pdf", register: registerRotatePdf },
-    { id: "word-to-pdf", register: registerWordToPdf },
-    { id: "extract-pages", register: registerExtractPages },
-    { id: "remove-pages", register: registerRemovePages },
-    { id: "organize-pdf", register: registerOrganizePdf },
-    { id: "multi-tool-pdf", register: registerMultiToolPdf },
-    { id: "protect-pdf", register: registerProtectPdf },
-    { id: "unlock-pdf", register: registerUnlockPdf },
-    { id: "repair-pdf", register: registerRepairPdf },
-    { id: "linearize-pdf", register: registerLinearizePdf },
-    { id: "grayscale-pdf", register: registerGrayscalePdf },
-    { id: "pdfa-convert", register: registerPdfaConvert },
-    { id: "crop-pdf", register: registerCropPdf },
-    { id: "nup-pdf", register: registerNupPdf },
-    { id: "booklet-pdf", register: registerBookletPdf },
-    { id: "watermark-pdf", register: registerWatermarkPdf },
-    { id: "pdf-page-numbers", register: registerPdfPageNumbers },
-    { id: "flatten-pdf", register: registerFlattenPdf },
-    { id: "redact-pdf", register: registerRedactPdf },
-    { id: "pdf-to-text", register: registerPdfToText },
-    { id: "pdf-to-word", register: registerPdfToWord },
-    { id: "pdf-metadata", register: registerPdfMetadata },
-    { id: "powerpoint-to-pdf", register: registerPowerpointToPdf },
-    { id: "html-to-pdf", register: registerHtmlToPdf },
-    { id: "markdown-to-docx", register: registerMarkdownToDocx },
-    { id: "markdown-to-html", register: registerMarkdownToHtml },
-    { id: "markdown-to-pdf", register: registerMarkdownToPdf },
-    { id: "to-epub", register: registerToEpub },
+    "convert-document": () =>
+      import("./convert-document.js").then((m) => m.registerConvertDocument),
+    "convert-presentation": () =>
+      import("./convert-presentation.js").then((m) => m.registerConvertPresentation),
+    "convert-spreadsheet": () =>
+      import("./convert-spreadsheet.js").then((m) => m.registerConvertSpreadsheet),
+    "epub-convert": () => import("./epub-convert.js").then((m) => m.registerEpubConvert),
+    "excel-to-pdf": () => import("./excel-to-pdf.js").then((m) => m.registerExcelToPdf),
+    "merge-pdf": () => import("./merge-pdf.js").then((m) => m.registerMergePdf),
+    "split-pdf": () => import("./split-pdf.js").then((m) => m.registerSplitPdf),
+    "compress-pdf": () => import("./compress-pdf.js").then((m) => m.registerCompressPdf),
+    "rotate-pdf": () => import("./rotate-pdf.js").then((m) => m.registerRotatePdf),
+    "word-to-pdf": () => import("./word-to-pdf.js").then((m) => m.registerWordToPdf),
+    "extract-pages": () => import("./extract-pages.js").then((m) => m.registerExtractPages),
+    "remove-pages": () => import("./remove-pages.js").then((m) => m.registerRemovePages),
+    "organize-pdf": () => import("./organize-pdf.js").then((m) => m.registerOrganizePdf),
+    "multi-tool-pdf": () => import("./multi-tool-pdf.js").then((m) => m.registerMultiToolPdf),
+    "protect-pdf": () => import("./protect-pdf.js").then((m) => m.registerProtectPdf),
+    "unlock-pdf": () => import("./unlock-pdf.js").then((m) => m.registerUnlockPdf),
+    "repair-pdf": () => import("./repair-pdf.js").then((m) => m.registerRepairPdf),
+    "linearize-pdf": () => import("./linearize-pdf.js").then((m) => m.registerLinearizePdf),
+    "grayscale-pdf": () => import("./grayscale-pdf.js").then((m) => m.registerGrayscalePdf),
+    "pdfa-convert": () => import("./pdfa-convert.js").then((m) => m.registerPdfaConvert),
+    "crop-pdf": () => import("./crop-pdf.js").then((m) => m.registerCropPdf),
+    "nup-pdf": () => import("./nup-pdf.js").then((m) => m.registerNupPdf),
+    "booklet-pdf": () => import("./booklet-pdf.js").then((m) => m.registerBookletPdf),
+    "watermark-pdf": () => import("./watermark-pdf.js").then((m) => m.registerWatermarkPdf),
+    "pdf-page-numbers": () => import("./pdf-page-numbers.js").then((m) => m.registerPdfPageNumbers),
+    "flatten-pdf": () => import("./flatten-pdf.js").then((m) => m.registerFlattenPdf),
+    "redact-pdf": () => import("./redact-pdf.js").then((m) => m.registerRedactPdf),
+    "pdf-to-text": () => import("./pdf-to-text.js").then((m) => m.registerPdfToText),
+    "pdf-to-word": () => import("./pdf-to-word.js").then((m) => m.registerPdfToWord),
+    "pdf-metadata": () => import("./pdf-metadata.js").then((m) => m.registerPdfMetadata),
+    "powerpoint-to-pdf": () =>
+      import("./powerpoint-to-pdf.js").then((m) => m.registerPowerpointToPdf),
+    "html-to-pdf": () => import("./html-to-pdf.js").then((m) => m.registerHtmlToPdf),
+    "markdown-to-docx": () => import("./markdown-to-docx.js").then((m) => m.registerMarkdownToDocx),
+    "markdown-to-html": () => import("./markdown-to-html.js").then((m) => m.registerMarkdownToHtml),
+    "markdown-to-pdf": () => import("./markdown-to-pdf.js").then((m) => m.registerMarkdownToPdf),
+    "to-epub": () => import("./to-epub.js").then((m) => m.registerToEpub),
 
     // Data Files
-    { id: "chart-maker", register: registerChartMaker },
-    { id: "create-zip", register: registerCreateZip },
-    { id: "csv-excel", register: registerCsvExcel },
-    { id: "csv-json", register: registerCsvJson },
-    { id: "extract-zip", register: registerExtractZip },
-    { id: "json-xml", register: registerJsonXml },
-    { id: "merge-csvs", register: registerMergeCsvs },
-    { id: "split-csv", register: registerSplitCsv },
-    { id: "xml-to-csv", register: registerXmlToCsv },
-    { id: "yaml-json", register: registerYamlJson },
+    "chart-maker": () => import("./chart-maker.js").then((m) => m.registerChartMaker),
+    "create-zip": () => import("./create-zip.js").then((m) => m.registerCreateZip),
+    "csv-excel": () => import("./csv-excel.js").then((m) => m.registerCsvExcel),
+    "csv-json": () => import("./csv-json.js").then((m) => m.registerCsvJson),
+    "extract-zip": () => import("./extract-zip.js").then((m) => m.registerExtractZip),
+    "json-xml": () => import("./json-xml.js").then((m) => m.registerJsonXml),
+    "merge-csvs": () => import("./merge-csvs.js").then((m) => m.registerMergeCsvs),
+    "split-csv": () => import("./split-csv.js").then((m) => m.registerSplitCsv),
+    "xml-to-csv": () => import("./xml-to-csv.js").then((m) => m.registerXmlToCsv),
+    "yaml-json": () => import("./yaml-json.js").then((m) => m.registerYamlJson),
 
     // AI Tools
-    { id: "background-replace", register: registerBackgroundReplace },
-    { id: "blur-background", register: registerBlurBackground },
-    { id: "remove-background", register: registerRemoveBackground },
-    { id: "remove-gif-background", register: registerRemoveGifBackground },
-    { id: "upscale", register: registerUpscale },
-    { id: "ocr", register: registerOcr },
-    { id: "ocr-pdf", register: registerOcrPdf },
-    { id: "blur-faces", register: registerBlurFaces },
-    { id: "erase-object", register: registerEraseObject },
-    { id: "sign-pdf", register: registerSignPdf },
-    { id: "smart-crop", register: registerSmartCrop },
-    { id: "image-enhancement", register: registerImageEnhancement },
-    { id: "content-aware-resize", register: registerContentAwareResize },
-    { id: "ai-canvas-expand", register: registerAiCanvasExpand },
-    { id: "auto-subtitles", register: registerAutoSubtitles },
-    { id: "colorize", register: registerColorize },
-    { id: "enhance-faces", register: registerEnhanceFaces },
-    { id: "noise-removal", register: registerNoiseRemoval },
-    { id: "passport-photo", register: registerPassportPhoto },
-    { id: "red-eye-removal", register: registerRedEyeRemoval },
-    { id: "restore-photo", register: registerRestorePhoto },
-    { id: "transcribe-audio", register: registerTranscribeAudio },
-    { id: "transparency-fixer", register: registerTransparencyFixer },
-  ];
+    "background-replace": () =>
+      import("./background-replace.js").then((m) => m.registerBackgroundReplace),
+    "blur-background": () => import("./blur-background.js").then((m) => m.registerBlurBackground),
+    "remove-background": () =>
+      import("./remove-background.js").then((m) => m.registerRemoveBackground),
+    "remove-gif-background": () =>
+      import("./remove-gif-background.js").then((m) => m.registerRemoveGifBackground),
+    upscale: () => import("./upscale.js").then((m) => m.registerUpscale),
+    ocr: () => import("./ocr.js").then((m) => m.registerOcr),
+    "ocr-pdf": () => import("./ocr-pdf.js").then((m) => m.registerOcrPdf),
+    "blur-faces": () => import("./blur-faces.js").then((m) => m.registerBlurFaces),
+    "erase-object": () => import("./erase-object.js").then((m) => m.registerEraseObject),
+    "sign-pdf": () => import("./sign-pdf.js").then((m) => m.registerSignPdf),
+    "smart-crop": () => import("./smart-crop.js").then((m) => m.registerSmartCrop),
+    "image-enhancement": () =>
+      import("./image-enhancement.js").then((m) => m.registerImageEnhancement),
+    "content-aware-resize": () =>
+      import("./content-aware-resize.js").then((m) => m.registerContentAwareResize),
+    "ai-canvas-expand": () => import("./ai-canvas-expand.js").then((m) => m.registerAiCanvasExpand),
+    "auto-subtitles": () => import("./auto-subtitles.js").then((m) => m.registerAutoSubtitles),
+    colorize: () => import("./colorize.js").then((m) => m.registerColorize),
+    "enhance-faces": () => import("./enhance-faces.js").then((m) => m.registerEnhanceFaces),
+    "noise-removal": () => import("./noise-removal.js").then((m) => m.registerNoiseRemoval),
+    "passport-photo": () => import("./passport-photo.js").then((m) => m.registerPassportPhoto),
+    "red-eye-removal": () => import("./red-eye-removal.js").then((m) => m.registerRedEyeRemoval),
+    "restore-photo": () => import("./restore-photo.js").then((m) => m.registerRestorePhoto),
+    "transcribe-audio": () =>
+      import("./transcribe-audio.js").then((m) => m.registerTranscribeAudio),
+    "transparency-fixer": () =>
+      import("./transparency-fixer.js").then((m) => m.registerTransparencyFixer),
+  };
 
-  let skipped = 0;
-  for (const { id, register } of toolRegistrations) {
-    if (skipTools.has(id)) {
-      app.log.info(`Skipping disabled/experimental tool: ${id}`);
-      skipped++;
-      continue;
-    }
+  const toolIds = Object.keys(toolLoaders);
+  const enabledIds = toolIds.filter((id) => {
+    if (!skipTools.has(id)) return true;
+    app.log.info(`Skipping disabled/experimental tool: ${id}`);
+    return false;
+  });
+  let skipped = toolIds.length - enabledIds.length;
 
+  // Load in parallel, then register in list order so boot stays deterministic.
+  const registers = await Promise.all(enabledIds.map((id) => toolLoaders[id]()));
+  for (const register of registers) {
     register(app);
   }
 
@@ -434,8 +289,8 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     skipTools,
   );
 
-  const registered = toolRegistrations.length - skipped + presetsRegistered;
+  const registered = toolIds.length - skipped + presetsRegistered;
   skipped += skippedByPolicy;
-  const total = toolRegistrations.length + presetsRegistered + skippedByPolicy;
+  const total = toolIds.length + presetsRegistered + skippedByPolicy;
   app.log.info(`Tool routes: ${registered} active, ${skipped} skipped (${total} total)`);
 }

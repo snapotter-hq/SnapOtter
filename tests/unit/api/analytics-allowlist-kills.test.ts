@@ -23,7 +23,7 @@ const ALLOWED: Record<string, string[]> = {
   ],
   pipeline_executed: ["step_count", "tool_ids", "is_batch", "file_count", "duration_ms", "status"],
   ai_bundle_action: ["bundle_id", "action", "duration_ms"],
-  instance_started: ["arch", "os_platform", "deploy_mode", "gpu_present"],
+  instance_started: ["arch", "os_platform", "deploy_mode", "gpu_present", "boot_duration_ms"],
   auth_login: ["method"],
   auth_login_failed: ["method"],
 };

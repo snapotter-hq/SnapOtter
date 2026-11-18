@@ -31,7 +31,14 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "app_version",
   ]),
   ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "app_version"]),
-  instance_started: new Set(["arch", "os_platform", "deploy_mode", "gpu_present", "app_version"]),
+  instance_started: new Set([
+    "arch",
+    "os_platform",
+    "deploy_mode",
+    "gpu_present",
+    "boot_duration_ms",
+    "app_version",
+  ]),
   auth_login: new Set(["method", "app_version"]),
   auth_login_failed: new Set(["method", "reason", "app_version"]),
 };

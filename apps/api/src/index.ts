@@ -276,12 +276,6 @@ try {
   console.error(err);
   process.exit(1);
 }
-// ignoreSampleRate: this once-per-boot census must not be thinned by the
-// volume sample rate that exists to throttle high-frequency usage events.
-await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, { ...gatherSystemProperties() }, undefined, {
-  ignoreSampleRate: true,
-});
-
 // Enterprise features (license-gated)
 let enterpriseLicense: { org: string; plan: string } | null = null;
 try {
@@ -772,10 +766,23 @@ void warmQueueEvents().catch((err) => {
 try {
   await app.listen({ port: env.PORT, host: env.HOST });
 
+  // Sent after listen so boot_duration_ms covers the whole cold start, from
+  // process start (tsx and its preloads included) to a listening server.
+  // ignoreSampleRate: this once-per-boot census must not be thinned by the
+  // volume sample rate that exists to throttle high-frequency usage events.
+  const systemProperties = gatherSystemProperties();
+  const startedProperties = {
+    ...systemProperties,
+    boot_duration_ms: Math.round(process.uptime() * 1000),
+  };
+  await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, startedProperties, undefined, {
+    ignoreSampleRate: true,
+  });
+
   // The AI sidecar is not started here: it spawns on the first AI request and
   // exits after AI_SIDECAR_IDLE_TIMEOUT, so an idle server holds no Python process.
   enableLazyAiDispatcher();
-  const gpuLine = gpuBootLine(gatherSystemProperties().gpu_present);
+  const gpuLine = gpuBootLine(systemProperties.gpu_present);
   // One entry per line: pino escapes newlines, so a joined banner would print
   // as a single unreadable JSON string.
   for (const line of [

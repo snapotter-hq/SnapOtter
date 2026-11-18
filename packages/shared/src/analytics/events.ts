@@ -89,6 +89,8 @@ export interface InstanceStartedProperties {
   os_platform: string;
   deploy_mode: DeployMode;
   gpu_present: boolean;
+  /** Milliseconds from process start until the API listens. Set at the call site, after listen. */
+  boot_duration_ms?: number;
   /** APP_VERSION at boot. trackEvent stamps the same property on every allow-listed server event (#4215). */
   app_version: string;
 }
