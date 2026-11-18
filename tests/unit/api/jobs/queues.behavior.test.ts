@@ -7,6 +7,7 @@ const queueInstances: Array<{
   on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
+  getDelayed: ReturnType<typeof vi.fn>;
 }> = [];
 
 async function loadQueuesModule() {
@@ -22,6 +23,7 @@ async function loadQueuesModule() {
         on: vi.fn(),
         getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
         getJobs: vi.fn().mockResolvedValue([]),
+        getDelayed: vi.fn().mockResolvedValue([]),
       };
       queueInstances.push(queue);
       return queue;
@@ -102,6 +104,45 @@ describe("job queues", () => {
       media: { active: 1, waiting: 1, failed: 2, oldestWaitingMs: 15_000 },
       image: { active: 0, waiting: 0, failed: 0, oldestWaitingMs: null },
     });
+  });
+
+  it("does not count idle job scheduler ticks as delayed", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("system");
+
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 0, delayed: 2 });
+    queueInstances[0].getDelayed.mockResolvedValueOnce([
+      { id: "repeat:a:1", repeatJobKey: "system:retention", attemptsMade: 0 },
+      { id: "repeat:b:1", repeatJobKey: "system:session-purge", attemptsMade: 0 },
+    ]);
+
+    await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 0 });
+  });
+
+  it("still counts real delayed retries next to scheduler ticks", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("image");
+    getQueue("system");
+
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ delayed: 1 });
+    queueInstances[0].getDelayed.mockResolvedValueOnce([{ id: "42", attemptsMade: 1 }]);
+    queueInstances[1].getJobCounts.mockResolvedValueOnce({ delayed: 2 });
+    queueInstances[1].getDelayed.mockResolvedValueOnce([
+      { id: "repeat:a:1", repeatJobKey: "system:retention", attemptsMade: 0 },
+      // A failed scheduler tick waiting on backoff is a real retry.
+      { id: "repeat:b:1", repeatJobKey: "system:session-purge", attemptsMade: 1 },
+    ]);
+
+    await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 2 });
+  });
+
+  it("does not list delayed jobs for a pool with none delayed", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("system");
+
+    await queueCounts();
+
+    expect(queueInstances[0].getDelayed).not.toHaveBeenCalled();
   });
 
   it("closes cached queues and clears counts", async () => {

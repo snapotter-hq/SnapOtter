@@ -15,6 +15,7 @@ interface FakeQueue {
   on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
+  getDelayed: ReturnType<typeof vi.fn>;
 }
 
 const queueInstances: FakeQueue[] = [];
@@ -33,6 +34,7 @@ async function loadQueuesModule() {
       on: vi.fn(),
       getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
       getJobs: vi.fn().mockResolvedValue([]),
+      getDelayed: vi.fn().mockResolvedValue([]),
     };
     queueInstances.push(queue);
     return queue;
