@@ -172,6 +172,19 @@ describe("credential content guard", () => {
     expect(findCredential("const token = process.env.SNAPOTTER_X_TOKEN;")).toBeNull();
   });
 
+  it("does not flag Rust or C++ scoped paths", () => {
+    expect(findCredential("hex::encode(crate::token::random_bytes::<16>())")).toBeNull();
+    expect(findCredential("session::token::generate_v4_identifier()")).toBeNull();
+    expect(findCredential("let token = crate::token::random_bytes::<16>();")).toBeNull();
+    expect(findCredential("let token = session::token::generate_v4_identifier();")).toBeNull();
+    expect(findCredential("auto token = secret::Vault::load_v2_key_material();")).toBeNull();
+  });
+
+  it("still flags a quoted credential literal", () => {
+    expect(findCredential('token = "abcdef1234567890abcdef"')).toMatch(/credential assignment/);
+    expect(findCredential('token: "abcdef1234567890abcdef"')).toMatch(/credential assignment/);
+  });
+
   it("still flags a real credential followed by a comma or semicolon", () => {
     const value = "correct-horse-battery-9";
     expect(findCredential(["password: ", '"', value, '",'].join(""))).toMatch(
