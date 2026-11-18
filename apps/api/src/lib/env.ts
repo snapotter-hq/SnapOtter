@@ -483,8 +483,47 @@ const envSchema = z
 
 export type Env = z.infer<typeof envSchema>;
 
+/** Whether a field's schema parses a number, looking through default/optional/effects wrappers. */
+function parsesNumber(field: z.ZodTypeAny): boolean {
+  let schema = field;
+  for (;;) {
+    if (schema instanceof z.ZodNumber) return true;
+    if (
+      schema instanceof z.ZodDefault ||
+      schema instanceof z.ZodOptional ||
+      schema instanceof z.ZodNullable
+    ) {
+      schema = schema._def.innerType;
+    } else if (schema instanceof z.ZodEffects) {
+      schema = schema._def.schema;
+    } else {
+      return false;
+    }
+  }
+}
+
+// Read from the schema, so a new numeric variable is covered without a second list.
+const NUMERIC_ENV_KEYS = Object.entries(envSchema.innerType().shape)
+  .filter(([, field]) => parsesNumber(field))
+  .map(([name]) => name);
+
+/**
+ * A blank numeric variable means "unset". Zod's `.default()` only applies to
+ * `undefined`, and `Number("")` is 0, so a blank `PORT=` (a Compose `${PORT}`
+ * with the variable unset, an empty field in a container manager's form) bound
+ * a random port and a blank limit silently lifted it (#4499). Only numeric
+ * keys are touched: a blank HOST must still stop the boot.
+ */
+function blankNumbersAsUnset(rawEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...rawEnv };
+  for (const name of NUMERIC_ENV_KEYS) {
+    if (env[name] !== undefined && env[name].trim() === "") delete env[name];
+  }
+  return env;
+}
+
 export function loadEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
-  return envSchema.parse(rawEnv);
+  return envSchema.parse(blankNumbersAsUnset(rawEnv));
 }
 
 /**
