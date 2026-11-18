@@ -96,9 +96,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
-const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
-const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
 const { readStoredFile } = await import("../../../apps/api/src/lib/file-storage.js");
 const { logger } = await import("../../../apps/api/src/lib/logger.js");

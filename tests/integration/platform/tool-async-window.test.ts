@@ -7,8 +7,6 @@
  */
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import {
