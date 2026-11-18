@@ -916,3 +916,92 @@ describe("embedded-lib.sh snapotter_finish", () => {
     expect(existsSync(halted)).toBe(false);
   });
 });
+
+describe("embedded-lib.sh embedded_setup_db_env", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "embedded-setup-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const show =
+    'EMBEDDED_DB_SECRETS_DIR="$S"; embedded_setup_db_env || exit $?; ' +
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion
+    'printf "%s\\n" "$EMBEDDED_MODE" "$DATABASE_URL" "$DATABASE_MIGRATION_URL" "$REDIS_URL" "${SQLITE_MIGRATE_PATH:-none}"';
+
+  it("exports the fixed embedded URLs on an install without passwords", () => {
+    const r = runLib(show, { S: join(dir, "secrets"), DATA_DIR: dir });
+    expect(r.status).toBe(0);
+    expect(r.stdout.split("\n")).toEqual([
+      "1",
+      "postgres://snapotter_app:snapotter_app@127.0.0.1:5432/snapotter",
+      "postgres://snapotter:snapotter@127.0.0.1:5432/snapotter",
+      "redis://127.0.0.1:6379",
+      "none",
+    ]);
+    expect(existsSync(join(dir, "secrets"))).toBe(false);
+  });
+
+  it("creates per-install passwords when asked and uses them in every URL", () => {
+    const r = runLib(show, {
+      S: join(dir, "secrets"),
+      DATA_DIR: dir,
+      EMBEDDED_DB_PASSWORDS: "1",
+      EMBEDDED_PG_PORT: "15432",
+      EMBEDDED_REDIS_PORT: "16379",
+    });
+    expect(r.status).toBe(0);
+    const [mode, app, owner, redis] = r.stdout.split("\n");
+    expect(mode).toBe("1");
+    const appPw = readFileSync(join(dir, "secrets", "pg-app"), "utf8").trim();
+    const ownerPw = readFileSync(join(dir, "secrets", "pg-owner"), "utf8").trim();
+    const redisPw = readFileSync(join(dir, "secrets", "redis"), "utf8").trim();
+    expect(appPw).toMatch(/^[0-9a-f]{64}$/);
+    expect(app).toBe(`postgres://snapotter_app:${appPw}@127.0.0.1:15432/snapotter`);
+    expect(owner).toBe(`postgres://snapotter:${ownerPw}@127.0.0.1:15432/snapotter`);
+    expect(redis).toBe(`redis://:${redisPw}@127.0.0.1:16379`);
+  });
+
+  it("keeps using the secrets of a secured install when the variable is later unset", () => {
+    const first = runLib(show, {
+      S: join(dir, "secrets"),
+      DATA_DIR: dir,
+      EMBEDDED_DB_PASSWORDS: "1",
+    });
+    expect(first.status).toBe(0);
+    const again = runLib(show, { S: join(dir, "secrets"), DATA_DIR: dir });
+    expect(again.status).toBe(0);
+    expect(again.stdout.split("\n")[1]).toBe(first.stdout.split("\n")[1]);
+  });
+
+  it("refuses a malformed EMBEDDED_DB_PASSWORDS and exports nothing", () => {
+    const r = runLib(show, {
+      S: join(dir, "secrets"),
+      DATA_DIR: dir,
+      EMBEDDED_DB_PASSWORDS: "true",
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("EMBEDDED_DB_PASSWORDS must be 1 or 0");
+    expect(r.stdout).toBe("");
+  });
+
+  it("points SQLITE_MIGRATE_PATH at a 1.x database in the data dir", () => {
+    writeFileSync(join(dir, "snapotter.db"), "");
+    const r = runLib(show, { S: join(dir, "secrets"), DATA_DIR: dir });
+    expect(r.stdout.split("\n")[4]).toBe(join(dir, "snapotter.db"));
+  });
+});
+
+describe("entrypoint.sh uses the shared boot steps", () => {
+  const entrypoint = readFileSync(resolve(here, "../../../docker/entrypoint.sh"), "utf8");
+  it("calls embedded_setup_db_env and bootstrap_ai_venv instead of inlining them", () => {
+    expect(entrypoint).toMatch(/^\s+embedded_setup_db_env \|\| exit 1$/mu);
+    expect(entrypoint).toMatch(
+      /^bootstrap_ai_venv \/opt\/venv \/data\/ai \/usr\/local\/bin\/reseed-ai-venv\.sh \|\| exit 1$/mu,
+    );
+    expect(entrypoint).not.toContain("NEED_BOOTSTRAP");
+    expect(entrypoint).not.toContain("ensure_embedded_db_secrets");
+  });
+});

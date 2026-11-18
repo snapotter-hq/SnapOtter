@@ -10,9 +10,8 @@ umask 0007
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
 # Embedded-mode helpers (decide_run_mode, embedded_requires_root,
-# embedded_db_passwords_requested, embedded_db_secured,
-# ensure_embedded_db_secrets, export_embedded_db_env, sqlite_autodetect_path,
-# check_pg_version) and constants. Sourcing it has no other side effects.
+# embedded_setup_db_env, bootstrap_ai_venv, and the smaller steps those two
+# are built from) and constants. Sourcing it has no other side effects.
 . /usr/local/bin/embedded-lib.sh
 
 # --- Docker secret file convention (_FILE suffix) ---
@@ -65,21 +64,7 @@ export DEFAULT_PASSWORD="${DEFAULT_PASSWORD:-admin}"
 RUN_MODE="$(decide_run_mode)" || exit $?   # exits 2 on ambiguous partial config
 if [ "$RUN_MODE" = "embedded" ]; then
   embedded_requires_root "$(id -u)" || exit 1
-  EMBEDDED_MODE=1
-  export EMBEDDED_MODE
-  # Per-install passwords (see embedded-lib.sh): generated when asked for, then
-  # used on every boot while the secrets directory exists. A secret missing from
-  # it is generated again here, so Redis can't come up open while Postgres
-  # still demands the old passwords.
-  EMBEDDED_DB_PASSWORDS_ON="$(embedded_db_passwords_requested)" || exit 1
-  if [ "$EMBEDDED_DB_PASSWORDS_ON" = 1 ] || embedded_db_secured "$EMBEDDED_DB_SECRETS_DIR"; then
-    ensure_embedded_db_secrets "$EMBEDDED_DB_SECRETS_DIR" || exit 1
-  fi
-  export_embedded_db_env "$EMBEDDED_DB_SECRETS_DIR" || exit 1
-  # 1.x single-container upgrade: auto-import /data/snapotter.db on first boot
-  # unless the operator set an explicit path. Importer no-ops on a non-empty DB.
-  SQLITE_MIGRATE_PATH="$(sqlite_autodetect_path "${DATA_DIR:-/data}")"
-  export SQLITE_MIGRATE_PATH
+  embedded_setup_db_env || exit 1
   printf '\n  \033[1;33m🦦 SnapOtter embedded mode\033[0m\n' >&2
   printf '  \033[2mRunning an in-container Postgres + Redis for quick start.\033[0m\n' >&2
   printf '  \033[2mFor production, use the Compose 3-container stack. See docs.\033[0m\n\n' >&2
@@ -101,51 +86,8 @@ if [ "$(id -u)" != "0" ]; then
   ensure_writable "$WS" "$DD" "$DD/.home" || exit 1
 fi
 
-# Clean up any interrupted bootstrap from a previous start
-AI_VENV="/data/ai/venv"
-AI_VENV_TMP="/data/ai/venv.bootstrapping"
-
-if [ -d "$AI_VENV_TMP" ]; then
-  echo "Cleaning up interrupted venv bootstrap..."
-  rm -rf "$AI_VENV_TMP"
-fi
-
-# Bootstrap AI venv from base image (first run or upgrade).
-# The image stamps /opt/venv/.venv-version with a hash of `pip freeze`.
-# When the stamp in /data/ai/venv doesn't match, the base packages changed
-# and we need a fresh copy so 2.0 Python tools don't fail with ImportError.
-if [ -d "/opt/venv" ]; then
-  NEED_BOOTSTRAP=false
-
-  if [ ! -d "$AI_VENV" ]; then
-    NEED_BOOTSTRAP=true
-    echo "First run: bootstrapping AI venv from base image..."
-  elif [ -f "/opt/venv/.venv-version" ]; then
-    IMAGE_STAMP=$(cat /opt/venv/.venv-version)
-    CURRENT_STAMP=""
-    if [ -f "$AI_VENV/.venv-version" ]; then
-      CURRENT_STAMP=$(cat "$AI_VENV/.venv-version")
-    fi
-    if [ "$CURRENT_STAMP" != "$IMAGE_STAMP" ]; then
-      NEED_BOOTSTRAP=true
-      echo "Base venv updated (stamp mismatch): refreshing AI venv..."
-    fi
-  fi
-
-  if [ "$NEED_BOOTSTRAP" = true ]; then
-    /usr/local/bin/reseed-ai-venv.sh
-    # Reset installed-bundle state: their packages lived in the old venv.
-    # Models in /data/ai/models survive, so reinstalling a bundle only
-    # reruns pip (model downloads are idempotent and skip existing files).
-    if [ -f "/data/ai/installed.json" ]; then
-      echo '{"bundles":{}}' > /data/ai/installed.json
-      echo "WARNING: Installed AI feature bundles were reset after base venv upgrade. Reinstall them from the Settings page."
-    fi
-    echo "AI venv ready at $AI_VENV"
-  elif [ -d "$AI_VENV" ]; then
-    rewrite_venv_paths "$AI_VENV" "/opt/venv" "$AI_VENV"
-  fi
-fi
+# Seed or refresh the AI venv from the image's base venv (first run or upgrade).
+bootstrap_ai_venv /opt/venv /data/ai /usr/local/bin/reseed-ai-venv.sh || exit 1
 
 # Wait for Postgres to be reachable before starting the app (external mode only;
 # in embedded mode s6 starts Postgres and gates the app on a pg_isready oneshot).

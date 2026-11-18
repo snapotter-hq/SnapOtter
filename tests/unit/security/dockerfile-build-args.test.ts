@@ -375,13 +375,23 @@ describe("Dockerfile build args", () => {
     // fixed owner password, which fails once either embedded port moves.
     const dest = dockerfile.match(/^COPY docker\/embedded-lib\.sh (\S+)$/m)?.[1];
     expect(dest).toBeDefined();
-    for (const script of ["docker/entrypoint.sh", "docker/snapotter-admin"]) {
+    // The entrypoint reaches export_embedded_db_env through embedded_setup_db_env.
+    const calls: Record<string, string> = {
+      "docker/entrypoint.sh": "embedded_setup_db_env",
+      "docker/snapotter-admin": "export_embedded_db_env",
+    };
+    for (const [script, fn] of Object.entries(calls)) {
       const source = readFileSync(resolve(root, script), "utf8");
       expect(source, `${script} must source ${dest}`).toContain(`. ${dest}`);
-      expect(source, `${script} must call export_embedded_db_env`).toMatch(
-        /^\s+export_embedded_db_env\b.*\|\| exit 1$/m,
+      expect(source, `${script} must call ${fn}`).toMatch(
+        new RegExp(`^\\s+${fn}\\b.*\\|\\| exit 1$`, "m"),
       );
     }
+    const lib = readFileSync(resolve(root, "docker/embedded-lib.sh"), "utf8");
+    const setup = lib.match(/^embedded_setup_db_env\(\) \{\n([\s\S]*?)^\}$/m)?.[1];
+    expect(setup, "embedded_setup_db_env must call export_embedded_db_env").toMatch(
+      /^\s+export_embedded_db_env\b.*\|\| return 1$/m,
+    );
   });
 
   it("only gives snapotter-admin the embedded URLs when the container runs embedded", () => {
