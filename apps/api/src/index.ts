@@ -54,6 +54,7 @@ import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { redactUrl } from "./lib/redact-url.js";
+import { requestsInFlight, trackRequestsInFlight } from "./lib/requests-in-flight.js";
 import { ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
@@ -375,6 +376,9 @@ const app = Fastify({
 app.server.requestTimeout = 30 * 60 * 1000;
 app.server.headersTimeout = 60 * 1000;
 
+// First, so a request refused by a later hook is counted and released too.
+trackRequestsInFlight(app);
+
 app.removeContentTypeParser("application/json");
 app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
   try {
@@ -613,11 +617,11 @@ app.get("/api/v1/admin/health", async (request, reply) => {
   } catch {
     /* db unreachable */
   }
-  let queueStats = { active: 0, pending: 0 };
+  let queueStats = { active: 0, pending: 0, delayed: 0 };
   let pools: Record<string, unknown> = {};
   try {
     const counts = await queueCounts();
-    queueStats = { active: counts.active, pending: counts.waiting };
+    queueStats = { active: counts.active, pending: counts.waiting, delayed: counts.delayed };
     pools = await perPoolHealth();
   } catch {
     /* redis unreachable */
@@ -656,6 +660,8 @@ app.get("/api/v1/admin/health", async (request, reply) => {
     storage: { mode: env.STORAGE_MODE, available: "N/A" },
     database: dbOk ? "ok" : "error",
     queue: queueStats,
+    // An upload has no job until its body has arrived; this counts it.
+    requestsInFlight: requestsInFlight(),
     pools,
     libraryStorage,
     lastBackup,
