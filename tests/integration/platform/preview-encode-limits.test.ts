@@ -232,20 +232,28 @@ describe("preview encode limits (#1406)", () => {
 
       req.destroy();
       const hungUpAt = Date.now();
+      // The contract is "killed on hang-up, not left to PREVIEW_TIMEOUT_S" (600s
+      // here; the stub sleeps 120s), not a latency target. It takes ~50ms on an
+      // idle host, but a loaded CI runner blew a 5s budget now and then (#4790).
       try {
-        await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 5_000 });
+        await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 20_000 });
       } catch (err) {
-        // Intermittent on loaded CI runners only (#4790): say which half was slow.
         throw new Error(
           `encode ${pid} still alive ${Date.now() - hungUpAt}ms after the client hung up; ` +
             `${describeKills(kill, pid)}; process state: ${processState(pid)}`,
           { cause: err },
         );
       }
+      // Dead alone could mean anything killed it; the disconnect path must have.
+      const killedByApp = kill.mock.calls.some(
+        ([signal], i) =>
+          signal === "SIGKILL" && (kill.mock.contexts[i] as ChildProcess).pid === pid,
+      );
+      expect(killedByApp, describeKills(kill, pid)).toBe(true);
     } finally {
       kill.mockRestore();
     }
-  });
+  }, 45_000);
 
   it("lets a stored-file encode finish into the cache after the client disconnects", async () => {
     env.PREVIEW_TIMEOUT_S = 600;
