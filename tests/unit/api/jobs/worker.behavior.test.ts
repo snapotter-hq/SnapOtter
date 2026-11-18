@@ -5514,6 +5514,10 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     expect(workerMod.timeoutMsFor("image", "compress")).toBe(15_000);
     expect(workerMod.timeoutMsFor("docs")).toBe(15_000);
     expect(workerMod.timeoutMsFor("docs", "unknown-tool")).toBe(15_000);
+    // The timeout message names this setting, so it must track the deadline (#4516).
+    expect(workerMod.timeoutSettingFor("docs", "compress-pdf")).toBe("JOB_TIMEOUT_LONG_S");
+    expect(workerMod.timeoutSettingFor("docs", "split-pdf")).toBe("JOB_TIMEOUT_FAST_S");
+    expect(workerMod.timeoutSettingFor("media")).toBe("JOB_TIMEOUT_LONG_S");
     for (const aliasId of [
       "brightness-contrast",
       "saturation",

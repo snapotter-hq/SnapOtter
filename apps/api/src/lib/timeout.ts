@@ -8,10 +8,17 @@
  * That AI wording only fits the `ai` pool, though: a qpdf split or an image
  * job has no model to download and no GPU to miss, so non-AI pools get a
  * plain time-limit message naming the setting that controls their deadline
- * (`JOB_TIMEOUT_LONG_S` for the media pool, `JOB_TIMEOUT_FAST_S` for the
- * other fast pools) (#4516).
+ * (#4516). The caller passes that setting because the deadline depends on the
+ * tool as well as the pool: a long docs tool such as compress-pdf runs on
+ * `JOB_TIMEOUT_LONG_S`.
  */
-export function timeoutMessage(timeoutMs: number, pool?: string): string {
+export type TimeoutSetting = "JOB_TIMEOUT_FAST_S" | "JOB_TIMEOUT_LONG_S";
+
+export function timeoutMessage(
+  timeoutMs: number,
+  pool?: string,
+  setting: TimeoutSetting = "JOB_TIMEOUT_FAST_S",
+): string {
   const seconds = Math.round(timeoutMs / 1000);
   // Must stay under friendlyError's 280-char / 3-line limit, or the whole
   // message collapses to the generic "Processing failed" fallback
@@ -23,7 +30,6 @@ export function timeoutMessage(timeoutMs: number, pool?: string): string {
       `be downloading. Try a smaller input or retry.`
     );
   }
-  const setting = pool === "media" ? "JOB_TIMEOUT_LONG_S" : "JOB_TIMEOUT_FAST_S";
   return (
     `Timed out after ${seconds}s. Large inputs can exceed the processing time ` +
     `limit; an admin can raise ${setting}. Try a smaller input or retry.`

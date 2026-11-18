@@ -31,13 +31,22 @@ describe("timeoutMessage", () => {
     }
   });
 
-  it("names the fast-pool setting for non-AI fast pools", () => {
-    expect(timeoutMessage(120_000, "docs")).toContain("JOB_TIMEOUT_FAST_S");
-    expect(timeoutMessage(120_000, "image")).toContain("JOB_TIMEOUT_FAST_S");
+  it("names the setting the caller passes for non-AI pools", () => {
+    expect(timeoutMessage(120_000, "image", "JOB_TIMEOUT_FAST_S")).toContain("JOB_TIMEOUT_FAST_S");
+    expect(timeoutMessage(7_200_000, "media", "JOB_TIMEOUT_LONG_S")).toContain(
+      "JOB_TIMEOUT_LONG_S",
+    );
+    // A long docs tool (compress-pdf) runs on the LONG deadline, so its
+    // message must not point the admin at the fast setting.
+    const msg = timeoutMessage(7_200_000, "docs", "JOB_TIMEOUT_LONG_S");
+    expect(msg).toContain("JOB_TIMEOUT_LONG_S");
+    expect(msg).not.toContain("JOB_TIMEOUT_FAST_S");
   });
 
-  it("names the long-pool setting for the media pool", () => {
-    expect(timeoutMessage(7_200_000, "media")).toContain("JOB_TIMEOUT_LONG_S");
+  it("survives friendlyError with the longer setting name too", () => {
+    const msg = timeoutMessage(7_200_000, "media", "JOB_TIMEOUT_LONG_S");
+    expect(msg.length).toBeLessThanOrEqual(280);
+    expect(msg.split("\n")).toHaveLength(1);
   });
 
   it("survives friendlyError for non-AI pools too", () => {

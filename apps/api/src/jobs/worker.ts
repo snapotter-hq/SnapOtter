@@ -71,6 +71,7 @@ export {
   type JobDispatch,
   selectJobDispatch,
   timeoutMsFor,
+  timeoutSettingFor,
 } from "./worker-tool-job.js";
 
 const workers: Worker[] = [];
