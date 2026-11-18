@@ -96,7 +96,9 @@ export function timeoutSettingFor(pool: Pool, toolId?: string): TimeoutSetting {
 }
 
 export function timeoutMsFor(pool: Pool, toolId?: string): number {
-  return env[timeoutSettingFor(pool, toolId)] * 1000;
+  return timeoutSettingFor(pool, toolId) === "JOB_TIMEOUT_LONG_S"
+    ? env.JOB_TIMEOUT_LONG_S * 1000
+    : env.JOB_TIMEOUT_FAST_S * 1000;
 }
 
 /**
