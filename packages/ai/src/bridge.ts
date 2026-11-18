@@ -20,6 +20,7 @@ import {
   sidecarMemoryRefusal,
 } from "./feature-gate.js";
 import { aiLog, describeUnexpectedExit } from "./log.js";
+import { resolveSidecarIdleTimeoutMs } from "./sidecar-idle.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 import { resolveAiVenvPath } from "./venv-path.js";
 
@@ -678,6 +679,14 @@ export class PythonDispatcher {
   private venvPath: string | undefined;
   /** False for a venv no install writes to, so requests skip the venv lock. */
   private takesVenvLock: boolean;
+  /**
+   * Lazy lifecycle: the child starts on the first request, requests wait for
+   * that start, and the child exits after AI_SIDECAR_IDLE_TIMEOUT idle. Off by
+   * default so embedders that start the dispatcher themselves keep the eager
+   * behavior; the API server turns it on (enableLazyLifecycle).
+   */
+  private exitWhenIdle: boolean;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Children whose death is already in the crash counter. A dead child can
@@ -687,10 +696,74 @@ export class PythonDispatcher {
    */
   private countedCrashes = new WeakSet<ChildProcess>();
 
-  constructor(opts: { profile: "ai" | "docs"; venvPath?: string; takesVenvLock?: boolean }) {
+  constructor(opts: {
+    profile: "ai" | "docs";
+    venvPath?: string;
+    takesVenvLock?: boolean;
+    exitWhenIdle?: boolean;
+  }) {
     this.profile = opts.profile;
     this.venvPath = opts.venvPath;
     this.takesVenvLock = opts.takesVenvLock ?? true;
+    this.exitWhenIdle = opts.exitWhenIdle ?? false;
+  }
+
+  enableLazyLifecycle(): void {
+    this.exitWhenIdle = true;
+    this.armIdleTimer();
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  /**
+   * Start the idle countdown for the current child. Called whenever the child
+   * becomes ready or its last in-flight request settles; a new request cancels
+   * it. The callback re-checks both conditions, so a stale timer can never
+   * stop a child that has since picked up work or been replaced.
+   */
+  private armIdleTimer(): void {
+    this.clearIdleTimer();
+    const proc = this.child;
+    if (!this.exitWhenIdle || !proc || !this.childReady || this.pending.size > 0) return;
+    const idleMs = resolveSidecarIdleTimeoutMs();
+    if (idleMs <= 0) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.child !== proc || this.pending.size > 0) return;
+      aiLog.info(
+        `[bridge] Python dispatcher idle for ${Math.round(idleMs / 1000)}s, exiting to free memory`,
+      );
+      this.stopChild();
+    }, idleMs);
+    this.idleTimer.unref();
+  }
+
+  /**
+   * Retire the current child on purpose (shutdown or idle exit). The child is
+   * detached from this instance synchronously, before SIGTERM, so a request
+   * arriving a tick later spawns a fresh child instead of being written to a
+   * process that is already going away.
+   */
+  private stopChild(): void {
+    this.clearIdleTimer();
+    if (!this.child || this.child.killed) return;
+    const proc = this.child;
+    const gen = this.generation;
+    this.stoppedChildren.add(proc);
+    this.child = null;
+    this.childReady = false;
+    this.rejectPendingForGeneration(
+      gen,
+      new SafeError("Python dispatcher exited unexpectedly", {
+        kind: "operational",
+        code: "dispatcher-exit",
+      }),
+    );
+    proc.stdin?.end();
+    proc.kill("SIGTERM");
   }
 
   private buildEnv(): Record<string, string> {
@@ -809,6 +882,7 @@ export class PythonDispatcher {
     if (this.childFailed) return null;
     this.generation++;
     const gen = this.generation;
+    this.clearIdleTimer();
     this.childReady = false;
     this.childScriptFailures = 0;
 
@@ -877,6 +951,7 @@ export class PythonDispatcher {
                 this.gpuProbed = true;
                 this.crashes = 0;
                 aiLog.info(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
+                this.armIdleTimer();
               }
               return;
             }
@@ -1067,11 +1142,13 @@ export class PythonDispatcher {
       const wrappedResolve = (result: { stdout: string; stderr: string }) => {
         cleanup();
         resolvePromise(result);
+        this.armIdleTimer();
       };
 
       const wrappedReject = (err: Error) => {
         cleanup();
         rejectPromise(err);
+        this.armIdleTimer();
       };
 
       if (timeout !== undefined) {
@@ -1090,6 +1167,7 @@ export class PythonDispatcher {
         }, timeout);
       }
 
+      this.clearIdleTimer();
       this.pending.set(id, {
         resolve: wrappedResolve,
         reject: wrappedReject,
@@ -1377,22 +1455,7 @@ export class PythonDispatcher {
     this.gpuProbed = false;
     this.gpuFrameworks = undefined;
     this.childScriptFailures = 0;
-    if (this.child && !this.child.killed) {
-      const proc = this.child;
-      const gen = this.generation;
-      this.stoppedChildren.add(proc);
-      this.child = null;
-      this.childReady = false;
-      this.rejectPendingForGeneration(
-        gen,
-        new SafeError("Python dispatcher exited unexpectedly", {
-          kind: "operational",
-          code: "dispatcher-exit",
-        }),
-      );
-      proc.stdin?.end();
-      proc.kill("SIGTERM");
-    }
+    this.stopChild();
   }
 
   /**
@@ -1430,6 +1493,25 @@ export class PythonDispatcher {
           resolvePromise({ ready: false, gpu: false });
         }
       }, 50);
+    });
+  }
+
+  /** Whether a child has reported its GPU probe since the last shutdown(). */
+  hasProbedGpu(): boolean {
+    return this.gpuProbed;
+  }
+
+  /** init() that a caller's abort signal can cut short. */
+  private waitForReady(signal: AbortSignal | undefined): Promise<unknown> {
+    if (signal?.aborted) return Promise.reject(pythonAbortError());
+    const started = this.init();
+    if (!signal) return started;
+    return new Promise((resolvePromise, rejectPromise) => {
+      const onAbort = () => rejectPromise(pythonAbortError());
+      signal.addEventListener("abort", onAbort, { once: true });
+      started.then(resolvePromise, rejectPromise).finally(() => {
+        signal.removeEventListener("abort", onAbort);
+      });
     });
   }
 
@@ -1485,30 +1567,53 @@ export class PythonDispatcher {
         }
       }
 
-      // Try persistent dispatcher first
-      const dispatcherPromise = this.dispatcherRun(scriptName, args, options, timeoutOverride);
-      if (dispatcherPromise) {
-        return dispatcherPromise.catch((err: Error) => {
-          if (
-            err.message === "Python dispatcher exited unexpectedly" ||
-            err.message === "Python dispatcher stdin closed unexpectedly"
-          ) {
-            aiLog.warn(
-              `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
-            );
-            return this.runPerRequest(scriptName, args, options, timeoutOverride).then(
-              (result) => ({
+      const viaDispatcher = (
+        budgetMs: number | undefined,
+      ): Promise<{ stdout: string; stderr: string }> => {
+        // Try persistent dispatcher first
+        const dispatcherPromise = this.dispatcherRun(scriptName, args, options, budgetMs);
+        if (dispatcherPromise) {
+          return dispatcherPromise.catch((err: Error) => {
+            if (
+              err.message === "Python dispatcher exited unexpectedly" ||
+              err.message === "Python dispatcher stdin closed unexpectedly"
+            ) {
+              aiLog.warn(
+                `[bridge] Dispatcher crashed during ${scriptName}, retrying with per-request process`,
+              );
+              return this.runPerRequest(scriptName, args, options, budgetMs).then((result) => ({
                 ...result,
                 stderr: `${result.stderr}\n[bridge] retried after dispatcher crash`,
-              }),
-            );
-          }
-          throw err;
-        });
-      }
+              }));
+            }
+            throw err;
+          });
+        }
 
-      // Fall back to per-request spawning
-      return this.runPerRequest(scriptName, args, options, timeoutOverride);
+        // Fall back to per-request spawning
+        return this.runPerRequest(scriptName, args, options, budgetMs);
+      };
+
+      // The AI dispatcher starts on first use and exits when idle, so a request
+      // usually finds no ready child. Wait for the shared start instead of
+      // spawning a one-shot interpreter that would load the same libraries
+      // again. A failed or backing-off child still falls through to per-request.
+      if (
+        this.exitWhenIdle &&
+        this.profile === "ai" &&
+        !this.childReady &&
+        !this.childFailed &&
+        Date.now() >= this.backoffEnd
+      ) {
+        const budget = timeoutOverride ?? resolvePythonTimeout(options.timeout);
+        const waitStartedAt = Date.now();
+        return this.waitForReady(options.signal).then(() =>
+          viaDispatcher(
+            budget === undefined ? undefined : Math.max(1, budget - (Date.now() - waitStartedAt)),
+          ),
+        );
+      }
+      return viaDispatcher(timeoutOverride);
     };
 
     // Wraps the call's final promise, so a call rejected while it waits for
@@ -1615,6 +1720,15 @@ export function gpuMayBeAvailable(
   deviceExists?: (path: string) => boolean,
 ): boolean {
   return getAiDispatcher().gpuMayBeAvailable(framework, deviceExists);
+}
+
+/**
+ * Switch the AI dispatcher to start on first use and exit when idle (see
+ * AI_SIDECAR_IDLE_TIMEOUT). The API server calls this instead of starting the
+ * dispatcher at boot.
+ */
+export function enableLazyAiDispatcher(): void {
+  getAiDispatcher().enableLazyLifecycle();
 }
 
 export function getDispatcherStatus(): DispatcherStatus {

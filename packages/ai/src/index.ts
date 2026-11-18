@@ -17,6 +17,7 @@ export type { DispatcherRecycleReason, DispatcherStatus } from "./bridge.js";
 export {
   buildInstallerEnv,
   buildOfflineInstallerEnv,
+  enableLazyAiDispatcher,
   getDispatcherStatus,
   getDocsDispatcher,
   gpuMayBeAvailable,

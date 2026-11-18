@@ -82,6 +82,7 @@ All caps are environment variables, documented fully in [Configuration](/guide/c
 |---|---|---|
 | `CONCURRENT_JOBS` | `1` | How many jobs run in parallel. Auto-detect uses CPU cores minus one, which is fine on big machines and too eager on a 2-core box under memory pressure. |
 | `MAX_WORKER_THREADS` | `2` | Image-processing thread pool. |
+| `AI_SIDECAR_IDLE_TIMEOUT` | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower `AI_SESSION_IDLE_TIMEOUT` too, since the process exit discards cached models. |
 | `MAX_BATCH_SIZE` | `5` | Batches are where 1-2 GB machines run out of memory first. |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Keeps a single huge file from occupying the whole workspace. |
 | `MAX_MEGAPIXELS` | `50` | Decoding a 100+ MP image costs RAM regardless of file size. |

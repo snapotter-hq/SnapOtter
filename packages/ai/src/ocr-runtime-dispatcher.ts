@@ -30,6 +30,7 @@ import {
   readPendingOcrRuntimeForHandoff,
   resolveAiDataDir,
 } from "./runtime-state.js";
+import { resolveSidecarIdleTimeoutMs } from "./sidecar-idle.js";
 
 export type OcrRuntimeScript = "ocr" | "ocr_pdf";
 type OcrRuntimeProtocolScript = OcrRuntimeScript | "smoke";
@@ -643,9 +644,14 @@ class OcrRuntimeManager {
   private didClose = false;
   private fatalError: Error | null = null;
   private forceKillTimer: NodeJS.Timeout | null = null;
+  private idleTimer: NodeJS.Timeout | null = null;
   private resolveClosed: () => void = () => {};
 
-  constructor(runtime: CapturedRuntime, onClosed: (manager: OcrRuntimeManager) => void) {
+  constructor(
+    runtime: CapturedRuntime,
+    onClosed: (manager: OcrRuntimeManager) => void,
+    private readonly onIdle: (manager: OcrRuntimeManager) => void = () => {},
+  ) {
     this.runtime = runtime;
     this.onClosed = onClosed;
     this.closed = new Promise<void>((resolvePromise) => {
@@ -685,6 +691,7 @@ class OcrRuntimeManager {
       return Promise.reject(new Error("Accurate OCR runtime dispatcher is unavailable"));
     }
 
+    this.clearIdleTimer();
     return new Promise<OcrRuntimeRunResult>((resolvePromise, rejectPromise) => {
       const pending: PendingRequest = {
         ...prepared,
@@ -742,6 +749,7 @@ class OcrRuntimeManager {
     const pending = this.queue.shift();
     if (!pending) {
       this.endWhenIdle();
+      this.armIdleTimer();
       return;
     }
     if (pending.settled) {
@@ -757,6 +765,28 @@ class OcrRuntimeManager {
     } catch (error) {
       this.terminate(error instanceof Error ? error : new Error(String(error)));
     }
+  }
+
+  /**
+   * Once the runtime has sat idle for AI_SIDECAR_IDLE_TIMEOUT it is handed to
+   * onIdle, which unpublishes it before draining so a request arriving during
+   * the exit spawns a fresh runtime instead of finding this one unavailable.
+   */
+  private armIdleTimer(): void {
+    this.clearIdleTimer();
+    const idleMs = resolveSidecarIdleTimeoutMs();
+    if (idleMs <= 0 || !this.canAccept() || this.current || this.queue.length > 0) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (!this.canAccept() || this.current || this.queue.length > 0) return;
+      this.onIdle(this);
+    }, idleMs);
+    this.idleTimer.unref();
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
   }
 
   private endWhenIdle(): void {
@@ -920,6 +950,7 @@ class OcrRuntimeManager {
     if (this.didClose) return;
     this.didClose = true;
     this.accepting = false;
+    this.clearIdleTimer();
     if (this.forceKillTimer) clearTimeout(this.forceKillTimer);
     this.forceKillTimer = null;
 
@@ -977,6 +1008,14 @@ let activationWatchTimer: NodeJS.Timeout | null = null;
 let activationWatchOptions: RuntimeStateOptions = {};
 
 type RuntimeActivationView = "committed" | "pending";
+
+function managerIdle(manager: OcrRuntimeManager): void {
+  // A candidate still being probed is not published yet; leave it to its rotation.
+  if (currentManager !== manager) return;
+  aiLog.info("[ocr-runtime] Accurate OCR runtime idle, exiting to free memory");
+  currentManager = null;
+  manager.beginDrain();
+}
 
 function managerClosed(manager: OcrRuntimeManager): void {
   managers.delete(manager);
@@ -1124,7 +1163,7 @@ async function performRotation(
 
   let candidate: OcrRuntimeManager;
   try {
-    candidate = new OcrRuntimeManager(runtime, managerClosed);
+    candidate = new OcrRuntimeManager(runtime, managerClosed, managerIdle);
   } catch (error) {
     throw error instanceof Error ? error : new Error(String(error));
   }
