@@ -39,6 +39,17 @@ export async function closeQueues(): Promise<void> {
   await Promise.all(entries.map((q) => q.close()));
 }
 
+/**
+ * A job scheduler always keeps its next tick in the delayed set, so an idle
+ * server never reports 0 delayed. A tick that already failed and waits on
+ * backoff is a real retry, so it still counts.
+ */
+async function idleSchedulerTicks(q: Queue<ToolJobData, ToolJobResult>): Promise<number> {
+  const jobs = await q.getDelayed();
+  return jobs.filter((job) => typeof job?.repeatJobKey === "string" && job.attemptsMade === 0)
+    .length;
+}
+
 /** Aggregate counts across all pools. */
 export async function queueCounts(): Promise<{
   active: number;
@@ -54,7 +65,10 @@ export async function queueCounts(): Promise<{
     const counts = await q.getJobCounts("active", "waiting", "delayed");
     active += counts.active ?? 0;
     waiting += counts.waiting ?? 0;
-    delayed += counts.delayed ?? 0;
+    const poolDelayed = counts.delayed ?? 0;
+    if (poolDelayed > 0) {
+      delayed += Math.max(0, poolDelayed - (await idleSchedulerTicks(q)));
+    }
   }
   return { active, waiting, delayed };
 }
