@@ -1352,6 +1352,9 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     });
     await terminalRow(first.jobId);
     await terminalRow(clientJobId);
+    // Run 1 is only done once its replay key is written, which lands after
+    // the row. Starting run 2 sooner lets that late write survive run 2's reset.
+    await waitForTerminalFrame(clientJobId);
 
     const second = await enqueueSingleRun({
       mode: "slow",
