@@ -15,6 +15,7 @@ import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../../helpers/terminal-frame.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -259,9 +260,7 @@ describe("svg-to-raster batch ZIP stream faults (#2751)", () => {
       details: [{ filename: "", error: "Failed to package batch results" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(clientJobId)).toMatchObject({
       jobId: clientJobId,
       type: "batch",
       status: "failed",
@@ -290,9 +289,7 @@ describe("svg-to-raster batch ZIP stream faults (#2751)", () => {
       details: [{ filename: "", error: "Failed to package batch results" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(clientJobId)).toMatchObject({
       jobId: clientJobId,
       type: "batch",
       status: "failed",
@@ -348,9 +345,7 @@ describe("svg-to-raster batch ZIP stream faults (#2751)", () => {
       ],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(clientJobId)).toMatchObject({
       jobId: clientJobId,
       type: "batch",
       status: "failed",
@@ -407,9 +402,7 @@ describe("svg-to-raster batch ZIP stream faults (#2751)", () => {
       details: [{ filename: "", error: "Workspace storage limit reached" }],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(clientJobId)).toMatchObject({
       jobId: clientJobId,
       type: "batch",
       status: "failed",
@@ -527,9 +520,7 @@ describe("svg-to-raster batch ZIP stream faults (#2751)", () => {
       ],
     });
 
-    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await waitForTerminalFrame(clientJobId)).toMatchObject({
       jobId: clientJobId,
       type: "batch",
       status: "failed",

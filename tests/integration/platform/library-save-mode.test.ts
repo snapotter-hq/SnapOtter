@@ -10,9 +10,8 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -94,18 +93,12 @@ async function runResize(opts: {
   }
   if (res.statusCode === 202) {
     // Async fallback: wait for the terminal SSE replay frame in Redis
-    const jobId = JSON.parse(res.body).jobId;
-    const key = `${bullPrefix()}:terminal:${jobId}`;
-    for (let i = 0; i < 150; i++) {
-      const cached = await sharedRedis().get(key);
-      if (cached) {
-        const frame = JSON.parse(cached);
-        expect(frame.phase).toBe("complete");
-        return { statusCode: 200, savedFileId: frame.result?.savedFileId };
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    throw new Error("Timed out waiting for async job result");
+    const frame = (await waitForTerminalFrame(JSON.parse(res.body).jobId)) as {
+      phase?: string;
+      result?: { savedFileId?: string };
+    };
+    expect(frame.phase).toBe("complete");
+    return { statusCode: 200, savedFileId: frame.result?.savedFileId };
   }
   let error: string | undefined;
   try {

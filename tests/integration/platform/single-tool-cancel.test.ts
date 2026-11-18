@@ -200,6 +200,7 @@ import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
@@ -309,14 +310,6 @@ async function terminalRow(jobId: string, timeoutMs = 25_000): Promise<JobRow> {
     const row = await jobRow(jobId);
     return row && row.status !== "queued" && row.status !== "processing" ? row : undefined;
   }, timeoutMs);
-}
-
-async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
-  const raw = await waitFor(async () => {
-    const value = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
-    return value ?? undefined;
-  }, 25_000);
-  return JSON.parse(raw) as Record<string, unknown>;
 }
 
 /** Collect ids published on the cancel channel for the duration of `fn`. */
@@ -496,7 +489,7 @@ describe("enqueueToolJob alias stamping (#808)", () => {
       userId: owner,
     });
     await terminalRow(jobId);
-    await terminalFrame(jobId);
+    await waitForTerminalFrame(jobId);
 
     expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const parent = await jobRow(clientJobId);
@@ -520,7 +513,7 @@ describe("enqueueToolJob alias stamping (#808)", () => {
 
     const { jobId } = await enqueueSingleRun({ mode: "fast", tag: "stamp-foreign", clientJobId });
     await terminalRow(jobId);
-    await terminalFrame(jobId);
+    await waitForTerminalFrame(jobId);
 
     expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const alias = await jobRow(clientJobId);
@@ -556,7 +549,7 @@ describe("enqueueToolJob alias stamping (#808)", () => {
 
     expect(await requestCancel(jobId)).toBe(true);
     expect((await terminalRow(jobId)).status).toBe("canceled");
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.error).toBe("Canceled");
 
     // Neither cancelSingleJobGuarded nor publishEphemeral touched the refused channel.
@@ -590,7 +583,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(await getQueue("image").getJob(jobId)).toBeUndefined();
     expect((await jobRow(jobId))?.status).toBe("canceled");
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
     expect(invoked).not.toContain("wait-cancel");
@@ -608,7 +601,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect((await terminalRow(jobId)).status).toBe("canceled");
     expect((await terminalRow(clientJobId)).status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
   });
@@ -628,7 +621,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     // canceled and write nothing, instead of completing and saving it.
     expect((await terminalRow(jobId)).status).toBe("canceled");
     expect((await terminalRow(clientJobId)).status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
     expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
@@ -677,7 +670,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       expect(row.status).toBe("canceled");
       expect(row.attempts).toBe(1);
       expect((await terminalRow(clientJobId)).status).toBe("canceled");
-      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+      expect((await waitForTerminalFrame(clientJobId)).error).toBe("Canceled");
 
       const cleanupLogs = errorLog.mock.calls.filter(
         ([ctx, msg]) =>
@@ -1272,7 +1265,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       expect(row.status).toBe("canceled");
       expect(row.attempts).toBe(1);
       expect((await terminalRow(clientJobId)).status).toBe("canceled");
-      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+      expect((await waitForTerminalFrame(clientJobId)).error).toBe("Canceled");
       expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
       const failureLogs = errorLog.mock.calls.filter(
         ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
@@ -1359,6 +1352,9 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     });
     await terminalRow(first.jobId);
     await terminalRow(clientJobId);
+    // Run 1 is only done once its replay key is written, which lands after
+    // the row. Starting run 2 sooner lets that late write survive run 2's reset.
+    await waitForTerminalFrame(clientJobId);
 
     const second = await enqueueSingleRun({
       mode: "slow",
@@ -1375,7 +1371,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await terminalRow(second.jobId)).status).toBe("canceled");
 
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
     expect((await terminalRow(clientJobId)).status).toBe("canceled");
@@ -1409,7 +1405,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.error).toBe("Canceled");
   });
 
@@ -1426,7 +1422,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     try {
       expect(await requestCancel(clientJobId)).toBe(true);
       expect((await terminalRow(jobId)).status).toBe("canceled");
-      const frame = await terminalFrame(clientJobId);
+      const frame = await waitForTerminalFrame(clientJobId);
       expect(frame.phase).toBe("failed");
       expect(frame.error).toBe("Canceled");
     } finally {
@@ -1470,7 +1466,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     // queue scan and the artifact read.
     expect(received).toContain(artifactId);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
 
@@ -1505,7 +1501,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(artifactId))?.status).toBe("canceled");
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.error).toBe("Canceled");
   });
 
@@ -1520,7 +1516,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
-    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
+    await waitForTerminalFrame(clientJobId);
 
     const queue = getQueue("image");
     await queue.pause();
@@ -1762,7 +1758,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     // The settle stayed inside the route's authorization: the alias owner
     // is the artifact owner by construction.
     expect(alias?.userId).toBe(owner);
-    const frame = await terminalFrame(clientJobId);
+    const frame = await waitForTerminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
 
@@ -1803,7 +1799,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect(await requestCancel(jobId)).toBe(true);
     expect((await terminalRow(jobId)).status).toBe("canceled");
-    const frame = await terminalFrame(jobId);
+    const frame = await waitForTerminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
   });

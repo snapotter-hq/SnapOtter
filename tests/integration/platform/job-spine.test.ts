@@ -19,18 +19,14 @@ import {
   warmQueueEvents,
 } from "../../../apps/api/src/jobs/enqueue.js";
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
-import {
-  bullPrefix,
-  POOLS,
-  queueName,
-  type ToolJobData,
-} from "../../../apps/api/src/jobs/types.js";
+import { POOLS, queueName, type ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
 import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
   registerToolProcessFn,
   type ToolProcessCtx,
 } from "../../../apps/api/src/routes/tool-factory.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import {
   AcceptedJobTimeoutError,
   cancelAcceptedJobAndWait,
@@ -171,10 +167,7 @@ describe("Job spine", () => {
     // Verify that a terminal SSE frame is retrievable after cancel.
     // publishEphemeral should have written the terminal replay key
     // so reconnecting SSE clients get the frame immediately.
-    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
-    const cached = await sharedRedis().get(terminalKeyName);
-    expect(cached).not.toBeNull();
-    const parsed = JSON.parse(cached!);
+    const parsed = await waitForTerminalFrame(jobId);
     expect(parsed.phase).toBe("failed");
     expect(parsed.error).toBe("Canceled");
     expect(parsed.jobId).toBe(jobId);

@@ -34,6 +34,7 @@ import {
   updateJobProgress,
   updateSingleFileProgress,
 } from "../../../apps/api/src/routes/progress.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 // The jobs.progress column is typed without the batch counters the worker
@@ -240,9 +241,7 @@ describe("late batch frames and the failBatchJob guard", () => {
     expect(row.outputRefs).toEqual(["outputs/x/batch.zip"]);
     expect((row.progress as { result?: unknown } | null)?.result).toEqual(BATCH_RESULT);
 
-    const frame = JSON.parse(
-      (await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)) as string,
-    ) as Record<string, unknown>;
+    const frame = await waitForTerminalFrame(id);
     expect(frame.status).toBe("completed");
     expect(frame.result).toEqual(BATCH_RESULT);
   });
@@ -260,9 +259,10 @@ describe("late batch frames and the failBatchJob guard", () => {
 
     const row = await readJob(id);
     expect(row.status).toBe("canceled");
-    const frame = JSON.parse(
-      (await sharedRedis().get(`${bullPrefix()}:terminal:${id}`)) as string,
-    ) as { status: string; errors: Array<{ filename: string; error: string }> };
+    const frame = (await waitForTerminalFrame(id)) as {
+      status: string;
+      errors: Array<{ filename: string; error: string }>;
+    };
     expect(frame.status).toBe("failed");
     expect(frame.errors[0]).toEqual({ filename: "", error: "Canceled" });
   });
@@ -301,9 +301,7 @@ describe("late batch frames and the failBatchJob guard", () => {
     expect(row.status).toBe("failed");
     expect(row.completedAt).not.toBeNull();
 
-    const raw = await sharedRedis().get(`${bullPrefix()}:terminal:${id}`);
-    expect(raw).not.toBeNull();
-    const frame = JSON.parse(raw as string) as Record<string, unknown>;
+    const frame = await waitForTerminalFrame(id);
     expect(frame.type).toBe("batch");
     expect(frame.status).toBe("failed");
   });

@@ -24,6 +24,7 @@ import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { objectExists } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../helpers/terminal-frame.js";
 import { batchJobIdFor, resolveBatchJobId } from "../batch-alias.js";
 import {
   buildTestApp,
@@ -180,19 +181,12 @@ let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
 
-/** Poll the Redis terminal replay key until the terminal frame appears. */
-async function waitForTerminalFrame(
-  jobId: string,
-  timeoutMs = 30_000,
+/** The batch's terminal frame, found through the client id the test submitted. */
+async function batchTerminalFrame(
+  clientJobId: string,
+  timeoutMs?: number,
 ): Promise<Record<string, unknown>> {
-  const key = `${bullPrefix()}:terminal:${await resolveBatchJobId(jobId)}`;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const raw = await sharedRedis().get(key);
-    if (raw) return JSON.parse(raw) as Record<string, unknown>;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`No terminal frame for ${jobId} within ${timeoutMs}ms`);
+  return waitForTerminalFrame(await resolveBatchJobId(clientJobId), timeoutMs);
 }
 
 beforeAll(async () => {
@@ -863,16 +857,9 @@ describe("Legacy batch SSE wire parity", () => {
     expect(res.statusCode).toBe(200);
 
     // Read the terminal SSE replay frame from Redis
-    const terminalKeyName = `${bullPrefix()}:terminal:${await resolveBatchJobId(clientJobId)}`;
-    let frame: string | null = null;
-    for (let i = 0; i < 40; i++) {
-      frame = await sharedRedis().get(terminalKeyName);
-      if (frame) break;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    expect(frame).not.toBeNull();
-    const parsed = JSON.parse(frame ?? "null");
+    const parsed = (await batchTerminalFrame(clientJobId)) as Record<string, unknown> & {
+      result: { downloadUrl: string; fileResults: Record<string, string> };
+    };
 
     // Legacy semantics: completedFiles = total finished (successes + failures)
     expect(parsed.totalFiles).toBe(3);
@@ -904,7 +891,7 @@ describe("Legacy batch SSE wire parity", () => {
 
     // The parent row replays the same terminal result after the Redis
     // terminal key expires (simulated by deleting it).
-    await sharedRedis().del(terminalKeyName);
+    await sharedRedis().del(`${bullPrefix()}:terminal:${await resolveBatchJobId(clientJobId)}`);
     const sse = await app.inject({
       method: "GET",
       url: `/api/v1/jobs/${clientJobId}/progress`,
@@ -1202,7 +1189,7 @@ describe("Sync-wait expiry", () => {
       // The flow does not care about the response: the finalize still
       // persists the ZIP and publishes the terminal frame the client
       // rides to.
-      const frame = await waitForTerminalFrame(clientJobId);
+      const frame = await batchTerminalFrame(clientJobId);
       expect(frame.status).toBe("completed");
       const result = frame.result as Record<string, unknown>;
       const download = await app.inject({
@@ -1248,7 +1235,7 @@ describe("ZIP packaging failure", () => {
       expect(JSON.parse(res.body).error).toBe("Failed to package batch results");
 
       // The failure is durable: a degraded client settles from this frame.
-      const frame = await waitForTerminalFrame(clientJobId);
+      const frame = await batchTerminalFrame(clientJobId);
       expect(frame.status).toBe("failed");
       const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
       expect(errors.some((e) => e.error === "Failed to package batch results")).toBe(true);
@@ -1286,7 +1273,7 @@ describe("ZIP packaging failure", () => {
         code: "workspace-cap",
       });
 
-      const frame = await waitForTerminalFrame(clientJobId);
+      const frame = await batchTerminalFrame(clientJobId);
       expect(frame.status).toBe("failed");
       const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
       expect(errors.some((e) => e.filename === "" && e.error === "Injected cap at packaging")).toBe(
@@ -1330,7 +1317,7 @@ describe("Workspace storage cap during batch processing", () => {
       expect(payload.code).toBe("workspace-cap");
       expect(payload.errors).toHaveLength(2);
 
-      const frame = await waitForTerminalFrame(clientJobId);
+      const frame = await batchTerminalFrame(clientJobId);
       expect(frame.status).toBe("failed");
       const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
       expect(
@@ -1426,7 +1413,7 @@ describe("Workspace storage cap during batch ingress", () => {
       expect((row?.error as { message?: string } | null)?.message).toBe(
         "Injected cap during ingress",
       );
-      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      const frame = await batchTerminalFrame(clientJobId, 10_000);
       expect(frame.status).toBe("failed");
       const errors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;
       expect(
@@ -1476,7 +1463,7 @@ describe("Workspace storage cap during batch ingress", () => {
         ],
       });
 
-      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      const frame = await batchTerminalFrame(clientJobId, 10_000);
       expect(frame.status).toBe("failed");
       expect(frame.errors).toEqual([
         { filename: "empty.png", error: "File is empty" },
@@ -1519,7 +1506,7 @@ describe("Workspace storage cap during batch ingress", () => {
         details: [{ filename: "", error: "Internal server error" }],
       });
 
-      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      const frame = await batchTerminalFrame(clientJobId, 10_000);
       expect(frame.status).toBe("failed");
       expect(frame.errors).toEqual([{ filename: "", error: "Internal server error" }]);
     } finally {
@@ -1561,7 +1548,7 @@ describe("Batch where every file fails validation", () => {
 
     // No flow exists, so no finalize will ever publish a terminal frame;
     // the route publishes it, or a degraded client waits forever.
-    const frame = await waitForTerminalFrame(clientJobId, 10_000);
+    const frame = await batchTerminalFrame(clientJobId, 10_000);
     expect(frame.status).toBe("failed");
     expect(frame.totalFiles).toBe(2);
     expect(frame.failedFiles).toBe(2);
@@ -1619,7 +1606,7 @@ describe("Batch where every worker job fails", () => {
 
     // The finalize publishes the same outcome as a terminal failed frame,
     // which is what a degraded client displays (#750).
-    const frame = await waitForTerminalFrame(clientJobId, 15_000);
+    const frame = await batchTerminalFrame(clientJobId, 15_000);
     expect(frame.status).toBe("failed");
     expect(frame.failedFiles).toBe(1);
     const frameErrors = (frame.errors ?? []) as Array<{ filename: string; error: string }>;

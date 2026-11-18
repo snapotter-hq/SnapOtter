@@ -19,6 +19,7 @@ import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { waitForTerminalFrame } from "../../../helpers/terminal-frame.js";
 import { resolveBatchJobId, toClientKey } from "../../batch-alias.js";
 import {
   buildTestApp,
@@ -251,8 +252,13 @@ async function childOutputs(clientJobId: string, index: number) {
   return listObjects(`outputs/${await resolveBatchJobId(clientJobId)}-f${index}/`);
 }
 
+/** One read, for checking that no terminal frame was written. */
 async function cachedTerminal(clientJobId: string) {
   return sharedRedis().get(`${bullPrefix()}:terminal:${await resolveBatchJobId(clientJobId)}`);
+}
+
+async function terminalFrame(clientJobId: string) {
+  return waitForTerminalFrame(await resolveBatchJobId(clientJobId));
 }
 
 async function waitForReplyDestroy() {
@@ -334,9 +340,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       details: [{ filename: "", error: "Failed to package batch results" }],
     });
 
-    const cached = await cachedTerminal(clientJobId);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await terminalFrame(clientJobId)).toMatchObject({
       jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
@@ -389,9 +393,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
         details: [{ filename: "", error: "The server's storage service is unavailable." }],
       });
 
-      const cached = await cachedTerminal(clientJobId);
-      expect(cached).not.toBeNull();
-      expect(JSON.parse(cached as string)).toMatchObject({
+      expect(await terminalFrame(clientJobId)).toMatchObject({
         jobId: await resolveBatchJobId(clientJobId),
         type: "batch",
         status: "failed",
@@ -483,9 +485,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       ],
     });
 
-    const cached = await cachedTerminal(clientJobId);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await terminalFrame(clientJobId)).toMatchObject({
       jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
@@ -623,9 +623,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       details: [{ filename: "", error: "Internal server error" }],
     });
 
-    const cached = await cachedTerminal(clientJobId);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await terminalFrame(clientJobId)).toMatchObject({
       jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
@@ -773,9 +771,7 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       ],
     });
 
-    const cached = await cachedTerminal(clientJobId);
-    expect(cached).not.toBeNull();
-    expect(JSON.parse(cached as string)).toMatchObject({
+    expect(await terminalFrame(clientJobId)).toMatchObject({
       jobId: await resolveBatchJobId(clientJobId),
       type: "batch",
       status: "failed",
