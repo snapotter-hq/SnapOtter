@@ -5,7 +5,7 @@
 
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
-const { splitSegments, tokenize, verdict } = require("./input.cjs");
+const { splitCommands, tokenize, verdict } = require("./input.cjs");
 
 const GIT_MUTATORS = new Set([
   "am",
@@ -99,8 +99,8 @@ function isAllowed({ sub, args }) {
 
 function mainCheckoutVerdict(command, cwd) {
   let dir = cwd || process.cwd();
-  for (const segment of splitSegments(command)) {
-    const tokens = tokenize(segment.trim());
+  for (const { line } of splitCommands(command)) {
+    const tokens = tokenize(line.trim());
     if (tokens[0] === "cd" && tokens[1]) {
       dir = path.resolve(dir, tokens[1].replace(/^~(?=\/|$)/, process.env.HOME || "~"));
       continue;

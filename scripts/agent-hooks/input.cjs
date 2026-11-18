@@ -137,6 +137,127 @@ function splitSegments(command) {
   return String(command || "").split(/&&|\|\||[;|\n]/);
 }
 
+// Splits a shell command the way the shell runs it: at && || ; | and newlines,
+// but never inside quotes, $( ), or a heredoc body. Each command comes back as
+// { line, heredocs }, where line is the command without its heredoc bodies.
+// The guards that match on a command's own words use this, so text inside a
+// message or a grep pattern no longer reads as a git or gh invocation.
+// splitSegments stays the cruder, broader split for the secret guards.
+function splitCommands(command) {
+  const s = String(command || "");
+  const commands = [];
+  let line = "";
+  let heredocs = [];
+  let pending = [];
+  let quote = null;
+  let depth = 0;
+  const flush = () => {
+    if (line.trim() || heredocs.length > 0) commands.push({ line, heredocs });
+    line = "";
+    heredocs = [];
+  };
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (quote) {
+      if (c === "\\" && quote === '"' && i + 1 < s.length) {
+        line += c + s[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === quote) quote = null;
+      line += c;
+      i += 1;
+      continue;
+    }
+    if (c === "\\" && i + 1 < s.length) {
+      line += c + s[i + 1];
+      i += 2;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      line += c;
+      i += 1;
+      continue;
+    }
+    if (c === "$" && s[i + 1] === "(") {
+      depth += 1;
+      line += "$(";
+      i += 2;
+      continue;
+    }
+    if (c === ")" && depth > 0) {
+      depth -= 1;
+      line += c;
+      i += 1;
+      continue;
+    }
+    if (c === "<" && s[i + 1] === "<" && s[i + 2] !== "<") {
+      const m = /^<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(s.slice(i));
+      if (m) {
+        pending.push(m[2]);
+        line += m[0];
+        i += m[0].length;
+        continue;
+      }
+    }
+    if (c === "\n" && pending.length > 0) {
+      i += 1;
+      for (const delimiter of pending) {
+        const body = [];
+        while (i < s.length) {
+          const end = s.indexOf("\n", i);
+          const next = s.slice(i, end === -1 ? s.length : end);
+          i = end === -1 ? s.length : end + 1;
+          if (next.replace(/^\t+/, "") === delimiter) break;
+          body.push(next);
+        }
+        heredocs.push(body.join("\n"));
+      }
+      pending = [];
+      flush();
+      continue;
+    }
+    if (depth === 0) {
+      if ((c === "&" && s[i + 1] === "&") || (c === "|" && s[i + 1] === "|")) {
+        flush();
+        i += 2;
+        continue;
+      }
+      if (c === ";" || c === "|" || c === "\n") {
+        flush();
+        i += 1;
+        continue;
+      }
+    }
+    line += c;
+    i += 1;
+  }
+  flush();
+  return commands;
+}
+
+// Expands $NAME and ${NAME} from earlier assignments in the same command, then
+// from the hook's environment. Unknown names are left as written.
+function expandVars(text, vars) {
+  return text.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (match, name) => {
+    if (vars && Object.hasOwn(vars, name)) return vars[name];
+    return process.env[name] ?? match;
+  });
+}
+
+// Records NAME=value and export NAME=value; returns true when the tokens were
+// only assignments.
+function recordAssignments(tokens, vars) {
+  const words = tokens[0] === "export" ? tokens.slice(1) : tokens;
+  if (words.length === 0) return false;
+  const assignments = words.map((t) => /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s.exec(t));
+  if (assignments.some((a) => !a)) return false;
+  for (const [, name, value] of assignments) vars[name] = expandVars(value, vars);
+  return true;
+}
+
 function tokenize(segment) {
   const matches = segment.match(/"[^"]*"|'[^']*'|[^\s]+/g) || [];
   return matches.map((token) => token.replace(/^["']|["']$/g, ""));
@@ -186,12 +307,15 @@ function reportVerdict(v) {
 
 module.exports = {
   collectStrings,
+  expandVars,
   extractCommand,
   extractExplicitFilePaths,
   extractFilePaths,
   gitSubcommand,
   readInput,
+  recordAssignments,
   reportVerdict,
+  splitCommands,
   splitSegments,
   strongestVerdict,
   tokenize,

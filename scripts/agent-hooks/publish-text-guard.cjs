@@ -7,7 +7,14 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { gitSubcommand, splitSegments, tokenize, verdict } = require("./input.cjs");
+const {
+  expandVars,
+  gitSubcommand,
+  recordAssignments,
+  splitCommands,
+  tokenize,
+  verdict,
+} = require("./input.cjs");
 const { findCredential } = require("./secret-content-guard.cjs");
 
 const OUTWARD_KINDS = new Set([
@@ -58,18 +65,37 @@ function withoutCode(text) {
   return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 }
 
-// Text of the files a command reads its message from. Returns the unreadable
-// paths too, because an unverifiable body must not pass silently.
-function bodyText(tokens, dir) {
+// A heredoc redirected into a file earlier in the same command, such as
+// `cat > "$S/body.md" <<'EOF'`. Returns the target path or null.
+function heredocTarget(tokens) {
+  const at = tokens.findIndex((t) => t === ">" || t === ">>" || t === "tee");
+  if (at !== -1 && tokens[at + 1] && !tokens[at + 1].startsWith("-")) return tokens[at + 1];
+  const glued = tokens.find((t) => /^>>?[^>&]/.test(t));
+  return glued ? glued.replace(/^>>?/, "") : null;
+}
+
+// Text of the files a command reads its message from, including files the
+// same command wrote from a heredoc. Returns the unreadable paths too, because
+// an unverifiable body must not pass silently.
+function bodyText(tokens, dir, vars, written, heredocs) {
   const texts = [];
   const unreadable = [];
   tokens.forEach((token, i) => {
     let file = null;
     if (BODY_FLAGS.has(token)) file = tokens[i + 1];
     else if (token.startsWith("--body-file=")) file = token.slice("--body-file=".length);
-    if (!file || file === "-") return;
+    if (!file) return;
+    if (file === "-") {
+      texts.push(...heredocs);
+      return;
+    }
+    const resolved = path.resolve(dir, expandVars(file, vars));
+    if (written.has(resolved)) {
+      texts.push(written.get(resolved));
+      return;
+    }
     try {
-      texts.push(fs.readFileSync(path.resolve(dir, file), "utf8"));
+      texts.push(fs.readFileSync(resolved, "utf8"));
     } catch {
       unreadable.push(file);
     }
@@ -82,12 +108,19 @@ function publishTextVerdict(command, cwd) {
   let outward = false;
   let bodies = "";
   let prose = "";
-  for (const segment of splitSegments(command)) {
-    const tokens = tokenize(segment.trim());
+  let message = "";
+  const vars = {};
+  const written = new Map();
+  for (const { line, heredocs } of splitCommands(command)) {
+    const tokens = tokenize(line.trim());
     if (tokens[0] === "cd" && tokens[1]) {
-      dir = path.resolve(dir, tokens[1].replace(/^~(?=\/|$)/, process.env.HOME || "~"));
+      const target = expandVars(tokens[1], vars).replace(/^~(?=\/|$)/, process.env.HOME || "~");
+      dir = path.resolve(dir, target);
       continue;
     }
+    if (recordAssignments(tokens, vars)) continue;
+    const target = heredocs.length > 0 ? heredocTarget(tokens) : null;
+    if (target) written.set(path.resolve(dir, expandVars(target, vars)), heredocs.join("\n"));
     const kind = kindOf(tokens);
     if (!kind) continue;
     if (kind === "gh pr merge" && !mergeArgsOk(tokens)) {
@@ -96,7 +129,7 @@ function publishTextVerdict(command, cwd) {
         "gh pr merge is missing --match-head-commit <sha> or an explicit --subject (AGENTS.md, squash merge). Add both, or approve this merge as written.",
       );
     }
-    const body = bodyText(tokens, dir);
+    const body = bodyText(tokens, dir, vars, written, heredocs);
     if (body.unreadable.length > 0) {
       return verdict(
         "ask",
@@ -105,10 +138,14 @@ function publishTextVerdict(command, cwd) {
     }
     outward = true;
     bodies += `\n${body.text}`;
+    message += `\n${line}\n${body.text}`;
     prose += `\n${body.text}\n${inlineMessages(tokens).join("\n")}`;
   }
   if (!outward) return null;
 
+  // Credentials are checked across the whole command; the style rules only
+  // look at the outward commands and their bodies, so a grep for an em dash
+  // elsewhere in the same command does not trip them.
   const text = `${command}${bodies}`;
   const credential = findCredential(text);
   if (credential) {
@@ -117,13 +154,13 @@ function publishTextVerdict(command, cwd) {
       `${credential} is in the commit, PR, or issue text. Remove it before publishing.`,
     );
   }
-  if (SESSION_LINK.test(text)) {
+  if (SESSION_LINK.test(message)) {
     return verdict(
       "ask",
       "agent session links and Claude-Session trailers are not allowed in commits, PRs, or issues (AGENTS.md). Remove them, or approve this text as written.",
     );
   }
-  if (EM_DASH.test(text)) {
+  if (EM_DASH.test(message)) {
     return verdict(
       "ask",
       "em dashes are banned in commits, PRs, and issues (AGENTS.md). Use commas, colons, parentheses, or separate sentences, or approve this text as written.",
