@@ -1,8 +1,8 @@
 ---
 description: "Wszystkie zmienne środowiskowe SnapOtter wraz z wartościami domyślnymi. Konfiguracja uwierzytelniania, przechowywania danych, modeli AI, analityki i nie tylko."
-i18n_source_hash: caa895c0ba16
+i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 984925b3e84a
+i18n_output_hash: e1a0c23025b1
 i18n_hash_version: 2
 ---
 
@@ -17,11 +17,13 @@ Cała konfiguracja odbywa się za pomocą zmiennych środowiskowych. Każda zmie
 | Zmienna | Domyślnie | Opis |
 |---|---|---|
 | `PORT` | `1349` | Port, na którym nasłuchuje serwer. |
+| `HOST` | `0.0.0.0` | Adres IP, na którym nasłuchuje serwer. W sieci typu bridge (domyślnej dla `docker run` i Compose) należy pozostawić `0.0.0.0` (lub `::`), w przeciwnym razie opublikowane porty przestaną działać. W instalacji natywnej lub w kontenerze w sieci hosta `127.0.0.1` odcina API od sieci; do zdalnego dostępu należy umieścić przed nim reverse proxy. [Tryb wbudowany](#embedded-mode) działa tylko z `0.0.0.0`, `::` lub `127.0.0.1`, ponieważ jego kontrola uruchomienia odwołuje się do `127.0.0.1`. Przy każdym innym adresie, łącznie z `::1`, kontener nigdy nie zostaje uznany za uruchomiony, a późniejsza awaria zatrzymuje go zamiast ponownie uruchomić serwer. Wszystko, co nie jest adresem IP, łącznie z `localhost`, zatrzymuje serwer przy uruchomieniu. |
 | `BASE_PATH` | (puste) | Publiczna ścieżka wdrożenia, np. `/snapotter`. Puste lub `/` oznacza obsługę w katalogu głównym domeny. Stosowana w czasie działania; przebudowa obrazu nie jest wymagana. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maksymalna liczba żądań na minutę z jednego adresu IP. Ustawienie 0 wyłącza ograniczanie liczby żądań. |
 | `CORS_ORIGIN` | (puste) | Dozwolone źródła (origin) dla CORS, oddzielone przecinkami, lub puste, aby dopuścić tylko to samo źródło. |
 | `LOG_LEVEL` | `info` | Szczegółowość logów. Jedna z wartości: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Określa, które węzły mogą ustawiać adres IP klienta przez `X-Forwarded-For`. Wartość domyślna ufa wyłącznie węzłowi z sieci prywatnej, więc zaufany jest reverse proxy w sieci Docker lub w sieci LAN, a sfałszowany nagłówek publicznego klienta nie. Ustawiać `true` tylko wtedy, gdy przed aplikacją stoi kontrolowany przez użytkownika proxy z publicznym adresem. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Ustawić `off`, aby uruchomić nową instancję z wyłączonym ustawieniem „Anonymous Product Analytics”, dzięki czemu nie wysyła ona niczego od pierwszego rozruchu. Zmienna jedynie wypełnia to ustawienie, dopóki nikt go nie wybrał. Gdy ustawienie zostanie zapisane, przez administratora lub przez tę zmienną, zmiana zmiennej nie daje żadnego efektu; administrator nadal może włączyć analitykę w Settings > System > Privacy. |
 
 ### Uwierzytelnianie {#authentication}
 
@@ -76,12 +78,15 @@ Uruchomienie obrazu bez `DATABASE_URL` i bez `REDIS_URL` powoduje, że wewnątrz
 |---|---|---|
 | `EMBEDDED` | `auto` | Włączana automatycznie, gdy `DATABASE_URL` i `REDIS_URL` nie są ustawione. Ustawienie `0` wyłącza ją (aplikacja kończy wtedy działanie od razu, jeśli nie ustawiono zewnętrznego `DATABASE_URL`/`REDIS_URL`, zamiast po cichu uruchamiać bazę danych w kontenerze). |
 | `REDIS_MAXMEMORY` | `512mb` | Limit pamięci wbudowanego Redis (tylko w trybie wbudowanym). Obniżyć na hostach o ograniczonej pamięci, takich jak Raspberry Pi. |
+| `EMBEDDED_PG_PORT` | `5432` | Port loopback dla wbudowanego PostgreSQL (tylko w trybie wbudowanym). Zmieniać go tylko wtedy, gdy kontener współdzieli sieć, w której port 5432 jest zajęty, np. przy `--network host`. Musi różnić się od `EMBEDDED_REDIS_PORT` i być większy niż 1023, ponieważ PostgreSQL działa jako nieuprzywilejowany użytkownik, który nie może powiązać się z portem uprzywilejowanym w sieci hosta. |
+| `EMBEDDED_REDIS_PORT` | `6379` | To samo dla wbudowanego Redis, który również działa jako nieuprzywilejowany użytkownik. |
+| `EMBEDDED_DB_PASSWORDS` | (puste) | Ustawić `1`, aby przy następnym rozruchu wygenerować losowe hasła dla ról wbudowanego PostgreSQL i dla Redis, przechowywane w `/data/.embedded-db-secrets`. Logowanie przez TCP wymaga wtedy tych haseł. Na wolumenie utworzonym po raz pierwszy przez wersję 2.3.0 lub nowszą superużytkownik PostgreSQL w ogóle nie może logować się przez TCP; na starszym wolumenie właściciel bazy danych jest superużytkownikiem, a chroni go właśnie jego hasło. Należy używać tej opcji zawsze, gdy inne programy współdzielą sieć kontenera, np. przy `--network host`. Dla danego wolumenu pozostaje ona włączona: hasła są używane przy każdym rozruchu, nawet po usunięciu tej zmiennej, a usunięcie `/data/.embedded-db-secrets` daje jedynie nowe hasła albo, jeśli zmienna nie jest ustawiona, rozruch kończący się błędem. Jeśli kontener nie uruchamia się, ponieważ jeden z tych plików jest uszkodzony, należy usunąć ten plik poleceniem `docker run --rm -v <volume>:/data --entrypoint rm snapotter/snapotter:<your tag> -r /data/.embedded-db-secrets/<name>` i ponownie uruchomić kontener; następny rozruch utworzy nowy. Zmienna przyjmuje `1`, `0` lub wartość pustą, a każda inna wartość przerywa rozruch. |
 | `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Liczba sekund, przez które rozruch czeka, aż wbudowany Redis odpowie na `PING`, zanim się podda. Po przekroczeniu limitu kontener zatrzymuje się i zapisuje w logu przyczynę, zamiast się zawiesić. Pełne sekundy od 1 do 999999; nie ma wartości nieograniczonej, ponieważ nieskończone oczekiwanie to właśnie awaria, której ten limit ma zapobiegać. Zwiększać tylko wtedy, gdy wolny host go przekracza. |
 | `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | To samo dla wbudowanego PostgreSQL. Odliczanie zaczyna się po zakończeniu `initdb` przy pierwszym rozruchu, więc obejmuje start serwera i odzyskiwanie po awarii, a nie początkowe tworzenie bazy danych. |
 
 Aktualizacja z wersji 1.x: umieścić dawny `snapotter.db` w `/data/snapotter.db` na wolumenie, a tryb wbudowany zaimportuje go do wbudowanego PostgreSQL przy pierwszym rozruchu. Import odbywa się jednorazowo; kolejne rozruchy go pomijają.
 
-Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu, jak każda inna konfiguracja. Opublikowany obraz jest dostarczany z włączoną analityką; aby ją wyłączyć, należy zbudować obraz z `--build-arg SNAPOTTER_ANALYTICS=off` lub użyć wyłączenia w aplikacji przez administratora.
+Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu, jak każda inna konfiguracja. Opublikowany obraz jest dostarczany z włączoną analityką; aby ją wyłączyć, należy zbudować obraz z `--build-arg SNAPOTTER_ANALYTICS=off`, ustawić `SNAPOTTER_ANALYTICS_DEFAULT=off` przed pierwszym rozruchem lub użyć wyłączenia w aplikacji przez administratora.
 
 ### Limity przetwarzania {#processing-limits}
 
@@ -92,11 +97,16 @@ Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie anal
 | `CONCURRENT_JOBS` | `0` (auto) | Liczba zadań wsadowych uruchamianych równolegle. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
 | `MAX_MEGAPIXELS` | `0` (bez limitu) | Maksymalna dozwolona rozdzielczość obrazu w megapikselach. Ustawienie 0 oznacza brak limitu. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maksymalna liczba wątków roboczych do przetwarzania obrazów. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
-| `PROCESSING_TIMEOUT_S` | `0` (bez limitu) | Maksymalny czas przetwarzania jednego żądania w sekundach. Ustawienie 0 oznacza brak limitu czasu. |
+| `PROCESSING_TIMEOUT_S` | `0` (bez limitu) | Limit czasu każdego wywołania sidecara Python, który uruchamia narzędzia AI, w sekundach. Ustawienie 0 oznacza brak limitu czasu. Nie ogranicza zadań dotyczących obrazów, PDF ani multimediów; robią to `JOB_TIMEOUT_FAST_S` i `JOB_TIMEOUT_LONG_S`. |
+| `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Liczba sekund bezczynności sidecara Python AI i środowiska dokładnego OCR, po których kończą one działanie i zwalniają pamięć (po rozgrzaniu około 1,3 GB i 0,7 GB). Oba uruchamiają się ponownie przy następnym żądaniu, więc pierwsze wywołanie AI po zakończeniu z powodu bezczynności ponosi koszt uruchomienia bibliotek, kilka sekund. Ustawienie 0 utrzymuje je w działaniu. Wartość domyślna odpowiada `AI_SESSION_IDLE_TIMEOUT`, więc załadowane modele nie są zwalniane wcześniej, niż przewiduje to ustawienie. Po zwiększeniu `AI_SESSION_IDLE_TIMEOUT` należy odpowiednio zwiększyć także tę wartość. |
+| `JOB_TIMEOUT_FAST_S` | `120` | Limit czasu jednego zadania w szybkich pulach (narzędzia do obrazów i dokumentów), w sekundach. Zadanie, które trwa dłużej, kończy się błędem przekroczenia limitu czasu. Ustawienie 0 oznacza brak limitu. |
+| `JOB_TIMEOUT_LONG_S` | `7200` | Limit czasu jednego zadania w długich pulach (narzędzia AI i multimedialne oraz każde narzędzie oznaczone jako długotrwałe), w sekundach. Ustawienie 0 oznacza brak limitu. OCR PDF w trybach Balanced i Best sam wydłuża swój limit czasu zależnie od liczby stron (2 i 5 minut na stronę), maksymalnie do 6 godzin, więc duży PDF nie wymaga zwiększania tej wartości. |
+| `SYNC_WAIT_MS` | `8000` | Jak długo żądanie narzędzia czeka na swoje zadanie, zanim API przestanie czekać i zwróci `202` z identyfikatorem zadania do śledzenia przez SSE, w milisekundach. Nie zatrzymuje to zadania. Ustawienie 0 oznacza czekanie na zadanie bez względu na to, jak długo trwa. |
 | `MAX_PIPELINE_STEPS` | `20` | Maksymalna liczba kroków w potoku. Ustawienie 0 oznacza brak limitu. |
 | `MAX_CANVAS_PIXELS` | `0` (bez limitu) | Maksymalny rozmiar płótna w pikselach dla obrazów wyjściowych. Ustawienie 0 oznacza brak limitu. |
 | `MAX_SVG_SIZE_MB` | `50` | Największy SVG akceptowany przed sanityzacją, w megabajtach. `0` zachowuje się tu inaczej niż w sąsiednich wierszach. Całkowicie usuwa limit rozmiaru przed parsowaniem, zamiast go podnosić, dlatego tę zmienną należy pozostawić ustawioną. |
 | `MAX_PDF_PAGES` | `0` (bez limitu) | Maksymalna liczba stron PDF przy konwersji PDF na obraz. Ustawienie 0 oznacza brak limitu. |
+| `MAX_SETTINGS_PAYLOAD_KB` | `64` | Największe pole `settings`, jakie może zawierać żądanie narzędzia, w kilobajtach, liczone w bajtach UTF-8. Żądania przekraczające limit otrzymują `400`. Ustawienie 0 oznacza brak limitu. Rzeczywiste ustawienia narzędzi są znacznie mniejsze niż 64 KB, więc tę wartość należy zwiększać tylko wtedy, gdy klient wysyła nietypowo duże ustawienia. |
 
 ### Silniki {#engines}
 
@@ -109,11 +119,15 @@ SnapOtter wyszukuje każdy plik wykonywalny przetwarzania w `$PATH` wewnątrz ko
 | `QPDF_PATH` | (puste) | Ścieżka do `qpdf`, używanego przez narzędzia PDF i do sprawdzania przesłanych plików PDF. |
 | `SOFFICE_PATH` | (puste) | Ścieżka do `soffice` z LibreOffice, używanego do konwersji dokumentów biurowych. |
 | `PDFCPU_PATH` | (puste) | Ścieżka do `pdfcpu`, używanego przez niektóre narzędzia PDF. |
+| `GS_PATH` | (puste) | Ścieżka do `gs` z Ghostscript, używanego przez narzędzia PDF i OCR PDF. |
+| `PANDOC_PATH` | (puste) | Ścieżka do `pandoc`, używanego przy konwersjach dokumentów. |
+| `SNAPOTTER_FONT_FILE` | (puste) | Plik czcionki dla tekstu nanoszonego na wideo (wypalanie napisów, znak wodny na wideo). Puste oznacza użycie pierwszej czcionki, którą znajdzie obraz. |
+| `SNAPOTTER_FONT_FAMILY` | (puste) | Nazwa rodziny czcionki `SNAPOTTER_FONT_FILE`. Puste oznacza `Sans`. |
 | `SNAPOTTER_HW_ACCEL` | (puste) | Rodzina sprzętowych koderów wideo, `nvenc` lub `vaapi`. Puste oznacza kodowanie programowe. |
 
 `SNAPOTTER_HW_ACCEL` wymaga ffmpeg zbudowanego z tą rodziną koderów, a ffmpeg w obrazie nie ma żadnej z nich. Przy własnym pliku wykonywalnym obrazu ustawienie wraca do kodowania programowego i informuje o tym w logu uruchomienia. Aby z niego skorzystać, należy zamontować własną kompilację ffmpeg, wskazać ją w `FFMPEG_PATH` i `FFPROBE_PATH` oraz udostępnić kontenerowi urządzenie GPU. Dla `nvenc` ustawić także `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: obraz prosi tylko o `compute,utility`, a bez `video` środowisko NVIDIA nie montuje biblioteki kodowania, więc koder jest widoczny na liście, ale każde kodowanie kończy się błędem. Nadpisanie ścieżki, która nie istnieje lub nie jest wykonywalna, również jest zapisywane w logu uruchomienia, a każde zadanie wymagające tego pliku kończy się błędem, dopóki ścieżka nie zostanie poprawiona lub zmienna usunięta.
 
-Opublikowane pliki Compose przekazują wszystkie sześć zmiennych z `.env`, więc wystarczy ustawić je tam.
+Opublikowane pliki Compose przekazują wszystkie te zmienne z `.env`, więc wystarczy ustawić je tam.
 
 ### Czyszczenie {#cleanup}
 

@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
-i18n_source_hash: caa895c0ba16
+i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 4df09c1703e8
+i18n_output_hash: 1fa494781b1c
 i18n_hash_version: 2
 ---
 
@@ -17,11 +17,13 @@ Alle configuratie verloopt via omgevingsvariabelen. Elke variabele heeft een zin
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `PORT` | `1349` | Poort waarop de server luistert. |
+| `HOST` | `0.0.0.0` | IP-adres waarop de server luistert. Houd op een bridge-netwerk (de standaard voor `docker run` en Compose) `0.0.0.0` (of `::`) aan, anders werken gepubliceerde poorten niet meer. Bij een native installatie of een container op het hostnetwerk houdt `127.0.0.1` de API van het netwerk af; zet er een reverse proxy voor voor toegang op afstand. De [embedded-modus](#embedded-mode) werkt alleen met `0.0.0.0`, `::` of `127.0.0.1`, omdat de opstartcontrole ervan `127.0.0.1` aanroept. Met elk ander adres, `::1` inbegrepen, geldt de container nooit als gestart, en een latere crash stopt hem in plaats van de server opnieuw te starten. Alles wat geen IP-adres is, `localhost` inbegrepen, stopt de server bij het opstarten. |
 | `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijvoorbeeld `/snapotter`. Leeg of `/` serveert op de hoofdmap van het domein. Wordt tijdens runtime toegepast; er is geen nieuwe image-build nodig. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
 | `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
 | `LOG_LEVEL` | `info` | Uitgebreidheid van de logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. De standaardinstelling vertrouwt alleen een peer in een privénetwerk, zodat een reverse proxy op een Docker-netwerk of LAN wordt vertrouwd en een vervalste header van een publieke client niet. Stel `true` alleen in als er een proxy onder uw beheer op een openbaar adres voor staat. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Stel in op `off` om een nieuwe instantie te starten met "Anonymous Product Analytics" uitgeschakeld, zodat die vanaf de eerste start niets verstuurt. Het vult de instelling alleen in zolang niemand er een waarde voor heeft gekozen. Zodra de instelling is opgeslagen, door een beheerder of door deze variabele, heeft het wijzigen van de variabele geen effect; een beheerder kan analytics nog steeds inschakelen onder Settings > System > Privacy. |
 
 ### Authenticatie {#authentication}
 
@@ -76,12 +78,15 @@ Start u de image zonder `DATABASE_URL` en zonder `REDIS_URL`, dan start hij binn
 |---|---|---|
 | `EMBEDDED` | `auto` | Wordt automatisch ingeschakeld wanneer zowel `DATABASE_URL` als `REDIS_URL` niet zijn ingesteld. Stel in op `0` om uit te schakelen (de app stopt dan direct als er geen externe `DATABASE_URL`/`REDIS_URL` is ingesteld, in plaats van stilzwijgend een database in de container te starten). |
 | `REDIS_MAXMEMORY` | `512mb` | Geheugenlimiet voor de embedded Redis (alleen embedded-modus). Verlaag deze op hosts met weinig geheugen, zoals een Raspberry Pi. |
+| `EMBEDDED_PG_PORT` | `5432` | Loopbackpoort voor de embedded PostgreSQL (alleen embedded-modus). Wijzig deze alleen als de container een netwerk deelt waarop 5432 al bezet is, zoals bij `--network host`. De poort moet verschillen van `EMBEDDED_REDIS_PORT` en boven 1023 liggen, omdat PostgreSQL draait als onbevoorrechte gebruiker die op het hostnetwerk geen bevoorrechte poort kan binden. |
+| `EMBEDDED_REDIS_PORT` | `6379` | Hetzelfde, voor de embedded Redis, die ook als onbevoorrechte gebruiker draait. |
+| `EMBEDDED_DB_PASSWORDS` | (leeg) | Stel in op `1` om bij de volgende start willekeurige wachtwoorden te genereren voor de rollen van de embedded PostgreSQL en voor Redis, bewaard in `/data/.embedded-db-secrets`. TCP-logins hebben ze daarna nodig. Op een volume dat voor het eerst door 2.3.0 of later is aangemaakt, kan de PostgreSQL-superuser helemaal niet via TCP inloggen; op een ouder volume is de database-eigenaar de superuser, en is het wachtwoord daarvan wat hem beschermt. Gebruik dit telkens wanneer andere programma's het netwerk van de container delen, zoals bij `--network host`. Het blijft aan voor dat volume: de wachtwoorden worden bij elke start gebruikt, ook als u deze variabele verwijdert, en het verwijderen van `/data/.embedded-db-secrets` levert u alleen nieuwe op, of een start die mislukt als de variabele niet is ingesteld. Start de container niet omdat een van die bestanden beschadigd is, verwijder dat bestand dan met `docker run --rm -v <volume>:/data --entrypoint rm snapotter/snapotter:<your tag> -r /data/.embedded-db-secrets/<name>` en start de container opnieuw; de volgende start maakt een nieuw bestand aan. De variabele accepteert `1`, `0` of leeg, en elke andere waarde stopt het opstarten. |
 | `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Aantal seconden dat het opstarten wacht tot de embedded Redis antwoordt op `PING` voordat het opgeeft. Bij een time-out stopt de container en logt hij waarom, in plaats van te blijven hangen. Hele seconden van 1 tot 999999; er is geen onbeperkte waarde, omdat eindeloos wachten juist de storing is die deze grens moet voorkomen. Verhoog dit alleen als een trage host de grens bereikt. |
 | `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Hetzelfde, voor de embedded PostgreSQL. De klok start nadat `initdb` bij de eerste start klaar is, dus hij dekt het starten van de server en het herstel na een crash, niet het aanmaken van de database zelf. |
 
 Upgraden vanaf 1.x: plaats uw oude `snapotter.db` op `/data/snapotter.db` in het volume en de embedded-modus importeert het bij de eerste start in de embedded PostgreSQL. De import wordt één keer uitgevoerd; latere starts slaan hem over.
 
-Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics ingeschakeld; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, of gebruik de opt-out voor beheerders in de app, om dit uit te schakelen.
+Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics ingeschakeld; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, stel `SNAPOTTER_ANALYTICS_DEFAULT=off` in vóór de eerste start, of gebruik de opt-out voor beheerders in de app, om dit uit te schakelen.
 
 ### Verwerkingslimieten {#processing-limits}
 
@@ -92,11 +97,16 @@ Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de 
 | `CONCURRENT_JOBS` | `0` (automatisch) | Aantal batchjobs dat parallel draait. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
 | `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane afbeeldingsresolutie in megapixels. Stel in op 0 voor onbeperkt. |
 | `MAX_WORKER_THREADS` | `0` (automatisch) | Maximaal aantal workerthreads voor beeldverwerking. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
-| `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Maximale verwerkingstijd per verzoek in seconden. Stel in op 0 voor geen time-out. |
+| `PROCESSING_TIMEOUT_S` | `0` (geen limiet) | Time-out voor elke aanroep van de Python-sidecar die de AI-tools uitvoert, in seconden. Stel in op 0 voor geen limiet. Het begrenst geen afbeeldings-, PDF- of mediajobs; dat doen `JOB_TIMEOUT_FAST_S` en `JOB_TIMEOUT_LONG_S`. |
+| `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Aantal seconden dat de Python-AI-sidecar en de nauwkeurige OCR-runtime inactief blijven voordat ze afsluiten en hun geheugen vrijgeven (ongeveer 1,3 GB en 0,7 GB zodra ze warm zijn). Beide starten opnieuw bij het volgende verzoek, dus de eerste AI-aanroep na een afsluiting wegens inactiviteit betaalt de opstartkosten van de bibliotheken, enkele seconden. Stel in op 0 om ze actief te houden. De standaard komt overeen met `AI_SESSION_IDLE_TIMEOUT`, zodat geladen modellen niet eerder worden verwijderd dan die instelling aangeeft. Verhoogt u `AI_SESSION_IDLE_TIMEOUT`, verhoog dit dan mee. |
+| `JOB_TIMEOUT_FAST_S` | `120` | Deadline voor één job op de snelle pools (afbeeldings- en documenttools), in seconden. Een job die langer duurt, mislukt met een time-outfout. Stel in op 0 voor geen limiet. |
+| `JOB_TIMEOUT_LONG_S` | `7200` | Deadline voor één job op de lange pools (AI- en mediatools, plus elke tool die als langlopend is gemarkeerd), in seconden. Stel in op 0 voor geen limiet. Balanced en Best PDF-OCR verlengen hun eigen deadline op basis van het aantal pagina's (2 en 5 minuten per pagina), tot 6 uur, dus voor een grote PDF hoeft u dit niet te verhogen. |
+| `SYNC_WAIT_MS` | `8000` | Hoe lang een toolverzoek op zijn job wacht voordat de API stopt met wachten en `202` teruggeeft met een job-id om via SSE te volgen, in milliseconden. Het stopt de job niet. Stel in op 0 om op de job te wachten, hoe lang die ook duurt. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximaal aantal stappen in een pipeline. Stel in op 0 voor geen limiet. |
 | `MAX_CANVAS_PIXELS` | `0` (geen limiet) | Maximale canvasgrootte in pixels voor uitvoerafbeeldingen. Stel in op 0 voor geen limiet. |
 | `MAX_SVG_SIZE_MB` | `50` | Grootste SVG die vóór het opschonen wordt geaccepteerd, in megabytes. `0` gedraagt zich hier anders dan in de rijen eromheen. Het verwijdert de groottelimiet vóór het parsen volledig in plaats van die te verhogen, dus laat deze ingesteld. |
 | `MAX_PDF_PAGES` | `0` (onbeperkt) | Maximaal aantal PDF-pagina's voor PDF-naar-afbeelding-conversie. Stel in op 0 voor onbeperkt. |
+| `MAX_SETTINGS_PAYLOAD_KB` | `64` | Grootste `settings`-veld dat een toolverzoek mag bevatten, in kilobytes, geteld in UTF-8-bytes. Verzoeken boven de limiet krijgen een `400`. Stel in op 0 voor geen limiet. Echte toolinstellingen zijn veel kleiner dan 64 KB, dus verhoog dit alleen als een client ongebruikelijk grote instellingen verstuurt. |
 
 ### Engines {#engines}
 
@@ -109,11 +119,15 @@ SnapOtter zoekt elk verwerkingsprogramma op `$PATH` binnen de container, dus dez
 | `QPDF_PATH` | (leeg) | Pad naar `qpdf`, gebruikt door de PDF-tools en om geüploade PDF's te controleren. |
 | `SOFFICE_PATH` | (leeg) | Pad naar `soffice` van LibreOffice, gebruikt voor conversies van kantoordocumenten. |
 | `PDFCPU_PATH` | (leeg) | Pad naar `pdfcpu`, gebruikt door sommige PDF-tools. |
+| `GS_PATH` | (leeg) | Pad naar `gs` van Ghostscript, gebruikt door de PDF-tools en PDF-OCR. |
+| `PANDOC_PATH` | (leeg) | Pad naar `pandoc`, gebruikt door documentconversies. |
+| `SNAPOTTER_FONT_FILE` | (leeg) | Lettertypebestand voor tekst die op video wordt getekend (ondertitels inbranden, videowatermerk). Leeg gebruikt het eerste lettertype dat de image vindt. |
+| `SNAPOTTER_FONT_FAMILY` | (leeg) | Familienaam van `SNAPOTTER_FONT_FILE`. Leeg betekent `Sans`. |
 | `SNAPOTTER_HW_ACCEL` | (leeg) | Familie van hardwarematige video-encoders, `nvenc` of `vaapi`. Leeg codeert in software. |
 
 `SNAPOTTER_HW_ACCEL` vereist een ffmpeg die met die encoderfamilie is gebouwd, en de ffmpeg in de image heeft geen van beide. Met het eigen programma van de image valt de instelling terug op software-encodering en meldt dat in het opstartlog. Om het te gebruiken mount u uw eigen ffmpeg-build, wijst u `FFMPEG_PATH` en `FFPROBE_PATH` ernaar en geeft u de container het GPU-apparaat. Stel voor `nvenc` ook `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video` in: de image vraagt alleen om `compute,utility`, en zonder `video` mount de NVIDIA-runtime de encodeerbibliotheek niet, zodat de encoder wel wordt vermeld maar elke encodering mislukt. Een padoverschrijving die niet bestaat of niet uitvoerbaar is, wordt eveneens in het opstartlog genoemd, en elke job die dat programma nodig heeft mislukt totdat u het pad herstelt of de instelling verwijdert.
 
-De gepubliceerde Compose-bestanden geven alle zes door vanuit `.env`, dus instellen daar volstaat.
+De gepubliceerde Compose-bestanden geven ze allemaal door vanuit `.env`, dus instellen daar volstaat.
 
 ### Opschonen {#cleanup}
 
