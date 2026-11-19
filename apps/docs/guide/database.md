@@ -30,7 +30,7 @@ Active login sessions. Each row ties a session token to a user.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | varchar | Primary key (session token) |
+| `id` | varchar | Primary key (SHA-256 hash of the session token) |
 | `userId` | uuid | Foreign key to `users.id` |
 | `expiresAt` | timestamp | Expiry time |
 | `createdAt` | timestamp | Creation time |

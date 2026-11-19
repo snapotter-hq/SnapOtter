@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 PostgreSQL 데이터베이스 스키마, 테이블, 마이그레이션, 백업 절차를 설명합니다."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 51ea83d245c6
+i18n_output_hash: 6949c0326de2
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter는 데이터 영속성을 위해 PostgreSQL 17과 [Drizzle ORM](https:
 
 | 컬럼 | 타입 | 참고 |
 |---|---|---|
-| `id` | varchar | 기본 키(세션 토큰) |
+| `id` | varchar | 기본 키(세션 토큰의 SHA-256 해시) |
 | `userId` | uuid | `users.id`에 대한 외래 키 |
 | `expiresAt` | timestamp | 만료 시각 |
 | `createdAt` | timestamp | 생성 시각 |

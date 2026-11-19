@@ -14,6 +14,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.js");
 
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import type { TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -1627,7 +1628,7 @@ describe("POST /api/auth/mfa/complete maxSessionsPerUser enforcement (#2540)", (
       // Seed a second session older than t1's follow-up login so the user already holds 2 sessions.
       const t0 = randomUUID();
       await db.insert(schema.sessions).values({
-        id: t0,
+        id: hashSessionToken(t0),
         userId,
         createdAt: new Date(Date.now() - 60_000),
         expiresAt: new Date(Date.now() + 3_600_000),
@@ -1723,7 +1724,7 @@ describe("POST /api/auth/mfa/complete maxSessionsPerUser enforcement (#2540)", (
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, userId))
         .orderBy(asc(schema.sessions.createdAt));
-      expect(remaining.map((r) => r.id)).toEqual([t1, t2]);
+      expect(remaining.map((r) => r.id)).toEqual([t1, t2].map(hashSessionToken));
     } finally {
       await db.delete(schema.users).where(eq(schema.users.id, userId));
     }

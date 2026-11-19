@@ -92,6 +92,13 @@
       "when": 1792500000000,
       "tag": "0012_settings_password_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795074249143,
+      "tag": "0013_sessions_hash_token_id",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,8 @@
 ---
 description: "Esquema do banco de dados PostgreSQL, tabelas, migrações e procedimentos de backup do SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 532bf68bb799
+i18n_output_hash: 1d3841c34087
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Sessões de login ativas. Cada linha associa um token de sessão a um usuário.
 
 | Coluna | Tipo | Observações |
 |---|---|---|
-| `id` | varchar | Chave primária (token de sessão) |
+| `id` | varchar | Chave primária (hash SHA-256 do token de sessão) |
 | `userId` | uuid | Chave estrangeira para `users.id` |
 | `expiresAt` | timestamp | Data de expiração |
 | `createdAt` | timestamp | Data de criação |

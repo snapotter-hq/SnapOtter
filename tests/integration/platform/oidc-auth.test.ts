@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { loadEnv } from "../../../apps/api/src/lib/env.js";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
@@ -82,7 +83,7 @@ async function createOidcUser(
   // Create a session (simulates what the OIDC callback would do)
   const sessionToken = randomUUID();
   await db.insert(schema.sessions).values({
-    id: sessionToken,
+    id: hashSessionToken(sessionToken),
     userId,
     expiresAt: new Date(Date.now() + 3_600_000),
     idToken: "mock-id-token-jwt",
@@ -100,7 +101,7 @@ async function createOidcSession(
 ): Promise<string> {
   const sessionToken = randomUUID();
   await db.insert(schema.sessions).values({
-    id: sessionToken,
+    id: hashSessionToken(sessionToken),
     userId,
     expiresAt: opts.expiresAt ?? new Date(Date.now() + 3_600_000),
     idToken: opts.idToken ?? null,
@@ -133,7 +134,7 @@ async function _createHybridUser(
 
   const sessionToken = randomUUID();
   await db.insert(schema.sessions).values({
-    id: sessionToken,
+    id: hashSessionToken(sessionToken),
     userId,
     expiresAt: new Date(Date.now() + 3_600_000),
   });
@@ -327,7 +328,7 @@ describe("Users list includes OIDC fields", () => {
     });
     const sessionToken = randomUUID();
     await db.insert(schema.sessions).values({
-      id: sessionToken,
+      id: hashSessionToken(sessionToken),
       userId,
       expiresAt: new Date(Date.now() + 3_600_000),
     });
@@ -1067,7 +1068,7 @@ describe("OIDC callback edge cases", () => {
     });
     const sessionToken = randomUUID();
     await db.insert(schema.sessions).values({
-      id: sessionToken,
+      id: hashSessionToken(sessionToken),
       userId,
       expiresAt: new Date(Date.now() + 3_600_000),
       idToken: "mock-id-token-jwt",
@@ -1088,7 +1089,7 @@ describe("OIDC callback edge cases", () => {
     const [gone] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken));
+      .where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
     expect(gone).toBeUndefined();
   });
 });
@@ -1211,7 +1212,7 @@ describe("Session expiry", () => {
     const [session] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, expiredToken));
+      .where(eq(schema.sessions.id, hashSessionToken(expiredToken)));
     expect(session).toBeUndefined();
   });
 });
@@ -1312,7 +1313,7 @@ describe("Logout", () => {
     const [before] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken));
+      .where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
     expect(before).toBeDefined();
 
     await testApp.app.inject({
@@ -1325,7 +1326,7 @@ describe("Logout", () => {
     const [after] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken));
+      .where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
     expect(after).toBeUndefined();
   });
 });

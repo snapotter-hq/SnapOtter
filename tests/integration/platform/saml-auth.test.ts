@@ -20,6 +20,7 @@ import { loadEnv } from "../../../apps/api/src/lib/env.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
@@ -970,7 +971,7 @@ describe("SAML callback", () => {
       await db
         .update(schema.sessions)
         .set({ createdAt: new Date(Date.now() - 60_000) })
-        .where(eq(schema.sessions.id, t1 as string));
+        .where(eq(schema.sessions.id, hashSessionToken(t1 as string)));
 
       const r2 = await postCallback();
       expect(r2.statusCode).toBe(302);
@@ -1045,7 +1046,9 @@ describe("SAML callback", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, userId))
         .orderBy(asc(schema.sessions.createdAt));
-      expect(midSessions.map((r) => r.id)).toEqual([t1, t2]);
+      expect(midSessions.map((r) => r.id)).toEqual(
+        [t1, t2].map((t) => hashSessionToken(t as string)),
+      );
 
       // 3. Third SAML login succeeds and evicts t1 (oldest).
       const r3 = await postCallback();
@@ -1058,7 +1061,9 @@ describe("SAML callback", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, userId))
         .orderBy(asc(schema.sessions.createdAt));
-      expect(remaining.map((r) => r.id)).toEqual([t2, t3]);
+      expect(remaining.map((r) => r.id)).toEqual(
+        [t2, t3].map((t) => hashSessionToken(t as string)),
+      );
     } finally {
       await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
     }

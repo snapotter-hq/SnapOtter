@@ -46,9 +46,9 @@ After acknowledging your report, we will keep you informed of our progress towar
 ### Authentication and Access Control
 
 - **Password hashing**: scrypt with 32-byte random salt and 64-byte derived key
-- **Timing-safe comparison**: All credential verification uses `crypto.timingSafeEqual` to prevent timing attacks
+- **Timing-safe comparison**: Password and API key verification uses `crypto.timingSafeEqual` to prevent timing attacks; session tokens are looked up by their SHA-256 hash, so a caller can't steer the comparison byte by byte
 - **Password policy**: Defaults to 8 characters with uppercase, lowercase, and numeric requirements; admins can change each rule (length 1 to 128) in Settings > Security
-- **Session management**: Cryptographically random UUIDs, configurable expiration (`SESSION_DURATION_HOURS`), automatic cleanup of expired sessions
+- **Session management**: Cryptographically random UUIDs, stored only as a SHA-256 hash so a read of the sessions table can't be replayed as a login, configurable expiration (`SESSION_DURATION_HOURS`), automatic cleanup of expired sessions
 - **Credential rotation**: Password changes invalidate all other sessions and revoke all API keys for the affected user
 - **Brute-force protection**: Per-endpoint rate limiting on the login route (`LOGIN_ATTEMPT_LIMIT`)
 - **API keys**: Hashed with scrypt (same parameters as passwords), SHA-256 prefix index for O(1) lookup, optional expiration, scoped permissions

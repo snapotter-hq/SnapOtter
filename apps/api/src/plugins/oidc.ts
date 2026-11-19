@@ -25,7 +25,7 @@ import {
 } from "../lib/oidc-faults.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
 import { evictExcessUserSessions, readMaxSessionsPerUser } from "../lib/session-cookie.js";
-import { createSessionToken } from "./auth.js";
+import { createSessionToken, hashSessionToken } from "../lib/session-token.js";
 import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -700,13 +700,14 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
       await db.transaction(async (tx) => {
+        const sessionId = hashSessionToken(token);
         await tx.insert(schema.sessions).values({
-          id: token,
+          id: sessionId,
           userId: resolvedUser.id,
           expiresAt,
           idToken,
         });
-        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, token);
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, sessionId);
       });
 
       markStateConsumed(storedState.state);

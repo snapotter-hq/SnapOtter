@@ -18,6 +18,7 @@ import {
   readMaxSessionsPerUser,
   setSessionCookie,
 } from "../lib/session-cookie.js";
+import { createSessionToken, hashSessionToken } from "../lib/session-token.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -25,7 +26,7 @@ import {
   isDisabledRole,
   requirePermission,
 } from "../permissions.js";
-import { AUTH_BODY_LIMIT_BYTES, createSessionToken, requireAuth } from "./auth.js";
+import { AUTH_BODY_LIMIT_BYTES, requireAuth } from "./auth.js";
 
 // ── Constants ─────────────────────────────────────────────────────
 
@@ -1008,13 +1009,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             }
           }
 
+          const sessionId = hashSessionToken(token);
+
           await tx.insert(schema.sessions).values({
-            id: token,
+            id: sessionId,
             userId: verifiedUser.id,
             expiresAt,
           });
 
-          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, sessionId);
 
           const [teamRow] = await tx
             .select()
@@ -1319,13 +1322,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             .set({ totpEnabled: true, updatedAt: new Date() })
             .where(eq(schema.users.id, verifiedUser.id));
 
+          const sessionId = hashSessionToken(token);
+
           await tx.insert(schema.sessions).values({
-            id: token,
+            id: sessionId,
             userId: verifiedUser.id,
             expiresAt,
           });
 
-          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, sessionId);
 
           const [teamRow] = await tx
             .select()

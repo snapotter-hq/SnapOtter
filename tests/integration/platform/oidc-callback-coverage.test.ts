@@ -115,6 +115,7 @@ const oidcModule = await import("../../../apps/api/src/plugins/oidc.js");
 const { getOidcEndSessionEndpoint } = oidcModule;
 const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import type { TestApp } from "../test-server.js";
 import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
@@ -516,7 +517,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const [before] = await db
         .select()
         .from(schema.sessions)
-        .where(eq(schema.sessions.id, sessionToken ?? ""));
+        .where(eq(schema.sessions.id, hashSessionToken(sessionToken ?? "")));
       expect(before?.idToken).toBe("fake-id-token");
 
       const res = await oidcApp.app.inject({
@@ -549,7 +550,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const [session] = await db
         .select()
         .from(schema.sessions)
-        .where(eq(schema.sessions.id, sessionToken ?? ""));
+        .where(eq(schema.sessions.id, hashSessionToken(sessionToken ?? "")));
       expect(session).toBeUndefined();
       expect(reportErrorSpy).not.toHaveBeenCalled();
     });
@@ -626,7 +627,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     const [session] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken));
+      .where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
     expect(session).toBeUndefined();
   }
 
@@ -673,7 +674,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     const [session] = await db
       .select()
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, sessionToken));
+      .where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
     expect(session).toBeUndefined();
   }
 

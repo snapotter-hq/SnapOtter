@@ -1,8 +1,8 @@
 ---
 description: "Databasschema, tabeller, migreringar och säkerhetskopieringsrutiner för PostgreSQL i SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 91f79dd431c6
+i18n_output_hash: 8e7e7f768cdd
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Aktiva inloggningssessioner. Varje rad kopplar en sessionstoken till en använda
 
 | Kolumn | Typ | Anmärkningar |
 |---|---|---|
-| `id` | varchar | Primärnyckel (sessionstoken) |
+| `id` | varchar | Primärnyckel (SHA-256-hash av sessionstoken) |
 | `userId` | uuid | Främmande nyckel till `users.id` |
 | `expiresAt` | timestamp | Utgångstid |
 | `createdAt` | timestamp | Skapandetid |

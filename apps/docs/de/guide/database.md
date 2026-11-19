@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 3d541b502f2e
+i18n_output_hash: a2f94e43cb15
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Aktive Anmeldesitzungen. Jede Zeile verknüpft ein Sitzungstoken mit einem Benut
 
 | Spalte | Typ | Hinweise |
 |---|---|---|
-| `id` | varchar | Primärschlüssel (Sitzungstoken) |
+| `id` | varchar | Primärschlüssel (SHA-256-Hash des Sitzungstokens) |
 | `userId` | uuid | Fremdschlüssel auf `users.id` |
 | `expiresAt` | timestamp | Ablaufzeitpunkt |
 | `createdAt` | timestamp | Erstellungszeitpunkt |

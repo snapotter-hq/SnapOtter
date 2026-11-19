@@ -12,6 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import type { TestApp } from "../test-server.js";
 
 const SCIM_TOKEN = `so_scim_v2_${"d".repeat(64)}`;
@@ -270,7 +271,7 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
 
     const anonSessionId = randomUUID();
     await db.insert(schema.sessions).values({
-      id: anonSessionId,
+      id: hashSessionToken(anonSessionId),
       userId: "anonymous",
       expiresAt: new Date(Date.now() + 3600_000),
     });

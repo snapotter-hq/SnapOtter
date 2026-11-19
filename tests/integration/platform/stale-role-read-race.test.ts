@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import { ensureAnonymousUser, hashPassword } from "../../../apps/api/src/plugins/auth.js";
 
 const originalLastAdmin = await vi.importActual("../../../apps/api/src/lib/last-admin.js");
@@ -452,7 +453,7 @@ describe("Stale role reads during concurrent operations", () => {
 
     const sessionId = randomUUID();
     await db.insert(schema.sessions).values({
-      id: sessionId,
+      id: hashSessionToken(sessionId),
       userId: targetUserId,
       expiresAt: new Date(Date.now() + 3600_000),
     });
@@ -653,7 +654,7 @@ describe("Stale role reads during concurrent operations", () => {
 
     const sessionId = randomUUID();
     await db.insert(schema.sessions).values({
-      id: sessionId,
+      id: hashSessionToken(sessionId),
       userId: targetUserId,
       expiresAt: new Date(Date.now() + 3600_000),
     });
@@ -831,7 +832,7 @@ describe("Stale role reads during concurrent operations", () => {
 
     const targetSessionId = randomUUID();
     await db.insert(schema.sessions).values({
-      id: targetSessionId,
+      id: hashSessionToken(targetSessionId),
       userId: targetUserId,
       expiresAt: new Date(Date.now() + 3600_000),
     });
@@ -1301,7 +1302,7 @@ describe("Stale role reads during concurrent operations", () => {
       await ensureAnonymousUser();
       const anonSessionId = randomUUID();
       await db.insert(schema.sessions).values({
-        id: anonSessionId,
+        id: hashSessionToken(anonSessionId),
         userId: "anonymous",
         expiresAt: new Date(Date.now() + 3600_000),
       });
@@ -1667,7 +1668,7 @@ describe("Stale role reads during concurrent operations", () => {
       await ensureAnonymousUser();
       const anonSessionId = randomUUID();
       await db.insert(schema.sessions).values({
-        id: anonSessionId,
+        id: hashSessionToken(anonSessionId),
         userId: "anonymous",
         expiresAt: new Date(Date.now() + 3600_000),
       });
