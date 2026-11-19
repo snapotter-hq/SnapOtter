@@ -33,7 +33,7 @@ function qrCapacityMessage(text: string, level: ErrorCorrectionLevel, logoForced
   const remedy = logoForcedH
     ? "A logo always uses level H. Shorten the text or remove the logo."
     : "Shorten the text or choose a lower error correction level.";
-  return `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${QR_BYTE_CAPACITY[level]} bytes. ${remedy}`;
+  return `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${QR_BYTE_CAPACITY[level]} bytes of general text (more if it is only digits or uppercase letters). ${remedy}`;
 }
 
 const settingsSchema = z.object({

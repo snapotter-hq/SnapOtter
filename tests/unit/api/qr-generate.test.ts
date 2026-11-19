@@ -207,7 +207,7 @@ describe("qr-generate capacity per error-correction level (#4402)", () => {
       expect(res.statusCode).toBe(400);
       expect(res.json()).toEqual({
         error: "Invalid settings",
-        details: `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${limit} bytes. Shorten the text or choose a lower error correction level.`,
+        details: `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${limit} bytes of general text (more if it is only digits or uppercase letters). Shorten the text or choose a lower error correction level.`,
       });
       expect(putObject).not.toHaveBeenCalled();
     },
@@ -223,8 +223,18 @@ describe("qr-generate capacity per error-correction level (#4402)", () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.json().details).toBe(
-      "text: 1274 bytes is too long for error correction level H, which holds at most 1273 bytes. A logo always uses level H. Shorten the text or remove the logo.",
+      "text: 1274 bytes is too long for error correction level H, which holds at most 1273 bytes of general text (more if it is only digits or uppercase letters). A logo always uses level H. Shorten the text or remove the logo.",
     );
+  });
+
+  it("maps an alphanumeric-mode overflow to the same 400, past the denser alphanumeric limit", async () => {
+    // Uppercase alphanumeric text holds 1852 characters at level H, more than the 1273-byte figure.
+    const fits = await post({ text: "A".repeat(1852), errorCorrection: "H" });
+    expect(fits.statusCode).toBe(200);
+
+    const res = await post({ text: "A".repeat(1853), errorCorrection: "H" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().details).toContain("more if it is only digits or uppercase letters");
   });
 
   it("still accepts numeric text longer than the byte-mode limit, since numeric mode packs denser", async () => {
