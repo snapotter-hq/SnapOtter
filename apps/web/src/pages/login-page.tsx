@@ -929,7 +929,7 @@ export function LoginPage() {
                       <p>{t.auth.forgotPasswordHelp}</p>
                       <code
                         dir="ltr"
-                        className="block overflow-x-auto whitespace-nowrap rounded bg-background px-2 py-1.5 font-mono text-foreground"
+                        className="block break-all rounded bg-background px-2 py-1.5 font-mono text-foreground"
                       >
                         docker exec -it snapotter snapotter-admin reset-password{" "}
                         {username || "<username>"}
