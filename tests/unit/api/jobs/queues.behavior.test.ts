@@ -7,6 +7,7 @@ const queueInstances: Array<{
   on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
+  getDelayed: ReturnType<typeof vi.fn>;
 }> = [];
 
 async function loadQueuesModule() {
@@ -22,6 +23,7 @@ async function loadQueuesModule() {
         on: vi.fn(),
         getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
         getJobs: vi.fn().mockResolvedValue([]),
+        getDelayed: vi.fn().mockResolvedValue([]),
       };
       queueInstances.push(queue);
       return queue;
@@ -70,10 +72,12 @@ describe("job queues", () => {
     getQueue("image");
     getQueue("docs");
 
-    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 2, waiting: 3, delayed: 4 });
-    queueInstances[1].getJobCounts.mockResolvedValueOnce({ active: 5, waiting: 7, delayed: 11 });
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 2, waiting: 3, delayed: 1 });
+    queueInstances[0].getDelayed.mockResolvedValueOnce([{ id: "a" }]);
+    queueInstances[1].getJobCounts.mockResolvedValueOnce({ active: 5, waiting: 7, delayed: 2 });
+    queueInstances[1].getDelayed.mockResolvedValueOnce([{ id: "b" }, { id: "c" }]);
 
-    await expect(queueCounts()).resolves.toEqual({ active: 7, waiting: 10, delayed: 15 });
+    await expect(queueCounts()).resolves.toEqual({ active: 7, waiting: 10, delayed: 3 });
 
     queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 13, waiting: 17 });
     queueInstances[1].getJobCounts.mockResolvedValueOnce({ active: 19, waiting: 23 });
@@ -85,6 +89,45 @@ describe("job queues", () => {
       media: { active: 0, waiting: 0 },
       system: { active: 0, waiting: 0 },
     });
+  });
+
+  it("leaves job-scheduler runs out of the delayed count", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("system");
+
+    // On an idle server every system job scheduler parks its next run in the
+    // delayed set, so the raw count never reaches 0.
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 0, delayed: 2 });
+    queueInstances[0].getDelayed.mockResolvedValueOnce([
+      { id: "repeat:job-reconciliation:1795018385612", repeatJobKey: "job-reconciliation" },
+      { id: "repeat:session-purge:1795021925616", repeatJobKey: "session-purge" },
+    ]);
+
+    await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 0 });
+  });
+
+  it("counts a backoff retry as delayed work next to scheduler runs", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("image");
+    getQueue("system");
+
+    queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 0, delayed: 1 });
+    queueInstances[0].getDelayed.mockResolvedValueOnce([{ id: "4d6c0f0e", attemptsMade: 1 }]);
+    queueInstances[1].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 0, delayed: 1 });
+    queueInstances[1].getDelayed.mockResolvedValueOnce([
+      { id: "repeat:retention:1795040000000", repeatJobKey: "retention" },
+    ]);
+
+    await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 1 });
+  });
+
+  it("skips listing delayed jobs for a pool with none", async () => {
+    const { getQueue, queueCounts } = await loadQueuesModule();
+    getQueue("image");
+
+    await queueCounts();
+
+    expect(queueInstances[0].getDelayed).not.toHaveBeenCalled();
   });
 
   it("reports oldest waiting age for per-pool health when waiting jobs exist", async () => {
