@@ -489,8 +489,8 @@ The startup error names the exact UID to use, so the quickest path is to start t
 | `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP (set 0 to disable) |
 | `MAX_USERS` | `0` (unlimited) | Maximum user accounts |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. Private networks only by default |
-| `PUID` | `999` | Run as this UID (for bind mount permissions) |
-| `PGID` | `999` | Run as this GID (for bind mount permissions) |
+| `PUID` | `999` | Run as this UID (for bind mount permissions). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Run as this GID (for bind mount permissions). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set) |
 | `LOG_LEVEL` | `info` | Log verbosity: fatal, error, warn, info, debug, trace |
 | `CONCURRENT_JOBS` | `0` (auto) | Max parallel AI processing jobs |
 | `SESSION_DURATION_HOURS` | `168` | Login session lifetime (7 days) |

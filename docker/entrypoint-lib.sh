@@ -56,6 +56,33 @@ ensure_writable() {
   return "$_ew_failed"
 }
 
+# verify_user_remap <user> <uid> <gid>
+# Checks that <user> resolves to <uid>:<gid> after the PUID/PGID remap. The
+# remap edits /etc/passwd and /etc/group, so on a read-only root (or with a
+# held passwd lock, or a uid the eviction couldn't free) it fails and the user
+# keeps its old ids. Comparing the end state catches every one of those, where
+# trusting each command's exit status would not. Returns 1 with guidance so the
+# entrypoint can stop before chowning /data to the wrong owner.
+verify_user_remap() {
+  _vr_user="$1"
+  _vr_uid="$2"
+  _vr_gid="$3"
+  _vr_cur_uid="$(id -u "$_vr_user" 2>/dev/null || echo '?')"
+  _vr_cur_gid="$(id -g "$_vr_user" 2>/dev/null || echo '?')"
+  if [ "$_vr_cur_uid" = "$_vr_uid" ] && [ "$_vr_cur_gid" = "$_vr_gid" ]; then
+    return 0
+  fi
+  {
+    echo "FATAL: PUID=$_vr_uid PGID=$_vr_gid could not be applied; $_vr_user is still $_vr_cur_uid:$_vr_cur_gid."
+    echo "  The remap edits /etc/passwd and /etc/group, which a read-only root filesystem does not allow."
+    echo "  Remove read_only, or unset PUID/PGID and run the container as that user instead"
+    echo "  (docker run --user $_vr_uid:$_vr_gid, Compose user: \"$_vr_uid:$_vr_gid\", Kubernetes runAsUser)."
+    echo "  Ownership of /data was left unchanged."
+    echo "  See https://docs.snapotter.com/guide/security#why-read-only-is-not-set"
+  } >&2
+  return 1
+}
+
 # rewrite_venv_paths <venv> <from> <to>
 # A Python venv is not fully relocatable after a raw copy: console scripts and
 # activation files keep the source venv path. Patch only text files that still
