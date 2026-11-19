@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 3d3b2271bec1
-i18n_source_hash: 322655170ae6
+i18n_output_hash: c49b939c4c6e
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### Session Token {#session-token}
 
+全新安裝後，必須先變更預設 `admin` 帳戶的密碼，下方的工具呼叫才能正常運作。請參閱[首次登入](#first-login)。
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Session 會在 7 天後過期（可透過 `SESSION_DURATION_HOURS` 設定）。
+
+### 首次登入 {#first-login}
+
+在預設 `admin` 帳戶變更密碼之前，其工作階段權杖存取大多數端點（包括工具呼叫與建立 API 金鑰）都會收到 `403`，錯誤代碼為 `MUST_CHANGE_PASSWORD`。管理員重設過密碼的帳戶也是如此。登入回應會以 `user.mustChangePassword: true` 標示這一點。請使用登入取得的工作階段權杖變更密碼：
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+送出該請求的工作階段仍然有效。該帳戶的其他所有工作階段都會被登出，其所有 API 金鑰都會被撤銷。設定 `SKIP_MUST_CHANGE_PASSWORD=true` 可關閉這項要求，它用於 CI 與開發環境。
 
 ### API Keys {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## 進度追蹤 {#progress-tracking}
 
-長時間執行的工作、排入佇列的工具、批次工作與管線都會透過 Server-Sent Events 發出即時進度。進度串流為公開且以工作 ID 為索引鍵，因此用戶端讀取時不需送出 Authorization 標頭。
+長時間執行的工作、排入佇列的工具、批次工作與管線都會透過 Server-Sent Events 發出即時進度。與其他端點一樣，此串流需要驗證：請在 `Authorization` 標頭中送出工作階段權杖或 API 金鑰（瀏覽器可以依賴工作階段 Cookie）。只有工作擁有者、具備 `files:all` 的使用者，以及在功能安裝工作中具備 `features:manage` 的使用者可以讀取。其他呼叫者會收到 `404`。
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 事件格式：
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 你可以用 `POST /api/v1/jobs/:jobId/cancel` 對排入佇列或執行中的工作要求取消。回應為 `{"canceled":true|false}`。
+
+### 工作狀態 {#job-status}
+
+`GET /api/v1/jobs/:jobId` 會回傳工作已儲存的狀態，不需保持連線開啟。可在收到 `202` 回應後輪詢，或在串流中斷時作為備援。其存取規則與進度串流相同。
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` 為 `queued`、`processing`、`completed`、`failed` 或 `canceled` 其中之一。失敗的工作會包含 `error.message`，有錯誤代碼時也會包含 `error.code`。已取消的工作仍可能帶有部分 `result`，例如已完成檔案的 ZIP，因此只要有 `result` 就應讀取。
 
 ## 檔案庫 {#file-library}
 

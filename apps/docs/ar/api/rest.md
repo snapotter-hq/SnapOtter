@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 12935886232f
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 146f4c35be04
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### رمز الجلسة {#session-token}
 
+في التثبيت الجديد، يجب على الحساب الافتراضي `admin` تغيير كلمة مروره قبل أن يعمل استدعاء الأداة أدناه. راجع [تسجيل الدخول الأول](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 تنتهي صلاحية الجلسات بعد 7 أيام (قابلة للتهيئة عبر `SESSION_DURATION_HOURS`).
+
+### تسجيل الدخول الأول {#first-login}
+
+إلى أن يغيّر الحساب الافتراضي `admin` كلمة مروره، يتلقى رمز جلسته الرمز `403` مع رمز الخطأ `MUST_CHANGE_PASSWORD` من معظم نقاط النهاية، بما في ذلك استدعاءات الأدوات وإنشاء مفاتيح API. وينطبق الأمر نفسه على أي حساب أعاد مسؤول تعيين كلمة مروره. تشير استجابة تسجيل الدخول إلى ذلك بالحقل `user.mustChangePassword: true`. غيّر كلمة المرور باستخدام رمز الجلسة الناتج عن تسجيل الدخول:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+تبقى الجلسة التي أرسلت الطلب صالحة. يُسجَّل الخروج من جميع جلسات الحساب الأخرى وتُلغى جميع مفاتيح API الخاصة به. يؤدي تعيين `SKIP_MUST_CHANGE_PASSWORD=true` إلى إيقاف هذا الشرط، وهو مخصص لبيئات CI والتطوير.
 
 ### مفاتيح API {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## تتبع التقدم {#progress-tracking}
 
-تُصدر المهام طويلة التشغيل والأدوات المُدرجة في طابور والمهام الدفعية وخطوط المعالجة تقدمًا لحظيًا عبر الأحداث المُرسَلة من الخادم Server-Sent Events. تدفق التقدم عام ومُفهرَس بمعرّف المهمة، لذا لا يحتاج العملاء إلى إرسال ترويسة Authorization لقراءته.
+تُصدر المهام طويلة التشغيل والأدوات المُدرجة في طابور والمهام الدفعية وخطوط المعالجة تقدمًا لحظيًا عبر الأحداث المُرسَلة من الخادم Server-Sent Events. يتطلب التدفق المصادقة مثل أي نقطة نهاية أخرى: أرسل رمز جلسة أو مفتاح API في ترويسة `Authorization` (يمكن للمتصفح الاعتماد على ملف تعريف ارتباط الجلسة). لا يمكن قراءته إلا لمالك المهمة، أو لمستخدم لديه `files:all`، أو لمستخدم لديه `features:manage` في حالة مهمة تثبيت ميزة. يحصل أي شخص آخر على `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 صيغة الحدث:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 يمكنك طلب إلغاء مهمة مُدرجة في طابور أو قيد التشغيل باستخدام `POST /api/v1/jobs/:jobId/cancel`. الاستجابة هي `{"canceled":true|false}`.
+
+### حالة المهمة {#job-status}
+
+تُرجع `GET /api/v1/jobs/:jobId` الحالة المخزنة للمهمة دون إبقاء اتصال مفتوح. استعلم عنها بعد استجابة `202`، أو ارجع إليها عند انقطاع التدفق. وتخضع لقواعد الوصول نفسها المطبقة على تدفق التقدم.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+قيمة `status` هي إحدى القيم `queued` أو `processing` أو `completed` أو `failed` أو `canceled`. تتضمن المهمة الفاشلة `error.message`، و`error.code` عند توفره. قد تحمل المهمة الملغاة مع ذلك `result` جزئيًا، مثل ملف ZIP للملفات التي اكتملت، لذا اقرأ `result` كلما كان موجودًا.
 
 ## مكتبة الملفات {#file-library}
 

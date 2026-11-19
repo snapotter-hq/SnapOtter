@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 537f7dfaff89
-i18n_source_hash: 322655170ae6
+i18n_output_hash: cb5150884e2c
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Mọi endpoint đều yêu cầu xác thực trừ khi `AUTH_ENABLED=false`.
 
 ### Token phiên {#session-token}
 
+Trên bản cài đặt mới, tài khoản mặc định `admin` phải đổi mật khẩu trước thì lệnh gọi công cụ bên dưới mới hoạt động. Xem [Đăng nhập lần đầu](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Phiên hết hạn sau 7 ngày (có thể cấu hình qua `SESSION_DURATION_HOURS`).
+
+### Đăng nhập lần đầu {#first-login}
+
+Cho đến khi tài khoản mặc định `admin` đổi mật khẩu, token phiên của nó nhận `403` với mã lỗi `MUST_CHANGE_PASSWORD` từ hầu hết endpoint, kể cả lệnh gọi công cụ và việc tạo khóa API. Điều này cũng áp dụng cho mọi tài khoản có mật khẩu đã bị quản trị viên đặt lại. Phản hồi đăng nhập đánh dấu điều này bằng `user.mustChangePassword: true`. Đổi mật khẩu bằng token phiên nhận được khi đăng nhập:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Phiên đã gửi yêu cầu vẫn còn hiệu lực. Mọi phiên khác của tài khoản bị đăng xuất và tất cả khóa API của tài khoản bị thu hồi. Đặt `SKIP_MUST_CHANGE_PASSWORD=true` sẽ tắt yêu cầu này; nó dành cho CI và môi trường phát triển.
 
 ### Khóa API {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## Theo dõi tiến trình {#progress-tracking}
 
-Các tác vụ chạy lâu, công cụ được xếp hàng, tác vụ hàng loạt và pipeline phát tiến trình theo thời gian thực qua Server-Sent Events. Luồng tiến trình là công khai và được khóa theo ID tác vụ, nên client không cần gửi header Authorization để đọc.
+Các tác vụ chạy lâu, công cụ được xếp hàng, tác vụ hàng loạt và pipeline phát tiến trình theo thời gian thực qua Server-Sent Events. Luồng này cần xác thực như mọi endpoint khác: gửi token phiên hoặc khóa API trong header `Authorization` (trình duyệt có thể dùng cookie phiên). Chỉ chủ sở hữu tác vụ, người dùng có `files:all`, hoặc, với tác vụ cài đặt tính năng, người dùng có `features:manage` mới đọc được. Mọi người khác nhận `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Định dạng sự kiện:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Bạn có thể yêu cầu hủy một tác vụ đang xếp hàng hoặc đang chạy bằng `POST /api/v1/jobs/:jobId/cancel`. Response là `{"canceled":true|false}`.
+
+### Trạng thái tác vụ {#job-status}
+
+`GET /api/v1/jobs/:jobId` trả về trạng thái đã lưu của một tác vụ mà không giữ kết nối mở. Hãy thăm dò nó sau phản hồi `202`, hoặc dùng nó làm phương án dự phòng khi luồng bị ngắt. Quy tắc truy cập giống như luồng tiến trình.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` là một trong các giá trị `queued`, `processing`, `completed`, `failed` hoặc `canceled`. Tác vụ thất bại có `error.message`, kèm `error.code` nếu có. Tác vụ đã hủy vẫn có thể mang `result` một phần, chẳng hạn một tệp ZIP gồm các tệp đã xong, vì vậy hãy đọc `result` bất cứ khi nào nó xuất hiện.
 
 ## Thư viện tệp {#file-library}
 

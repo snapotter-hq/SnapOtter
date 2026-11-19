@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 3bc5083c6988
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 75bf1a2260d1
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Alle Endpunkte erfordern eine Authentifizierung, sofern nicht `AUTH_ENABLED=fals
 
 ### Sitzungs-Token {#session-token}
 
+Bei einer Neuinstallation muss das Standardkonto `admin` zuerst sein Passwort ändern, bevor der Tool-Aufruf unten funktioniert. Siehe [Erste Anmeldung](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sitzungen laufen nach 7 Tagen ab (konfigurierbar über `SESSION_DURATION_HOURS`).
+
+### Erste Anmeldung {#first-login}
+
+Solange das Standardkonto `admin` sein Passwort nicht geändert hat, erhält sein Sitzungs-Token von den meisten Endpunkten, auch bei Tool-Aufrufen und beim Erstellen von API-Schlüsseln, `403` mit dem Fehlercode `MUST_CHANGE_PASSWORD`. Dasselbe gilt für jedes Konto, dessen Passwort ein Admin zurückgesetzt hat. Die Login-Antwort kennzeichnet das mit `user.mustChangePassword: true`. Ändern Sie das Passwort mit dem Sitzungs-Token aus dem Login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Die Sitzung, die die Anfrage gesendet hat, bleibt gültig. Alle anderen Sitzungen des Kontos werden abgemeldet und alle seine API-Schlüssel widerrufen. Mit `SKIP_MUST_CHANGE_PASSWORD=true` wird die Anforderung deaktiviert; das ist für CI und Entwicklung gedacht.
 
 ### API-Schlüssel {#api-keys}
 
@@ -480,11 +495,12 @@ Die Ausgabe jedes Schritts ist die Eingabe des nächsten Schritts. Pipelines erl
 
 ## Fortschrittsverfolgung {#progress-tracking}
 
-Lang laufende Jobs, eingereihte Tools, Batch-Jobs und Pipelines geben Echtzeit-Fortschritt über Server-Sent Events aus. Der Fortschritts-Stream ist öffentlich und wird über die Job-ID gekennzeichnet, sodass Clients keinen Authorization-Header senden müssen, um ihn zu lesen.
+Lang laufende Jobs, eingereihte Tools, Batch-Jobs und Pipelines geben Echtzeit-Fortschritt über Server-Sent Events aus. Der Stream erfordert wie jeder andere Endpunkt eine Authentifizierung: Senden Sie ein Sitzungs-Token oder einen API-Schlüssel im `Authorization`-Header (ein Browser kann das Sitzungs-Cookie verwenden). Lesen dürfen ihn nur der Eigentümer des Jobs, Benutzer mit `files:all` sowie bei Feature-Installationsjobs Benutzer mit `features:manage`. Alle anderen erhalten `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Ereignisformat:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Sie können den Abbruch eines eingereihten oder laufenden Jobs mit `POST /api/v1/jobs/:jobId/cancel` anfordern. Die Antwort ist `{"canceled":true|false}`.
+
+### Job-Status {#job-status}
+
+`GET /api/v1/jobs/:jobId` liefert den gespeicherten Zustand eines Jobs, ohne eine Verbindung offen zu halten. Fragen Sie ihn nach einer `202`-Antwort ab oder greifen Sie darauf zurück, wenn der Stream abbricht. Es gelten dieselben Zugriffsregeln wie für den Fortschritts-Stream.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` ist einer der Werte `queued`, `processing`, `completed`, `failed` oder `canceled`. Ein fehlgeschlagener Job enthält `error.message` und, falls vorhanden, `error.code`. Ein abgebrochener Job kann trotzdem ein teilweises `result` enthalten, etwa ein ZIP der fertigen Dateien, lesen Sie `result` also immer, wenn es vorhanden ist.
 
 ## Dateibibliothek {#file-library}
 

@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: f8559fd2fa75
-i18n_source_hash: 322655170ae6
+i18n_output_hash: ed9a62f2b460
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Alle endpoints vereisen authenticatie, tenzij `AUTH_ENABLED=false`.
 
 ### Sessietoken {#session-token}
 
+Bij een nieuwe installatie moet het standaardaccount `admin` eerst zijn wachtwoord wijzigen voordat de toolaanroep hieronder werkt. Zie [Eerste aanmelding](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sessies verlopen na 7 dagen (configureerbaar via `SESSION_DURATION_HOURS`).
+
+### Eerste aanmelding {#first-login}
+
+Zolang het standaardaccount `admin` zijn wachtwoord niet heeft gewijzigd, krijgt zijn sessietoken van de meeste endpoints `403` met de foutcode `MUST_CHANGE_PASSWORD`, ook bij toolaanroepen en het aanmaken van API-sleutels. Hetzelfde geldt voor elk account waarvan een beheerder het wachtwoord heeft gereset. Het login-antwoord geeft dit aan met `user.mustChangePassword: true`. Wijzig het wachtwoord met het sessietoken uit de login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+De sessie die het verzoek stuurde blijft geldig. Alle andere sessies van het account worden afgemeld en al zijn API-sleutels worden ingetrokken. Met `SKIP_MUST_CHANGE_PASSWORD=true` zet je de eis uit; dat is bedoeld voor CI en ontwikkeling.
 
 ### API-sleutels {#api-keys}
 
@@ -480,11 +495,12 @@ De uitvoer van elke stap is de invoer van de volgende stap. Pipelines staan stan
 
 ## Voortgang volgen {#progress-tracking}
 
-Langlopende taken, tools in de wachtrij, batchtaken en pipelines geven realtime voortgang door via Server-Sent Events. De voortgangsstroom is publiek en gekoppeld aan de job-ID, dus clients hoeven geen Authorization-header te sturen om deze te lezen.
+Langlopende taken, tools in de wachtrij, batchtaken en pipelines geven realtime voortgang door via Server-Sent Events. De stroom vereist authenticatie zoals elk ander endpoint: stuur een sessietoken of API-sleutel mee in de `Authorization`-header (een browser kan de sessiecookie gebruiken). Alleen de eigenaar van de taak, een gebruiker met `files:all` of, bij een installatietaak voor een functie, een gebruiker met `features:manage` kan hem lezen. Iedereen anders krijgt `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Event-formaat:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Je kunt annulering aanvragen voor een taak in de wachtrij of een lopende taak met `POST /api/v1/jobs/:jobId/cancel`. De response is `{"canceled":true|false}`.
+
+### Taakstatus {#job-status}
+
+`GET /api/v1/jobs/:jobId` geeft de opgeslagen toestand van een taak terug zonder een verbinding open te houden. Vraag hem op na een `202`-antwoord, of val erop terug als de stroom wegvalt. Hiervoor gelden dezelfde toegangsregels als voor de voortgangsstroom.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` is een van `queued`, `processing`, `completed`, `failed` of `canceled`. Een mislukte taak bevat `error.message` en, als die er is, `error.code`. Een geannuleerde taak kan toch een gedeeltelijk `result` hebben, zoals een ZIP van de bestanden die klaar waren, dus lees `result` altijd als het aanwezig is.
 
 ## Bestandsbibliotheek {#file-library}
 

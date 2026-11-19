@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: 27176e33ec9f
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 955525a9893e
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Todos os endpoints exigem autenticação, a menos que `AUTH_ENABLED=false`.
 
 ### Token de sessão {#session-token}
 
+Em uma instalação nova, a conta padrão `admin` precisa trocar a senha antes que a chamada de ferramenta abaixo funcione. Veja [Primeiro login](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 As sessões expiram após 7 dias (configurável via `SESSION_DURATION_HOURS`).
+
+### Primeiro login {#first-login}
+
+Até a conta padrão `admin` trocar a senha, o token de sessão dela recebe `403` com o código de erro `MUST_CHANGE_PASSWORD` na maioria dos endpoints, incluindo chamadas de ferramentas e a criação de chaves de API. O mesmo vale para qualquer conta cuja senha um administrador tenha redefinido. A resposta do login sinaliza isso com `user.mustChangePassword: true`. Troque a senha com o token de sessão do login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+A sessão que enviou a requisição continua válida. Todas as outras sessões da conta são encerradas e todas as suas chaves de API são revogadas. Definir `SKIP_MUST_CHANGE_PASSWORD=true` desativa a exigência; isso é para CI e desenvolvimento.
 
 ### Chaves de API {#api-keys}
 
@@ -480,11 +495,12 @@ A saída de cada etapa é a entrada da etapa seguinte. Os pipelines permitem 20 
 
 ## Acompanhamento de Progresso {#progress-tracking}
 
-Trabalhos de longa duração, ferramentas enfileiradas, trabalhos em lote e pipelines emitem progresso em tempo real via Server-Sent Events. O fluxo de progresso é público e indexado pelo ID do trabalho, então os clientes não precisam enviar um cabeçalho Authorization para lê-lo.
+Trabalhos de longa duração, ferramentas enfileiradas, trabalhos em lote e pipelines emitem progresso em tempo real via Server-Sent Events. O fluxo exige autenticação como qualquer outro endpoint: envie um token de sessão ou uma chave de API no cabeçalho `Authorization` (um navegador pode usar o cookie de sessão). Só podem lê-lo o dono do trabalho, um usuário com `files:all` ou, em um trabalho de instalação de recurso, um usuário com `features:manage`. Qualquer outro recebe `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Formato do evento:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Você pode solicitar o cancelamento de um trabalho enfileirado ou em execução com `POST /api/v1/jobs/:jobId/cancel`. A resposta é `{"canceled":true|false}`.
+
+### Status do trabalho {#job-status}
+
+`GET /api/v1/jobs/:jobId` retorna o estado salvo de um trabalho sem manter uma conexão aberta. Consulte-o depois de uma resposta `202` ou recorra a ele quando o fluxo cair. Ele segue as mesmas regras de acesso do fluxo de progresso.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` é um de `queued`, `processing`, `completed`, `failed` ou `canceled`. Um trabalho com falha inclui `error.message` e, quando houver, `error.code`. Um trabalho cancelado ainda pode trazer um `result` parcial, como um ZIP dos arquivos que terminaram, então leia `result` sempre que ele estiver presente.
 
 ## Biblioteca de Arquivos {#file-library}
 

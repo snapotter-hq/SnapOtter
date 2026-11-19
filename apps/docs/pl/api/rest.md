@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 53e8d429a362
+i18n_output_hash: 8df34fa0c217
 i18n_hash_version: 2
-i18n_source_hash: 322655170ae6
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -21,6 +21,8 @@ Wszystkie punkty końcowe wymagają uwierzytelnienia, chyba że `AUTH_ENABLED=fa
 
 ### Token sesji {#session-token}
 
+W nowej instalacji domyślne konto `admin` musi najpierw zmienić hasło, zanim zadziała poniższe wywołanie narzędzia. Zobacz [Pierwsze logowanie](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -36,6 +38,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sesje wygasają po 7 dniach (konfigurowalne za pomocą `SESSION_DURATION_HOURS`).
+
+### Pierwsze logowanie {#first-login}
+
+Dopóki domyślne konto `admin` nie zmieni hasła, jego token sesji dostaje `403` z kodem błędu `MUST_CHANGE_PASSWORD` od większości endpointów, w tym przy wywołaniach narzędzi i tworzeniu kluczy API. To samo dotyczy każdego konta, którego hasło zresetował administrator. Odpowiedź logowania sygnalizuje to polem `user.mustChangePassword: true`. Zmień hasło, używając tokenu sesji z logowania:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Sesja, która wysłała żądanie, pozostaje ważna. Wszystkie pozostałe sesje konta zostają wylogowane, a wszystkie jego klucze API unieważnione. Ustawienie `SKIP_MUST_CHANGE_PASSWORD=true` wyłącza ten wymóg; jest przeznaczone dla CI i środowisk deweloperskich.
 
 ### Klucze API {#api-keys}
 
@@ -481,11 +496,12 @@ Wyjście każdego kroku jest wejściem następnego kroku. Potoki domyślnie dopu
 
 ## Śledzenie postępu {#progress-tracking}
 
-Długotrwałe zadania, narzędzia w kolejce, zadania wsadowe i potoki emitują postęp w czasie rzeczywistym za pomocą Server-Sent Events. Strumień postępu jest publiczny i identyfikowany przez identyfikator zadania, więc klienci nie muszą wysyłać nagłówka Authorization, aby go odczytać.
+Długotrwałe zadania, narzędzia w kolejce, zadania wsadowe i potoki emitują postęp w czasie rzeczywistym za pomocą Server-Sent Events. Strumień wymaga uwierzytelnienia jak każdy inny endpoint: wyślij token sesji lub klucz API w nagłówku `Authorization` (przeglądarka może użyć ciasteczka sesji). Odczytać go mogą tylko właściciel zadania, użytkownik z `files:all` albo, w przypadku zadania instalacji funkcji, użytkownik z `features:manage`. Każdy inny dostaje `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Format zdarzenia:
@@ -496,6 +512,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Możesz zażądać anulowania zadania w kolejce lub uruchomionego za pomocą `POST /api/v1/jobs/:jobId/cancel`. Odpowiedzią jest `{"canceled":true|false}`.
+
+### Stan zadania {#job-status}
+
+`GET /api/v1/jobs/:jobId` zwraca zapisany stan zadania bez utrzymywania otwartego połączenia. Odpytuj go po odpowiedzi `202` albo wróć do niego, gdy strumień się zerwie. Obowiązują te same zasady dostępu co dla strumienia postępu.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` przyjmuje jedną z wartości `queued`, `processing`, `completed`, `failed` lub `canceled`. Zadanie zakończone błędem zawiera `error.message` oraz, jeśli istnieje, `error.code`. Anulowane zadanie może mimo to mieć częściowy `result`, na przykład ZIP z ukończonymi plikami, więc odczytuj `result` zawsze, gdy jest obecny.
 
 ## Biblioteka plików {#file-library}
 

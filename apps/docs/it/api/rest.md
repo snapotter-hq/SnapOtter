@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 9fca6835d7a9
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 8025b13e01d6
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Tutti gli endpoint richiedono l'autenticazione a meno che `AUTH_ENABLED=false`.
 
 ### Token di sessione {#session-token}
 
+In una nuova installazione, l'account predefinito `admin` deve cambiare la password prima che la chiamata allo strumento qui sotto funzioni. Vedi [Primo accesso](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Le sessioni scadono dopo 7 giorni (configurabile tramite `SESSION_DURATION_HOURS`).
+
+### Primo accesso {#first-login}
+
+Finché l'account predefinito `admin` non cambia la password, il suo token di sessione riceve `403` con il codice di errore `MUST_CHANGE_PASSWORD` dalla maggior parte degli endpoint, comprese le chiamate agli strumenti e la creazione di chiavi API. Lo stesso vale per qualsiasi account la cui password sia stata reimpostata da un amministratore. La risposta del login lo segnala con `user.mustChangePassword: true`. Cambia la password con il token di sessione ottenuto dal login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+La sessione che ha inviato la richiesta resta valida. Tutte le altre sessioni dell'account vengono chiuse e tutte le sue chiavi API revocate. Impostare `SKIP_MUST_CHANGE_PASSWORD=true` disattiva il requisito; è pensato per la CI e lo sviluppo.
 
 ### Chiavi API {#api-keys}
 
@@ -480,11 +495,12 @@ L'output di ogni fase è l'input della fase successiva. Le pipeline consentono 2
 
 ## Tracciamento dell'avanzamento {#progress-tracking}
 
-I job di lunga durata, gli strumenti in coda, i job batch e le pipeline emettono l'avanzamento in tempo reale tramite Server-Sent Events. Lo stream di avanzamento è pubblico e indicizzato per ID del job, quindi i client non devono inviare un header Authorization per leggerlo.
+I job di lunga durata, gli strumenti in coda, i job batch e le pipeline emettono l'avanzamento in tempo reale tramite Server-Sent Events. Lo stream richiede l'autenticazione come qualsiasi altro endpoint: invia un token di sessione o una chiave API nell'header `Authorization` (un browser può usare il cookie di sessione). Possono leggerlo solo il proprietario del job, un utente con `files:all` o, per un job di installazione di funzionalità, un utente con `features:manage`. Chiunque altro riceve `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Formato dell'evento:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Puoi richiedere l'annullamento di un job in coda o in esecuzione con `POST /api/v1/jobs/:jobId/cancel`. La risposta è `{"canceled":true|false}`.
+
+### Stato del job {#job-status}
+
+`GET /api/v1/jobs/:jobId` restituisce lo stato salvato di un job senza tenere aperta una connessione. Interrogalo dopo una risposta `202`, oppure usalo come ripiego quando lo stream si interrompe. Segue le stesse regole di accesso dello stream di avanzamento.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` è uno tra `queued`, `processing`, `completed`, `failed` o `canceled`. Un job fallito include `error.message` e, quando presente, `error.code`. Un job annullato può comunque contenere un `result` parziale, ad esempio uno ZIP dei file completati, quindi leggi `result` ogni volta che è presente.
 
 ## Libreria file {#file-library}
 

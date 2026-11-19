@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 427a7fff20af
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 4baf9d79932f
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### 세션 토큰 {#session-token}
 
+새로 설치한 경우 아래 도구 호출이 작동하려면 먼저 기본 `admin` 계정의 비밀번호를 변경해야 합니다. [첫 로그인](#first-login)을 참고하세요.
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 세션은 7일 후 만료됩니다(`SESSION_DURATION_HOURS`로 구성 가능).
+
+### 첫 로그인 {#first-login}
+
+기본 `admin` 계정이 비밀번호를 변경하기 전까지 해당 세션 토큰은 대부분의 엔드포인트(도구 호출과 API 키 생성 포함)에서 오류 코드 `MUST_CHANGE_PASSWORD`와 함께 `403`을 받습니다. 관리자가 비밀번호를 재설정한 계정도 마찬가지입니다. 로그인 응답은 `user.mustChangePassword: true`로 이를 표시합니다. 로그인에서 받은 세션 토큰으로 비밀번호를 변경하세요:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+요청을 보낸 세션은 계속 유효합니다. 해당 계정의 다른 모든 세션은 로그아웃되고 모든 API 키는 폐기됩니다. `SKIP_MUST_CHANGE_PASSWORD=true`를 설정하면 이 요구 사항이 꺼지며, CI와 개발 환경용입니다.
 
 ### API 키 {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## 진행률 추적 {#progress-tracking}
 
-장시간 실행 작업, 큐에 들어간 도구, 배치 작업, 파이프라인은 Server-Sent Events를 통해 실시간 진행률을 발행합니다. 진행률 스트림은 공개이며 작업 ID로 키가 지정되므로 클라이언트가 이를 읽는 데 Authorization 헤더를 보낼 필요가 없습니다.
+장시간 실행 작업, 큐에 들어간 도구, 배치 작업, 파이프라인은 Server-Sent Events를 통해 실시간 진행률을 발행합니다. 이 스트림은 다른 엔드포인트와 마찬가지로 인증이 필요합니다. `Authorization` 헤더에 세션 토큰이나 API 키를 보내세요(브라우저는 세션 쿠키를 사용할 수 있습니다). 작업 소유자, `files:all` 권한이 있는 사용자, 그리고 기능 설치 작업의 경우 `features:manage` 권한이 있는 사용자만 읽을 수 있습니다. 그 밖의 호출자는 `404`를 받습니다.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 이벤트 형식:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 `POST /api/v1/jobs/:jobId/cancel`로 큐에 들어갔거나 실행 중인 작업의 취소를 요청할 수 있습니다. 응답은 `{"canceled":true|false}`입니다.
+
+### 작업 상태 {#job-status}
+
+`GET /api/v1/jobs/:jobId`는 연결을 열어 두지 않고 작업의 저장된 상태를 반환합니다. `202` 응답 후에 폴링하거나 스트림이 끊겼을 때 대안으로 사용하세요. 접근 규칙은 진행률 스트림과 같습니다.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status`는 `queued`, `processing`, `completed`, `failed`, `canceled` 중 하나입니다. 실패한 작업에는 `error.message`가 포함되며, 있는 경우 `error.code`도 포함됩니다. 취소된 작업도 완료된 파일의 ZIP처럼 부분적인 `result`를 가질 수 있으므로, `result`가 있으면 항상 읽으세요.
 
 ## 파일 라이브러리 {#file-library}
 
