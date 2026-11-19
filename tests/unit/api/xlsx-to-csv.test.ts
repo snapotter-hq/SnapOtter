@@ -101,8 +101,10 @@ describe("xlsxToCsv", () => {
 
   it("picks the sheet by its position in the workbook, not its file name", async () => {
     const workbook = new ExcelJS.Workbook();
-    const storedFirst = workbook.addWorksheet("Stored first");
-    const storedSecond = workbook.addWorksheet("Stored second");
+    // orderNo (a sheet's place in workbook.xml) is real but missing from ExcelJS's types.
+    type Ordered = ExcelJSType.Worksheet & { orderNo: number };
+    const storedFirst = workbook.addWorksheet("Stored first") as Ordered;
+    const storedSecond = workbook.addWorksheet("Stored second") as Ordered;
     storedFirst.addRow(["file sheet1"]);
     storedSecond.addRow(["file sheet2"]);
     storedFirst.orderNo = 2;
