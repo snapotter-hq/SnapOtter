@@ -5610,6 +5610,10 @@ export const en = {
     password: "Password",
     loginButton: "Login",
     loggingIn: "Logging in...",
+    forgotPassword: "Forgot password?",
+    forgotPasswordHelp:
+      "Ask an admin to reset it in Settings > People. If you're the only admin, run this on the server:",
+    forgotPasswordGuide: "Account recovery guide",
     invalidCredentials: "Invalid username or password",
     connectionError: "Connection error",
     signInWith: "Sign in with {provider}",
@@ -5705,6 +5709,7 @@ export const en = {
     generatedTitle: "Strong password ready",
     regenerateButton: "Generate another",
     generatedHint: "It's filled in below. Copy it somewhere safe, or let your browser save it.",
+    savedConfirm: "I've saved this password somewhere safe",
     newPasswordPlaceholder: "Enter new password",
     confirmPasswordLabel: "Confirm new password",
     confirmPasswordPlaceholder: "Repeat new password",

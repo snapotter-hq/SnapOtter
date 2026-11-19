@@ -286,21 +286,22 @@ describe("Generate sizes the password to the policy", () => {
       code: "VALIDATION_ERROR",
       rule: "minLength",
       rules: ["minLength"],
-      minLength: 24,
+      minLength: 48,
     });
     await renderWithCurrentPassword();
 
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateForMeButton }));
-    expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+    expect(field(en.changePassword.newPasswordLabel).value.split("-")).toHaveLength(5);
 
+    fireEvent.click(screen.getByRole("checkbox", { name: en.changePassword.savedConfirm }));
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
     expect(
-      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 24 })),
+      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 48 })),
     ).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.regenerateButton }));
     const generated = field(en.changePassword.newPasswordLabel).value;
-    expect(generated).toHaveLength(24);
+    expect(generated.length).toBeGreaterThanOrEqual(48);
     expect(field(en.changePassword.confirmPasswordLabel).value).toBe(generated);
   });
 
@@ -308,11 +309,12 @@ describe("Generate sizes the password to the policy", () => {
     answer(400, { code: "VALIDATION_ERROR", rule: "digit", rules: ["digit"] });
     await renderWithCurrentPassword();
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateForMeButton }));
+    fireEvent.click(screen.getByRole("checkbox", { name: en.changePassword.savedConfirm }));
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
     expect(await screen.findByText(en.errors.passwordNeedsDigit)).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.regenerateButton }));
-    expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+    expect(field(en.changePassword.newPasswordLabel).value.split("-")).toHaveLength(5);
   });
 });
 
@@ -351,6 +353,30 @@ describe("the generated-password panel", () => {
     expect(
       screen.getByRole("button", { name: en.changePassword.generateForMeButton }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps Change password off until the user says the generated one is saved", async () => {
+    render(
+      <I18nProvider>
+        <ChangePasswordPage />
+      </I18nProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText(en.changePassword.currentPasswordLabel), {
+      target: { value: "old-Password1" },
+    });
+    const change = screen.getByRole("button", { name: en.changePassword.changeButton });
+
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateForMeButton }));
+    expect(change).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: en.changePassword.savedConfirm }));
+    expect(change).toBeEnabled();
+
+    // A new password is a new thing to save.
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.regenerateButton }));
+    expect(
+      screen.getByRole("checkbox", { name: en.changePassword.savedConfirm }),
+    ).not.toBeChecked();
+    expect(change).toBeDisabled();
   });
 });
 

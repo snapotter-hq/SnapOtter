@@ -5701,6 +5701,10 @@ export const ptBR: TranslationKeys = {
     password: "Senha",
     loginButton: "Entrar",
     loggingIn: "Entrando...",
+    forgotPassword: "Esqueceu a senha?",
+    forgotPasswordHelp:
+      "Peça a um administrador para redefini-la em Configurações > Pessoas. Se você for o único administrador, execute isto no servidor:",
+    forgotPasswordGuide: "Guia de recuperação de conta",
     invalidCredentials: "Nome de usuário ou senha inválidos",
     connectionError: "Erro de conexão",
     signInWith: "Entrar com {provider}",
@@ -5800,6 +5804,7 @@ export const ptBR: TranslationKeys = {
     regenerateButton: "Gerar outra",
     generatedHint:
       "Ela já está preenchida abaixo. Copie para um lugar seguro ou deixe o navegador salvá-la.",
+    savedConfirm: "Salvei esta senha em um lugar seguro",
     newPasswordPlaceholder: "Digite a nova senha",
     confirmPasswordLabel: "Confirmar nova senha",
     confirmPasswordPlaceholder: "Repita a nova senha",

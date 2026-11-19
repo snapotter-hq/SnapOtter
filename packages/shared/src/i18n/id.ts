@@ -5686,6 +5686,10 @@ export const id: TranslationKeys = {
     password: "Kata sandi",
     loginButton: "Masuk",
     loggingIn: "Sedang masuk...",
+    forgotPassword: "Lupa kata sandi?",
+    forgotPasswordHelp:
+      "Minta admin untuk mengatur ulang di Pengaturan > Anggota. Jika Anda satu-satunya admin, jalankan ini di server:",
+    forgotPasswordGuide: "Panduan pemulihan akun",
     invalidCredentials: "Nama pengguna atau kata sandi salah",
     connectionError: "Kesalahan koneksi",
     signInWith: "Masuk dengan {provider}",
@@ -5783,6 +5787,7 @@ export const id: TranslationKeys = {
     regenerateButton: "Buat yang lain",
     generatedHint:
       "Sudah terisi di bawah. Salin ke tempat yang aman, atau biarkan browser Anda menyimpannya.",
+    savedConfirm: "Saya sudah menyimpan kata sandi ini di tempat yang aman",
     newPasswordPlaceholder: "Masukkan kata sandi baru",
     confirmPasswordLabel: "Konfirmasi kata sandi baru",
     confirmPasswordPlaceholder: "Ulangi kata sandi baru",

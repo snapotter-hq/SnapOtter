@@ -5710,6 +5710,10 @@ export const nl: TranslationKeys = {
     password: "Wachtwoord",
     loginButton: "Inloggen",
     loggingIn: "Inloggen...",
+    forgotPassword: "Wachtwoord vergeten?",
+    forgotPasswordHelp:
+      "Vraag een beheerder om het te resetten via Instellingen > Personen. Ben je de enige beheerder, voer dit dan uit op de server:",
+    forgotPasswordGuide: "Handleiding accountherstel",
     invalidCredentials: "Ongeldige gebruikersnaam of wachtwoord",
     connectionError: "Verbindingsfout",
     signInWith: "Inloggen met {provider}",
@@ -5808,6 +5812,7 @@ export const nl: TranslationKeys = {
     regenerateButton: "Nog een genereren",
     generatedHint:
       "Het staat hieronder ingevuld. Kopieer het naar een veilige plek of laat je browser het opslaan.",
+    savedConfirm: "Ik heb dit wachtwoord veilig bewaard",
     newPasswordPlaceholder: "Voer nieuw wachtwoord in",
     confirmPasswordLabel: "Nieuw wachtwoord bevestigen",
     confirmPasswordPlaceholder: "Herhaal nieuw wachtwoord",

@@ -5694,6 +5694,10 @@ export const uk: TranslationKeys = {
     password: "Пароль",
     loginButton: "Увійти",
     loggingIn: "Вхід...",
+    forgotPassword: "Забули пароль?",
+    forgotPasswordHelp:
+      "Попросіть адміністратора скинути його в розділі Налаштування > Користувачі. Якщо ви єдиний адміністратор, виконайте на сервері:",
+    forgotPasswordGuide: "Посібник із відновлення доступу",
     invalidCredentials: "Невірне ім'я користувача або пароль",
     connectionError: "Помилка з'єднання",
     signInWith: "Увійти через {provider}",
@@ -5791,6 +5795,7 @@ export const uk: TranslationKeys = {
     regenerateButton: "Згенерувати інший",
     generatedHint:
       "Його вже вписано нижче. Скопіюйте його в надійне місце або дозвольте браузеру його зберегти.",
+    savedConfirm: "Цей пароль збережено в надійному місці",
     newPasswordPlaceholder: "Введіть новий пароль",
     confirmPasswordLabel: "Підтвердіть новий пароль",
     confirmPasswordPlaceholder: "Повторіть новий пароль",

@@ -5416,6 +5416,10 @@ export const hi: TranslationKeys = {
     password: "पासवर्ड",
     loginButton: "लॉगिन",
     loggingIn: "लॉगिन हो रहा है...",
+    forgotPassword: "पासवर्ड भूल गए?",
+    forgotPasswordHelp:
+      "किसी एडमिन से सेटिंग्स > सदस्य में इसे रीसेट करने को कहें। अगर आप अकेले एडमिन हैं, तो सर्वर पर यह चलाएँ:",
+    forgotPasswordGuide: "खाता रिकवरी गाइड",
     invalidCredentials: "गलत यूज़रनेम या पासवर्ड",
     connectionError: "कनेक्शन त्रुटि",
     signInWith: "{provider} से साइन इन करें",
@@ -5509,6 +5513,7 @@ export const hi: TranslationKeys = {
     generatedTitle: "मजबूत पासवर्ड तैयार है",
     regenerateButton: "दूसरा जनरेट करें",
     generatedHint: "यह नीचे भर दिया गया है। इसे किसी सुरक्षित जगह कॉपी करें, या अपने ब्राउज़र को इसे सहेजने दें।",
+    savedConfirm: "मैंने यह पासवर्ड किसी सुरक्षित जगह सहेज लिया है",
     newPasswordPlaceholder: "नया पासवर्ड दर्ज करें",
     confirmPasswordLabel: "नए पासवर्ड की पुष्टि करें",
     confirmPasswordPlaceholder: "नया पासवर्ड दोहराएं",

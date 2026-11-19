@@ -5671,6 +5671,10 @@ export const vi: TranslationKeys = {
     password: "Mật khẩu",
     loginButton: "Đăng nhập",
     loggingIn: "Đang đăng nhập...",
+    forgotPassword: "Quên mật khẩu?",
+    forgotPasswordHelp:
+      "Hãy nhờ quản trị viên đặt lại trong Cài đặt > Thành viên. Nếu bạn là quản trị viên duy nhất, hãy chạy lệnh này trên máy chủ:",
+    forgotPasswordGuide: "Hướng dẫn khôi phục tài khoản",
     invalidCredentials: "Tên đăng nhập hoặc mật khẩu không đúng",
     connectionError: "Lỗi kết nối",
     signInWith: "Đăng nhập với {provider}",
@@ -5767,6 +5771,7 @@ export const vi: TranslationKeys = {
     regenerateButton: "Tạo mật khẩu khác",
     generatedHint:
       "Mật khẩu đã được điền bên dưới. Hãy sao chép vào nơi an toàn hoặc để trình duyệt lưu lại.",
+    savedConfirm: "Tôi đã lưu mật khẩu này ở nơi an toàn",
     newPasswordPlaceholder: "Nhập mật khẩu mới",
     confirmPasswordLabel: "Xác nhận mật khẩu mới",
     confirmPasswordPlaceholder: "Nhập lại mật khẩu mới",

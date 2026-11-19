@@ -5718,6 +5718,10 @@ export const fr: TranslationKeys = {
     password: "Mot de passe",
     loginButton: "Se connecter",
     loggingIn: "Connexion en cours...",
+    forgotPassword: "Mot de passe oublié ?",
+    forgotPasswordHelp:
+      "Demandez à un administrateur de le réinitialiser dans Paramètres > Personnes. Si vous êtes le seul administrateur, exécutez ceci sur le serveur :",
+    forgotPasswordGuide: "Guide de récupération du compte",
     invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     connectionError: "Erreur de connexion",
     signInWith: "Se connecter avec {provider}",
@@ -5820,6 +5824,7 @@ export const fr: TranslationKeys = {
     regenerateButton: "En générer un autre",
     generatedHint:
       "Il est saisi ci-dessous. Copiez-le en lieu sûr ou laissez votre navigateur l'enregistrer.",
+    savedConfirm: "J'ai enregistré ce mot de passe en lieu sûr",
     newPasswordPlaceholder: "Saisissez le nouveau mot de passe",
     confirmPasswordLabel: "Confirmer le nouveau mot de passe",
     confirmPasswordPlaceholder: "Répétez le nouveau mot de passe",
