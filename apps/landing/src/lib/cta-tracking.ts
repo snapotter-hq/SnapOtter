@@ -55,16 +55,20 @@ declare global {
 }
 
 export function installCtaTracking(): void {
+  const track = (event: Event) =>
+    trackCtaClick(
+      event.target as ClickTarget | null,
+      window.posthog,
+      document.documentElement.lang || "en",
+    );
   // Capture phase, so the event is queued before a same-tab link navigates;
   // posthog-js flushes its queue with sendBeacon on unload.
+  document.addEventListener("click", track, { capture: true });
+  // A middle-click opens a link in a new tab without firing "click".
   document.addEventListener(
-    "click",
+    "auxclick",
     (event) => {
-      trackCtaClick(
-        event.target as ClickTarget | null,
-        window.posthog,
-        document.documentElement.lang || "en",
-      );
+      if ((event as MouseEvent).button === 1) track(event);
     },
     { capture: true },
   );

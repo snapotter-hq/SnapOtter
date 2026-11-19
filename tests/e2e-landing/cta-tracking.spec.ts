@@ -100,6 +100,18 @@ test.describe("landing CTA events", () => {
     ]);
   });
 
+  test("a middle-click on a CTA link counts too", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/");
+
+    await page
+      .locator('a[data-cta="install"][data-cta-location="nav"]')
+      .dispatchEvent("auxclick", { button: 1 });
+
+    const sent = await captures(page);
+    expect(sent.map(([, p]) => `${p.cta}@${p.location}`)).toEqual(["install@nav"]);
+  });
+
   test("a click outside any CTA sends nothing", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/");
