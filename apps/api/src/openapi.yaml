@@ -17510,7 +17510,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to JPG input file (.heic, .heif)"
+                  description: "HEIC to JPG input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -17581,7 +17581,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to PNG input file (.heic, .heif)"
+                  description: "HEIC to PNG input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -17652,7 +17652,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to AVIF input file (.heic, .heif)"
+                  description: "HEIC to AVIF input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -19411,7 +19411,7 @@ paths:
                   items:
                     type: string
                     format: binary
-                  description: "HEIC to PDF input files (.heic, .heif)"
+                  description: "HEIC to PDF input files (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |

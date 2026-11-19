@@ -68,6 +68,7 @@ export const IMAGE_INPUTS = [
   ".avif",
   ".heic",
   ".heif",
+  ".hif",
   ".svg",
   ".svgz",
   ".ico",

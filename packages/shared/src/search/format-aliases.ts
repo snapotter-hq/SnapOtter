@@ -2,7 +2,7 @@
 export const FORMAT_ALIASES: Record<string, string[]> = {
   jpg: ["jpeg", "jpe"],
   tif: ["tiff"],
-  heic: ["heif"],
+  heic: ["heif", "hif"],
   word: ["doc", "docx"],
   excel: ["xls", "xlsx", "spreadsheet"],
   powerpoint: ["ppt", "pptx"],

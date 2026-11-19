@@ -119,6 +119,7 @@ const KNOWN_CONVERSION_FORMAT_TOKENS = new Set([
   "gif",
   "heic",
   "heif",
+  "hif",
   "html",
   "image",
   "jpeg",
@@ -172,7 +173,7 @@ const BROAD_CONVERSION_FORMAT_TOKENS = new Set([
 const NOOP_FORMAT_ALIAS_GROUPS = [
   ["jpg", "jpeg", "jpe"],
   ["tif", "tiff"],
-  ["heic", "heif"],
+  ["heic", "heif", "hif"],
 ] as const;
 const NOOP_FORMAT_ALIAS_CANONICAL_BY_TOKEN = new Map<string, string>(
   NOOP_FORMAT_ALIAS_GROUPS.flatMap(([canonical, ...aliases]) =>
