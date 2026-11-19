@@ -4057,6 +4057,8 @@ export const fr: TranslationKeys = {
       scannedHint:
         "Ce PDF est numérisé, il n'y a donc pas de texte à extraire. L'OCR peut le lire, mais c'est plus long et cela demande que le pack d'IA OCR soit installé.",
       runOcr: "Lancer l'OCR sur ce PDF",
+      unreadablePages:
+        "{count} pages sur {total} n'ont pas de couche de texte lisible, leur partie du .txt risque donc d'être illisible. L'OCR peut lire ces pages.",
     },
     "pdf-to-markdown": {
       submit: "Convertir en Markdown",

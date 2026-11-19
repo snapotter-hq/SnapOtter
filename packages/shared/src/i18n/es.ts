@@ -4033,6 +4033,8 @@ export const es: TranslationKeys = {
       scannedHint:
         "Este PDF está escaneado, así que no hay texto que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
       runOcr: "Ejecutar OCR en este PDF",
+      unreadablePages:
+        "{count} de {total} páginas no tienen una capa de texto legible, así que su parte del .txt puede salir ilegible. El OCR puede leer esas páginas.",
     },
     "pdf-to-markdown": {
       submit: "Convertir a Markdown",

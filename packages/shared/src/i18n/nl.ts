@@ -4055,6 +4055,8 @@ export const nl: TranslationKeys = {
       scannedHint:
         "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
       runOcr: "OCR uitvoeren op deze pdf",
+      unreadablePages:
+        "{count} van de {total} pagina's hebben geen leesbare tekstlaag, dus hun deel van de .txt kan onleesbaar zijn. OCR kan die pagina's lezen.",
     },
     "pdf-to-markdown": {
       submit: "Converteren naar Markdown",

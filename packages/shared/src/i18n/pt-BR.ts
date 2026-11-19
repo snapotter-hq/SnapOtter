@@ -4044,6 +4044,8 @@ export const ptBR: TranslationKeys = {
       scannedHint:
         "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
       runOcr: "Executar OCR neste PDF",
+      unreadablePages:
+        "{count} de {total} páginas não têm uma camada de texto legível, então a parte delas no .txt pode sair ilegível. O OCR consegue ler essas páginas.",
     },
     "pdf-to-markdown": {
       submit: "Converter para Markdown",

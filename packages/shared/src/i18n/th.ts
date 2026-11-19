@@ -3980,6 +3980,8 @@ export const th: TranslationKeys = {
       scannedHint:
         "PDF นี้เป็นไฟล์สแกน จึงไม่มีข้อความให้แยก OCR อ่านได้ แต่ใช้เวลานานกว่าและต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
       runOcr: "เรียกใช้ OCR กับ PDF นี้",
+      unreadablePages:
+        "{count} จาก {total} หน้าไม่มีเลเยอร์ข้อความที่อ่านได้ ส่วนของหน้าเหล่านั้นในไฟล์ .txt จึงอาจอ่านไม่ออก OCR อ่านหน้าเหล่านั้นได้",
     },
     "pdf-to-markdown": {
       submit: "แปลงเป็น Markdown",

@@ -3973,6 +3973,8 @@ export const en = {
       scannedHint:
         "This PDF is scanned, so there's no text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
       runOcr: "Run OCR on this PDF",
+      unreadablePages:
+        "{count} of {total} pages have no readable text layer, so their part of the .txt may come out garbled. OCR can read those pages.",
     },
     "pdf-to-markdown": {
       submit: "Convert to Markdown",

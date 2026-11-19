@@ -209,6 +209,30 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
   if (res.status !== 0) throw new Error(`could not build ${kind} PDF: ${res.stderr}`);
   return readFileSync(out);
 }
+/** Build a two-page PDF: page 1 reads fine in Helvetica, page 2 is FONT_TEXT
+ *  in the "type0-no-tounicode" shape, so it extracts as glyph ids (#954). */
+function makePartlyUnreadablePdf(): Buffer {
+  const dir = mkdtempSync(join(tmpdir(), "pdf-partial-"));
+  const out = join(dir, "partial.pdf");
+  const font = join(process.cwd(), "apps", "api", "static", "fonts", "Roboto-Black.ttf");
+  const script = [
+    "import sys, fitz",
+    "font, text, out = sys.argv[-3:]",
+    "d = fitz.open()",
+    "d.new_page().insert_text((72, 72), 'Real invoice text', fontname='helv', fontsize=12)",
+    "p = d.new_page(); p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
+    "for xref, _ext, ftype, *_ in p.get_fonts():",
+    "    if ftype == 'Type0':",
+    "        d.xref_set_key(xref, 'ToUnicode', 'null')",
+    "d.save(out); d.close()",
+  ].join("\n");
+  const res = spawnSync(pythonBin as string, ["-c", script, font, FONT_TEXT, out], {
+    encoding: "utf8",
+  });
+  if (res.status !== 0) throw new Error(`could not build partly unreadable PDF: ${res.stderr}`);
+  return readFileSync(out);
+}
+
 async function downloadText(res: { body: string }): Promise<string> {
   const { downloadUrl } = JSON.parse(res.body);
   const dl = await testApp.app.inject({ method: "GET", url: downloadUrl });
@@ -238,6 +262,8 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
+    // Every page came back blank, so calling it a scan is right here (#954).
+    expect(body.error).toMatch(/scanned or image-only/);
     // The web app offers the OCR handoff off this code, not the prose (#1164).
     expect(body.code).toBe("NO_TEXT_LAYER");
   }, 60_000);
@@ -325,6 +351,23 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const body = JSON.parse(res.body);
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
+    // The text is drawn and visible, so "scanned or image-only" would be wrong (#954).
+    expect(body.error).not.toMatch(/scanned|image-only/);
+    expect(body.code).toBe("NO_TEXT_LAYER");
+  }, 60_000);
+
+  it("says how many pages had no readable text when the rest extracted (#954)", async () => {
+    const res = await runTool(makePartlyUnreadablePdf(), "partial.pdf");
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).unreadablePages).toEqual({ count: 1, total: 2 });
+    // The unreadable page stays in the .txt as extracted; only the warning is new.
+    expect(await downloadText(res)).toContain("Real invoice text");
+  }, 60_000);
+
+  it("reports no unreadable pages for a PDF that reads fine throughout", async () => {
+    const res = await runTool();
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).unreadablePages).toBeUndefined();
   }, 60_000);
 
   it("still extracts a page whose other text reads fine next to an /Identity-H line", async () => {
