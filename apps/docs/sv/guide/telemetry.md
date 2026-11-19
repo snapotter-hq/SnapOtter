@@ -1,8 +1,8 @@
 ---
 description: "Vilken anonym användningsdata SnapOtter samlar in, när den skickas och hur man stänger av instansomfattande produktanalys."
-i18n_source_hash: f8bbfe8db02f
+i18n_source_hash: b82b4638cd21
 i18n_provenance: machine
-i18n_output_hash: 2faf54a9b8ce
+i18n_output_hash: 06d5e4572205
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Anonym produktanalys är på som standard och ställs in för hela instansen av 
 
 ## Händelser vi skickar (när aktiverat) {#events-we-send-when-enabled}
 
-- tool_used: verktygs-id, status, varaktighet, kategori, om det är ett AI-verktyg, en felkod vid misslyckande.
+- tool_used: verktygs-id, status, varaktighet, kategori, om det är ett AI-verktyg, en felkod vid misslyckande och stegnamnet för ett verktyg som rapporterar ett steg för sig (analyssteget i Passport Photo).
 - pipeline_executed: antal steg, verktygs-id:n, batch-flagga, antal filer, varaktighet, status.
 - ai_bundle_action: paket-id, åtgärd (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), varaktighet och, vid en misslyckad installation, en felkategori från en fast lista (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Installationsutdata, sökvägar och felmeddelanden skickas aldrig.
 - Frontend-användning: vilka verktygssidor som öppnas, tillagda filer (endast antal), verktyg startat, nedladdningar, sparanden, sökning (endast antal resultat), batch bearbetad.
