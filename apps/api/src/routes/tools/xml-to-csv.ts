@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { assertWellFormedXml } from "../../lib/well-formed-xml.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -93,6 +94,7 @@ export function registerXmlToCsv(app: FastifyInstance) {
 
       const text = input.buffer.toString("utf8");
 
+      assertWellFormedXml(text);
       // Mirror json-xml.ts parser options
       const parser = new XMLParser({ ignoreAttributes: false });
       let parsed: unknown;
