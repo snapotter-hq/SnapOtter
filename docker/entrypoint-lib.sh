@@ -77,7 +77,7 @@ verify_user_remap() {
     echo "  The remap edits /etc/passwd and /etc/group, which a read-only root filesystem does not allow."
     echo "  Remove read_only, or unset PUID/PGID and run the container as that user instead"
     echo "  (docker run --user $_vr_uid:$_vr_gid, Compose user: \"$_vr_uid:$_vr_gid\", Kubernetes runAsUser)."
-    echo "  Ownership of /data was left unchanged."
+    echo "  Stopped before chowning /data, so existing files keep their owner."
     echo "  See https://docs.snapotter.com/guide/security#why-read-only-is-not-set"
   } >&2
   return 1
