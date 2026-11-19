@@ -480,6 +480,23 @@ jobs:
         # jobs; running test-e2e in-container too is a separate follow-up (it also
         # would not fit this job's 60-minute budget alongside test-unit).
         run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit
+      - name: Report disk after the run
+        # Free disk space prints headroom before the build, when it always looks
+        # fine. Running out of space mid-suite shows up as one test file failing
+        # to load right after Postgres logs ENOSPC, so print where the space went
+        # and say so when that happened (#1208). Postgres's data dir is a tmpfs in
+        # docker-compose.test.yml, so its ENOSPC can mean memory, not `/`. Only
+        # Postgres's log is searched: some tests print a mocked ENOSPC on purpose.
+        # No grep -q: the step runs under pipefail, and quitting at the first
+        # match would SIGPIPE the log writer and hide the match.
+        if: always()
+        run: |
+          df -h /
+          docker system df || true
+          if docker compose -f docker/docker-compose.test.yml logs postgres 2>/dev/null | grep "No space left on device" >/dev/null; then
+            echo "::error::Postgres ran out of space during the suite ('No space left on device'). Its data dir is a tmpfs, so check memory as well as the disk usage above. Test failures from that point on come from the full volume, not a regression."
+            exit 1
+          fi
 
   extended-matrix:
     name: Extended Matrix + Fuzz (${{ matrix.shard }}/4)
