@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: d28b22605837
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 8c5d97092eb1
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 ### 初回ログイン {#first-login}
 
-デフォルトの `admin` アカウントがパスワードを変更するまで、ログインが必要なほとんどのエンドポイント（ツール呼び出しや API キーの作成を含む）は、エラーコード `MUST_CHANGE_PASSWORD` とともに `403` を返します。管理者がパスワードをリセットしたアカウントも同様です。ログインのレスポンスでは `mustChangePassword: true` でこれが示されます。ログインで得たセッショントークンを使ってパスワードを変更します:
+デフォルトの `admin` アカウントがパスワードを変更するまで、そのセッショントークンはほとんどのエンドポイント（ツール呼び出しや API キーの作成を含む）から、エラーコード `MUST_CHANGE_PASSWORD` とともに `403` を受け取ります。管理者がパスワードをリセットしたアカウントも同様です。ログインのレスポンスでは `user.mustChangePassword: true` でこれが示されます。ログインで得たセッショントークンを使ってパスワードを変更します:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

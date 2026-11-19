@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 76de9cc5c68a
-i18n_source_hash: e573dec740aa
+i18n_output_hash: e06ca7ea7d8a
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Sessioner löper ut efter 7 dagar (konfigurerbart via `SESSION_DURATION_HOURS`).
 
 ### Första inloggningen {#first-login}
 
-Tills standardkontot `admin` har bytt lösenord svarar de flesta endpoints som kräver inloggning, bland annat verktygsanrop och skapande av API-nycklar, med `403` och felkoden `MUST_CHANGE_PASSWORD`. Detsamma gäller alla konton vars lösenord en administratör har återställt. Inloggningssvaret markerar detta med `mustChangePassword: true`. Byt lösenord med sessionstoken från inloggningen:
+Tills standardkontot `admin` har bytt lösenord får dess sessionstoken `403` med felkoden `MUST_CHANGE_PASSWORD` från de flesta endpoints, även vid verktygsanrop och när API-nycklar skapas. Detsamma gäller alla konton vars lösenord en administratör har återställt. Inloggningssvaret markerar detta med `user.mustChangePassword: true`. Byt lösenord med sessionstoken från inloggningen:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

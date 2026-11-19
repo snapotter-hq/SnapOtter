@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 6cab7f3fda25
-i18n_source_hash: e573dec740aa
+i18n_output_hash: cb5150884e2c
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Phiên hết hạn sau 7 ngày (có thể cấu hình qua `SESSION_DURATION_HOUR
 
 ### Đăng nhập lần đầu {#first-login}
 
-Cho đến khi tài khoản mặc định `admin` đổi mật khẩu, hầu hết endpoint cần đăng nhập, bao gồm lệnh gọi công cụ và việc tạo khóa API, đều trả về `403` với mã lỗi `MUST_CHANGE_PASSWORD`. Điều này cũng áp dụng cho mọi tài khoản có mật khẩu đã bị quản trị viên đặt lại. Phản hồi đăng nhập đánh dấu điều này bằng `mustChangePassword: true`. Đổi mật khẩu bằng token phiên nhận được khi đăng nhập:
+Cho đến khi tài khoản mặc định `admin` đổi mật khẩu, token phiên của nó nhận `403` với mã lỗi `MUST_CHANGE_PASSWORD` từ hầu hết endpoint, kể cả lệnh gọi công cụ và việc tạo khóa API. Điều này cũng áp dụng cho mọi tài khoản có mật khẩu đã bị quản trị viên đặt lại. Phản hồi đăng nhập đánh dấu điều này bằng `user.mustChangePassword: true`. Đổi mật khẩu bằng token phiên nhận được khi đăng nhập:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

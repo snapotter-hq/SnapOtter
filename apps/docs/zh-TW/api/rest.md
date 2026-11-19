@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 98861ed2f52b
-i18n_source_hash: e573dec740aa
+i18n_output_hash: c49b939c4c6e
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Session 會在 7 天後過期（可透過 `SESSION_DURATION_HOURS` 設定）。
 
 ### 首次登入 {#first-login}
 
-在預設 `admin` 帳戶變更密碼之前，大多數需要登入的端點（包括工具呼叫與建立 API 金鑰）都會回傳 `403`，錯誤代碼為 `MUST_CHANGE_PASSWORD`。管理員重設過密碼的帳戶也是如此。登入回應會以 `mustChangePassword: true` 標示這一點。請使用登入取得的工作階段權杖變更密碼：
+在預設 `admin` 帳戶變更密碼之前，其工作階段權杖存取大多數端點（包括工具呼叫與建立 API 金鑰）都會收到 `403`，錯誤代碼為 `MUST_CHANGE_PASSWORD`。管理員重設過密碼的帳戶也是如此。登入回應會以 `user.mustChangePassword: true` 標示這一點。請使用登入取得的工作階段權杖變更密碼：
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

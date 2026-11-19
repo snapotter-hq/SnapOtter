@@ -37,7 +37,7 @@ Sessions expire after 7 days (configurable via `SESSION_DURATION_HOURS`).
 
 ### First Login {#first-login}
 
-Until the default `admin` account changes its password, most endpoints that need a login, tool calls and API key creation among them, return `403` with the error code `MUST_CHANGE_PASSWORD`. The same applies to any account whose password an admin has reset. The login response flags this with `mustChangePassword: true`. Change the password with the session token from the login:
+Until the default `admin` account changes its password, its session token gets `403` with the error code `MUST_CHANGE_PASSWORD` from most endpoints, including tool calls and API key creation. The same applies to any account whose password an admin has reset. The login response flags this with `user.mustChangePassword: true`. Change the password with the session token from the login:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

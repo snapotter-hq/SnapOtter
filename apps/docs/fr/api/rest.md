@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 2e9de2601025
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 158ed4245ae6
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Les sessions expirent au bout de 7 jours (configurable via `SESSION_DURATION_HOU
 
 ### Première connexion {#first-login}
 
-Tant que le compte par défaut `admin` n'a pas changé son mot de passe, la plupart des endpoints qui exigent une connexion, dont les appels d'outils et la création de clés API, renvoient `403` avec le code d'erreur `MUST_CHANGE_PASSWORD`. Il en va de même pour tout compte dont un administrateur a réinitialisé le mot de passe. La réponse de connexion le signale avec `mustChangePassword: true`. Changez le mot de passe avec le jeton de session obtenu à la connexion :
+Tant que le compte par défaut `admin` n'a pas changé son mot de passe, son jeton de session reçoit `403` avec le code d'erreur `MUST_CHANGE_PASSWORD` sur la plupart des endpoints, y compris les appels d'outils et la création de clés API. Il en va de même pour tout compte dont un administrateur a réinitialisé le mot de passe. La réponse de connexion le signale avec `user.mustChangePassword: true`. Changez le mot de passe avec le jeton de session obtenu à la connexion :
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

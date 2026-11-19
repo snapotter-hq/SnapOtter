@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 8ef438e30514
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 70e53ad992e8
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Oturumların süresi 7 gün sonra dolar (`SESSION_DURATION_HOURS` ile yapıland�
 
 ### İlk giriş {#first-login}
 
-Varsayılan `admin` hesabı parolasını değiştirene kadar, giriş gerektiren uç noktaların çoğu, araç çağrıları ve API anahtarı oluşturma da dahil, `MUST_CHANGE_PASSWORD` hata koduyla `403` döndürür. Aynısı, parolası bir yönetici tarafından sıfırlanan her hesap için de geçerlidir. Giriş yanıtı bunu `mustChangePassword: true` ile belirtir. Parolayı girişten aldığınız oturum belirteciyle değiştirin:
+Varsayılan `admin` hesabı parolasını değiştirene kadar, oturum belirteci araç çağrıları ve API anahtarı oluşturma dahil çoğu uç noktadan `MUST_CHANGE_PASSWORD` hata koduyla `403` alır. Aynısı, parolası bir yönetici tarafından sıfırlanan her hesap için de geçerlidir. Giriş yanıtı bunu `user.mustChangePassword: true` ile belirtir. Parolayı girişten aldığınız oturum belirteciyle değiştirin:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

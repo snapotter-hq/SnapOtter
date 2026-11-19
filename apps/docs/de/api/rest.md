@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 3112099db142
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 75bf1a2260d1
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Sitzungen laufen nach 7 Tagen ab (konfigurierbar über `SESSION_DURATION_HOURS`)
 
 ### Erste Anmeldung {#first-login}
 
-Solange das Standardkonto `admin` sein Passwort nicht geändert hat, antworten die meisten Endpunkte, die eine Anmeldung erfordern, darunter Tool-Aufrufe und das Erstellen von API-Schlüsseln, mit `403` und dem Fehlercode `MUST_CHANGE_PASSWORD`. Dasselbe gilt für jedes Konto, dessen Passwort ein Admin zurückgesetzt hat. Die Login-Antwort kennzeichnet das mit `mustChangePassword: true`. Ändern Sie das Passwort mit dem Sitzungs-Token aus dem Login:
+Solange das Standardkonto `admin` sein Passwort nicht geändert hat, erhält sein Sitzungs-Token von den meisten Endpunkten, auch bei Tool-Aufrufen und beim Erstellen von API-Schlüsseln, `403` mit dem Fehlercode `MUST_CHANGE_PASSWORD`. Dasselbe gilt für jedes Konto, dessen Passwort ein Admin zurückgesetzt hat. Die Login-Antwort kennzeichnet das mit `user.mustChangePassword: true`. Ändern Sie das Passwort mit dem Sitzungs-Token aus dem Login:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

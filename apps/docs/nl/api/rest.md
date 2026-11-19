@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: d53c0d753990
-i18n_source_hash: e573dec740aa
+i18n_output_hash: ed9a62f2b460
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Sessies verlopen na 7 dagen (configureerbaar via `SESSION_DURATION_HOURS`).
 
 ### Eerste aanmelding {#first-login}
 
-Zolang het standaardaccount `admin` zijn wachtwoord niet heeft gewijzigd, antwoorden de meeste endpoints die een aanmelding vereisen, waaronder toolaanroepen en het aanmaken van API-sleutels, met `403` en de foutcode `MUST_CHANGE_PASSWORD`. Hetzelfde geldt voor elk account waarvan een beheerder het wachtwoord heeft gereset. Het login-antwoord geeft dit aan met `mustChangePassword: true`. Wijzig het wachtwoord met het sessietoken uit de login:
+Zolang het standaardaccount `admin` zijn wachtwoord niet heeft gewijzigd, krijgt zijn sessietoken van de meeste endpoints `403` met de foutcode `MUST_CHANGE_PASSWORD`, ook bij toolaanroepen en het aanmaken van API-sleutels. Hetzelfde geldt voor elk account waarvan een beheerder het wachtwoord heeft gereset. Het login-antwoord geeft dit aan met `user.mustChangePassword: true`. Wijzig het wachtwoord met het sessietoken uit de login:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

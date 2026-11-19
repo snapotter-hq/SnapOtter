@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: b240e2439bbc
-i18n_source_hash: e573dec740aa
+i18n_output_hash: ba586fc24c44
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 ### 首次登录 {#first-login}
 
-在默认 `admin` 账户修改密码之前，大多数需要登录的端点（包括工具调用和创建 API 密钥）都会返回 `403`，错误码为 `MUST_CHANGE_PASSWORD`。管理员重置过密码的账户也是如此。登录响应会用 `mustChangePassword: true` 标明这一点。请使用登录获得的会话令牌修改密码：
+在默认 `admin` 账户修改密码之前，其会话令牌访问大多数端点（包括工具调用和创建 API 密钥）都会收到 `403`，错误码为 `MUST_CHANGE_PASSWORD`。管理员重置过密码的账户也是如此。登录响应会用 `user.mustChangePassword: true` 标明这一点。请使用登录获得的会话令牌修改密码：
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

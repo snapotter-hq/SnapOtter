@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: e0559e6b4135
+i18n_output_hash: 8df34fa0c217
 i18n_hash_version: 2
-i18n_source_hash: e573dec740aa
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -41,7 +41,7 @@ Sesje wygasają po 7 dniach (konfigurowalne za pomocą `SESSION_DURATION_HOURS`)
 
 ### Pierwsze logowanie {#first-login}
 
-Dopóki domyślne konto `admin` nie zmieni hasła, większość endpointów wymagających zalogowania, w tym wywołania narzędzi i tworzenie kluczy API, zwraca `403` z kodem błędu `MUST_CHANGE_PASSWORD`. To samo dotyczy każdego konta, którego hasło zresetował administrator. Odpowiedź logowania sygnalizuje to polem `mustChangePassword: true`. Zmień hasło, używając tokenu sesji z logowania:
+Dopóki domyślne konto `admin` nie zmieni hasła, jego token sesji dostaje `403` z kodem błędu `MUST_CHANGE_PASSWORD` od większości endpointów, w tym przy wywołaniach narzędzi i tworzeniu kluczy API. To samo dotyczy każdego konta, którego hasło zresetował administrator. Odpowiedź logowania sygnalizuje to polem `user.mustChangePassword: true`. Zmień hasło, używając tokenu sesji z logowania:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

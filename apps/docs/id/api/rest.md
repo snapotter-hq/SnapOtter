@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: e49d4197e95d
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 9ef22f278d64
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Sesi kedaluwarsa setelah 7 hari (dapat dikonfigurasi melalui `SESSION_DURATION_H
 
 ### Login pertama {#first-login}
 
-Sampai akun bawaan `admin` mengganti kata sandinya, sebagian besar endpoint yang memerlukan login, termasuk panggilan tool dan pembuatan kunci API, mengembalikan `403` dengan kode galat `MUST_CHANGE_PASSWORD`. Hal yang sama berlaku untuk akun mana pun yang kata sandinya telah direset oleh admin. Respons login menandainya dengan `mustChangePassword: true`. Ganti kata sandi menggunakan token sesi dari login:
+Sampai akun bawaan `admin` mengganti kata sandinya, token sesinya mendapat `403` dengan kode galat `MUST_CHANGE_PASSWORD` dari sebagian besar endpoint, termasuk panggilan tool dan pembuatan kunci API. Hal yang sama berlaku untuk akun mana pun yang kata sandinya telah direset oleh admin. Respons login menandainya dengan `user.mustChangePassword: true`. Ganti kata sandi menggunakan token sesi dari login:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

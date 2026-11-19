@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 3206c277f5ab
-i18n_source_hash: e573dec740aa
+i18n_output_hash: 4baf9d79932f
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 ### 첫 로그인 {#first-login}
 
-기본 `admin` 계정이 비밀번호를 변경하기 전까지는 로그인이 필요한 대부분의 엔드포인트(도구 호출과 API 키 생성 포함)가 오류 코드 `MUST_CHANGE_PASSWORD`와 함께 `403`을 반환합니다. 관리자가 비밀번호를 재설정한 계정도 마찬가지입니다. 로그인 응답은 `mustChangePassword: true`로 이를 표시합니다. 로그인에서 받은 세션 토큰으로 비밀번호를 변경하세요:
+기본 `admin` 계정이 비밀번호를 변경하기 전까지 해당 세션 토큰은 대부분의 엔드포인트(도구 호출과 API 키 생성 포함)에서 오류 코드 `MUST_CHANGE_PASSWORD`와 함께 `403`을 받습니다. 관리자가 비밀번호를 재설정한 계정도 마찬가지입니다. 로그인 응답은 `user.mustChangePassword: true`로 이를 표시합니다. 로그인에서 받은 세션 토큰으로 비밀번호를 변경하세요:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \

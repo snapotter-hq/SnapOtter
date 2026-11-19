@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: af67888f2493
-i18n_source_hash: e573dec740aa
+i18n_output_hash: ba33fa699e8f
+i18n_source_hash: e1ea853b4dd1
 i18n_provenance: human
 ---
 
@@ -40,7 +40,7 @@ Las sesiones expiran después de 7 días (configurable mediante `SESSION_DURATIO
 
 ### Primer inicio de sesión {#first-login}
 
-Hasta que la cuenta predeterminada `admin` cambie su contraseña, la mayoría de los endpoints que requieren iniciar sesión, entre ellos las llamadas a herramientas y la creación de claves de API, responden `403` con el código de error `MUST_CHANGE_PASSWORD`. Lo mismo ocurre con cualquier cuenta cuya contraseña haya restablecido un administrador. La respuesta del login lo indica con `mustChangePassword: true`. Cambia la contraseña con el token de sesión del login:
+Hasta que la cuenta predeterminada `admin` cambie su contraseña, su token de sesión recibe `403` con el código de error `MUST_CHANGE_PASSWORD` en la mayoría de los endpoints, incluidas las llamadas a herramientas y la creación de claves de API. Lo mismo ocurre con cualquier cuenta cuya contraseña haya restablecido un administrador. La respuesta del login lo indica con `user.mustChangePassword: true`. Cambia la contraseña con el token de sesión del login:
 
 ```bash
 curl -X POST http://localhost:1349/api/auth/change-password \
