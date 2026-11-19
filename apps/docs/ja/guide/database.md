@@ -1,165 +1,165 @@
 ---
-description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
+description: "SnapOtter の PostgreSQL データベーススキーマ、テーブル、マイグレーション、バックアップ手順。"
 i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 089fd7c91c3d
+i18n_output_hash: b925f95e1fd5
 i18n_hash_version: 2
 ---
 
-# Database {#database}
+# データベース {#database}
 
-SnapOtter gebruikt PostgreSQL 17 met [Drizzle ORM](https://orm.drizzle.team/) (pg-core / node-postgres) voor gegevensopslag. Het schema is gedefinieerd in `apps/api/src/db/schema.ts`.
+SnapOtter はデータの永続化に PostgreSQL 17 と [Drizzle ORM](https://orm.drizzle.team/)（pg-core / node-postgres）を使用します。スキーマは `apps/api/src/db/schema.ts` で定義されています。
 
-De verbinding wordt geconfigureerd via de omgevingsvariabele `DATABASE_URL` (standaard `postgres://snapotter:snapotter@postgres:5432/snapotter`). In Docker Compose slaat de Postgres-container zijn gegevens op in het benoemde volume `SnapOtter-pgdata`. Verzoeken worden afgehandeld onder een rol die alleen rijen kan lezen en schrijven, zoals hieronder onder [Rollen met minimale rechten](#least-privilege-roles) wordt beschreven.
+接続は `DATABASE_URL` 環境変数（デフォルト `postgres://snapotter:snapotter@postgres:5432/snapotter`）で設定します。Docker Compose では、Postgres コンテナが `SnapOtter-pgdata` という名前付きボリュームにデータを保存します。 リクエストは、後述の [最小権限ロール](#least-privilege-roles) で説明するとおり、行の読み取りと書き込みしかできないロールで処理されます。
 
-## Tabellen {#tables}
+## テーブル {#tables}
 
 ### users {#users}
 
-Slaat gebruikersaccounts op. Wordt bij de eerste start automatisch aangemaakt op basis van `DEFAULT_USERNAME` en `DEFAULT_PASSWORD`.
+ユーザーアカウントを保存します。初回起動時に `DEFAULT_USERNAME` と `DEFAULT_PASSWORD` から自動的に作成されます。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `username` | varchar | Uniek, verplicht |
-| `passwordHash` | varchar | scrypt-hash |
-| `role` | varchar | `admin`, `editor` of `user` |
-| `mustChangePassword` | boolean | Vlag voor verplichte wachtwoordreset |
-| `createdAt` | timestamp | Aanmaaktijd |
-| `updatedAt` | timestamp | Tijd van laatste wijziging |
+| `id` | uuid | 主キー |
+| `username` | varchar | 一意、必須 |
+| `passwordHash` | varchar | scrypt ハッシュ |
+| `role` | varchar | `admin`、`editor`、または `user` |
+| `mustChangePassword` | boolean | パスワードの強制リセットフラグ |
+| `createdAt` | timestamp | 作成日時 |
+| `updatedAt` | timestamp | 最終更新日時 |
 
 ### sessions {#sessions}
 
-Actieve loginsessies. Elke rij koppelt een sessietoken aan een gebruiker.
+アクティブなログインセッション。各行はセッショントークンをユーザーに紐付けます。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
 | `id` | varchar | 主キー（セッショントークンの SHA-256 ハッシュ） |
-| `userId` | uuid | Foreign key naar `users.id` |
-| `expiresAt` | timestamp | Vervaltijd |
-| `createdAt` | timestamp | Aanmaaktijd |
+| `userId` | uuid | `users.id` への外部キー |
+| `expiresAt` | timestamp | 有効期限 |
+| `createdAt` | timestamp | 作成日時 |
 
 ### teams {#teams}
 
-Groepen om gebruikers te organiseren. Beheerders kunnen gebruikers aan teams toewijzen.
+ユーザーを整理するためのグループ。管理者はユーザーをチームに割り当てられます。
 
-| Kolom | Type | Beschrijving |
+| カラム | 型 | 説明 |
 |--------|------|-------------|
-| `id` | uuid | Primaire sleutel |
-| `name` | varchar (uniek, max. 50 tekens) | Teamnaam |
-| `createdAt` | timestamp | Aanmaaktijd |
+| `id` | uuid | 主キー |
+| `name` | varchar（一意、最大 50 文字） | チーム名 |
+| `createdAt` | timestamp | 作成日時 |
 
 ### api_keys {#api-keys}
 
-API-sleutels voor programmatische toegang. De ruwe sleutel wordt eenmalig bij het aanmaken getoond; alleen de hash wordt opgeslagen.
+プログラムからのアクセス用の API キー。生のキーは作成時に一度だけ表示され、保存されるのはハッシュのみです。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `userId` | uuid | Foreign key naar `users.id` |
-| `keyHash` | varchar | scrypt-hash van de sleutel |
-| `name` | varchar | Door de gebruiker opgegeven label |
-| `createdAt` | timestamp | Aanmaaktijd |
-| `lastUsedAt` | timestamp | Wordt bij elk geauthenticeerd verzoek bijgewerkt |
+| `id` | uuid | 主キー |
+| `userId` | uuid | `users.id` への外部キー |
+| `keyHash` | varchar | キーの scrypt ハッシュ |
+| `name` | varchar | ユーザーが指定したラベル |
+| `createdAt` | timestamp | 作成日時 |
+| `lastUsedAt` | timestamp | 認証済みリクエストごとに更新 |
 
-Sleutels beginnen met het voorvoegsel `si_` gevolgd door 96 hexadecimale tekens (48 willekeurige bytes).
+キーは `si_` を接頭辞とし、その後に 96 桁の 16 進数（48 バイトのランダム値）が続きます。
 
 ### pipelines {#pipelines}
 
-Opgeslagen toolketens die gebruikers in de interface maken.
+ユーザーが UI で作成する、保存されたツールチェーン。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `name` | varchar | Pipelinenaam |
-| `description` | varchar | Optionele beschrijving |
-| `steps` | jsonb | Array van `{ toolId, settings }`-objecten |
-| `createdAt` | timestamp | Aanmaaktijd |
+| `id` | uuid | 主キー |
+| `name` | varchar | パイプライン名 |
+| `description` | varchar | 任意の説明 |
+| `steps` | jsonb | `{ toolId, settings }` オブジェクトの配列 |
+| `createdAt` | timestamp | 作成日時 |
 
 ### user_files {#user-files}
 
-Permanente bestandenbibliotheek. Een opgeslagen bewerking wordt standaard ingevoegd als een onafhankelijke hoofdrij ("opslaan als nieuw": `version` 1, `parentId` null, zodat het origineel zichtbaar blijft), of als een aan de bovenliggende versie gekoppelde versie wanneer u het origineel overschrijft (`parentId` ingesteld, `version` verhoogd, waardoor het origineel wordt vervangen). De kolom `toolChain` legt de toegepaste tools vast.
+永続的なファイルライブラリ。保存された編集は、デフォルトでは独立したルート行として挿入され（「新規として保存」: `version` 1、`parentId` null なので元のファイルは一覧に残ります）、元のファイルを上書きした場合は親にリンクされたバージョンとして挿入されます（`parentId` が設定され、`version` が増加し、元のファイルを置き換えます）。`toolChain` カラムには適用されたツールが記録されます。
 
-| Kolom | Type | Beschrijving |
+| カラム | 型 | 説明 |
 |--------|------|-------------|
-| `id` | uuid | Primaire sleutel |
-| `userId` | uuid | FK naar users (CASCADE DELETE) |
-| `originalName` | varchar | Oorspronkelijke bestandsnaam van de upload |
-| `storedName` | varchar | Bestandsnaam op schijf |
-| `mimeType` | varchar | MIME-type |
-| `size` | integer | Bestandsgrootte in bytes |
-| `width` | integer | Afbeeldingsbreedte in px |
-| `height` | integer | Afbeeldingshoogte in px |
-| `version` | integer | Versienummer (1 = origineel) |
-| `parentId` | uuid of null | FK naar user_files (bovenliggende versie) |
-| `toolChain` | jsonb | Tool-ID's in de volgorde waarin ze zijn toegepast om deze versie te maken |
-| `createdAt` | timestamp | Aanmaaktijd |
+| `id` | uuid | 主キー |
+| `userId` | uuid | users への FK（CASCADE DELETE） |
+| `originalName` | varchar | アップロード時の元のファイル名 |
+| `storedName` | varchar | ディスク上のファイル名 |
+| `mimeType` | varchar | MIME タイプ |
+| `size` | integer | ファイルサイズ（バイト） |
+| `width` | integer | 画像の幅（ピクセル） |
+| `height` | integer | 画像の高さ（ピクセル） |
+| `version` | integer | バージョン番号（1 = オリジナル） |
+| `parentId` | uuid または null | user_files への FK（親バージョン） |
+| `toolChain` | jsonb | このバージョンを生成するために順に適用されたツール ID |
+| `createdAt` | timestamp | 作成日時 |
 
 ### jobs {#jobs}
 
-Houdt verwerkingsjobs bij voor voortgangsrapportage en opschoning.
+進捗報告とクリーンアップのために処理ジョブを追跡します。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `type` | varchar | Identificatie van tool of pipeline |
-| `status` | varchar | `queued`, `processing`, `completed` of `failed` |
-| `progress` | real | Fractie van 0.0 tot 1.0 |
-| `inputFiles` | jsonb | Array van invoerbestandspaden |
-| `outputPath` | varchar | Pad naar het resultaatbestand |
-| `settings` | jsonb | Gebruikte toolinstellingen |
-| `error` | varchar | Foutmelding bij mislukken |
-| `createdAt` | timestamp | Aanmaaktijd |
-| `completedAt` | timestamp | Voltooiingstijd |
+| `id` | uuid | 主キー |
+| `type` | varchar | ツールまたはパイプラインの識別子 |
+| `status` | varchar | `queued`、`processing`、`completed`、または `failed` |
+| `progress` | real | 0.0〜1.0 の割合 |
+| `inputFiles` | jsonb | 入力ファイルパスの配列 |
+| `outputPath` | varchar | 結果ファイルへのパス |
+| `settings` | jsonb | 使用されたツール設定 |
+| `error` | varchar | 失敗した場合のエラーメッセージ |
+| `createdAt` | timestamp | 作成日時 |
+| `completedAt` | timestamp | 完了日時 |
 
 ### settings {#settings}
 
-Sleutel-waardeopslag voor serverbrede instellingen die beheerders in de interface kunnen wijzigen.
+管理者が UI から変更できる、サーバー全体の設定のためのキーバリューストア。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `key` | varchar | Primaire sleutel |
-| `value` | varchar | Waarde van de instelling |
-| `updatedAt` | timestamp | Tijd van laatste wijziging |
+| `key` | varchar | 主キー |
+| `value` | varchar | 設定値 |
+| `updatedAt` | timestamp | 最終更新日時 |
 
 ### roles {#roles}
 
-Aangepaste rollen met fijnmazige rechten.
+きめ細かな権限を持つカスタムロール。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `name` | varchar | Unieke rolnaam |
-| `description` | varchar | Optionele beschrijving |
-| `permissions` | jsonb | Array van rechtenstrings |
-| `createdAt` | timestamp | Aanmaaktijd |
+| `id` | uuid | 主キー |
+| `name` | varchar | 一意のロール名 |
+| `description` | varchar | 任意の説明 |
+| `permissions` | jsonb | 権限文字列の配列 |
+| `createdAt` | timestamp | 作成日時 |
 
 ### audit_log {#audit-log}
 
-Log van beveiligingsrelevante acties.
+セキュリティに関わるアクションのログ。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid | Primaire sleutel |
-| `userId` | uuid | FK naar users |
-| `action` | varchar | Actietype |
-| `details` | jsonb | Actiespecifieke gegevens |
-| `createdAt` | timestamp | Tijdstip van de actie |
+| `id` | uuid | 主キー |
+| `userId` | uuid | users への FK |
+| `action` | varchar | アクションの種類 |
+| `details` | jsonb | アクション固有のデータ |
+| `createdAt` | timestamp | アクション日時 |
 
 ### user_preferences {#user-preferences}
 
-UI-status per gebruiker, geïndexeerd op voorkeursnaam. Ondersteunt de vastgezette tools van het dashboard via `PUT /api/v1/preferences`.
+ユーザーごとの UI 状態を、設定名をキーとして保持します。ホームページのピン留めしたツールは `PUT /api/v1/preferences` 経由でここに書き込まれます。
 
-| Kolom | Type | Opmerkingen |
+| カラム | 型 | 備考 |
 |---|---|---|
-| `userId` | text | FK naar users, cascade bij verwijderen. Primaire sleutel samen met `key` |
-| `key` | text | Voorkeursnaam. Primaire sleutel samen met `userId` |
-| `value` | jsonb | Inhoud van de voorkeur |
-| `updatedAt` | timestamp | Laatste schrijfactie |
+| `userId` | text | users への FK、削除時にカスケード。`key` と合わせて主キー |
+| `key` | text | 設定の名前。`userId` と合わせて主キー |
+| `value` | jsonb | 設定の内容 |
+| `updatedAt` | timestamp | 最終書き込み日時 |
 
-## Migraties {#migrations}
+## マイグレーション {#migrations}
 
-Drizzle beheert schemamigraties. Migratiebestanden staan in `apps/api/drizzle/`. Tijdens de ontwikkeling:
+Drizzle がスキーマのマイグレーションを処理します。マイグレーションファイルは `apps/api/drizzle/` にあります。開発中は次のとおりです。
 
 ```bash
 cd apps/api
@@ -167,23 +167,23 @@ npx drizzle-kit generate   # generate a migration from schema changes
 npx drizzle-kit migrate    # apply pending migrations
 ```
 
-In productie worden openstaande migraties bij het opstarten automatisch toegepast.
+本番環境では、保留中のマイグレーションが起動時に自動的に適用されます。
 
-## Rollen met minimale rechten {#least-privilege-roles}
+## 最小権限ロール {#least-privilege-roles}
 
-Twee rollen, twee taken. `DATABASE_URL` handelt verzoeken af en heeft `SELECT`, `INSERT`, `UPDATE` en `DELETE` op de tabellen van de app, plus `USAGE` en `SELECT` op de bijbehorende sequences. Dat is de volledige lijst. De rol kan geen tabel aanmaken of verwijderen, geen extensie installeren, geen `TRUNCATE` uitvoeren, `pg_authid` niet lezen, geen database aanmaken, geen rol wijzigen en het schema `drizzle`, waar de migratiegeschiedenis staat, niet aanraken.
+2 つのロールに、2 つの役割。`DATABASE_URL` はリクエストを処理するためのもので、アプリのテーブルに対する `SELECT`、`INSERT`、`UPDATE`、`DELETE`、およびそれらのシーケンスに対する `USAGE` と `SELECT` を持ちます。権限はこれがすべてです。テーブルの作成や削除、拡張機能のインストール、`TRUNCATE`、`pg_authid` の読み取り、データベースの作成、ロールの変更はできず、マイグレーション履歴が置かれている `drizzle` スキーマに触れることもできません。
 
-`DATABASE_MIGRATION_URL` is de bevoorrechte rol. Deze voert migraties uit en verleent rechten aan de runtimerol tijdens het opstarten, en wordt gesloten voordat één verzoek wordt afgehandeld.
+特権を持つのは `DATABASE_MIGRATION_URL` の方です。起動中にマイグレーションを実行してランタイムロールに権限を付与し、リクエストを 1 件も処理しないうちに接続を閉じます。
 
-De scheiding wordt geleverd met SnapOtter 2.3.0. Vanaf die release zijn de Compose-bestanden in de repository en de all-in-one-image zo ingericht, bestaande installaties inbegrepen: bij het opstarten maakt SnapOtter de runtimerol aan als die ontbreekt, verleent de rechten, migreert en past de rechten daarna toe op tabellen die er al waren. Voor het upgraden is geen handmatige SQL nodig.
+この分割は SnapOtter 2.3.0 で導入されました。このリリース以降、リポジトリ内の Compose ファイルとオールインワンイメージは、既存のインストールも含めてこの構成になっています。SnapOtter は起動時に、ランタイムロールがなければ作成して権限を付与し、マイグレーションを実行したうえで、以前から存在していたテーブルにも権限を行き渡らせます。アップグレードのために手作業で SQL を実行する必要はありません。
 
-De 2.2.0-image leest alleen de runtimeverbindingsreeks en maakt de tweede rol nooit aan. Geeft u hem de gesplitste configuratie, dan komt hij nooit op: het applicatielog toont dat wachtwoordauthenticatie voor die rol mislukt, en het Postgres-log meldt dat de rol niet bestaat. Upgrade de image naar 2.3.0 of later voordat u een Compose-bestand naar de gesplitste configuratie omzet.
+2.2.0 イメージはランタイム用の接続文字列しか読まず、2 つ目のロールも作成しません。そのため分割した設定を渡すと起動しません。アプリのログにはそのロールのパスワード認証の失敗が表示され、Postgres のログにはロールが存在しないと記録されます。Compose ファイルを分割構成に切り替える前に、イメージを 2.3.0 以降にアップグレードしてください。
 
-Laat u `DATABASE_MIGRATION_URL` leeg, dan draait SnapOtter met één rol, waarbij `DATABASE_URL` beide taken uitvoert, precies zoals vóór de scheiding. Dat is een ondersteunde configuratie, geen verouderde. Het is het juiste antwoord op beheerde Postgres, waar het aanmaken van rollen vaak niet aan u is.
+`DATABASE_MIGRATION_URL` を空のままにすると単一ロールで動作し、分割前とまったく同じように `DATABASE_URL` が両方の役割を担います。これは非推奨ではなく、サポートされた構成です。ロールの作成が自分の裁量では行えないことも多いマネージド Postgres では、こちらが適切な選択です。
 
-### Externe en beheerde Postgres {#external-and-managed-postgres}
+### 外部およびマネージドの Postgres {#external-and-managed-postgres}
 
-Op RDS, Supabase, Cloud SQL of een cluster dat u zelf beheert, is de scheiding optioneel. Maak de runtimerol eenmalig aan:
+RDS、Supabase、Cloud SQL、あるいは自分で運用しているクラスタでは、この分割はオプトインです。ランタイムロールを一度だけ作成します。
 
 ```sql
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
@@ -200,32 +200,32 @@ Postgres 16 以降、`CREATEROLE` で変更できるのは、そのロール自�
 
 SnapOtter がパスワードを設定するときは、クラスタの `password_encryption` が `md5` であっても SCRAM-SHA-256 の検証子を保存します。Postgres は `pg_hba.conf` の `md5` 行経由でこれを受け付けますが、md5 ハッシュを自前で検証するコネクションプーラーはランタイムロールとしてログインできません。
 
-Geef SnapOtter vervolgens beide verbindingsreeksen, gericht op dezelfde host, poort en database:
+そのうえで、同じホスト、ポート、データベースを指す 2 つの接続文字列を SnapOtter に渡します。
 
 ```bash
 DATABASE_URL=postgres://snapotter_app:choose-a-strong-password@db.example.com:5432/snapotter
 DATABASE_MIGRATION_URL=postgres://snapotter:the-owner-password@db.example.com:5432/snapotter
 ```
 
-Daar houdt het op. SnapOtter past de rechten zelf toe en past ze na elke migratie opnieuw toe, zodat een tabel die in een toekomstige release wordt toegevoegd is gedekt zonder dat iemand er SQL voor hoeft uit te voeren.
+作業はここまでです。権限の付与は SnapOtter 自身が行い、マイグレーションのたびに付与し直すため、将来のリリースで追加されるテーブルについても、誰かが SQL を実行しなくてもカバーされます。
 
-De rol in `DATABASE_MIGRATION_URL` moet eigenaar zijn van de SnapOtter-tabellen, omdat alleen de eigenaar van een tabel er rechten op kan verlenen. Op een bestaande installatie is dat de rol waaronder u SnapOtter tot nu toe draait, niet een nieuwe rol die speciaal hiervoor is aangemaakt. Wijst u naar een nieuwe rol die niets bezit, dan mislukt het opstarten met een foutmelding die precies dit zegt. Ook heeft de rol `CREATEROLE` nodig om de runtimerol aan te maken en te onderhouden, en het recht om het schema `drizzle` aan te maken.
+`DATABASE_MIGRATION_URL` に指定するロールは、SnapOtter のテーブルを所有している必要があります。テーブルに対して権限を付与できるのは、その所有者だけだからです。既存のインストールでは、そのために新しく作ったロールではなく、これまで SnapOtter を動かしてきたロールがこれに当たります。何も所有していない新規ロールを指定すると、まさにその旨を伝えるエラーで起動に失敗します。さらに、ランタイムロールを作成して維持するための `CREATEROLE` と、`drizzle` スキーマを作成する権限も必要です。
 
-Gebruikt u dezelfde rol in beide URL's, dan is de scheiding uitgeschakeld en meldt SnapOtter dat in het log in plaats van te doen alsof. Biedt uw provider geen rol die zowel eigenaar van de tabellen kan zijn als `CREATEROLE` kan hebben, draai dan met één rol.
+両方の URL に同じロールを指定すると分割は無効になり、SnapOtter はそれを取り繕わずログに記録します。テーブルを所有しつつ `CREATEROLE` も持てるロールがプロバイダ側で用意できない場合は、単一ロールで運用してください。
 
-### Waarom het superuser-bit ongemoeid wordt gelaten {#why-the-superuser-bit-is-left-alone}
+### スーパーユーザー属性をそのままにしている理由 {#why-the-superuser-bit-is-left-alone}
 
-SnapOtter verwijdert nooit zelf `SUPERUSER` van een rol. Op een installatie die vóór de scheiding is gemaakt, is `snapotter` de enige superuser van het cluster, en degraderen zou het cluster zonder superuser achterlaten, alleen herstelbaar via de single-usermodus met de server gestopt. In plaats daarvan biedt het verplaatsen van de langlopende verbinding naar de beperkte rol de bescherming. De superuser staat slechts enkele seconden tijdens het opstarten op de lijn en is daarna weg.
+SnapOtter がロールから `SUPERUSER` を独自に外すことはありません。分割より前に作成されたインストールでは `snapotter` がクラスタで唯一のスーパーユーザーであり、これを降格させるとクラスタにスーパーユーザーが 1 つも残らず、サーバーを停止したうえでのシングルユーザーモードでしか復旧できなくなります。代わりに、長時間維持される接続を制限付きのロールへ移すことで保護を得ています。スーパーユーザーが接続に現れるのは起動時の数秒間だけで、あとは姿を消します。
 
-Nieuwe all-in-one-installaties hebben dat probleem nooit. Ze krijgen drie rollen: `postgres` (bootstrap-superuser, afwezig in elke verbindingsreeks die SnapOtter gebruikt), `snapotter` (`NOSUPERUSER`, bezit de gegevens, verbindt alleen bij het opstarten) en `snapotter_app` (alleen rijen, handelt verzoeken af).
+新規のオールインワンインストールでは、この問題は起きません。ロールは 3 つ用意されます。`postgres`（ブートストラップ用のスーパーユーザーで、SnapOtter が使うどの接続文字列にも登場しません）、`snapotter`（`NOSUPERUSER`。データを所有し、接続するのは起動時だけです）、`snapotter_app`（行だけを扱い、リクエストを処理します）です。
 
-Om een oudere `snapotter` toch te degraderen, maakt u eerst een tweede superuser aan en logt u daarmee in om te bevestigen dat het werkt. Daarna `ALTER ROLE snapotter NOSUPERUSER`.
+それでも古い `snapotter` を降格させたい場合は、先に 2 つ目のスーパーユーザーを作成し、そのロールでログインできることを確認してください。そのうえで `ALTER ROLE snapotter NOSUPERUSER` を実行します。
 
-## Back-up en herstel {#backup-and-restore}
+## {#backup-and-restore} のバックアップと復元
 
-De relationele database staat in het volume `SnapOtter-pgdata` van de Postgres-container, niet in het volume `/data` van de app.
+リレーショナル データベースは、アプリの `/data` ボリュームではなく、Postgres コンテナーの `SnapOtter-pgdata` ボリュームに存在します。
 
-**Logische back-up met validatie (aanbevolen)**
+**検証付きの論理バックアップ (推奨)**
 
 ```bash
 # Dump into PostgreSQL's portable custom archive format
@@ -240,11 +240,11 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Beide commando's verbinden als `snapotter`, de eigenaar, en dat moet zo blijven. De runtimerol kan het schema `drizzle` niet zien, dus een dump die als die rol is gemaakt, zou onvolledig zijn. `--no-owner` laat herstelde objecten eigendom zijn van degene die het herstel uitvoert, dus uitvoeren als de eigenaar plaatst het eigendom waar de rechten het verwachten. Een kanttekening bij een nieuw cluster: `pg_dump` bevat de rechten maar niet de rollen die ze noemen, dus maak `snapotter_app` aan vóór het herstellen, anders stopt `--exit-on-error` bij de eerste `GRANT`. SnapOtter past de rechten bij de volgende start hoe dan ook opnieuw toe.
+どちらのコマンドも所有者である `snapotter` として接続しており、今後もそのままにしてください。ランタイムロールからは `drizzle` スキーマが見えないため、そのロールで取得したダンプは不完全になります。`--no-owner` を指定すると、リストアされたオブジェクトの所有者はリストアを実行した人になるので、所有者として実行すれば権限設定が前提とする所有関係どおりになります。新しいクラスタでは 1 つ注意点があります。`pg_dump` は権限の設定を含めますが、そこで名指しされているロールまでは含めません。そのため、リストアの前に `snapotter_app` を作成しておかないと、`--exit-on-error` によって最初の `GRANT` で停止します。いずれにせよ、SnapOtter は次回の起動時に権限を付与し直します。
 
-Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` en geen duurzame BullMQ-status in Redis. Maak daarvan een back-up en herstel ze met de gecoördineerde procedure in [Beveiliging en hardening](/ja/guide/security#backup-and-recovery).
+このデータベース ダンプには、`/data/files` で保存されたライブラリ オブジェクトや、Redis の永続的な BullMQ 状態は含まれません。 [セキュリティと強化](/ja/guide/security#backup-and-recovery) の連携手順でバックアップと復元を行ってください。
 
-**Koude volume-snapshot**
+**コールド ボリューム スナップショット**
 
 ```bash
 # Stop every service first, then use your storage platform to snapshot the
@@ -252,8 +252,8 @@ Deze databasedump bevat geen opgeslagen bibliotheekobjecten in `/data/files` en 
 docker compose -f docker/docker-compose.yml stop
 ```
 
-Kopieer een draaiende PostgreSQL-gegevensmap niet met `tar`. Compose voegt een projectvoorvoegsel toe aan volumenamen, dus bepaal de gemounte volume-ID's via `docker inspect` of uw opslagplatform in plaats van uit te gaan van het letterlijke label `SnapOtter-pgdata`.
+`tar` を使用してライブ PostgreSQL データ ディレクトリをコピーしないでください。ボリューム名はプロジェクトごとにプレフィックスを作成するため、リテラル ラベル `SnapOtter-pgdata` を想定するのではなく、`docker inspect` またはストレージ プラットフォームからマウントされたボリューム ID を解決します。
 
-### Migreren vanaf 1.x (SQLite) {#migrating-from-1-x-sqlite}
+### 1.x（SQLite）からの移行 {#migrating-from-1-x-sqlite}
 
-Upgraden vanaf SnapOtter 1.x heeft een eigen handleiding: zie [Upgraden van 1.x naar 2.0](./upgrading). Kort gezegd: hergebruik uw bestaande volume `/data` en 2.0 detecteert `/data/snapotter.db` automatisch en importeert het bij de eerste start (of stel `SQLITE_MIGRATE_PATH` in om er expliciet naar te verwijzen). Maak eerst een back-up van het hele volume `/data`, niet alleen van `snapotter.db`: 1.x gebruikt de WAL-modus van SQLite, dus een gestopte container laat vaak het grootste deel van zijn gegevens achter in `snapotter.db-wal` naast een bijna lege `snapotter.db`.
+SnapOtter 1.x からのアップグレードには専用のガイドがあります。[1.x から 2.0 へのアップグレード](./upgrading) を参照してください。要点としては、既存の `/data` ボリュームを再利用すれば、2.0 が初回起動時に `/data/snapotter.db` を自動検出してインポートします（または `SQLITE_MIGRATE_PATH` を設定して明示的に指定します）。まず `snapotter.db` だけでなく `/data` ボリューム全体をバックアップしてください。1.x は SQLite の WAL モードを使うため、停止したコンテナはデータの大半を、ほぼ空の `snapotter.db` のそばにある `snapotter.db-wal` に残していることがよくあります。
