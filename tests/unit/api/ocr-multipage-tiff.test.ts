@@ -16,11 +16,15 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
  * that sends page 1 every time fails here just as one that stops after it.
  */
 
-const mocks = vi.hoisted(() => ({ extractText: vi.fn() }));
+const DEFAULT_MAX_PIXELS = 40_000_000;
+const mocks = vi.hoisted(() => ({ extractText: vi.fn(), maxPixels: 40_000_000 }));
 
 vi.mock("@snapotter/ai", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@snapotter/ai")>()),
   extractText: mocks.extractText,
+  get MAX_OCR_INPUT_PIXELS() {
+    return mocks.maxPixels;
+  },
 }));
 
 await import("../../../apps/api/src/routes/tools/ocr.js");
@@ -92,6 +96,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  mocks.maxPixels = DEFAULT_MAX_PIXELS;
   mocks.extractText.mockReset();
   mocks.extractText.mockImplementation(async (buffer: Buffer) =>
     result(`text of page ${(await pageIndexOf(buffer)) + 1}\n`),
@@ -185,6 +190,30 @@ describe("OCR on a multi-page TIFF (#4364)", () => {
     await expect(runOcr(await tiffOfPages(2), "big.tiff")).rejects.toMatchObject({
       code: "OCR_OUTPUT_TOO_LARGE",
     });
+  });
+
+  it("reads every page of a rotated TIFF, which preparation cuts to page 1", async () => {
+    const tiff = await sharp(await tiffOfPages(3), { pages: -1 })
+      .withMetadata({ orientation: 6 })
+      .tiff()
+      .toBuffer();
+    expect((await sharp(tiff).metadata()).orientation).toBe(6);
+
+    const { payload } = await runOcr(tiff, "rotated.tiff");
+
+    expect(mocks.extractText).toHaveBeenCalledTimes(3);
+    expect(payload.text).toContain("--- Page 3 ---\n\ntext of page 3");
+  });
+
+  it("refuses a later page over the pixel limit as an input error", async () => {
+    // Page 1 is 80x30 (2,400 pixels) and page 2 is 50x50 (2,500).
+    mocks.maxPixels = 2_450;
+    mocks.extractText.mockImplementation(async () => result("page text"));
+
+    await expect(
+      runOcr(readFixture(fixtures.image.edge.multipageMixedSizesTiff), "mixed.tiff"),
+    ).rejects.toMatchObject({ statusCode: 400, code: "IMAGE_TOO_LARGE" });
+    expect(mocks.extractText).toHaveBeenCalledTimes(1);
   });
 
   it("leaves a single-page TIFF on the plain path", async () => {

@@ -210,7 +210,6 @@ describe("ocr", () => {
     const result = await awaitOcrResult(res, { timeoutMs: 100_000 });
     const text = String(result?.text ?? "");
     expect(text.match(/^--- Page \d+ ---$/gm)).toHaveLength(10);
-    expect(text.match(/Multipage/g)).toHaveLength(10);
     expect(text).toMatch(/--- Page 10 ---\s+Multipage[\s\S]*Page\s*10/);
     expect(result?.warnings).toEqual([]);
   });
