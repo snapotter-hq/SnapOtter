@@ -25,8 +25,9 @@ export function readyToolsForBundle(bundleId: string, bundles: FeatureBundleStat
 
 /**
  * True from the moment a tool page's install prompt gives way to the installed
- * tool until the user adds a file. A tool that was already installed when the
- * page opened never turns it on.
+ * tool until the user adds a file or moves to another tool. ToolPageContent
+ * isn't remounted per tool, so both pieces of state are dropped on a tool
+ * change: otherwise a prompt seen earlier would announce a later visit.
  */
 export function useJustInstalled(
   toolId: string | undefined,
@@ -42,15 +43,23 @@ export function useJustInstalled(
       promptedFor.current = toolId;
       return;
     }
-    if (ready && toolId && promptedFor.current === toolId) {
+    if (promptedFor.current !== toolId) {
       promptedFor.current = undefined;
-      setReadyFor(toolId);
+      return;
     }
-  }, [toolId, promptShown, ready]);
+    if (ready) {
+      promptedFor.current = undefined;
+      if (!hasFiles) setReadyFor(toolId);
+    }
+  }, [toolId, promptShown, ready, hasFiles]);
 
   useEffect(() => {
     if (hasFiles) setReadyFor(undefined);
   }, [hasFiles]);
+
+  useEffect(() => {
+    setReadyFor((current) => (current === toolId ? current : undefined));
+  }, [toolId]);
 
   return readyFor !== undefined && readyFor === toolId;
 }

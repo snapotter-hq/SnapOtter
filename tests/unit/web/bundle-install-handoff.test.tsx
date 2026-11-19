@@ -199,6 +199,36 @@ describe("useJustInstalled (#5040)", () => {
     rerender({ ...initial, toolId: "noise-removal", promptShown: false, ready: true });
     expect(result.current).toBe(false);
   });
+  it("doesn't announce a tool whose prompt was left before the install finished", () => {
+    const { result, rerender } = renderHook(
+      (p: Props) => useJustInstalled(p.toolId, p.promptShown, p.ready, p.hasFiles),
+      { initialProps: initial },
+    );
+    rerender({ ...initial, toolId: "noise-removal", promptShown: false, ready: true });
+    rerender({ ...initial, promptShown: false, ready: true });
+    expect(result.current).toBe(false);
+  });
+
+  it("doesn't come back after visiting another tool", () => {
+    const { result, rerender } = renderHook(
+      (p: Props) => useJustInstalled(p.toolId, p.promptShown, p.ready, p.hasFiles),
+      { initialProps: initial },
+    );
+    rerender({ ...initial, promptShown: false, ready: true });
+    rerender({ ...initial, toolId: "noise-removal", promptShown: false, ready: true });
+    rerender({ ...initial, promptShown: false, ready: true });
+    expect(result.current).toBe(false);
+  });
+
+  it("stays off when files are already loaded as the install finishes", () => {
+    const { result, rerender } = renderHook(
+      (p: Props) => useJustInstalled(p.toolId, p.promptShown, p.ready, p.hasFiles),
+      { initialProps: { ...initial, hasFiles: true } },
+    );
+    rerender({ ...initial, promptShown: false, ready: true, hasFiles: true });
+    rerender({ ...initial, promptShown: false, ready: true, hasFiles: false });
+    expect(result.current).toBe(false);
+  });
 });
 
 describe("ToolDropzone ready notice (#5040)", () => {
