@@ -1,5 +1,6 @@
 import { SafeError } from "@snapotter/shared";
 import pg, { type Client } from "pg";
+import { scramSha256Verifier } from "./scram-verifier.js";
 
 /**
  * Build and run a DDL statement with Postgres doing its own identifier and
@@ -109,7 +110,12 @@ async function alignPassword(client: Client, role: string, password: string): Pr
   if (await passwordAlreadyWorks(client, role, password)) return;
 
   try {
-    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [role, password]);
+    // A verifier, never the cleartext: Postgres logs the full text of a failed
+    // statement, and this one fails on any role the owner lacks ADMIN OPTION on.
+    await exec(client, "ALTER ROLE %I WITH LOGIN PASSWORD %L", [
+      role,
+      scramSha256Verifier(password),
+    ]);
   } catch (err) {
     // Two boots that both found the password stale can still collide here.
     // Re-probe rather than retry: if the boot that won set the value this one
@@ -146,7 +152,7 @@ export async function ensureRuntimeRole(
     await exec(
       client,
       "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
-      [role, password],
+      [role, scramSha256Verifier(password)],
     );
     return true;
   } catch (err) {
