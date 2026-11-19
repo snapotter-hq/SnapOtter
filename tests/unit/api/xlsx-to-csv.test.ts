@@ -217,6 +217,35 @@ describe("xlsxToCsv", () => {
       await expect(xlsxToCsv(buffer, 1)).rejects.toThrow(/merges more than 1,000,000 cells/);
     });
 
+    it("refuses a sheet whose CSV would pass the output cap (#4857)", async () => {
+      // One cell at XFD per row is about 40 bytes of XML and 16 KB of commas.
+      const rows = Array.from(
+        { length: 200 },
+        (_, i) => `<row r="${i + 1}"><c r="XFD${i + 1}"><v>1</v></c></row>`,
+      ).join("");
+      const buffer = await patchedWorkbook(() => rows);
+      await expect(xlsxToCsv(buffer, 1, { maxOutputBytes: 1024 * 1024 })).rejects.toThrow(
+        /CSV would be larger than 1 MB/,
+      );
+    });
+
+    it("allows wide rows that stay under the output cap", async () => {
+      const buffer = await patchedWorkbook(() => '<row r="1"><c r="XFD1"><v>1</v></c></row>');
+      const csv = await xlsxToCsv(buffer, 1, { maxOutputBytes: 1024 * 1024 });
+      expect(csv.toString("utf8")).toBe(`${",".repeat(16_383)}1`);
+    });
+
+    it("counts the cap in UTF-8 bytes, not characters", async () => {
+      const buffer = await patchedWorkbook(
+        () => '<row r="1"><c r="A1" t="inlineStr"><is><t>漢字漢字</t></is></c></row>',
+      );
+      // Four characters, twelve bytes.
+      await expect(xlsxToCsv(buffer, 1, { maxOutputBytes: 11 })).rejects.toThrow(/larger than/);
+      expect((await xlsxToCsv(buffer, 1, { maxOutputBytes: 12 })).toString("utf8")).toBe(
+        "漢字漢字",
+      );
+    });
+
     it("reports malformed sheet XML as unreadable input", async () => {
       const buffer = await patchedWorkbook(() => '<row r="1"><c r="A1"><v>1</v></row>');
       await expect(xlsxToCsv(buffer, 1)).rejects.toThrow(/Not a readable XLSX file/);
