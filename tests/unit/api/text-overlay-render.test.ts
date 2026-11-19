@@ -66,8 +66,10 @@ describe("renderTextOverlays wrapping", () => {
 
   it("keeps the old single line, clipped at both edges, when wrap is off", async () => {
     const b = await litBounds({ ...base, text: LONG_TEXT, wrap: false }, 400, 300);
-    expect(b.minX).toBe(0);
-    expect(b.maxX).toBe(399);
+    // The edge column can land in a word gap, and where depends on the host's
+    // sans-serif font, so only require the line to run past the 90% wrap box.
+    expect(b.minX).toBeLessThan(20);
+    expect(b.maxX).toBeGreaterThan(380);
     expect(b.maxY - b.minY).toBeLessThan(96);
   });
 
