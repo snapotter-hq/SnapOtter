@@ -1,8 +1,8 @@
 ---
-description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว ครอบคลุมการตั้งค่า Docker Compose การสร้างจากซอร์สโค้ด และภาพรวมฟีเจอร์ทั้งหมด"
-i18n_source_hash: 2291f9ca0071
+description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว เข้าสู่ระบบ แล้วเปิดเครื่องมือแรกของคุณ ครอบคลุมการเร่งความเร็วด้วย GPU เครื่องขนาดเล็ก Docker Compose และการสร้างจากซอร์สโค้ด"
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 2475289bf2fc
+i18n_output_hash: 175a21458deb
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## เริ่มต้นอย่างรวดเร็ว {#quick-start}
 
+รันคำสั่งเดียว:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-คอนเทนเนอร์เดียวนี้รันทุกอย่างที่ต้องใช้ เมื่อไม่ได้ตั้งค่า `DATABASE_URL` ระบบจะเริ่ม PostgreSQL และ Redis ของตัวเองบนอินเทอร์เฟซ loopback (โหมดฝังในตัว) และเก็บข้อมูลทั้งหมดไว้ในวอลุ่ม `SnapOtter-data` นี่เป็นวิธีที่เร็วที่สุดในการลองใช้ SnapOtter หรือโฮสต์เองบนโฮมแล็บ สำหรับการใช้งานจริง ให้ใช้ [สแต็ก Docker Compose มาตรฐาน](#docker-compose) ซึ่งแยก PostgreSQL และ Redis ไว้ในคอนเทนเนอร์ของตัวเอง โหมดฝังในตัวรันด้วยสิทธิ์ root (ค่าเริ่มต้น) และจะปิดตัวเองโดยอัตโนมัติทันทีที่คุณตั้งค่า `DATABASE_URL`
+จากนั้นเปิด [http://localhost:1349](http://localhost:1349) แล้วเข้าสู่ระบบด้วย `admin` / `admin` ระบบจะขอให้คุณเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
 
-ผลลัพธ์ของงานไม่ได้เก็บไว้ในวอลุ่มข้อมูล จึงหายไปเมื่อเปลี่ยนคอนเทนเนอร์ (เช่น ตอนอัปเกรดอิมเมจ) และลิงก์ดาวน์โหลดก็ใช้งานไม่ได้อีก ส่วนวอลุ่มในคู่มือการติดตั้งใช้งานอธิบายวิธีเก็บผลลัพธ์เหล่านี้ไว้
+ตอนนี้เปิดเครื่องมือสักตัว เลือกจากแถบด้านข้าง หรือไปที่ [Resize](http://localhost:1349/image/resize) โดยตรง วางภาพลงไป แล้วดาวน์โหลดผลลัพธ์
 
-ติดตั้งบน Raspberry Pi แล็ปท็อปเก่า หรือ VPS ขนาดเล็กใช่ไหม ดู [การตั้งค่าสำหรับทรัพยากรจำกัด](/th/guide/low-resource) สำหรับขั้นตอนที่ปรับแต่งแล้วและสิ่งที่คาดหวังได้จากฮาร์ดแวร์ที่มีข้อจำกัด
+การติดตั้งมีเพียงเท่านี้ คอนเทนเนอร์เดียวนี้รันทุกอย่างที่ต้องใช้ เมื่อไม่ได้ตั้งค่า `DATABASE_URL` ระบบจะเริ่ม PostgreSQL และ Redis ของตัวเองบนอินเทอร์เฟซ loopback (โหมดฝังในตัว) และเก็บข้อมูลทั้งหมดไว้ในวอลุ่ม `SnapOtter-data` นี่เป็นวิธีที่เร็วที่สุดในการลองใช้ SnapOtter หรือโฮสต์เองบนโฮมแล็บ โหมดฝังในตัวรันด้วยสิทธิ์ root (ค่าเริ่มต้น) และจะปิดตัวเองโดยอัตโนมัติทันทีที่คุณตั้งค่า `DATABASE_URL` สำหรับการใช้งานจริง ให้ใช้ [สแต็ก Docker Compose](#docker-compose) ซึ่งแยก PostgreSQL และ Redis ไว้ในคอนเทนเนอร์ของตัวเอง
 
-เปิด [http://localhost:1349](http://localhost:1349) แล้วเข้าสู่ระบบด้วย `admin` / `admin` ระบบจะขอให้คุณเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+ผลลัพธ์ของงานไม่ได้เก็บไว้ในวอลุ่มข้อมูล จึงหายไปเมื่อเปลี่ยนคอนเทนเนอร์ (เช่น ตอนอัปเกรดอิมเมจ) และลิงก์ดาวน์โหลดก็ใช้งานไม่ได้อีก หัวข้อ [การเก็บผลลัพธ์ของงาน](/th/guide/deployment#keeping-job-output) ในคู่มือการติดตั้งใช้งานอธิบายวิธีเก็บผลลัพธ์เหล่านี้ไว้
+
+::: tip การรันบน RAM 4 GB หรือน้อยกว่า
+บน Raspberry Pi แล็ปท็อปเก่า หรือ VPS ขนาดเล็ก ให้รันทีละงาน จำกัดเธรดพูลของงานภาพด้วยการเพิ่ม `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` ในคำสั่งข้างต้น และข้ามบันเดิล AI ที่หนัก [การตั้งค่าสำหรับทรัพยากรจำกัด](/th/guide/low-resource#tuning-knobs) รวบรวมขีดจำกัดอื่นที่ควรตั้งค่า และสิ่งที่คาดหวังได้จากฮาร์ดแวร์ที่มีข้อจำกัด
+:::
 
 ::: tip การวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน
 SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตนเป็นค่าเริ่มต้น หากต้องการปิด ให้เปิด **Settings → System → Privacy** แล้วปิด **Anonymous Product Analytics** การทำงานจะหยุดทันทีสำหรับทั้งอินสแตนซ์
@@ -36,25 +42,51 @@ SnapOtter มีการวิเคราะห์ผลิตภัณฑ์�
 ดูรายละเอียดว่ามีการเก็บข้อมูลอะไรบ้างได้ที่ [SnapOtter เก็บข้อมูลอะไร](/th/guide/telemetry)
 :::
 
-::: tip การเร่งความเร็วด้วย NVIDIA CUDA
-เพิ่ม `--gpus all` เพื่อเร่งความเร็วการลบพื้นหลัง การขยายภาพ การปรับปรุงใบหน้า และการฟื้นฟูภาพด้วย NVIDIA CUDA ส่วน OCR ยังคงใช้ CPU และทำงานในอิมเมจเดียวกันไม่ว่าจะเข้าถึง GPU ได้หรือไม่:
+## การเร่งความเร็วด้วย GPU {#gpu-acceleration}
+
+NVIDIA GPU ทำให้เครื่องมือ AI ที่หนักเร็วขึ้นมาก ได้แก่ การขยายภาพ (เร็วขึ้นประมาณ 47 เท่า) การปรับปรุงใบหน้า (ประมาณ 12 เท่า) การถอดเสียง และการลบพื้นหลัง (อย่างละประมาณ 4 เท่า) ส่วน OCR การตรวจจับใบหน้า และการฟื้นฟูภาพถ่ายยังคงใช้ CPU ดังนั้น GPU ไม่ช่วยงานเหล่านี้ อิมเมจเดียวกันรองรับทั้งสองแบบ ให้เพิ่ม `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-ต้องติดตั้ง [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) ระบบจะย้อนกลับไปใช้ CPU โดยอัตโนมัติเมื่อไม่มี CUDA การเร่งความเร็วด้วย iGPU ของ Intel/AMD ผ่าน VA-API, Quick Sync หรือ OpenCL ยังไม่รองรับสำหรับการอนุมาน AI ในปัจจุบัน ดูเบนช์มาร์กได้ที่ [แท็ก Docker](/th/guide/docker-tags) หากเครื่องมือ AI ทำงานบน CPU ทั้งที่ตั้งค่า `--gpus all` แล้ว ให้ดู [ตรวจสอบการเร่งความเร็วด้วย GPU](/th/guide/deployment#verify-gpu-acceleration)
-:::
+ต้องติดตั้ง [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) บนโฮสต์ หากไม่มี CUDA SnapOtter จะย้อนกลับไปใช้ CPU เอง การเร่งความเร็วด้วย iGPU ของ Intel/AMD ผ่าน VA-API, Quick Sync หรือ OpenCL ยังไม่รองรับสำหรับการอนุมาน AI ในปัจจุบัน
 
-::: details มีบน GHCR ด้วย
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [ความต้องการด้านฮาร์ดแวร์](/th/guide/deployment#full-ai-tools-on-nvidia-cuda) มีเวลาประมวลผลของ GPU และ CPU ครบถ้วน และ [เบนช์มาร์กอิมเมจ Docker](/th/guide/docker-tags#benchmarks) มีตัวเลขการเริ่มแบบอุ่นและแบบเย็น
+- หากเครื่องมือ AI ยังทำงานบน CPU ให้ดู [ตรวจสอบการเร่งความเร็วด้วย GPU](/th/guide/deployment#verify-gpu-acceleration)
+- สำหรับ Compose ให้ใช้ [NVIDIA CUDA Quick Start](/th/guide/deployment#quick-start-nvidia-cuda) ในคู่มือการติดตั้งใช้งาน
+
+## วิธีติดตั้งอื่น ๆ {#other-ways-to-install}
+
+### คอนเทนเนอร์เดียวด้วย Compose {#single-container-compose}
+
+คอนเทนเนอร์โหมดฝังในตัวแบบเดียวกับหัวข้อเริ่มต้นอย่างรวดเร็ว แต่เขียนเป็นไฟล์ Compose เพื่อให้ติดตามและแก้ไขได้ง่ายขึ้น บันทึกเป็น `docker-compose.yml` แล้วรัน `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-ทั้งสองรีจิสทรีเผยแพร่อิมเมจเดียวกันในทุกรุ่น
-:::
+เช่นเดียวกับคำสั่ง `docker run` วิธีนี้เหมาะสำหรับลองใช้ SnapOtter และการติดตั้งขนาดเล็ก ทุกการตั้งค่าใน [การกำหนดค่า](/th/guide/configuration) ให้ใส่ไว้ใต้ `environment`
 
-## Docker Compose {#docker-compose}
+### Docker Compose (สำหรับการใช้งานจริง) {#docker-compose}
 
 ใช้ไฟล์สำหรับการใช้งานจริงที่ดูแลและทดสอบพร้อมกับแต่ละรุ่น แทนการคัดลอกตัวอย่าง Compose แบบย่อจากหน้านี้:
 
@@ -76,11 +108,19 @@ docker compose -f docker-compose.yml up -d --no-build
 
 เปิด [http://localhost:1349](http://localhost:1349) แล้วเข้าสู่ระบบด้วย `admin` / `admin`
 
-[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) มาตรฐานประกอบด้วยวอลุ่มรันไทม์ทั้งสี่ การตรวจสอบสถานะ ขีดจำกัดทรัพยากร การกำหนดค่า Redis แบบคงทน อิมเมจฐานข้อมูล/แคชที่ตรึงเวอร์ชัน และการเสริมความแข็งแกร่งของคอนเทนเนอร์ปัจจุบัน ควรเปลี่ยนรหัสผ่านผู้ดูแลระบบเริ่มต้นทันทีหลังเข้าสู่ระบบครั้งแรก เพื่อให้ติดตั้งซ้ำได้ผลเหมือนเดิม ให้ตรึงอิมเมจแอปพลิเคชัน SnapOtter ไว้กับแท็กรุ่นหรือ digest ที่คุณตรวจสอบแล้ว แทนการตาม `latest`
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) มาตรฐานรวมวอลุ่มรันไทม์ทั้งสี่ตัว การตรวจสอบสถานะ ขีดจำกัดทรัพยากร การกำหนดค่า Redis แบบคงทน อิมเมจฐานข้อมูล/แคชที่ตรึงเวอร์ชัน และการเสริมความแข็งแกร่งของคอนเทนเนอร์ในปัจจุบัน เปลี่ยนรหัสผ่านผู้ดูแลระบบเริ่มต้นทันทีหลังเข้าสู่ระบบครั้งแรก หากต้องการการติดตั้งใช้งานที่ทำซ้ำได้ ให้ตรึงอิมเมจแอปพลิเคชัน SnapOtter ไว้ที่แท็กรุ่นหรือ digest ที่คุณตรวจสอบแล้ว แทนการตาม `latest`
 
 ดู [การกำหนดค่า](/th/guide/configuration) สำหรับตัวแปรสภาพแวดล้อมทั้งหมด และ [ความปลอดภัยและการเสริมความแข็งแกร่ง](/th/guide/security) สำหรับความลับ นโยบายเครือข่าย และแนวทางการสำรองข้อมูล
 
-## สร้างจากซอร์สโค้ด {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+ทั้ง Docker Hub และ GHCR เผยแพร่อิมเมจเดียวกันในทุกรุ่น หากต้องการดึงจาก GHCR ให้สลับชื่ออิมเมจ:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### สร้างจากซอร์สโค้ด {#build-from-source}
 
 **สิ่งที่ต้องมี:** Node.js 22.22+, pnpm 9+, Docker (สำหรับ Postgres + Redis), Python 3.11+ (สำหรับฟีเจอร์ AI), Git
 
@@ -92,12 +132,12 @@ pnpm install
 pnpm dev
 ```
 
-- Frontend: [http://localhost:1351](http://localhost:1351)
-- Backend: [http://localhost:13490](http://localhost:13490)
+- ฟรอนต์เอนด์: [http://localhost:1351](http://localhost:1351)
+- แบ็กเอนด์: [http://localhost:13490](http://localhost:13490)
 
 ## สิ่งที่คุณทำได้ {#what-you-can-do}
 
-### การประมวลผลไฟล์ (เครื่องมือกว่า 200 รายการ) {#file-processing-200-tools}
+### การประมวลผลไฟล์ (200+ เครื่องมือ) {#file-processing-200-tools}
 
 | ประเภท | จำนวน | ตัวอย่างเครื่องมือ |
 |----------|-------|---------------|
@@ -157,6 +197,6 @@ SnapOtter ใช้งานได้ในเบราว์เซอร์บ�
 
 แอปที่ติดตั้งจะเปิดในหน้าต่างของตัวเอง ตรงไปยังอินสแตนซ์ของคุณ
 
-ข้อควรทราบอย่างหนึ่ง เบราว์เซอร์จะแสดงข้อความให้ติดตั้งเฉพาะบน HTTPS ที่อยู่ HTTP ธรรมดาใน LAN ยังใช้งานในแท็บเบราว์เซอร์ได้ตามปกติ แต่หากต้องการติดตั้งจริง ให้วางอินสแตนซ์ไว้หลัง reverse proxy ที่มีใบรับรอง (ดู[คู่มือการติดตั้งใช้งาน](/th/guide/deployment))
+ข้อควรทราบอย่างหนึ่ง เบราว์เซอร์จะแสดงข้อความให้ติดตั้งเฉพาะบน HTTPS ที่อยู่ HTTP ธรรมดาใน LAN ยังใช้งานในแท็บเบราว์เซอร์ได้ตามปกติ แต่หากต้องการติดตั้งจริง ให้วางอินสแตนซ์ไว้หลัง reverse proxy ที่มีใบรับรอง (ดู [คู่มือการติดตั้งใช้งาน](/th/guide/deployment))
 
 บนโทรศัพท์และแท็บเล็ต เครื่องมือภาพจะมีปุ่ม **Take photo** อยู่ข้างปุ่มอัปโหลด ถ่ายใบเสร็จหรือกระดานไวต์บอร์ด แล้วภาพจะเข้าสู่เครื่องมือทันที

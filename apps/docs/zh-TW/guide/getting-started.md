@@ -1,8 +1,8 @@
 ---
-description: "以單一指令透過 Docker 安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整的功能概覽。"
-i18n_source_hash: 2291f9ca0071
+description: "以單一指令透過 Docker 安裝 SnapOtter，登入並開啟您的第一個工具。內容涵蓋 GPU 加速、小型機器、Docker Compose，以及從原始碼建置。"
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 54bc669fa408
+i18n_output_hash: b4232fdd12fc
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## 快速開始 {#quick-start}
 
+執行一個指令：
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-這個單一容器包含執行所需的一切：未設定 `DATABASE_URL` 時，它會在 loopback 介面上啟動自己的 PostgreSQL 與 Redis（內嵌模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用伺服器自行架設最快的方式。正式環境請使用[標準 Docker Compose 堆疊](#docker-compose)，它會把 PostgreSQL 與 Redis 放在各自的容器中。內嵌模式以 root 身分執行（預設），一旦設定 `DATABASE_URL` 就會自動關閉。
+接著開啟 [http://localhost:1349](http://localhost:1349)，並以 `admin` / `admin` 登入。首次登入時，系統會要求您變更密碼。
 
-工作結果不會儲存在資料磁碟區中，因此容器被替換時（例如升級映像檔）它們會消失，對應的下載連結也會失效。部署指南的「磁碟區」一節說明了如何保留它們。
+現在開啟一個工具。您可以從側邊欄選一個，也可以直接前往[調整大小](http://localhost:1349/image/resize)，放入一張圖片，再下載結果。
 
-要安裝在 Raspberry Pi、舊筆電或小型 VPS 上嗎？請參閱[低資源環境設定](/zh-TW/guide/low-resource)，了解調校後的操作步驟，以及在受限硬體上的預期表現。
+安裝就是這樣。這個單一容器包含執行所需的一切：未設定 `DATABASE_URL` 時，它會在 loopback 介面上啟動自己的 PostgreSQL 與 Redis（內嵌模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用伺服器自行架設最快的方式。內嵌模式以 root 身分執行（預設），一旦設定 `DATABASE_URL` 就會自動關閉。正式環境請使用 [Docker Compose 堆疊](#docker-compose)，它會把 PostgreSQL 與 Redis 放在各自的容器中。
 
-開啟 [http://localhost:1349](http://localhost:1349)，並以 `admin` / `admin` 登入。首次登入時，系統會要求您變更密碼。
+工作結果不會儲存在資料磁碟區中，因此容器被替換時（例如升級映像檔）它們會消失，對應的下載連結也會失效。部署指南中的[保留工作輸出](/zh-TW/guide/deployment#keeping-job-output)說明了如何保留它們。
+
+::: tip 在 4 GB 或更少記憶體上執行
+在 Raspberry Pi、舊筆電或小型 VPS 上，請一次只執行一個工作，在上面的指令中加入 `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` 來限制圖片執行緒集區，並略過較大的 AI 套件。[低資源環境設定](/zh-TW/guide/low-resource#tuning-knobs)列出了其他值得設定的限制，以及在受限硬體上的預期表現。
+:::
 
 ::: tip 匿名產品分析
 SnapOtter 預設包含匿名產品分析。若要關閉，請開啟 **設定 → 系統 → 隱私權**，並關閉 **匿名產品分析**。整個執行個體會立即停止收集。
@@ -36,25 +42,51 @@ SnapOtter 預設包含匿名產品分析。若要關閉，請開啟 **設定 →
 關於收集內容的詳細資訊，請參閱 [SnapOtter 收集哪些資料](/zh-TW/guide/telemetry)。
 :::
 
-::: tip NVIDIA CUDA 加速
-加上 `--gpus all`，即可使用 NVIDIA CUDA 加速的去背、放大、臉部增強與修復。OCR 仍然使用 CPU，無論是否有 GPU 存取權，都可在同一個映像檔中運作：
+## GPU 加速 {#gpu-acceleration}
+
+NVIDIA GPU 能大幅加快繁重的 AI 工具：放大（約 47 倍）、臉部增強（約 12 倍）、轉錄與去背（各約 4 倍）。OCR、臉部偵測與照片修復仍受限於 CPU，因此 GPU 對它們沒有幫助。同一個映像檔兩種情況都適用，只需加上 `--gpus all`：
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-需要 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。CUDA 無法使用時會自動退回 CPU。目前 AI 推論不支援透過 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 內顯加速。效能基準請參閱 [Docker 映像檔標籤](/zh-TW/guide/docker-tags)。如果已使用 `--gpus all`，AI 工具卻仍在 CPU 上執行，請參閱[驗證 GPU 加速](/zh-TW/guide/deployment#verify-gpu-acceleration)。
-:::
+這需要在主機上安裝 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。沒有 CUDA 時，SnapOtter 會自動退回 CPU。目前 AI 推論不支援透過 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 內顯加速。
 
-::: details 也可從 GHCR 取得
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [硬體需求](/zh-TW/guide/deployment#full-ai-tools-on-nvidia-cuda)提供完整的 GPU 與 CPU 耗時，[Docker 映像檔基準測試](/zh-TW/guide/docker-tags#benchmarks)則提供暖啟動與冷啟動數據。
+- 如果 AI 工具仍在 CPU 上執行，請參閱[驗證 GPU 加速](/zh-TW/guide/deployment#verify-gpu-acceleration)。
+- 使用 Compose 時，請參閱部署指南中的 [NVIDIA CUDA 快速開始](/zh-TW/guide/deployment#quick-start-nvidia-cuda)。
+
+## 其他安裝方式 {#other-ways-to-install}
+
+### 使用 Compose 的單一容器 {#single-container-compose}
+
+與快速開始相同的內嵌模式容器，寫成 Compose 檔案，更方便管理與修改。將它儲存為 `docker-compose.yml`，然後執行 `docker compose up -d`：
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-兩個登錄庫在每次發行時都會發布相同的映像檔。
-:::
+與 `docker run` 指令一樣，這適合試用 SnapOtter 與小型安裝。[設定](/zh-TW/guide/configuration)中的所有項目都放在 `environment` 之下。
 
-## Docker Compose {#docker-compose}
+### Docker Compose（正式環境） {#docker-compose}
 
 請使用隨每次發行維護並測試過的正式環境檔案，而不要複製本頁中簡化的 Compose 範例：
 
@@ -80,7 +112,15 @@ docker compose -f docker-compose.yml up -d --no-build
 
 所有環境變數請參閱[設定](/zh-TW/guide/configuration)，機密、網路原則與備份指引請參閱[安全性與強化](/zh-TW/guide/security)。
 
-## 從原始碼建置 {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub 與 GHCR 在每次發行時都會發布相同的映像檔。若要從 GHCR 拉取，請替換映像檔名稱：
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### 從原始碼建置 {#build-from-source}
 
 **先決條件：** Node.js 22.22+、pnpm 9+、Docker（用於 Postgres 與 Redis）、Python 3.11+（用於 AI 功能）、Git。
 

@@ -1,8 +1,8 @@
 ---
-description: "Installieren Sie SnapOtter mit Docker in einem einzigen Befehl. Enthält die Docker-Compose-Einrichtung, den Build aus dem Quellcode und eine vollständige Funktionsübersicht."
-i18n_source_hash: 2291f9ca0071
+description: "Installieren Sie SnapOtter mit Docker in einem Befehl, melden Sie sich an und öffnen Sie Ihr erstes Werkzeug. Behandelt GPU-Beschleunigung, kleine Rechner, Docker Compose und den Build aus dem Quellcode."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 3f1d17388926
+i18n_output_hash: ef095237d7d1
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ Erkunden Sie die vollständige Oberfläche unter [demo.snapotter.com](https://de
 
 ## Schnellstart {#quick-start}
 
+Führen Sie einen Befehl aus:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Dieser einzelne Container führt alles aus, was er benötigt: Wenn `DATABASE_URL` nicht gesetzt ist, startet er sein eigenes PostgreSQL und Redis auf der Loopback-Schnittstelle (eingebetteter Modus) und hält alle Daten im Volume `SnapOtter-data`. Das ist der schnellste Weg, SnapOtter auszuprobieren oder im Homelab selbst zu hosten. Für den Produktivbetrieb verwenden Sie den [kanonischen Docker-Compose-Stack](#docker-compose), der PostgreSQL und Redis in eigenen Containern hält. Der eingebettete Modus läuft als root (Standard) und schaltet sich automatisch ab, sobald Sie `DATABASE_URL` setzen.
+Öffnen Sie anschließend [http://localhost:1349](http://localhost:1349) und melden Sie sich mit `admin` / `admin` an. Bei der ersten Anmeldung werden Sie aufgefordert, Ihr Passwort zu ändern.
 
-Auftragsergebnisse werden nicht im Daten-Volume gespeichert. Sie gehen verloren, wenn der Container ersetzt wird (zum Beispiel bei einem Image-Upgrade), und ihre Download-Links funktionieren dann nicht mehr. Wie Sie sie behalten, erklärt der Abschnitt „Volumes“ im Leitfaden zur Bereitstellung.
+Öffnen Sie jetzt ein Werkzeug. Wählen Sie eines in der Seitenleiste aus oder gehen Sie direkt zu [Größe ändern](http://localhost:1349/image/resize), legen Sie ein Bild ab und laden Sie das Ergebnis herunter.
 
-Installieren Sie auf einem Raspberry Pi, einem alten Notebook oder einem kleinen VPS? Siehe [Ressourcenschonende Setups](/de/guide/low-resource) für eine abgestimmte Anleitung und was Sie von eingeschränkter Hardware erwarten können.
+Das ist die gesamte Installation. Dieser einzelne Container führt alles aus, was er benötigt: Wenn `DATABASE_URL` nicht gesetzt ist, startet er sein eigenes PostgreSQL und Redis auf der Loopback-Schnittstelle (eingebetteter Modus) und hält alle Daten im Volume `SnapOtter-data`. Das ist der schnellste Weg, SnapOtter auszuprobieren oder im Homelab selbst zu hosten. Der eingebettete Modus läuft als root (Standard) und schaltet sich automatisch ab, sobald Sie `DATABASE_URL` setzen. Für den Produktivbetrieb verwenden Sie den [Docker-Compose-Stack](#docker-compose), der PostgreSQL und Redis in eigenen Containern hält.
 
-Öffnen Sie [http://localhost:1349](http://localhost:1349) und melden Sie sich mit `admin` / `admin` an. Bei der ersten Anmeldung werden Sie aufgefordert, Ihr Passwort zu ändern.
+Auftragsergebnisse werden nicht im Daten-Volume gespeichert. Sie gehen verloren, wenn der Container ersetzt wird (zum Beispiel bei einem Image-Upgrade), und ihre Download-Links funktionieren dann nicht mehr. [Auftragsausgaben behalten](/de/guide/deployment#keeping-job-output) im Leitfaden zur Bereitstellung zeigt, wie Sie sie aufbewahren.
+
+::: tip Betrieb mit 4 GB RAM oder weniger
+Führen Sie auf einem Raspberry Pi, einem alten Notebook oder einem kleinen VPS jeweils nur einen Auftrag aus und begrenzen Sie den Thread-Pool für Bilder, indem Sie `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` zum obigen Befehl hinzufügen, und verzichten Sie auf die schweren KI-Bundles. [Ressourcenschonende Setups](/de/guide/low-resource#tuning-knobs) nennt die weiteren sinnvollen Limits und was Sie von eingeschränkter Hardware erwarten können.
+:::
 
 ::: tip Anonyme Produktanalysen
 SnapOtter enthält standardmäßig anonyme Produktanalysen. Um sie auszuschalten, öffnen Sie **Einstellungen → System → Datenschutz** und schalten Sie **Anonyme Produktanalysen** aus. Das wirkt sofort für die gesamte Instanz.
@@ -36,25 +42,51 @@ Die Fehlerüberwachung erfolgt über [Sentry](https://sentry.io), das SnapOtter 
 Details dazu, was erfasst wird, finden Sie unter [Was SnapOtter erfasst](/de/guide/telemetry).
 :::
 
-::: tip NVIDIA-CUDA-Beschleunigung
-Fügen Sie `--gpus all` hinzu, um Hintergrundentfernung, Hochskalierung, Gesichtsverbesserung und Restaurierung mit NVIDIA CUDA zu beschleunigen. OCR bleibt CPU-basiert und funktioniert im selben Image mit oder ohne GPU-Zugriff:
+## GPU-Beschleunigung {#gpu-acceleration}
+
+Eine NVIDIA GPU beschleunigt die rechenintensiven KI-Werkzeuge deutlich: Hochskalierung (etwa 47-fach), Gesichtsverbesserung (etwa 12-fach), Transkription und Hintergrundentfernung (jeweils etwa 4-fach). OCR, Gesichtserkennung und Fotorestaurierung bleiben CPU-basiert, eine GPU hilft ihnen also nicht. Dasselbe Image deckt beides ab; fügen Sie `--gpus all` hinzu:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Erfordert das [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Fällt automatisch auf die CPU zurück, wenn CUDA nicht verfügbar ist. Eine Beschleunigung über Intel/AMD-iGPUs mittels VA-API, Quick Sync oder OpenCL wird für KI-Inferenz derzeit nicht unterstützt. Benchmarks finden Sie unter [Docker-Tags](/de/guide/docker-tags). Wenn KI-Werkzeuge trotz `--gpus all` auf der CPU laufen, siehe [GPU-Beschleunigung überprüfen](/de/guide/deployment#verify-gpu-acceleration).
-:::
+Erfordert das [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) auf dem Host. Ohne CUDA fällt SnapOtter automatisch auf die CPU zurück. Eine Beschleunigung über Intel/AMD-iGPUs mittels VA-API, Quick Sync oder OpenCL wird für KI-Inferenz derzeit nicht unterstützt.
 
-::: details Auch auf GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [Hardwareanforderungen](/de/guide/deployment#full-ai-tools-on-nvidia-cuda) enthält alle GPU- und CPU-Messwerte, [Docker-Image-Benchmarks](/de/guide/docker-tags#benchmarks) die Werte für Warm- und Kaltstart.
+- Wenn KI-Werkzeuge trotzdem auf der CPU laufen, siehe [GPU-Beschleunigung überprüfen](/de/guide/deployment#verify-gpu-acceleration).
+- Für Compose verwenden Sie den [NVIDIA-CUDA-Schnellstart](/de/guide/deployment#quick-start-nvidia-cuda) im Leitfaden zur Bereitstellung.
+
+## Weitere Installationswege {#other-ways-to-install}
+
+### Einzelner Container mit Compose {#single-container-compose}
+
+Derselbe Container im eingebetteten Modus wie im Schnellstart, als Compose-Datei geschrieben, damit er sich leichter nachverfolgen und ändern lässt. Speichern Sie sie als `docker-compose.yml` und führen Sie `docker compose up -d` aus:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Beide Registries veröffentlichen bei jedem Release dasselbe Image.
-:::
+Wie der Befehl `docker run` ist dies zum Ausprobieren von SnapOtter und für kleine Installationen gedacht. Jede Einstellung aus [Konfiguration](/de/guide/configuration) gehört unter `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (Produktion) {#docker-compose}
 
 Verwenden Sie die Produktionsdatei, die mit jedem Release gepflegt und getestet wird, anstatt ein verkürztes Compose-Beispiel von dieser Seite zu kopieren:
 
@@ -80,7 +112,15 @@ Die kanonische [`docker/docker-compose.yml`](https://github.com/snapotter-hq/Sna
 
 Alle Umgebungsvariablen finden Sie unter [Konfiguration](/de/guide/configuration), Hinweise zu Secrets, Netzwerkrichtlinien und Backups unter [Sicherheit und Härtung](/de/guide/security).
 
-## Aus dem Quellcode bauen {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub und GHCR veröffentlichen bei jedem Release dasselbe Image. Um von GHCR zu laden, tauschen Sie den Image-Namen aus:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Aus dem Quellcode bauen {#build-from-source}
 
 **Voraussetzungen:** Node.js 22.22+, pnpm 9+, Docker (für Postgres + Redis), Python 3.11+ (für KI-Funktionen), Git.
 

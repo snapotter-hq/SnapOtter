@@ -1,8 +1,8 @@
 ---
-description: "Встановіть SnapOtter за допомогою Docker однією командою. Включає налаштування Docker Compose, збірку з вихідного коду та повний огляд можливостей."
-i18n_source_hash: 2291f9ca0071
+description: "Встановіть SnapOtter через Docker однією командою, увійдіть і відкрийте перший інструмент. Охоплює прискорення на GPU, слабкі машини, Docker Compose і збірку з вихідного коду."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 534692cc4879
+i18n_output_hash: ede5483d50db
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## Швидкий старт {#quick-start}
 
+Виконайте одну команду:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Цей єдиний контейнер запускає все необхідне: якщо `DATABASE_URL` не задано, він стартує власні PostgreSQL і Redis на інтерфейсі loopback (вбудований режим) і зберігає всі дані в томі `SnapOtter-data`. Це найшвидший спосіб спробувати SnapOtter або розгорнути його у домашній лабораторії. Для production використовуйте [канонічний стек Docker Compose](#docker-compose), у якому PostgreSQL і Redis працюють у власних контейнерах. Вбудований режим працює від root (за замовчуванням) і автоматично вимикається, щойно ви задаєте `DATABASE_URL`.
+Потім відкрийте [http://localhost:1349](http://localhost:1349) і увійдіть із даними `admin` / `admin`. Під час першого входу вас попросять змінити пароль.
 
-Результати завдань не зберігаються в томі даних, тому вони зникають при заміні контейнера (наприклад, під час оновлення образу), а посилання на їх завантаження перестають працювати. Як їх зберегти, пояснює розділ «Томи» посібника з розгортання.
+Тепер відкрийте інструмент. Виберіть будь-який на бічній панелі або одразу перейдіть до [Зміни розміру](http://localhost:1349/image/resize), перетягніть зображення й завантажте результат.
 
-Встановлюєте на Raspberry Pi, старий ноутбук або невеликий VPS? Див. [Low-Resource Setups](/uk/guide/low-resource) з налаштованою покроковою інструкцією та очікуваннями від обмеженого обладнання.
+Ось і все встановлення. Цей єдиний контейнер запускає все необхідне: якщо `DATABASE_URL` не задано, він стартує власні PostgreSQL і Redis на інтерфейсі loopback (вбудований режим) і зберігає всі дані в томі `SnapOtter-data`. Це найшвидший спосіб спробувати SnapOtter або розгорнути його у домашній лабораторії. Вбудований режим працює від root (за замовчуванням) і автоматично вимикається, щойно ви задаєте `DATABASE_URL`. Для production використовуйте [стек Docker Compose](#docker-compose), у якому PostgreSQL і Redis працюють у власних контейнерах.
 
-Відкрийте [http://localhost:1349](http://localhost:1349) і увійдіть із даними `admin` / `admin`. Під час першого входу вас попросять змінити пароль.
+Результати завдань не зберігаються в томі даних, тому вони зникають при заміні контейнера (наприклад, під час оновлення образу), а посилання на їх завантаження перестають працювати. Як їх зберегти, описано в розділі [Збереження результатів завдань](/uk/guide/deployment#keeping-job-output) посібника з розгортання.
+
+::: tip Робота на 4 ГБ ОЗП або менше
+На Raspberry Pi, старому ноутбуці або невеликому VPS запускайте по одному завданню за раз і обмежте пул потоків обробки зображень, додавши `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` до наведеної вище команди, а важкі AI-пакети не встановлюйте. У розділі [Low-Resource Setups](/uk/guide/low-resource#tuning-knobs) перелічено інші корисні обмеження та описано, чого очікувати від обмеженого обладнання.
+:::
 
 ::: tip Анонімна продуктова аналітика
 SnapOtter за замовчуванням містить анонімну продуктову аналітику. Щоб вимкнути її, відкрийте **Settings → System → Privacy** і вимкніть **Anonymous Product Analytics**. Аналітика одразу припиняється для всього екземпляра.
@@ -36,25 +42,51 @@ SnapOtter за замовчуванням містить анонімну про
 Подробиці про те, що збирається, див. у [What SnapOtter collects](/uk/guide/telemetry).
 :::
 
-::: tip Прискорення NVIDIA CUDA
-Додайте `--gpus all` для прискореного через NVIDIA CUDA видалення фону, збільшення, покращення облич і відновлення. OCR залишається на CPU і працює в тому самому образі з доступом до GPU та без нього:
+## Прискорення на GPU {#gpu-acceleration}
+
+GPU NVIDIA помітно прискорює важкі AI-інструменти: збільшення (приблизно в 47 разів), покращення облич (приблизно в 12 разів), транскрибування та видалення фону (приблизно в 4 рази кожне). OCR, виявлення облич і відновлення фотографій, як і раніше, залежать від CPU, тож GPU їм не допомагає. Той самий образ підходить для обох випадків; додайте `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Потрібен [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Автоматично переходить на CPU, якщо CUDA недоступна. Прискорення на інтегрованих GPU Intel/AMD через VA-API, Quick Sync або OpenCL для AI-інференсу наразі не підтримується. Бенчмарки див. у [Docker Tags](/uk/guide/docker-tags). Якщо AI-інструменти працюють на CPU, незважаючи на `--gpus all`, див. [Перевірка GPU-прискорення](/uk/guide/deployment#verify-gpu-acceleration).
-:::
+Для цього на хості потрібен [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Без CUDA SnapOtter автоматично переходить на CPU. Прискорення на інтегрованих GPU Intel/AMD через VA-API, Quick Sync або OpenCL для AI-інференсу наразі не підтримується.
 
-::: details Також у GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- У розділі [Hardware Requirements](/uk/guide/deployment#full-ai-tools-on-nvidia-cuda) наведено повні виміри на GPU і CPU, а в [бенчмарках образу Docker](/uk/guide/docker-tags#benchmarks) показники теплого й холодного старту.
+- Якщо AI-інструменти все одно працюють на CPU, див. [Перевірка GPU-прискорення](/uk/guide/deployment#verify-gpu-acceleration).
+- Для Compose скористайтеся [швидким стартом з NVIDIA CUDA](/uk/guide/deployment#quick-start-nvidia-cuda) в посібнику з розгортання.
+
+## Інші способи встановлення {#other-ways-to-install}
+
+### Один контейнер через Compose {#single-container-compose}
+
+Той самий контейнер у вбудованому режимі, що й у швидкому старті, але оформлений як файл Compose, щоб ним було простіше керувати й змінювати його. Збережіть його як `docker-compose.yml` і виконайте `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Обидва реєстри публікують однаковий образ під час кожного релізу.
-:::
+Як і команда `docker run`, він призначений для знайомства з SnapOtter і невеликих встановлень. Усі параметри з розділу [Конфігурація](/uk/guide/configuration) задаються в `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (production) {#docker-compose}
 
 Використовуйте виробничий файл, який підтримується і тестується з кожним релізом, замість копіювання скороченого прикладу Compose з цієї сторінки:
 
@@ -80,7 +112,15 @@ docker compose -f docker-compose.yml up -d --no-build
 
 Усі змінні середовища див. у розділі [Конфігурація](/uk/guide/configuration), а секрети, мережеву політику та рекомендації щодо резервного копіювання, у розділі [Безпека та посилення захисту](/uk/guide/security).
 
-## Збірка з вихідного коду {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub і GHCR публікують однаковий образ під час кожного релізу. Щоб завантажити з GHCR, замініть назву образу:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Збірка з вихідного коду {#build-from-source}
 
 **Передумови:** Node.js 22.22+, pnpm 9+, Docker (для Postgres + Redis), Python 3.11+ (для AI-функцій), Git.
 
