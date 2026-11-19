@@ -571,7 +571,8 @@ export function registerCollage(app: FastifyInstance) {
       // Without cells every slot expects an upload, so a short count is a
       // mistake, not a partial collage. Partial collages opt in through
       // explicit cells with imageIndex -1, which is what the web UI sends.
-      if (!settings.cells && files.length < template.imageCount) {
+      // An empty cells array falls back to the same defaults, so treat it as omitted.
+      if (!settings.cells?.length && files.length < template.imageCount) {
         return reply.status(400).send({
           error: `Template "${template.id}" needs ${template.imageCount} images, ${files.length} given. Upload more images, or send cells with imageIndex -1 for the slots to leave empty.`,
           code: "INVALID_SETTINGS",

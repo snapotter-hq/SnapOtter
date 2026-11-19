@@ -339,7 +339,15 @@ test.describe("Collage: extended", () => {
       [
         {
           name: "settings",
-          value: JSON.stringify({ templateId: "2-h-equal", aspectRatio: "1:1" }),
+          // A partial collage opts in through explicit cells (#4405).
+          value: JSON.stringify({
+            templateId: "2-h-equal",
+            aspectRatio: "1:1",
+            cells: [
+              { imageIndex: 0, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+              { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            ],
+          }),
         },
       ],
     );

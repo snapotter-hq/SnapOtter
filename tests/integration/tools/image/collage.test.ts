@@ -194,6 +194,29 @@ describe("Collage", () => {
     expect(JSON.parse(res.body).error).toMatch(/needs 2 images, 1 given/);
   });
 
+  it("treats an empty cells array like omitted cells when images are short (#4405)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", cells: [] }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("INVALID_SETTINGS");
+  });
+
   it("applies custom gap between cells", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
