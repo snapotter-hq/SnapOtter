@@ -51,6 +51,43 @@ function isLosslessWebP(buffer: Buffer): boolean {
   return sawLosslessFrame;
 }
 
+/**
+ * Rotate each page of a multi-page TIFF and rejoin them as one stack (#4849).
+ * A bare `sharp(buffer).rotate()` decodes page 1 only, which would hand every
+ * tool after this a one-page TIFF.
+ *
+ * libvips only writes a page stack whose pages share one size. When the
+ * rotated pages don't, this returns null and the caller keeps page 1, as it
+ * did before; the warn line says the other pages were left behind.
+ */
+async function rotateTiffPages(
+  buffer: Buffer,
+  meta: Metadata,
+  log: Pick<FastifyBaseLogger, "warn">,
+): Promise<Sharp | null> {
+  const pages = meta.pages ?? 1;
+  assertGifWorkload({ width: meta.width, height: meta.height, pages }, "Multi-page TIFF input");
+  const frames: Buffer[] = [];
+  let size: string | undefined;
+  for (let page = 0; page < pages; page++) {
+    let frame = sharp(buffer, { page, pages: 1 }).rotate();
+    // A PNG intermediate keeps 16 bits only when the pipeline is in a 16-bit space.
+    if (meta.depth === "ushort" && meta.space) frame = frame.toColorspace(meta.space);
+    const { data, info } = await frame.png().toBuffer({ resolveWithObject: true });
+    const pageSize = `${info.width}x${info.height}`;
+    if (size !== undefined && pageSize !== size) {
+      log.warn(
+        { orientation: meta.orientation, pages, bytes: buffer.length },
+        "autoOrient: TIFF pages have different sizes, keeping page 1 only",
+      );
+      return null;
+    }
+    size = pageSize;
+    frames.push(data);
+  }
+  return sharp(frames, { join: { across: 1, animated: true } });
+}
+
 export async function autoOrient(
   buffer: Buffer,
   log: Pick<FastifyBaseLogger, "warn"> = logger,
@@ -106,7 +143,9 @@ export async function autoOrient(
       if (meta.delay !== undefined) encoderOptions.delay = meta.delay;
       if (meta.loop !== undefined) encoderOptions.loop = meta.loop;
     } else {
-      pipeline = sharp(buffer).rotate();
+      pipeline =
+        (pages > 1 && output.format === "tiff" && (await rotateTiffPages(buffer, meta, log))) ||
+        sharp(buffer).rotate();
       if (meta.depth === "ushort" && meta.space) {
         pipeline = pipeline.toColorspace(meta.space);
       }

@@ -99,6 +99,9 @@ export const fixtures = {
       // Two TIFF pages of different sizes (80x30, then 50x50), which libvips
       // refuses to load as one page stack (#4419).
       multipageMixedSizesTiff: p("image/edge/multipage-mixed-sizes.tiff"),
+      // Two TIFF pages of different sizes (40x20, then 30x10), both tagged
+      // orientation 6, so autoOrient can't rejoin them as one stack (#4849).
+      multipageMixedSizesOrientedTiff: p("image/edge/multipage-mixed-sizes-oriented.tiff"),
     },
     formats: (ext: string) => p(`image/formats/sample.${ext}`),
     multipageTiff: p("image/formats/multipage.tiff"),
