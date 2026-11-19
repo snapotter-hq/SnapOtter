@@ -721,9 +721,10 @@ describe("autoOrient", () => {
   });
 
   it("keeps 16-bit samples when rotating a multi-page TIFF (#4849)", async () => {
-    const raw = Buffer.alloc(32 * 24 * 3 * 2);
-    for (let i = 0; i < raw.length; i += 2) raw.writeUInt16LE(40000, i);
-    const page = await sharp(raw, { raw: { width: 32, height: 24, channels: 3, depth: "ushort" } })
+    // A Uint16Array input is read as 16-bit; 40000 isn't n * 257, so an 8-bit
+    // round trip anywhere would change it.
+    const samples = new Uint16Array(32 * 24 * 3).fill(40000);
+    const page = await sharp(samples, { raw: { width: 32, height: 24, channels: 3 } })
       .toColorspace("rgb16")
       .png()
       .toBuffer();
@@ -739,10 +740,8 @@ describe("autoOrient", () => {
         .toBuffer({ resolveWithObject: true });
       return { info, rgb: Array.from(new Uint16Array(data.buffer, data.byteOffset, 3)) };
     };
-    const before = await firstSample16(tiff, 0);
     expect((await sharp(tiff).metadata()).depth).toBe("ushort");
-    // A sample an 8-bit round trip can't produce (8-bit values widen to n * 257).
-    expect(before.rgb.some((v) => v % 257 !== 0)).toBe(true);
+    expect((await firstSample16(tiff, 0)).rgb).toEqual([40000, 40000, 40000]);
 
     const result = await autoOrient(tiff);
     const meta = await sharp(result).metadata();
@@ -752,7 +751,7 @@ describe("autoOrient", () => {
     for (let page = 0; page < 2; page++) {
       const after = await firstSample16(result, page);
       expect([after.info.width, after.info.height]).toEqual([24, 32]);
-      expect(after.rgb).toEqual(before.rgb);
+      expect(after.rgb).toEqual([40000, 40000, 40000]);
     }
   });
 });
