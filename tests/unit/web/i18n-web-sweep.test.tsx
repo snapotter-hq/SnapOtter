@@ -15,6 +15,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const storage = vi.hoisted(() => new Map<string, string>());
 const apiGet = vi.hoisted(() => vi.fn());
+// The before/after slider re-measures its layers through a ResizeObserver,
+// which jsdom lacks.
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    disconnect() {}
+  },
+);
 vi.stubGlobal("localStorage", {
   getItem: (k: string) => storage.get(k) ?? null,
   setItem: (k: string, v: string) => void storage.set(k, v),

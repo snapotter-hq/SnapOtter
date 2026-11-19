@@ -111,8 +111,21 @@ export function BeforeAfterSlider({
     height: number;
   } | null>(null);
 
-  const handleAfterImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
+  // Without a width cap, an image that hits the 70dvh height limit on a wide
+  // pane would sit in letterbox bars that the divider still sweeps across.
+  // Capping the frame at 70dvh times the aspect ratio keeps it on the image.
+  const [beforeAspect, setBeforeAspect] = useState<number | null>(null);
+
+  const handleBeforeImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    setBeforeAspect(naturalWidth && naturalHeight ? naturalWidth / naturalHeight : null);
+  }, []);
+
+  const afterImgRef = useRef<HTMLImageElement>(null);
+
+  const measureContentBox = useCallback(() => {
+    const img = afterImgRef.current;
+    if (!img) return;
     const cw = img.clientWidth;
     const ch = img.clientHeight;
     const nw = img.naturalWidth;
@@ -129,8 +142,19 @@ export function BeforeAfterSlider({
     });
   }, []);
 
+  // The frame resizes after load (the aspect cap above, a window resize), so
+  // re-measure whenever the after image's box changes, or the background
+  // layers drift off the image.
+  useEffect(() => {
+    const img = afterImgRef.current;
+    if (!img) return;
+    const observer = new ResizeObserver(measureContentBox);
+    observer.observe(img);
+    return () => observer.disconnect();
+  }, [measureContentBox]);
+
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-2xl mx-auto h-full min-h-0">
+    <div className="flex flex-col items-center gap-3 w-full h-full min-h-0">
       {/* Slider container */}
       <div
         ref={containerRef}
@@ -141,7 +165,10 @@ export function BeforeAfterSlider({
         aria-valuemax={100}
         tabIndex={0}
         className="relative flex w-full min-h-0 overflow-hidden rounded-lg border border-border select-none touch-none"
-        style={{ cursor: isDragging ? (isMobile ? "ns-resize" : "ew-resize") : "default" }}
+        style={{
+          cursor: isDragging ? (isMobile ? "ns-resize" : "ew-resize") : "default",
+          maxWidth: beforeAspect ? `calc(70dvh * ${beforeAspect})` : undefined,
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -161,6 +188,7 @@ export function BeforeAfterSlider({
           src={beforeSrc}
           alt={t.comparison.original}
           className="block w-full max-h-[70dvh] object-contain"
+          onLoad={handleBeforeImgLoad}
           draggable={false}
         />
 
@@ -206,7 +234,8 @@ export function BeforeAfterSlider({
             alt={t.comparison.processed}
             className="relative w-full h-full object-contain"
             style={{ filter: bgPreview?.dropShadow || undefined }}
-            onLoad={handleAfterImgLoad}
+            ref={afterImgRef}
+            onLoad={measureContentBox}
             draggable={false}
           />
         </div>
