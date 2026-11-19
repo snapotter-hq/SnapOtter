@@ -27,6 +27,9 @@ export function registerVideoToAvif(app: FastifyInstance) {
       const settings = settingsSchema.parse(ctx.settings);
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}.avif`;
+      // Older SVT-AV1 builds such as 1.7.0 refuse an odd 4:2:0 width, so round
+      // down to even rather than depend on which libsvtav1 FFMPEG_PATH has.
+      const width = settings.width - (settings.width % 2);
 
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out, info) => {
         if (settings.startS >= (info.durationS ?? Infinity)) {
@@ -46,7 +49,7 @@ export function registerVideoToAvif(app: FastifyInstance) {
           "-t",
           formatFfmpegSeconds(settings.durationS),
           "-vf",
-          `fps=${settings.fps},scale=${settings.width}:-2:flags=lanczos,format=yuv420p`,
+          `fps=${settings.fps},scale=${width}:-2:flags=lanczos,format=yuv420p`,
           "-c:v",
           softwareEncoder("av1"),
           "-crf",

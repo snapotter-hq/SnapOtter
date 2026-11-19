@@ -88,7 +88,7 @@ describe("video-to-avif settings", () => {
 });
 
 describe.skipIf(!ffmpegPresent)("video-to-avif against real ffmpeg", () => {
-  it("writes an animated AV1 AVIF sequence at the requested width", async () => {
+  it("writes an animated AV1 AVIF sequence, rounding an odd width down to even", async () => {
     const result = await run({ fps: 6, width: 121 });
 
     expect(result.filename).toBe("tiny.avif");
@@ -98,8 +98,7 @@ describe.skipIf(!ffmpegPresent)("video-to-avif against real ffmpeg", () => {
     const { format, streams, frames } = probe(result.scratchPath);
     expect(format.format_name).toContain("mp4");
     expect(streams.every((s) => s.codec_name === "av1")).toBe(true);
-    // Odd widths survive: libsvtav1 pads internally and the muxer crops back.
-    expect(streams.every((s) => s.width === 121)).toBe(true);
+    expect(streams.every((s) => s.width === 120)).toBe(true);
     const sequence = streams.filter(
       (s) => frames.filter((f) => f.stream_index === s.index).length > 1,
     );
