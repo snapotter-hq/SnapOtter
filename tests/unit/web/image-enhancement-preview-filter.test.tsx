@@ -105,4 +105,36 @@ describe("image-enhancement exposure preview", () => {
       filter.indexOf("contrast("),
     );
   });
+
+  it("emits contrast from the scaled value", async () => {
+    // auto at intensity 50: 20 * 1.0 = 20 -> contrast(1.2).
+    stubAnalysis({ brightness: 30, contrast: 20 });
+    const { filter } = await renderPreview();
+    expect(filter).toContain("contrast(1.2)");
+  });
+});
+
+describe("image-enhancement contrast preview", () => {
+  async function filterFor(corrections: Record<string, number>, mode: string) {
+    stubAnalysis(corrections);
+    const onPreviewFilter = vi.fn();
+    const view = render(<ImageEnhancementControls onPreviewFilter={onPreviewFilter} />);
+    await waitFor(() =>
+      expect(onPreviewFilter).toHaveBeenLastCalledWith(expect.stringContaining("url(")),
+    );
+    view.getByRole("button", { name: mode }).click();
+    await waitFor(() => expect(onPreviewFilter.mock.lastCall?.[0]).toBeDefined());
+    return () => onPreviewFilter.mock.lastCall?.[0] as string;
+  }
+
+  it("clamps the CSS contrast to the server's 3.0 ceiling", async () => {
+    // Landscape multiplies contrast by 1.3: 200 * 1.3 = 260 -> 1 + 2.6 = 3.6 -> 3.
+    const last = await filterFor({ brightness: 30, contrast: 200 }, "Landscape");
+    await waitFor(() => expect(last()).toContain("contrast(3)"));
+  });
+
+  it("drops a contrast reduction in document mode", async () => {
+    const last = await filterFor({ brightness: 30, contrast: -20 }, "Document");
+    await waitFor(() => expect(last()).not.toContain("contrast("));
+  });
 });

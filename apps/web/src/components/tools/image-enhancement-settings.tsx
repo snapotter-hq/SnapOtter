@@ -26,6 +26,7 @@ interface CorrectionParams {
   saturation: number;
   sharpness: number;
   denoise: number;
+  backlit?: boolean;
 }
 
 interface AnalysisData {
@@ -127,6 +128,27 @@ const ISSUE_TO_TOGGLE: Record<string, string> = {
   noisy: "denoise",
 };
 
+/**
+ * Mirrors toneAdjustments() in packages/image-engine/src/operations/auto-enhance.ts.
+ * Document mode drops a backlit lift and any contrast reduction.
+ */
+function previewToneAdjustments(
+  c: CorrectionParams,
+  mode: EnhancementMode,
+  intensity: number,
+  toggles: Record<string, boolean>,
+): { exposure: number; contrast: number } {
+  const presets = PRESET_MULTIPLIERS[mode];
+  const scale = intensity / 50;
+  const document = mode === "document";
+  const exposure =
+    toggles.exposure && !(document && c.backlit)
+      ? c.brightness * (presets.brightness ?? 1) * scale
+      : 0;
+  const contrast = toggles.contrast ? c.contrast * (presets.contrast ?? 1) * scale : 0;
+  return { exposure, contrast: document ? Math.max(0, contrast) : contrast };
+}
+
 interface ImageEnhancementControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
@@ -220,13 +242,14 @@ export function ImageEnhancementControls({
     const c = analysis.corrections;
     const parts: string[] = [];
 
-    // Same order as the server: the exposure curve, then contrast.
-    if (toggles.exposure && Math.abs(c.brightness * (presets.brightness ?? 1) * scale) > 2) {
+    // Same order, gates and clamps as the server's second pass
+    // (toneAdjustments in auto-enhance.ts): the exposure curve, then contrast.
+    const tone = previewToneAdjustments(c, mode, intensity, toggles);
+    if (Math.abs(tone.exposure) > 2) {
       parts.push("url(#snapotter-enhance-exposure-filter)");
     }
-    if (toggles.contrast && Math.abs(c.contrast) > 2) {
-      const adj = c.contrast * (presets.contrast ?? 1) * scale;
-      parts.push(`contrast(${1 + adj / 100})`);
+    if (Math.abs(tone.contrast) > 2) {
+      parts.push(`contrast(${Math.min(3, Math.max(0.2, 1 + tone.contrast / 100))})`);
     }
     if (toggles.saturation && Math.abs(c.saturation) > 2) {
       const adj = c.saturation * (presets.saturation ?? 1) * scale;
@@ -250,8 +273,7 @@ export function ImageEnhancementControls({
   // gain, so the preview mirrors it with an SVG gamma transfer: exponent 1/g
   // lifts, g darkens, with g = 1 + |adj| / 100 capped at 3 (#4842).
   const exposureAdj = analysis
-    ? (analysis.corrections.brightness * (PRESET_MULTIPLIERS[mode].brightness ?? 1) * intensity) /
-      50
+    ? previewToneAdjustments(analysis.corrections, mode, intensity, toggles).exposure
     : 0;
   const exposureGamma = Math.min(3, 1 + Math.abs(exposureAdj) / 100);
   const exposureExponent = exposureAdj > 0 ? 1 / exposureGamma : exposureGamma;

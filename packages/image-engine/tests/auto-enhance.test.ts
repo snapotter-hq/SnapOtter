@@ -1181,6 +1181,120 @@ describe("applyCorrections global contrast (#4842)", () => {
   });
 });
 
+/** A grey frame drawn by `valueAt(x, y)`. */
+async function grayScene(
+  w: number,
+  h: number,
+  valueAt: (x: number, y: number) => number,
+): Promise<Buffer> {
+  const buf = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = valueAt(x, y);
+      const i = (y * w + x) * 3;
+      buf[i] = v;
+      buf[i + 1] = v;
+      buf[i + 2] = v;
+    }
+  }
+  return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
+/** A bright page (235, with dark text lines at 20) in the middle of a dark desk (35). */
+function pageOnDesk(): Promise<Buffer> {
+  return grayScene(400, 300, (x, y) => {
+    const onPage = x >= 70 && x < 330 && y >= 40 && y < 260;
+    if (!onPage) return 35;
+    return y % 12 < 2 && x > 90 && x < 310 ? 20 : 235;
+  });
+}
+
+/** A dark subject (20-59) in the middle of a bright window (225-249) on every side. */
+function subjectInWindow(): Promise<Buffer> {
+  return grayScene(400, 300, (x, y) => {
+    const subject = x >= 120 && x < 280 && y >= 80 && y < 300;
+    return subject ? 20 + ((x * 13 + y * 7) % 40) : 225 + ((x * 7 + y * 3) % 25);
+  });
+}
+
+describe("backlit placement check (#4842 review)", () => {
+  it("does not read a page on a dark desk as backlit", async () => {
+    const analysis = await analyzeImage(await pageOnDesk());
+    expect(analysis.corrections.backlit).toBeUndefined();
+  });
+
+  it("reads a dark subject framed by a bright window as backlit", async () => {
+    const analysis = await analyzeImage(await subjectInWindow());
+    expect(analysis.corrections.backlit).toBe(true);
+  });
+
+  it("keeps document mode from lifting a frame flagged backlit (paper and text keep their levels)", async () => {
+    const scene = await backlitScene();
+    const corrections = { ...(await analyzeImage(scene)).corrections };
+    expect(corrections.backlit).toBe(true);
+    const size = { width: 400, height: 300 };
+    const doc = await run(scene, corrections, "document", 50, onlyEnabled("exposure"), size);
+    const docUnflagged = await run(
+      scene,
+      { ...corrections, backlit: undefined, brightness: 0 },
+      "document",
+      50,
+      onlyEnabled("exposure"),
+      size,
+    );
+    expect(await channelMeans(doc)).toEqual(await channelMeans(docUnflagged));
+  });
+});
+
+describe("document mode contrast (#4842 review)", () => {
+  it("never lowers contrast in document mode", async () => {
+    const page = await pageOnDesk();
+    const size = { width: 400, height: 300 };
+    const without = await run(page, NO_CORR, "document", 50, onlyEnabled("contrast"), size);
+    const reduced = await run(
+      page,
+      { ...NO_CORR, contrast: -24 },
+      "document",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect(await channelStdevs(reduced)).toEqual(await channelStdevs(without));
+  });
+
+  it("still lowers contrast for the same correction in auto mode", async () => {
+    const page = await pageOnDesk();
+    const size = { width: 400, height: 300 };
+    const without = await run(page, NO_CORR, "auto", 50, onlyEnabled("contrast"), size);
+    const reduced = await run(
+      page,
+      { ...NO_CORR, contrast: -24 },
+      "auto",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect((await channelStdevs(reduced))[0]).toBeLessThan((await channelStdevs(without))[0]);
+  });
+
+  it("still raises contrast in document mode", async () => {
+    const flat = await texturedGray(128, 128, 110, 146);
+    const size = { width: 128, height: 128 };
+    const without = await run(flat, NO_CORR, "document", 50, onlyEnabled("contrast"), size);
+    const raised = await run(
+      flat,
+      { ...NO_CORR, contrast: 20 },
+      "document",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect((await channelStdevs(raised))[0]).toBeGreaterThan((await channelStdevs(without))[0]);
+  });
+});
+
 describe("backlit photos (#4842)", () => {
   it("reads a bright background over a dark subject as backlit, not overexposed", async () => {
     const analysis = await analyzeImage(await backlitScene());

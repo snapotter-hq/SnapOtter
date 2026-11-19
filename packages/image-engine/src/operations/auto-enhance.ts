@@ -21,10 +21,14 @@ const TONE_SAMPLE_EDGE = 256;
 /**
  * A photo counts as backlit when at least this share of it sits in deep
  * shadow (luminance below 64) while BACKLIT_HIGHLIGHT_SHARE sits in bright
- * highlights (192 and up): a dark subject against a bright sky or window.
+ * highlights (192 and up), and the light is where a backlight would be: the
+ * top third or the outer border brighter than the rest by BACKLIT_LIGHT_LEAD.
+ * The placement check keeps out a page photographed on a dark desk, which has
+ * the same histogram with the bright mass in the middle.
  */
 const BACKLIT_SHADOW_SHARE = 0.15;
 const BACKLIT_HIGHLIGHT_SHARE = 0.25;
+const BACKLIT_LIGHT_LEAD = 20;
 
 /** Channel-mean red/blue gap (0-255) below which white balance is left alone. */
 const WB_DEAD_ZONE = 12.5;
@@ -34,6 +38,10 @@ interface ToneDistribution {
   shadows: number;
   /** Share of pixels with luminance of 192 or more. */
   highlights: number;
+  /** Mean luminance of the top third minus that of the bottom third. */
+  topLead: number;
+  /** Mean luminance outside the central half (each axis) minus inside it. */
+  borderLead: number;
 }
 
 /**
@@ -146,7 +154,9 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
   );
   const tones = await measureTones(buffer);
   const backlit =
-    tones.shadows >= BACKLIT_SHADOW_SHARE && tones.highlights >= BACKLIT_HIGHLIGHT_SHARE;
+    tones.shadows >= BACKLIT_SHADOW_SHARE &&
+    tones.highlights >= BACKLIT_HIGHLIGHT_SHARE &&
+    Math.max(tones.topLead, tones.borderLead) >= BACKLIT_LIGHT_LEAD;
   const corrections = computeCorrections(scores, {
     redBlueGap: isGrayscale ? 0 : rCh.mean - bCh.mean,
     backlit,
@@ -159,25 +169,46 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
 }
 
 /**
- * Luminance histogram shape, which the channel means can't show: a backlit
- * photo and an evenly bright one can share a mean. Measured on a thumbnail
- * because only the proportions matter.
+ * Luminance histogram shape and where the light sits, which the channel means
+ * can't show: a backlit photo and an evenly bright one can share a mean.
+ * Measured on a thumbnail because only the proportions matter.
  */
 async function measureTones(buffer: Buffer): Promise<ToneDistribution> {
-  const { data } = await sharp(buffer)
+  const { data, info } = await sharp(buffer)
     .removeAlpha()
     .resize(TONE_SAMPLE_EDGE, TONE_SAMPLE_EDGE, { fit: "inside", withoutEnlargement: true })
     .greyscale()
     .raw()
     .toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const sums = { top: 0, bottom: 0, center: 0, border: 0 };
+  const counts = { top: 0, bottom: 0, center: 0, border: 0 };
   let shadows = 0;
   let highlights = 0;
-  for (const v of data) {
-    if (v < 64) shadows++;
-    else if (v >= 192) highlights++;
+  for (let y = 0; y < height; y++) {
+    const rowBand = y < height / 3 ? "top" : y >= (height * 2) / 3 ? "bottom" : null;
+    const midRow = y >= height / 4 && y < (height * 3) / 4;
+    for (let x = 0; x < width; x++) {
+      const v = data[(y * width + x) * channels];
+      if (v < 64) shadows++;
+      else if (v >= 192) highlights++;
+      if (rowBand) {
+        sums[rowBand] += v;
+        counts[rowBand]++;
+      }
+      const ring = midRow && x >= width / 4 && x < (width * 3) / 4 ? "center" : "border";
+      sums[ring] += v;
+      counts[ring]++;
+    }
   }
-  const total = Math.max(1, data.length);
-  return { shadows: shadows / total, highlights: highlights / total };
+  const mean = (k: keyof typeof sums) => (counts[k] > 0 ? sums[k] / counts[k] : 0);
+  const total = Math.max(1, width * height);
+  return {
+    shadows: shadows / total,
+    highlights: highlights / total,
+    topLead: mean("top") - mean("bottom"),
+    borderLead: mean("border") - mean("center"),
+  };
 }
 
 function computeScores(
@@ -346,7 +377,11 @@ export async function applyCorrections(
   // Step 2: Normalise - auto-levels histogram stretch
   // lower = percentile below which pixels are clipped to black (0-99)
   // upper = percentile above which pixels are clipped to white (1-100)
-  if (toggles.exposure !== false && !corrections.backlit) {
+  // Document mode never treats a frame as backlit: a page wants its paper
+  // white and its text black, not lifted shadows (#4842).
+  const backlit = corrections.backlit === true && mode !== "document";
+
+  if (toggles.exposure !== false && !backlit) {
     const baseClip = 5 - (intensity / 100) * 4.5;
     const clipPct = clamp(Math.round(baseClip * presets.normalise), 0, 10);
     const lower = clipPct;
@@ -396,10 +431,12 @@ export async function applyCorrections(
 
   // Second pipeline (see above): the exposure curve, then contrast, the same
   // order the preview's filters use. Each only outside its dead zone.
-  const exposureAdj =
-    toggles.exposure !== false ? corrections.brightness * presets.brightness * scale : 0;
-  const contrastAdj =
-    toggles.contrast !== false ? corrections.contrast * presets.contrast * scale : 0;
+  const { exposure: exposureAdj, contrast: contrastAdj } = toneAdjustments(
+    corrections,
+    mode,
+    intensity,
+    toggles,
+  );
   const applyExposure = Math.abs(exposureAdj) > 2;
   const applyContrast = Math.abs(contrastAdj) > 2;
   if (!applyExposure && !applyContrast) return result;
@@ -427,6 +464,29 @@ export async function applyCorrections(
   }
 
   return tone;
+}
+
+/**
+ * The scaled exposure and contrast adjustments for the second pass. Two
+ * corrections are dropped in document mode: a backlit lift (its brightness is
+ * a shadow lift, which greys text), and a contrast reduction (a page's wide
+ * spread is the point, and the preset's 2x multiplier would halve it).
+ */
+function toneAdjustments(
+  corrections: CorrectionParams,
+  mode: EnhancementMode,
+  intensity: number,
+  toggles: Record<string, boolean>,
+): { exposure: number; contrast: number } {
+  const presets = PRESET_MULTIPLIERS[mode];
+  const scale = intensity / 50;
+  const document = mode === "document";
+  const exposure =
+    toggles.exposure !== false && !(document && corrections.backlit)
+      ? corrections.brightness * presets.brightness * scale
+      : 0;
+  const contrast = toggles.contrast !== false ? corrections.contrast * presets.contrast * scale : 0;
+  return { exposure, contrast: document ? Math.max(0, contrast) : contrast };
 }
 
 /**
