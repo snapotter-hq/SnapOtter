@@ -233,6 +233,12 @@
     "outputHash": "0a2fe40efa3c",
     "stale": false
   },
+  "banner.helpImprove": {
+    "sourceHash": "e97e4baffb35",
+    "provenance": "machine",
+    "outputHash": "e35169fb8fdc",
+    "stale": false
+  },
   "banner.localeRecall": {
     "sourceHash": "f14d32ca69c8",
     "provenance": "machine",
@@ -240,9 +246,9 @@
     "stale": false
   },
   "banner.machineTranslated": {
-    "sourceHash": "efec2514040c",
+    "sourceHash": "a807ae11d4ca",
     "provenance": "machine",
-    "outputHash": "d8b1a3d220a5",
+    "outputHash": "ae5d84f8625e",
     "stale": false
   },
   "banner.viewInEnglish": {
