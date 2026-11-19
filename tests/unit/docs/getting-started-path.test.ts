@@ -70,6 +70,7 @@ describe("getting-started leads with one install path", () => {
     const gpu = section("gpu-acceleration");
     expect(gpu).toContain("--gpus all");
     expect(gpu).toMatch(/background removal/i);
+    expect(gpu).not.toMatch(/photo restoration[^.]*much faster|much faster[^.]*photo restoration/i);
     expect(gpu).toMatch(/OCR/);
     expect(gpu).toContain("](/guide/deployment#verify-gpu-acceleration)");
     expect(gpu).toContain("](/guide/docker-tags#benchmarks)");

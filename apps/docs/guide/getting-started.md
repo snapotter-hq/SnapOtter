@@ -40,7 +40,7 @@ For details about what is collected, see [What SnapOtter collects](/guide/teleme
 
 ## GPU Acceleration {#gpu-acceleration}
 
-An NVIDIA GPU makes the heavy AI tools much faster: background removal, upscaling, face enhancement, and photo restoration. Everything else runs the same on CPU, and OCR stays CPU-based with or without a GPU. The same image covers both; add `--gpus all`:
+An NVIDIA GPU makes the heavy AI tools much faster: upscaling (about 47 times), face enhancement (about 12 times), transcription, and background removal (about 4 times each). OCR, face detection, and photo restoration stay CPU-bound, so a GPU doesn't help them. The same image covers both; add `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
@@ -48,7 +48,7 @@ docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data s
 
 This needs the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host. Without CUDA, SnapOtter falls back to CPU on its own. Intel/AMD iGPU acceleration through VA-API, Quick Sync, or OpenCL is not supported for AI inference today.
 
-- [Docker Image benchmarks](/guide/docker-tags#benchmarks) show the GPU and CPU timings side by side.
+- [Hardware Requirements](/guide/deployment#full-ai-tools-on-nvidia-cuda) has the full GPU and CPU timings, and [Docker Image benchmarks](/guide/docker-tags#benchmarks) the warm and cold-start numbers.
 - If AI tools still run on CPU, see [Verify GPU acceleration](/guide/deployment#verify-gpu-acceleration).
 - For Compose, use the [NVIDIA CUDA Quick Start](/guide/deployment#quick-start-nvidia-cuda) in the Deployment guide.
 
@@ -70,7 +70,7 @@ services:
       - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
     environment:
       - DEFAULT_USERNAME=admin
-      - DEFAULT_PASSWORD=admin  # change on first login, or set a strong one here
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
     restart: unless-stopped
     # mem_limit: 4g
     # cpus: 2
