@@ -88,6 +88,7 @@ test.describe("landing index policy", () => {
     const expected = expectedNoindex();
     expect([...noindexed].sort()).toEqual([...expected].sort());
     expect(noindexed.has("/de/alternatives/removebg/")).toBe(true);
+    expect(noindexed.has("/de/alternatives/bentopdf/")).toBe(true);
     expect(noindexed.has("/tools/image/jpg-to-png/")).toBe(true);
     expect(noindexed.has("/tools/image/compress-image-to-100kb/")).toBe(true);
   });
@@ -101,6 +102,9 @@ test.describe("landing index policy", () => {
       ...ALTERNATIVES.map((a) => `/alternatives/${a.slug}/`),
       "/tools/image/resize/",
     ];
+    // The English-only open-source peer pages (#5029) are in ALTERNATIVES too; name
+    // one so a regression in that data shows up here by slug.
+    expect(mustStay).toContain("/alternatives/gotenberg/");
     for (const p of mustStay) {
       expect(pages.get(p)?.noindex, `${p} must be built and indexable`).toBe(false);
       expect(locs.has(p), `${p} must be in the sitemap`).toBe(true);

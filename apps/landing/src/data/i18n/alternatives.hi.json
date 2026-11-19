@@ -2113,13 +2113,6 @@
     "outputHash": "9d07075e2235",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "अगर आप कभी सिर्फ़ PDF ही छूते हैं, तो Stirling-PDF बेहतरीन है और देखने लायक है। अगर आप इमेज भी रिसाइज़ करते हैं, वीडियो कन्वर्ट करते हैं, ऑडियो ट्रांसक्राइब करते हैं या फ़ाइलों को बैच में प्रोसेस करते हैं, तो SnapOtter यह सब एक ही डिप्लॉयमेंट में संभालता है, कई टूल साथ-साथ चलाने के बजाय।",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "ebb71439ae79",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "हो सकता है, अगर आप PDF से ज़्यादा के लिए एक ही स्टैक चाहते हैं। SnapOtter का PDF कवरेज व्यापक है, और यह इमेज, वीडियो, ऑडियो तथा फ़ाइल टूल जोड़ता है। सिर्फ़ PDF वाले सेटअप के लिए Stirling-PDF एक ठोस, केंद्रित विकल्प है।",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "1915f8854bc7",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "दोनों प्रोजेक्ट ओपन सोर्स और सेल्फ-होस्ट करने योग्य हैं। SnapOtter AGPLv3 है और SSO, ऑडिट लॉगिंग तथा समान कंट्रोल के लिए एक वैकल्पिक सशुल्क एंटरप्राइज़ टियर जोड़ता है।",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "5ade0a7126ee",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "क्या दोनों मुफ़्त और ओपन सोर्स हैं?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "5783c0283c1c",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF और SnapOtter दोनों सेल्फ-होस्टेड और ओपन सोर्स हैं, इसलिए किसी भी हाल में फ़ाइलें आपके सर्वर पर ही रहती हैं। फ़र्क दायरे का है: Stirling-PDF का ध्यान PDF पर है, जबकि SnapOtter पाँचों फ़ाइल प्रकारों में फैला है।",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "adb45bca886c",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF एक मज़बूत सेल्फ-होस्टेड PDF टूलकिट है। SnapOtter PDF भी कवर करता है, साथ ही एक ही स्टैक में इमेज, वीडियो, ऑडियो और फ़ाइल टूल देता है। दोनों ओपन सोर्स हैं।",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "5480cea55428",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "हाँ",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "4a3daa901d0a",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "हाँ",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "48565d5d02bf",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60+ PDF ऑपरेशन",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "bd11ed0eeac7",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

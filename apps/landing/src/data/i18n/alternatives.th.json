@@ -2113,13 +2113,6 @@
     "outputHash": "d02b672ee5a8",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "ถ้าคุณยุ่งกับ PDF อย่างเดียวเท่านั้น Stirling-PDF ยอดเยี่ยมและควรลองดู แต่ถ้าคุณต้องปรับขนาดภาพ แปลงวิดีโอ ถอดเสียง หรือประมวลผลไฟล์เป็นชุดด้วย SnapOtter จัดการทั้งหมดในการดีพลอยเดียว แทนที่จะต้องรันเครื่องมือหลายตัวควบคู่กัน",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "f4246a11675e",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "ได้ ถ้าคุณต้องการสแตกเดียวสำหรับงานที่มากกว่า PDF SnapOtter ครอบคลุม PDF อย่างกว้างขวางและเพิ่มเครื่องมือด้านภาพ วิดีโอ เสียง และไฟล์ แต่ถ้าต้องการชุดที่ทำเฉพาะ PDF Stirling-PDF เป็นตัวเลือกที่โฟกัสและแข็งแรง",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "6efdb6bbe006",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "ทั้งสองโปรเจกต์เป็นโอเพนซอร์สและ self-host ได้ SnapOtter ใช้ AGPLv3 และมีรุ่นเอนเทอร์ไพรส์แบบเสียเงินเป็นตัวเลือกเสริมสำหรับ SSO การบันทึกล็อกเพื่อตรวจสอบ และการควบคุมในลักษณะเดียวกัน",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "061b25267349",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "ทั้งคู่ฟรีและโอเพนซอร์สไหม",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "e7fc5a9a3423",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF และ SnapOtter ต่างเป็นแบบ self-hosted และโอเพนซอร์ส ไฟล์จึงอยู่บนเซิร์ฟเวอร์ของคุณไม่ว่าจะเลือกอันไหน ความต่างอยู่ที่ขอบเขต Stirling-PDF โฟกัสที่ PDF ส่วน SnapOtter ครอบคลุมไฟล์ทั้งห้าประเภท",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "55ceab14ac98",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF เป็นชุดเครื่องมือ PDF แบบ self-hosted ที่แข็งแกร่ง ส่วน SnapOtter ครอบคลุม PDF ได้ด้วย พร้อมเครื่องมือด้านภาพ วิดีโอ เสียง และไฟล์ในสแตกเดียว ทั้งคู่เป็นโอเพนซอร์ส",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "08b83a7bc314",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "ใช่",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "673722dd77f3",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "ใช่",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "3b7aaa5e1892",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "การจัดการ PDF กว่า 60 รายการ",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "3e4daad46acd",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {
