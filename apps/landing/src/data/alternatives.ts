@@ -59,6 +59,17 @@ export interface Alternative {
 
 const REVIEW_DATE = "2026-07-01";
 
+// The open-source peer pages were checked against each project's own README and
+// docs on this date. SnapOtter's side repeats the same honest gaps on every one
+// of them, so those cells live here once.
+const PEER_REVIEW_DATE = "2026-11-19";
+const SNAPOTTER_PROCESSING = "On the server you host; the browser uploads each file to it";
+const SNAPOTTER_INSTALL =
+  "Docker image of several GB, plus Postgres and Redis (embedded in single-container mode)";
+const SNAPOTTER_TELEMETRY =
+  "Anonymous PostHog analytics and Sentry error reports on by default; an admin can turn them off";
+const SNAPOTTER_LICENSE = "AGPLv3, or a commercial license";
+
 interface HostedRowsOptions {
   category: string;
   competitorCoverage: string;
@@ -561,16 +572,17 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
     pageTitle: "SnapOtter vs Stirling-PDF: Self-Hosted File Tools Compared",
     h1: "SnapOtter vs Stirling-PDF",
     metaDescription:
-      "Stirling-PDF is a strong self-hosted PDF toolkit. SnapOtter covers PDFs too, plus image, video, audio, and file tools in one stack. Both are open source.",
+      "Stirling-PDF is a strong self-hosted PDF platform with a built-in MCP server. SnapOtter covers PDFs too, plus image, video, audio, and file tools in one stack.",
     intro:
-      "Stirling-PDF and SnapOtter are both self-hosted and open source, so files stay on your server either way. The difference is scope: Stirling-PDF focuses on PDFs, while SnapOtter spans all five file types.",
+      "Stirling-PDF and SnapOtter both run on your own server, so files stay on your infrastructure either way. The difference is scope: Stirling-PDF focuses on PDFs, while SnapOtter spans all five file types.",
     breadth:
-      "If you only ever touch PDFs, Stirling-PDF is excellent and worth a look. If you also resize images, convert video, transcribe audio, or batch files, SnapOtter handles all of it in one deployment instead of running several tools side by side.",
+      "If you only ever touch PDFs, Stirling-PDF is excellent and goes deeper on them, with a desktop client and a built-in MCP server for AI assistants that SnapOtter doesn't have. If you also resize images, convert video, transcribe audio, or batch files, SnapOtter handles all of it in one deployment instead of running several tools side by side.",
     competitorOpenSource: true,
-    lastReviewed: REVIEW_DATE,
+    lastReviewed: PEER_REVIEW_DATE,
     sources: [
       { label: "Stirling-PDF GitHub", url: "https://github.com/Stirling-Tools/stirling-pdf" },
       { label: "Stirling-PDF docs", url: "https://docs.stirlingpdf.com/" },
+      { label: "Stirling-PDF MCP server", url: "https://docs.stirlingpdf.com/MCP/" },
     ],
     rows: [
       {
@@ -582,7 +594,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       {
         feature: "Open source",
         snapotter: "Yes, AGPLv3",
-        competitor: "Yes",
+        competitor: "Open-core, per its README; see its LICENSE",
         snapotterWins: false,
       },
       {
@@ -594,7 +606,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       {
         feature: "Tool count",
         snapotter: "200+",
-        competitor: "60+ PDF operations",
+        competitor: "50+ PDF tools",
         snapotterWins: true,
       },
       {
@@ -615,6 +627,19 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
         competitor: "PDF automation workflows",
         snapotterWins: false,
       },
+      {
+        feature: "MCP server for AI assistants",
+        snapotter: "None; AI agents can call the REST API",
+        competitor:
+          "Built in, off by default; an admin enables it at /mcp with OAuth or an API key",
+        snapotterWins: false,
+      },
+      {
+        feature: "Where it runs",
+        snapotter: "Self-hosted server with a browser UI",
+        competitor: "Self-hosted server, browser UI, and a desktop client",
+        snapotterWins: false,
+      },
     ],
     faqs: [
       {
@@ -623,7 +648,11 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       },
       {
         q: "Are both free and open source?",
-        a: "Both projects are open source and self-hostable. SnapOtter is AGPLv3 and adds an optional paid enterprise tier for SSO, audit logging, and similar controls.",
+        a: "Both are self-hostable with free editions. SnapOtter is AGPLv3 and adds an optional paid enterprise tier for SSO, audit logging, and similar controls. Stirling-PDF calls itself open-core and sells a Server plan and enterprise features; its LICENSE says which parts are which.",
+      },
+      {
+        q: "Can an AI assistant drive Stirling-PDF or SnapOtter?",
+        a: "Stirling-PDF ships a built-in MCP server. It's off by default; once an admin turns it on, assistants connect at /mcp with OAuth or an API key and every action runs as that user. SnapOtter has no MCP server today. Its REST API covers every tool, so an agent that can make HTTP calls can use it, but there's nothing to plug into an MCP client directly.",
       },
     ],
   },
@@ -694,6 +723,380 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       {
         q: "Do both keep files on my server?",
         a: "Yes. Both are self-hosted, so files stay on your infrastructure. The difference is breadth, not where your data lives.",
+      },
+    ],
+  },
+  {
+    slug: "bentopdf",
+    competitor: "BentoPDF",
+    category: "In-browser PDF tools",
+    pageTitle: "SnapOtter vs BentoPDF: Server-Side vs In-Browser PDF Tools",
+    h1: "SnapOtter vs BentoPDF",
+    metaDescription:
+      "BentoPDF runs 50+ PDF tools inside your browser. SnapOtter runs 200+ tools for PDFs, images, video, audio, and files on a server you host. Which one fits, honestly.",
+    intro:
+      "BentoPDF and SnapOtter are both AGPLv3 and both self-hostable, but they do the work in different places. BentoPDF processes PDFs in the browser with WebAssembly, so a file stays on the device that opened it. SnapOtter uploads files to a server you run and processes them there.",
+    breadth:
+      "If PDFs are the whole job and you want processing to stay on each person's device, pick BentoPDF. It's far lighter to host, since it's static files, and its privacy story is simpler than ours. SnapOtter earns its heavier install when PDFs are only part of the work: the same server handles images, video, audio, and file conversion, takes jobs over a REST API, and runs long OCR or encode jobs on server hardware instead of in a browser tab.",
+    competitorOpenSource: true,
+    lastReviewed: PEER_REVIEW_DATE,
+    sources: [
+      { label: "BentoPDF README", url: "https://github.com/alam00000/bentopdf" },
+      { label: "BentoPDF licensing", url: "https://www.bentopdf.com/licensing" },
+    ],
+    rows: [
+      {
+        feature: "Where files are processed",
+        snapotter: SNAPOTTER_PROCESSING,
+        competitor: "In the browser, with WebAssembly; no server-side processing",
+        snapotterWins: false,
+      },
+      {
+        feature: "Hosting",
+        snapotter: SNAPOTTER_INSTALL,
+        competitor: "Static files on any web server, or its bentopdf-simple image",
+        snapotterWins: false,
+      },
+      {
+        feature: "File types",
+        snapotter: "PDF, image, video, audio, and files (200+ tools)",
+        competitor: "PDF (50+ tools)",
+        snapotterWins: true,
+      },
+      {
+        feature: "Automation",
+        snapotter: "REST API, pipelines, and batch jobs",
+        competitor: "Visual workflow builder in the browser",
+        snapotterWins: true,
+      },
+      {
+        feature: "Offline use",
+        snapotter: "Works offline once the image and any AI bundles are on the server",
+        competitor:
+          "Supported; WASM modules load from jsDelivr by default, and an air-gap script bundles them",
+        snapotterWins: false,
+      },
+      {
+        feature: "Usage analytics",
+        snapotter: SNAPOTTER_TELEMETRY,
+        competitor:
+          "Its README lists one non-PDF network call, a GitHub star count, which a build flag removes",
+        snapotterWins: false,
+      },
+      {
+        feature: "License",
+        snapotter: SNAPOTTER_LICENSE,
+        competitor: "AGPLv3, or a $79 lifetime commercial license",
+        snapotterWins: false,
+      },
+    ],
+    faqs: [
+      {
+        q: "When should I pick BentoPDF instead of SnapOtter?",
+        a: "When you only need PDF tools and want files processed on each user's own device. BentoPDF is static files, so you can host it almost anywhere, and nothing needs a database or a job queue.",
+      },
+      {
+        q: "Does SnapOtter process PDFs in the browser like BentoPDF?",
+        a: "No. SnapOtter is a server app. The browser uploads each file to your SnapOtter server, which does the work and sends the result back. Host it on your own network and files stay on that network, but they do leave the user's device.",
+      },
+      {
+        q: "Does SnapOtter collect usage data?",
+        a: "Yes, by default. Anonymous PostHog product analytics and Sentry error reports are on until an admin turns them off under Settings > System > Privacy. File names, file contents, and extracted text are never sent.",
+      },
+    ],
+  },
+  {
+    slug: "vert",
+    competitor: "VERT",
+    category: "File conversion",
+    pageTitle: "SnapOtter vs VERT: Self-Hosted File Conversion Compared",
+    h1: "SnapOtter vs VERT",
+    metaDescription:
+      "VERT converts 250+ file formats, mostly in your browser. SnapOtter converts on a server you host, then adds compression, editing, OCR, and transcription across 200+ tools.",
+    intro:
+      "VERT is an AGPLv3 file converter that runs most conversions in the browser with WebAssembly. SnapOtter is an AGPLv3 server app: it converts on your own hardware, then keeps going with compression, editing, OCR, and transcription.",
+    breadth:
+      "Pick VERT if conversion is the job and you'd rather it ran on each person's device. It's lighter to host and its interface is built for exactly that. Video is the exception in VERT's own docs: it goes to a server, either VERT's official instance or a vertd daemon you host. SnapOtter runs every job on your server, video included, and puts conversion next to resizing, compression, redaction, OCR, and pipelines.",
+    competitorOpenSource: true,
+    lastReviewed: PEER_REVIEW_DATE,
+    sources: [
+      { label: "VERT README", url: "https://github.com/VERT-sh/VERT" },
+      { label: "VERT FAQ", url: "https://github.com/VERT-sh/VERT/blob/main/docs/FAQ.md" },
+    ],
+    rows: [
+      {
+        feature: "Where files are processed",
+        snapotter: SNAPOTTER_PROCESSING,
+        competitor:
+          "In the browser for images, audio, and documents; video goes to a vertd server, official or self-hosted",
+        snapotterWins: false,
+      },
+      {
+        feature: "Scope",
+        snapotter: "Conversion plus compression, editing, OCR, and transcription (200+ tools)",
+        competitor: "Conversion across 250+ formats",
+        snapotterWins: true,
+      },
+      {
+        feature: "Hosting",
+        snapotter: SNAPOTTER_INSTALL,
+        competitor: "Web app built with Docker or from source; settings are baked in at build time",
+        snapotterWins: false,
+      },
+      {
+        feature: "Usage analytics",
+        snapotter: SNAPOTTER_TELEMETRY,
+        competitor:
+          "Plausible on vert.sh with an opt-out in Settings; a build flag blocks all external requests",
+        snapotterWins: false,
+      },
+      {
+        feature: "Automation",
+        snapotter: "REST API, pipelines, and batch jobs",
+        competitor: "Built around the web interface",
+        snapotterWins: true,
+      },
+      {
+        feature: "License",
+        snapotter: SNAPOTTER_LICENSE,
+        competitor: "AGPLv3",
+        snapotterWins: false,
+      },
+    ],
+    faqs: [
+      {
+        q: "When should I pick VERT instead of SnapOtter?",
+        a: "When you mainly convert files and want that to happen on the user's device. VERT is quick to set up for that one job, and for anything but video your files don't go to a server at all.",
+      },
+      {
+        q: "Does SnapOtter convert video on the server too?",
+        a: "Yes. Everything in SnapOtter runs on the server you host, video included, so there's no separate daemon to run. The flip side is that every file is uploaded to that server first.",
+      },
+      {
+        q: "Does SnapOtter collect usage data?",
+        a: "Yes, by default. Anonymous PostHog product analytics and Sentry error reports are on until an admin turns them off under Settings > System > Privacy. File names, file contents, and extracted text are never sent.",
+      },
+    ],
+  },
+  {
+    slug: "it-tools",
+    competitor: "IT-Tools",
+    category: "Developer utilities",
+    pageTitle: "SnapOtter vs IT-Tools: Developer Utilities or File Toolkit?",
+    h1: "SnapOtter vs IT-Tools",
+    metaDescription:
+      "IT-Tools is a self-hosted collection of developer utilities. SnapOtter is a self-hosted file toolkit for images, video, audio, and PDFs. They overlap less than you'd think.",
+    intro:
+      "IT-Tools is a GPLv3 collection of small developer utilities: a JWT parser, crontab and UUID generators, subnet calculators, hashing, and JSON, YAML, and TOML converters. SnapOtter works on files: images, video, audio, PDFs, and documents.",
+    breadth:
+      "Plenty of homelabs should run both. IT-Tools is a small static app, one docker run, and great at text-in, text-out jobs. SnapOtter is a much bigger install aimed at files: resizing photos, compressing video, merging PDFs, transcribing audio. The overlap is small, mostly QR codes and JSON, YAML, and CSV conversion.",
+    competitorOpenSource: true,
+    lastReviewed: PEER_REVIEW_DATE,
+    sources: [
+      { label: "IT-Tools README", url: "https://github.com/CorentinTh/it-tools" },
+      {
+        label: "IT-Tools tool list (source)",
+        url: "https://github.com/CorentinTh/it-tools/tree/main/src/tools",
+      },
+      {
+        label: "IT-Tools Dockerfile",
+        url: "https://github.com/CorentinTh/it-tools/blob/main/Dockerfile",
+      },
+    ],
+    rows: [
+      {
+        feature: "Focus",
+        snapotter: "Files: image, video, audio, PDF, and documents",
+        competitor: "Developer and IT utilities, mostly text in and text out",
+        snapotterWins: false,
+      },
+      {
+        feature: "Where work happens",
+        snapotter: SNAPOTTER_PROCESSING,
+        competitor: "In the browser; the container is nginx serving the built app",
+        snapotterWins: false,
+      },
+      {
+        feature: "Footprint",
+        snapotter: SNAPOTTER_INSTALL,
+        competitor: "One small container, no database",
+        snapotterWins: false,
+      },
+      {
+        feature: "Image, video, audio, and PDF tools",
+        snapotter: "200+ tools across five file types",
+        competitor: "Not its focus (it has a PDF signature checker)",
+        snapotterWins: true,
+      },
+      {
+        feature: "Usage analytics",
+        snapotter: SNAPOTTER_TELEMETRY,
+        competitor: "Plausible support in the source, off unless the build enables it",
+        snapotterWins: false,
+      },
+      {
+        feature: "License",
+        snapotter: SNAPOTTER_LICENSE,
+        competitor: "GPLv3",
+        snapotterWins: false,
+      },
+    ],
+    faqs: [
+      {
+        q: "Is SnapOtter a replacement for IT-Tools?",
+        a: "No. IT-Tools covers developer chores like decoding a JWT or working out a subnet, and SnapOtter doesn't try to. If those are what you need, run IT-Tools. If you also process images, video, audio, or PDFs, add SnapOtter next to it.",
+      },
+      {
+        q: "Why is SnapOtter so much bigger to install?",
+        a: "It bundles the engines that file work needs (Sharp, FFmpeg, LibreOffice, qpdf, and optional AI models), plus Postgres and Redis for users, jobs, and queues. IT-Tools is a static web app, so it needs none of that.",
+      },
+    ],
+  },
+  {
+    slug: "squoosh",
+    competitor: "Squoosh",
+    category: "Image compression",
+    pageTitle: "SnapOtter vs Squoosh: Batch Image Compression on Your Server",
+    h1: "SnapOtter vs Squoosh",
+    metaDescription:
+      "Squoosh compresses one image at a time in your browser. SnapOtter compresses batches on a server you host, as one of 200+ tools. When each one makes sense.",
+    intro:
+      "Squoosh is Google Chrome Labs' Apache-2.0 image compressor. It runs in the browser and shows the original and the compressed result side by side while you tune codec settings. SnapOtter compresses images on a server, as one tool among 200+.",
+    breadth:
+      "For squeezing a single image while you watch every codec setting change the result, Squoosh is hard to beat, and there's nothing to install. SnapOtter fits when you have a folder of images, want the same settings every time, or need compression as one step in a pipeline next to resizing, metadata stripping, and conversion, called from a script over the REST API.",
+    competitorOpenSource: true,
+    lastReviewed: PEER_REVIEW_DATE,
+    sources: [
+      { label: "Squoosh README", url: "https://github.com/GoogleChromeLabs/squoosh" },
+      { label: "Squoosh app", url: "https://squoosh.app" },
+    ],
+    rows: [
+      {
+        feature: "Where images are processed",
+        snapotter: SNAPOTTER_PROCESSING,
+        competitor: "In the browser; its README says images aren't sent to a server",
+        snapotterWins: false,
+      },
+      {
+        feature: "Setup",
+        snapotter: SNAPOTTER_INSTALL,
+        competitor: "Nothing to install; squoosh.app also installs as a PWA",
+        snapotterWins: false,
+      },
+      {
+        feature: "Batches",
+        snapotter: "Batch jobs and pipelines across many files",
+        competitor: "The web app works on one image at a time",
+        snapotterWins: true,
+      },
+      {
+        feature: "Scope",
+        snapotter: "Compression plus 200+ image, video, audio, PDF, and file tools",
+        competitor: "Image compression and resizing",
+        snapotterWins: true,
+      },
+      {
+        feature: "Usage analytics",
+        snapotter: SNAPOTTER_TELEMETRY,
+        competitor: "squoosh.app uses Google Analytics, per its README",
+        snapotterWins: false,
+      },
+      {
+        feature: "License",
+        snapotter: SNAPOTTER_LICENSE,
+        competitor: "Apache-2.0",
+        snapotterWins: false,
+      },
+    ],
+    faqs: [
+      {
+        q: "When should I use Squoosh instead of SnapOtter?",
+        a: "When you're tuning one image by eye. Squoosh's side-by-side view makes it easy to find the smallest file that still looks right, and it runs in the browser with no setup.",
+      },
+      {
+        q: "Can SnapOtter compress a whole folder with the same settings?",
+        a: "Yes. Drop in many files at once for a batch, save the settings as a pipeline, or call the compress tool over the REST API from a script.",
+      },
+    ],
+  },
+  {
+    slug: "gotenberg",
+    competitor: "Gotenberg",
+    category: "Document-to-PDF API",
+    pageTitle: "SnapOtter vs Gotenberg: PDF Conversion API Compared",
+    h1: "SnapOtter vs Gotenberg",
+    metaDescription:
+      "Gotenberg is a Docker API that turns HTML, URLs, and Office files into PDFs. SnapOtter is a self-hosted web app and API with 200+ file tools. Which fits your stack.",
+    intro:
+      "Gotenberg is an MIT-licensed Docker API for PDF: send HTML, a URL, Markdown, or an Office file and get a PDF back, rendered by Chromium and LibreOffice. It has no user interface. SnapOtter is a web app with a REST API across 200+ tools.",
+    breadth:
+      "If you're a developer generating invoices or reports from HTML inside your own product, use Gotenberg. That's what it's built for, with PDF/A and PDF/UA remediation, signing, and form filling in the same request. SnapOtter suits teams as well as scripts: a browser UI for people, an API for automation, and image, video, and audio tools that Gotenberg doesn't cover.",
+    competitorOpenSource: true,
+    lastReviewed: PEER_REVIEW_DATE,
+    sources: [
+      { label: "Gotenberg README", url: "https://github.com/gotenberg/gotenberg" },
+      { label: "Gotenberg docs", url: "https://gotenberg.dev/docs" },
+    ],
+    rows: [
+      {
+        feature: "Interface",
+        snapotter: "Web app plus REST API",
+        competitor: "HTTP API only: multipart/form-data in, PDF out",
+        snapotterWins: false,
+      },
+      {
+        feature: "HTML to PDF",
+        snapotter: "HTML and Markdown files; HTML loads no remote resources",
+        competitor: "HTML, URLs, and Markdown via headless Chromium",
+        snapotterWins: false,
+      },
+      {
+        feature: "Office to PDF",
+        snapotter: "Word, Excel, and PowerPoint via LibreOffice",
+        competitor: "100+ formats via LibreOffice",
+        snapotterWins: false,
+      },
+      {
+        feature: "PDF standards",
+        snapotter: "PDF/A-2 conversion",
+        competitor: "PDF/A and PDF/UA validation and remediation, Factur-X included",
+        snapotterWins: false,
+      },
+      {
+        feature: "Beyond PDF",
+        snapotter: "Image, video, audio, and file tools",
+        competitor: "Page and URL screenshots; otherwise PDF-focused",
+        snapotterWins: true,
+      },
+      {
+        feature: "Footprint",
+        snapotter: SNAPOTTER_INSTALL,
+        competitor: "One container: docker run gotenberg/gotenberg:9",
+        snapotterWins: false,
+      },
+      {
+        feature: "License",
+        snapotter: SNAPOTTER_LICENSE,
+        competitor: "MIT",
+        snapotterWins: false,
+      },
+    ],
+    faqs: [
+      {
+        q: "When should I pick Gotenberg instead of SnapOtter?",
+        a: "When PDF generation lives inside your own application and nobody needs a UI. Gotenberg's API is purpose-built for that, its PDF/A and PDF/UA support goes further than SnapOtter's, and the MIT license is simpler to embed in a closed-source product.",
+      },
+      {
+        q: "Can I call SnapOtter from code the way I call Gotenberg?",
+        a: "Yes. Every tool has a REST endpoint, authenticated with an API key. Long jobs return a job id and stream progress, so it suits batch work, though it isn't a drop-in replacement for Gotenberg's routes.",
+      },
+      {
+        q: "Does SnapOtter send anything out of my network?",
+        a: "Anonymous PostHog product analytics and Sentry error reports are on by default, and an admin can turn them off under Settings > System > Privacy. File names, file contents, and extracted text are never sent. Your files go only to the SnapOtter server you host.",
+      },
+      {
+        q: "What does the AGPLv3 license mean if I build on SnapOtter?",
+        a: "If you modify SnapOtter and let others use it over a network, AGPLv3 asks you to share those changes. A commercial license is available for teams that can't.",
       },
     ],
   },

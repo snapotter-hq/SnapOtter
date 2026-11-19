@@ -48,4 +48,69 @@ describe("landing alternatives data", () => {
       expect(competitorCells).not.toContain("Capped by plan");
     }
   });
+
+  describe("open-source peer pages (#5029)", () => {
+    const peers: Record<string, string> = {
+      bentopdf: "github.com/alam00000/bentopdf",
+      vert: "github.com/VERT-sh/VERT",
+      "it-tools": "github.com/CorentinTh/it-tools",
+      squoosh: "github.com/GoogleChromeLabs/squoosh",
+      gotenberg: "github.com/gotenberg/gotenberg",
+    };
+    const bySlug = new Map(ALTERNATIVES.map((a) => [a.slug, a]));
+    const textOf = (a: (typeof ALTERNATIVES)[number]) =>
+      [
+        a.pageTitle,
+        a.h1,
+        a.metaDescription,
+        a.intro,
+        a.breadth,
+        ...a.rows.flatMap((r) => [r.feature, r.snapotter, r.competitor]),
+        ...a.faqs.flatMap((f) => [f.q, f.a]),
+      ].join("\n");
+
+    it("has a dated, sourced page for each peer, citing the peer's own repository", () => {
+      for (const [slug, repo] of Object.entries(peers)) {
+        const alt = bySlug.get(slug);
+        expect(alt, slug).toBeDefined();
+        expect(alt?.competitorOpenSource, slug).toBe(true);
+        expect(alt?.lastReviewed, slug).toMatch(/^2026-11-\d{2}$/);
+        expect(
+          alt?.sources.some((s) => s.url.includes(repo)),
+          slug,
+        ).toBe(true);
+      }
+    });
+
+    it("admits SnapOtter's gaps on every peer page", () => {
+      for (const slug of Object.keys(peers)) {
+        const text = textOf(bySlug.get(slug) as (typeof ALTERNATIVES)[number]);
+        expect(text, slug).toMatch(/several GB/);
+        expect(text, slug).toMatch(/PostHog/);
+        expect(text, slug).toMatch(/server you host/);
+        expect(
+          bySlug.get(slug)?.rows.some((r) => !r.snapotterWins),
+          slug,
+        ).toBe(true);
+      }
+    });
+
+    it("never claims no tracking, fully local, or an exact tool count", () => {
+      for (const alt of ALTERNATIVES.filter((a) => a.slug in peers || a.slug === "stirling-pdf")) {
+        const text = textOf(alt);
+        expect(text, alt.slug).not.toMatch(/no tracking|fully local|100% (private|local)/i);
+        const counts = [...text.matchAll(/(\d+)\+? tools/g)].map((m) => m[0]);
+        for (const count of counts.filter((c) => c.startsWith("2"))) {
+          expect(count, alt.slug).toBe("200+ tools");
+        }
+      }
+    });
+  });
+
+  it("tells Stirling-PDF readers about its built-in MCP server", () => {
+    const stirling = ALTERNATIVES.find((a) => a.slug === "stirling-pdf");
+    expect(stirling?.rows.some((r) => r.competitor.includes("/mcp"))).toBe(true);
+    expect(stirling?.sources.some((s) => s.url === "https://docs.stirlingpdf.com/MCP/")).toBe(true);
+    expect(stirling?.lastReviewed).toMatch(/^2026-11-\d{2}$/);
+  });
 });

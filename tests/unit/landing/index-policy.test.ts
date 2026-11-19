@@ -8,6 +8,7 @@ import {
 } from "../../../apps/landing/src/lib/index-policy.js";
 
 const NON_ENGLISH = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
+const PEER_SLUGS = ["bentopdf", "vert", "it-tools", "squoosh", "gotenberg"];
 const toolPath = (t: (typeof TOOLS)[number]) => `/tools/${toolSection(t)}/${t.id}/`;
 
 describe("landing index policy (#4833)", () => {
@@ -50,6 +51,17 @@ describe("landing index policy (#4833)", () => {
     expect(isNoindexPath("/alternatives/")).toBe(false);
     for (const alt of ALTERNATIVES) {
       expect(isNoindexPath(`/alternatives/${alt.slug}/`), alt.slug).toBe(false);
+    }
+  });
+
+  it("indexes the English open-source peer pages and noindexes every locale copy (#5029)", () => {
+    const slugs = new Set(ALTERNATIVES.map((a) => a.slug));
+    for (const slug of PEER_SLUGS) {
+      expect(slugs.has(slug), slug).toBe(true);
+      expect(isNoindexPath(`/alternatives/${slug}/`), slug).toBe(false);
+      for (const code of NON_ENGLISH) {
+        expect(isNoindexPath(`/${code}/alternatives/${slug}/`), `${code}/${slug}`).toBe(true);
+      }
     }
   });
 

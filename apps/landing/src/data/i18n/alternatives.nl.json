@@ -2113,13 +2113,6 @@
     "outputHash": "69d86711bad5",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "Als je alleen ooit met PDF's werkt, is Stirling-PDF uitstekend en zeker een blik waard. Bewerk je ook afbeeldingen, converteer je video, transcribeer je audio of verwerk je bestanden in batch, dan doet SnapOtter dat allemaal in één implementatie in plaats van meerdere tools naast elkaar te draaien.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "8018383c7791",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "Dat kan, als je één stack wilt voor meer dan PDF's. De PDF-dekking van SnapOtter is breed, en het voegt tools voor beeld, video, audio en bestanden toe. Voor een PDF-only opzet is Stirling-PDF een degelijke, gerichte keuze.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "e5f06a31bc3c",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "Beide projecten zijn opensource en zelf te hosten. SnapOtter is AGPLv3 en voegt een optionele betaalde enterprise-laag toe voor SSO, auditlogging en vergelijkbare functies.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "9dff2b93a9ba",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "Zijn beide gratis en opensource?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "7f9267f328b2",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF en SnapOtter zijn beide zelf gehost en opensource, dus je bestanden blijven hoe dan ook op je eigen server. Het verschil is de reikwijdte: Stirling-PDF richt zich op PDF's, terwijl SnapOtter alle vijf de bestandstypen omvat.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "f4ebbf028987",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF is een sterke zelf gehoste PDF-toolkit. SnapOtter dekt PDF's ook, plus tools voor beeld, video, audio en bestanden in één stack. Beide zijn opensource.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "c648a763259c",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "Ja",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "cde9e58a9a4e",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "Ja",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "3c6c20c246d8",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60+ PDF-bewerkingen",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "56cc7eb6c6ff",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

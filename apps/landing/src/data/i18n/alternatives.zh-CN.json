@@ -2113,13 +2113,6 @@
     "outputHash": "dfb49851df48",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "如果你只处理 PDF，Stirling-PDF 非常出色，值得一试。如果你还要调整图像尺寸、转换视频、转录音频或批量处理文件，SnapOtter 能在一次部署中完成所有这些，而不必并排运行好几个工具。",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "b9abc3974f23",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "如果你想用一套技术栈处理不止 PDF 的内容，那它可以。SnapOtter 的 PDF 覆盖面很广，还加入了图像、视频、音频和文件工具。若只需纯 PDF 方案，Stirling-PDF 是可靠而专注的选择。",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "a1bb56d5269a",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "两个项目都开源且可自托管。SnapOtter 采用 AGPLv3，并提供可选的付费企业版，包含 SSO、审计日志等类似管控功能。",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "296ecfc87eec",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "两者都是免费且开源的吗？",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "6af6a7a41c0e",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF 和 SnapOtter 都是自托管且开源的，因此无论用哪个，文件都留在你的服务器上。区别在于覆盖范围：Stirling-PDF 专注于 PDF，而 SnapOtter 覆盖全部五类文件。",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "76b825e3abb0",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF 是一套强大的自托管 PDF 工具包。SnapOtter 同样覆盖 PDF，并在一套技术栈中加入图像、视频、音频和文件工具。两者均为开源。",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "f9dd4a7039a0",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "是",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "b5141d3d19e9",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "是",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "d89c3a1de1ba",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60 多项 PDF 操作",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "b3f870e0d4ec",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

@@ -2113,13 +2113,6 @@
     "outputHash": "73fff4004f8a",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "Se lavori solo con i PDF, Stirling-PDF è eccellente e vale la pena provarlo. Se invece ridimensioni anche immagini, converti video, trascrivi audio o elabori file in batch, SnapOtter gestisce tutto in una sola installazione anziché far girare più strumenti affiancati.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "72ced9623686",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "Può esserlo, se vuoi un unico stack per qualcosa di più dei PDF. La copertura PDF di SnapOtter è ampia e aggiunge strumenti per immagini, video, audio e file. Per una configurazione solo-PDF, Stirling-PDF è una scelta solida e mirata.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "1e9e37365ca6",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "Entrambi i progetti sono open source e self-hostabili. SnapOtter è AGPLv3 e aggiunge un livello enterprise a pagamento opzionale per SSO, registrazione degli audit e controlli simili.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "fe31a4f0bbaa",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "Sono entrambi gratuiti e open source?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "7d2d27eb6d3c",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF e SnapOtter sono entrambi self-hosted e open source, quindi in entrambi i casi i file restano sul tuo server. La differenza è la portata: Stirling-PDF si concentra sui PDF, mentre SnapOtter copre tutti e cinque i tipi di file.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "0691d52e0e21",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF è un solido toolkit PDF self-hosted. SnapOtter copre anche i PDF, più strumenti per immagini, video, audio e file in un unico stack. Entrambi sono open source.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "3046f75f82e2",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "Sì",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "5209723fc252",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "Sì",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "d5a314bf1cd6",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "Oltre 60 operazioni PDF",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "79212e63198c",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {
