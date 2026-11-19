@@ -62,6 +62,7 @@ const TIFF_TOOLS: Array<{ toolId: string; settings?: Record<string, unknown> }> 
   { toolId: "border", settings: { borderWidth: 5 } },
   { toolId: "color-blindness" },
   { toolId: "compress" },
+  { toolId: "compress", settings: { mode: "targetSize", targetSizeKb: 500 } },
   { toolId: "convert", settings: { format: "tiff" } },
   { toolId: "crop", settings: { left: 0, top: 0, width: 40, height: 30 } },
   { toolId: "duotone" },
