@@ -145,7 +145,7 @@ pnpm dev
 | **Video** | 59 | Taglia, Ritaglia, Comprimi, Converti, Unisci, Estrai audio, Sottotitoli automatici, Da video a GIF, Ridimensiona, Stabilizza, preset di formato |
 | **Audio** | 27 | Taglia, Unisci, Converti, Normalizza, Riduzione del rumore, Trascrivi, Cambio di tonalità, Dissolvenza, Creatore di suonerie, preset di formato |
 | **PDF / Documento** | 35 | Unisci, Dividi, Comprimi, OCR, Filigrana, Redigi, Da Word a PDF, Da Excel a PDF, Ruota, Proteggi, Ripara |
-| **File** | 23 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON |
+| **File** | 25 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON |
 
 ### Pipelines {#pipelines}
 
