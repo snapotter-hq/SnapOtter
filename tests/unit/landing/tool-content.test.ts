@@ -79,7 +79,7 @@ describe("landing first-hand tool content (#4911)", () => {
   it("keeps dashes out of the visible copy", () => {
     for (const content of entries) {
       for (const text of allStrings(content)) {
-        expect(text, content.toolId).not.toMatch(/[–—]| -- /);
+        expect(text, content.toolId).not.toMatch(/[\u2013\u2014]| -- /);
       }
     }
   });
