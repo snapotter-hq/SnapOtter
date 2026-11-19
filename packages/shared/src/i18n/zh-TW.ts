@@ -1045,6 +1045,10 @@ export const zhTW: TranslationKeys = {
       name: "比例計算機",
       description: "解比例（三率法）：由三個已知值求出 X",
     },
+    base64: {
+      name: "Base64 編碼 / 解碼",
+      description: "將文字編碼為 Base64，或將 Base64 解碼回文字",
+    },
     "create-zip": {
       name: "建立 ZIP",
       description: "將多個檔案打包為單一 ZIP 壓縮檔",
@@ -3930,6 +3934,17 @@ export const zhTW: TranslationKeys = {
       zeroDivisorDirect: "正比時 A 不能為 0",
       zeroDivisorInverse: "反比時 C 不能為 0",
     },
+    base64: {
+      encode: "編碼",
+      decode: "解碼",
+      encodeInput: "要編碼的文字",
+      decodeInput: "要解碼的 Base64",
+      encodePlaceholder: "貼上或輸入文字",
+      decodePlaceholder: "貼上 Base64（空格和換行會被忽略）",
+      urlSafe: "URL 安全（- 和 _，無填補）",
+      converting: "正在轉換",
+      result: "結果",
+    },
     "create-zip": {
       submit: "建立 ZIP",
       submitBatch: "建立 ZIP（{count} 個檔案）",
@@ -5505,7 +5520,9 @@ export const zhTW: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "此去背結果已過期。請重新開始。",
       BROWSER_CRASHED: "瀏覽器在算繪時當機。請再試一次。",
       BROWSER_NOT_AVAILABLE: "此工具所需的瀏覽器目前無法使用。",
+      DECODED_DATA_NOT_TEXT: "此 Base64 解碼後是二進位資料而不是文字，無法在此顯示。",
       DEPENDENCY_VALIDATION_FAILED: "此設定所依賴的另一項設定無效。",
+      ENCODED_TEXT_INVALID: "這不是有效的 Base64。請檢查是否有多餘字元或結尾被截斷。",
       FEATURE_CPU_UNSUPPORTED: "此功能需要支援 AVX 的 CPU，但此伺服器的 CPU 不支援。",
       FEATURE_INCOMPATIBLE: "此功能無法搭配目前的設定執行。",
       FST_REQ_FILE_TOO_LARGE: "此檔案過大，無法上傳。",

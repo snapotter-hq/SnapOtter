@@ -47,6 +47,13 @@ export type FontFormat = (typeof FONT_FORMATS)[number];
  * route enforces it; the panel caps its input at the same length.
  */
 export const CONVERT_CASE_MAX_CHARS = 1_000_000;
+/**
+ * Most characters the base64 text tool takes in one request. It covers anything
+ * pasted to copy back out (a long config, a PEM bundle) while keeping the
+ * answer small enough for a textarea. The route enforces it; the panel caps its
+ * input at the same length.
+ */
+export const BASE64_TEXT_MAX_CHARS = 1_000_000;
 
 export const CATEGORIES: CategoryInfo[] = [
   // Image

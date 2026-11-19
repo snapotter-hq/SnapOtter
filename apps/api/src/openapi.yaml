@@ -16159,6 +16159,81 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/base64:
+    post:
+      operationId: base64Text
+      tags: [Files]
+      summary: Base64 Encode / Decode
+      description: |
+        Encode UTF-8 text to Base64, or decode Base64 back to UTF-8 text. This tool
+        accepts a JSON body, not multipart, and answers with the converted text
+        instead of a file to download.
+
+        Decoding ignores whitespace and line breaks, accepts input with or without
+        padding, and takes both the standard (`+`, `/`) and URL-safe (`-`, `_`)
+        alphabets. Input that is not Base64 fails with `ENCODED_TEXT_INVALID`;
+        Base64 that decodes to binary data rather than UTF-8 text fails with
+        `DECODED_DATA_NOT_TEXT`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, mode]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Text to encode, or Base64 to decode
+                mode:
+                  type: string
+                  enum: [encode, decode]
+                  description: Conversion direction
+                urlSafe:
+                  type: boolean
+                  default: false
+                  description: When encoding, use the URL-safe alphabet (`-` and `_`) without padding. Ignored when decoding.
+            example:
+              text: Hello, World!
+              mode: encode
+              urlSafe: false
+      responses:
+        "200":
+          description: Converted text
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, result]
+                properties:
+                  mode:
+                    type: string
+                    enum: [encode, decode]
+                  result:
+                    type: string
+                    description: The Base64 output when encoding, or the decoded text when decoding
+              example:
+                mode: encode
+                result: SGVsbG8sIFdvcmxkIQ==
+        "400":
+          description: Invalid input, input that is not Base64, or Base64 that does not decode to text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip

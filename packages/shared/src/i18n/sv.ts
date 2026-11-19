@@ -1269,6 +1269,10 @@ export const sv: TranslationKeys = {
       name: "Proportionsräknare",
       description: "Lös regula de tri: räkna ut X från tre kända värden",
     },
+    base64: {
+      name: "Base64-koda / avkoda",
+      description: "Koda text till Base64 eller avkoda Base64 tillbaka till text",
+    },
     "create-zip": {
       name: "Skapa ZIP",
       description: "Paketera flera filer i ett enda ZIP-arkiv",
@@ -4203,6 +4207,17 @@ export const sv: TranslationKeys = {
       zeroDivisorDirect: "A kan inte vara 0 i en direkt proportion",
       zeroDivisorInverse: "C kan inte vara 0 i en omvänd proportion",
     },
+    base64: {
+      encode: "Koda",
+      decode: "Avkoda",
+      encodeInput: "Text att koda",
+      decodeInput: "Base64 att avkoda",
+      encodePlaceholder: "Klistra in eller skriv text",
+      decodePlaceholder: "Klistra in Base64 (mellanslag och radbrytningar ignoreras)",
+      urlSafe: "URL-säker (- och _, utan utfyllnad)",
+      converting: "Konverterar",
+      result: "Resultat",
+    },
     "create-zip": {
       submit: "Skapa ZIP",
       submitBatch: "Skapa ZIP ({count} filer)",
@@ -5822,8 +5837,12 @@ export const sv: TranslationKeys = {
       BROWSER_CRASHED: "Webbläsaren kraschade under renderingen. Försök igen.",
       BROWSER_NOT_AVAILABLE:
         "Webbläsaren som det här verktyget behöver är inte tillgänglig just nu.",
+      DECODED_DATA_NOT_TEXT:
+        "Den här Base64-texten innehåller binärdata, inte text, så den kan inte visas här.",
       DEPENDENCY_VALIDATION_FAILED:
         "Den här inställningen beror på en annan inställning som inte är giltig.",
+      ENCODED_TEXT_INVALID:
+        "Det är inte giltig Base64. Leta efter lösa tecken eller ett avklippt slut.",
       FEATURE_CPU_UNSUPPORTED:
         "Den här funktionen kräver en processor med AVX-stöd, och den här serverns processor saknar det.",
       FEATURE_INCOMPATIBLE: "Den här funktionen kan inte köras med de nuvarande inställningarna.",

@@ -1270,6 +1270,10 @@ export const ptBR: TranslationKeys = {
       name: "Calculadora de proporção",
       description: "Resolva a regra de três: encontre X a partir de três valores conhecidos",
     },
+    base64: {
+      name: "Codificar / decodificar Base64",
+      description: "Codifique texto em Base64 ou decodifique Base64 de volta para texto",
+    },
     "create-zip": {
       name: "Criar ZIP",
       description: "Agrupe vários arquivos em um único arquivo ZIP",
@@ -4212,6 +4216,17 @@ export const ptBR: TranslationKeys = {
       zeroDivisorDirect: "A não pode ser 0 em uma proporção direta",
       zeroDivisorInverse: "C não pode ser 0 em uma proporção inversa",
     },
+    base64: {
+      encode: "Codificar",
+      decode: "Decodificar",
+      encodeInput: "Texto para codificar",
+      decodeInput: "Base64 para decodificar",
+      encodePlaceholder: "Cole ou digite o texto",
+      decodePlaceholder: "Cole o Base64 (espaços e quebras de linha são ignorados)",
+      urlSafe: "Seguro para URL (- e _, sem preenchimento)",
+      converting: "Convertendo",
+      result: "Resultado",
+    },
     "create-zip": {
       submit: "Criar ZIP",
       submitBatch: "Criar ZIP ({count} arquivos)",
@@ -5843,8 +5858,12 @@ export const ptBR: TranslationKeys = {
       BROWSER_CRASHED: "O navegador travou durante a renderização. Tente novamente.",
       BROWSER_NOT_AVAILABLE:
         "O navegador de que esta ferramenta precisa não está disponível no momento.",
+      DECODED_DATA_NOT_TEXT:
+        "Este Base64 contém dados binários, não texto, então não pode ser exibido aqui.",
       DEPENDENCY_VALIDATION_FAILED:
         "Esta configuração depende de outra configuração que não é válida.",
+      ENCODED_TEXT_INVALID:
+        "Isso não é Base64 válido. Verifique se há caracteres soltos ou um final cortado.",
       FEATURE_CPU_UNSUPPORTED:
         "Este recurso precisa de um processador com suporte a AVX, e o processador deste servidor não tem.",
       FEATURE_INCOMPATIBLE: "Este recurso não pode ser executado com as configurações atuais.",

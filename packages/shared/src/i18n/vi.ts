@@ -1272,6 +1272,10 @@ export const vi: TranslationKeys = {
       name: "Máy tính tỉ lệ",
       description: "Giải quy tắc tam suất: tìm X từ ba giá trị đã biết",
     },
+    base64: {
+      name: "Mã hóa / giải mã Base64",
+      description: "Mã hóa văn bản sang Base64 hoặc giải mã Base64 về văn bản",
+    },
     "create-zip": {
       name: "Tạo ZIP",
       description: "Gộp nhiều tệp thành một kho lưu trữ ZIP",
@@ -4201,6 +4205,17 @@ export const vi: TranslationKeys = {
       zeroDivisorDirect: "A không thể bằng 0 trong tỉ lệ thuận",
       zeroDivisorInverse: "C không thể bằng 0 trong tỉ lệ nghịch",
     },
+    base64: {
+      encode: "Mã hóa",
+      decode: "Giải mã",
+      encodeInput: "Văn bản cần mã hóa",
+      decodeInput: "Base64 cần giải mã",
+      encodePlaceholder: "Dán hoặc nhập văn bản",
+      decodePlaceholder: "Dán Base64 (khoảng trắng và ngắt dòng sẽ được bỏ qua)",
+      urlSafe: "An toàn cho URL (- và _, không đệm)",
+      converting: "Đang chuyển đổi",
+      result: "Kết quả",
+    },
     "create-zip": {
       submit: "Tạo ZIP",
       submitBatch: "Tạo ZIP ({count} tệp)",
@@ -5808,7 +5823,11 @@ export const vi: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "Kết quả xóa nền này đã hết hạn. Hãy bắt đầu lại.",
       BROWSER_CRASHED: "Trình duyệt đã gặp sự cố khi kết xuất. Hãy thử lại.",
       BROWSER_NOT_AVAILABLE: "Trình duyệt mà công cụ này cần hiện không khả dụng.",
+      DECODED_DATA_NOT_TEXT:
+        "Base64 này giải mã ra dữ liệu nhị phân, không phải văn bản, nên không thể hiển thị ở đây.",
       DEPENDENCY_VALIDATION_FAILED: "Cài đặt này phụ thuộc vào một cài đặt khác không hợp lệ.",
+      ENCODED_TEXT_INVALID:
+        "Đây không phải Base64 hợp lệ. Hãy kiểm tra ký tự thừa hoặc phần cuối bị cắt.",
       FEATURE_CPU_UNSUPPORTED:
         "Tính năng này cần CPU hỗ trợ AVX, nhưng CPU của máy chủ này không hỗ trợ.",
       FEATURE_INCOMPATIBLE: "Tính năng này không thể chạy với các cài đặt hiện tại.",

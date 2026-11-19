@@ -1269,6 +1269,10 @@ export const pl: TranslationKeys = {
       name: "Kalkulator proporcji",
       description: "Rozwiąż regułę trzech: oblicz X z trzech znanych wartości",
     },
+    base64: {
+      name: "Kodowanie / dekodowanie Base64",
+      description: "Zakoduj tekst do Base64 lub zdekoduj Base64 z powrotem na tekst",
+    },
     "create-zip": {
       name: "Utwórz ZIP",
       description: "Spakuj wiele plików do jednego archiwum ZIP",
@@ -4213,6 +4217,17 @@ export const pl: TranslationKeys = {
       zeroDivisorDirect: "A nie może wynosić 0 w proporcji prostej",
       zeroDivisorInverse: "C nie może wynosić 0 w proporcji odwrotnej",
     },
+    base64: {
+      encode: "Zakoduj",
+      decode: "Zdekoduj",
+      encodeInput: "Tekst do zakodowania",
+      decodeInput: "Base64 do zdekodowania",
+      encodePlaceholder: "Wklej lub wpisz tekst",
+      decodePlaceholder: "Wklej Base64 (spacje i podziały wierszy są pomijane)",
+      urlSafe: "Bezpieczne dla URL (- i _, bez dopełnienia)",
+      converting: "Konwertowanie",
+      result: "Wynik",
+    },
     "create-zip": {
       submit: "Utwórz ZIP",
       submitBatch: "Utwórz ZIP ({count} plików)",
@@ -5844,8 +5859,12 @@ export const pl: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "To usuwanie tła wygasło. Zacznij od nowa.",
       BROWSER_CRASHED: "Przeglądarka uległa awarii podczas renderowania. Spróbuj ponownie.",
       BROWSER_NOT_AVAILABLE: "Przeglądarka potrzebna temu narzędziu jest teraz niedostępna.",
+      DECODED_DATA_NOT_TEXT:
+        "To Base64 zawiera dane binarne, a nie tekst, więc nie da się go tu wyświetlić.",
       DEPENDENCY_VALIDATION_FAILED:
         "To ustawienie zależy od innego ustawienia, które jest nieprawidłowe.",
+      ENCODED_TEXT_INVALID:
+        "To nie jest poprawne Base64. Sprawdź, czy nie ma zbędnych znaków lub uciętej końcówki.",
       FEATURE_CPU_UNSUPPORTED:
         "Ta funkcja wymaga procesora z obsługą AVX, a procesor tego serwera jej nie ma.",
       FEATURE_INCOMPATIBLE: "Ta funkcja nie może działać z bieżącymi ustawieniami.",

@@ -1278,6 +1278,10 @@ export const fr: TranslationKeys = {
       name: "Calculateur de proportions",
       description: "Résolvez la règle de trois : trouvez X à partir de trois valeurs connues",
     },
+    base64: {
+      name: "Encoder / décoder en Base64",
+      description: "Encodez du texte en Base64 ou décodez du Base64 en texte",
+    },
     "create-zip": {
       name: "Créer un ZIP",
       description: "Regroupez plusieurs fichiers dans une seule archive ZIP",
@@ -4226,6 +4230,17 @@ export const fr: TranslationKeys = {
       zeroDivisorDirect: "A ne peut pas valoir 0 dans une proportion directe",
       zeroDivisorInverse: "C ne peut pas valoir 0 dans une proportion inverse",
     },
+    base64: {
+      encode: "Encoder",
+      decode: "Décoder",
+      encodeInput: "Texte à encoder",
+      decodeInput: "Base64 à décoder",
+      encodePlaceholder: "Collez ou saisissez du texte",
+      decodePlaceholder: "Collez du Base64 (les espaces et sauts de ligne sont ignorés)",
+      urlSafe: "Compatible URL (- et _, sans remplissage)",
+      converting: "Conversion",
+      result: "Résultat",
+    },
     "create-zip": {
       submit: "Créer un ZIP",
       submitBatch: "Créer un ZIP ({count} fichiers)",
@@ -5865,8 +5880,12 @@ export const fr: TranslationKeys = {
       BROWSER_CRASHED: "Le navigateur a planté pendant le rendu. Réessayez.",
       BROWSER_NOT_AVAILABLE:
         "Le navigateur dont cet outil a besoin n'est pas disponible pour le moment.",
+      DECODED_DATA_NOT_TEXT:
+        "Ce Base64 contient des données binaires, pas du texte : impossible de l'afficher ici.",
       DEPENDENCY_VALIDATION_FAILED:
         "Ce paramètre dépend d'un autre paramètre qui n'est pas valide.",
+      ENCODED_TEXT_INVALID:
+        "Ce n'est pas du Base64 valide. Vérifiez qu'il n'y a pas de caractères parasites ni de fin tronquée.",
       FEATURE_CPU_UNSUPPORTED:
         "Cette fonctionnalité nécessite un processeur compatible AVX, et celui de ce serveur ne l'est pas.",
       FEATURE_INCOMPATIBLE:

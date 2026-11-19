@@ -1271,6 +1271,10 @@ export const ru: TranslationKeys = {
       name: "Калькулятор пропорций",
       description: "Решите пропорцию: найдите X по трём известным значениям",
     },
+    base64: {
+      name: "Кодирование / декодирование Base64",
+      description: "Кодируйте текст в Base64 или декодируйте Base64 обратно в текст",
+    },
     "create-zip": {
       name: "Создание ZIP",
       description: "Упаковка нескольких файлов в один ZIP-архив",
@@ -4213,6 +4217,17 @@ export const ru: TranslationKeys = {
       zeroDivisorDirect: "В прямой пропорции A не может быть равно 0",
       zeroDivisorInverse: "В обратной пропорции C не может быть равно 0",
     },
+    base64: {
+      encode: "Закодировать",
+      decode: "Декодировать",
+      encodeInput: "Текст для кодирования",
+      decodeInput: "Base64 для декодирования",
+      encodePlaceholder: "Вставьте или введите текст",
+      decodePlaceholder: "Вставьте Base64 (пробелы и переносы строк игнорируются)",
+      urlSafe: "Безопасно для URL (- и _, без дополнения)",
+      converting: "Конвертация",
+      result: "Результат",
+    },
     "create-zip": {
       submit: "Создать ZIP",
       submitBatch: "Создать ZIP ({count} файлов)",
@@ -5836,8 +5851,12 @@ export const ru: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "Срок действия этого удаления фона истёк. Начните заново.",
       BROWSER_CRASHED: "Браузер аварийно завершил работу при отрисовке. Попробуйте ещё раз.",
       BROWSER_NOT_AVAILABLE: "Браузер, который нужен этому инструменту, сейчас недоступен.",
+      DECODED_DATA_NOT_TEXT:
+        "Этот Base64 содержит двоичные данные, а не текст, поэтому показать его здесь нельзя.",
       DEPENDENCY_VALIDATION_FAILED:
         "Этот параметр зависит от другого параметра с недопустимым значением.",
+      ENCODED_TEXT_INVALID:
+        "Это не корректный Base64. Проверьте, нет ли лишних символов или обрезанного конца.",
       FEATURE_CPU_UNSUPPORTED:
         "Для этой функции нужен процессор с поддержкой AVX, а процессор этого сервера её не поддерживает.",
       FEATURE_INCOMPATIBLE: "Эта функция не может работать с текущими настройками.",

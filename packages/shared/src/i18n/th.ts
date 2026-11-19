@@ -1253,6 +1253,10 @@ export const th: TranslationKeys = {
       name: "เครื่องคิดเลขสัดส่วน",
       description: "แก้โจทย์บัญญัติไตรยางศ์: หา X จากค่าที่รู้สามค่า",
     },
+    base64: {
+      name: "เข้ารหัส / ถอดรหัส Base64",
+      description: "เข้ารหัสข้อความเป็น Base64 หรือถอดรหัส Base64 กลับเป็นข้อความ",
+    },
     "create-zip": {
       name: "สร้าง ZIP",
       description: "รวมหลายไฟล์เป็นไฟล์ ZIP เดียว",
@@ -4148,6 +4152,17 @@ export const th: TranslationKeys = {
       zeroDivisorDirect: "A เป็น 0 ไม่ได้ในการแปรผันตรง",
       zeroDivisorInverse: "C เป็น 0 ไม่ได้ในการแปรผกผัน",
     },
+    base64: {
+      encode: "เข้ารหัส",
+      decode: "ถอดรหัส",
+      encodeInput: "ข้อความที่จะเข้ารหัส",
+      decodeInput: "Base64 ที่จะถอดรหัส",
+      encodePlaceholder: "วางหรือพิมพ์ข้อความ",
+      decodePlaceholder: "วาง Base64 (ระบบจะข้ามช่องว่างและการขึ้นบรรทัดใหม่)",
+      urlSafe: "ปลอดภัยสำหรับ URL (- และ _ ไม่มีการเติม)",
+      converting: "กำลังแปลง",
+      result: "ผลลัพธ์",
+    },
     "create-zip": {
       submit: "สร้าง ZIP",
       submitBatch: "สร้าง ZIP ({count} ไฟล์)",
@@ -5727,7 +5742,9 @@ export const th: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "การลบพื้นหลังนี้หมดอายุแล้ว เริ่มใหม่อีกครั้ง",
       BROWSER_CRASHED: "เบราว์เซอร์ขัดข้องระหว่างเรนเดอร์ ลองอีกครั้ง",
       BROWSER_NOT_AVAILABLE: "เบราว์เซอร์ที่เครื่องมือนี้ต้องใช้ยังไม่พร้อมใช้งานในขณะนี้",
+      DECODED_DATA_NOT_TEXT: "Base64 นี้ถอดรหัสได้เป็นข้อมูลไบนารี ไม่ใช่ข้อความ จึงแสดงที่นี่ไม่ได้",
       DEPENDENCY_VALIDATION_FAILED: "การตั้งค่านี้ขึ้นอยู่กับการตั้งค่าอื่นที่ไม่ถูกต้อง",
+      ENCODED_TEXT_INVALID: "ข้อความนี้ไม่ใช่ Base64 ที่ถูกต้อง ตรวจดูว่ามีอักขระแปลกปลอมหรือส่วนท้ายถูกตัดหรือไม่",
       FEATURE_CPU_UNSUPPORTED: "ฟีเจอร์นี้ต้องใช้ CPU ที่รองรับ AVX แต่ CPU ของเซิร์ฟเวอร์นี้ไม่รองรับ",
       FEATURE_INCOMPATIBLE: "ฟีเจอร์นี้ทำงานกับการตั้งค่าปัจจุบันไม่ได้",
       FST_REQ_FILE_TOO_LARGE: "ไฟล์นี้ใหญ่เกินกว่าจะอัปโหลดได้",

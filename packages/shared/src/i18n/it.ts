@@ -1274,6 +1274,10 @@ export const it: TranslationKeys = {
       name: "Calcolatore di proporzioni",
       description: "Risolvi la regola del tre: trova X da tre valori noti",
     },
+    base64: {
+      name: "Codifica / decodifica Base64",
+      description: "Codifica testo in Base64 o decodifica Base64 in testo",
+    },
     "create-zip": {
       name: "Crea ZIP",
       description: "Raggruppa più file in un unico archivio ZIP",
@@ -4216,6 +4220,17 @@ export const it: TranslationKeys = {
       zeroDivisorDirect: "A non può essere 0 in una proporzione diretta",
       zeroDivisorInverse: "C non può essere 0 in una proporzione inversa",
     },
+    base64: {
+      encode: "Codifica",
+      decode: "Decodifica",
+      encodeInput: "Testo da codificare",
+      decodeInput: "Base64 da decodificare",
+      encodePlaceholder: "Incolla o scrivi del testo",
+      decodePlaceholder: "Incolla Base64 (spazi e a capo vengono ignorati)",
+      urlSafe: "Sicuro per URL (- e _, senza riempimento)",
+      converting: "Conversione",
+      result: "Risultato",
+    },
     "create-zip": {
       submit: "Crea ZIP",
       submitBatch: "Crea ZIP ({count} file)",
@@ -5848,8 +5863,12 @@ export const it: TranslationKeys = {
       BROWSER_CRASHED: "Il browser si è arrestato durante il rendering. Riprova.",
       BROWSER_NOT_AVAILABLE:
         "Il browser richiesto da questo strumento non è disponibile al momento.",
+      DECODED_DATA_NOT_TEXT:
+        "Questo Base64 contiene dati binari, non testo, quindi non può essere mostrato qui.",
       DEPENDENCY_VALIDATION_FAILED:
         "Questa impostazione dipende da un'altra impostazione non valida.",
+      ENCODED_TEXT_INVALID:
+        "Questo non è Base64 valido. Controlla che non ci siano caratteri estranei o una fine troncata.",
       FEATURE_CPU_UNSUPPORTED:
         "Questa funzione richiede una CPU con supporto AVX, e la CPU di questo server non ce l'ha.",
       FEATURE_INCOMPATIBLE: "Questa funzione non può essere eseguita con le impostazioni attuali.",

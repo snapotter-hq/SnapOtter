@@ -19,6 +19,7 @@ export const LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS: ReadonlySet<string> = new Set(
   "aspect-ratio-calculator",
   "barcode-generate",
   "barcode-read",
+  "base64",
   "beautify",
   "bulk-rename",
   "collage",
