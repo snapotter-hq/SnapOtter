@@ -54,6 +54,26 @@ services:
         # runner fails closed before the suite starts. Host CI runs them too.
         "--exclude",
         "**/tests/unit/scripts/node-test-suites.test.ts",
+        # More repo-audit specs (#4921): the first four list tracked files or
+        # resolve the git dir, the last two read *.md files the dockerignore
+        # prunes. tests/unit/infra/docker-test-excludes.test.ts keeps the git
+        # and testcontainer cases on this list.
+        "--exclude",
+        "**/tests/unit/docs/no-em-dashes.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/tracked-file-size.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/vitest-collection-scope.test.ts",
+        "--exclude",
+        "**/tests/unit/agent-hooks/hooks.test.mjs",
+        "--exclude",
+        "**/tests/unit/docs/aio-workspace-docs.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/release-version-policy.test.ts",
+        # Starts its own Redis testcontainer, and there is no Docker socket in
+        # this container. Host CI runs it.
+        "--exclude",
+        "**/tests/integration/platform/worker-error-backoff.test.ts",
       ]
     environment:
       - NODE_ENV=test
