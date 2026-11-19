@@ -30,6 +30,53 @@ function lengthAt72Dpi(value: string): number | null {
   return Number.isFinite(length) && length > 0 ? length : null;
 }
 
+const PERCENTAGE_PATTERN = /^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?%$/;
+
+/**
+ * Parse a root width or height into density-72 px. A missing or percentage
+ * size is "auto": with no outer viewport librsvg sizes it from the viewBox.
+ * Returns null for em, auto and anything else unparseable.
+ */
+function rootLength(attr: AttributeValue | undefined): number | "auto" | null {
+  if (!attr) return "auto";
+  const trimmed = attr.value.trim();
+  if (trimmed.length <= MAX_LENGTH_CHARS && PERCENTAGE_PATTERN.test(trimmed)) return "auto";
+  return lengthAt72Dpi(trimmed);
+}
+
+const NUMBER_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+const MAX_VIEWBOX_CHARS = 256;
+
+/** Width and height of a viewBox, or null unless it is four numbers with a positive size. */
+function viewBoxSize(attr: AttributeValue | undefined): { width: number; height: number } | null {
+  if (!attr || attr.value.length > MAX_VIEWBOX_CHARS) return null;
+  const parts = attr.value.trim().split(/[\s,]+/);
+  if (parts.length !== 4 || !parts.every((part) => NUMBER_PATTERN.test(part))) return null;
+  const [width, height] = parts.slice(2).map(Number);
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { width, height }
+    : null;
+}
+
+/**
+ * Resolve the root size in density-72 px the way librsvg does: absolute
+ * lengths as given, an auto side from the viewBox, keeping its aspect ratio
+ * when the other side is absolute.
+ */
+function rootSizeAt72Dpi(
+  attributes: Map<string, AttributeValue>,
+): { width: number; height: number } | null {
+  const width = rootLength(attributes.get("width"));
+  const height = rootLength(attributes.get("height"));
+  if (width === null || height === null) return null;
+  if (width !== "auto" && height !== "auto") return { width, height };
+  const viewBox = viewBoxSize(attributes.get("viewBox"));
+  if (!viewBox) return null;
+  if (width !== "auto") return { width, height: (width * viewBox.height) / viewBox.width };
+  if (height !== "auto") return { width: (height * viewBox.width) / viewBox.height, height };
+  return viewBox;
+}
+
 /** One quoted attribute, matched only where the previous one ended. */
 const ATTRIBUTE = /\s+([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/y;
 
@@ -110,8 +157,10 @@ function formatLength(n: number): string {
  * (density/72)^2: a 640pt SVG at 300 DPI came out 11111 px wide instead of
  * 2667 (#4423). At density 72 the two scales cancel, so the root is resized
  * to the target pixel size instead, with a viewBox added when missing so the
- * drawing scales with it. Roots sized in %, em or not at all are returned
- * untouched with the caller's density.
+ * drawing scales with it. A root with no absolute size takes it from its
+ * viewBox, as librsvg would (#4940). Roots sized in em, or with neither an
+ * absolute size nor a viewBox, are returned untouched with the caller's
+ * density.
  */
 export function bakeSvgDensity(svg: Buffer, density: number): { buffer: Buffer; density: number } {
   const unchanged = { buffer: svg, density };
@@ -123,28 +172,32 @@ export function bakeSvgDensity(svg: Buffer, density: number): { buffer: Buffer; 
   const tag = text.slice(start, tagEnd);
 
   const attributes = readAttributes(tag);
-  const widthAttr = attributes?.get("width");
-  const heightAttr = attributes?.get("height");
-  if (!attributes || !widthAttr || !heightAttr) return unchanged;
-  const width = lengthAt72Dpi(widthAttr.value);
-  const height = lengthAt72Dpi(heightAttr.value);
-  if (width === null || height === null) return unchanged;
+  if (!attributes) return unchanged;
+  const size = rootSizeAt72Dpi(attributes);
+  if (!size) return unchanged;
   const scale = density / 72;
-  if (!Number.isFinite(width * scale) || !Number.isFinite(height * scale)) return unchanged;
+  const width = size.width * scale;
+  const height = size.height * scale;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return unchanged;
 
-  const [first, second] = [
-    { span: widthAttr, text: formatLength(width * scale) },
-    { span: heightAttr, text: formatLength(height * scale) },
-  ].sort((a, b) => a.span.start - b.span.start);
-  let newTag =
-    tag.slice(0, first.span.start) +
-    first.text +
-    tag.slice(first.span.end, second.span.start) +
-    second.text +
-    tag.slice(second.span.end);
-  if (!attributes.has("viewBox")) {
-    newTag = `<svg viewBox="0 0 ${formatLength(width)} ${formatLength(height)}"${newTag.slice(4)}`;
+  const replacements: { span: AttributeValue; text: string }[] = [];
+  let inserted = "";
+  for (const [name, value] of [
+    ["width", width],
+    ["height", height],
+  ] as const) {
+    const span = attributes.get(name);
+    if (span) replacements.push({ span, text: formatLength(value) });
+    else inserted += ` ${name}="${formatLength(value)}"`;
   }
+  if (!attributes.has("viewBox")) {
+    inserted = ` viewBox="0 0 ${formatLength(size.width)} ${formatLength(size.height)}"${inserted}`;
+  }
+  let newTag = tag;
+  for (const { span, text: value } of replacements.sort((a, b) => b.span.start - a.span.start)) {
+    newTag = newTag.slice(0, span.start) + value + newTag.slice(span.end);
+  }
+  newTag = `<svg${inserted}${newTag.slice(4)}`;
 
   return {
     buffer: Buffer.from(text.slice(0, start) + newTag + text.slice(tagEnd), "utf-8"),

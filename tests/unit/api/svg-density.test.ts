@@ -65,10 +65,29 @@ describe("openSvgAtDensity (#4423)", () => {
     for (const root of [
       'width="2in" height="2in"',
       'width="144" height="144" viewBox="0 0 144 144"',
+      'viewBox="0 0 144 144"',
+      'width="100%" height="100%" viewBox="0 0 144 144"',
+      'width="2in" viewBox="0 0 144 144"',
     ]) {
       expect(await opaqueRowFraction(svg(root, body), 72)).toBeCloseTo(0.25, 2);
       expect(await opaqueRowFraction(svg(root, body), 300)).toBeCloseTo(0.25, 2);
     }
+  });
+
+  it.each([
+    ["only a viewBox", 'viewBox="0 0 144 72"', 600, 300],
+    ["percentage sizes", 'width="100%" height="50%" viewBox="0 0 144 72"', 600, 300],
+    ["only an absolute width", 'width="2in" viewBox="0 0 144 72"', 600, 300],
+    ["only an absolute height", 'height="1in" viewBox="0 0 144 72"', 600, 300],
+    [
+      "a percentage width and an absolute height",
+      'width="50%" height="1in" viewBox="0 0 144 72"',
+      600,
+      300,
+    ],
+    ["a fractional viewBox", 'viewBox="0 0 10.5 7.3"', 44, 30],
+  ])("sizes a root with %s from its viewBox (#4940)", async (_label, attrs, ew, eh) => {
+    expect(await size(svg(attrs), 300)).toEqual([ew, eh]);
   });
 
   it("tags PNG and TIFF output with the requested DPI, not the 72 it rendered at", async () => {
@@ -121,7 +140,12 @@ describe("bakeSvgDensity", () => {
   it.each([
     ["a percentage width", 'width="100%" height="50pt"'],
     ["an em height", 'width="10pt" height="2em"'],
-    ["no height", 'width="10pt" viewBox="0 0 10 10"'],
+    ["no height and no viewBox", 'width="10pt"'],
+    ["no size and no viewBox", ""],
+    ["a zero-width viewBox", 'width="100%" viewBox="0 0 0 10"'],
+    ["an em width beside a viewBox", 'width="10em" viewBox="0 0 10 10"'],
+    ["a malformed viewBox", 'viewBox="0 0 10"'],
+    ["a hex viewBox", 'viewBox="0 0 0x10 10"'],
     ["a zero width", 'width="0" height="10pt"'],
     ["a non-numeric width", 'width="auto" height="10pt"'],
   ])("leaves a root with %s to sharp unchanged", (_label, attrs) => {
@@ -129,6 +153,25 @@ describe("bakeSvgDensity", () => {
     const result = bakeSvgDensity(input, 300);
     expect(result.buffer).toBe(input);
     expect(result.density).toBe(300);
+  });
+
+  it("writes a missing root size from the viewBox and drops to density 72", () => {
+    const { buffer, density } = bakeSvgDensity(svg('viewBox="0, 0, 144, 72"'), 300);
+    expect(density).toBe(72);
+    expect(buffer.toString("utf-8")).toContain(
+      '<svg width="600" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0, 0, 144, 72">',
+    );
+  });
+
+  it("replaces a percentage size and derives a missing one from the viewBox aspect", () => {
+    const text = bakeSvgDensity(svg('width="100%" viewBox="0 0 30 10"'), 144).buffer.toString(
+      "utf-8",
+    );
+    expect(text).toContain('<svg height="20" xmlns="http://www.w3.org/2000/svg" width="60"');
+    const tall = bakeSvgDensity(svg('height="1in" viewBox="0 0 10 20"'), 144).buffer.toString(
+      "utf-8",
+    );
+    expect(tall).toContain('<svg width="72" xmlns="http://www.w3.org/2000/svg" height="144"');
   });
 
   it("finds the root after a DOCTYPE with an internal subset", () => {
