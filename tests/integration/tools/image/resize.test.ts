@@ -342,9 +342,10 @@ describe("Resize", () => {
     expect(meta.height).toBe(300);
   });
 
-  it("names the decoder pixel limit for a 289 MP upload (#4435)", async () => {
+  it("names the configured megapixel limit for a 289 MP upload (#4435)", async () => {
     // Only the IHDR is read before the refusal, so a header claiming
-    // 17000x17000 stands in for the real 289 MP file.
+    // 17000x17000 stands in for the real 289 MP file. vitest.config.ts sets
+    // MAX_MEGAPIXELS=100, which sharp's own 268 MP ceiling used to mask.
     const chunk = (type: string, data: Buffer): Buffer => {
       const len = Buffer.alloc(4);
       len.writeUInt32BE(data.length);
@@ -377,7 +378,7 @@ describe("Resize", () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toBe(
-      "Invalid image: Image exceeds the decoder's 268,402,689 pixel limit (17000x17000, 289.0MP)",
+      "Invalid image: Image exceeds maximum size: 289.0MP (limit: 100MP)",
     );
   });
 });
