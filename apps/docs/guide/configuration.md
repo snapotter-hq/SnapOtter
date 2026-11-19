@@ -39,9 +39,9 @@ The two booleans below accept only `true` and `false`. Anything else, `1` or `ye
 | Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` or `s3`. S3 and MinIO need a license with the s3_storage feature plus the `S3_*` variables below. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string, and the connection every request is served on. On 2.3.0 and later, set `DATABASE_MIGRATION_URL` too and this becomes the least-privilege runtime role, holding DML on the app's tables and nothing else. The Compose stack points it at its `postgres` service; leave it unset (together with `REDIS_URL`) to get embedded mode. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string, and the connection every request is served on. On 2.3.0 and later, set `DATABASE_MIGRATION_URL` too and this becomes the least-privilege runtime role, holding DML on the app's tables and nothing else. The Compose stack points it at its `postgres` service; leave it unset (together with `REDIS_URL`) to get embedded mode. To connect over a unix socket, name the socket directory in `host`, as in `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, and mount that directory into the container. |
 | `DATABASE_MIGRATION_URL` | (empty) | Privileged connection, used only during boot to run migrations and grant the runtime role, then closed before the first request. Leave it empty and SnapOtter runs single-role, with `DATABASE_URL` doing both jobs. See [Least-privilege roles](/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection string (used for BullMQ job queues). Compose points this at its `redis` service. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection string (used for BullMQ job queues). Compose points this at its `redis` service. For a unix socket, use `unix:///run/redis/redis.sock?db=5` (add `&password=...` if Redis needs one) and mount the socket into the container. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. The image sets `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). The image sets `/data/files`. |
 
