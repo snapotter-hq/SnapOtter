@@ -454,6 +454,87 @@ describe("AI image job handlers", () => {
     });
   });
 
+  // The route used to name every result *_redeye_fixed.png with image/png, and
+  // the sidecar only knows "jpeg", so "jpg" fell through to PNG (#4363).
+  it.each([
+    { format: "jpg", sidecar: "jpeg", ext: "jpg", contentType: "image/jpeg" },
+    { format: "jpeg", sidecar: "jpeg", ext: "jpg", contentType: "image/jpeg" },
+    { format: "webp", sidecar: "webp", ext: "webp", contentType: "image/webp" },
+    { format: "png", sidecar: "png", ext: "png", contentType: "image/png" },
+  ] as const)("honours red-eye format $format", async (c) => {
+    const result = await runAiToolJob(
+      job("red-eye-removal", { format: c.format, quality: 60 }, "sample.webp"),
+      PNG,
+      ctx,
+    );
+
+    expect(removeRedEye).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: c.sidecar, quality: 60 }),
+      expect.any(Function),
+    );
+    expect(result).toMatchObject({
+      filename: `sample_redeye_fixed.${c.ext}`,
+      contentType: c.contentType,
+    });
+  });
+
+  it("encodes avif and jxl red-eye output in Node from sidecar PNG", async () => {
+    const avif = await runAiToolJob(
+      job("red-eye-removal", { format: "avif", quality: 70 }),
+      PNG,
+      ctx,
+    );
+    expect(avif).toMatchObject({ filename: "photo_redeye_fixed.avif", contentType: "image/avif" });
+    expect((await sharp(avif.buffer).metadata()).compression).toBe("av1");
+
+    const jxl = await runAiToolJob(
+      job("red-eye-removal", { format: "jxl", quality: 65 }),
+      PNG,
+      ctx,
+    );
+    expect(encoderMocks.encodeJxl).toHaveBeenCalledWith(PNG, 65);
+    expect(jxl).toMatchObject({
+      buffer: FAKE_JXL,
+      filename: "photo_redeye_fixed.jxl",
+      contentType: "image/jxl",
+    });
+    for (const call of vi.mocked(removeRedEye).mock.calls) {
+      expect(call[2]).toMatchObject({ format: "png" });
+    }
+  });
+
+  it.each([
+    { input: "jpeg", sidecar: "jpeg", ext: "jpg", contentType: "image/jpeg" },
+    { input: "webp", sidecar: "webp", ext: "webp", contentType: "image/webp" },
+    { input: "gif", sidecar: "png", ext: "gif", contentType: "image/gif" },
+    { input: "tiff", sidecar: "png", ext: "tiff", contentType: "image/tiff" },
+  ] as const)("keeps a $input input's format when red-eye format is original", async (c) => {
+    const input = await sharp(PNG).toFormat(c.input).toBuffer();
+
+    const result = await runAiToolJob(
+      job("red-eye-removal", { format: "original" }, `photo.${c.ext}`),
+      input,
+      ctx,
+    );
+
+    expect(vi.mocked(removeRedEye).mock.calls[0]?.[2]).toMatchObject({ format: c.sidecar });
+    expect(result).toMatchObject({
+      filename: `photo_redeye_fixed.${c.ext}`,
+      contentType: c.contentType,
+    });
+    expect((await sharp(result.buffer).metadata()).format).toBe(
+      c.sidecar === "png" ? c.input : "png",
+    );
+  });
+
+  it("rejects an unknown red-eye format instead of silently writing PNG", async () => {
+    await expect(
+      runAiToolJob(job("red-eye-removal", { format: "bmp" }), PNG, ctx),
+    ).rejects.toThrow();
+  });
+
   it("falls back to the lower-memory transparency model on OOM", async () => {
     vi.mocked(removeBackground)
       .mockRejectedValueOnce(new Error("out of memory"))
@@ -617,6 +698,29 @@ describe("AI image pipeline process registrations", () => {
     for (const call of vi.mocked(noiseRemoval).mock.calls) {
       expect(call[2]).toMatchObject({ format: "png" });
     }
+  });
+
+  it("honours format in the red-eye pipeline processor (#4363)", async () => {
+    const jpeg = await sharp(PNG).jpeg().toBuffer();
+    const redEyeConfig = getToolConfig("red-eye-removal");
+
+    const original = await redEyeConfig?.process(jpeg, { format: "original" }, "photo.jpg", ctx);
+    expect(vi.mocked(removeRedEye).mock.calls[0]?.[2]).toMatchObject({ format: "jpeg" });
+    expect(original).toMatchObject({
+      filename: "photo_redeye_fixed.jpg",
+      contentType: "image/jpeg",
+      resultPayload: { facesDetected: 1, eyesCorrected: 2 },
+    });
+
+    const avif = await redEyeConfig?.process(
+      PNG,
+      { format: "avif", quality: 50 },
+      "photo.png",
+      ctx,
+    );
+    expect(vi.mocked(removeRedEye).mock.calls[1]?.[2]).toMatchObject({ format: "png" });
+    expect(avif).toMatchObject({ filename: "photo_redeye_fixed.avif", contentType: "image/avif" });
+    expect((await sharp(avif?.buffer).metadata()).compression).toBe("av1");
   });
 
   it("keeps a JPEG input's format in the noise-removal pipeline processor (#4469)", async () => {
