@@ -12,7 +12,7 @@
 import { FEATURE_BUNDLES, getRequiredBundlesForTool, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { invalidateCache, isFeatureInstalled } from "../../../apps/api/src/lib/feature-status.js";
-import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
+import { buildTestApp, loginAsAdmin, preReadyHooks, type TestApp } from "../test-server.js";
 
 const PROVISION = process.env.AI_PROVISION === "1" && process.env.REQUIRE_AI_FEATURES === "1";
 const INSTALL_TIMEOUT_MS = 3 * 60 * 60 * 1000;
@@ -33,6 +33,10 @@ describe.skipIf(!PROVISION)("AI bundle provisioning", () => {
   let token: string;
 
   beforeAll(async () => {
+    // buildTestApp leaves the feature routes out; the install route lives
+    // there. Imported here so a skipped run never loads the install machinery.
+    const { registerFeatureRoutes } = await import("../../../apps/api/src/routes/features.js");
+    preReadyHooks.push((app) => registerFeatureRoutes(app));
     testApp = await buildTestApp();
     token = await loginAsAdmin(testApp.app);
   });
@@ -70,14 +74,21 @@ describe.skipIf(!PROVISION)("AI bundle provisioning", () => {
           url: `/api/v1/admin/features/${bundleId}/install`,
           headers: { authorization: `Bearer ${token}` },
         });
-        // 409 "already installed" is a race with the check above, not a failure.
-        expect([202, 409], `${bundleId}: ${res.body}`).toContain(res.statusCode);
+        // "Already installed" is a race with the check above; any other 409
+        // (an unsupported host, say) means nothing will install.
+        const alreadyInstalled = res.statusCode === 409 && res.body.includes("already installed");
+        expect(res.statusCode === 202 || alreadyInstalled, `${bundleId}: ${res.body}`).toBe(true);
 
         const deadline = Date.now() + INSTALL_TIMEOUT_MS;
+        let started = alreadyInstalled;
         for (;;) {
           const state = await bundleState(bundleId);
           if (state?.status === "installed") break;
           if (state?.status === "error") throw new Error(`${bundleId}: ${state.error}`);
+          // Bundles install one at a time here, so an install that was running
+          // and is now neither installed nor in error ended without saying why.
+          if (state?.status === "queued" || state?.status === "installing") started = true;
+          else if (started) throw new Error(`${bundleId}: install ended as ${state?.status}`);
           if (Date.now() > deadline) throw new Error(`${bundleId}: install still ${state?.status}`);
           await new Promise((resolve) => setTimeout(resolve, POLL_MS));
         }
