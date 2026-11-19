@@ -29,6 +29,7 @@ import {
   updateSingleFileProgressAtomically,
 } from "../routes/progress.js";
 import { isBatchCanceled, recordChildOutcome } from "./batch-progress.js";
+import type { ProgressReporter } from "./monotonic-progress.js";
 import { generatePreview } from "./postprocess.js";
 import { resultPayloadKey, type ToolJobData, type ToolJobResult } from "./types.js";
 import {
@@ -139,22 +140,37 @@ export async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJo
     data.inputRefs = [prevRow.outputRefs[0]];
   }
 
-  // Report pipeline-level progress to the pipeline's SSE channel.
+  // Report pipeline-level progress to the pipeline's SSE channel. Steps share
+  // 0-90 evenly (finalize owns the rest), and the tool's own reports fill in
+  // this step's slice so a long step doesn't sit on one number (#4345).
   const pipelineProgressId = data.clientJobId;
+  let forwardStepProgress: ProgressReporter | undefined;
   if (pipelineProgressId) {
-    const stepSuffix = `-s${data.stepIndex ?? 0}`;
+    const stepIndex = data.stepIndex ?? 0;
+    const totalSteps = data.totalSteps ?? 1;
+    const stepSuffix = `-s${stepIndex}`;
     const flowId = data.jobId.endsWith(stepSuffix)
       ? data.jobId.slice(0, -stepSuffix.length)
       : data.jobId;
-    const percent = Math.round(((data.stepIndex ?? 0) / (data.totalSteps ?? 1)) * 90);
-    const stage = `Step ${(data.stepIndex ?? 0) + 1}/${data.totalSteps}: ${data.toolId}`;
-    void updateSingleFileProgress({
-      jobId: pipelineProgressId,
-      phase: "processing",
-      percent,
-      stage,
-      ...(pipelineProgressId !== flowId && { expectedPipelineFlowId: flowId }),
-    });
+    const stage = `Step ${stepIndex + 1}/${data.totalSteps}: ${data.toolId}`;
+    // Each frame is a guarded row write, so skip readings that round to the
+    // percent already sent.
+    let lastPercent: number | undefined;
+    const reportPipeline = (stepPercent: number) => {
+      const fraction = Math.min(Math.max(stepPercent, 0), 100) / 100;
+      const percent = Math.round(((stepIndex + fraction) / totalSteps) * 90);
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      void updateSingleFileProgress({
+        jobId: pipelineProgressId,
+        phase: "processing",
+        percent,
+        stage,
+        ...(pipelineProgressId !== flowId && { expectedPipelineFlowId: flowId }),
+      });
+    };
+    reportPipeline(0);
+    forwardStepProgress = reportPipeline;
   }
 
   // Clear clientJobId so processToolJob's terminal SSE event goes to the
@@ -163,7 +179,7 @@ export async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJo
   data.clientJobId = undefined;
 
   try {
-    return await processToolJob(job);
+    return await processToolJob(job, forwardStepProgress);
   } catch (err) {
     reportToolJobFailure(job, err);
     // Step failed -- return failure marker. processToolJob already

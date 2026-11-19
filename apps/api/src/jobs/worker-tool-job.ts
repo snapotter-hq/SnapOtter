@@ -52,7 +52,7 @@ import {
   userCancelSignal,
   wasUserCanceled,
 } from "./cancel.js";
-import { createMonotonicReporter } from "./monotonic-progress.js";
+import { createMonotonicReporter, type ProgressReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
 import {
   type AutoSaveTx,
@@ -154,7 +154,15 @@ export function isTimeoutAbortError(err: unknown): boolean {
   return ABORT_ERROR_MESSAGE.test(message.trim());
 }
 
-export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
+/**
+ * `onProgress` sees every percent the tool reports, after the monotonic clamp.
+ * A pipeline step uses it to mirror the tool's progress onto the pipeline's
+ * own channel, since the step runs with clientJobId cleared (#4345).
+ */
+export async function processToolJob(
+  job: Job<ToolJobData>,
+  onProgress?: ProgressReporter,
+): Promise<ToolJobResult> {
   const data = job.data;
   const { jobId } = data;
   const startTime = Date.now();
@@ -285,6 +293,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
           ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
         writeJobProgress({ percent, stage });
+        onProgress?.(percent, stage);
       });
 
       // Check for cancellation before dispatching

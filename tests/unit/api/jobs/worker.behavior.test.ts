@@ -6668,6 +6668,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
     processV2Mock.mockImplementationOnce(
       async (ctx: { report: (percent: number, stage?: string) => void }) => {
         ctx.report(60, "Inner tool progress");
+        ctx.report(60.4, "Same rounded percent");
         return {
           buffer: Buffer.from("step-bytes"),
           filename: "step.png",
@@ -6708,13 +6709,32 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       percent: 60,
       stage: "Inner tool progress",
     });
+    // The same report reaches the pipeline channel scaled into the step's slice of 0-90 (#4345).
+    expect(updateSingleFileProgressMock).toHaveBeenNthCalledWith(3, {
+      jobId: "client-pipeline-alias",
+      phase: "processing",
+      percent: 72,
+      stage: "Step 2/2: compress",
+      expectedPipelineFlowId: "flow-step-alias",
+    });
+    // 60.4 rounds to the same pipeline percent, so only the step row hears it.
+    const pipelineFrames = updateSingleFileProgressMock.mock.calls.filter(
+      ([arg]) => (arg as { jobId: string }).jobId === "client-pipeline-alias",
+    );
+    expect(pipelineFrames).toHaveLength(2);
 
     updateSingleFileProgressMock.mockClear();
-    processV2Mock.mockResolvedValueOnce({
-      buffer: Buffer.from("step-bytes"),
-      filename: "step.png",
-      contentType: "image/png",
-    });
+    processV2Mock.mockImplementationOnce(
+      async (ctx: { report: (percent: number, stage?: string) => void }) => {
+        // Out-of-range readings stay inside the step's slice (#4345).
+        ctx.report(150, "Overshoot");
+        return {
+          buffer: Buffer.from("step-bytes"),
+          filename: "step.png",
+          contentType: "image/png",
+        };
+      },
+    );
     await processor({
       id: "flow-step-direct-s0",
       attemptsMade: 0,
@@ -6745,6 +6765,12 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       stage: "Step 1/2: compress",
     });
     expect(directStepProgressArg).not.toHaveProperty("expectedPipelineFlowId");
+    expect(updateSingleFileProgressMock).toHaveBeenCalledWith({
+      jobId: "flow-step-direct",
+      phase: "processing",
+      percent: 45,
+      stage: "Step 1/2: compress",
+    });
   });
 });
 
