@@ -1,19 +1,21 @@
 ---
-description: "使用模式範本重新命名多個檔案並以 ZIP 下載。"
-i18n_source_hash: 2776dcc2f71c
+description: "使用模式範本重新命名多張圖片並以 ZIP 下載。"
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 767ee191db72
 ---
 
 # Bulk Rename {#bulk-rename}
 
-使用帶有索引、補零索引及原始檔名預留位置的模式範本重新命名多個檔案。回傳包含所有已重新命名檔案的 ZIP 壓縮檔。
+使用帶有索引、補零索引及原始檔名預留位置的模式範本重新命名多張圖片。回傳包含所有已重新命名圖片的 ZIP 壓縮檔。
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-接受包含多個檔案及 JSON `settings` 欄位的 multipart form data。
+接受包含多個圖片檔案及 JSON `settings` 欄位的 multipart form data。
+
+上傳的每個檔案都必須是圖片。ZIP 開始產生之前會先檢查每個檔案的檔頭，之後檔案位元組會原封不動寫入 ZIP（不重新編碼）。如果有任何檔案不是可辨識的圖片，或超過 `MAX_MEGAPIXELS`，整個請求會以 `400` 失敗，並回傳指出該檔案的錯誤，例如 `Invalid file "notes.txt": Unrecognized image format`。
 
 ## Parameters {#parameters}
 

@@ -1,19 +1,21 @@
 ---
-description: "Renombra varios archivos usando una plantilla de patrón y descárgalos como ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Renombra varias imágenes usando una plantilla de patrón y descárgalas como ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 0b1606c2fba1
 ---
 
 # Renombrado masivo {#bulk-rename}
 
-Renombra varios archivos usando una plantilla de patrón con marcadores de posición para el índice, el índice con relleno de ceros y el nombre de archivo original. Devuelve un archivo ZIP que contiene todos los archivos renombrados.
+Renombra varias imágenes usando una plantilla de patrón con marcadores de posición para el índice, el índice con relleno de ceros y el nombre de archivo original. Devuelve un archivo ZIP que contiene todas las imágenes renombradas.
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Acepta datos de formulario multipart con varios archivos y un campo JSON `settings`.
+Acepta datos de formulario multipart con varios archivos de imagen y un campo JSON `settings`.
+
+Cada archivo subido debe ser una imagen. La cabecera de cada archivo se comprueba antes de que empiece el ZIP, y los bytes se comprimen sin cambios (sin recodificar). Si algún archivo no es una imagen reconocida, o supera `MAX_MEGAPIXELS`, toda la solicitud falla con `400` y un error que nombra ese archivo, por ejemplo `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameters {#parameters}
 

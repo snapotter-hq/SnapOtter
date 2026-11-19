@@ -1,19 +1,21 @@
 ---
-description: "使用模式模板重命名多个文件并以 ZIP 下载。"
-i18n_source_hash: 2776dcc2f71c
+description: "使用模式模板重命名多个图片并以 ZIP 下载。"
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 4b35a9b3af6b
 ---
 
 # Bulk Rename {#bulk-rename}
 
-使用带有索引、补零索引和原始文件名占位符的模式模板重命名多个文件。返回一个包含所有重命名文件的 ZIP 归档。
+使用带有索引、补零索引和原始文件名占位符的模式模板重命名多个图片。返回一个包含所有重命名图片的 ZIP 归档。
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-接受包含多个文件和一个 JSON `settings` 字段的 multipart 表单数据。
+接受包含多个图片文件和一个 JSON `settings` 字段的 multipart 表单数据。
+
+上传的每个文件都必须是图片。ZIP 开始生成之前会先检查每个文件的文件头，随后文件字节会原样写入 ZIP（不重新编码）。如果有任何文件不是可识别的图片，或超过 `MAX_MEGAPIXELS`，整个请求会以 `400` 失败，并返回指明该文件的错误，例如 `Invalid file "notes.txt": Unrecognized image format`。
 
 ## Parameters {#parameters}
 

@@ -1,19 +1,21 @@
 ---
-description: "Hernoem meerdere bestanden met een patroonsjabloon en download ze als ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Hernoem meerdere afbeeldingen met een patroonsjabloon en download ze als ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 81e94f6cfbd1
 ---
 
 # Bulk hernoemen {#bulk-rename}
 
-Hernoem meerdere bestanden met een patroonsjabloon met plaatshouders voor index, opgevulde index en originele bestandsnaam. Retourneert een ZIP-archief met alle hernoemde bestanden.
+Hernoem meerdere afbeeldingen met een patroonsjabloon met plaatshouders voor index, opgevulde index en originele bestandsnaam. Retourneert een ZIP-archief met alle hernoemde afbeeldingen.
 
 ## API-endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Accepteert multipart form data met meerdere bestanden en een JSON-veld `settings`.
+Accepteert multipart form data met meerdere afbeeldingen en een JSON-veld `settings`.
+
+Elke upload moet een afbeelding zijn. De header van elk bestand wordt gecontroleerd voordat de ZIP begint, en de bytes worden daarna ongewijzigd gezipt (geen hercodering). Als een bestand geen herkende afbeelding is of `MAX_MEGAPIXELS` overschrijdt, mislukt het hele verzoek met `400` en een foutmelding die dat bestand noemt, bijvoorbeeld `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameters {#parameters}
 

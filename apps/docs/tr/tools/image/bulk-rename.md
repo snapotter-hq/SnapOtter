@@ -1,19 +1,21 @@
 ---
-description: "Bir kalıp şablonu kullanarak birden fazla dosyayı yeniden adlandırın ve ZIP olarak indirin."
-i18n_source_hash: 2776dcc2f71c
+description: "Bir kalıp şablonu kullanarak birden fazla görseli yeniden adlandırın ve ZIP olarak indirin."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 7f08948bcee7
 ---
 
 # Toplu Yeniden Adlandırma {#bulk-rename}
 
-Dizin, dolgulu dizin ve özgün dosya adı için yer tutucular içeren bir kalıp şablonu kullanarak birden fazla dosyayı yeniden adlandırın. Yeniden adlandırılan tüm dosyaları içeren bir ZIP arşivi döndürür.
+Dizin, dolgulu dizin ve özgün dosya adı için yer tutucular içeren bir kalıp şablonu kullanarak birden fazla görseli yeniden adlandırın. Yeniden adlandırılan tüm görselleri içeren bir ZIP arşivi döndürür.
 
 ## API Uç Noktası {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Birden fazla dosya ve bir JSON `settings` alanı içeren multipart form verisi kabul eder.
+Birden fazla görsel dosyası ve bir JSON `settings` alanı içeren multipart form verisi kabul eder.
+
+Yüklenen her dosya bir görsel olmalıdır. ZIP başlamadan önce her dosyanın başlığı kontrol edilir, ardından baytlar yeniden kodlanmadan olduğu gibi ziplenir. Herhangi bir dosya tanınan bir görsel değilse veya `MAX_MEGAPIXELS` sınırını aşarsa, tüm istek `400` ile başarısız olur ve hata o dosyanın adını belirtir, örneğin `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parametreler {#parameters}
 

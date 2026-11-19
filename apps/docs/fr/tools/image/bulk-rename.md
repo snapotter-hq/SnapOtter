@@ -1,19 +1,21 @@
 ---
-description: "Renomme plusieurs fichiers à l'aide d'un modèle de motif et les télécharge sous forme de ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Renomme plusieurs images à l'aide d'un modèle de motif et les télécharge sous forme de ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: ec51a289e6cb
 ---
 
 # Renommage en masse {#bulk-rename}
 
-Renomme plusieurs fichiers à l'aide d'un modèle de motif comportant des espaces réservés pour l'index, l'index complété par des zéros et le nom de fichier d'origine. Renvoie une archive ZIP contenant tous les fichiers renommés.
+Renomme plusieurs images à l'aide d'un modèle de motif comportant des espaces réservés pour l'index, l'index complété par des zéros et le nom de fichier d'origine. Renvoie une archive ZIP contenant toutes les images renommées.
 
 ## Point de terminaison de l'API {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Accepte des données de formulaire multipart contenant plusieurs fichiers et un champ JSON `settings`.
+Accepte des données de formulaire multipart contenant plusieurs fichiers image et un champ JSON `settings`.
+
+Chaque fichier envoyé doit être une image. L'en-tête de chaque fichier est vérifié avant le début du ZIP, puis les octets sont archivés tels quels (sans ré-encodage). Si un fichier n'est pas une image reconnue, ou s'il dépasse `MAX_MEGAPIXELS`, toute la requête échoue avec `400` et une erreur qui nomme ce fichier, par exemple `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Paramètres {#parameters}
 

@@ -1,19 +1,21 @@
 ---
-description: "パターンテンプレートを使用して複数のファイルをリネームし、ZIP としてダウンロードします。"
-i18n_source_hash: 2776dcc2f71c
+description: "パターンテンプレートを使用して複数の画像をリネームし、ZIP としてダウンロードします。"
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: e2e6d53898eb
 ---
 
 # Bulk Rename {#bulk-rename}
 
-インデックス、ゼロ埋めインデックス、元のファイル名のプレースホルダーを持つパターンテンプレートを使用して、複数のファイルをリネームします。リネームされたすべてのファイルを含む ZIP アーカイブを返します。
+インデックス、ゼロ埋めインデックス、元のファイル名のプレースホルダーを持つパターンテンプレートを使用して、複数の画像をリネームします。リネームされたすべての画像を含む ZIP アーカイブを返します。
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-複数のファイルと JSON の `settings` フィールドを含むマルチパートフォームデータを受け付けます。
+複数の画像ファイルと JSON の `settings` フィールドを含むマルチパートフォームデータを受け付けます。
+
+アップロードはすべて画像である必要があります。各ファイルのヘッダーは ZIP の作成を始める前に検査され、バイト列はそのまま ZIP に格納されます (再エンコードなし)。認識できない画像ファイルや `MAX_MEGAPIXELS` を超えるファイルが 1 つでもあると、リクエスト全体が `400` で失敗し、そのファイル名を示すエラーが返されます。例: `Invalid file "notes.txt": Unrecognized image format`
 
 ## Parameters {#parameters}
 

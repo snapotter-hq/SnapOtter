@@ -1,19 +1,21 @@
 ---
-description: "Byt namn på flera filer med en mönstermall och ladda ner som ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Byt namn på flera bilder med en mönstermall och ladda ner som ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 1b6fbb751928
 ---
 
 # Massbyta namn {#bulk-rename}
 
-Byt namn på flera filer med en mönstermall som har platshållare för index, utfyllt index och ursprungligt filnamn. Returnerar ett ZIP-arkiv som innehåller alla omdöpta filer.
+Byt namn på flera bilder med en mönstermall som har platshållare för index, utfyllt index och ursprungligt filnamn. Returnerar ett ZIP-arkiv som innehåller alla omdöpta bilder.
 
 ## API-slutpunkt {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Tar emot multipart-formulärdata med flera filer och ett JSON-fält `settings`.
+Tar emot multipart-formulärdata med flera bilder och ett JSON-fält `settings`.
+
+Varje uppladdning måste vara en bild. Varje fils header kontrolleras innan ZIP-filen skapas, och byten packas sedan oförändrade (ingen omkodning). Om en fil inte är en känd bild eller överskrider `MAX_MEGAPIXELS` misslyckas hela begäran med `400` och ett felmeddelande som namnger den filen, till exempel `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parametrar {#parameters}
 

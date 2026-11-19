@@ -1,16 +1,18 @@
 ---
-description: Rename multiple files using a pattern template and download as ZIP.
+description: Rename multiple images using a pattern template and download as ZIP.
 ---
 
 # Bulk Rename {#bulk-rename}
 
-Rename multiple files using a pattern template with placeholders for index, padded index, and original filename. Returns a ZIP archive containing all renamed files.
+Rename multiple images using a pattern template with placeholders for index, padded index, and original filename. Returns a ZIP archive containing all renamed images.
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Accepts multipart form data with multiple files and a JSON `settings` field.
+Accepts multipart form data with multiple image files and a JSON `settings` field.
+
+Every upload must be an image. Each file's header is checked before the ZIP starts, and the bytes are then zipped unchanged (no re-encode). If any file is not a recognized image, or exceeds `MAX_MEGAPIXELS`, the whole request fails with `400` and an error naming that file, for example `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameters {#parameters}
 
