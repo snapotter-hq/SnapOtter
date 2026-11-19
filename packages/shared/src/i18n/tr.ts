@@ -605,6 +605,10 @@ export const tr: TranslationKeys = {
       description:
         "Biçim dönüştürme, kalite kontrolü ve canlı önizleme ile web için görüntü optimizasyonu",
     },
+    "optimize-svg": {
+      name: "SVG Optimize Et",
+      description: "SVG kodunu svgo ile küçültür ve sonucu vektör SVG olarak korur",
+    },
     "strip-metadata": {
       name: "Görüntü Meta Verisi Kaldır",
       description: "EXIF, GPS ve kamera bilgilerini kaldırın",
@@ -1566,6 +1570,17 @@ export const tr: TranslationKeys = {
       larger: "%{percent} daha büyük",
       submit: "İşle ve İndir",
       submitBatch: "İşle ve İndir ({count} dosya)",
+      progressLabel: "Optimize ediliyor",
+    },
+    "optimize-svg": {
+      precision: "Ondalık Hassasiyet",
+      precisionHint:
+        "Koordinatlarda tutulan ondalık basamak sayısı. Daha az basamak daha küçük dosya demektir.",
+      removeMetadata: "Yorumları ve meta verileri kaldır",
+      multipass: "Birden fazla geçiş çalıştır",
+      pretty: "Çıktıyı okunaklı biçimlendir",
+      submit: "SVG'yi Optimize Et",
+      submitBatch: "SVG'yi Optimize Et ({count} dosya)",
       progressLabel: "Optimize ediliyor",
     },
     "strip-metadata": {
@@ -5911,6 +5926,7 @@ export const tr: TranslationKeys = {
       TOO_MANY_FRAMES: "Bu dosyada işlenemeyecek kadar çok kare var.",
       FEATURE_INSTALL_BUSY:
         "Kurulum AI ortamını güncelliyor ve şu anda durdurulamaz. Kısa süre içinde tamamlanacak.",
+      SVG_TOO_LARGE: "Bu SVG optimize edilemeyecek kadar büyük veya karmaşık.",
       CANCELED: "İşlem iptal edildi.",
       PAGE_OUT_OF_RANGE: "Bu sayfa aralığı, bu PDF'de olmayan bir sayfa içeriyor.",
       INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",

@@ -591,6 +591,10 @@ export const ko: TranslationKeys = {
       name: "웹 최적화",
       description: "포맷 변환, 품질 조절, 실시간 미리보기로 웹용 이미지 최적화",
     },
+    "optimize-svg": {
+      name: "SVG 최적화",
+      description: "svgo로 SVG 코드를 축소하고 결과를 벡터 SVG로 유지",
+    },
     "strip-metadata": {
       name: "이미지 메타데이터 제거",
       description: "EXIF, GPS 및 카메라 정보 제거",
@@ -1502,6 +1506,16 @@ export const ko: TranslationKeys = {
       larger: "{percent}% 증가",
       submit: "처리 후 다운로드",
       submitBatch: "처리 후 다운로드 ({count}개 파일)",
+      progressLabel: "최적화 중",
+    },
+    "optimize-svg": {
+      precision: "소수점 정밀도",
+      precisionHint: "좌표에 남길 소수점 자릿수입니다. 자릿수가 적을수록 파일이 작아집니다.",
+      removeMetadata: "주석 및 메타데이터 제거",
+      multipass: "여러 번 패스 실행",
+      pretty: "출력 보기 좋게 정렬",
+      submit: "SVG 최적화",
+      submitBatch: "SVG 최적화 ({count}개 파일)",
       progressLabel: "최적화 중",
     },
     "strip-metadata": {
@@ -5809,6 +5823,7 @@ export const ko: TranslationKeys = {
       TOO_MANY_FRAMES: "이 파일은 프레임이 너무 많아 처리할 수 없습니다.",
       FEATURE_INSTALL_BUSY:
         "설치가 AI 환경을 업데이트하는 중이라 지금은 중지할 수 없습니다. 곧 완료됩니다.",
+      SVG_TOO_LARGE: "이 SVG는 너무 크거나 복잡해서 최적화할 수 없습니다.",
       CANCELED: "작업이 취소되었습니다.",
       PAGE_OUT_OF_RANGE: "이 페이지 범위에 이 PDF에 없는 페이지가 포함되어 있습니다.",
       INVALID_PAGE_RANGE: "이 페이지 범위는 올바르지 않습니다. 1-3,5처럼 페이지 번호를 입력하세요.",

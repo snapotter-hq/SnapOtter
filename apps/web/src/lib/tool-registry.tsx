@@ -127,6 +127,11 @@ const OptimizeForWebSettings = lazy(() =>
     default: m.OptimizeForWebSettings,
   })),
 );
+const OptimizeSvgSettings = lazy(() =>
+  import("@/components/tools/optimize-svg-settings").then((m) => ({
+    default: m.OptimizeSvgSettings,
+  })),
+);
 const StripMetadataSettings = lazy(() =>
   import("@/components/tools/strip-metadata-settings").then((m) => ({
     default: m.StripMetadataSettings,
@@ -1077,6 +1082,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["favicon", { Settings: FaviconSettings }],
   ["image-to-pdf", { Settings: ImageToPdfSettings }],
   ["optimize-for-web", { Settings: OptimizeForWebSettings }],
+  ["optimize-svg", { accept: ".svg,.svgz", Settings: OptimizeSvgSettings }],
   [
     "pdf-to-image",
     { accept: ".pdf", Settings: PdfToImageSettings, ResultsPanel: PdfToImagePreview },

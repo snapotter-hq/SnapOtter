@@ -606,6 +606,10 @@ export const nl: TranslationKeys = {
       description:
         "Afbeeldingen optimaliseren voor web met formaatconversie, kwaliteitsregeling en live preview",
     },
+    "optimize-svg": {
+      name: "SVG optimaliseren",
+      description: "Verklein SVG-code met svgo en houd het resultaat als vector-SVG",
+    },
     "strip-metadata": {
       name: "Afbeeldingsmetadata verwijderen",
       description: "EXIF-, GPS- en camera-info verwijderen",
@@ -1570,6 +1574,16 @@ export const nl: TranslationKeys = {
       larger: "{percent}% groter",
       submit: "Verwerken & Downloaden",
       submitBatch: "Verwerken & Downloaden ({count} bestanden)",
+      progressLabel: "Optimaliseren",
+    },
+    "optimize-svg": {
+      precision: "Decimale precisie",
+      precisionHint: "Aantal decimalen in coördinaten. Minder decimalen geven een kleiner bestand.",
+      removeMetadata: "Opmerkingen en metadata verwijderen",
+      multipass: "Meerdere rondes uitvoeren",
+      pretty: "Uitvoer leesbaar opmaken",
+      submit: "SVG optimaliseren",
+      submitBatch: "SVG optimaliseren ({count} bestanden)",
       progressLabel: "Optimaliseren",
     },
     "strip-metadata": {
@@ -5928,6 +5942,7 @@ export const nl: TranslationKeys = {
       TOO_MANY_FRAMES: "Dit bestand heeft te veel frames om te verwerken.",
       FEATURE_INSTALL_BUSY:
         "De installatie werkt de AI-omgeving bij en kan nu niet worden gestopt. Ze is zo klaar.",
+      SVG_TOO_LARGE: "Deze SVG is te groot of te complex om te optimaliseren.",
       CANCELED: "De bewerking is geannuleerd.",
       PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",

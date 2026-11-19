@@ -603,6 +603,10 @@ export const it: TranslationKeys = {
       description:
         "Ottimizza le immagini per il web con conversione del formato, controllo della qualità e anteprima in tempo reale",
     },
+    "optimize-svg": {
+      name: "Ottimizza SVG",
+      description: "Minimizza il codice SVG con svgo e mantiene il risultato come SVG vettoriale",
+    },
     "strip-metadata": {
       name: "Rimuovi metadati immagine",
       description: "Rimuovi EXIF, GPS e informazioni della fotocamera",
@@ -1567,6 +1571,17 @@ export const it: TranslationKeys = {
       larger: "{percent}% più grande",
       submit: "Elabora e scarica",
       submitBatch: "Elabora e scarica ({count} file)",
+      progressLabel: "Ottimizzazione in corso",
+    },
+    "optimize-svg": {
+      precision: "Precisione decimale",
+      precisionHint:
+        "Cifre decimali mantenute nelle coordinate. Meno cifre producono un file più piccolo.",
+      removeMetadata: "Rimuovi commenti e metadati",
+      multipass: "Esegui più passaggi",
+      pretty: "Formatta l'output in modo leggibile",
+      submit: "Ottimizza SVG",
+      submitBatch: "Ottimizza SVG ({count} file)",
       progressLabel: "Ottimizzazione in corso",
     },
     "strip-metadata": {
@@ -5928,6 +5943,7 @@ export const it: TranslationKeys = {
       TOO_MANY_FRAMES: "Questo file ha troppi fotogrammi da elaborare.",
       FEATURE_INSTALL_BUSY:
         "L'installazione sta aggiornando l'ambiente IA e non può essere interrotta ora. Terminerà a breve.",
+      SVG_TOO_LARGE: "Questo SVG è troppo grande o complesso da ottimizzare.",
       CANCELED: "L'operazione è stata annullata.",
       PAGE_OUT_OF_RANGE: "Questo intervallo include una pagina che questo PDF non ha.",
       INVALID_PAGE_RANGE:

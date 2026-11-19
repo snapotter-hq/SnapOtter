@@ -778,6 +778,66 @@
     ]
   },
   {
+    "id": "optimize-svg",
+    "name": "Optimize SVG",
+    "modality": "image",
+    "section": "image",
+    "acceptedInputs": [".svg", ".svgz"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "precision",
+        "values": [0, 4, 8, null]
+      },
+      {
+        "key": "multipass",
+        "values": [true, false, null]
+      },
+      {
+        "key": "removeMetadata",
+        "values": [true, false, null]
+      },
+      {
+        "key": "pretty",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "precision",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "precision",
+        "value": 9,
+        "why": "above declared max"
+      },
+      {
+        "key": "precision",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "multipass",
+        "value": "yes-please",
+        "why": "wrong type"
+      },
+      {
+        "key": "removeMetadata",
+        "value": "yes-please",
+        "why": "wrong type"
+      },
+      {
+        "key": "pretty",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "strip-metadata",
     "name": "Remove Image Metadata",
     "modality": "image",

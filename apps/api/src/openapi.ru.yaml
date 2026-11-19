@@ -1572,6 +1572,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/optimize-svg:
+    post:
+      operationId: optimizeSvg
+      tags:
+        - Image
+      summary: Оптимизация SVG
+      description: |
+        Сжимает разметку SVG с помощью svgo и возвращает SVG, а не растровое изображение. Входные данные очищаются до и после оптимизации. Вход `.svgz` сначала распаковывается, а результат записывается как обычный `.svg`. viewBox и `<title>` всегда сохраняются. Вход больше 2 МБ после распаковки отклоняется с кодом 400 `SVG_TOO_LARGE`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Файл SVG или SVGZ для оптимизации
+                settings:
+                  type: string
+                  description: |
+                    Строка JSON с параметрами:
+                    - `precision` (целое число 0-8, по умолчанию 3) - Число знаков после запятой в координатах и числах
+                    - `multipass` (логическое значение, по умолчанию true) - Повторяет проходы оптимизации, пока вывод не перестанет уменьшаться
+                    - `removeMetadata` (логическое значение, по умолчанию true) - Удаляет комментарии, `<metadata>`, `<desc>` и пространства имён редакторов
+                    - `pretty` (логическое значение, по умолчанию false) - Добавляет отступы вместо сжатия вывода в одну строку
+            example:
+              file: logo.svg
+              settings: '{}'
+      responses:
+        '200':
+          description: Оптимизированный SVG
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/logo.svg
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Недопустимые данные, включая файл не в формате SVG
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/image-enhancement:
     post:
       operationId: enhanceImage
@@ -25896,6 +25958,14 @@ x-i18n:
       sourceHash: 10a427197f6e
       provenance: machine
       outputHash: f4d7b4589e3e
+    paths./api/v1/tools/image/optimize-svg.post.summary:
+      sourceHash: 61636a7785ef
+      provenance: machine
+      outputHash: c49f4a50ad04
+    paths./api/v1/tools/image/optimize-svg.post.description:
+      sourceHash: e068976135dd
+      provenance: machine
+      outputHash: 82af9b8bffd1
     paths./api/v1/tools/image/image-enhancement.post.summary:
       sourceHash: 246a536c8207
       provenance: machine
@@ -29468,6 +29538,26 @@ x-i18n:
       sourceHash: 88ca7e4a48e4
       provenance: machine
       outputHash: dea70993e963
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 17bd2131158d
+      provenance: machine
+      outputHash: 339a4e73873e
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 8d0ddfcfb67f
+      provenance: machine
+      outputHash: 87107db1a2d8
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/200/description:
+      sourceHash: c2b0c7c8aeac
+      provenance: machine
+      outputHash: daa925fd3dbe
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/400/description:
+      sourceHash: 8776a8c77ab9
+      provenance: machine
+      outputHash: 4c4d240a177f
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 5541b9519f82
     ptr:/paths/~1api~1v1~1tools~1image~1image-enhancement/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 98a38389e6c1
       provenance: machine
