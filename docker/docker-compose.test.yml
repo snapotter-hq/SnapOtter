@@ -102,11 +102,13 @@ services:
       # One vitest fork bounds peak memory on a 7GB CI runner; the 90-minute
       # job budget absorbs the slower serial run.
       - VITEST_MAX_FORKS=1
-      # Dockerfile.test bakes PyMuPDF into /app/.venv. This turns a suite that
-      # can't find it into a failure, not a lane of silently skipped fitz
-      # tests (#1610). Setting PYTHON_VENV_PATH here would point the suite
-      # away from that venv.
+      # Dockerfile.test bakes PyMuPDF, pikepdf and pdf2docx into /app/.venv.
+      # These turn a suite that can't find one into a failure, not a lane of
+      # silently skipped tests (#1610, #1612). Setting PYTHON_VENV_PATH here
+      # would point the suite away from that venv.
       - REQUIRE_PYTHON_FITZ=1
+      - REQUIRE_PYTHON_PIKEPDF=1
+      - REQUIRE_PYTHON_PDF2DOCX=1
     # No tmpfs: the tools write multi-megapixel encodes and video transcodes to
     # WORKSPACE_PATH and /tmp, and a RAM-backed mount made that scratch count
     # against the 7GB runner alongside the app, Postgres, and Redis, which

@@ -525,6 +525,23 @@ jobs:
           fi
       - uses: ./.github/actions/doc-binaries
       - uses: ./.github/actions/setup
+      # FUZZ and FULL_MATRIX only run here, and python-gate.ts skips the fitz,
+      # pikepdf and pdf2docx tools without these modules (#1612). They go in
+      # <repo>/.venv, which python-gate.ts and the sidecar bridge both try
+      # first. Same pins as docker/Dockerfile, enforced by the guard test.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - name: Install the production doc-tool Python modules into .venv
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --no-cache-dir \
+            numpy==1.26.4 \
+            opencv-python-headless==4.10.0.84 \
+            pikepdf==10.8.0 \
+            PyMuPDF==1.27.2.3 \
+            pdf2docx==0.5.13 && \
+            .venv/bin/python -c "import fitz, pikepdf, pdf2docx"
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
         run: |
           for img in postgres:17-alpine redis:8-alpine; do
@@ -536,6 +553,15 @@ jobs:
             done
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
+      # The integration run below can't tell a skip from a pass, so prove the
+      # gate really sees each module before it starts. Placed after the
+      # pre-pull because vitest's global setup starts the same containers.
+      - name: Check the Python gate finds the doc-tool modules
+        run: pnpm vitest run tests/unit/infra/test-image-python-modules.test.ts
+        env:
+          REQUIRE_PYTHON_FITZ: "1"
+          REQUIRE_PYTHON_PIKEPDF: "1"
+          REQUIRE_PYTHON_PDF2DOCX: "1"
       - name: Run integration suite with full matrix and fuzz enabled
         run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/4
         env:
