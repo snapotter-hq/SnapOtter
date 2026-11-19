@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Seçenekleri içeren JSON dizgesi:
                     - `templateId` (dizgi, zorunlu) - Izgara düzenini tanımlayan şablon kimliği
-                    - `cells` (dizi, isteğe bağlı) - Hücre başına yapılandırma geçersiz kılmaları
+                    - `cells` (dizi, isteğe bağlı) - Hücre başına yapılandırma geçersiz kılmaları. Bir hücreyi boş bırakmak için `imageIndex` değerini `-1` yapın
                     - `gap` (sayı 0-500, varsayılan 8) - Görüntüler arasındaki piksel cinsinden boşluk
                     - `cornerRadius` (sayı 0-500, varsayılan 0) - Köşe yuvarlama yarıçapı
                     - `backgroundColor` (dizgi, varsayılan "#FFFFFF") - Arka plan dolgu rengi
                     - `aspectRatio` (dizgi, varsayılan "free") - En-boy oranı kısıtı
                     - `outputFormat` (dizgi, varsayılan "png") - Şunlardan biri: png, jpeg, webp, avif, jxl
                     - `quality` (sayı 1-100, varsayılan 90) - Çıktı kalitesi
+
+                    `cells` olmadan her şablon hücresi için bir görsel gönderin. Daha az görsel gönderilirse `INVALID_SETTINGS` koduyla 400 döner. Şablonun hücre sayısını aşan görseller yok sayılır ve yanıttaki `warnings` alanında adlarıyla belirtilir.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: İşlenmiş görüntü
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Şablonun alabileceğinden fazla görsel yüklendiğinde bulunur. Yok sayılan dosyaların adlarını verir.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30421,13 +30432,17 @@ x-i18n:
       provenance: machine
       outputHash: f82681fab4e1
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: d40664a338a5
+      outputHash: 8924ee462155
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 5989301df5ab
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 530a89c5133a
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

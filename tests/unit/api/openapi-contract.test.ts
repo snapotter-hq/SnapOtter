@@ -125,4 +125,40 @@ describe("openapi.yaml contract", () => {
     expect(parseLatestRelease(json.example.latest)).toEqual(json.example.latest);
     expect(ok["200"].description).toMatch(/analytics is off/);
   });
+
+  // The route enforces one image per cell unless cells opt slots out, and
+  // reports dropped extras in warnings (#4405, #4919).
+  it("documents the collage image count rules and the warnings field", () => {
+    const op = spec.paths["/api/v1/tools/image/collage"]?.post as {
+      requestBody: {
+        content: {
+          "multipart/form-data": {
+            schema: { properties: { settings: { description: string } } };
+            example: { file: string[]; settings: string };
+          };
+        };
+      };
+      responses: Record<
+        string,
+        { content: { "application/json": { schema: Record<string, unknown> } } }
+      >;
+    };
+    const form = op.requestBody.content["multipart/form-data"];
+    const settingsDoc = form.schema.properties.settings.description;
+    expect(settingsDoc).toMatch(/`imageIndex`.*`-1`/);
+    expect(settingsDoc).toContain("INVALID_SETTINGS");
+
+    const example = JSON.parse(form.example.settings) as { templateId?: string };
+    expect(example.templateId).toBe("2-h-equal");
+    expect(form.example.file).toHaveLength(2);
+
+    const ok = op.responses["200"].content["application/json"].schema as {
+      allOf?: Array<{ $ref?: string; properties?: Record<string, unknown> }>;
+    };
+    expect(ok.allOf?.[0]).toEqual({ $ref: "#/components/schemas/ToolResponse" });
+    expect(ok.allOf?.[1]?.properties?.warnings).toMatchObject({
+      type: "array",
+      items: { type: "string" },
+    });
+  });
 });

@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Cadena JSON con opciones:
                     - `templateId` (cadena, obligatorio) - ID de la plantilla que define la cuadrícula
-                    - `cells` (array, opcional) - Ajustes de celda que sobrescriben los valores por defecto
+                    - `cells` (array, opcional) - Ajustes de celda que sobrescriben los valores por defecto. Pon el `imageIndex` de una celda en `-1` para dejarla vacía
                     - `gap` (número de 0 a 500, por defecto 8) - Separación entre imágenes en píxeles
                     - `cornerRadius` (número de 0 a 500, por defecto 0) - Radio de redondeo de las esquinas
                     - `backgroundColor` (cadena, por defecto "#FFFFFF") - Color de relleno del fondo
                     - `aspectRatio` (cadena, por defecto "free") - Restricción de relación de aspecto
                     - `outputFormat` (cadena, por defecto "png") - Uno de: png, jpeg, webp, avif, jxl
                     - `quality` (número de 1 a 100, por defecto 90) - Calidad de salida
+
+                    Sin `cells`, envía una imagen por cada celda de la plantilla. Con menos imágenes se devuelve 400 con el código `INVALID_SETTINGS`. Las imágenes que superan el número de celdas de la plantilla se ignoran y se indican en `warnings` de la respuesta.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Imagen procesada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Presente cuando se suben más imágenes de las que admite la plantilla. Indica los archivos ignorados.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30424,13 +30435,17 @@ x-i18n:
       provenance: machine
       outputHash: 280499197ad4
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 0826bd1c9a45
+      outputHash: e59eb8d4dfcc
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 5c5d32e665bd
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 849e88b33289
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

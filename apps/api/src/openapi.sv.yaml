@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     JSON-sträng med alternativ:
                     - `templateId` (string, krävs) - Mall-ID som definierar rutnätets layout
-                    - `cells` (array, valfri) - Inställningar som åsidosätter per cell
+                    - `cells` (array, valfri) - Inställningar som åsidosätter per cell. Sätt en cells `imageIndex` till `-1` för att lämna den tom
                     - `gap` (number 0-500, standard 8) - Avstånd mellan bilderna i pixlar
                     - `cornerRadius` (number 0-500, standard 0) - Avrundningsradie för hörnen
                     - `backgroundColor` (string, standard "#FFFFFF") - Bakgrundsfärg
                     - `aspectRatio` (string, standard "free") - Begränsning av bildförhållande
                     - `outputFormat` (string, standard "png") - Ett av: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, standard 90) - Utdatakvalitet
+
+                    Utan `cells` skickar du en bild per mallcell. Färre bilder ger 400 med koden `INVALID_SETTINGS`. Bilder utöver mallens antal celler ignoreras och namnges i svarets `warnings`.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Bearbetad bild
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Finns när fler bilder laddades upp än mallen rymmer. Namnger de ignorerade filerna.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30417,13 +30428,17 @@ x-i18n:
       provenance: machine
       outputHash: 5f25542b5691
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 7c18312940fb
+      outputHash: 13a114d04079
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 036b5a415da6
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 3a998251fb22
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

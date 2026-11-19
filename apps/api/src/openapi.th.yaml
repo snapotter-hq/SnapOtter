@@ -4511,24 +4511,35 @@ paths:
                   description: |
                     สตริง JSON พร้อมตัวเลือก:
                     - `templateId` (สตริง, จำเป็น) - รหัสเทมเพลตที่กำหนดโครงตาราง
-                    - `cells` (array, ไม่บังคับ) - การกำหนดค่าเฉพาะของแต่ละช่อง
+                    - `cells` (array, ไม่บังคับ) - การกำหนดค่าเฉพาะของแต่ละช่อง ตั้ง `imageIndex` ของช่องเป็น `-1` เพื่อเว้นช่องนั้นว่างไว้
                     - `gap` (ตัวเลข 0-500, ค่าเริ่มต้น 8) - ระยะห่างระหว่างภาพเป็นพิกเซล
                     - `cornerRadius` (ตัวเลข 0-500, ค่าเริ่มต้น 0) - รัศมีการโค้งมุม
                     - `backgroundColor` (สตริง, ค่าเริ่มต้น "#FFFFFF") - สีพื้นหลัง
                     - `aspectRatio` (สตริง, ค่าเริ่มต้น "free") - ข้อจำกัดอัตราส่วนภาพ
                     - `outputFormat` (สตริง, ค่าเริ่มต้น "png") - หนึ่งใน: png, jpeg, webp, avif, jxl
                     - `quality` (ตัวเลข 1-100, ค่าเริ่มต้น 90) - คุณภาพของไฟล์ผลลัพธ์
+
+                    หากไม่ส่ง `cells` ให้ส่งรูปภาพหนึ่งรูปต่อหนึ่งช่องของเทมเพลต หากรูปภาพน้อยกว่านั้นจะได้รับ 400 พร้อมรหัส `INVALID_SETTINGS` รูปภาพที่เกินจำนวนช่องของเทมเพลตจะถูกละเว้นและระบุชื่อไว้ใน `warnings` ของการตอบกลับ
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: ภาพที่ประมวลผลแล้ว
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: มีอยู่เมื่ออัปโหลดรูปภาพมากกว่าที่เทมเพลตรองรับ ระบุชื่อไฟล์ที่ถูกละเว้น
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30349,13 +30360,17 @@ x-i18n:
       provenance: machine
       outputHash: dd563fbad2f9
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: afd1a54de1a5
+      outputHash: beff17f75a4f
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 13f1348f9424
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: bdb7185503bb
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

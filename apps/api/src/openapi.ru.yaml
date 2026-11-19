@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Строка JSON с параметрами:
                     - `templateId` (строка, обязательно) - ID шаблона, задающего сетку макета
-                    - `cells` (массив, необязательно) - Переопределения настроек для отдельных ячеек
+                    - `cells` (массив, необязательно) - Переопределения настроек для отдельных ячеек. Чтобы оставить ячейку пустой, задайте её `imageIndex` равным `-1`
                     - `gap` (число 0-500, по умолчанию 8) - Промежуток между изображениями в пикселях
                     - `cornerRadius` (число 0-500, по умолчанию 0) - Радиус скругления углов
                     - `backgroundColor` (строка, по умолчанию "#FFFFFF") - Цвет фона
                     - `aspectRatio` (строка, по умолчанию "free") - Ограничение соотношения сторон
                     - `outputFormat` (строка, по умолчанию "png") - Одно из: png, jpeg, webp, avif, jxl
                     - `quality` (число 1-100, по умолчанию 90) - Качество вывода
+
+                    Без `cells` отправляйте по одному изображению на каждую ячейку шаблона. Если изображений меньше, возвращается 400 с кодом `INVALID_SETTINGS`. Изображения сверх числа ячеек шаблона игнорируются, а их имена перечисляются в поле `warnings` ответа.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Обработанное изображение
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Присутствует, если загружено больше изображений, чем вмещает шаблон. Перечисляет проигнорированные файлы.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30424,13 +30435,17 @@ x-i18n:
       provenance: machine
       outputHash: a66c7da17b1e
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: ffc7cde9888c
+      outputHash: e8ebc1f8b195
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 5aab5049133f
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: da3789cd1373
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

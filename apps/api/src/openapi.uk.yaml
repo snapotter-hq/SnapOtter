@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     JSON-рядок з параметрами:
                     - `templateId` (рядок, обов'язково) - ID шаблону, що задає сітку макета
-                    - `cells` (масив, необов'язково) - Перевизначення налаштувань для окремих комірок
+                    - `cells` (масив, необов'язково) - Перевизначення налаштувань для окремих комірок. Щоб залишити комірку порожньою, задайте її `imageIndex` рівним `-1`
                     - `gap` (число 0-500, за замовчуванням 8) - Відстань між зображеннями в пікселях
                     - `cornerRadius` (число 0-500, за замовчуванням 0) - Радіус заокруглення кутів
                     - `backgroundColor` (рядок, за замовчуванням "#FFFFFF") - Колір заливки фону
                     - `aspectRatio` (рядок, за замовчуванням "free") - Обмеження співвідношення сторін
                     - `outputFormat` (рядок, за замовчуванням "png") - Одне з: png, jpeg, webp, avif, jxl
                     - `quality` (число 1-100, за замовчуванням 90) - Якість результату
+
+                    Без `cells` надсилайте по одному зображенню на кожну комірку шаблону. Якщо зображень менше, повертається 400 з кодом `INVALID_SETTINGS`. Зображення понад кількість комірок шаблону ігноруються, а їхні назви перелічуються в полі `warnings` відповіді.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Оброблене зображення
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Присутнє, якщо завантажено більше зображень, ніж вміщує шаблон. Перелічує проігноровані файли.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30422,13 +30433,17 @@ x-i18n:
       provenance: machine
       outputHash: '595250058932'
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 40f2c98eb559
+      outputHash: 1efee423663b
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: cd97cbc5d46e
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: dac709d3a19f
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

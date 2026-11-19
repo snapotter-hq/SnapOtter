@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     String JSON dengan opsi:
                     - `templateId` (string, wajib) - ID templat yang menentukan tata letak grid
-                    - `cells` (larik, opsional) - Penggantian konfigurasi per sel
+                    - `cells` (larik, opsional) - Penggantian konfigurasi per sel. Atur `imageIndex` sebuah sel ke `-1` agar sel itu dibiarkan kosong
                     - `gap` (angka 0-500, default 8) - Jarak antar gambar dalam piksel
                     - `cornerRadius` (angka 0-500, default 0) - Radius pembulatan sudut
                     - `backgroundColor` (string, default "#FFFFFF") - Warna isian latar belakang
                     - `aspectRatio` (string, default "free") - Batasan rasio aspek
                     - `outputFormat` (string, default "png") - Salah satu dari: png, jpeg, webp, avif, jxl
                     - `quality` (angka 1-100, default 90) - Kualitas keluaran
+
+                    Tanpa `cells`, kirim satu gambar untuk setiap sel templat. Jika gambarnya kurang, respons berupa 400 dengan kode `INVALID_SETTINGS`. Gambar yang melebihi jumlah sel templat diabaikan dan disebutkan dalam `warnings` pada respons.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Gambar yang telah diproses
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Ada jika gambar yang diunggah lebih banyak daripada kapasitas templat. Menyebutkan file yang diabaikan.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30422,13 +30433,17 @@ x-i18n:
       provenance: machine
       outputHash: 3c6ac2cf06bb
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 52848f9a4754
+      outputHash: c39375220c7d
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 2cd5716f7e7e
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: c37a654dbd76
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

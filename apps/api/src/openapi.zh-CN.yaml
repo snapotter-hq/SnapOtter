@@ -4511,24 +4511,35 @@ paths:
                   description: |
                     JSON 字符串，包含以下选项：
                     - `templateId`（字符串，必填）- 定义网格布局的模板 ID
-                    - `cells`（数组，可选）- 每个单元格的配置覆盖项
+                    - `cells`（数组，可选）- 每个单元格的配置覆盖项；将单元格的`imageIndex`设为`-1`即可留空
                     - `gap`（数字 0-500，默认 8）- 图片之间的间距（像素）
                     - `cornerRadius`（数字 0-500，默认 0）- 圆角半径
                     - `backgroundColor`（字符串，默认 "#FFFFFF"）- 背景填充颜色
                     - `aspectRatio`（字符串，默认 "free"）- 宽高比约束
                     - `outputFormat`（字符串，默认 "png"）- 可选值：png、jpeg、webp、avif、jxl
                     - `quality`（数字 1-100，默认 90）- 输出质量
+
+                    不提供`cells`时，模板的每个单元格需对应一张图片。图片不足时返回 400，错误码为`INVALID_SETTINGS`。超出模板单元格数量的图片会被忽略，并在响应的`warnings`中列出文件名。
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: 处理后的图片
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: 上传的图片多于模板可容纳的数量时出现，列出被忽略的文件。
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30345,13 +30356,17 @@ x-i18n:
       provenance: machine
       outputHash: 3866e4cc92a7
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: ffdad9c4992b
+      outputHash: ad61cb55938b
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: bc63cc77b7e3
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 61f3932bdad9
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

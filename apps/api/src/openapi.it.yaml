@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Stringa JSON con le opzioni:
                     - `templateId` (stringa, obbligatorio) - ID del modello che definisce il layout a griglia
-                    - `cells` (array, facoltativo) - Sostituzioni della configurazione per cella
+                    - `cells` (array, facoltativo) - Sostituzioni della configurazione per cella. Imposta `imageIndex` di una cella su `-1` per lasciarla vuota
                     - `gap` (numero 0-500, predefinito 8) - Spazio tra le immagini in pixel
                     - `cornerRadius` (numero 0-500, predefinito 0) - Raggio di arrotondamento degli angoli
                     - `backgroundColor` (stringa, predefinito "#FFFFFF") - Colore di riempimento dello sfondo
                     - `aspectRatio` (stringa, predefinito "free") - Vincolo del rapporto d'aspetto
                     - `outputFormat` (stringa, predefinito "png") - Uno tra: png, jpeg, webp, avif, jxl
                     - `quality` (numero 1-100, predefinito 90) - Qualità dell'output
+
+                    Senza `cells`, invia un'immagine per ogni cella del modello. Con meno immagini la risposta è 400 con codice `INVALID_SETTINGS`. Le immagini oltre il numero di celle del modello vengono ignorate e indicate in `warnings` nella risposta.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Immagine elaborata
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Presente quando sono state caricate più immagini di quante ne contenga il modello. Indica i file ignorati.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30422,13 +30433,17 @@ x-i18n:
       provenance: machine
       outputHash: 78e8f003061b
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 4d43e8d0360f
+      outputHash: 8a118e44d0e3
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 43a48a588123
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: b9228004b7a6
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

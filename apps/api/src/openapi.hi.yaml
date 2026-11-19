@@ -4539,24 +4539,35 @@ paths:
                   description: |
                     विकल्पों वाली JSON स्ट्रिंग:
                     - `templateId` (string, required) - ग्रिड लेआउट परिभाषित करने वाला टेम्पलेट ID
-                    - `cells` (array, optional) - प्रति सेल कॉन्फ़िगरेशन ओवरराइड
+                    - `cells` (array, optional) - प्रति सेल कॉन्फ़िगरेशन ओवरराइड। किसी सेल को खाली छोड़ने के लिए उसका `imageIndex` `-1` पर सेट करें
                     - `gap` (number 0-500, default 8) - पिक्सल में इमेज के बीच का अंतर
                     - `cornerRadius` (number 0-500, default 0) - कोनों की गोलाई की त्रिज्या
                     - `backgroundColor` (string, default "#FFFFFF") - बैकग्राउंड भरने का रंग
                     - `aspectRatio` (string, default "free") - आस्पेक्ट अनुपात की बाधा
                     - `outputFormat` (string, default "png") - इनमें से एक: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, default 90) - आउटपुट गुणवत्ता
+
+                    `cells` के बिना, टेम्पलेट के हर सेल के लिए एक इमेज भेजें। कम इमेज भेजने पर `INVALID_SETTINGS` कोड के साथ 400 मिलता है। टेम्पलेट के सेल से ज़्यादा इमेज अनदेखी कर दी जाती हैं और उनके नाम रिस्पॉन्स के `warnings` में दिए जाते हैं।
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: प्रोसेस की गई इमेज
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: तब मौजूद होता है जब टेम्पलेट की क्षमता से ज़्यादा इमेज अपलोड की गई हों। अनदेखी की गई फ़ाइलों के नाम बताता है।
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30417,13 +30428,17 @@ x-i18n:
       provenance: machine
       outputHash: 56d2c2cc3dfa
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: c9bf121b8353
+      outputHash: 216dce028f78
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 7c835a52cfbf
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: e38bc5ddf341
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

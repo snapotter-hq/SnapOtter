@@ -4536,24 +4536,35 @@ paths:
                   description: |
                     JSON-Zeichenkette mit Optionen:
                     - `templateId` (Zeichenkette, erforderlich) - Vorlagen-ID, die das Rasterlayout festlegt
-                    - `cells` (Array, optional) - Überschreibungen der Konfiguration pro Zelle
+                    - `cells` (Array, optional) - Überschreibungen der Konfiguration pro Zelle. Setze `imageIndex` einer Zelle auf `-1`, um sie leer zu lassen
                     - `gap` (Zahl 0-500, Standard 8) - Abstand zwischen den Bildern in Pixeln
                     - `cornerRadius` (Zahl 0-500, Standard 0) - Radius der Eckenrundung
                     - `backgroundColor` (Zeichenkette, Standard "#FFFFFF") - Hintergrundfarbe
                     - `aspectRatio` (Zeichenkette, Standard "free") - Vorgabe für das Seitenverhältnis
                     - `outputFormat` (Zeichenkette, Standard "png") - Eines von: png, jpeg, webp, avif, jxl
                     - `quality` (Zahl 1-100, Standard 90) - Ausgabequalität
+
+                    Ohne `cells` muss pro Vorlagenzelle ein Bild gesendet werden. Bei weniger Bildern kommt 400 mit dem Code `INVALID_SETTINGS` zurück. Bilder, die über die Zellenzahl der Vorlage hinausgehen, werden ignoriert und in `warnings` der Antwort aufgeführt.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Verarbeitetes Bild
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Vorhanden, wenn mehr Bilder hochgeladen wurden, als die Vorlage aufnehmen kann. Nennt die ignorierten Dateien.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30418,13 +30429,17 @@ x-i18n:
       provenance: machine
       outputHash: 1a830405e524
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 22274a90f2bb
+      outputHash: 7bdae2bfc950
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 1269dc340ad8
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 040d241ebf3f
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
