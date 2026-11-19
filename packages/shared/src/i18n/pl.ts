@@ -1245,6 +1245,10 @@ export const pl: TranslationKeys = {
       name: "Konwertuj czcionkę",
       description: "Konwertuj czcionki między TTF, OTF, WOFF i WOFF2",
     },
+    "convert-case": {
+      name: "Zmień wielkość liter",
+      description: "Zamień tekst na WIELKIE, małe litery, styl tytułu, styl zdania i inne",
+    },
     "create-zip": {
       name: "Utwórz ZIP",
       description: "Spakuj wiele plików do jednego archiwum ZIP",
@@ -4119,6 +4123,25 @@ export const pl: TranslationKeys = {
       submit: "Konwertuj",
       submitBatch: "Konwertuj ({count} plików)",
       progressLabel: "Konwersja",
+    },
+    "convert-case": {
+      input: "Tekst",
+      placeholder: "Wklej lub wpisz tekst",
+      chooseCase: "Zamień na",
+      result: "Wynik",
+      modes: {
+        upper: "WIELKIE LITERY",
+        lower: "małe litery",
+        sentence: "Styl zdania",
+        title: "Styl Tytułu",
+        capitalized: "Każde Słowo Wielką Literą",
+        inverse: "oDWRÓCONA wIELKOŚĆ",
+        alternating: "nApRzEmIeNnIe",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Utwórz ZIP",

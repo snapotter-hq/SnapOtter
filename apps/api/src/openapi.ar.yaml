@@ -16014,6 +16014,100 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags:
+        - Files
+      summary: تحويل حالة الأحرف
+      description: |
+        يحوّل النص إلى حالة أحرف أخرى: UPPER, lower, Sentence, Title, Capitalized, iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case أو kebab-case. تقبل هذه الأداة جسم JSON وليس multipart، وتردّ بالنص المحوَّل بدل ملف للتنزيل.
+
+        يُبقي `title` الكلمات الإنجليزية القصيرة بأحرف صغيرة ما لم تكن في بداية السطر أو نهايته. تقسّم `camel`, `pascal`, `snake` و`kebab` النص عند المسافات وعلامات الترقيم وتغيّرات حالة الأحرف الموجودة، وتحوّل كل سطر على حدة.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - mode
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: النص المراد تحويله
+                mode:
+                  type: string
+                  enum:
+                    - upper
+                    - lower
+                    - sentence
+                    - title
+                    - capitalized
+                    - inverse
+                    - alternating
+                    - camel
+                    - pascal
+                    - snake
+                    - kebab
+                  description: حالة الأحرف المطلوبة
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: وسم لغة BCP 47 لقواعد حالة الأحرف الخاصة باللغة، مثل حرف i التركي المنقوط وغير المنقوط. من دونه لا تتأثر النتيجة باللغة.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        '200':
+          description: النص المحوَّل
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - result
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - upper
+                      - lower
+                      - sentence
+                      - title
+                      - capitalized
+                      - inverse
+                      - alternating
+                      - camel
+                      - pascal
+                      - snake
+                      - kebab
+                  result:
+                    type: string
+                    description: النص المحوَّل
+              example:
+                mode: title
+                result: The Lord of the Rings
+        '400':
+          description: إدخال غير صالح
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: المصادقة مطلوبة
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26886,6 +26980,14 @@ x-i18n:
       sourceHash: d6035d52053d
       provenance: machine
       outputHash: 9f1825750569
+    paths./api/v1/tools/files/convert-case.post.summary:
+      sourceHash: 01842c30dd46
+      provenance: machine
+      outputHash: 34a8607ac3ef
+    paths./api/v1/tools/files/convert-case.post.description:
+      sourceHash: 01451dcad982
+      provenance: machine
+      outputHash: f280e50721a2
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33511,6 +33613,34 @@ x-i18n:
       provenance: machine
       outputHash: d9ea4a3bff3d
     ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: 4d70eb439dc0
+      provenance: machine
+      outputHash: f4834db2a582
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 8c1e152c67ff
+      provenance: machine
+      outputHash: 33d247d45477
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/locale/description:
+      sourceHash: d75377c99d3d
+      provenance: machine
+      outputHash: ce024c9cb004
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/description:
+      sourceHash: 637c8f6233f5
+      provenance: machine
+      outputHash: dd29f036a213
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: 223109693f29
+      provenance: machine
+      outputHash: dd29f036a213
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: d9ea4a3bff3d
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf

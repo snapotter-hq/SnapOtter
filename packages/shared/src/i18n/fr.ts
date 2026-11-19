@@ -1252,6 +1252,10 @@ export const fr: TranslationKeys = {
       name: "Convertir une police",
       description: "Convertissez des polices entre TTF, OTF, WOFF et WOFF2",
     },
+    "convert-case": {
+      name: "Changer la casse",
+      description: "Passer le texte en MAJUSCULES, minuscules, casse de titre, de phrase et plus",
+    },
     "create-zip": {
       name: "Créer un ZIP",
       description: "Regroupez plusieurs fichiers dans une seule archive ZIP",
@@ -4130,6 +4134,25 @@ export const fr: TranslationKeys = {
       submit: "Convertir",
       submitBatch: "Convertir ({count} fichiers)",
       progressLabel: "Conversion",
+    },
+    "convert-case": {
+      input: "Texte",
+      placeholder: "Collez ou saisissez du texte",
+      chooseCase: "Convertir en",
+      result: "Résultat",
+      modes: {
+        upper: "MAJUSCULES",
+        lower: "minuscules",
+        sentence: "Casse de phrase",
+        title: "Casse De Titre",
+        capitalized: "Chaque Mot En Majuscule",
+        inverse: "cASSE iNVERSÉE",
+        alternating: "cAsSe AlTeRnÉe",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Créer un ZIP",

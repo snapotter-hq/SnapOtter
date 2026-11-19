@@ -1247,6 +1247,10 @@ export const it: TranslationKeys = {
       name: "Converti Font",
       description: "Converti i font tra TTF, OTF, WOFF e WOFF2",
     },
+    "convert-case": {
+      name: "Cambia maiuscole/minuscole",
+      description: "Trasforma il testo in MAIUSCOLO, minuscolo, stile titolo, stile frase e altro",
+    },
     "create-zip": {
       name: "Crea ZIP",
       description: "Raggruppa più file in un unico archivio ZIP",
@@ -4119,6 +4123,25 @@ export const it: TranslationKeys = {
       submit: "Converti",
       submitBatch: "Converti ({count} file)",
       progressLabel: "Conversione",
+    },
+    "convert-case": {
+      input: "Testo",
+      placeholder: "Incolla o digita il testo",
+      chooseCase: "Converti in",
+      result: "Risultato",
+      modes: {
+        upper: "MAIUSCOLO",
+        lower: "minuscolo",
+        sentence: "Stile frase",
+        title: "Stile Titolo",
+        capitalized: "Ogni Parola Maiuscola",
+        inverse: "mAIUSCOLE iNVERTITE",
+        alternating: "aLtErNaTo",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Crea ZIP",

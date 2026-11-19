@@ -1248,6 +1248,10 @@ export const de: TranslationKeys = {
       name: "Schrift konvertieren",
       description: "Schriften zwischen TTF, OTF, WOFF und WOFF2 konvertieren",
     },
+    "convert-case": {
+      name: "Groß-/Kleinschreibung ändern",
+      description: "Text in GROSS-, klein-, Titel-, Satzschreibung und mehr umwandeln",
+    },
     "create-zip": {
       name: "ZIP erstellen",
       description: "Mehrere Dateien in ein einzelnes ZIP-Archiv bündeln",
@@ -4137,6 +4141,25 @@ export const de: TranslationKeys = {
       submit: "Konvertieren",
       submitBatch: "Konvertieren ({count} Dateien)",
       progressLabel: "Wird konvertiert",
+    },
+    "convert-case": {
+      input: "Text",
+      placeholder: "Text einfügen oder eingeben",
+      chooseCase: "Umwandeln in",
+      result: "Ergebnis",
+      modes: {
+        upper: "GROSSBUCHSTABEN",
+        lower: "kleinbuchstaben",
+        sentence: "Satzschreibung",
+        title: "Titelschreibung",
+        capitalized: "Jedes Wort Groß",
+        inverse: "uMGEKEHRTE sCHREIBUNG",
+        alternating: "aBwEcHsElNd",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "ZIP erstellen",

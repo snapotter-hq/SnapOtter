@@ -1245,6 +1245,10 @@ export const vi: TranslationKeys = {
       name: "Chuyển đổi phông chữ",
       description: "Chuyển đổi phông chữ giữa TTF, OTF, WOFF và WOFF2",
     },
+    "convert-case": {
+      name: "Đổi chữ hoa/thường",
+      description: "Đổi văn bản sang CHỮ HOA, chữ thường, kiểu tiêu đề, kiểu câu và hơn nữa",
+    },
     "create-zip": {
       name: "Tạo ZIP",
       description: "Gộp nhiều tệp thành một kho lưu trữ ZIP",
@@ -4104,6 +4108,25 @@ export const vi: TranslationKeys = {
       submit: "Chuyển đổi",
       submitBatch: "Chuyển đổi ({count} tệp)",
       progressLabel: "Đang chuyển đổi",
+    },
+    "convert-case": {
+      input: "Văn bản",
+      placeholder: "Dán hoặc nhập văn bản",
+      chooseCase: "Chuyển sang",
+      result: "Kết quả",
+      modes: {
+        upper: "CHỮ HOA",
+        lower: "chữ thường",
+        sentence: "Kiểu câu",
+        title: "Kiểu Tiêu Đề",
+        capitalized: "Viết Hoa Mỗi Từ",
+        inverse: "đẢO cHỮ hOA",
+        alternating: "xEn KẼ",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Tạo ZIP",

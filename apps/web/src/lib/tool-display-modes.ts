@@ -211,6 +211,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "yaml-json": "no-comparison",
   "xml-to-csv": "no-comparison",
   "convert-font": "no-comparison",
+  "convert-case": "no-dropzone",
   "create-zip": "no-comparison",
   "extract-zip": "no-comparison",
 };

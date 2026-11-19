@@ -1242,6 +1242,10 @@ export const sv: TranslationKeys = {
       name: "Konvertera typsnitt",
       description: "Konvertera typsnitt mellan TTF, OTF, WOFF och WOFF2",
     },
+    "convert-case": {
+      name: "Ändra skiftläge",
+      description: "Gör om text till VERSALER, gemener, rubrikstil, meningsstil med mera",
+    },
     "create-zip": {
       name: "Skapa ZIP",
       description: "Paketera flera filer i ett enda ZIP-arkiv",
@@ -4106,6 +4110,25 @@ export const sv: TranslationKeys = {
       submit: "Konvertera",
       submitBatch: "Konvertera ({count} filer)",
       progressLabel: "Konverterar",
+    },
+    "convert-case": {
+      input: "Text",
+      placeholder: "Klistra in eller skriv text",
+      chooseCase: "Gör om till",
+      result: "Resultat",
+      modes: {
+        upper: "VERSALER",
+        lower: "gemener",
+        sentence: "Meningsstil",
+        title: "Rubrikstil",
+        capitalized: "Varje Ord Med Versal",
+        inverse: "oMVÄNT sKIFTLÄGE",
+        alternating: "vÄxLaNdE",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Skapa ZIP",

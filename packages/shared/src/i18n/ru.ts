@@ -1245,6 +1245,11 @@ export const ru: TranslationKeys = {
       name: "Конвертация шрифтов",
       description: "Конвертируйте шрифты между TTF, OTF, WOFF и WOFF2",
     },
+    "convert-case": {
+      name: "Изменить регистр",
+      description:
+        "Переведите текст в ВЕРХНИЙ, нижний регистр, регистр заголовка, предложения и другие",
+    },
     "create-zip": {
       name: "Создание ZIP",
       description: "Упаковка нескольких файлов в один ZIP-архив",
@@ -4117,6 +4122,25 @@ export const ru: TranslationKeys = {
       submit: "Конвертировать",
       submitBatch: "Конвертировать ({count} файлов)",
       progressLabel: "Конвертация",
+    },
+    "convert-case": {
+      input: "Текст",
+      placeholder: "Вставьте или введите текст",
+      chooseCase: "Преобразовать в",
+      result: "Результат",
+      modes: {
+        upper: "ВЕРХНИЙ РЕГИСТР",
+        lower: "нижний регистр",
+        sentence: "Как в предложении",
+        title: "Как В Заголовке",
+        capitalized: "Каждое Слово С Заглавной",
+        inverse: "иНВЕРСИЯ рЕГИСТРА",
+        alternating: "чЕрЕдОвАнИе",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Создать ZIP",

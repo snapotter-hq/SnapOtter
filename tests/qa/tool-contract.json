@@ -12150,6 +12150,18 @@
     ]
   },
   {
+    "id": "convert-case",
+    "name": "Convert Case",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",

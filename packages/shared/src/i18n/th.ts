@@ -1225,6 +1225,10 @@ export const th: TranslationKeys = {
       name: "แปลงฟอนต์",
       description: "แปลงฟอนต์ระหว่าง TTF, OTF, WOFF และ WOFF2",
     },
+    "convert-case": {
+      name: "แปลงตัวพิมพ์",
+      description: "เปลี่ยนข้อความเป็นตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก แบบหัวเรื่อง แบบประโยค และอื่นๆ",
+    },
     "create-zip": {
       name: "สร้าง ZIP",
       description: "รวมหลายไฟล์เป็นไฟล์ ZIP เดียว",
@@ -4050,6 +4054,25 @@ export const th: TranslationKeys = {
       submit: "แปลง",
       submitBatch: "แปลง ({count} ไฟล์)",
       progressLabel: "กำลังแปลง",
+    },
+    "convert-case": {
+      input: "ข้อความ",
+      placeholder: "วางหรือพิมพ์ข้อความ",
+      chooseCase: "แปลงเป็น",
+      result: "ผลลัพธ์",
+      modes: {
+        upper: "ตัวพิมพ์ใหญ่ (UPPER)",
+        lower: "ตัวพิมพ์เล็ก (lower)",
+        sentence: "แบบประโยค (Sentence)",
+        title: "แบบหัวเรื่อง (Title)",
+        capitalized: "ขึ้นต้นทุกคำด้วยตัวใหญ่ (Capitalized)",
+        inverse: "สลับตัวพิมพ์ (iNVERSE)",
+        alternating: "ตัวพิมพ์สลับกัน (aLtErNaTiNg)",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "สร้าง ZIP",

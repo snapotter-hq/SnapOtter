@@ -868,6 +868,11 @@ const XmlToCsvSettings = lazy(() =>
     default: m.XmlToCsvSettings,
   })),
 );
+const ConvertCaseSettings = lazy(() =>
+  import("@/components/tools/convert-case-settings").then((m) => ({
+    default: m.ConvertCaseSettings,
+  })),
+);
 const CreateZipSettings = lazy(() =>
   import("@/components/tools/create-zip-settings").then((m) => ({
     default: m.CreateZipSettings,
@@ -1218,6 +1223,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
   ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],
+  ["convert-case", { Settings: ConvertCaseSettings }],
   ["create-zip", { Settings: CreateZipSettings }],
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];

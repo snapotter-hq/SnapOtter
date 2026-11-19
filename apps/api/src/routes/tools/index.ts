@@ -37,6 +37,7 @@ import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConversionPresets } from "./conversion-presets.js";
 import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
+import { registerConvertCase } from "./convert-case.js";
 import { registerConvertDocument } from "./convert-document.js";
 import { registerConvertFont } from "./convert-font.js";
 import { registerConvertPresentation } from "./convert-presentation.js";
@@ -393,6 +394,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "split-csv", register: registerSplitCsv },
     { id: "xml-to-csv", register: registerXmlToCsv },
     { id: "yaml-json", register: registerYamlJson },
+    { id: "convert-case", register: registerConvertCase },
 
     // AI Tools
     { id: "background-replace", register: registerBackgroundReplace },

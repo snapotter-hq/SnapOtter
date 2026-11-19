@@ -1198,6 +1198,10 @@ export const en = {
       name: "Convert Font",
       description: "Convert fonts between TTF, OTF, WOFF, and WOFF2",
     },
+    "convert-case": {
+      name: "Convert Case",
+      description: "Change text to UPPER, lower, Title, Sentence case and more",
+    },
     "create-zip": {
       name: "Create ZIP",
       description: "Bundle multiple files into a single ZIP archive",
@@ -4046,6 +4050,25 @@ export const en = {
       submit: "Convert",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
+    },
+    "convert-case": {
+      input: "Text",
+      placeholder: "Paste or type text",
+      chooseCase: "Convert to",
+      result: "Result",
+      modes: {
+        upper: "UPPER CASE",
+        lower: "lower case",
+        sentence: "Sentence case",
+        title: "Title Case",
+        capitalized: "Capitalized Case",
+        inverse: "iNVERSE cASE",
+        alternating: "aLtErNaTiNg cAsE",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Create ZIP",

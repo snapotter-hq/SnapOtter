@@ -25,6 +25,7 @@ export const LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS: ReadonlySet<string> = new Set(
   "compare",
   "compose",
   "content-aware-resize",
+  "convert-case",
   "edit-metadata",
   "favicon",
   "find-duplicates",
