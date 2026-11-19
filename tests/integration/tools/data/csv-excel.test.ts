@@ -54,16 +54,11 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     expect(dl.rawPayload[0]).toBe(0x50);
     expect(dl.rawPayload[1]).toBe(0x4b);
 
-    // XLSX is a ZIP containing xl/worksheets/sheet1.xml.
-    // Parse the zip and verify the first sheet's XML has the header "name".
+    // XLSX is a ZIP containing xl/worksheets/sheet1.xml. Cells are written in the
+    // sheet XML, not a shared strings table (#4376), so the header "name" is there.
     const zip = new AdmZip(Buffer.from(dl.rawPayload));
-    const sheetEntry = zip.getEntry("xl/worksheets/sheet1.xml");
-    expect(sheetEntry).toBeDefined();
-    // The shared strings table stores cell values; look there
-    const sst = zip.getEntry("xl/sharedStrings.xml");
-    expect(sst).toBeDefined();
-    const sstXml = sst?.getData().toString("utf8") ?? "";
-    expect(sstXml).toContain("name");
+    const sheetXml = zip.getEntry("xl/worksheets/sheet1.xml")?.getData().toString("utf8") ?? "";
+    expect(sheetXml).toContain("<v>name</v>");
   }, 30_000);
 
   it("converts a single-column CSV to XLSX instead of refusing it (#2099)", async () => {
@@ -74,9 +69,9 @@ describe("csv-excel (pure JS, no skipIf)", () => {
       url: JSON.parse(res.body).downloadUrl,
     });
     const zip = new AdmZip(Buffer.from(dl.rawPayload));
-    const sst = zip.getEntry("xl/sharedStrings.xml")?.getData().toString("utf8") ?? "";
-    expect(sst).toContain("a@x.io");
-    expect(sst).toContain("b@x.io");
+    const sheetXml = zip.getEntry("xl/worksheets/sheet1.xml")?.getData().toString("utf8") ?? "";
+    expect(sheetXml).toContain("a@x.io");
+    expect(sheetXml).toContain("b@x.io");
   }, 30_000);
 
   it("still refuses data the comma fallback would split (#2099)", async () => {
@@ -105,6 +100,24 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     // XLSX files start with PK zip magic
     expect(dl.rawPayload[0]).toBe(0x50);
     expect(dl.rawPayload[1]).toBe(0x4b);
+  }, 30_000);
+
+  it("round-trips CSV through XLSX and back without changing a cell (#4376)", async () => {
+    const csv = 'id,name,zip\r\n1,"Grace, Hopper",007\r\n2,Ada,0100';
+    const toXlsx = await runTool("people.csv", Buffer.from(csv));
+    expect(toXlsx.statusCode).toBe(200);
+    const xlsx = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(toXlsx.body).downloadUrl,
+    });
+
+    const toCsv = await runTool("people.xlsx", Buffer.from(xlsx.rawPayload));
+    expect(toCsv.statusCode).toBe(200);
+    const back = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(toCsv.body).downloadUrl,
+    });
+    expect(back.payload).toBe(csv);
   }, 30_000);
 
   it("converts XLSX to CSV containing the fixture content", async () => {
