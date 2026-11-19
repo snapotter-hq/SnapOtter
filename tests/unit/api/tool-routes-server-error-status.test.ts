@@ -2121,3 +2121,76 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
     }
   });
 });
+
+describe("compose programming errors (#4441)", () => {
+  const png = () =>
+    sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+
+  const sendCompose = async (app: Awaited<ReturnType<typeof buildApp>>, data: Buffer) =>
+    app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compose",
+      ...multipartBody([
+        { field: "file", name: "base.png", type: "image/png", data },
+        { field: "overlay", name: "over.png", type: "image/png", data },
+      ]),
+    });
+
+  beforeEach(() => {
+    putObject.mockReset();
+  });
+
+  for (const make of [
+    () => new TypeError("Cannot read properties of undefined (reading 'width')"),
+    () => new ReferenceError("overlayMeta is not defined"),
+  ]) {
+    it(`answers 500, not 422, when compositing throws a ${make().name}`, async () => {
+      const compositeSpy = vi.spyOn(sharp.prototype, "composite").mockImplementationOnce(() => {
+        throw make();
+      });
+      const app = await buildApp(registerCompose);
+      try {
+        const res = await sendCompose(app, await png());
+        expect(res.statusCode, res.body).toBe(500);
+        expect(res.json().error).toBe("Internal server error");
+      } finally {
+        compositeSpy.mockRestore();
+        await app.close();
+      }
+    });
+  }
+
+  it("still answers 422 when a decode step fails with an ordinary error", async () => {
+    const compositeSpy = vi.spyOn(sharp.prototype, "composite").mockImplementationOnce(() => {
+      throw new Error("Input buffer has corrupt header");
+    });
+    const app = await buildApp(registerCompose);
+    try {
+      const res = await sendCompose(app, await png());
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json()).toMatchObject({
+        error: "Processing failed",
+        details: "Input buffer has corrupt header",
+      });
+    } finally {
+      compositeSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("answers 200 when compositing succeeds", async () => {
+    putObject.mockResolvedValue(undefined);
+    const app = await buildApp(registerCompose);
+    try {
+      const res = await sendCompose(app, await png());
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().processedSize).toBeGreaterThan(0);
+    } finally {
+      await app.close();
+    }
+  });
+});

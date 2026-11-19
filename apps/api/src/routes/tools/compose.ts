@@ -182,6 +182,8 @@ export function registerCompose(app: FastifyInstance) {
       if (rawErr instanceof InputValidationError) {
         return sendInputValidationError(reply, rawErr, "compose", request.log);
       }
+      // A bug in this route is not a bad upload: let the error handler answer 500.
+      if (rawErr instanceof TypeError || rawErr instanceof ReferenceError) throw rawErr;
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       const tooLarge = imageSizeLimitError(err);
