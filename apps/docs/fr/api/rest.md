@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 5862026ef364
-i18n_source_hash: 0c461ea0d64a
+i18n_output_hash: dab54f75f5da
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -397,6 +397,7 @@ Capturez une page web sous forme d'image. Contrairement aux autres outils, ce po
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Largeur personnalisée de la fenêtre d'affichage 320-3840 |
 | `viewportHeight` | number | `720` | Hauteur personnalisée de la fenêtre d'affichage 320-2160 |
+| `clientJobId` | string | (généré) | Votre propre identifiant de tâche, pour ouvrir le flux de progression avant l'arrivée de la réponse |
 
 **Exemple :**
 
@@ -417,6 +418,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+La capture s'exécute comme une tâche en file d'attente. Si elle se termine dans la fenêtre d'attente synchrone, vous obtenez le résultat ci-dessus avec `200`. Une capture plus lente répond `202` avec `{"jobId":"...","async":true}` ; suivez-la comme décrit dans [Suivi de la progression](#progress-tracking). Jusqu'à la version 2.3.0, ce point de terminaison attendait toujours et répondait `200` : les scripts qui ne gèrent que `200` doivent aussi gérer `202`.
 
 ### Sous-routes des outils {#tool-sub-routes}
 

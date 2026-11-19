@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: d92dbaf24b32
-i18n_source_hash: 0c461ea0d64a
+i18n_output_hash: f5bfb0980a54
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -397,6 +397,7 @@ Tangkap halaman web sebagai gambar. Tidak seperti tool lain, endpoint ini meneri
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Lebar viewport kustom 320-3840 |
 | `viewportHeight` | number | `720` | Tinggi viewport kustom 320-2160 |
+| `clientJobId` | string | (dibuat otomatis) | ID job milik Anda, agar Anda bisa membuka stream progres sebelum jawaban tiba |
 
 **Contoh:**
 
@@ -417,6 +418,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Penangkapan berjalan sebagai job dalam antrean. Jika selesai dalam jendela tunggu sinkron, Anda menerima hasil di atas dengan `200`. Penangkapan yang lebih lambat menjawab `202` dengan `{"jobId":"...","async":true}`; ikuti seperti dijelaskan di [Pelacakan Progres](#progress-tracking). Hingga versi 2.3.0 endpoint ini selalu menunggu dan menjawab `200`, jadi skrip yang hanya menangani `200` juga perlu menangani `202`.
 
 ### Sub-Rute Tool {#tool-sub-routes}
 

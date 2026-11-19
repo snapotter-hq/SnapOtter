@@ -5847,6 +5847,11 @@ paths:
                   minimum: 320
                   maximum: 2160
                   default: 720
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
             example:
               url: https://example.com/
               format: png
@@ -5869,6 +5874,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: 비동기 처리를 위해 접수되었습니다. /api/v1/jobs/{jobId}/progress의 SSE로 진행 상황을 확인하세요.
+          headers:
+            Location:
+              description: 작업의 상태 URL입니다(statusUrl과 같은 값).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: 잘못된 URL 또는 매개변수
           content:

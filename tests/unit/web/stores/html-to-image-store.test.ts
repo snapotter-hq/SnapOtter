@@ -6,11 +6,40 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   formatHeaders: vi.fn((headers: HeadersInit) => new Headers(headers)),
 }));
 
+vi.mock("@/lib/cancel-abandoned-job", () => ({
+  cancelAbandonedJob: vi.fn(async () => {}),
+}));
+
+class FakeEventSource {
+  static OPEN = 1;
+  static instances: FakeEventSource[] = [];
+
+  readonly url: string;
+  readyState = FakeEventSource.OPEN;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.instances.push(this);
+  }
+
+  emit(frame: Record<string, unknown>) {
+    this.onmessage?.({ data: JSON.stringify(frame) });
+  }
+
+  close() {
+    this.readyState = 2;
+  }
+}
+vi.stubGlobal("EventSource", FakeEventSource);
+
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
 import { en, type TranslationKeys } from "@snapotter/shared";
 import { formatHeaders } from "@/lib/api";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 
 const DEFAULT_STATE = useHtmlToImageStore.getState();
@@ -26,6 +55,19 @@ function okJson(data: unknown) {
   } as Response);
 }
 
+function acceptedJson(data: unknown) {
+  return Promise.resolve({
+    ok: true,
+    status: 202,
+    json: () => Promise.resolve(data),
+  } as Response);
+}
+
+/** Let the store's awaited fetch and JSON parse run up to the stream. */
+async function flush() {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
 function failJson(data: unknown) {
   return Promise.resolve({
     ok: false,
@@ -38,6 +80,8 @@ describe("useHtmlToImageStore", () => {
     useHtmlToImageStore.setState({ ...DEFAULT_STATE }, true);
     fetchMock.mockReset();
     vi.mocked(formatHeaders).mockClear();
+    vi.mocked(cancelAbandonedJob).mockClear();
+    FakeEventSource.instances = [];
   });
 
   it("clears stale errors when switching input mode and editing input", () => {
@@ -122,6 +166,7 @@ describe("useHtmlToImageStore", () => {
       devicePreset: "mobile",
       viewportWidth: 414,
       viewportHeight: 896,
+      clientJobId: expect.any(String),
     });
     expect(state().resultUrl).toBe("/downloads/result.png");
     expect(state().resultSize).toBe(1234);
@@ -253,5 +298,133 @@ describe("useHtmlToImageStore", () => {
     expect(state().error).toBeNull();
     expect(state().resultUrl).toBe("/out.png");
     expect(state().resultSize).toBeNull();
+  });
+
+  describe("queued capture (202, #4337)", () => {
+    async function startQueued(accepted: Record<string, unknown> = {}) {
+      state().setUrl("https://example.com");
+      fetchMock.mockResolvedValueOnce(await acceptedJson({ async: true, ...accepted }));
+      const run = state().capture();
+      await flush();
+      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+      return { run, clientJobId: body.clientJobId as string };
+    }
+
+    it("follows the job's progress stream to its result", async () => {
+      const { run } = await startQueued({ jobId: "run-1", progressJobId: "run-1" });
+
+      expect(FakeEventSource.instances).toHaveLength(1);
+      const es = FakeEventSource.instances[0];
+      expect(es.url).toBe("/api/v1/jobs/run-1/progress");
+      expect(state()).toMatchObject({ capturing: true, queued: true });
+
+      es.emit({ type: "single", phase: "processing", percent: 40 });
+      expect(state().progress).toBe(40);
+
+      es.emit({
+        type: "single",
+        phase: "complete",
+        result: {
+          jobId: "art-1",
+          downloadUrl: "/api/v1/download/art-1/screenshot.png",
+          processedSize: 77,
+        },
+      });
+      await run;
+
+      expect(es.readyState).toBe(2);
+      expect(state()).toMatchObject({
+        capturing: false,
+        queued: false,
+        progress: null,
+        resultUrl: "/api/v1/download/art-1/screenshot.png",
+        resultSize: 77,
+        error: null,
+      });
+      expect(cancelAbandonedJob).not.toHaveBeenCalled();
+    });
+
+    it("falls back to its own clientJobId when the 202 names no job", async () => {
+      const { run, clientJobId } = await startQueued();
+      const es = FakeEventSource.instances[0];
+      expect(es.url).toBe(`/api/v1/jobs/${clientJobId}/progress`);
+      es.emit({ type: "single", phase: "complete", result: { downloadUrl: "/out.png" } });
+      await run;
+      expect(state().resultUrl).toBe("/out.png");
+    });
+
+    it("shows the capture fallback for a failed job and the canceled text for a canceled one", async () => {
+      let started = await startQueued({ jobId: "run-2" });
+      FakeEventSource.instances[0].emit({
+        type: "single",
+        phase: "failed",
+        error: "Page took too long to load",
+      });
+      await started.run;
+      expect(state()).toMatchObject({ capturing: false, error: "Capture failed" });
+
+      fetchMock.mockReset();
+      started = await startQueued({ jobId: "run-3" });
+      FakeEventSource.instances[1].emit({
+        type: "single",
+        phase: "failed",
+        error: "Canceled",
+        code: "CANCELED",
+      });
+      await started.run;
+      expect(state().error).toBe(en.errors.canceled);
+    });
+
+    it("rejects a completed frame with nothing to download", async () => {
+      const { run } = await startQueued({ jobId: "run-4" });
+      FakeEventSource.instances[0].emit({ type: "single", phase: "complete", result: {} });
+      await run;
+      expect(state().error).toBe(en.errors.invalidServerResponse);
+    });
+
+    it("cancel stops the stream and cancels the server job", async () => {
+      const { run } = await startQueued({ jobId: "run-5", progressJobId: "run-5" });
+      const es = FakeEventSource.instances[0];
+
+      state().cancel();
+      await run;
+
+      expect(es.readyState).toBe(2);
+      expect(cancelAbandonedJob).toHaveBeenCalledWith("run-5", "html-to-image");
+      expect(state()).toMatchObject({ capturing: false, queued: false, error: null });
+
+      es.emit({ type: "single", phase: "complete", result: { downloadUrl: "/late.png" } });
+      expect(state().resultUrl).toBeNull();
+    });
+
+    it("reset cancels a queued job too", async () => {
+      const { run } = await startQueued({ jobId: "run-6" });
+      state().reset();
+      await run;
+      expect(cancelAbandonedJob).toHaveBeenCalledWith("run-6", "html-to-image");
+      expect(state().capturing).toBe(false);
+    });
+
+    it("gives up and cancels the job when the stream goes quiet", async () => {
+      vi.useFakeTimers();
+      try {
+        const { run } = await startQueued({ jobId: "run-7" });
+        await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+        await run;
+        expect(state().error).toBe(en.errors.jobTrackingFailed);
+        expect(cancelAbandonedJob).toHaveBeenCalledWith("run-7", "html-to-image");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not cancel anything after a capture that finished inside the sync window", async () => {
+      fetchMock.mockResolvedValueOnce(await okJson({ downloadUrl: "/out.png", processedSize: 1 }));
+      state().setUrl("https://example.com");
+      await state().capture();
+      state().reset();
+      expect(cancelAbandonedJob).not.toHaveBeenCalled();
+      expect(FakeEventSource.instances).toHaveLength(0);
+    });
   });
 });

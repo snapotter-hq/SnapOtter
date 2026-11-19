@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 5faff88c6e61
-i18n_source_hash: 0c461ea0d64a
+i18n_output_hash: b551e54b0e3b
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -397,6 +397,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | कस्टम व्यूपोर्ट चौड़ाई 320-3840 |
 | `viewportHeight` | number | `720` | कस्टम व्यूपोर्ट ऊँचाई 320-2160 |
+| `clientJobId` | string | (स्वतः बनाया गया) | आपकी अपनी जॉब आईडी, ताकि जवाब आने से पहले आप प्रोग्रेस स्ट्रीम खोल सकें |
 
 **उदाहरण:**
 
@@ -417,6 +418,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+कैप्चर एक कतारबद्ध जॉब के रूप में चलता है। अगर यह सिंक्रोनस प्रतीक्षा अवधि के भीतर पूरा हो जाए, तो आपको ऊपर वाला परिणाम `200` के साथ मिलता है। धीमा कैप्चर `{"jobId":"...","async":true}` के साथ `202` लौटाता है; इसे [प्रोग्रेस ट्रैकिंग](#progress-tracking) में बताए अनुसार फ़ॉलो करें। 2.3.0 तक यह एंडपॉइंट हमेशा इंतज़ार करता था और `200` लौटाता था, इसलिए जो स्क्रिप्ट केवल `200` संभालती हैं, उन्हें `202` भी संभालना चाहिए।
 
 ### टूल सब-रूट {#tool-sub-routes}
 

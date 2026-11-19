@@ -37,7 +37,11 @@ import {
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
 } from "../routes/progress.js";
-import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
+import {
+  getDirectJobProcessFn,
+  getToolConfig,
+  type ToolProcessCtx,
+} from "../routes/tool-factory.js";
 import {
   hasAiJobHandler,
   hasAiPathJobHandler,
@@ -344,11 +348,18 @@ export async function processToolJob(
         extraOutputs = aiResult.extraOutputs;
       } else {
         const config = getToolConfig(data.toolId);
-        if (!config) throw new Error(`No tool config for ${data.toolId}`);
+        // A custom route's direct-only process fn never runs for a pipeline
+        // step or batch child, whose input is not what it was written for.
+        const processV2 = config
+          ? config.processV2
+          : data.kind === "tool"
+            ? getDirectJobProcessFn(data.toolId)
+            : undefined;
+        if (!config && !processV2) throw new Error(`No tool config for ${data.toolId}`);
 
         // Use the resolved v2 process function (adapter or native)
-        if (!config.processV2) throw new Error(`No processV2 for ${data.toolId}`);
-        const result = await config.processV2({
+        if (!processV2) throw new Error(`No processV2 for ${data.toolId}`);
+        const result = await processV2({
           inputs,
           settings: data.settings,
           scratchDir,

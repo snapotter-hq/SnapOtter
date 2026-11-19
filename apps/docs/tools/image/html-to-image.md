@@ -24,6 +24,7 @@ Accepts a **JSON body** (not multipart). No file upload is needed.
 | devicePreset | string | No | `"desktop"` | Device emulation: `desktop`, `tablet`, `mobile`, `custom` |
 | viewportWidth | number | No | `1280` | Custom viewport width in pixels (320 to 3840, used when devicePreset is `custom`) |
 | viewportHeight | number | No | `720` | Custom viewport height in pixels (320 to 2160, used when devicePreset is `custom`) |
+| clientJobId | string | No | - | Your own job id, so you can open the progress stream before the answer arrives |
 
 Either `url` or `html` must be provided, but not both.
 
@@ -67,6 +68,25 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
+### Slow pages {#slow-pages}
+
+The capture runs as a queued job. A capture that finishes inside the synchronous wait window answers `200` with the result above. A slower one answers `202` with a job id:
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true,
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress"
+}
+```
+
+Follow `progressUrl` (Server-Sent Events) until the job completes. The completed event carries the same result object as the `200` answer. You can cancel the job with `POST /api/v1/jobs/{jobId}/cancel`.
+
+::: warning Changed after 2.3.0
+Up to 2.3.0 this endpoint always held the request open until the capture finished and answered `200`. Scripts that only handle `200` should also handle `202`.
+:::
+
 ## Notes {#notes}
 
 - Requires Chromium to be installed on the server. Returns HTTP 503 if the browser service is not available.
@@ -74,5 +94,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 - This endpoint is rate-limited to 120 requests per hour.
 - `originalSize` is always 0 since this tool generates images from URLs/HTML.
 - The output filename is `screenshot.<format>`.
-- If the page takes too long to load, the request returns HTTP 504 (gateway timeout).
-- If the browser service crashes repeatedly, it is temporarily disabled and returns HTTP 503 with code `BROWSER_CRASHED`.
+- If the page takes too long to load, the capture fails with HTTP 504 (gateway timeout).
+- If the browser service crashes repeatedly, it is temporarily disabled and the capture fails with HTTP 503 and code `BROWSER_CRASHED`.
+- A capture that fails with a 5xx status is retried once before it reports the failure, like other queued image jobs.
+- A capture that has already answered `202` reports a failure on its progress stream instead of in the HTTP status.

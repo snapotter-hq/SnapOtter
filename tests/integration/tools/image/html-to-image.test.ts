@@ -294,15 +294,19 @@ describe("HTML to Image", () => {
     });
   });
 
+  // Captures run as image-pool jobs (#4337), which retry a 5xx failure once,
+  // so the 504 and 503 cases fail both attempts. A 422 is not retried.
   describe("capture errors", () => {
     it("returns 504 on page load timeout", async () => {
       const { capturePage } = await import("../../../../apps/api/src/lib/browser-service.js");
-      (capturePage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Timeout 30000ms exceeded"),
-      );
+      const timeout = new Error("Timeout 30000ms exceeded");
+      (capturePage as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(timeout)
+        .mockRejectedValueOnce(timeout);
 
       const res = await post({ url: "https://example.com" }, adminToken);
       expect(res.statusCode).toBe(504);
+      expect(JSON.parse(res.body).error).toBe("Page took too long to load");
     });
 
     it("returns 422 on generic capture failure", async () => {
@@ -317,9 +321,10 @@ describe("HTML to Image", () => {
 
     it("returns 503 when browser service is crashed", async () => {
       const { capturePage } = await import("../../../../apps/api/src/lib/browser-service.js");
-      (capturePage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Browser service permanently disabled after repeated crashes"),
-      );
+      const crashed = new Error("Browser service permanently disabled after repeated crashes");
+      (capturePage as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(crashed)
+        .mockRejectedValueOnce(crashed);
 
       const res = await post({ url: "https://example.com" }, adminToken);
       expect(res.statusCode).toBe(503);

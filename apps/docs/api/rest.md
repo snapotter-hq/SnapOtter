@@ -394,6 +394,7 @@ Capture a webpage as an image. Unlike other tools, this endpoint accepts `applic
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Custom viewport width 320-3840 |
 | `viewportHeight` | number | `720` | Custom viewport height 320-2160 |
+| `clientJobId` | string | (generated) | Your own job id, so you can open the progress stream before the answer arrives |
 
 **Example:**
 
@@ -414,6 +415,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+The capture runs as a queued job. If it finishes inside the synchronous wait window, you get the result above with `200`. A slower capture answers `202` with `{"jobId":"...","async":true}`; follow it as described in [Progress Tracking](#progress-tracking). Up to 2.3.0 this endpoint always waited and answered `200`, so scripts that only handle `200` should also handle `202`.
 
 ### Tool Sub-Routes {#tool-sub-routes}
 

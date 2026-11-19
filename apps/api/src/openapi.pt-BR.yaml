@@ -5848,6 +5848,11 @@ paths:
                   minimum: 320
                   maximum: 2160
                   default: 720
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID do trabalho fornecido pelo cliente para acompanhar o progresso via SSE
             example:
               url: https://example.com/
               format: png
@@ -5870,6 +5875,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: Aceito para processamento assíncrono. Acompanhe o progresso via SSE em /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL de status do trabalho (mesmo valor de statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: URL ou parâmetros inválidos
           content:
