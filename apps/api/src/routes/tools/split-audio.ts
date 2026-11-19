@@ -17,6 +17,32 @@ const settingsSchema = z.object({
   minSilenceS: z.number().min(0.1).max(10).default(0.3),
 });
 
+// Stream copy cuts on codec frame boundaries, so a remainder shorter than a
+// couple of frames becomes a part ffprobe cannot open (#4438). Matches
+// trim-audio's MIN_TRIM_WINDOW_S: below this, the tail joins the previous part.
+const MIN_TAIL_S = 0.1;
+const NOTHING_TO_SPLIT = "Nothing to split: output would be a single segment";
+
+/**
+ * The -segment_time to pass for time mode, or null when the input fits in one
+ * part. A remainder under MIN_TAIL_S is spread across the full parts by
+ * stretching each one slightly (by at most 2 * MIN_TAIL_S / parts), so the
+ * last cut lands past the end of the input. A cut list (-segment_times)
+ * would keep exact boundaries but can outgrow Linux's 128 KiB per-argument
+ * limit on long inputs split into short parts.
+ */
+export function timeModeSegmentLength(durationS: number, segmentS: number): number | null {
+  const fullParts = Math.floor(durationS / segmentS);
+  const tailS = durationS - fullParts * segmentS;
+  if (tailS >= MIN_TAIL_S) {
+    return fullParts >= 1 ? segmentS : null;
+  }
+  if (fullParts < 2) {
+    return null;
+  }
+  return (durationS + MIN_TAIL_S) / fullParts;
+}
+
 export function registerSplitAudio(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "split-audio",
@@ -43,8 +69,14 @@ export function registerSplitAudio(app: FastifyInstance) {
             throw new InputValidationError("Could not determine audio duration");
           }
           segLen = Math.max(0.1, duration / settings.parts + 0.001);
-        } else {
+        } else if (duration === null || duration === undefined) {
           segLen = settings.segmentS;
+        } else {
+          const stretched = timeModeSegmentLength(duration, settings.segmentS);
+          if (stretched === null) {
+            throw new InputValidationError(NOTHING_TO_SPLIT);
+          }
+          segLen = stretched;
         }
 
         ctx.report(5, "Splitting audio");
@@ -117,7 +149,7 @@ export function registerSplitAudio(app: FastifyInstance) {
       const files = (await readdir(framesDir)).filter((f) => f.endsWith(srcExt));
       files.sort();
       if (files.length < 2) {
-        throw new InputValidationError("Nothing to split: output would be a single segment");
+        throw new InputValidationError(NOTHING_TO_SPLIT);
       }
 
       // Zip parts (same pattern as video-to-frames)
