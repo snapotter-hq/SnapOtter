@@ -24,6 +24,7 @@ interface Job {
   "runs-on"?: string | string[];
   needs?: string | string[];
   outputs?: Record<string, string>;
+  services?: Record<string, { ports?: (string | number)[] }>;
   steps?: Step[];
 }
 
@@ -247,13 +248,28 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     },
   );
 
-  it("routes Changes, Lint, Typecheck, Build and Unit to the fleet and nothing else", () => {
+  it("routes every CI job, so a trusted run never waits in the hosted queue", () => {
+    // Hosted capacity for this account can drop to a single job; any job left
+    // hosted, an aggregator included, would hold every merge behind it.
     expect(
       routedJobs(ci)
         .map(([id]) => id)
         .sort(),
-    ).toEqual(["build", "changes", "lint", "test-unit", "typecheck"]);
+    ).toEqual(Object.keys(ci.jobs).sort());
   });
+
+  it.each(routedJobs(ci).filter(([, job]) => job.services))(
+    "%s publishes its service ports on random host ports",
+    (_id, job) => {
+      // The fleet host runs its own dev Postgres and Redis on 5432 and 6379,
+      // and two fleet jobs can run at once.
+      for (const service of Object.values(job.services ?? {})) {
+        for (const port of service.ports ?? []) {
+          expect(String(port)).toMatch(/^\d+$/);
+        }
+      }
+    },
+  );
 
   it.each(jobsReadingFleetOutput)(
     "%s never resolves to the fleet label for a fork PR",
@@ -280,7 +296,9 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     const sudoSteps = (job.steps ?? []).filter(
       (step) =>
         /\bsudo\b/.test(step.run ?? "") ||
-        ["apt-install", "imagemagick-exr", "doc-binaries", "playwright-install"].some((action) =>
+        // playwright-install skips its sudo half itself on self-hosted
+        // runners (RUNNER_ENVIRONMENT; tested in visual-baselines-pr.test.ts).
+        ["apt-install", "imagemagick-exr", "doc-binaries"].some((action) =>
           (step.uses ?? "").endsWith(`/actions/${action}`),
         ),
     );

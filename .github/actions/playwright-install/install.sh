@@ -14,6 +14,12 @@ if [ "$(uname -s)" != "Linux" ]; then
   exit 0
 fi
 
+# The self-hosted fleet runners (#4965) have the browsers' system libraries
+# preinstalled and no passwordless sudo for install-deps.
+if [ "${RUNNER_ENVIRONMENT:-}" = "self-hosted" ]; then
+  exit 0
+fi
+
 attempts="${ATTEMPTS:-3}"
 for i in $(seq 1 "$attempts"); do
   if timeout -k 30 "${DEPS_TIMEOUT:-300}" pnpm playwright install-deps "${browsers[@]}"; then

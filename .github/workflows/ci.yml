@@ -209,9 +209,9 @@ jobs:
     # Keeps the required "Unit Tests" context stable across shard counts, the
     # same way test-integration-result does for Integration.
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
-    needs: test-unit
+    needs: [changes, test-unit]
     if: always()
     steps:
       - name: Check all unit shards
@@ -227,8 +227,9 @@ jobs:
   test-integration:
     name: Integration (${{ matrix.shard }}/6)
     # Pinned: ubuntu-latest became 26.04, which has no libmagickcore-6 EXR
-    # package. Move to 26.04 with the ImageMagick 7 names (#4768).
-    runs-on: ubuntu-24.04
+    # package. Move to 26.04 with the ImageMagick 7 names (#4768). The fleet
+    # runners (#4965) are Ubuntu 24.04 with these packages preinstalled.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-24.04' }}
     # Headroom for a degraded-apt-mirror day (#876, #2007). Same apt-install
     # ladder as test-unit (~34m worst case since #1971, plus up to 3m of KILL
     # grace), plus the rest of a shard, which took up to ~8m on main. Re-derive
@@ -243,7 +244,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The fleet runner user has no sudo; the host carries these packages,
+      # the EXR coder, pandoc, pdfcpu and an EPS-readable ImageMagick policy
+      # already (#4965).
       - name: Install system dependencies (image formats + docs + Fast OCR)
+        if: runner.environment == 'github-hosted'
         uses: ./.github/actions/apt-install
         with:
           packages: >-
@@ -255,9 +260,13 @@ jobs:
             tesseract-ocr-fra tesseract-ocr-spa
             tesseract-ocr-chi-sim tesseract-ocr-jpn
 
-      - uses: ./.github/actions/imagemagick-exr
+      - if: runner.environment == 'github-hosted'
+        uses: ./.github/actions/imagemagick-exr
 
+      # The fleet host also has tesseract's osd model, which only root can
+      # remove; no integration test depends on its absence.
       - name: Verify the Fast OCR language payload
+        if: runner.environment == 'github-hosted'
         run: |
           sudo rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
           test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata
@@ -269,9 +278,11 @@ jobs:
             exit 1
           }
 
-      - uses: ./.github/actions/doc-binaries
+      - if: runner.environment == 'github-hosted'
+        uses: ./.github/actions/doc-binaries
 
       - name: Allow ImageMagick to read EPS/PS via Ghostscript delegate
+        if: runner.environment == 'github-hosted'
         run: |
           POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
           if [ -n "$POLICY_FILE" ]; then
@@ -292,6 +303,10 @@ jobs:
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
       - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/6
+        env:
+          # A fleet runner is long-lived and shared, so a cancelled run would
+          # leak its Postgres and Redis containers without the reaper (#4965).
+          TESTCONTAINERS_RYUK_DISABLED: ${{ runner.environment == 'github-hosted' && 'true' || 'false' }}
 
   test-integration-result:
     # Single gate job for branch protection so changing the shard count (or
@@ -299,9 +314,9 @@ jobs:
     # unexpanded name "Integration (${{ matrix.shard }}/6)") never leaves
     # required shard contexts stuck as expected.
     name: Integration
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
-    needs: test-integration
+    needs: [changes, test-integration]
     if: always()
     steps:
       - name: Check all integration shards
@@ -316,7 +331,7 @@ jobs:
 
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
@@ -331,8 +346,9 @@ jobs:
           POSTGRES_USER: snapotter
           POSTGRES_PASSWORD: snapotter
           POSTGRES_DB: snapotter
+        # A random host port: the fleet host's own dev stack holds 5432 (#4965).
         ports:
-          - 5432:5432
+          - 5432
         options: >-
           --health-cmd "pg_isready -U snapotter"
           --health-interval 5s
@@ -341,7 +357,7 @@ jobs:
       redis:
         image: redis:8-alpine
         ports:
-          - 6379:6379
+          - 6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -368,6 +384,10 @@ jobs:
         run: pnpm playwright test tests/e2e/smoke.spec.ts tests/e2e/navigation.spec.ts tests/e2e/home-page.spec.ts --project=chromium
         env:
           PW_WORKERS: "2"
+          # The service ports are random (see services above); the job
+          # context only exists at step level.
+          E2E_PG_BASE_URL: postgres://snapotter:snapotter@localhost:${{ job.services.postgres.ports['5432'] }}/snapotter
+          REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
       - name: Upload report on failure
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
@@ -378,7 +398,7 @@ jobs:
 
   test-e2e-mobile-smoke:
     name: E2E Mobile Smoke (Chromium)
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-mobile-smoke
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
@@ -393,8 +413,9 @@ jobs:
           POSTGRES_USER: snapotter
           POSTGRES_PASSWORD: snapotter
           POSTGRES_DB: snapotter
+        # A random host port: the fleet host's own dev stack holds 5432 (#4965).
         ports:
-          - 5432:5432
+          - 5432
         options: >-
           --health-cmd "pg_isready -U snapotter"
           --health-interval 5s
@@ -403,7 +424,7 @@ jobs:
       redis:
         image: redis:8-alpine
         ports:
-          - 6379:6379
+          - 6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -426,6 +447,10 @@ jobs:
         run: pnpm playwright test --project=mobile-chromium --grep @mobile --grep-invert @visual
         env:
           PW_WORKERS: "2"
+          # The service ports are random (see services above); the job
+          # context only exists at step level.
+          E2E_PG_BASE_URL: postgres://snapotter:snapotter@localhost:${{ job.services.postgres.ports['5432'] }}/snapotter
+          REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
       - name: Upload report on failure
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
@@ -436,7 +461,7 @@ jobs:
 
   test-e2e-landing:
     name: E2E Landing (Chromium)
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-landing
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
@@ -476,7 +501,7 @@ jobs:
 
   test-e2e-docs:
     name: E2E Docs (Chromium)
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-docs
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
@@ -517,7 +542,7 @@ jobs:
 
   pip-audit:
     name: Python Dependency Audit
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
@@ -578,7 +603,7 @@ jobs:
     # stops routing the HR model's input through normalize() can't pass
     # unnoticed (#1299).
     name: AI Sidecar (rembg, ${{ matrix.pins }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.aipython == 'true'
@@ -623,6 +648,7 @@ jobs:
         env:
           PYTHON_VENV_PATH: .venv-rembg
           REQUIRE_REMBG: "1"
+          TESTCONTAINERS_RYUK_DISABLED: ${{ runner.environment == 'github-hosted' && 'true' || 'false' }}
 
   ai-sidecar-rembg-result:
     # The one name branch protection requires (#1386). A skipped matrix job
@@ -634,9 +660,9 @@ jobs:
     # Keep always(), not !cancelled(): a job skipped by its own if: reports as
     # success, so a cancelled run would pass this check.
     name: AI Sidecar (rembg)
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
-    needs: ai-sidecar-rembg
+    needs: [changes, ai-sidecar-rembg]
     if: always()
     steps:
       - name: Check both pin sets

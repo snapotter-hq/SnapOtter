@@ -132,9 +132,10 @@ describe("OCR v3 runtime artifact contract", () => {
     expect(integrationJob).toBeDefined();
 
     // The install goes through .github/actions/apt-install (#876), so the
-    // payload lives in the step's folded `packages:` scalar.
+    // payload lives in the step's folded `packages:` scalar. The optional
+    // `if:` is the hosted-only gate for the fleet runners (#4965).
     const packagesBlock = integrationJob?.match(
-      /^ {6}- name: Install system dependencies[^\n]*\n {8}uses: \.\/\.github\/actions\/apt-install\n {8}with:\n {10}packages: >-\n(?<packages>(?: {12}[^\n]+\n)+)/m,
+      /^ {6}- name: Install system dependencies[^\n]*\n(?: {8}if: [^\n]+\n)? {8}uses: \.\/\.github\/actions\/apt-install\n {8}with:\n {10}packages: >-\n(?<packages>(?: {12}[^\n]+\n)+)/m,
     )?.groups?.packages;
     expect(packagesBlock).toBeDefined();
 
@@ -154,7 +155,7 @@ describe("OCR v3 runtime artifact contract", () => {
     const systemDependencyLines =
       integrationJob
         ?.match(
-          /^ {6}- name: Verify the Fast OCR language payload\n {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
+          /^ {6}- name: Verify the Fast OCR language payload\n(?: {8}if: [^\n]+\n)? {8}run: \|\n(?<run>[\s\S]*?)(?=^ {6}- )/m,
         )
         ?.groups?.run?.split("\n") ?? [];
     expect(systemDependencyLines.length).toBeGreaterThan(0);
