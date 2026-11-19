@@ -50,6 +50,7 @@ const ALL_FIXTURES = [...FIXTURES_BY_EXT.values()].flat();
 const CUSTOM_ROUTE_TOOLS = new Set([
   "barcode-generate",
   "chart-maker",
+  "convert-case",
   "qr-generate",
   "passport-photo",
   "html-to-image",
