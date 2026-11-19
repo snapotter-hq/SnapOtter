@@ -303,6 +303,16 @@ def _process_cgroup_memory_limits() -> list[int] | None:
         )
     for line in membership_lines:
         fields = line.split(":", 2)
+        # The kernel writes /.. paths for a process outside its cgroup
+        # namespace root, and normpath would fold them into some other
+        # cgroup's path. Refused before the format check, as the API does (#1693).
+        if len(fields) == 3 and ".." in fields[2].split("/"):
+            raise PreflightError(
+                "unable to resolve the process cgroup memory capacity: "
+                f"cgroup membership {_quoted(fields[2])} is outside the cgroup namespace"
+            )
+    for line in membership_lines:
+        fields = line.split(":", 2)
         if len(fields) != 3 or not fields[2].startswith("/"):
             if sys.platform.startswith("linux"):
                 raise PreflightError(
