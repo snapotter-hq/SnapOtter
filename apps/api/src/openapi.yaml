@@ -421,32 +421,44 @@ paths:
                     - `square` (boolean, default false) - Crop to square aspect ratio
 
                     At least one of `width`, `height`, or `square` must be provided.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        "200":
-          description: Processed image
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/ToolResponse"
-                  - type: object
-                    properties:
-                      width:
-                        type: integer
-                      height:
-                        type: integer
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
               example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                downloadUrl: /api/v1/download/abc123/output.png
-                originalSize: 1
-                processedSize: 1
-                previewUrl: example
-                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                width: 1
-                height: 1
+                async: true
         "400":
           description: Invalid input
           content:

@@ -10,7 +10,7 @@ Seam carving resize that intelligently removes or adds pixels along paths of lea
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Processing:** Synchronous (returns result directly)
+**Processing:** Asynchronous (returns 202, poll `/api/v1/jobs/{jobId}/progress` for status via SSE)
 
 **Model bundle:** None required for basic operation. Face protection uses the `face-detection` bundle (200-300 MB) if enabled.
 
@@ -36,22 +36,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Response {#response}
+
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Final Result (via SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notes {#notes}
 
-- This custom route currently returns a synchronous 200 response.
 - Uses the `caire` seam carving library for content-aware resizing.
 - Only reduces dimensions (removes seams). Cannot expand an image beyond its original size.
 - The `protectFaces` option uses AI face detection to mark face regions as high-energy, preventing seams from passing through faces.

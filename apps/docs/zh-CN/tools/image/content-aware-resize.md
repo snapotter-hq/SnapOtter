@@ -1,8 +1,8 @@
 ---
 description: "基于接缝裁剪的缩放，沿低重要性路径增删像素，以保留关键内容和人脸。"
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: 94de49a9eacf
+i18n_output_hash: 6f195038282b
 ---
 
 # 内容感知缩放 {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 94de49a9eacf
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**处理方式：** 同步（直接返回结果）
+**处理方式：** 异步（返回 202，通过 SSE 轮询 `/api/v1/jobs/{jobId}/progress` 获取状态）
 
 **模型包：** 基本操作无需模型包。如果启用人脸保护，则使用 `face-detection` 模型包（200-300 MB）。
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## 响应（200 OK） {#response-200-ok}
+## 响应 {#response}
+
+### 初始响应（202 Accepted） {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### 最终结果（通过 SSE） {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## 注意事项 {#notes}
 
-- 此自定义路由目前返回同步的 200 响应。
 - 使用 `caire` 接缝裁剪库进行内容感知缩放。
 - 仅缩小尺寸（删除接缝）。无法将图片扩展到超过其原始尺寸。
 - `protectFaces` 选项使用 AI 人脸检测将人脸区域标记为高能量，防止接缝穿过人脸。

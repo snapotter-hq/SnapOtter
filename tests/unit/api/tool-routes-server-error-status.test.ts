@@ -52,7 +52,6 @@ vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   capturePage: async () => Buffer.from("png"),
 }));
 
-import * as aiMod from "@snapotter/ai";
 import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import * as exiftoolMod from "../../../apps/api/src/lib/exiftool.js";
 import {
@@ -73,7 +72,6 @@ import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerCompose } from "../../../apps/api/src/routes/tools/compose.js";
-import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
@@ -1788,7 +1786,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
   });
 });
 
-describe("outer processing catches in compare, watermark-image, compose, vectorize, and content-aware-resize (#3905)", () => {
+describe("outer processing catches in compare, watermark-image, compose, and vectorize (#3905)", () => {
   const oomMessage =
     "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
 
@@ -1796,7 +1794,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
     putObject.mockReset().mockResolvedValue(undefined);
   });
 
-  it("compare, watermark-image, compose, vectorize, and content-aware-resize surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
+  it("compare, watermark-image, compose, and vectorize surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
     const png = await sharp({
       create: { width: 16, height: 16, channels: 3, background: "#f00" },
     })
@@ -1810,12 +1808,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
     registerWatermarkImage(app);
     registerCompose(app);
     registerVectorize(app);
-    registerContentAwareResize(app);
     await app.ready();
-
-    const seamCarveSpy = vi
-      .spyOn(aiMod, "seamCarve")
-      .mockResolvedValue({ buffer: png, width: 8, height: 16 });
 
     try {
       const routeCases = [
@@ -1855,13 +1848,6 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           files: [{ name: "a.png", type: "image/png", data: png }],
           settings: undefined,
           expected422Error: "Vectorization failed",
-        },
-        {
-          toolId: "content-aware-resize",
-          url: "/api/v1/tools/image/content-aware-resize",
-          files: [{ name: "a.png", type: "image/png", data: png }],
-          settings: { width: 8 },
-          expected422Error: "Content-aware resize failed",
         },
       ] as const;
 
@@ -2080,43 +2066,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
       } finally {
         grayscaleSpy.mockRestore();
       }
-
-      // 4. content-aware-resize seamCarve rejects with V8 RangeError, SIGKILL, or ENOSPC
-      seamCarveSpy
-        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
-        .mockRejectedValueOnce(
-          Object.assign(new Error("caire exited SIGKILL"), { signal: "SIGKILL" }),
-        )
-        .mockRejectedValueOnce(
-          Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/caire'"), {
-            code: "ENOSPC",
-            syscall: "open",
-          }),
-        );
-
-      for (let i = 0; i < 2; i++) {
-        const carveOomRes = await app.inject({
-          method: "POST",
-          url: "/api/v1/tools/image/content-aware-resize",
-          ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
-        });
-        expect(carveOomRes.statusCode, carveOomRes.body).toBe(503);
-        expect(carveOomRes.json()).toEqual({
-          error: oomMessage,
-          code: "ENGINE_UNAVAILABLE",
-          requestId: expect.any(String),
-        });
-      }
-
-      const carveEnospcRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/content-aware-resize",
-        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
-      });
-      expect(carveEnospcRes.statusCode, carveEnospcRes.body).toBe(503);
-      expect(carveEnospcRes.json()).toMatchObject({ code: "storage-full" });
     } finally {
-      seamCarveSpy.mockRestore();
       await app.close();
     }
   });

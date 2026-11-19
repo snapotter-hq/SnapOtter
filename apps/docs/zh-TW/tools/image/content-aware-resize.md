@@ -1,8 +1,8 @@
 ---
 description: "縫隙裁剪（seam-carving）縮放，沿低重要度路徑增減像素，以保留關鍵內容與臉部。"
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: cc485691dbad
+i18n_output_hash: d4331296878e
 ---
 
 # 內容感知縮放 {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: cc485691dbad
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**處理方式：** 同步（直接回傳結果）
+**處理方式：** 非同步（回傳 202，透過 SSE 輪詢 `/api/v1/jobs/{jobId}/progress` 取得狀態）
 
 **模型套件：** 基本操作不需要。若啟用臉部保護，則使用 `face-detection` 套件（200-300 MB）。
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## 回應（200 OK） {#response-200-ok}
+## 回應 {#response}
+
+### 初始回應（202 Accepted） {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### 最終結果（透過 SSE） {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## 備註 {#notes}
 
-- 此自訂路由目前回傳同步的 200 回應。
 - 使用 `caire` 縫隙裁剪函式庫進行內容感知縮放。
 - 僅會縮小尺寸（移除縫隙）。無法將圖片擴大到超過原始尺寸。
 - `protectFaces` 選項使用 AI 臉部偵測將臉部區域標記為高能量，避免縫隙穿越臉部。

@@ -6,6 +6,10 @@ description: Release notes and version history for SnapOtter. See what's new, im
 
 ## Unreleased {#unreleased}
 
+### Changed {#unreleased-changed}
+
+- **Content-aware resize now runs as a background job.** `POST /api/v1/tools/image/content-aware-resize` used to hold the request open for the whole seam carve and answer `200` with the result. It now answers `202 Accepted` with a `jobId`, `statusUrl` and `progressUrl`, like the other long-running tools. Follow `/api/v1/jobs/{jobId}/progress` over SSE: the `result` on the frame with `phase: "complete"` has the same `downloadUrl`, `originalSize`, `processedSize`, `width` and `height` fields the old `200` body had, and a processing failure arrives as a `phase: "failed"` frame instead of a `422`. That frame's `httpStatus` is `400` when the input was the problem (an image over 25 MP, or more than 2x enlargement), where the old route answered `422`. You can now cancel a running job and pass your own `clientJobId`. A request with no `width`, `height` or `square` now gets `400` `"Invalid settings"`, with the old message in `details`. (#4338)
+
 ### Deprecated {#unreleased-deprecated}
 
 - **The five image compress-to-size operations are deprecated.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, and `-500kb` are marked deprecated in the OpenAPI spec and will stay for at least one minor release. Send `POST /api/v1/tools/image/compress` with `settings` set to `{"mode":"targetSize","targetSizeKb":20}` (or 50, 100, 200, 500). The output is the same. The PDF preset paths are unchanged.

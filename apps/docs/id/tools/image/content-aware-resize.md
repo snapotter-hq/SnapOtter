@@ -1,8 +1,8 @@
 ---
 description: "Pengubahan ukuran seam-carving yang menambah atau menghapus piksel di sepanjang jalur berkepentingan rendah untuk mempertahankan konten kunci dan wajah."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: 3f4e4fe5b1bb
+i18n_output_hash: 9e1054865a22
 ---
 
 # Pengubahan Ukuran Sadar-Konten {#content-aware-resize}
@@ -13,7 +13,7 @@ Pengubahan ukuran seam carving yang secara cerdas menghapus atau menambahkan pik
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Pemrosesan:** Sinkron (mengembalikan hasil secara langsung)
+**Pemrosesan:** Asinkron (mengembalikan 202, polling `/api/v1/jobs/{jobId}/progress` untuk status via SSE)
 
 **Model bundle:** Tidak diperlukan untuk operasi dasar. Perlindungan wajah menggunakan bundle `face-detection` (200-300 MB) jika diaktifkan.
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Respons (200 OK) {#response-200-ok}
+## Respons {#response}
+
+### Respons Awal (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Hasil Akhir (via SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Catatan {#notes}
 
-- Rute kustom ini saat ini mengembalikan respons 200 sinkron.
 - Menggunakan pustaka seam carving `caire` untuk pengubahan ukuran sadar-konten.
 - Hanya mengurangi dimensi (menghapus seam). Tidak dapat memperluas gambar melampaui ukuran aslinya.
 - Opsi `protectFaces` menggunakan deteksi wajah AI untuk menandai area wajah sebagai berenergi tinggi, mencegah seam melewati wajah.

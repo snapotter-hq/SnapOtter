@@ -1,8 +1,8 @@
 ---
 description: "Formaatwijziging met seam carving die pixels toevoegt of verwijdert langs paden van laag belang om belangrijke inhoud en gezichten te behouden."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: 30825642af92
+i18n_output_hash: 1834ea3b5341
 ---
 
 # Inhoudsbewuste formaatwijziging {#content-aware-resize}
@@ -13,7 +13,7 @@ Formaatwijziging met seam carving die op intelligente wijze pixels verwijdert of
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Verwerking:** Synchroon (geeft het resultaat direct terug)
+**Verwerking:** Asynchroon (retourneert 202, poll `/api/v1/jobs/{jobId}/progress` voor de status via SSE)
 
 **Modelbundel:** Geen vereist voor de basisbewerking. Gezichtsbescherming gebruikt de bundel `face-detection` (200-300 MB) indien ingeschakeld.
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Antwoord (200 OK) {#response-200-ok}
+## Antwoord {#response}
+
+### Eerste antwoord (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Eindresultaat (via SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Opmerkingen {#notes}
 
-- Deze aangepaste route geeft momenteel een synchroon 200-antwoord terug.
 - Gebruikt de seam-carving-bibliotheek `caire` voor inhoudsbewuste formaatwijziging.
 - Verkleint alleen afmetingen (verwijdert seams). Kan een afbeelding niet vergroten boven de oorspronkelijke grootte.
 - De optie `protectFaces` gebruikt AI-gezichtsdetectie om gezichtsgebieden als hoog-energetisch te markeren, zodat er geen seams door gezichten lopen.

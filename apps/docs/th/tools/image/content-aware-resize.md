@@ -1,8 +1,8 @@
 ---
 description: "การปรับขนาดแบบ seam-carving ที่เพิ่มหรือลบพิกเซลตามเส้นทางที่มีความสำคัญต่ำ เพื่อรักษาเนื้อหาหลักและใบหน้าเอาไว้"
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: 9d94b8142fa0
+i18n_output_hash: 1e2e018700da
 ---
 
 # Content-Aware Resize {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 9d94b8142fa0
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**การประมวลผล:** แบบซิงโครนัส (ส่งคืนผลลัพธ์โดยตรง)
+**การประมวลผล:** แบบอะซิงโครนัส (คืนค่า 202, poll `/api/v1/jobs/{jobId}/progress` เพื่อดูสถานะผ่าน SSE)
 
 **ชุดโมเดล:** ไม่จำเป็นสำหรับการทำงานพื้นฐาน การปกป้องใบหน้าใช้ชุด `face-detection` (200-300 MB) หากเปิดใช้งาน
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Response {#response}
+
+### การตอบกลับเริ่มต้น (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### ผลลัพธ์สุดท้าย (ผ่าน SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notes {#notes}
 
-- เส้นทางแบบกำหนดเองนี้ปัจจุบันส่งคืนการตอบสนอง 200 แบบซิงโครนัส
 - ใช้ไลบรารี seam carving `caire` สำหรับการปรับขนาดแบบคำนึงถึงเนื้อหา
 - ลดขนาดได้เท่านั้น (ลบ seam) ไม่สามารถขยายภาพเกินขนาดต้นฉบับได้
 - ตัวเลือก `protectFaces` ใช้การตรวจจับใบหน้าด้วย AI เพื่อทำเครื่องหมายบริเวณใบหน้าเป็นพลังงานสูง ป้องกันไม่ให้ seam ผ่านใบหน้า

@@ -135,6 +135,58 @@ export async function settleAsyncFallback(
 }
 
 /**
+ * Resolve a long tool's 202 into the answer its synchronous route used to give
+ * (#4338): 200 with the job's result, or the status, message and code the
+ * worker recorded on the failed row. Any other response passes through. A job
+ * still running at the deadline is canceled so it can't starve later tests.
+ */
+export async function settleAcceptedResponse(
+  res: { statusCode: number; body: string },
+  timeoutMs = 25_000,
+): Promise<{ statusCode: number; body: string }> {
+  if (res.statusCode !== 202) return res;
+
+  const { jobId } = JSON.parse(res.body) as { jobId: string };
+  const deadline = Date.now() + timeoutMs;
+  let row:
+    | {
+        status: string;
+        pool: string | null;
+        progress: unknown;
+        error: { message?: string; httpStatus?: number; code?: string } | null;
+      }
+    | undefined;
+
+  while (Date.now() < deadline) {
+    [row] = await db
+      .select({
+        status: schema.jobs.status,
+        pool: schema.jobs.pool,
+        progress: schema.jobs.progress,
+        error: schema.jobs.error,
+      })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, jobId));
+    if (row && TERMINAL_DATABASE_STATUSES.has(row.status)) break;
+    await delay(100);
+  }
+
+  if (!row || !TERMINAL_DATABASE_STATUSES.has(row.status)) {
+    await cancelAcceptedJobAndWait(jobId, (row?.pool as Pool | undefined) ?? "image");
+    throw new AcceptedJobTimeoutError(jobId, timeoutMs);
+  }
+
+  if (row.status === "completed") {
+    const result = (row.progress as { result?: Record<string, unknown> } | null)?.result ?? {};
+    return { statusCode: 200, body: JSON.stringify(result) };
+  }
+  return {
+    statusCode: row.error?.httpStatus ?? 422,
+    body: JSON.stringify({ error: row.error?.message, code: row.error?.code }),
+  };
+}
+
+/**
  * Wait for an accepted job to succeed. If the observation window expires,
  * cancel and fully drain the job before failing the test so timed-out work can
  * never starve another integration fork.

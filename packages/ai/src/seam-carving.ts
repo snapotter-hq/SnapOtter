@@ -22,6 +22,8 @@ export interface SeamCarveOptions {
   blurRadius?: number;
   sobelThreshold?: number;
   square?: boolean;
+  /** Kills the caire process when the job is canceled. */
+  signal?: AbortSignal;
 }
 
 export interface SeamCarveResult {
@@ -175,8 +177,11 @@ export async function seamCarve(
     const currentMp = (currentW * currentH) / 1_000_000;
     const timeoutMs = Math.ceil(Math.max(120_000, currentMp * 10_000));
     try {
-      await execFileAsync(cairePath, args, { timeout: timeoutMs });
+      await execFileAsync(cairePath, args, { timeout: timeoutMs, signal: options.signal });
     } catch (err) {
+      // A cancel kills the child too, so it must be checked before the
+      // timeout branch or it would read as "timed out on this image".
+      if ((err as Error).name === "AbortError") throw err;
       // execFile sets killed=true when it terminates the child on timeout.
       // Replace the raw caire terminal output (ANSI/spinner control chars) with
       // an actionable message; keep the original as `cause` for server logs.

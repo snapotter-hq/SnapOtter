@@ -68,7 +68,6 @@ export function isPublic(op: PathOperation): boolean {
 export function generateLlmsTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   const customModes: Record<string, string> = {
-    "content-aware-resize": "sync",
     "passport-photo": "two-phase",
   };
   lines.push(`# ${spec.info.title}`);

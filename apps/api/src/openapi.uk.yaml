@@ -432,32 +432,44 @@ paths:
                     - `square` (логічне значення, за замовчуванням false) - Обрізати до квадратного співвідношення сторін
 
                     Має бути задано принаймні одне з: `width`, `height` або `square`.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID завдання від клієнта для відстеження прогресу через SSE
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        '200':
-          description: Оброблене зображення
+        '202':
+          description: Прийнято для асинхронної обробки. Відстежуйте прогрес через SSE за адресою /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL статусу завдання (те саме значення, що й statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ToolResponse'
-                  - type: object
-                    properties:
-                      width:
-                        type: integer
-                      height:
-                        type: integer
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
               example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                downloadUrl: /api/v1/download/abc123/output.png
-                originalSize: 1
-                processedSize: 1
-                previewUrl: example
-                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                width: 1
-                height: 1
+                async: true
         '400':
           description: Некоректні вхідні дані
           content:
@@ -28113,10 +28125,18 @@ x-i18n:
       sourceHash: 01c5c9eafe1b
       provenance: machine
       outputHash: db109e2a1f15
-    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/200/description:
-      sourceHash: 82f006c19be1
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
       provenance: machine
-      outputHash: cd97cbc5d46e
+      outputHash: '417958436e93'
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: bb7550a13f80
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: b73d7aa89c2f
     ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
