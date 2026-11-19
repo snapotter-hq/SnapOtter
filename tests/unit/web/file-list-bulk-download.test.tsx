@@ -66,9 +66,10 @@ beforeEach(() => {
     createObjectURL: vi.fn(() => "blob:zip"),
     revokeObjectURL: vi.fn(),
   });
+  // String bodies, not jsdom Blobs: Node 22's Response can't read a jsdom Blob.
   fetchMock = vi.fn(
     async () =>
-      new Response(new Blob(["PK"]), {
+      new Response("PK", {
         status: 200,
         headers: { "Content-Type": "application/zip" },
       }),
@@ -121,7 +122,7 @@ describe("FileList bulk download", () => {
     fireEvent.click(downloadButton());
     await waitFor(() => expect(downloadButton()).toBeDisabled());
 
-    answer(new Response(new Blob(["PK"]), { status: 200 }));
+    answer(new Response("PK", { status: 200 }));
     await waitFor(() => expect(downloadButton()).toBeEnabled());
     expect(clicks).toHaveLength(1);
   });
