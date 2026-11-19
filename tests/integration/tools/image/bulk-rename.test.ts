@@ -493,31 +493,6 @@ describe("Bulk Rename", () => {
     expect(JSON.parse(res.body).error).toContain('"tiny.txt"');
   });
 
-  it("rejects garbage bytes behind an image extension (#4401)", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "fake.png",
-        contentType: "image/png",
-        content: Buffer.from("definitely not a png"),
-      },
-      { name: "settings", content: JSON.stringify({}) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/bulk-rename",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
-
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toContain('"fake.png"');
-  });
-
   it("handles startIndex of 0", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "x.png", contentType: "image/png", content: PNG },

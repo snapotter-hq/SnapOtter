@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { extname, join } from "node:path";
 import multipart from "@fastify/multipart";
+import { IMAGE_INPUTS } from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
@@ -9,6 +10,7 @@ import { registerBulkRename } from "../../../apps/api/src/routes/tools/bulk-rena
 
 const PNG = readFileSync(join(__dirname, "../../fixtures/image/valid/test-200x150.png"));
 const TXT = readFileSync(join(__dirname, "../../fixtures/document/formats/tiny.txt"));
+const FORMATS_DIR = join(__dirname, "../../fixtures/image/formats");
 
 async function buildApp() {
   const app = Fastify({ logger: false });
@@ -84,5 +86,25 @@ describe("bulk-rename only accepts images (#4401)", () => {
     expect(res.statusCode).toBe(200);
     const names = new AdmZip(res.rawPayload).getEntries().map((e) => e.entryName);
     expect(names).toEqual(["x-1.png", "x-2"]);
+  });
+
+  // RAW, TGA and SVGZ pass the validator on their extension alone and other
+  // formats take different detection paths, so sweep every accepted format.
+  it("zips one fixture of every accepted image format unchanged", async () => {
+    const accepted = new Set(IMAGE_INPUTS.map((ext) => ext.toLowerCase()));
+    const files = readdirSync(FORMATS_DIR)
+      .filter((name) => accepted.has(extname(name).toLowerCase()))
+      .sort()
+      .map((filename) => ({ filename, content: readFileSync(join(FORMATS_DIR, filename)) }));
+    expect(files.length).toBeGreaterThan(20);
+
+    const res = await rename(files);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const entries = new AdmZip(res.rawPayload).getEntries();
+    expect(entries).toHaveLength(files.length);
+    entries.forEach((entry, i) => {
+      expect(entry.getData().equals(files[i].content), files[i].filename).toBe(true);
+    });
   });
 });
