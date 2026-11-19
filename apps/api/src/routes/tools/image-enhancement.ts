@@ -102,7 +102,7 @@ export async function processImageEnhancement(
       image = image.removeAlpha();
     }
 
-    image = applyCorrections(
+    image = await applyCorrections(
       image,
       analysis.corrections,
       settings.mode,

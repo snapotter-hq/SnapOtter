@@ -141,7 +141,7 @@ function onlyEnabled(...keys: string[]): Record<string, boolean> {
   return t as Record<string, boolean>;
 }
 
-function run(
+async function run(
   buf: Buffer,
   corrections: CorrectionParams,
   mode: EnhancementMode,
@@ -149,9 +149,15 @@ function run(
   toggles: Record<string, boolean>,
   size?: { width: number; height: number },
 ): Promise<Buffer> {
-  return applyCorrections(sharp(buf) as Sharp, corrections, mode, intensity, toggles, size)
-    .png()
-    .toBuffer();
+  const image = await applyCorrections(
+    sharp(buf) as Sharp,
+    corrections,
+    mode,
+    intensity,
+    toggles,
+    size,
+  );
+  return image.png().toBuffer();
 }
 
 // ===========================================================================
@@ -273,13 +279,29 @@ describe("analyzeImage corrections", () => {
     expect((await analyzeImage(await twoTone(0, 255))).corrections.contrast).toBe(-24);
   });
 
-  it("computes temperature correction from the white-balance dead zone (factor 0.5)", async () => {
-    // whiteBalance 50 -> 0.
+  it("computes temperature from the red/blue gap, past a 12.5 dead zone at 0.4 per level", async () => {
+    // Neutral -> 0.
     expect((await analyzeImage(await solidRgb(128, 128, 128))).corrections.temperature).toBe(0);
-    // whiteBalance 0 (blue cast) -> round((40 - 0) * 0.5) = 20.
-    expect((await analyzeImage(await solidRgb(40, 60, 200))).corrections.temperature).toBe(20);
-    // whiteBalance 26 (mild cast, spread 30) -> round((40 - 26) * 0.5) = 7.
+    // Gap 12 sits inside the dead zone -> 0.
+    expect((await analyzeImage(await solidRgb(128, 128, 116))).corrections.temperature).toBe(0);
+    // Blue cast, gap -160 -> warms: round((160 - 12.5) * 0.4) = 59.
+    expect((await analyzeImage(await solidRgb(40, 60, 200))).corrections.temperature).toBe(59);
+    // Mild blue cast, gap -30 -> round((30 - 12.5) * 0.4) = 7.
     expect((await analyzeImage(await solidRgb(100, 110, 130))).corrections.temperature).toBe(7);
+  });
+
+  it("cools a warm cast instead of warming it further (#4842)", async () => {
+    // Red cast, gap +140 -> -round((140 - 12.5) * 0.4) = -51.
+    expect((await analyzeImage(await solidRgb(200, 120, 60))).corrections.temperature).toBe(-51);
+  });
+
+  it("caps the temperature correction at 60 either way", async () => {
+    expect((await analyzeImage(await solidRgb(255, 128, 0))).corrections.temperature).toBe(-60);
+    expect((await analyzeImage(await solidRgb(0, 128, 255))).corrections.temperature).toBe(60);
+  });
+
+  it("ignores the green channel: a pure green/magenta spread is not a temperature cast", async () => {
+    expect((await analyzeImage(await solidRgb(100, 200, 100))).corrections.temperature).toBe(0);
   });
 
   it("boosts saturation only below 40 (factor 0.6, clamped [0,30])", async () => {
@@ -976,5 +998,358 @@ describe("applyCorrections CLAHE", () => {
     const base = (await channelStdevs(tex))[0];
     const out = await run(tex, NO_CORR, "auto", 50, { ...ALL_OFF });
     expect((await channelStdevs(out))[0]).toBeCloseTo(base, 5);
+  });
+});
+
+// ===========================================================================
+// #4842: the computed exposure, contrast, white-balance and backlight
+// corrections have to reach the pixels, in the right direction.
+// ===========================================================================
+
+/** Bright sky over the top 60%, a dark textured subject (20-59, mean 39.5) below. */
+async function backlitScene(w = 400, h = 300): Promise<Buffer> {
+  const buf = Buffer.alloc(w * h * 3);
+  const horizon = Math.round(h * 0.6);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = y < horizon ? 225 + ((x * 7 + y * 3) % 25) : 20 + ((x * 13 + y * 7) % 40);
+      const i = (y * w + x) * 3;
+      buf[i] = v;
+      buf[i + 1] = v;
+      buf[i + 2] = v;
+    }
+  }
+  return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
+/** Textured image with a fixed per-channel cast, every channel spread +/-20. */
+async function castTexture(r: number, g: number, b: number, w = 200, h = 150): Promise<Buffer> {
+  const buf = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const d = ((x * 5 + y * 3) % 40) - 20;
+      const i = (y * w + x) * 3;
+      buf[i] = r + d;
+      buf[i + 1] = g + d;
+      buf[i + 2] = b + d;
+    }
+  }
+  return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
+/** Mean of the first channel over rows [y0, y1), read from raw pixels (stats() ignores extract). */
+async function rowsMean(png: Buffer, y0: number, y1: number): Promise<number> {
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  let sum = 0;
+  let n = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = 0; x < info.width; x++) {
+      sum += data[(y * info.width + x) * info.channels];
+      n++;
+    }
+  }
+  return sum / n;
+}
+
+describe("applyCorrections exposure curve (#4842)", () => {
+  it("brightens when the brightness correction is positive (sharp gamma no longer cancels out)", async () => {
+    const tex = await texturedGray(128, 128, 40, 120);
+    const off = await run(tex, NO_CORR, "auto", 50, onlyEnabled("exposure"), {
+      width: 128,
+      height: 128,
+    });
+    const lifted = await run(
+      tex,
+      { ...NO_CORR, brightness: 30 },
+      "auto",
+      50,
+      onlyEnabled("exposure"),
+      {
+        width: 128,
+        height: 128,
+      },
+    );
+    expect((await channelMeans(lifted))[0]).toBeGreaterThan((await channelMeans(off))[0] + 10);
+  });
+
+  it("darkens when the brightness correction is negative instead of dropping it", async () => {
+    const tex = await texturedGray(128, 128, 140, 220);
+    const off = await run(tex, NO_CORR, "auto", 50, onlyEnabled("exposure"), {
+      width: 128,
+      height: 128,
+    });
+    const darker = await run(
+      tex,
+      { ...NO_CORR, brightness: -30 },
+      "auto",
+      50,
+      onlyEnabled("exposure"),
+      {
+        width: 128,
+        height: 128,
+      },
+    );
+    expect((await channelMeans(darker))[0]).toBeLessThan((await channelMeans(off))[0] - 10);
+  });
+
+  it("brightens a dark photo end to end with only exposure enabled", async () => {
+    const dark = await texturedGray(128, 128, 10, 99);
+    const analysis = await analyzeImage(dark);
+    expect(analysis.corrections.brightness).toBeGreaterThan(0);
+    const withCurve = await run(dark, analysis.corrections, "auto", 50, onlyEnabled("exposure"), {
+      width: 128,
+      height: 128,
+    });
+    const stretchOnly = await run(
+      dark,
+      { ...analysis.corrections, brightness: 0 },
+      "auto",
+      50,
+      onlyEnabled("exposure"),
+      { width: 128, height: 128 },
+    );
+    expect((await channelMeans(withCurve))[0]).toBeGreaterThan(
+      (await channelMeans(stretchOnly))[0],
+    );
+    expect((await channelMeans(withCurve))[0]).toBeGreaterThan((await channelMeans(dark))[0]);
+  });
+});
+
+describe("applyCorrections global contrast (#4842)", () => {
+  it("applies the contrast correction (stdev rises with it, CLAHE held constant)", async () => {
+    const flat = await texturedGray(128, 128, 110, 146);
+    const size = { width: 128, height: 128 };
+    const without = await run(flat, NO_CORR, "auto", 50, onlyEnabled("contrast"), size);
+    const withIt = await run(
+      flat,
+      { ...NO_CORR, contrast: 30 },
+      "auto",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect((await channelStdevs(withIt))[0]).toBeGreaterThan(
+      (await channelStdevs(without))[0] * 1.2,
+    );
+  });
+
+  it("survives the normalise stretch (it runs after it, not before)", async () => {
+    const flat = await texturedGray(128, 128, 110, 146);
+    const size = { width: 128, height: 128 };
+    const toggles = onlyEnabled("contrast", "exposure");
+    const without = await run(flat, NO_CORR, "auto", 50, toggles, size);
+    const lower = await run(flat, { ...NO_CORR, contrast: -30 }, "auto", 50, toggles, size);
+    expect((await channelStdevs(lower))[0]).toBeLessThan((await channelStdevs(without))[0] * 0.85);
+  });
+
+  it("leaves contrast alone when the contrast toggle is off", async () => {
+    const flat = await texturedGray(128, 128, 110, 146);
+    const out = await run(flat, { ...NO_CORR, contrast: 30 }, "auto", 50, ALL_OFF, {
+      width: 128,
+      height: 128,
+    });
+    expect(await channelStdevs(out)).toEqual(await channelStdevs(flat));
+  });
+
+  it("keeps the alpha channel intact through the exposure curve and contrast", async () => {
+    const rgba = await sharp({
+      create: {
+        width: 64,
+        height: 64,
+        channels: 4,
+        background: { r: 120, g: 120, b: 120, alpha: 0.5 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const toggles = onlyEnabled("contrast", "exposure");
+    const before = await run(rgba, NO_CORR, "auto", 50, toggles);
+    const after = await run(
+      rgba,
+      { ...NO_CORR, brightness: 30, contrast: 30 },
+      "auto",
+      50,
+      toggles,
+    );
+    // The colour channels did move, so the alpha check is not vacuous.
+    expect((await channelMeans(after))[0]).not.toBe((await channelMeans(before))[0]);
+    expect((await channelMeans(after))[3]).toBe((await channelMeans(before))[3]);
+  });
+});
+
+/** A grey frame drawn by `valueAt(x, y)`. */
+async function grayScene(
+  w: number,
+  h: number,
+  valueAt: (x: number, y: number) => number,
+): Promise<Buffer> {
+  const buf = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = valueAt(x, y);
+      const i = (y * w + x) * 3;
+      buf[i] = v;
+      buf[i + 1] = v;
+      buf[i + 2] = v;
+    }
+  }
+  return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
+/** A bright page (235, with dark text lines at 20) in the middle of a dark desk (35). */
+function pageOnDesk(): Promise<Buffer> {
+  return grayScene(400, 300, (x, y) => {
+    const onPage = x >= 70 && x < 330 && y >= 40 && y < 260;
+    if (!onPage) return 35;
+    return y % 12 < 2 && x > 90 && x < 310 ? 20 : 235;
+  });
+}
+
+/** A dark subject (20-59) in the middle of a bright window (225-249) on every side. */
+function subjectInWindow(): Promise<Buffer> {
+  return grayScene(400, 300, (x, y) => {
+    const subject = x >= 120 && x < 280 && y >= 80 && y < 300;
+    return subject ? 20 + ((x * 13 + y * 7) % 40) : 225 + ((x * 7 + y * 3) % 25);
+  });
+}
+
+describe("backlit placement check (#4842 review)", () => {
+  it("does not read a page on a dark desk as backlit", async () => {
+    const analysis = await analyzeImage(await pageOnDesk());
+    expect(analysis.corrections.backlit).toBeUndefined();
+  });
+
+  it("reads a dark subject framed by a bright window as backlit", async () => {
+    const analysis = await analyzeImage(await subjectInWindow());
+    expect(analysis.corrections.backlit).toBe(true);
+  });
+
+  it("keeps document mode from lifting a frame flagged backlit (paper and text keep their levels)", async () => {
+    const scene = await backlitScene();
+    const corrections = { ...(await analyzeImage(scene)).corrections };
+    expect(corrections.backlit).toBe(true);
+    const size = { width: 400, height: 300 };
+    const doc = await run(scene, corrections, "document", 50, onlyEnabled("exposure"), size);
+    const docUnflagged = await run(
+      scene,
+      { ...corrections, backlit: undefined, brightness: 0 },
+      "document",
+      50,
+      onlyEnabled("exposure"),
+      size,
+    );
+    expect(await channelMeans(doc)).toEqual(await channelMeans(docUnflagged));
+  });
+});
+
+describe("document mode contrast (#4842 review)", () => {
+  it("never lowers contrast in document mode", async () => {
+    const page = await pageOnDesk();
+    const size = { width: 400, height: 300 };
+    const without = await run(page, NO_CORR, "document", 50, onlyEnabled("contrast"), size);
+    const reduced = await run(
+      page,
+      { ...NO_CORR, contrast: -24 },
+      "document",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect(await channelStdevs(reduced)).toEqual(await channelStdevs(without));
+  });
+
+  it("still lowers contrast for the same correction in auto mode", async () => {
+    const page = await pageOnDesk();
+    const size = { width: 400, height: 300 };
+    const without = await run(page, NO_CORR, "auto", 50, onlyEnabled("contrast"), size);
+    const reduced = await run(
+      page,
+      { ...NO_CORR, contrast: -24 },
+      "auto",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect((await channelStdevs(reduced))[0]).toBeLessThan((await channelStdevs(without))[0]);
+  });
+
+  it("still raises contrast in document mode", async () => {
+    const flat = await texturedGray(128, 128, 110, 146);
+    const size = { width: 128, height: 128 };
+    const without = await run(flat, NO_CORR, "document", 50, onlyEnabled("contrast"), size);
+    const raised = await run(
+      flat,
+      { ...NO_CORR, contrast: 20 },
+      "document",
+      50,
+      onlyEnabled("contrast"),
+      size,
+    );
+    expect((await channelStdevs(raised))[0]).toBeGreaterThan((await channelStdevs(without))[0]);
+  });
+});
+
+describe("backlit photos (#4842)", () => {
+  it("reads a bright background over a dark subject as backlit, not overexposed", async () => {
+    const analysis = await analyzeImage(await backlitScene());
+    expect(analysis.corrections.backlit).toBe(true);
+    expect(analysis.corrections.brightness).toBeGreaterThan(0);
+    expect(analysis.issues).not.toContain("overexposed");
+  });
+
+  it("still flags an evenly bright photo as overexposed", async () => {
+    const analysis = await analyzeImage(await texturedGray(128, 128, 200, 250));
+    expect(analysis.corrections.backlit).toBeUndefined();
+    expect(analysis.corrections.brightness).toBeLessThan(0);
+    expect(analysis.issues).toContain("overexposed");
+  });
+
+  it("lifts the subject with the full auto pipeline at the defaults", async () => {
+    const scene = await backlitScene();
+    const analysis = await analyzeImage(scene);
+    const out = await run(scene, analysis.corrections, "auto", 50, {}, { width: 400, height: 300 });
+    expect(await rowsMean(scene, 180, 300)).toBeCloseTo(39.5, 1);
+    expect(await rowsMean(out, 180, 300)).toBeGreaterThan(55);
+  });
+
+  it("lifts the subject with only exposure enabled (no normalise black clip)", async () => {
+    const scene = await backlitScene();
+    const analysis = await analyzeImage(scene);
+    const out = await run(scene, analysis.corrections, "auto", 50, onlyEnabled("exposure"), {
+      width: 400,
+      height: 300,
+    });
+    expect(await rowsMean(out, 180, 300)).toBeGreaterThan(55);
+  });
+});
+
+describe("white balance neutralises in both directions (#4842)", () => {
+  async function redBlueRatio(buf: Buffer): Promise<number> {
+    const [r, , b] = await channelMeans(buf);
+    return r / b;
+  }
+
+  it("moves a warm cast's R/B ratio towards 1", async () => {
+    const warm = await castTexture(179, 119, 64);
+    const analysis = await analyzeImage(warm);
+    const out = await run(warm, analysis.corrections, "auto", 50, onlyEnabled("whiteBalance"));
+    const before = await redBlueRatio(warm);
+    expect(before).toBeGreaterThan(1);
+    expect(await redBlueRatio(out)).toBeLessThan(before);
+  });
+
+  it("moves a cool cast's R/B ratio towards 1", async () => {
+    const cool = await castTexture(69, 119, 179);
+    const analysis = await analyzeImage(cool);
+    const out = await run(cool, analysis.corrections, "auto", 50, onlyEnabled("whiteBalance"));
+    const before = await redBlueRatio(cool);
+    expect(before).toBeLessThan(1);
+    expect(await redBlueRatio(out)).toBeGreaterThan(before);
   });
 });

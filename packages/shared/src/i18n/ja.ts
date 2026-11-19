@@ -1300,6 +1300,7 @@ export const ja: TranslationKeys = {
       enhance: "エンハンス",
       sharpenFilter: "シャープフィルター",
       whiteBalanceTemperatureFilter: "ホワイトバランス色温度フィルター",
+      exposureFilter: "露出フィルター",
       originalSizeKb: "元：{size} KB",
       enhancedSizeKb: "エンハンス後：{size} KB",
     },

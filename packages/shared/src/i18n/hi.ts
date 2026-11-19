@@ -1158,6 +1158,7 @@ export const hi: TranslationKeys = {
       enhance: "एन्हांस करें",
       sharpenFilter: "शार्पन फिल्टर",
       whiteBalanceTemperatureFilter: "व्हाइट बैलेंस टेम्परेचर फिल्टर",
+      exposureFilter: "एक्सपोज़र फिल्टर",
       originalSizeKb: "मूल: {size} KB",
       enhancedSizeKb: "एन्हांस्ड: {size} KB",
     },

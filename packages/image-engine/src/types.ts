@@ -172,11 +172,17 @@ export interface AnalysisResult {
 }
 
 export interface CorrectionParams {
-  /** Maps to CSS brightness() and Sharp gamma. -100 to +100. */
+  /**
+   * Exposure as a power curve: Sharp gamma and an SVG feComponentTransfer
+   * gamma in the preview. Positive lifts, negative darkens. -100 to +100.
+   */
   brightness: number;
-  /** Maps to CSS contrast() and Sharp linear(). -100 to +100. */
+  /** Maps to CSS contrast() and Sharp linear() around mid-grey. -100 to +100. */
   contrast: number;
-  /** Maps to recomb matrix / CSS feColorMatrix. -100 to +100. */
+  /**
+   * Maps to per-channel Sharp linear() / CSS feColorMatrix. Positive warms
+   * (red up, blue down), negative cools. -100 to +100.
+   */
   temperature: number;
   /** Maps to CSS saturate() and Sharp modulate(). -100 to +100. */
   saturation: number;
@@ -184,6 +190,12 @@ export interface CorrectionParams {
   sharpness: number;
   /** Denoise strength. 0 = off, 1-5 = median kernel size. */
   denoise: number;
+  /**
+   * Bright background with a dark subject. The exposure correction then lifts
+   * the shadows, and the normalise stretch is skipped because its black clip
+   * would crush the subject it is meant to rescue.
+   */
+  backlit?: boolean;
 }
 
 export interface OptimizeForWebOptions {

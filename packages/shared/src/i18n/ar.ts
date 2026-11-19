@@ -1327,6 +1327,7 @@ export const ar: TranslationKeys = {
       enhance: "تحسين",
       sharpenFilter: "مرشح زيادة الحدة",
       whiteBalanceTemperatureFilter: "مرشح درجة حرارة توازن اللون الأبيض",
+      exposureFilter: "مرشح التعريض",
       originalSizeKb: "الأصلي: {size} KB",
       enhancedSizeKb: "المحسّن: {size} KB",
     },

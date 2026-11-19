@@ -1342,6 +1342,7 @@ export const tr: TranslationKeys = {
       enhance: "İyileştir",
       sharpenFilter: "Keskinleştirme filtresi",
       whiteBalanceTemperatureFilter: "Beyaz dengesi sıcaklık filtresi",
+      exposureFilter: "Pozlama filtresi",
       originalSizeKb: "Orijinal: {size} KB",
       enhancedSizeKb: "İyileştirilmiş: {size} KB",
     },

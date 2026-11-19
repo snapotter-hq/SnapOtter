@@ -172,7 +172,7 @@ describe("applyCorrections", () => {
       denoise: 0,
     };
     const image = sharp(PNG_200x150);
-    const enhanced = applyCorrections(image, corrections, "auto", 50, {});
+    const enhanced = await applyCorrections(image, corrections, "auto", 50, {});
     const buffer = await enhanced.toBuffer();
     expect(buffer.length).toBeGreaterThan(0);
   });
@@ -195,7 +195,7 @@ describe("applyCorrections", () => {
       denoise: false,
     };
     const image = sharp(PNG_200x150);
-    const enhanced = applyCorrections(image, corrections, "auto", 50, toggles);
+    const enhanced = await applyCorrections(image, corrections, "auto", 50, toggles);
     const enhancedBuf = await enhanced.toBuffer();
     const originalMeta = await sharp(PNG_200x150).metadata();
     const enhancedMeta = await sharp(enhancedBuf).metadata();
@@ -208,7 +208,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
   it("does not darken a well-exposed image", async () => {
     const analysis = await analyzeImage(PNG_200x150);
     const image = sharp(PNG_200x150);
-    const enhanced = applyCorrections(image, analysis.corrections, "auto", 50, {});
+    const enhanced = await applyCorrections(image, analysis.corrections, "auto", 50, {});
     const enhancedBuf = await enhanced.toBuffer();
 
     const origStats = await sharp(PNG_200x150).stats();
@@ -235,7 +235,13 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
       .toBuffer();
 
     const analysis = await analyzeImage(darkBuffer);
-    const enhanced = applyCorrections(sharp(darkBuffer), analysis.corrections, "auto", 50, {});
+    const enhanced = await applyCorrections(
+      sharp(darkBuffer),
+      analysis.corrections,
+      "auto",
+      50,
+      {},
+    );
     const enhancedBuf = await enhanced.toBuffer();
 
     const origStats = await sharp(darkBuffer).stats();
@@ -263,7 +269,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
       sharpness: 0,
       denoise: 0,
     };
-    const enhanced = applyCorrections(image, corrections, "auto", 0, {});
+    const enhanced = await applyCorrections(image, corrections, "auto", 0, {});
     const enhancedBuf = await enhanced.toBuffer();
 
     const origStats = await sharp(PNG_200x150).stats();
@@ -290,7 +296,13 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     expect(analysis.scores.exposure).toBeGreaterThan(55);
     expect(analysis.scores.exposure).toBeLessThan(70);
 
-    const enhanced = applyCorrections(sharp(brightishBuffer), analysis.corrections, "auto", 50, {});
+    const enhanced = await applyCorrections(
+      sharp(brightishBuffer),
+      analysis.corrections,
+      "auto",
+      50,
+      {},
+    );
     const enhancedBuf = await enhanced.toBuffer();
     const enhStats = await sharp(enhancedBuf).stats();
     const origStats = await sharp(brightishBuffer).stats();
@@ -312,7 +324,13 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     const modes = ["auto", "portrait", "landscape", "low-light", "food", "document"] as const;
     for (const mode of modes) {
       const analysis = await analyzeImage(PNG_200x150);
-      const enhanced = applyCorrections(sharp(PNG_200x150), analysis.corrections, mode, 50, {});
+      const enhanced = await applyCorrections(
+        sharp(PNG_200x150),
+        analysis.corrections,
+        mode,
+        50,
+        {},
+      );
       const buf = await enhanced.toBuffer();
       expect(buf.length).toBeGreaterThan(0);
     }
@@ -321,8 +339,8 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
   it("intensity 100 produces a visibly different output from intensity 0", async () => {
     const analysis = await analyzeImage(PNG_200x150);
 
-    const low = applyCorrections(sharp(PNG_200x150), analysis.corrections, "auto", 0, {});
-    const high = applyCorrections(sharp(PNG_200x150), analysis.corrections, "auto", 100, {});
+    const low = await applyCorrections(sharp(PNG_200x150), analysis.corrections, "auto", 0, {});
+    const high = await applyCorrections(sharp(PNG_200x150), analysis.corrections, "auto", 100, {});
 
     const lowBuf = await low.toBuffer();
     const highBuf = await high.toBuffer();
@@ -331,9 +349,11 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
   });
 
   it("skips CLAHE above MAX_CLAHE_PIXELS (regression: 20MP RAW photo hung 40+s on this step alone)", async () => {
+    // contrast 0: the contrast toggle also gates the global contrast step, so a
+    // non-zero value would make the toggle-off run differ for another reason.
     const corrections = {
       brightness: 20,
-      contrast: 20,
+      contrast: 0,
       temperature: 0,
       saturation: 0,
       sharpness: 0,
@@ -342,7 +362,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     // A real 5504x3672 (20.2MP) photo triggered this; reuse those dimensions
     // as the reported imageSize so the pixel-count gate is exercised without
     // needing to decode an actual 20MP buffer in a unit test.
-    const overCap = applyCorrections(
+    const overCap = await applyCorrections(
       sharp(PNG_200x150),
       corrections,
       "auto",
@@ -355,7 +375,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     );
     const overCapBuf = await overCap.toBuffer();
 
-    const claheDisabled = applyCorrections(
+    const claheDisabled = await applyCorrections(
       sharp(PNG_200x150),
       corrections,
       "auto",
@@ -371,9 +391,11 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
   });
 
   it("still applies CLAHE at or below MAX_CLAHE_PIXELS", async () => {
+    // contrast 0: the contrast toggle also gates the global contrast step, so a
+    // non-zero value would make the toggle-off run differ for another reason.
     const corrections = {
       brightness: 20,
-      contrast: 20,
+      contrast: 0,
       temperature: 0,
       saturation: 0,
       sharpness: 0,
@@ -385,7 +407,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     // imageSize far bigger than the actual small test buffer isn't valid here
     // (that's exactly what the "above the cap" test above uses instead,
     // where CLAHE never actually runs so the mismatch never surfaces).
-    const underCap = applyCorrections(
+    const underCap = await applyCorrections(
       sharp(PNG_200x150),
       corrections,
       "auto",
@@ -398,7 +420,7 @@ describe("applyCorrections pipeline (CLAHE + normalise + gamma)", () => {
     );
     const underCapBuf = await underCap.toBuffer();
 
-    const claheDisabled = applyCorrections(
+    const claheDisabled = await applyCorrections(
       sharp(PNG_200x150),
       corrections,
       "auto",
@@ -444,7 +466,7 @@ describe("auto-enhance edge cases", () => {
       denoise: 5,
     };
     const image = sharp(PNG_200x150);
-    const enhanced = applyCorrections(image, corrections, "low-light", 100, {});
+    const enhanced = await applyCorrections(image, corrections, "low-light", 100, {});
     const buf = await enhanced.toBuffer();
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -462,7 +484,7 @@ describe("auto-enhance edge cases", () => {
       denoise: 3,
     };
     const image = sharp(PNG_200x150);
-    const enhanced = applyCorrections(image, corrections, "auto", 50, {});
+    const enhanced = await applyCorrections(image, corrections, "auto", 50, {});
     const buf = await enhanced.toBuffer();
     expect(buf.length).toBeGreaterThan(0);
   });

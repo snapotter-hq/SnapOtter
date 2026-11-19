@@ -1340,6 +1340,7 @@ export const vi: TranslationKeys = {
       enhance: "Nâng cao",
       sharpenFilter: "Bộ lọc làm nét",
       whiteBalanceTemperatureFilter: "Bộ lọc nhiệt độ cân bằng trắng",
+      exposureFilter: "Bộ lọc phơi sáng",
       originalSizeKb: "Gốc: {size} KB",
       enhancedSizeKb: "Đã nâng cao: {size} KB",
     },

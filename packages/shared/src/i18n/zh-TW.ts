@@ -1106,6 +1106,7 @@ export const zhTW: TranslationKeys = {
       enhance: "增強",
       sharpenFilter: "銳利化濾鏡",
       whiteBalanceTemperatureFilter: "白平衡色溫濾鏡",
+      exposureFilter: "曝光濾鏡",
       originalSizeKb: "原始：{size} KB",
       enhancedSizeKb: "增強後：{size} KB",
     },

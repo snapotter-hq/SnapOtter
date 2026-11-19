@@ -1281,6 +1281,7 @@ export const ko: TranslationKeys = {
       enhance: "향상",
       sharpenFilter: "샤프닝 필터",
       whiteBalanceTemperatureFilter: "화이트 밸런스 색온도 필터",
+      exposureFilter: "노출 필터",
       originalSizeKb: "원본: {size} KB",
       enhancedSizeKb: "향상 후: {size} KB",
     },

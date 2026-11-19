@@ -1344,6 +1344,7 @@ export const ptBR: TranslationKeys = {
       enhance: "Melhorar",
       sharpenFilter: "Filtro de nitidez",
       whiteBalanceTemperatureFilter: "Filtro de temperatura do balanço de branco",
+      exposureFilter: "Filtro de exposição",
       originalSizeKb: "Original: {size} KB",
       enhancedSizeKb: "Melhorado: {size} KB",
     },
