@@ -1068,6 +1068,10 @@ export const hi: TranslationKeys = {
       name: "CSV मर्ज",
       description: "मिलते-जुलते कॉलम वाली कई CSV या TSV फ़ाइलों को एक में जोड़ें",
     },
+    "merge-text": {
+      name: "टेक्स्ट फ़ाइलें मर्ज",
+      description: "कई टेक्स्ट या Markdown फ़ाइलों को आपके चुने क्रम में एक में जोड़ें",
+    },
     "yaml-json": {
       name: "YAML / JSON कन्वर्ट",
       description: "YAML और JSON के बीच दोनों दिशाओं में कन्वर्ट करें",
@@ -3927,6 +3931,14 @@ export const hi: TranslationKeys = {
     "merge-csvs": {
       submit: "मर्ज करें",
       submitBatch: "मर्ज करें ({count} फ़ाइलें)",
+      progressLabel: "मर्ज हो रहा है",
+    },
+    "merge-text": {
+      separator: "फ़ाइलों के बीच",
+      separatorBlankLine: "खाली पंक्ति",
+      separatorRule: "क्षैतिज रेखा (---)",
+      separatorFilenameHeading: "फ़ाइल नाम शीर्षक के रूप में",
+      submit: "मर्ज करें",
       progressLabel: "मर्ज हो रहा है",
     },
     "yaml-json": {

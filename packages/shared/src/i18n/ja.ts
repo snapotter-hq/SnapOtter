@@ -1210,6 +1210,10 @@ export const ja: TranslationKeys = {
       name: "CSV 結合",
       description: "列が一致する複数の CSV または TSV ファイルを1つに結合",
     },
+    "merge-text": {
+      name: "テキストファイル結合",
+      description: "複数のテキストまたは Markdown ファイルを、選んだ順番で1つに結合",
+    },
     "yaml-json": {
       name: "YAML / JSON 変換",
       description: "YAML と JSON を双方向で変換",
@@ -4081,6 +4085,14 @@ export const ja: TranslationKeys = {
     "merge-csvs": {
       submit: "結合",
       submitBatch: "結合 ({count}ファイル)",
+      progressLabel: "結合中",
+    },
+    "merge-text": {
+      separator: "ファイル間の区切り",
+      separatorBlankLine: "空行",
+      separatorRule: "水平線 (---)",
+      separatorFilenameHeading: "ファイル名を見出しに",
+      submit: "結合",
       progressLabel: "結合中",
     },
     "yaml-json": {

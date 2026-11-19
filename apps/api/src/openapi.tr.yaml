@@ -16027,6 +16027,68 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/merge-text:
+    post:
+      operationId: mergeText
+      tags:
+        - Files
+      summary: Metin Dosyalarını Birleştir
+      description: Birden fazla metin veya Markdown dosyasını yüklenme sırasıyla tek dosyada birleştirir. Her dosya UTF-8 metin olmalıdır. Tüm girdilerin uzantısı aynıysa çıktı bu uzantıyı korur, değilse düz metin olur. CSV girdileri her zaman .txt olarak döner, çünkü her dosyanın kendi başlık satırı vardır.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Birleştirilecek iki veya daha fazla .txt, .md, .markdown, .csv veya .log dosyası (2-50 dosya)
+                settings:
+                  type: string
+                  description: |
+                    Seçenekleri içeren JSON dizgesi:
+                    - `separator` (blank-line | rule | filename-heading, varsayılan blank-line) - Dosyalar arasına ne konacağı: boş satır, `---` çizgisi veya başlık olarak her dosyanın adı
+            example:
+              file:
+                - notes-1.md
+                - notes-2.md
+              settings: '{"separator":"filename-heading"}'
+      responses:
+        '200':
+          description: Birleştirilmiş metin dosyası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/merged.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Geçersiz giriş
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
@@ -27210,6 +27272,14 @@ x-i18n:
       sourceHash: 4956c801900a
       provenance: machine
       outputHash: 32ec7d10fc66
+    paths./api/v1/tools/files/merge-text.post.summary:
+      sourceHash: b9311f92a88b
+      provenance: machine
+      outputHash: 0624be9eaf7c
+    paths./api/v1/tools/files/merge-text.post.description:
+      sourceHash: eb21d6096cf1
+      provenance: machine
+      outputHash: 90892a8266a2
     paths./api/v1/tools/files/yaml-json.post.summary:
       sourceHash: cd3e06c3d51d
       provenance: machine
@@ -33823,6 +33893,26 @@ x-i18n:
       provenance: machine
       outputHash: b5c825dbe620
     ptr:/paths/~1api~1v1~1tools~1files~1merge-csvs/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 71487691d646
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: edb6ac1bcc24
+      provenance: machine
+      outputHash: f2e716f79d9f
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 26b420f88b74
+      provenance: machine
+      outputHash: 4e1133c8fefd
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/200/description:
+      sourceHash: de8b7de8b472
+      provenance: machine
+      outputHash: 79eefc5bc87a
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: b5c825dbe620
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 71487691d646

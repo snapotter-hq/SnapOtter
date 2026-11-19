@@ -1232,6 +1232,10 @@ export const es: TranslationKeys = {
       name: "Unir CSVs",
       description: "Combina varios archivos CSV o TSV con columnas coincidentes en uno",
     },
+    "merge-text": {
+      name: "Unir archivos de texto",
+      description: "Combina varios archivos de texto o Markdown en uno, en el orden que elijas",
+    },
     "yaml-json": {
       name: "Convertir YAML / JSON",
       description: "Convierte entre YAML y JSON en ambas direcciones",
@@ -4123,6 +4127,14 @@ export const es: TranslationKeys = {
     "merge-csvs": {
       submit: "Combinar",
       submitBatch: "Combinar ({count} archivos)",
+      progressLabel: "Combinando",
+    },
+    "merge-text": {
+      separator: "Entre archivos",
+      separatorBlankLine: "Línea en blanco",
+      separatorRule: "Línea horizontal (---)",
+      separatorFilenameHeading: "Nombre de archivo como encabezado",
+      submit: "Combinar",
       progressLabel: "Combinando",
     },
     "yaml-json": {
