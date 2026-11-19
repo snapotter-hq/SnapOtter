@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { isSafeMessageError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -280,6 +280,88 @@ describe("pdfcpuCropMargin", () => {
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 2000, "/out.pdf")),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("pdfcpuPageSizes", () => {
+  const info = (pageSizes: unknown) =>
+    JSON.stringify({ header: {}, infos: [{ pageCount: 3, pageSizes, unit: "points" }] });
+
+  it("runs info -j on the input and returns the distinct page sizes", async () => {
+    h.nextClose({
+      stdout: info([
+        { width: 419.53, height: 595.28 },
+        { width: 612, height: 792 },
+      ]),
+      code: 0,
+    });
+    const sizes = await import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf"));
+    expect(h.lastArgs()).toEqual(["-c", "disable", "info", "-j", "/in.pdf"]);
+    expect(sizes).toEqual([
+      { width: 419.53, height: 595.28 },
+      { width: 612, height: 792 },
+    ]);
+  });
+
+  it("rejects output with no usable page sizes", async () => {
+    h.nextClose({ stdout: info([]), code: 0 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
+    ).rejects.toThrow("pdfcpu info reported no page sizes");
+    h.nextClose({ stdout: info([{ width: "wide", height: 10 }]), code: 0 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
+    ).rejects.toThrow("pdfcpu info reported no page sizes");
+    h.nextClose({ stdout: "not json", code: 0 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
+    ).rejects.toThrow("pdfcpu info reported no page sizes");
+  });
+
+  it("propagates a pdfcpu failure", async () => {
+    h.nextClose({ stderr: "pdfcpu: cannot read file", code: 1 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
+    ).rejects.toThrow("pdfcpu exited 1: pdfcpu: cannot read file");
+  });
+});
+
+describe("assertCropMarginFits (#4421)", () => {
+  const a5 = { width: 419.53, height: 595.28 };
+
+  it("accepts a margin that leaves some area on every page", async () => {
+    const m = await import("../src/pdfcpu.js");
+    expect(() => m.assertCropMarginFits(0, [a5])).not.toThrow();
+    expect(() => m.assertCropMarginFits(209, [a5])).not.toThrow();
+  });
+
+  it("rejects a margin of half the shorter side or more as a 400 input error", async () => {
+    const m = await import("../src/pdfcpu.js");
+    for (const margin of [209.765, 210, 250]) {
+      let err: unknown;
+      try {
+        m.assertCropMarginFits(margin, [a5]);
+      } catch (e) {
+        err = e;
+      }
+      expect(isToolInputError(err)).toBe(true);
+      expect(err).toMatchObject({ statusCode: 400, code: "INVALID_SETTINGS" });
+      expect((err as Error).message).toBe(
+        "Crop margin is too large for this PDF. It must be less than 209.76 points, half the shortest page side.",
+      );
+    }
+  });
+
+  it("measures against the smallest page when sizes differ", async () => {
+    const m = await import("../src/pdfcpu.js");
+    const sizes = [
+      { width: 612, height: 792 },
+      { width: 300, height: 100 },
+    ];
+    expect(() => m.assertCropMarginFits(49, sizes)).not.toThrow();
+    expect(() => m.assertCropMarginFits(50, sizes)).toThrow(
+      "It must be less than 50 points, half the shortest page side.",
+    );
   });
 });
 

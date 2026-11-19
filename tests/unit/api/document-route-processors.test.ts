@@ -38,6 +38,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 }));
 
 vi.mock("@snapotter/doc-engine", () => ({
+  assertCropMarginFits: vi.fn(),
   convertDocument: vi.fn(),
   gsCompressPdfTuned: vi.fn(),
   gsGrayscalePdf: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfcpuBooklet: vi.fn(),
   pdfcpuCropMargin: vi.fn(),
   pdfcpuNup: vi.fn(),
+  pdfcpuPageSizes: vi.fn(async () => [{ width: 612, height: 792 }]),
   pdfcpuTextStamp: vi.fn(),
   pdfFlattenPy: vi.fn(),
   pdfMetadataGetPy: vi.fn(async () => ({ Title: "Updated" })),
@@ -79,6 +81,7 @@ vi.mock("@snapotter/doc-engine", () => ({
 
 import { writeFile } from "node:fs/promises";
 import {
+  assertCropMarginFits,
   convertDocument,
   gsCompressPdfTuned,
   gsGrayscalePdf,
@@ -87,6 +90,7 @@ import {
   pdfcpuBooklet,
   pdfcpuCropMargin,
   pdfcpuNup,
+  pdfcpuPageSizes,
   pdfcpuTextStamp,
   pdfFlattenPy,
   pdfMetadataGetPy,
@@ -1312,6 +1316,23 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         "pdf",
         { timeoutMs: 120_000, signal: pptCtx.signal },
       );
+    });
+  });
+
+  it("crop-pdf checks the margin against the page sizes before cropping (#4421)", async () => {
+    registerCropPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: { margin: 250 } };
+      vi.mocked(assertCropMarginFits).mockImplementationOnce(() => {
+        throw new Error("margin too large");
+      });
+      await expect(getToolConfig("crop-pdf")?.processV2?.(ctx)).rejects.toThrow("margin too large");
+      expect(pdfcpuPageSizes).toHaveBeenCalledWith(join(scratchDir, "in-doc.pdf"), {
+        signal: ctx.signal,
+      });
+      expect(assertCropMarginFits).toHaveBeenCalledWith(250, [{ width: 612, height: 792 }]);
+      expect(pdfcpuCropMargin).not.toHaveBeenCalled();
     });
   });
 

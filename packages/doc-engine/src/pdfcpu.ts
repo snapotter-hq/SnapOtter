@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
-import { engineCrashError, engineCrashSignal, wrapWithMemoryLimit } from "@snapotter/shared";
+import {
+  engineCrashError,
+  engineCrashSignal,
+  ToolInputError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import { resolvePdfcpu } from "./binaries.js";
 
 export interface PdfcpuOptions {
@@ -121,6 +126,56 @@ export async function pdfcpuCropMargin(
     throw new Error("Crop margin must be 0-2000 points");
   }
   await runPdfcpu(["crop", String(marginPoints), inputPath, outPath], opts);
+}
+
+export interface PdfPageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The distinct page sizes of a PDF in points, from `pdfcpu info -j`. pdfcpu
+ * reports MediaBox sizes, which is also the box `pdfcpu crop` measures its
+ * margin from (a page that already has a CropBox is re-cropped from its
+ * MediaBox), so these are the sizes a crop margin has to fit inside.
+ */
+export async function pdfcpuPageSizes(
+  inputPath: string,
+  opts?: PdfcpuOptions,
+): Promise<PdfPageSize[]> {
+  const out = await runPdfcpu(["info", "-j", inputPath], opts);
+  let sizes: unknown;
+  try {
+    sizes = (JSON.parse(out) as { infos?: { pageSizes?: unknown }[] }).infos?.[0]?.pageSizes;
+  } catch {
+    sizes = undefined;
+  }
+  const valid =
+    Array.isArray(sizes) &&
+    sizes.length > 0 &&
+    sizes.every(
+      (s) =>
+        typeof s?.width === "number" &&
+        typeof s?.height === "number" &&
+        Number.isFinite(s.width) &&
+        Number.isFinite(s.height),
+    );
+  if (!valid) throw new Error("pdfcpu info reported no page sizes");
+  return (sizes as PdfPageSize[]).map(({ width, height }) => ({ width, height }));
+}
+
+/**
+ * A uniform margin of half the shortest page side or more leaves no area, and
+ * pdfcpu writes an inverted CropBox for it instead of failing (#4421).
+ */
+export function assertCropMarginFits(marginPoints: number, sizes: PdfPageSize[]): void {
+  const shortestSide = Math.min(...sizes.flatMap((s) => [s.width, s.height]));
+  if (2 * marginPoints < shortestSide) return;
+  const limit = Math.floor((shortestSide / 2) * 100) / 100;
+  throw new ToolInputError(
+    `Crop margin is too large for this PDF. It must be less than ${limit} points, half the shortest page side.`,
+    { code: "INVALID_SETTINGS" },
+  );
 }
 
 /** Valid n-up values per pdfcpu v0.13.0 help. */

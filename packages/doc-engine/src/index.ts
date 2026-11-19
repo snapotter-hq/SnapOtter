@@ -35,12 +35,15 @@ export {
   qpdfSplitRanges,
 } from "./pdf-ops.js";
 export {
+  assertCropMarginFits,
   type BookletValue,
   type NupValue,
   type PdfcpuOptions,
+  type PdfPageSize,
   pdfcpuBooklet,
   pdfcpuCropMargin,
   pdfcpuNup,
+  pdfcpuPageSizes,
   pdfcpuTextStamp,
   type TextStampOptions,
 } from "./pdfcpu.js";
