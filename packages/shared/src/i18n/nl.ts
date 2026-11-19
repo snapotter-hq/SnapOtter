@@ -5899,6 +5899,7 @@ export const nl: TranslationKeys = {
     resultResizedToFit: "Verkleind om binnen de doelgrootte te passen",
     resultMissedTarget: "Doelgrootte niet gehaald",
     reverseOrder: "Volgorde omkeren",
+    removeFile: "{name} verwijderen",
     whiteBackground: "Witte achtergrond",
     blackBackground: "Zwarte achtergrond",
     expandPanel: "Paneel uitvouwen",

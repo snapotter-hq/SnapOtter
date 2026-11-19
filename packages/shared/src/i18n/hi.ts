@@ -5636,6 +5636,7 @@ export const hi: TranslationKeys = {
     resultResizedToFit: "लक्ष्य आकार में फिट करने के लिए छोटा किया गया",
     resultMissedTarget: "लक्ष्य आकार तक नहीं पहुंचा",
     reverseOrder: "क्रम उलटें",
+    removeFile: "{name} हटाएं",
     whiteBackground: "सफ़ेद बैकग्राउंड",
     blackBackground: "काला बैकग्राउंड",
     expandPanel: "पैनल विस्तारित करें",

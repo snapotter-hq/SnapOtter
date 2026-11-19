@@ -5785,6 +5785,7 @@ export const en = {
     resultResizedToFit: "Scaled down to fit the size target",
     resultMissedTarget: "Didn't reach the size target",
     reverseOrder: "Reverse order",
+    removeFile: "Remove {name}",
     whiteBackground: "White background",
     blackBackground: "Black background",
     expandPanel: "Expand panel",

@@ -5882,6 +5882,7 @@ export const uk: TranslationKeys = {
     resultResizedToFit: "Зменшено, щоб уміститися в цільовий розмір",
     resultMissedTarget: "Цільовий розмір не досягнуто",
     reverseOrder: "Змінити порядок на зворотний",
+    removeFile: "Вилучити {name}",
     whiteBackground: "Біле тло",
     blackBackground: "Чорне тло",
     expandPanel: "Розгорнути панель",

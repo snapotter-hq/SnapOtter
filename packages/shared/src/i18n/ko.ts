@@ -5773,6 +5773,7 @@ export const ko: TranslationKeys = {
     resultResizedToFit: "목표 크기에 맞추기 위해 축소함",
     resultMissedTarget: "목표 크기에 도달하지 못함",
     reverseOrder: "순서 뒤집기",
+    removeFile: "{name} 제거",
     whiteBackground: "흰색 배경",
     blackBackground: "검은색 배경",
     expandPanel: "패널 펼치기",

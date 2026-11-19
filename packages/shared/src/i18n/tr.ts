@@ -5871,6 +5871,7 @@ export const tr: TranslationKeys = {
     resultResizedToFit: "Hedef boyuta sığması için küçültüldü",
     resultMissedTarget: "Hedef boyuta ulaşılamadı",
     reverseOrder: "Sırayı tersine çevir",
+    removeFile: "{name} dosyasını kaldır",
     whiteBackground: "Beyaz arka plan",
     blackBackground: "Siyah arka plan",
     expandPanel: "Paneli genişlet",

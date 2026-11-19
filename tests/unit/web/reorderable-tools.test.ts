@@ -29,6 +29,10 @@ describe("REORDERABLE_TOOLS", () => {
     expect(REORDERABLE_TOOLS.has("jpg-to-pdf")).toBe(true);
   });
 
+  it("includes the base image-to-pdf tool, which uploads files in page order (#4836)", () => {
+    expect(REORDERABLE_TOOLS.has("image-to-pdf")).toBe(true);
+  });
+
   it("excludes per-file batch tools where order is irrelevant", () => {
     for (const id of ["compress", "convert", "content-aware-resize"]) {
       expect(REORDERABLE_TOOLS.has(id)).toBe(false);

@@ -27,11 +27,13 @@ import {
   GripVertical,
   Loader2,
   Music,
+  X,
   XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { quietImport } from "@/lib/chunk-reload";
+import { format } from "@/lib/format";
 import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { hasResultWarning } from "@/lib/result-notes";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
@@ -339,6 +341,35 @@ function ThumbTile({
   );
 }
 
+/** Per-tile remove control, pinned to the bottom corner so it clears the drag
+ *  handle (top-start) and the status badge (top-end). */
+function RemoveTileButton({
+  entry,
+  index,
+  onRemove,
+}: {
+  entry: FileEntry;
+  index: number;
+  onRemove: (index: number) => void;
+}) {
+  const { t } = useTranslation();
+  const label = format(t.a11y.removeFile, { name: entry.file.name });
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove(index);
+      }}
+      className="absolute bottom-0 end-0 flex h-4 w-4 items-center justify-center rounded-ss bg-background/70 text-muted-foreground hover:bg-background hover:text-foreground"
+    >
+      <X className="h-3 w-3" />
+    </button>
+  );
+}
+
 /** A ThumbTile wrapped in a dnd-kit sortable, with a keyboard-reachable drag
  *  handle. Tapping the tile still selects; the handle is the drag activator. */
 function SortableThumbTile({
@@ -347,6 +378,7 @@ function SortableThumbTile({
   isSelected,
   buttonRef,
   onSelect,
+  onRemove,
   dragLabel,
 }: {
   entry: FileEntry;
@@ -354,6 +386,7 @@ function SortableThumbTile({
   isSelected: boolean;
   buttonRef?: React.Ref<HTMLButtonElement>;
   onSelect: (index: number) => void;
+  onRemove?: (index: number) => void;
   dragLabel: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -391,6 +424,7 @@ function SortableThumbTile({
       >
         <GripVertical className="h-3 w-3" />
       </button>
+      {onRemove && <RemoveTileButton entry={entry} index={index} onRemove={onRemove} />}
     </div>
   );
 }
@@ -403,6 +437,8 @@ interface ThumbnailStripProps {
   onReorder?: (from: number, to: number) => void;
   /** When provided, a reverse-order control is shown. */
   onReverse?: () => void;
+  /** When provided, each tile gets a remove control; called with its index. */
+  onRemove?: (index: number) => void;
 }
 
 export function ThumbnailStrip({
@@ -411,6 +447,7 @@ export function ThumbnailStrip({
   onSelect,
   onReorder,
   onReverse,
+  onRemove,
 }: ThumbnailStripProps) {
   const { t } = useTranslation();
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -462,7 +499,7 @@ export function ThumbnailStrip({
     const isSelected = i === selectedIndex;
     const buttonRef = isSelected ? selectedRef : undefined;
     if (!onReorder) {
-      return (
+      const tile = (
         <ThumbTile
           key={entry.id}
           entry={entry}
@@ -471,6 +508,13 @@ export function ThumbnailStrip({
           buttonRef={buttonRef}
           onSelect={onSelect}
         />
+      );
+      if (!onRemove) return tile;
+      return (
+        <div key={entry.id} className="relative shrink-0">
+          {tile}
+          <RemoveTileButton entry={entry} index={i} onRemove={onRemove} />
+        </div>
       );
     }
     return (
@@ -481,6 +525,7 @@ export function ThumbnailStrip({
         isSelected={isSelected}
         buttonRef={buttonRef}
         onSelect={onSelect}
+        onRemove={onRemove}
         dragLabel={t.a11y.dragToReorder}
       />
     );

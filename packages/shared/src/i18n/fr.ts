@@ -5919,6 +5919,7 @@ export const fr: TranslationKeys = {
     resultResizedToFit: "Réduite pour tenir dans la taille cible",
     resultMissedTarget: "Taille cible non atteinte",
     reverseOrder: "Inverser l'ordre",
+    removeFile: "Retirer {name}",
     whiteBackground: "Arrière-plan blanc",
     blackBackground: "Arrière-plan noir",
     expandPanel: "Développer le panneau",

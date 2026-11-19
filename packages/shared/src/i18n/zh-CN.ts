@@ -5529,6 +5529,7 @@ export const zhCN: TranslationKeys = {
     resultResizedToFit: "已缩小以符合目标大小",
     resultMissedTarget: "未达到目标大小",
     reverseOrder: "反转顺序",
+    removeFile: "移除 {name}",
     whiteBackground: "白色背景",
     blackBackground: "黑色背景",
     expandPanel: "展开面板",

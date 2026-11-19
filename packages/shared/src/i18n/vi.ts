@@ -5848,6 +5848,7 @@ export const vi: TranslationKeys = {
     resultResizedToFit: "Đã thu nhỏ để vừa kích thước mục tiêu",
     resultMissedTarget: "Chưa đạt kích thước mục tiêu",
     reverseOrder: "Đảo ngược thứ tự",
+    removeFile: "Xóa {name}",
     whiteBackground: "Nền trắng",
     blackBackground: "Nền đen",
     expandPanel: "Mở rộng bảng",
