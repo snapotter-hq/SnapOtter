@@ -133,7 +133,7 @@
   },
   "altIndex.why.noQuotas.body": {
     "sourceHash": "832b7db630d3",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "7a5178ad3c13",
     "stale": false
   },
@@ -175,7 +175,7 @@
   },
   "altIndex.why.yours.body": {
     "sourceHash": "c81dc8258b01",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "5194160ff1bf",
     "stale": false
   },
@@ -541,7 +541,7 @@
   },
   "contact.intro": {
     "sourceHash": "6da9d3a7cbf5",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "c71db491c638",
     "stale": false
   },
@@ -1099,7 +1099,7 @@
   },
   "faq.q2.a": {
     "sourceHash": "bfbe1ebc18ca",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "2e6fbf409143",
     "stale": false
   },
@@ -1123,7 +1123,7 @@
   },
   "faq.q4.a": {
     "sourceHash": "52a773097545",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "bd8bfcbf22e9",
     "stale": false
   },
@@ -2719,7 +2719,7 @@
   },
   "privacy.controller.body": {
     "sourceHash": "b8be39e60bf2",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "cf5862ba1068",
     "stale": false
   },
@@ -2737,7 +2737,7 @@
   },
   "privacy.metaDescription": {
     "sourceHash": "f75c36391f56",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "e2abda925a1a",
     "stale": false
   },
@@ -2761,7 +2761,7 @@
   },
   "privacy.overview.body": {
     "sourceHash": "5430f0211ab8",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "a7a81f331bc1",
     "stale": false
   },
@@ -3043,7 +3043,7 @@
   },
   "terms.whoWeAre.body": {
     "sourceHash": "392c953fd7c0",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "e4f4828c3c7c",
     "stale": false
   },

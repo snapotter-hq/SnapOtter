@@ -241,7 +241,7 @@
   },
   "banner.localeRecall": {
     "sourceHash": "f14d32ca69c8",
-    "provenance": "human",
+    "provenance": "machine",
     "outputHash": "7df18ed6e102",
     "stale": false
   },
