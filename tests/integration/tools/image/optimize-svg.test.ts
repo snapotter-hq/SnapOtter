@@ -71,7 +71,8 @@ describe("optimize-svg", () => {
     const res = await run(VERBOSE_SVG, "badge.svg");
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toMatch(/badge\.svg$/);
+    // An unchanged name gets the tool suffix from buildOutputName.
+    expect(json.downloadUrl).toMatch(/badge_optimize-svg\.svg$/);
     expect(json.processedSize).toBeLessThan(json.originalSize);
 
     const svg = await download(json.downloadUrl);
