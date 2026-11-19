@@ -76,6 +76,22 @@ describe("generateLocaleLlmsTxt", () => {
     // Still lists the tool by id with the sync mode, never crashes.
     expect(out).toContain("(resize, sync)");
   });
+
+  it("lists content-aware-resize as async now that it runs on the queue (#4338)", () => {
+    const out = generateLocaleLlmsTxt({
+      spec,
+      sections,
+      toolsBySection: {
+        image: [
+          { id: "content-aware-resize", executionHint: "long" as const },
+          { id: "passport-photo", executionHint: "long" as const },
+        ],
+      },
+      toolStrings: {},
+    });
+    expect(out).toContain("(content-aware-resize, async)");
+    expect(out).toContain("(passport-photo, two-phase)");
+  });
 });
 
 describe("openapi.zh-TW.yaml auth, roles, and features descriptions (#3585, #3597)", () => {

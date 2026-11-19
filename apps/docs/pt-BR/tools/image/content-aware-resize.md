@@ -1,8 +1,8 @@
 ---
 description: "Redimensionamento por corte de costura (seam carving) que adiciona ou remove pixels ao longo de caminhos de baixa importância para preservar o conteúdo principal e os rostos."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: d6732db341fa
+i18n_output_hash: 2eacedb4a530
 ---
 
 # Redimensionamento com Reconhecimento de Conteúdo {#content-aware-resize}
@@ -13,7 +13,7 @@ Redimensionamento por corte de costura (seam carving) que remove ou adiciona pix
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Processamento:** Síncrono (retorna o resultado diretamente)
+**Processamento:** Assíncrono (retorna 202, consulte `/api/v1/jobs/{jobId}/progress` para o status via SSE)
 
 **Pacote do modelo:** Nenhum necessário para a operação básica. A proteção de rostos usa o pacote `face-detection` (200-300 MB) se ativada.
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Resposta (200 OK) {#response-200-ok}
+## Resposta {#response}
+
+### Resposta Inicial (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Resultado Final (via SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notas {#notes}
 
-- Esta rota personalizada atualmente retorna uma resposta síncrona 200.
 - Usa a biblioteca de corte de costura `caire` para o redimensionamento com reconhecimento de conteúdo.
 - Apenas reduz as dimensões (remove costuras). Não pode expandir uma imagem além do seu tamanho original.
 - A opção `protectFaces` usa detecção de rostos por IA para marcar as regiões de rosto como de alta energia, impedindo que as costuras passem pelos rostos.

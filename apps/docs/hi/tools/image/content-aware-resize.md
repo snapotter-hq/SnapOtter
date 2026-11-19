@@ -1,8 +1,8 @@
 ---
 description: "सीम-कार्विंग आकार बदलना जो प्रमुख सामग्री और चेहरों को संरक्षित करने के लिए कम-महत्व वाले पथों के साथ पिक्सेल जोड़ता या हटाता है।"
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: e17ef26ea7e2
+i18n_output_hash: 9b230b690995
 ---
 
 # Content-Aware Resize {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: e17ef26ea7e2
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Processing:** तुल्यकालिक (परिणाम सीधे लौटाता है)
+**Processing:** असिंक्रोनस (202 लौटाता है, SSE के माध्यम से स्थिति के लिए `/api/v1/jobs/{jobId}/progress` पोल करें)
 
 **Model bundle:** बुनियादी संचालन के लिए कोई आवश्यक नहीं। सक्षम होने पर चेहरा सुरक्षा `face-detection` बंडल (200-300 MB) का उपयोग करती है।
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Response {#response}
+
+### Initial Response (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Final Result (via SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notes {#notes}
 
-- यह कस्टम रूट वर्तमान में एक तुल्यकालिक 200 प्रतिक्रिया लौटाता है।
 - सामग्री-जागरूक आकार बदलने के लिए `caire` सीम कार्विंग लाइब्रेरी का उपयोग करता है।
 - केवल आयाम घटाता है (सीम हटाता है)। किसी छवि को उसके मूल आकार से आगे विस्तारित नहीं कर सकता।
 - `protectFaces` विकल्प चेहरा क्षेत्रों को उच्च-ऊर्जा के रूप में चिह्नित करने के लिए AI चेहरा पहचान का उपयोग करता है, जिससे सीम को चेहरों से गुज़रने से रोका जाता है।

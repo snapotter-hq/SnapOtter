@@ -1126,6 +1126,53 @@ describe("useToolProcessor malformed 2xx results (#1740)", () => {
 });
 
 /**
+ * #4338: content-aware-resize moved onto the queue and now answers 202. Its
+ * settings panel reads progress and downloadUrl from this hook, so the queued
+ * path has to land the same result the old synchronous 200 did.
+ */
+describe("useToolProcessor queued content-aware-resize (#4338)", () => {
+  it("follows the 202 onto the progress stream and lands the carved result", () => {
+    const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("content-aware-resize"));
+    act(() => {
+      result.current.processFiles([file], { width: 100 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => sendSingleFrame({ phase: "processing", percent: 40, stage: "Processing" }));
+    expect(result.current.progress).toMatchObject({ phase: "processing", stage: "Processing" });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    const carved = {
+      jobId: JOB_ID,
+      downloadUrl: `/api/v1/download/${JOB_ID}/photo_seam.png`,
+      originalSize: 64,
+      processedSize: 48,
+      width: 100,
+      height: 150,
+    };
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: carved }));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: carved.downloadUrl,
+      error: null,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(result.current.downloadUrl).toBe(carved.downloadUrl);
+    expect(result.current.resultPayload).toMatchObject({ width: 100, height: 150 });
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+/**
  * #1794: the progress stream's completed frame is the async twin of the sync
  * 2xx answer #1740 checks. One with no download URL used to land as a
  * finished run with nothing behind it, and nobody heard about it.

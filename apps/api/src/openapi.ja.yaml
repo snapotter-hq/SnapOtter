@@ -432,32 +432,44 @@ paths:
                     - `square` (boolean, デフォルト false) - 正方形の縦横比にトリミング
 
                     `width`、`height`、`square` のうち少なくとも 1 つを指定する必要があります。
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE による進捗追跡用にクライアントが指定するジョブ ID
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        '200':
-          description: 処理済み画像
+        '202':
+          description: 非同期処理として受け付けました。/api/v1/jobs/{jobId}/progress の SSE で進捗を確認できます。
+          headers:
+            Location:
+              description: ジョブのステータス URL（statusUrl と同じ値）。
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ToolResponse'
-                  - type: object
-                    properties:
-                      width:
-                        type: integer
-                      height:
-                        type: integer
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
               example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                downloadUrl: /api/v1/download/abc123/output.png
-                originalSize: 1
-                processedSize: 1
-                previewUrl: example
-                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                width: 1
-                height: 1
+                async: true
         '400':
           description: 入力が無効です
           content:
@@ -28042,10 +28054,18 @@ x-i18n:
       sourceHash: 01c5c9eafe1b
       provenance: machine
       outputHash: 66afa9f68671
-    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/200/description:
-      sourceHash: 82f006c19be1
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
       provenance: machine
-      outputHash: 4f6b53ae2cba
+      outputHash: 129eb7ccebec
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: bd0d8b89b514
+    ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: cc09bc03305b
     ptr:/paths/~1api~1v1~1tools~1image~1content-aware-resize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

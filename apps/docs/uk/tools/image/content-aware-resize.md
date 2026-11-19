@@ -1,8 +1,8 @@
 ---
 description: "Зміна розміру методом швів, що додає або видаляє пікселі вздовж малозначущих шляхів для збереження ключового вмісту та облич."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: 16ea4c2778e1
 i18n_provenance: human
-i18n_output_hash: 69e88590877c
+i18n_output_hash: eebd0546d5d1
 ---
 
 # Content-Aware Resize {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 69e88590877c
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Processing:** Синхронна (повертає результат напряму)
+**Processing:** Асинхронна (повертає 202, опитуйте `/api/v1/jobs/{jobId}/progress` для отримання статусу через SSE)
 
 **Model bundle:** Не потрібен для базової роботи. Захист облич використовує пакет `face-detection` (200-300 MB), якщо увімкнено.
 
@@ -39,22 +39,38 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## Відповідь {#response}
+
+### Початкова відповідь (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Кінцевий результат (через SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notes {#notes}
 
-- Цей власний маршрут наразі повертає синхронну відповідь 200.
 - Використовує бібліотеку швів `caire` для зміни розміру з урахуванням вмісту.
 - Лише зменшує розміри (видаляє шви). Не може розширити зображення понад його оригінальний розмір.
 - Параметр `protectFaces` використовує AI-виявлення облич, щоб позначити області облич як високоенергетичні, запобігаючи проходженню швів через обличчя.
