@@ -11,6 +11,14 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resol
 
 const WORKSHEET_REL_TYPE = /\/worksheet$/;
 
+// Excel's sheet limits. A reference past them can only come from a crafted file, and
+// padding a row out to one would let a few bytes of XML ask for gigabytes of CSV.
+const MAX_COLUMNS = 16_384;
+const MAX_ROWS = 1_048_576;
+// Merged ranges are repeated into every cell they cover, so a single crafted range
+// like A2:XFD60000 would do the same. Real sheets merge headers, not a million cells.
+const MAX_MERGED_CELLS = 1_000_000;
+
 type SharedString = string | null | { richText: { text: string | null }[] };
 
 interface SaxNode {
@@ -39,7 +47,8 @@ interface WorkbookParts {
   _parseStyles(entry: Readable): Promise<void>;
   workbookRels?: { Id: string; Target: string; Type: string }[];
   model?: { sheets?: { rId: string }[] };
-  properties?: { date1904?: boolean };
+  // The workbookPr xform, not its model: the flag is at properties.model.date1904.
+  properties?: { model?: { date1904?: boolean } };
   sharedStrings?: SharedString[];
   styles: { getStyleModel(id: number): { numFmt?: string } | null };
 }
@@ -121,6 +130,14 @@ function columnOf(ref: string | undefined): number {
   return col;
 }
 
+function checkBounds(row: number, col: number): void {
+  if (row > MAX_ROWS || col > MAX_COLUMNS) {
+    throw new InputValidationError(
+      `Cell reference past Excel's limits (row ${row}, column ${col}); the file may be corrupt`,
+    );
+  }
+}
+
 /** Row number of a cell reference such as "AB12", or 0 when absent. */
 function rowOf(ref: string): number {
   const digits = /\d+$/.exec(ref);
@@ -146,19 +163,28 @@ const MERGE_SCAN_OVERLAP = 256;
  */
 async function readMergeRanges(stream: Readable): Promise<MergeRange[]> {
   const merges: MergeRange[] = [];
+  let mergedCells = 0;
   let tail = "";
   for await (const chunk of stream) {
     const text = tail + (chunk as Buffer).toString("utf8");
     let lastEnd = 0;
     for (const match of text.matchAll(MERGE_CELL)) {
       const [first, second] = [match[1], match[2]];
-      merges.push({
+      const merge = {
         top: Math.min(rowOf(first), rowOf(second)),
         bottom: Math.max(rowOf(first), rowOf(second)),
         left: Math.min(columnOf(first), columnOf(second)),
         right: Math.max(columnOf(first), columnOf(second)),
         text: "",
-      });
+      };
+      checkBounds(merge.bottom, merge.right);
+      mergedCells += (merge.bottom - merge.top + 1) * (merge.right - merge.left + 1);
+      if (mergedCells > MAX_MERGED_CELLS) {
+        throw new InputValidationError(
+          `The sheet merges more than ${MAX_MERGED_CELLS.toLocaleString("en-US")} cells; unmerge them and try again`,
+        );
+      }
+      merges.push(merge);
       lastEnd = (match.index ?? 0) + match[0].length;
     }
     tail = text.slice(Math.max(lastEnd, text.length - MERGE_SCAN_OVERLAP));
@@ -229,7 +255,7 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
     const sheetEntry = await read(sheetPath);
     if (!sheetEntry) throw new InputValidationError("Not a readable XLSX file");
 
-    const date1904 = Boolean(parts.properties?.date1904);
+    const date1904 = Boolean(parts.properties?.model?.date1904);
     const strings = parts.sharedStrings ?? [];
     const dateStyles = new Map<number, boolean>();
     const isDateStyle = (styleId: number) => {
@@ -335,6 +361,7 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
           switch (node.name) {
             case "row":
               rowNumber = Number.parseInt(node.attributes.r ?? "", 10) || lastRow + 1;
+              checkBounds(rowNumber, 0);
               await emitGapRows(rowNumber);
               rowCells = [];
               rowHasValue = false;
@@ -350,6 +377,7 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
                 inPhonetic: false,
               };
               lastCol = cell.col;
+              checkBounds(rowNumber, cell.col);
               while (rowCells.length < cell.col) rowCells.push("");
               break;
             case "f":
@@ -403,6 +431,10 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
     await emitGapRows(lastMergedRow + 1);
     flush();
     return Buffer.concat(output);
+  } catch (err) {
+    // Malformed XML and corrupt zip streams are bad input, like a file that won't open.
+    if (err instanceof InputValidationError) throw err;
+    throw new InputValidationError(`Not a readable XLSX file: ${(err as Error).message}`);
   } finally {
     zipfile.close();
   }

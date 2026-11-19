@@ -8,6 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import AdmZip from "adm-zip";
 import type ExcelJSType from "exceljs";
 import { describe, expect, it } from "vitest";
 import { xlsxToCsv } from "../../../apps/api/src/lib/xlsx-to-csv.js";
@@ -137,6 +138,87 @@ describe("xlsxToCsv", () => {
     await expect(xlsxToCsv(Buffer.from("id,name\n1,Ada\n"), 1)).rejects.toThrow(
       /Not a readable XLSX file/,
     );
+  });
+
+  describe("XML ExcelJS never writes", () => {
+    /**
+     * An ExcelJS file whose sheet1.xml <sheetData> is swapped for hand-written XML.
+     * Its A1 carries a date format, so `s="<dateStyle>"` marks a date cell.
+     */
+    async function patchedWorkbook(
+      sheetData: (dateStyle: string) => string,
+      { date1904 = false, mergeCells = "" } = {},
+    ): Promise<Buffer> {
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet("Data");
+      ws.getCell("A1").value = new Date(Date.UTC(2024, 0, 1));
+      ws.getCell("A1").numFmt = "yyyy-mm-dd";
+      const zip = new AdmZip(await write(workbook));
+      const sheetXml = zip.getEntry("xl/worksheets/sheet1.xml")?.getData().toString("utf8") ?? "";
+      const dateStyle = /<c r="A1" s="(\d+)"/.exec(sheetXml)?.[1] ?? "";
+      expect(dateStyle).not.toBe("");
+      const patched = sheetXml
+        .replace(
+          /<sheetData>[\s\S]*<\/sheetData>/,
+          `<sheetData>${sheetData(dateStyle)}</sheetData>`,
+        )
+        .replace(/<mergeCells[\s\S]*<\/mergeCells>/, "")
+        .replace("</sheetData>", `</sheetData>${mergeCells}`);
+      zip.updateFile("xl/worksheets/sheet1.xml", Buffer.from(patched));
+      if (date1904) {
+        const workbookXml = zip.getEntry("xl/workbook.xml")?.getData().toString("utf8") ?? "";
+        zip.updateFile(
+          "xl/workbook.xml",
+          Buffer.from(workbookXml.replace("<workbookPr", '<workbookPr date1904="1"')),
+        );
+      }
+      return zip.toBuffer();
+    }
+
+    it("reads inline strings, skipping phonetic runs, and t=d dates", async () => {
+      const buffer = await patchedWorkbook(
+        () =>
+          '<row r="1"><c r="A1" t="inlineStr"><is><r><t>rich </t></r><r><t>inline</t></r></is></c>' +
+          '<c r="B1" t="inlineStr"><is><t>漢字</t><rPh sb="0" eb="2"><t>かんじ</t></rPh></is></c>' +
+          '<c r="C1" t="d"><v>2024-03-04T05:06:07Z</v></c></row>',
+      );
+      expect(await csvOf(buffer)).toBe("rich inline,漢字,2024-03-04T05:06:07.000Z");
+    });
+
+    it("places rows and cells that have no r attribute after the previous one", async () => {
+      const buffer = await patchedWorkbook(
+        () =>
+          '<row r="2"><c r="B2" t="inlineStr"><is><t>b2</t></is></c><c t="inlineStr"><is><t>c2</t></is></c></row>' +
+          '<row><c t="inlineStr"><is><t>a3</t></is></c></row>',
+      );
+      expect(await csvOf(buffer)).toBe(",b2,c2\r\na3");
+    });
+
+    it("reads date serials against the 1904 epoch when the workbook says so", async () => {
+      const sheet = (dateStyle: string) =>
+        `<row r="1"><c r="A1" s="${dateStyle}"><v>0</v></c></row>`;
+      expect(await csvOf(await patchedWorkbook(sheet))).toBe("1899-12-30T00:00:00.000Z");
+      expect(await csvOf(await patchedWorkbook(sheet, { date1904: true }))).toBe(
+        "1904-01-01T00:00:00.000Z",
+      );
+    });
+
+    it("refuses a cell reference past Excel's column limit", async () => {
+      const buffer = await patchedWorkbook(() => '<row r="1"><c r="ZZZZZZ1"><v>1</v></c></row>');
+      await expect(xlsxToCsv(buffer, 1)).rejects.toThrow(/past Excel's limits/);
+    });
+
+    it("refuses merged ranges that would repeat into a million cells", async () => {
+      const buffer = await patchedWorkbook(() => '<row r="1"><c r="A1"><v>1</v></c></row>', {
+        mergeCells: '<mergeCells count="1"><mergeCell ref="A2:XFD60000"/></mergeCells>',
+      });
+      await expect(xlsxToCsv(buffer, 1)).rejects.toThrow(/merges more than 1,000,000 cells/);
+    });
+
+    it("reports malformed sheet XML as unreadable input", async () => {
+      const buffer = await patchedWorkbook(() => '<row r="1"><c r="A1"><v>1</v></row>');
+      await expect(xlsxToCsv(buffer, 1)).rejects.toThrow(/Not a readable XLSX file/);
+    });
   });
 
   it("converts 200k rows inside a 256 MB heap", () => {
