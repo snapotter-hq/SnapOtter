@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: a1d02cd96a03
+i18n_output_hash: 93880e997f46
 i18n_hash_version: 2
-i18n_source_hash: 322655170ae6
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -21,6 +21,8 @@ i18n_provenance: human
 
 ### Токен сессии {#session-token}
 
+После новой установки учётная запись по умолчанию `admin` должна сменить пароль, иначе вызов инструмента ниже не сработает. См. [Первый вход](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -36,6 +38,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Сессии истекают через 7 дней (настраивается через `SESSION_DURATION_HOURS`).
+
+### Первый вход {#first-login}
+
+Пока учётная запись по умолчанию `admin` не сменит пароль, большинство эндпоинтов, требующих входа, включая вызовы инструментов и создание API-ключей, отвечают `403` с кодом ошибки `MUST_CHANGE_PASSWORD`. То же относится к любой учётной записи, пароль которой сбросил администратор. Ответ на вход отмечает это полем `mustChangePassword: true`. Смените пароль с помощью токена сессии, полученного при входе:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Сессия, отправившая запрос, остаётся действительной. Все остальные сессии учётной записи завершаются, а все её API-ключи отзываются. `SKIP_MUST_CHANGE_PASSWORD=true` отключает это требование; оно предназначено для CI и разработки.
 
 ### API-ключи {#api-keys}
 
@@ -481,11 +496,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## Отслеживание прогресса {#progress-tracking}
 
-Долго выполняющиеся задания, поставленные в очередь инструменты, пакетные задания и конвейеры передают прогресс в реальном времени через Server-Sent Events. Поток прогресса публичен и привязан к идентификатору задания, поэтому клиентам не нужно отправлять заголовок Authorization для его чтения.
+Долго выполняющиеся задания, поставленные в очередь инструменты, пакетные задания и конвейеры передают прогресс в реальном времени через Server-Sent Events. Поток требует аутентификации, как и любой другой эндпоинт: передайте токен сессии или API-ключ в заголовке `Authorization` (браузер может использовать cookie сессии). Читать его могут только владелец задания, пользователь с `files:all` или, для задания установки функции, пользователь с `features:manage`. Все остальные получают `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Формат события:
@@ -496,6 +512,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Вы можете запросить отмену поставленного в очередь или выполняющегося задания через `POST /api/v1/jobs/:jobId/cancel`. Ответом будет `{"canceled":true|false}`.
+
+### Статус задания {#job-status}
+
+`GET /api/v1/jobs/:jobId` возвращает сохранённое состояние задания, не удерживая соединение открытым. Опрашивайте его после ответа `202` или используйте как запасной вариант, когда поток обрывается. Правила доступа те же, что и у потока прогресса.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` принимает одно из значений `queued`, `processing`, `completed`, `failed` или `canceled`. Неудачное задание содержит `error.message` и, если он есть, `error.code`. Отменённое задание всё равно может содержать частичный `result`, например ZIP с завершёнными файлами, поэтому читайте `result` всякий раз, когда он присутствует.
 
 ## Файловая библиотека {#file-library}
 

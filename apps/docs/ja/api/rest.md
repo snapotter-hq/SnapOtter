@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: ab8f7378cbbd
-i18n_source_hash: 322655170ae6
+i18n_output_hash: d28b22605837
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### セッショントークン {#session-token}
 
+新規インストールでは、以下のツール呼び出しが動作する前に、デフォルトの `admin` アカウントのパスワードを変更する必要があります。[初回ログイン](#first-login)を参照してください。
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 セッションは 7 日後に期限切れになります（`SESSION_DURATION_HOURS` で設定可能）。
+
+### 初回ログイン {#first-login}
+
+デフォルトの `admin` アカウントがパスワードを変更するまで、ログインが必要なほとんどのエンドポイント（ツール呼び出しや API キーの作成を含む）は、エラーコード `MUST_CHANGE_PASSWORD` とともに `403` を返します。管理者がパスワードをリセットしたアカウントも同様です。ログインのレスポンスでは `mustChangePassword: true` でこれが示されます。ログインで得たセッショントークンを使ってパスワードを変更します:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+リクエストを送信したセッションは有効なままです。そのアカウントの他のセッションはすべてサインアウトされ、API キーもすべて失効します。`SKIP_MUST_CHANGE_PASSWORD=true` を設定するとこの要件は無効になります。CI と開発向けの設定です。
 
 ### API キー {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## 進捗トラッキング {#progress-tracking}
 
-長時間実行されるジョブ、キューに入るツール、バッチジョブ、パイプラインは、Server-Sent Events を介してリアルタイムの進捗を送信します。進捗ストリームは公開されており、ジョブ ID をキーとしているため、クライアントは読み取りに Authorization ヘッダーを送信する必要はありません。
+長時間実行されるジョブ、キューに入るツール、バッチジョブ、パイプラインは、Server-Sent Events を介してリアルタイムの進捗を送信します。このストリームには他のエンドポイントと同様に認証が必要です。`Authorization` ヘッダーでセッショントークンまたは API キーを送信してください（ブラウザーはセッション Cookie を利用できます）。読み取れるのは、ジョブの所有者、`files:all` を持つユーザー、および機能インストールジョブの場合は `features:manage` を持つユーザーだけです。それ以外の呼び出し元には `404` が返ります。
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 イベント形式:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 `POST /api/v1/jobs/:jobId/cancel` を使って、キューに入っているまたは実行中のジョブのキャンセルをリクエストできます。レスポンスは `{"canceled":true|false}` です。
+
+### ジョブのステータス {#job-status}
+
+`GET /api/v1/jobs/:jobId` は、接続を開いたままにせずにジョブの保存済みの状態を返します。`202` レスポンスの後にポーリングするか、ストリームが切れたときの代替手段として使ってください。アクセスルールは進捗ストリームと同じです。
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` は `queued`、`processing`、`completed`、`failed`、`canceled` のいずれかです。失敗したジョブには `error.message` が含まれ、ある場合は `error.code` も含まれます。キャンセルされたジョブでも、完了したファイルの ZIP などの部分的な `result` を持つことがあるため、`result` が存在する場合は常に読み取ってください。
 
 ## ファイルライブラリ {#file-library}
 

@@ -17,6 +17,8 @@ All endpoints require authentication unless `AUTH_ENABLED=false`.
 
 ### Session Token {#session-token}
 
+On a fresh install, the default `admin` account has to change its password before the tool call below will work. See [First Login](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -32,6 +34,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sessions expire after 7 days (configurable via `SESSION_DURATION_HOURS`).
+
+### First Login {#first-login}
+
+Until the default `admin` account changes its password, most endpoints that need a login, tool calls and API key creation among them, return `403` with the error code `MUST_CHANGE_PASSWORD`. The same applies to any account whose password an admin has reset. The login response flags this with `mustChangePassword: true`. Change the password with the session token from the login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+The session that sent the request stays valid. Every other session for the account is signed out and all of its API keys are revoked. Setting `SKIP_MUST_CHANGE_PASSWORD=true` turns the requirement off; it's meant for CI and development.
 
 ### API Keys {#api-keys}
 
@@ -477,11 +492,12 @@ Each step's output is the next step's input. Pipelines allow 20 steps by default
 
 ## Progress Tracking {#progress-tracking}
 
-Long-running jobs, queued tools, batch jobs, and pipelines emit real-time progress via Server-Sent Events. The progress stream is public and keyed by job ID, so clients do not need to send an Authorization header to read it.
+Long-running jobs, queued tools, batch jobs, and pipelines emit real-time progress via Server-Sent Events. The stream needs authentication like any other endpoint: send a session token or API key in the `Authorization` header (a browser can rely on the session cookie). Only the job's owner, a user with `files:all`, or, for a feature-install job, a user with `features:manage` can read it. Anyone else gets `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Event format:
@@ -492,6 +508,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 You can request cancellation for a queued or running job with `POST /api/v1/jobs/:jobId/cancel`. The response is `{"canceled":true|false}`.
+
+### Job Status {#job-status}
+
+`GET /api/v1/jobs/:jobId` returns a job's stored state without holding a connection open. Poll it after a `202` response, or fall back to it when the stream drops. It follows the same access rules as the progress stream.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` is one of `queued`, `processing`, `completed`, `failed`, or `canceled`. A failed job includes `error.message`, plus `error.code` when there is one. A canceled job can still carry a partial `result`, such as a ZIP of the files that finished, so read `result` whenever it's present.
 
 ## File Library {#file-library}
 

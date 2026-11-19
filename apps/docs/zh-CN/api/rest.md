@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: fa33c0ccdd16
-i18n_source_hash: 322655170ae6
+i18n_output_hash: b240e2439bbc
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### 会话令牌 {#session-token}
 
+全新安装后，必须先修改默认 `admin` 账户的密码，下面的工具调用才能正常工作。请参阅[首次登录](#first-login)。
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 会话在 7 天后过期（可通过 `SESSION_DURATION_HOURS` 配置）。
+
+### 首次登录 {#first-login}
+
+在默认 `admin` 账户修改密码之前，大多数需要登录的端点（包括工具调用和创建 API 密钥）都会返回 `403`，错误码为 `MUST_CHANGE_PASSWORD`。管理员重置过密码的账户也是如此。登录响应会用 `mustChangePassword: true` 标明这一点。请使用登录获得的会话令牌修改密码：
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+发送该请求的会话仍然有效。该账户的其他所有会话都会被登出，其所有 API 密钥都会被吊销。设置 `SKIP_MUST_CHANGE_PASSWORD=true` 可关闭这一要求，它用于 CI 和开发环境。
 
 ### API 密钥 {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## 进度跟踪 {#progress-tracking}
 
-长时间运行的作业、排队工具、批处理作业和流水线会通过 Server-Sent Events 实时发出进度。进度流是公开的，以作业 ID 作为键，因此客户端无需发送 Authorization 头即可读取。
+长时间运行的作业、排队工具、批处理作业和流水线会通过 Server-Sent Events 实时发出进度。与其他端点一样，该流需要认证：请在 `Authorization` 头中发送会话令牌或 API 密钥（浏览器可以依赖会话 Cookie）。只有作业所有者、拥有 `files:all` 的用户，以及对于功能安装作业拥有 `features:manage` 的用户才能读取。其他调用方会收到 `404`。
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 事件格式：
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 你可以用 `POST /api/v1/jobs/:jobId/cancel` 请求取消一个已排队或正在运行的作业。响应为 `{"canceled":true|false}`。
+
+### 作业状态 {#job-status}
+
+`GET /api/v1/jobs/:jobId` 返回作业已保存的状态，无需保持连接打开。可在收到 `202` 响应后轮询它，或在流断开时用作后备。其访问规则与进度流相同。
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` 取值为 `queued`、`processing`、`completed`、`failed` 或 `canceled` 之一。失败的作业包含 `error.message`，有错误码时还包含 `error.code`。已取消的作业仍可能带有部分 `result`，例如已完成文件的 ZIP，因此只要存在 `result` 就应读取。
 
 ## 文件库 {#file-library}
 

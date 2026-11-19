@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 3aa8e2d17ee4
-i18n_source_hash: 322655170ae6
+i18n_output_hash: db4d5c25ae47
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### सेशन टोकन {#session-token}
 
+नए इंस्टॉल पर, नीचे दी गई टूल कॉल काम करे इससे पहले डिफ़ॉल्ट `admin` खाते को अपना पासवर्ड बदलना होगा। [पहला लॉगिन](#first-login) देखें।
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 सेशन 7 दिनों के बाद समाप्त हो जाते हैं (`SESSION_DURATION_HOURS` के माध्यम से कॉन्फ़िगर करने योग्य)।
+
+### पहला लॉगिन {#first-login}
+
+जब तक डिफ़ॉल्ट `admin` खाता अपना पासवर्ड नहीं बदलता, लॉगिन की ज़रूरत वाले ज़्यादातर एंडपॉइंट, जिनमें टूल कॉल और API की बनाना शामिल हैं, त्रुटि कोड `MUST_CHANGE_PASSWORD` के साथ `403` लौटाते हैं। यही उस हर खाते पर लागू होता है जिसका पासवर्ड किसी एडमिन ने रीसेट किया हो। लॉगिन प्रतिक्रिया इसे `mustChangePassword: true` से दर्शाती है। लॉगिन से मिले सेशन टोकन से पासवर्ड बदलें:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+अनुरोध भेजने वाला सेशन मान्य रहता है। खाते के बाकी सभी सेशन साइन आउट हो जाते हैं और उसकी सभी API कीज़ रद्द कर दी जाती हैं। `SKIP_MUST_CHANGE_PASSWORD=true` सेट करने से यह आवश्यकता बंद हो जाती है; यह CI और डेवलपमेंट के लिए है।
 
 ### API कीज़ {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## प्रगति ट्रैकिंग {#progress-tracking}
 
-लंबे समय तक चलने वाले जॉब, क्यू किए गए टूल, बैच जॉब, और पाइपलाइन Server-Sent Events के माध्यम से रीयल-टाइम प्रगति उत्सर्जित करते हैं। प्रगति स्ट्रीम सार्वजनिक है और जॉब ID द्वारा कीड है, इसलिए क्लाइंट को इसे पढ़ने के लिए Authorization हेडर भेजने की आवश्यकता नहीं है।
+लंबे समय तक चलने वाले जॉब, क्यू किए गए टूल, बैच जॉब, और पाइपलाइन Server-Sent Events के माध्यम से रीयल-टाइम प्रगति उत्सर्जित करते हैं। किसी भी दूसरे एंडपॉइंट की तरह स्ट्रीम के लिए भी ऑथेंटिकेशन ज़रूरी है: `Authorization` हेडर में सेशन टोकन या API की भेजें (ब्राउज़र सेशन कुकी पर निर्भर रह सकता है)। इसे केवल जॉब का मालिक, `files:all` वाला उपयोगकर्ता, या फ़ीचर इंस्टॉल जॉब के लिए `features:manage` वाला उपयोगकर्ता पढ़ सकता है। बाकी सभी को `404` मिलता है।
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 इवेंट फ़ॉर्मेट:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 आप `POST /api/v1/jobs/:jobId/cancel` के साथ किसी क्यू किए गए या चल रहे जॉब के लिए रद्दीकरण का अनुरोध कर सकते हैं। प्रतिक्रिया `{"canceled":true|false}` है।
+
+### जॉब स्थिति {#job-status}
+
+`GET /api/v1/jobs/:jobId` कनेक्शन खुला रखे बिना किसी जॉब की सहेजी गई स्थिति लौटाता है। `202` प्रतिक्रिया के बाद इसे पोल करें, या स्ट्रीम टूटने पर इसका सहारा लें। इस पर प्रगति स्ट्रीम वाले ही एक्सेस नियम लागू होते हैं।
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` इनमें से एक होता है: `queued`, `processing`, `completed`, `failed`, या `canceled`। विफल जॉब में `error.message` होता है, और उपलब्ध होने पर `error.code` भी। रद्द किए गए जॉब में फिर भी आंशिक `result` हो सकता है, जैसे पूरी हो चुकी फ़ाइलों का ZIP, इसलिए जब भी `result` मौजूद हो उसे पढ़ें।
 
 ## फ़ाइल लाइब्रेरी {#file-library}
 

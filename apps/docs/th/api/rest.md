@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 93d61c21a01e
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 93b89ec12ddd
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ i18n_provenance: human
 
 ### โทเคนเซสชัน {#session-token}
 
+ในการติดตั้งใหม่ บัญชีเริ่มต้น `admin` ต้องเปลี่ยนรหัสผ่านก่อน การเรียกเครื่องมือด้านล่างจึงจะทำงาน ดู [การเข้าสู่ระบบครั้งแรก](#first-login)
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 เซสชันจะหมดอายุหลังจาก 7 วัน (กำหนดค่าได้ผ่าน `SESSION_DURATION_HOURS`)
+
+### การเข้าสู่ระบบครั้งแรก {#first-login}
+
+จนกว่าบัญชีเริ่มต้น `admin` จะเปลี่ยนรหัสผ่าน เอนด์พอยต์ส่วนใหญ่ที่ต้องเข้าสู่ระบบ รวมถึงการเรียกเครื่องมือและการสร้าง API key จะตอบกลับ `403` พร้อมรหัสข้อผิดพลาด `MUST_CHANGE_PASSWORD` เช่นเดียวกับบัญชีใดก็ตามที่ผู้ดูแลระบบรีเซ็ตรหัสผ่านให้ การตอบกลับของการเข้าสู่ระบบจะระบุสิ่งนี้ด้วย `mustChangePassword: true` ให้เปลี่ยนรหัสผ่านด้วยโทเคนเซสชันที่ได้จากการเข้าสู่ระบบ:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+เซสชันที่ส่งคำขอยังคงใช้งานได้ เซสชันอื่นทั้งหมดของบัญชีจะถูกออกจากระบบและ API key ทั้งหมดของบัญชีจะถูกเพิกถอน การตั้งค่า `SKIP_MUST_CHANGE_PASSWORD=true` จะปิดข้อกำหนดนี้ ซึ่งมีไว้สำหรับ CI และการพัฒนา
 
 ### API Keys {#api-keys}
 
@@ -480,11 +495,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## การติดตามความคืบหน้า {#progress-tracking}
 
-งานที่ทำงานนาน เครื่องมือที่เข้าคิว งานแบตช์ และไปป์ไลน์จะส่งความคืบหน้าแบบเรียลไทม์ผ่าน Server-Sent Events สตรีมความคืบหน้าเป็นสาธารณะและระบุด้วย job ID ดังนั้นไคลเอนต์ไม่จำเป็นต้องส่งส่วนหัว Authorization เพื่ออ่าน
+งานที่ทำงานนาน เครื่องมือที่เข้าคิว งานแบตช์ และไปป์ไลน์จะส่งความคืบหน้าแบบเรียลไทม์ผ่าน Server-Sent Events สตรีมนี้ต้องยืนยันตัวตนเหมือนเอนด์พอยต์อื่นๆ ให้ส่งโทเคนเซสชันหรือ API key ในส่วนหัว `Authorization` (เบราว์เซอร์ใช้คุกกี้เซสชันได้) ผู้ที่อ่านได้มีเพียงเจ้าของงาน ผู้ใช้ที่มี `files:all` และผู้ใช้ที่มี `features:manage` สำหรับงานติดตั้งฟีเจอร์ ผู้อื่นทั้งหมดจะได้รับ `404`
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 รูปแบบอีเวนต์:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 คุณสามารถขอยกเลิกงานที่เข้าคิวหรือกำลังทำงานได้ด้วย `POST /api/v1/jobs/:jobId/cancel` การตอบกลับคือ `{"canceled":true|false}`
+
+### สถานะงาน {#job-status}
+
+`GET /api/v1/jobs/:jobId` คืนสถานะที่บันทึกไว้ของงานโดยไม่ต้องเปิดการเชื่อมต่อค้างไว้ ให้โพลหลังได้รับการตอบกลับ `202` หรือใช้เป็นทางสำรองเมื่อสตรีมหลุด กฎการเข้าถึงเหมือนกับสตรีมความคืบหน้า
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` เป็นค่าใดค่าหนึ่งใน `queued`, `processing`, `completed`, `failed` หรือ `canceled` งานที่ล้มเหลวจะมี `error.message` และมี `error.code` ด้วยเมื่อมีค่า งานที่ถูกยกเลิกยังอาจมี `result` บางส่วน เช่น ZIP ของไฟล์ที่เสร็จแล้ว ดังนั้นให้อ่าน `result` ทุกครั้งที่มี
 
 ## คลังไฟล์ {#file-library}
 

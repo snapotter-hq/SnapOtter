@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: f22f7259f0f9
-i18n_source_hash: 322655170ae6
+i18n_output_hash: af67888f2493
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Todos los endpoints requieren autenticación salvo que `AUTH_ENABLED=false`.
 
 ### Token de sesión {#session-token}
 
+En una instalación nueva, la cuenta predeterminada `admin` debe cambiar su contraseña antes de que funcione la llamada a la herramienta de abajo. Consulta [Primer inicio de sesión](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Las sesiones expiran después de 7 días (configurable mediante `SESSION_DURATION_HOURS`).
+
+### Primer inicio de sesión {#first-login}
+
+Hasta que la cuenta predeterminada `admin` cambie su contraseña, la mayoría de los endpoints que requieren iniciar sesión, entre ellos las llamadas a herramientas y la creación de claves de API, responden `403` con el código de error `MUST_CHANGE_PASSWORD`. Lo mismo ocurre con cualquier cuenta cuya contraseña haya restablecido un administrador. La respuesta del login lo indica con `mustChangePassword: true`. Cambia la contraseña con el token de sesión del login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+La sesión que envió la solicitud sigue siendo válida. Todas las demás sesiones de la cuenta se cierran y todas sus claves de API se revocan. Con `SKIP_MUST_CHANGE_PASSWORD=true` se desactiva el requisito; está pensado para CI y desarrollo.
 
 ### Claves de API {#api-keys}
 
@@ -480,11 +495,12 @@ La salida de cada paso es la entrada del siguiente paso. Los pipelines permiten 
 
 ## Seguimiento del progreso {#progress-tracking}
 
-Los trabajos de larga duración, las herramientas en cola, los trabajos por lotes y los pipelines emiten el progreso en tiempo real mediante Server-Sent Events. El flujo de progreso es público y está indexado por el ID del trabajo, así que los clientes no necesitan enviar una cabecera Authorization para leerlo.
+Los trabajos de larga duración, las herramientas en cola, los trabajos por lotes y los pipelines emiten el progreso en tiempo real mediante Server-Sent Events. El flujo requiere autenticación como cualquier otro endpoint: envía un token de sesión o una clave de API en la cabecera `Authorization` (un navegador puede usar la cookie de sesión). Solo pueden leerlo el propietario del trabajo, un usuario con `files:all` o, en un trabajo de instalación de funciones, un usuario con `features:manage`. Cualquier otro recibe `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Formato del evento:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Puedes solicitar la cancelación de un trabajo en cola o en ejecución con `POST /api/v1/jobs/:jobId/cancel`. La respuesta es `{"canceled":true|false}`.
+
+### Estado del trabajo {#job-status}
+
+`GET /api/v1/jobs/:jobId` devuelve el estado guardado de un trabajo sin mantener una conexión abierta. Consúltalo tras una respuesta `202` o úsalo como alternativa cuando se corte el flujo. Sigue las mismas reglas de acceso que el flujo de progreso.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` es uno de `queued`, `processing`, `completed`, `failed` o `canceled`. Un trabajo fallido incluye `error.message` y, cuando existe, `error.code`. Un trabajo cancelado puede incluir aun así un `result` parcial, como un ZIP de los archivos que terminaron, así que lee `result` siempre que esté presente.
 
 ## Biblioteca de archivos {#file-library}
 

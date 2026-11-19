@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: d9b051c30682
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 8ef438e30514
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Makine tarafından okunabilir belirtimler:
 
 ### Oturum Belirteci {#session-token}
 
+Yeni bir kurulumda, aşağıdaki araç çağrısının çalışması için varsayılan `admin` hesabının önce parolasını değiştirmesi gerekir. Bkz. [İlk giriş](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Oturumların süresi 7 gün sonra dolar (`SESSION_DURATION_HOURS` ile yapılandırılabilir).
+
+### İlk giriş {#first-login}
+
+Varsayılan `admin` hesabı parolasını değiştirene kadar, giriş gerektiren uç noktaların çoğu, araç çağrıları ve API anahtarı oluşturma da dahil, `MUST_CHANGE_PASSWORD` hata koduyla `403` döndürür. Aynısı, parolası bir yönetici tarafından sıfırlanan her hesap için de geçerlidir. Giriş yanıtı bunu `mustChangePassword: true` ile belirtir. Parolayı girişten aldığınız oturum belirteciyle değiştirin:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+İsteği gönderen oturum geçerli kalır. Hesabın diğer tüm oturumları kapatılır ve tüm API anahtarları iptal edilir. `SKIP_MUST_CHANGE_PASSWORD=true` ayarı bu zorunluluğu kapatır; CI ve geliştirme için tasarlanmıştır.
 
 ### API Anahtarları {#api-keys}
 
@@ -480,11 +495,12 @@ Her adımın çıktısı bir sonraki adımın girdisidir. İşlem hatları varsa
 
 ## İlerleme İzleme {#progress-tracking}
 
-Uzun süre çalışan işler, kuyruğa alınan araçlar, toplu işler ve işlem hatları, Server-Sent Events aracılığıyla gerçek zamanlı ilerleme yayar. İlerleme akışı herkese açıktır ve iş kimliğiyle anahtarlanır, bu nedenle istemcilerin okumak için bir Authorization başlığı göndermesi gerekmez.
+Uzun süre çalışan işler, kuyruğa alınan araçlar, toplu işler ve işlem hatları, Server-Sent Events aracılığıyla gerçek zamanlı ilerleme yayar. Akış, diğer tüm uç noktalar gibi kimlik doğrulama gerektirir: `Authorization` başlığında bir oturum belirteci veya API anahtarı gönderin (tarayıcı oturum çerezini kullanabilir). Akışı yalnızca işin sahibi, `files:all` iznine sahip bir kullanıcı veya bir özellik kurulum işi için `features:manage` iznine sahip bir kullanıcı okuyabilir. Diğer herkes `404` alır.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Olay biçimi:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Kuyruğa alınan veya çalışan bir iş için `POST /api/v1/jobs/:jobId/cancel` ile iptal talep edebilirsiniz. Yanıt `{"canceled":true|false}` şeklindedir.
+
+### İş durumu {#job-status}
+
+`GET /api/v1/jobs/:jobId`, bir bağlantıyı açık tutmadan işin kayıtlı durumunu döndürür. Bir `202` yanıtından sonra sorgulayın veya akış koptuğunda buna başvurun. İlerleme akışıyla aynı erişim kurallarına tabidir.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` değeri `queued`, `processing`, `completed`, `failed` veya `canceled` olabilir. Başarısız bir iş `error.message` ve varsa `error.code` içerir. İptal edilen bir iş yine de kısmi bir `result` taşıyabilir (örneğin tamamlanan dosyaların ZIP'i), bu yüzden `result` mevcut olduğunda her zaman okuyun.
 
 ## Dosya Kitaplığı {#file-library}
 

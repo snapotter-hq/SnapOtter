@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 05bd2d5b4423
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 76de9cc5c68a
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Alla slutpunkter kräver autentisering om inte `AUTH_ENABLED=false`.
 
 ### Sessionstoken {#session-token}
 
+På en ny installation måste standardkontot `admin` byta lösenord innan verktygsanropet nedan fungerar. Se [Första inloggningen](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sessioner löper ut efter 7 dagar (konfigurerbart via `SESSION_DURATION_HOURS`).
+
+### Första inloggningen {#first-login}
+
+Tills standardkontot `admin` har bytt lösenord svarar de flesta endpoints som kräver inloggning, bland annat verktygsanrop och skapande av API-nycklar, med `403` och felkoden `MUST_CHANGE_PASSWORD`. Detsamma gäller alla konton vars lösenord en administratör har återställt. Inloggningssvaret markerar detta med `mustChangePassword: true`. Byt lösenord med sessionstoken från inloggningen:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Sessionen som skickade begäran förblir giltig. Alla andra sessioner för kontot loggas ut och alla dess API-nycklar återkallas. Med `SKIP_MUST_CHANGE_PASSWORD=true` stängs kravet av; det är avsett för CI och utveckling.
 
 ### API-nycklar {#api-keys}
 
@@ -480,11 +495,12 @@ Varje stegs utdata är nästa stegs indata. Pipelines tillåter 20 steg som stan
 
 ## Förloppsspårning {#progress-tracking}
 
-Långvariga jobb, köade verktyg, batchjobb och pipelines sänder realtidsförlopp via Server-Sent Events. Förloppsströmmen är publik och identifieras med jobb-ID, så klienter behöver inte skicka en Authorization-header för att läsa den.
+Långvariga jobb, köade verktyg, batchjobb och pipelines sänder realtidsförlopp via Server-Sent Events. Strömmen kräver autentisering precis som alla andra endpoints: skicka en sessionstoken eller API-nyckel i `Authorization`-headern (en webbläsare kan använda sessionskakan). Bara jobbets ägare, en användare med `files:all` eller, för ett installationsjobb för en funktion, en användare med `features:manage` kan läsa den. Alla andra får `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Händelseformat:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Du kan begära avbrytning av ett köat eller körande jobb med `POST /api/v1/jobs/:jobId/cancel`. Svaret är `{"canceled":true|false}`.
+
+### Jobbstatus {#job-status}
+
+`GET /api/v1/jobs/:jobId` returnerar ett jobbs sparade tillstånd utan att hålla en anslutning öppen. Fråga efter det efter ett `202`-svar, eller fall tillbaka på det när strömmen bryts. Samma åtkomstregler som för förloppsströmmen gäller.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` är en av `queued`, `processing`, `completed`, `failed` eller `canceled`. Ett misslyckat jobb innehåller `error.message` och, när den finns, `error.code`. Ett avbrutet jobb kan ändå ha ett partiellt `result`, till exempel en ZIP med de filer som blev klara, så läs `result` när det finns.
 
 ## Filbibliotek {#file-library}
 

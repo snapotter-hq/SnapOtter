@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 052f0c2736c0
-i18n_source_hash: 322655170ae6
+i18n_output_hash: 2e9de2601025
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Tous les points de terminaison exigent une authentification, sauf lorsque `AUTH_
 
 ### Jeton de session {#session-token}
 
+Sur une nouvelle installation, le compte par défaut `admin` doit changer son mot de passe avant que l'appel d'outil ci-dessous fonctionne. Voir [Première connexion](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Les sessions expirent au bout de 7 jours (configurable via `SESSION_DURATION_HOURS`).
+
+### Première connexion {#first-login}
+
+Tant que le compte par défaut `admin` n'a pas changé son mot de passe, la plupart des endpoints qui exigent une connexion, dont les appels d'outils et la création de clés API, renvoient `403` avec le code d'erreur `MUST_CHANGE_PASSWORD`. Il en va de même pour tout compte dont un administrateur a réinitialisé le mot de passe. La réponse de connexion le signale avec `mustChangePassword: true`. Changez le mot de passe avec le jeton de session obtenu à la connexion :
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+La session qui a envoyé la requête reste valide. Toutes les autres sessions du compte sont déconnectées et toutes ses clés API sont révoquées. Définir `SKIP_MUST_CHANGE_PASSWORD=true` désactive cette exigence ; c'est prévu pour la CI et le développement.
 
 ### Clés d'API {#api-keys}
 
@@ -480,11 +495,12 @@ La sortie de chaque étape constitue l'entrée de l'étape suivante. Les pipelin
 
 ## Suivi de la progression {#progress-tracking}
 
-Les tâches de longue durée, les outils mis en file d'attente, les tâches par lots et les pipelines émettent une progression en temps réel via Server-Sent Events. Le flux de progression est public et indexé par ID de tâche, de sorte que les clients n'ont pas besoin d'envoyer d'en-tête d'autorisation pour le lire.
+Les tâches de longue durée, les outils mis en file d'attente, les tâches par lots et les pipelines émettent une progression en temps réel via Server-Sent Events. Le flux exige une authentification comme tout autre endpoint : envoyez un jeton de session ou une clé API dans l'en-tête `Authorization` (un navigateur peut s'appuyer sur le cookie de session). Seuls le propriétaire de la tâche, un utilisateur disposant de `files:all` ou, pour une tâche d'installation de fonctionnalité, un utilisateur disposant de `features:manage` peuvent le lire. Tout autre appelant reçoit `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Format des événements :
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Vous pouvez demander l'annulation d'une tâche en file d'attente ou en cours d'exécution avec `POST /api/v1/jobs/:jobId/cancel`. La réponse est `{"canceled":true|false}`.
+
+### Statut d'une tâche {#job-status}
+
+`GET /api/v1/jobs/:jobId` renvoie l'état enregistré d'une tâche sans garder de connexion ouverte. Interrogez-le après une réponse `202`, ou rabattez-vous dessus quand le flux se coupe. Il suit les mêmes règles d'accès que le flux de progression.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` vaut `queued`, `processing`, `completed`, `failed` ou `canceled`. Une tâche en échec inclut `error.message` et, s'il existe, `error.code`. Une tâche annulée peut tout de même porter un `result` partiel, par exemple un ZIP des fichiers terminés, lisez donc `result` dès qu'il est présent.
 
 ## Bibliothèque de fichiers {#file-library}
 

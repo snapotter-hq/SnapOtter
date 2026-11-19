@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 2d4f6ecb375d
-i18n_source_hash: 322655170ae6
+i18n_output_hash: e49d4197e95d
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -20,6 +20,8 @@ Semua endpoint memerlukan autentikasi kecuali `AUTH_ENABLED=false`.
 
 ### Token Sesi {#session-token}
 
+Pada instalasi baru, akun bawaan `admin` harus mengganti kata sandinya sebelum panggilan tool di bawah dapat berjalan. Lihat [Login pertama](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -35,6 +37,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Sesi kedaluwarsa setelah 7 hari (dapat dikonfigurasi melalui `SESSION_DURATION_HOURS`).
+
+### Login pertama {#first-login}
+
+Sampai akun bawaan `admin` mengganti kata sandinya, sebagian besar endpoint yang memerlukan login, termasuk panggilan tool dan pembuatan kunci API, mengembalikan `403` dengan kode galat `MUST_CHANGE_PASSWORD`. Hal yang sama berlaku untuk akun mana pun yang kata sandinya telah direset oleh admin. Respons login menandainya dengan `mustChangePassword: true`. Ganti kata sandi menggunakan token sesi dari login:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Sesi yang mengirim permintaan tetap berlaku. Semua sesi lain untuk akun tersebut dikeluarkan dan semua kunci API-nya dicabut. Mengatur `SKIP_MUST_CHANGE_PASSWORD=true` mematikan persyaratan ini; ini ditujukan untuk CI dan pengembangan.
 
 ### Kunci API {#api-keys}
 
@@ -480,11 +495,12 @@ Keluaran setiap langkah adalah masukan langkah berikutnya. Pipeline mengizinkan 
 
 ## Pelacakan Progres {#progress-tracking}
 
-Job yang berjalan lama, tool yang diantrekan, job batch, dan pipeline memancarkan progres real-time melalui Server-Sent Events. Aliran progres bersifat publik dan dikunci berdasarkan ID job, jadi klien tidak perlu mengirim header Authorization untuk membacanya.
+Job yang berjalan lama, tool yang diantrekan, job batch, dan pipeline memancarkan progres real-time melalui Server-Sent Events. Aliran ini memerlukan autentikasi seperti endpoint lainnya: kirim token sesi atau kunci API di header `Authorization` (browser dapat mengandalkan cookie sesi). Hanya pemilik job, pengguna dengan `files:all`, atau, untuk job instalasi fitur, pengguna dengan `features:manage` yang dapat membacanya. Selain itu akan mendapat `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Format event:
@@ -495,6 +511,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Anda dapat meminta pembatalan untuk job yang diantrekan atau sedang berjalan dengan `POST /api/v1/jobs/:jobId/cancel`. Response-nya adalah `{"canceled":true|false}`.
+
+### Status job {#job-status}
+
+`GET /api/v1/jobs/:jobId` mengembalikan status job yang tersimpan tanpa membiarkan koneksi tetap terbuka. Poll setelah respons `202`, atau gunakan sebagai cadangan saat aliran terputus. Aturan aksesnya sama dengan aliran progres.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` adalah salah satu dari `queued`, `processing`, `completed`, `failed`, atau `canceled`. Job yang gagal menyertakan `error.message`, ditambah `error.code` jika ada. Job yang dibatalkan tetap dapat membawa `result` parsial, misalnya ZIP berisi file yang sudah selesai, jadi baca `result` setiap kali ada.
 
 ## Pustaka File {#file-library}
 

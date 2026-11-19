@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 8f4812836c6c
+i18n_output_hash: e89b99fcb744
 i18n_hash_version: 2
-i18n_source_hash: 322655170ae6
+i18n_source_hash: e573dec740aa
 i18n_provenance: human
 ---
 
@@ -21,6 +21,8 @@ i18n_provenance: human
 
 ### Токен сесії {#session-token}
 
+Після нового встановлення обліковий запис за замовчуванням `admin` має змінити пароль, інакше виклик інструмента нижче не спрацює. Див. [Перший вхід](#first-login).
+
 ```bash
 # Login
 curl -X POST http://localhost:1349/api/auth/login \
@@ -36,6 +38,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 ```
 
 Сесії завершуються через 7 днів (налаштовується через `SESSION_DURATION_HOURS`).
+
+### Перший вхід {#first-login}
+
+Доки обліковий запис за замовчуванням `admin` не змінить пароль, більшість ендпоінтів, що потребують входу, зокрема виклики інструментів і створення API-ключів, відповідають `403` з кодом помилки `MUST_CHANGE_PASSWORD`. Те саме стосується будь-якого облікового запису, пароль якого скинув адміністратор. Відповідь на вхід позначає це полем `mustChangePassword: true`. Змініть пароль за допомогою токена сесії, отриманого під час входу:
+
+```bash
+curl -X POST http://localhost:1349/api/auth/change-password \
+  -H "Authorization: Bearer <session-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"admin","newPassword":"<new-password>"}'
+```
+
+Сесія, яка надіслала запит, залишається дійсною. Усі інші сесії облікового запису завершуються, а всі його API-ключі відкликаються. `SKIP_MUST_CHANGE_PASSWORD=true` вимикає цю вимогу; вона призначена для CI та розробки.
 
 ### API-ключі {#api-keys}
 
@@ -481,11 +496,12 @@ curl -X POST http://localhost:1349/api/v1/pipeline/batch \
 
 ## Відстеження прогресу {#progress-tracking}
 
-Тривалі завдання, поставлені в чергу інструменти, пакетні завдання і конвеєри видають прогрес у реальному часі через Server-Sent Events. Потік прогресу є публічним і прив'язується за ID завдання, тож клієнтам не потрібно надсилати заголовок Authorization для його читання.
+Тривалі завдання, поставлені в чергу інструменти, пакетні завдання і конвеєри видають прогрес у реальному часі через Server-Sent Events. Потік потребує автентифікації, як і будь-який інший ендпоінт: надішліть токен сесії або API-ключ у заголовку `Authorization` (браузер може використовувати cookie сесії). Читати його можуть лише власник завдання, користувач із `files:all` або, для завдання встановлення функції, користувач із `features:manage`. Усі інші отримують `404`.
 
 ```bash
 # Connect to the SSE stream (jobId is in the JSON response body from the tool endpoint)
-curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress
+curl -N http://localhost:1349/api/v1/jobs/<jobId>/progress \
+  -H "Authorization: Bearer <token>"
 ```
 
 Формат події:
@@ -496,6 +512,18 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 ```
 
 Ви можете запросити скасування поставленого в чергу або запущеного завдання за допомогою `POST /api/v1/jobs/:jobId/cancel`. Відповідь: `{"canceled":true|false}`.
+
+### Статус завдання {#job-status}
+
+`GET /api/v1/jobs/:jobId` повертає збережений стан завдання, не тримаючи з'єднання відкритим. Опитуйте його після відповіді `202` або повертайтеся до нього, коли потік обривається. Правила доступу ті самі, що й для потоку прогресу.
+
+```bash
+curl http://localhost:1349/api/v1/jobs/<jobId> \
+  -H "Authorization: Bearer <token>"
+# Returns: {"jobId":"...","status":"completed","createdAt":"...","progress":{"percent":100},"result":{"downloadUrl":"/api/v1/download/..."},"progressUrl":"/api/v1/jobs/.../progress"}
+```
+
+`status` має одне зі значень `queued`, `processing`, `completed`, `failed` або `canceled`. Невдале завдання містить `error.message` і, якщо він є, `error.code`. Скасоване завдання все одно може містити частковий `result`, наприклад ZIP із завершеними файлами, тож читайте `result` щоразу, коли він присутній.
 
 ## Бібліотека файлів {#file-library}
 
