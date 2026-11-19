@@ -3504,6 +3504,10 @@
         "values": [0, 50, 100, null]
       },
       {
+        "key": "format",
+        "values": ["original", "png", "jpeg", "jpg", "webp", "avif", "jxl", null]
+      },
+      {
         "key": "quality",
         "values": [1, 50.5, 100, null]
       }
@@ -3537,6 +3541,16 @@
       {
         "key": "strength",
         "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
         "why": "wrong type"
       },
       {
