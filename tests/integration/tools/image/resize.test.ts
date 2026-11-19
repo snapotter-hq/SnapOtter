@@ -326,4 +326,18 @@ describe("Resize", () => {
 
     expect(res.statusCode).toBe(401);
   });
+
+  it("resizes every page of a multi-page TIFF (#4419)", async () => {
+    // multipage.tiff is 10 pages of 800x600. Page 1 alone came back before.
+    const meta = await resizeAndMeta(
+      { percentage: 50 },
+      readFixture(fixtures.image.multipageTiff),
+      "multipage.tiff",
+      "image/tiff",
+    );
+    expect(meta.format).toBe("tiff");
+    expect(meta.pages).toBe(10);
+    expect(meta.width).toBe(400);
+    expect(meta.height).toBe(300);
+  });
 });

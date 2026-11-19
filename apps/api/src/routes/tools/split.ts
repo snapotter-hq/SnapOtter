@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import type { Sharp, SharpFormat } from "@snapotter/image-engine";
-import { hasServerErrorStatus } from "@snapotter/shared";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readTiffPagesFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -93,6 +94,21 @@ function applyTileFormat(
     formatOpts.reuse = false;
   }
   return pipeline.toFormat(targetFormat, formatOpts);
+}
+
+/**
+ * Open the tile source. `extract` is page-aware, so a multi-page TIFF whose
+ * tiles stay TIFF keeps every page in each tile instead of only page 1
+ * (#4419). Tiles in any other format take page 1, as converting the TIFF does.
+ */
+async function openTileSource(
+  buffer: Buffer,
+  sharpFormat: SharpFormat | null,
+  sourceFormat: string | undefined,
+): Promise<() => Sharp> {
+  const tileFormat = sharpFormat ?? sourceFormat ?? "";
+  const pages = await readTiffPagesFor(buffer, tileFormat);
+  return () => openAnimated(buffer, pages);
 }
 
 export function registerSplit(app: FastifyInstance) {
@@ -253,6 +269,7 @@ export function registerSplit(app: FastifyInstance) {
         settings.outputFormat,
         originalExt,
       );
+      const openTile = await openTileSource(fileBuffer, sharpFormat, metadata.format);
       const jobId = randomUUID();
 
       reply.hijack();
@@ -288,7 +305,7 @@ export function registerSplit(app: FastifyInstance) {
           if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
 
           const pipeline = applyTileFormat(
-            sharp(fileBuffer).extract({ left, top, width: w, height: h }),
+            openTile().extract({ left, top, width: w, height: h }),
             sharpFormat,
             metadata.format,
             settings.quality,
@@ -315,7 +332,9 @@ export function registerSplit(app: FastifyInstance) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
-        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        if (isToolInputError(err) || isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          throw err;
+        }
         const tooLarge = imageSizeLimitError(err);
         if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         return reply.status(422).send({
@@ -373,6 +392,8 @@ export function registerSplit(app: FastifyInstance) {
           originalExt,
         );
 
+        const openTile = await openTileSource(inputBuffer, sharpFormat, sourceFormat);
+
         const archive = archiver("zip", { zlib: { level: 5 } });
         const chunks: Buffer[] = [];
         archive.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -403,7 +424,7 @@ export function registerSplit(app: FastifyInstance) {
             if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
 
             const pipeline = applyTileFormat(
-              sharp(inputBuffer).extract({ left, top, width: w, height: h }),
+              openTile().extract({ left, top, width: w, height: h }),
               sharpFormat,
               sourceFormat,
               settings.quality,
