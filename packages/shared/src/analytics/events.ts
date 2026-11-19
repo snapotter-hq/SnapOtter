@@ -44,6 +44,13 @@ export const ANALYTICS_EVENTS = {
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
+/**
+ * Steps of a multi-request tool that report their own outcome without being a
+ * run. Passport Photo's analyze is its AI step; generate is the run (#4886).
+ */
+export const TOOL_USED_STEPS = ["analyze"] as const;
+export type ToolUsedStep = (typeof TOOL_USED_STEPS)[number];
+
 export interface ToolUsedProperties {
   tool_id: string;
   status: "completed" | "failed";
@@ -60,6 +67,8 @@ export interface ToolUsedProperties {
   error_code?: string;
   /** Coarse failure reason so "why do tools fail" is answerable without messages. */
   error_kind?: "input" | "operational" | "bug" | "timeout" | "cancelled";
+  /** Set only on a step event, so run counts filter on step not being set. */
+  step?: ToolUsedStep;
 }
 
 export interface SearchProperties {

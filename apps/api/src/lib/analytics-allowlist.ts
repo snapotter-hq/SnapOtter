@@ -1,4 +1,8 @@
-import { AI_INSTALL_ERROR_KINDS, AUTH_LOGIN_FAILURE_REASONS } from "@snapotter/shared";
+import {
+  AI_INSTALL_ERROR_KINDS,
+  AUTH_LOGIN_FAILURE_REASONS,
+  TOOL_USED_STEPS,
+} from "@snapotter/shared";
 
 // Defense in depth: only these keys may leave the server per event, and only as
 // primitives. Free-text fields (error_message, params, search query) are never
@@ -18,6 +22,7 @@ export const ALLOWED: Record<string, ReadonlySet<string>> = {
     "execution_hint",
     "error_code",
     "error_kind",
+    "step",
     "app_version",
   ]),
   pipeline_executed: new Set([
@@ -41,6 +46,7 @@ export const ALLOWED: Record<string, ReadonlySet<string>> = {
 const ALLOWED_VALUES: Record<string, Record<string, ReadonlySet<string>>> = {
   auth_login_failed: { reason: new Set<string>(AUTH_LOGIN_FAILURE_REASONS) },
   ai_bundle_action: { error_kind: new Set<string>(AI_INSTALL_ERROR_KINDS) },
+  tool_used: { step: new Set<string>(TOOL_USED_STEPS) },
 };
 
 function isAllowedValue(value: unknown): boolean {

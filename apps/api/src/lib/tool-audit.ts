@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { ToolUsedStep } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
@@ -23,6 +24,16 @@ const NON_INLINE_TOOL_SUB_ROUTES = new Set([
   "analyze",
   "effects",
   "batch",
+]);
+
+/**
+ * Sub-routes from the set above that still report a tool_used outcome, tagged
+ * as a step so they are never counted as a run. Passport Photo's analyze does
+ * the face detection and background removal, the part most likely to fail
+ * (#4886). Image Enhancement's analyze is a read-only probe and stays silent.
+ */
+const TOOL_USED_STEP_ROUTES = new Map<string, ToolUsedStep>([
+  ["passport-photo/analyze", "analyze"],
 ]);
 
 export interface ToolRequestAuditContext {
@@ -396,7 +407,11 @@ export async function emitInlineRequestAuditIfNeeded(
 ): Promise<void> {
   const ctx = requestContextMap.get(request) ?? toolRequestStorage.getStore();
   if (!ctx?.authorized || ctx.enqueued) return;
-  if (ctx.subRoute !== null && NON_INLINE_TOOL_SUB_ROUTES.has(ctx.subRoute)) return;
+  if (ctx.subRoute !== null && NON_INLINE_TOOL_SUB_ROUTES.has(ctx.subRoute)) {
+    const step = TOOL_USED_STEP_ROUTES.get(`${ctx.toolId}/${ctx.subRoute}`);
+    if (step) emitInlineToolUsed(request, ctx, statusCode, payload, step);
+    return;
+  }
   emitInlineToolUsed(request, ctx, statusCode, payload);
   if (ctx.audited || statusCode !== 200) return;
 
