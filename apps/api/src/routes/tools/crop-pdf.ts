@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pdfcpuCropMargin } from "@snapotter/doc-engine";
+import { assertCropMarginFits, pdfcpuCropMargin, pdfcpuPageSizes } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
@@ -24,6 +24,7 @@ export function registerCropPdf(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
 
       const outPath = join(ctx.scratchDir, `${base}_cropped.pdf`);
+      assertCropMarginFits(settings.margin, await pdfcpuPageSizes(inPath, { signal: ctx.signal }));
       ctx.report(10, "Cropping");
       await pdfcpuCropMargin(inPath, settings.margin, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
