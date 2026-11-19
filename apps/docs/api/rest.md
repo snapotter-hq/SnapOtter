@@ -264,7 +264,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 |---------|------|-------------|
 | `convert-video` | Convert Video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Compress Video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Trim Video | `startS`, `endS`, `precise` (bool, frame-accurate cut) |
+| `trim-video` | Trim Video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, frame-accurate cut) |
 | `mute-video` | Mute Video | - |
 | `video-to-gif` | Video to GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Resize Video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -297,7 +297,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
 | `convert-audio` | Convert Audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Trim Audio | `startS`, `endS` |
+| `trim-audio` | Trim Audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Volume Adjust | `gainDb` (-30 to 30) |
 | `normalize-audio` | Normalize Audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fade Audio | `fadeInS` (0-30), `fadeOutS` (0-30) |

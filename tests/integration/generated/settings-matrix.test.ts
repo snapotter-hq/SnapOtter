@@ -640,6 +640,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "short clip", settings: { startS: 0, endS: 0.5 } },
     { label: "precise true", settings: { startS: 0, endS: 0.5, precise: true } },
     { label: "precise false", settings: { startS: 0, endS: 0.5, precise: false } },
+    { label: "ends cut", settings: { mode: "ends", cutStartS: 0.1, cutEndS: 0.1 } },
   ],
 
   "video-to-gif": [
@@ -829,6 +830,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   "trim-audio": [
     { label: "short clip", settings: { startS: 0, endS: 0.5 } },
     { label: "offset clip", settings: { startS: 0.1, endS: 0.5 } },
+    { label: "ends cut", settings: { mode: "ends", cutStartS: 0.1, cutEndS: 0.1 } },
   ],
 
   "extract-audio": [

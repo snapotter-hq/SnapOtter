@@ -2,6 +2,7 @@ import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { audioContentType, formatFfmpegSeconds, runMediaTool } from "../../lib/media-tool.js";
+import { checkTrimMode, resolveTrimWindow, trimModeFields } from "../../lib/trim-window.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -10,14 +11,8 @@ import { createToolRoute } from "../tool-factory.js";
 const MIN_TRIM_WINDOW_S = 0.1;
 
 const settingsSchema = z
-  .object({
-    startS: z.number().finite().min(0).default(0),
-    endS: z.number().finite().min(0.000001),
-  })
-  .refine((s) => s.endS > s.startS, { message: "End must be after start" })
-  .refine((s) => s.endS - s.startS >= MIN_TRIM_WINDOW_S, {
-    message: `Trim window must be at least ${MIN_TRIM_WINDOW_S} seconds`,
-  });
+  .object(trimModeFields)
+  .superRefine((s, ctx) => checkTrimMode(s, ctx, MIN_TRIM_WINDOW_S));
 
 export function registerTrimAudio(app: FastifyInstance) {
   createToolRoute(app, {
@@ -37,19 +32,16 @@ export function registerTrimAudio(app: FastifyInstance) {
         if (info.durationS === null) {
           throw new InputValidationError("Could not determine audio duration");
         }
-        if (settings.startS >= info.durationS) {
-          throw new InputValidationError("Start is beyond the end of the audio");
-        }
-        const endS = Math.min(settings.endS, info.durationS);
-        if (endS - settings.startS < MIN_TRIM_WINDOW_S) {
+        const { startS, endS } = resolveTrimWindow(settings, info.durationS, "audio");
+        if (endS - startS < MIN_TRIM_WINDOW_S) {
           throw new InputValidationError(
-            `Trim window is shorter than ${MIN_TRIM_WINDOW_S} seconds after clamping to the audio duration`,
+            `Trim window is shorter than ${MIN_TRIM_WINDOW_S} seconds after resolving it against the audio duration`,
           );
         }
         // Fast seek with stream-copy for audio
         return [
           "-ss",
-          formatFfmpegSeconds(settings.startS),
+          formatFfmpegSeconds(startS),
           "-to",
           formatFfmpegSeconds(endS),
           "-i",
