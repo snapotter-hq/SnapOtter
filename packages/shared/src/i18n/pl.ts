@@ -1249,6 +1249,10 @@ export const pl: TranslationKeys = {
       name: "Scal pliki CSV",
       description: "Połącz wiele plików CSV lub TSV z pasującymi kolumnami w jeden",
     },
+    "merge-text": {
+      name: "Scal pliki tekstowe",
+      description: "Połącz wiele plików tekstowych lub Markdown w jeden, w wybranej kolejności",
+    },
     "yaml-json": {
       name: "Konwertuj YAML / JSON",
       description: "Konwertuj pomiędzy YAML i JSON w obu kierunkach",
@@ -4175,6 +4179,14 @@ export const pl: TranslationKeys = {
     "merge-csvs": {
       submit: "Scal",
       submitBatch: "Scal ({count} plików)",
+      progressLabel: "Scalanie",
+    },
+    "merge-text": {
+      separator: "Między plikami",
+      separatorBlankLine: "Pusty wiersz",
+      separatorRule: "Linia pozioma (---)",
+      separatorFilenameHeading: "Nazwa pliku jako nagłówek",
+      submit: "Scal",
       progressLabel: "Scalanie",
     },
     "yaml-json": {

@@ -90,6 +90,7 @@ import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergeAudio } from "./merge-audio.js";
 import { registerMergeCsvs } from "./merge-csvs.js";
 import { registerMergePdf } from "./merge-pdf.js";
+import { registerMergeText } from "./merge-text.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMultiToolPdf } from "./multi-tool-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -397,6 +398,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "extract-zip", register: registerExtractZip },
     { id: "json-xml", register: registerJsonXml },
     { id: "merge-csvs", register: registerMergeCsvs },
+    { id: "merge-text", register: registerMergeText },
     { id: "split-csv", register: registerSplitCsv },
     { id: "xml-to-csv", register: registerXmlToCsv },
     { id: "yaml-json", register: registerYamlJson },

@@ -1252,6 +1252,11 @@ export const tr: TranslationKeys = {
       name: "CSV Birleştir",
       description: "Eşleşen sütunlara sahip birden fazla CSV veya TSV dosyasını birleştir",
     },
+    "merge-text": {
+      name: "Metin Dosyalarını Birleştir",
+      description:
+        "Birden fazla metin veya Markdown dosyasını seçtiğiniz sırayla tek dosyada birleştir",
+    },
     "yaml-json": {
       name: "YAML / JSON Dönüştür",
       description: "YAML ile JSON arasında çift yönlü dönüştürme yap",
@@ -4173,6 +4178,14 @@ export const tr: TranslationKeys = {
     "merge-csvs": {
       submit: "Birleştir",
       submitBatch: "Birleştir ({count} dosya)",
+      progressLabel: "Birleştiriliyor",
+    },
+    "merge-text": {
+      separator: "Dosyalar arasında",
+      separatorBlankLine: "Boş satır",
+      separatorRule: "Yatay çizgi (---)",
+      separatorFilenameHeading: "Başlık olarak dosya adı",
+      submit: "Birleştir",
       progressLabel: "Birleştiriliyor",
     },
     "yaml-json": {

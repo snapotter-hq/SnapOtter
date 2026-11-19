@@ -1233,6 +1233,10 @@ export const th: TranslationKeys = {
       name: "รวม CSV",
       description: "รวมไฟล์ CSV หรือ TSV หลายไฟล์ที่มีคอลัมน์ตรงกันเป็นไฟล์เดียว",
     },
+    "merge-text": {
+      name: "รวมไฟล์ข้อความ",
+      description: "รวมไฟล์ข้อความหรือ Markdown หลายไฟล์เป็นไฟล์เดียวตามลำดับที่คุณเลือก",
+    },
     "yaml-json": {
       name: "แปลง YAML / JSON",
       description: "แปลงระหว่าง YAML และ JSON ทั้งสองทิศทาง",
@@ -4110,6 +4114,14 @@ export const th: TranslationKeys = {
     "merge-csvs": {
       submit: "รวม",
       submitBatch: "รวม ({count} ไฟล์)",
+      progressLabel: "กำลังรวม",
+    },
+    "merge-text": {
+      separator: "ระหว่างไฟล์",
+      separatorBlankLine: "บรรทัดว่าง",
+      separatorRule: "เส้นแนวนอน (---)",
+      separatorFilenameHeading: "ชื่อไฟล์เป็นหัวข้อ",
+      submit: "รวม",
       progressLabel: "กำลังรวม",
     },
     "yaml-json": {

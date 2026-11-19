@@ -1256,6 +1256,11 @@ export const de: TranslationKeys = {
       name: "CSVs zusammenführen",
       description: "Mehrere CSV- oder TSV-Dateien mit übereinstimmenden Spalten zusammenführen",
     },
+    "merge-text": {
+      name: "Textdateien zusammenführen",
+      description:
+        "Mehrere Text- oder Markdown-Dateien in der gewählten Reihenfolge zu einer zusammenführen",
+    },
     "yaml-json": {
       name: "YAML / JSON konvertieren",
       description: "Zwischen YAML und JSON konvertieren, in beide Richtungen",
@@ -4197,6 +4202,14 @@ export const de: TranslationKeys = {
     "merge-csvs": {
       submit: "Zusammenführen",
       submitBatch: "Zusammenführen ({count} Dateien)",
+      progressLabel: "Wird zusammengeführt",
+    },
+    "merge-text": {
+      separator: "Zwischen den Dateien",
+      separatorBlankLine: "Leerzeile",
+      separatorRule: "Trennlinie (---)",
+      separatorFilenameHeading: "Dateiname als Überschrift",
+      submit: "Zusammenführen",
       progressLabel: "Wird zusammengeführt",
     },
     "yaml-json": {
