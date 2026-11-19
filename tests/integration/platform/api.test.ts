@@ -306,12 +306,12 @@ describe("Auth endpoints", () => {
       expect(JSON.parse(res.body).code).toBe("INVALID_PASSWORD");
     });
 
-    it("rejects new password shorter than 8 characters", async () => {
+    it("rejects an empty new password", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/auth/change-password",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { currentPassword: "Adminpass1", newPassword: "short" },
+        payload: { currentPassword: "Adminpass1", newPassword: "" },
       });
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
@@ -372,12 +372,12 @@ describe("Auth endpoints", () => {
       expect(JSON.parse(res.body).code).toBe("CONFLICT");
     });
 
-    it("rejects password shorter than 8 characters", async () => {
+    it("rejects an empty password", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/auth/register",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { username: "shortpw_user", password: "short" },
+        payload: { username: "shortpw_user", password: "" },
       });
       expect(res.statusCode).toBe(400);
     });

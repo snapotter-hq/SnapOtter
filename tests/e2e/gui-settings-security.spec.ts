@@ -1,5 +1,5 @@
 import type { Browser, Page } from "@playwright/test";
-import { expect, login, openSettings, test } from "./helpers";
+import { expect, login, openSettings, putSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Settings Dialog: Security (change password) and API Keys tabs
@@ -15,9 +15,8 @@ import { expect, login, openSettings, test } from "./helpers";
 // createThrowawayUser() - register a disposable non-admin user via the API.
 //
 // The change-password form acts on the *current session user*. Driving it as
-// admin would mutate the shared admin password, and the policy (>= 8 chars,
-// upper/lower/digit) makes it impossible to restore the seeded "admin" value,
-// poisoning every later test that logs in as admin. So the success-path tests
+// admin would mutate the shared admin password and poison every later test
+// that logs in as admin. So the success-path tests
 // create a throwaway user, change *its* password in a separate browser context,
 // then delete it. MAX_USERS defaults to 0 (unlimited) and
 // SKIP_MUST_CHANGE_PASSWORD=true in the e2e env, so the login lands on "/".
@@ -148,22 +147,27 @@ test.describe("GUI Settings - Security Tab", () => {
   });
 
   test("short password shows validation error", async ({ loggedInPage: page }) => {
-    await openSettings(page);
-    await page.getByRole("button", { name: /security/i }).click();
+    // New installs have no minimum, so set one. Too short then fails the
+    // policy check, which runs before anything changes, so the shared admin
+    // password stays as it was.
+    expect((await putSettings(page, { passwordMinLength: "8" })).ok).toBe(true);
+    try {
+      await openSettings(page);
+      await page.getByRole("button", { name: /security/i }).click();
 
-    // Too short fails the server's password policy (minimum 8), which is
-    // checked before anything changes, so no password is changed.
-    await page.getByPlaceholder("Current Password").fill("admin");
-    await page.getByPlaceholder("New Password").first().fill("ab");
-    await page.getByPlaceholder("Confirm New Password").fill("ab");
+      await page.getByPlaceholder("Current Password").fill("admin");
+      await page.getByPlaceholder("New Password").first().fill("ab");
+      await page.getByPlaceholder("Confirm New Password").fill("ab");
 
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: /change password/i })
-      .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: /change password/i })
+        .click();
 
-    // Should show validation error about minimum length
-    await expect(page.getByText(/at least 8 characters/i)).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText(/at least 8 characters/i)).toBeVisible({ timeout: 5_000 });
+    } finally {
+      await putSettings(page, { passwordMinLength: "1" });
+    }
   });
 
   test("wrong current password shows error message", async ({ loggedInPage: page }) => {
