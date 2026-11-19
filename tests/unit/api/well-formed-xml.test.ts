@@ -41,6 +41,27 @@ describe("assertWellFormedXml", () => {
     expect(failure("<a>1</a>garbage").message).toMatch(/Extra text at the end/);
   });
 
+  it("keeps the message short when many tags are left open", () => {
+    const err = failure("<a>".repeat(200_000));
+    expect(err.message).toBe(
+      "XML parse failed: More than one tag is never closed. (line 1, column 1)",
+    );
+  });
+
+  it("accepts a BOM, DOCTYPE, processing instruction, namespaces and &nbsp;", () => {
+    expect(() =>
+      assertWellFormedXml(
+        '\uFEFF<?xml version="1.0"?><?xml-stylesheet href="s.xsl"?><!DOCTYPE n [<!ENTITY e "v">]><x:n xmlns:x="u">&nbsp;&e;</x:n>',
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects what XML forbids even though the lenient parser read it", () => {
+    expect(failure("<a></a><b></b>").message).toMatch(/Multiple possible root nodes/);
+    expect(failure("<a>x & y</a>").message).toMatch(/^XML parse failed: /);
+    expect(failure("<a disabled><b>1</b></a>").message).toMatch(/boolean attribute 'disabled'/);
+  });
+
   it("rejects an empty document", () => {
     expect(failure("").message).toBe("XML parse failed: Start tag expected. (line 1)");
   });

@@ -95,6 +95,7 @@ export function registerXmlToCsv(app: FastifyInstance) {
       const text = input.buffer.toString("utf8");
 
       assertWellFormedXml(text);
+
       // Mirror json-xml.ts parser options
       const parser = new XMLParser({ ignoreAttributes: false });
       let parsed: unknown;
