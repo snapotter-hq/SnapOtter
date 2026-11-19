@@ -197,6 +197,8 @@ Stop there. SnapOtter applies the grants itself and reapplies them after every m
 
 The role in `DATABASE_MIGRATION_URL` has to own the SnapOtter tables, because only a table's owner can grant on it. On an existing install that means the role you have been running SnapOtter as, not a fresh one created for the purpose. Point it at a new role that owns nothing and boot fails with an error saying exactly this. It also needs `CREATEROLE` to create and maintain the runtime role, and the right to create the `drizzle` schema.
 
+When SnapOtter creates the runtime role or changes its password, it sends a SCRAM-SHA-256 verifier rather than the password itself, so a failed statement can't leave the password in the Postgres log. The role's password is stored as SCRAM even if the cluster sets `password_encryption = md5`. Postgres handles that for an `md5` line in `pg_hba.conf`, but a connection pooler that checks md5 hashes itself can't log in as that role.
+
 Name the same role in both URLs and the split is off, and SnapOtter says so in the log instead of pretending otherwise. If your provider gives you no role that can both own the tables and hold `CREATEROLE`, run single-role.
 
 ### Why the superuser bit is left alone {#why-the-superuser-bit-is-left-alone}
