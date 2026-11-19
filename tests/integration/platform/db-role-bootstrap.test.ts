@@ -12,6 +12,7 @@ import {
   probeDatabase,
   runMigrations,
 } from "../../../apps/api/src/db/migrate.js";
+import { scramSha256Verifier } from "../../../apps/api/src/db/scram-verifier.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 
 // Covers db/bootstrap-roles.ts and the boot path in db/migrate.ts: role
@@ -49,6 +50,11 @@ const bootRole = `${role}_boot`;
 const ghostRole = `${role}_ghost`;
 // Does not exist until the concurrent-creation spec races several boots at it.
 const raceRole = `${role}_race`;
+// Created and rotated under a spy, so the spec can see every statement sent.
+const leakRole = `${role}_leak`;
+// Only ever given a password by plain DDL, as the reference the verifier specs
+// recompute.
+const verifierRole = `${role}_verifier`;
 
 // Mirrors MIGRATION_LOCK_KEY in apps/api/src/db/migrate.ts, which does not
 // export it.
@@ -213,7 +219,16 @@ afterAll(async () => {
   if (!owner) return;
   await owner.query("DROP TABLE IF EXISTS probe_future_table").catch(() => {});
   await owner.query("DROP TABLE IF EXISTS probe_after_boot_table").catch(() => {});
-  for (const name of [role, strangerRole, superRole, adoptedRole, bootRole, raceRole]) {
+  for (const name of [
+    role,
+    strangerRole,
+    superRole,
+    adoptedRole,
+    bootRole,
+    raceRole,
+    leakRole,
+    verifierRole,
+  ]) {
     // DROP OWNED BY also strips the default-privilege entries and the database
     // GRANT, which DROP ROLE would otherwise refuse over. It only reaches the
     // current database, which is where every grant was made.
@@ -367,6 +382,73 @@ describe("runtime role provisioning", () => {
       (err: Error) => err,
     );
     expect(failure?.message).toMatch(/superuser/i);
+  });
+});
+
+// A failed statement goes into the Postgres log in full (log_min_error_statement
+// defaults to error), and under log_statement = ddl a successful one does too.
+// So the password must never be in the text the role DDL sends, nor in the bind
+// parameters of the format() call that builds it (#4578).
+describe("runtime role password handling", () => {
+  const leakPassword = "l3ak-canary-create";
+  const leakRotated = "l3ak-canary-rotate";
+
+  it("sends no statement or parameter that holds the password", async () => {
+    const spy = vi.spyOn(owner, "query");
+    try {
+      await expect(ensureRuntimeRole(owner, leakRole, leakPassword)).resolves.toBe(true);
+      await expect(ensureRuntimeRole(owner, leakRole, leakRotated)).resolves.toBe(false);
+      const sent = spy.mock.calls.map((args) => JSON.stringify(args));
+      // Both a CREATE and an ALTER went out, so the scan below covered both.
+      expect(sent.some((text) => text.includes("CREATE ROLE"))).toBe(true);
+      expect(sent.some((text) => text.includes("ALTER ROLE"))).toBe(true);
+      for (const text of sent) {
+        expect(text).not.toContain(leakPassword);
+        expect(text).not.toContain(leakRotated);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+    // A verifier the server took for a cleartext would refuse this login.
+    await expect(
+      asRole(leakRole, leakRotated, (client) => client.query("SELECT 1")),
+    ).resolves.toBeDefined();
+    await expect(
+      asRole(leakRole, leakPassword, (client) => client.query("SELECT 1")),
+    ).rejects.toMatchObject({ code: "28P01" });
+  });
+
+  // The verifier only works if it is byte for byte what the server derives from
+  // the cleartext, so recompute one the server built with its own salt.
+  it.each([
+    ["an ASCII password", "plain-ascii-pw"],
+    ["a password with a quote", password],
+    ["a password that SASLprep changes", "p\u00e4ssw\u00f6rd-\uff46\uff55\uff4c\uff4c\u00a0x"],
+  ])("derives the verifier Postgres would for %s", async (_label, plaintext) => {
+    const { rows: existing } = await owner.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [
+      verifierRole,
+    ]);
+    if (existing.length === 0) await execAsOwner("CREATE ROLE %I LOGIN", verifierRole);
+    await owner.query("SET password_encryption = 'scram-sha-256'");
+    const { rows: stmt } = await owner.query<{ stmt: string }>(
+      "SELECT format('ALTER ROLE %I PASSWORD %L', $1::text, $2::text) AS stmt",
+      [verifierRole, plaintext],
+    );
+    await owner.query(stmt[0].stmt);
+
+    const stored = await owner.query<{ rolpassword: string }>(
+      "SELECT rolpassword FROM pg_authid WHERE rolname = $1",
+      [verifierRole],
+    );
+    const match = /^SCRAM-SHA-256\$(\d+):([^$]+)\$/.exec(stored.rows[0].rolpassword);
+    expect(match).not.toBeNull();
+    const [, iterations, salt] = match as RegExpExecArray;
+    expect(
+      scramSha256Verifier(plaintext, {
+        iterations: Number(iterations),
+        salt: Buffer.from(salt, "base64"),
+      }),
+    ).toBe(stored.rows[0].rolpassword);
   });
 });
 
