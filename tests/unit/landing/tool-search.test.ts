@@ -482,6 +482,17 @@ describe("landing searchTools with real catalog metadata", () => {
     expect(result.hasConfidentMatch).toBe(false);
   });
 
+  // #4825: Sony names HEIF files .HIF, so hif reads like heic in a query.
+  it("treats hif as a HEIC alias", () => {
+    for (const query of ["hif to jpg", "hif2jpg"]) {
+      const result = searchTools(realTools, { query, modality: "all", limit: 5 });
+      expect(result.results[0]?.item.id, query).toBe("heic-to-jpg");
+    }
+    const noop = searchTools(realTools, { query: "hif to heic", modality: "all", limit: 8 });
+    expect(noop.results).toHaveLength(0);
+    expect(noop.hasConfidentMatch).toBe(false);
+  });
+
   it("returns confident results for document extension conversions", () => {
     const result = searchTools(realTools, { query: "doc to docx", modality: "all", limit: 8 });
 
