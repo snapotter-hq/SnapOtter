@@ -7,7 +7,7 @@
  *     - color-blindness   (createToolRoute factory, standard response)
  *     - beautify           (custom route, download response)
  *     - edit-metadata      (custom route + /inspect endpoint)
- *     - vectorize          (custom route, raster -> SVG)
+ *     - vectorize          (createToolRoute factory, raster -> SVG)
  *     - split              (custom route, streams ZIP)
  *     - favicon            (custom route, streams ZIP)
  *     - meme-generator     (custom route, download response)

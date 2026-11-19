@@ -107,7 +107,6 @@ import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
 import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
-import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
 import { registerWatermarkImage } from "../../../apps/api/src/routes/tools/watermark-image.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -215,14 +214,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
       ],
       settings: undefined,
       expectedError: "Processing failed",
-    },
-    {
-      name: "vectorize",
-      register: registerVectorize,
-      url: "/api/v1/tools/image/vectorize",
-      files: () => [{ name: "a.png", type: "image/png", data: png }],
-      settings: undefined,
-      expectedError: "Vectorization failed",
     },
     {
       name: "svg-to-raster",

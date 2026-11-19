@@ -1786,7 +1786,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
   });
 });
 
-describe("outer processing catches in compare, watermark-image, compose, and vectorize (#3905)", () => {
+describe("outer processing catches in compare, watermark-image, and compose, plus the vectorize process fn (#3905)", () => {
   const oomMessage =
     "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
 
@@ -1794,7 +1794,7 @@ describe("outer processing catches in compare, watermark-image, compose, and vec
     putObject.mockReset().mockResolvedValue(undefined);
   });
 
-  it("compare, watermark-image, compose, and vectorize surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
+  it("compare, watermark-image, and compose surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
     const png = await sharp({
       create: { width: 16, height: 16, channels: 3, background: "#f00" },
     })
@@ -1841,13 +1841,6 @@ describe("outer processing catches in compare, watermark-image, compose, and vec
           ],
           settings: undefined,
           expected422Error: "Processing failed",
-        },
-        {
-          toolId: "vectorize",
-          url: "/api/v1/tools/image/vectorize",
-          files: [{ name: "a.png", type: "image/png", data: png }],
-          settings: undefined,
-          expected422Error: "Vectorization failed",
         },
       ] as const;
 
@@ -2019,40 +2012,21 @@ describe("outer processing catches in compare, watermark-image, compose, and vec
         compositeSpy.mockRestore();
       }
 
-      // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError on HTTP route and registered process fn
-      const grayscaleSpy = vi
-        .spyOn(sharp.prototype, "grayscale")
-        .mockImplementationOnce(function (this: Sharp) {
-          return {
-            png: () => ({
-              toBuffer: async () => {
-                throw new RangeError("Array buffer allocation failed");
-              },
-            }),
-          } as unknown as Sharp;
-        })
-        .mockImplementationOnce(function (this: Sharp) {
-          return {
-            png: () => ({
-              toBuffer: async () => {
-                throw new RangeError("Array buffer allocation failed");
-              },
-            }),
-          } as unknown as Sharp;
-        });
+      // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError in the
+      // registered process fn. The HTTP route is a createToolRoute now (#4337), so the
+      // worker carries this error to the response like any factory tool.
+      const grayscaleSpy = vi.spyOn(sharp.prototype, "grayscale").mockImplementationOnce(function (
+        this: Sharp,
+      ) {
+        return {
+          png: () => ({
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          }),
+        } as unknown as Sharp;
+      });
       try {
-        const vectorizeStepOom = await app.inject({
-          method: "POST",
-          url: "/api/v1/tools/image/vectorize",
-          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
-        });
-        expect(vectorizeStepOom.statusCode, vectorizeStepOom.body).toBe(503);
-        expect(vectorizeStepOom.json()).toEqual({
-          error: oomMessage,
-          code: "ENGINE_UNAVAILABLE",
-          requestId: expect.any(String),
-        });
-
         const vectorizeCfg = getToolConfig("vectorize");
         if (!vectorizeCfg) throw new Error("vectorize missing from toolRegistry");
         await expect(
