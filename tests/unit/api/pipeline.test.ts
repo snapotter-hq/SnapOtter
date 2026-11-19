@@ -6,7 +6,7 @@
  */
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
-import { SafeError } from "@snapotter/shared";
+import { PIPELINE_TEMPLATES, SafeError } from "@snapotter/shared";
 import Fastify, { type FastifyRequest } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -297,6 +297,7 @@ import { hasEffectiveToolAccess } from "../../../apps/api/src/permissions.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import {
   pipelineDefinitionSchema,
+  pipelineStepModalityError,
   pipelineStepSchema,
   registerPipelineRoutes,
   resolvePipelineStepToolId,
@@ -4847,6 +4848,135 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         width: 100,
         height: 100,
       });
+    }
+  });
+});
+
+// ── Step modality compatibility (#4343) ────────────────────────────────
+
+describe("pipeline step modality compatibility (#4343)", () => {
+  const chain = (...toolIds: string[]) =>
+    toolIds.map((toolId) => ({ toolId, resolvedToolId: toolId }));
+
+  it("rejects a step that can't read the previous step's output", () => {
+    expect(pipelineStepModalityError(chain("resize", "trim-audio"), 1)).toBe(
+      "Step 2 (trim-audio): expects audio input, but step 1 (resize) outputs image",
+    );
+    expect(pipelineStepModalityError(chain("resize", "trim-video"), 1)).toBe(
+      "Step 2 (trim-video): expects video input, but step 1 (resize) outputs image",
+    );
+    expect(pipelineStepModalityError(chain("resize", "compress", "trim-audio"), 2)).toBe(
+      "Step 3 (trim-audio): expects audio input, but step 2 (compress) outputs image",
+    );
+  });
+
+  it("accepts chains whose steps change modality through the declared output", () => {
+    expect(pipelineStepModalityError(chain("extract-audio", "normalize-audio"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("pdf-to-image", "resize"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("image-to-pdf", "compress-pdf"), 1)).toBeNull();
+  });
+
+  it("treats document and file tools as one family, since their output follows settings", () => {
+    // csv-excel writes .xlsx and excel-to-csv writes .csv, whatever their declared modality says.
+    expect(pipelineStepModalityError(chain("csv-excel", "excel-to-pdf"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("excel-to-csv", "csv-json"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("pdf-to-text", "compress-pdf"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("csv-json", "trim-audio"), 1)).toBe(
+      "Step 2 (trim-audio): expects audio input, but step 1 (csv-json) outputs file",
+    );
+  });
+
+  it("accepts a step whose tool takes a secondary input modality", () => {
+    // replace-audio lists video first but also takes audio.
+    expect(pipelineStepModalityError(chain("convert-audio", "replace-audio"), 1)).toBeNull();
+  });
+
+  it("does not judge the first step, unknown tools, or tools that accept any input", () => {
+    expect(pipelineStepModalityError(chain("trim-audio"), 0)).toBeNull();
+    expect(pipelineStepModalityError(chain("resize", "not-a-real-tool"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("not-a-real-tool", "trim-audio"), 1)).toBeNull();
+    expect(pipelineStepModalityError(chain("resize", "create-zip"), 1)).toBeNull();
+  });
+
+  it("judges the resolved tool but names the step by its requested toolId", () => {
+    const steps = [
+      { toolId: "resize", resolvedToolId: "content-aware-resize" },
+      { toolId: "trim-audio", resolvedToolId: "trim-audio" },
+    ];
+    expect(pipelineStepModalityError(steps, 1)).toBe(
+      "Step 2 (trim-audio): expects audio input, but step 1 (resize) outputs image",
+    );
+  });
+
+  it.each(PIPELINE_TEMPLATES.map((t) => [t.id, t] as const))(
+    "keeps the built-in template %s valid",
+    (_id, template) => {
+      const steps = template.steps.map((step) => ({
+        toolId: step.toolId,
+        resolvedToolId: resolvePipelineStepToolId(step),
+      }));
+      for (let i = 0; i < steps.length; i++) {
+        expect(pipelineStepModalityError(steps, i)).toBeNull();
+      }
+    },
+  );
+
+  it("answers 400 before any step runs on /execute, /batch, and /save", async () => {
+    vi.clearAllMocks();
+    const resizeConfig = getToolConfig("resize");
+    getToolConfigSpy.mockImplementation((toolId: string) =>
+      toolId === "resize" || toolId === "trim-audio" ? resizeConfig : undefined,
+    );
+    const pipelineField = {
+      type: "field" as const,
+      fieldname: "pipeline",
+      value: JSON.stringify({
+        steps: [
+          { toolId: "resize", settings: { width: 800 } },
+          { toolId: "trim-audio", settings: { startS: 0, endS: 1 } },
+        ],
+      }),
+    };
+    const expectedError =
+      "Step 2 (trim-audio): expects audio input, but step 1 (resize) outputs image";
+
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerPipelineRoutes(app);
+    await app.ready();
+
+    try {
+      const executeReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        pipelineField,
+      ]);
+      expect(executeReply.statusCode).toBe(400);
+      expect(executeReply.payload).toEqual({ error: expectedError });
+
+      const batchReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        pipelineField,
+      ]);
+      expect(batchReply.statusCode).toBe(400);
+      expect(batchReply.payload).toEqual({ error: expectedError });
+
+      const saveRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Image To Audio",
+          steps: JSON.parse(pipelineField.value).steps,
+        },
+      });
+      expect(saveRes.statusCode).toBe(400);
+      expect(saveRes.json()).toMatchObject({ error: expectedError });
+
+      expect(flowAddMock).not.toHaveBeenCalled();
+      expect(insertValuesMock).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      getToolConfigSpy.mockReset();
     }
   });
 });
