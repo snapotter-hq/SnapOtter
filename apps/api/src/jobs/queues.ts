@@ -39,7 +39,18 @@ export async function closeQueues(): Promise<void> {
   await Promise.all(entries.map((q) => q.close()));
 }
 
-/** Aggregate counts across all pools. */
+/**
+ * Delayed jobs that stand for pending work, such as a backoff retry. A job
+ * scheduler (system-jobs.ts) keeps its next run in the delayed set for as long
+ * as it exists, so counting those would report an idle server as busy forever.
+ */
+async function pendingDelayed(q: Queue<ToolJobData, ToolJobResult>, delayed: number) {
+  if (delayed === 0) return 0;
+  const jobs = await q.getDelayed();
+  return jobs.filter((job) => !job.repeatJobKey).length;
+}
+
+/** Aggregate counts across all pools. `delayed` leaves out job-scheduler runs. */
 export async function queueCounts(): Promise<{
   active: number;
   waiting: number;
@@ -54,7 +65,7 @@ export async function queueCounts(): Promise<{
     const counts = await q.getJobCounts("active", "waiting", "delayed");
     active += counts.active ?? 0;
     waiting += counts.waiting ?? 0;
-    delayed += counts.delayed ?? 0;
+    delayed += await pendingDelayed(q, counts.delayed ?? 0);
   }
   return { active, waiting, delayed };
 }

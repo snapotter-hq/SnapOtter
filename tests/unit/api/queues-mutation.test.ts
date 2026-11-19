@@ -15,6 +15,7 @@ interface FakeQueue {
   on: ReturnType<typeof vi.fn>;
   getJobCounts: ReturnType<typeof vi.fn>;
   getJobs: ReturnType<typeof vi.fn>;
+  getDelayed: ReturnType<typeof vi.fn>;
 }
 
 const queueInstances: FakeQueue[] = [];
@@ -33,6 +34,7 @@ async function loadQueuesModule() {
       on: vi.fn(),
       getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, failed: 0 }),
       getJobs: vi.fn().mockResolvedValue([]),
+      getDelayed: vi.fn(),
     };
     queueInstances.push(queue);
     return queue;
@@ -46,6 +48,10 @@ async function loadQueuesModule() {
   for (const fn of Object.values(loggerMock)) fn.mockClear();
 
   return import("../../../apps/api/src/jobs/queues.js");
+}
+
+function userJobs(count: number) {
+  return Array.from({ length: count }, (_, i) => ({ id: `job-${i}` }));
 }
 
 describe("queues.ts mutation coverage", () => {
@@ -182,16 +188,19 @@ describe("queues.ts mutation coverage", () => {
         waiting: 10,
         delayed: 100,
       });
+      queueInstances[0].getDelayed.mockResolvedValueOnce(userJobs(100));
       queueInstances[1].getJobCounts.mockResolvedValueOnce({
         active: 2,
         waiting: 20,
         delayed: 200,
       });
+      queueInstances[1].getDelayed.mockResolvedValueOnce(userJobs(200));
       queueInstances[2].getJobCounts.mockResolvedValueOnce({
         active: 4,
         waiting: 40,
         delayed: 400,
       });
+      queueInstances[2].getDelayed.mockResolvedValueOnce(userJobs(400));
 
       // Distinct powers keep each field's sum unique so a swapped accumulator
       // (active += counts.waiting, etc.) produces a different total.
@@ -225,6 +234,7 @@ describe("queues.ts mutation coverage", () => {
       // Only one of five pools is instantiated.
       getQueue("system");
       queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 5, waiting: 6, delayed: 7 });
+      queueInstances[0].getDelayed.mockResolvedValueOnce(userJobs(7));
 
       await expect(queueCounts()).resolves.toEqual({ active: 5, waiting: 6, delayed: 7 });
       // The four skipped pools never call getJobCounts.
@@ -234,6 +244,20 @@ describe("queues.ts mutation coverage", () => {
     it("returns all zeros when no queues have been created", async () => {
       const { queueCounts } = await loadQueuesModule();
       await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 0 });
+    });
+
+    it("counts only delayed jobs with no repeatJobKey", async () => {
+      const { getQueue, queueCounts } = await loadQueuesModule();
+      getQueue("system");
+      queueInstances[0].getJobCounts.mockResolvedValueOnce({ active: 0, waiting: 0, delayed: 3 });
+      queueInstances[0].getDelayed.mockResolvedValueOnce([
+        { id: "repeat:storage-ttl:1795018385612", repeatJobKey: "storage-ttl" },
+        { id: "job-1" },
+        { id: "repeat:audit-archive:1795018385612", repeatJobKey: "audit-archive" },
+      ]);
+
+      await expect(queueCounts()).resolves.toEqual({ active: 0, waiting: 0, delayed: 1 });
+      expect(queueInstances[0].getDelayed).toHaveBeenCalledWith();
     });
   });
 
