@@ -730,6 +730,11 @@ const CropPdfSettings = lazy(() =>
     default: m.CropPdfSettings,
   })),
 );
+const ResizePdfPagesSettings = lazy(() =>
+  import("@/components/tools/resize-pdf-pages-settings").then((m) => ({
+    default: m.ResizePdfPagesSettings,
+  })),
+);
 const NupPdfSettings = lazy(() =>
   import("@/components/tools/nup-pdf-settings").then((m) => ({
     default: m.NupPdfSettings,
@@ -1216,6 +1221,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],
   ["repair-pdf", { accept: ".pdf", Settings: RepairPdfSettings }],
   ["crop-pdf", { accept: ".pdf", Settings: CropPdfSettings }],
+  ["resize-pdf-pages", { accept: ".pdf", Settings: ResizePdfPagesSettings }],
   ["nup-pdf", { accept: ".pdf", Settings: NupPdfSettings }],
   ["booklet-pdf", { accept: ".pdf", Settings: BookletPdfSettings }],
   ["watermark-pdf", { accept: ".pdf", Settings: WatermarkPdfSettings }],

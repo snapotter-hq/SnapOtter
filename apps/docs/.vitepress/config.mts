@@ -593,6 +593,7 @@ function buildBaseTheme() {
               { text: "Grayscale PDF", link: "/tools/pdf/grayscale-pdf" },
               { text: "PDF/A Converter", link: "/tools/pdf/pdfa-convert" },
               { text: "Crop PDF", link: "/tools/pdf/crop-pdf" },
+              { text: "Resize PDF Pages", link: "/tools/pdf/resize-pdf-pages" },
               { text: "Pages Per Sheet (N-up)", link: "/tools/pdf/nup-pdf" },
               { text: "Booklet PDF", link: "/tools/pdf/booklet-pdf" },
               { text: "Watermark PDF", link: "/tools/pdf/watermark-pdf" },

@@ -1159,6 +1159,10 @@ export const uk: TranslationKeys = {
       name: "Обрізання PDF",
       description: "Обрізати всі сторінки з однаковими полями",
     },
+    "resize-pdf-pages": {
+      name: "Змінити розмір сторінок PDF",
+      description: "Перетворіть сторінки на A4, Letter або етикетку 4x6 дюйма",
+    },
     "nup-pdf": {
       name: "Сторінок на аркуш (N-up)",
       description: "Розмістити кілька сторінок на одному аркуші",
@@ -3976,6 +3980,28 @@ export const uk: TranslationKeys = {
       submit: "Обрізати",
       submitBatch: "Обрізати ({count} файлів)",
       progressLabel: "Обрізання",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Розмір сторінки",
+      width: "Ширина",
+      height: "Висота",
+      unit: "Одиниця",
+      keepOrientation: "Зберігати орієнтацію кожної сторінки",
+      fitHint:
+        "Вміст масштабується під розмір і центрується, тож текст і штрихкоди лишаються чіткими.",
+      submit: "Змінити розмір",
+      submitBatch: "Змінити розмір ({count} файлів)",
+      progressLabel: "Зміна розміру",
+      sizes: {
+        "4x6in": "4 x 6 in (транспортна етикетка)",
+        "100x150mm": "100 x 150 mm (транспортна етикетка)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Власний",
+      },
     },
     "nup-pdf": {
       perSheet: "Сторінок на аркуш",

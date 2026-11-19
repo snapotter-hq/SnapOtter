@@ -1159,6 +1159,10 @@ export const ru: TranslationKeys = {
       name: "Обрезка PDF",
       description: "Обрезка всех страниц с одинаковым отступом",
     },
+    "resize-pdf-pages": {
+      name: "Изменить размер страниц PDF",
+      description: "Приведите страницы к A4, Letter или этикетке 4x6 дюйма",
+    },
     "nup-pdf": {
       name: "Страниц на листе (N-up)",
       description: "Размещение нескольких страниц на одном листе",
@@ -3975,6 +3979,28 @@ export const ru: TranslationKeys = {
       submit: "Обрезать",
       submitBatch: "Обрезать ({count} файлов)",
       progressLabel: "Обрезка",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Размер страницы",
+      width: "Ширина",
+      height: "Высота",
+      unit: "Единица",
+      keepOrientation: "Сохранять ориентацию каждой страницы",
+      fitHint:
+        "Содержимое масштабируется по размеру и центрируется, поэтому текст и штрихкоды остаются чёткими.",
+      submit: "Изменить размер",
+      submitBatch: "Изменить размер ({count} файлов)",
+      progressLabel: "Изменение размера",
+      sizes: {
+        "4x6in": "4 x 6 in (транспортная этикетка)",
+        "100x150mm": "100 x 150 mm (транспортная этикетка)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Пользовательский",
+      },
     },
     "nup-pdf": {
       perSheet: "Страниц на лист",

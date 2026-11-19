@@ -57,6 +57,21 @@ describe("getSettingsSummary", () => {
     expect(getSettingsSummary("crop", { width: 800, height: 600 })).toBe("800 x 600");
   });
 
+  it("returns the preset for resize-pdf-pages", () => {
+    expect(getSettingsSummary("resize-pdf-pages", { pageSize: "4x6in" })).toBe("4x6in");
+  });
+
+  it("returns the custom size and unit for resize-pdf-pages", () => {
+    expect(
+      getSettingsSummary("resize-pdf-pages", {
+        pageSize: "custom",
+        width: 100,
+        height: 150,
+        unit: "mm",
+      }),
+    ).toBe("100 x 150 mm");
+  });
+
   it("returns empty string for unknown tool with empty settings", () => {
     expect(getSettingsSummary("unknown-tool", {})).toBe("");
   });
