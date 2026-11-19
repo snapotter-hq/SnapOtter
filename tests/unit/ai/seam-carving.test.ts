@@ -514,8 +514,18 @@ describe("seamCarve", () => {
         { width: 120 },
       );
       expect(resizeCalls).toEqual([[200, 500, { fit: "fill" }]]);
-      expect(caireArgs).toContain("-width");
+      expect(caireArgs[caireArgs.indexOf("-width") + 1]).toBe("120");
       expect(caireArgs).not.toContain("-height");
+    });
+
+    it("leaves an enlarged axis at the source size for caire to grow by seam insertion", async () => {
+      const { resizeCalls, caireArgs } = await runPreResize(
+        { width: 800, height: 500 },
+        { width: 1200, height: 100 },
+      );
+      expect(resizeCalls).toEqual([[800, 125, { fit: "fill" }]]);
+      expect(caireArgs[caireArgs.indexOf("-width") + 1]).toBe("1200");
+      expect(caireArgs[caireArgs.indexOf("-height") + 1]).toBe("100");
     });
 
     it("height-only reduction below 25% leaves the width at the original size", async () => {
