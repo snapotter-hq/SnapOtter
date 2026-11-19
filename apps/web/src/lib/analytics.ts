@@ -50,7 +50,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   result_downloaded: new Set(["tool_id"]),
   result_saved: new Set(["tool_id"]),
   search: new Set(["results_count", "clicked_tool_id"]),
-  ai_bundle_prompted: new Set(["bundle_id"]),
+  ai_bundle_prompted: new Set(["bundle_id", "tool_id"]),
   batch_processed: new Set([
     "tool_id",
     "file_count",

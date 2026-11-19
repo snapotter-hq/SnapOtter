@@ -15,6 +15,12 @@ vi.stubGlobal("localStorage", {
   clear: () => storage.clear(),
 });
 
+const trackMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/lazy-analytics", () => ({
+  withAnalytics: (use: (analytics: { track: typeof trackMock }) => void) =>
+    use({ track: trackMock }),
+}));
+
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -204,5 +210,42 @@ describe("FeatureInstallPrompt download ETA (#1145)", () => {
 
     expect(await screen.findByText(de.features.progressMessages[0])).toBeTruthy();
     expect(screen.queryByText("Almost there... probably...")).toBeNull();
+  });
+});
+
+// #4819: a tool's opens could not be split into "stopped at the bundle gate"
+// and the rest, because the prompt impression carried no tool id.
+describe("FeatureInstallPrompt impression analytics (#4819)", () => {
+  beforeEach(() => {
+    trackMock.mockClear();
+    useFeaturesStore.setState({ installing: {}, errors: {}, queued: [], startTimes: {} });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("tags the prompt impression with the tool that showed it", () => {
+    render(
+      <FeatureInstallPrompt
+        bundle={makeBundleState({ id: "face-detection" })}
+        isAdmin
+        toolId="passport-photo"
+        toolName="Passport Photo"
+      />,
+    );
+
+    expect(trackMock).toHaveBeenCalledWith("ai_bundle_prompted", {
+      bundle_id: "face-detection",
+      tool_id: "passport-photo",
+    });
+  });
+
+  it("sends only the bundle id when the prompt is not tied to a tool", () => {
+    render(<FeatureInstallPrompt bundle={makeBundleState()} isAdmin />);
+
+    expect(trackMock).toHaveBeenCalledWith("ai_bundle_prompted", {
+      bundle_id: "background-removal",
+    });
   });
 });

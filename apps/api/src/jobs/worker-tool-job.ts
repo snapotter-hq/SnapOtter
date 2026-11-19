@@ -7,8 +7,6 @@ import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@open
 import {
   ANALYTICS_EVENTS,
   extractErrorCode,
-  getBundleForTool,
-  getOptionalBundleForTool,
   isSafeMessageError,
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
@@ -32,6 +30,7 @@ import { resolveCanonicalToolId } from "../lib/pool.js";
 import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { type TimeoutSetting, timeoutMessage } from "../lib/timeout.js";
 import { emitWorkerToolAudit } from "../lib/tool-audit.js";
+import { toolUsedDimensions } from "../lib/tool-used-telemetry.js";
 import {
   cancelSingleJobGuarded,
   publishEphemeral,
@@ -122,26 +121,14 @@ export function selectJobDispatch(toolId: string, kind: ToolJobData["kind"]): Jo
 
 export type JobDispatch = "ai-path" | "ai-handler" | "registry";
 
-/**
- * Dimensions shared by both tool_used branches, kept in one place so the
- * success and failure events never drift. input_format is the safe extension
- * only (never the filename); is_batch flags a per-file batch child so batch
- * volume is distinguishable from single runs; execution_hint records the tool's
- * sync/async class.
- */
 function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string, unknown> {
-  const canonicalId = resolveCanonicalToolId(data.toolId);
-  const tool = TOOLS.find((t) => t.id === canonicalId);
-  return {
-    tool_id: data.toolId,
-    duration_ms: durationMs,
-    category: tool?.category ?? "unknown",
-    is_ai_tool:
-      getBundleForTool(canonicalId) !== null || getOptionalBundleForTool(canonicalId) !== null,
-    is_batch: data.kind === "batch-child",
-    input_format: safeFormatTag(data.filename) ?? "unknown",
-    execution_hint: tool?.executionHint ?? "fast",
-  };
+  return toolUsedDimensions({
+    toolId: data.toolId,
+    canonicalId: resolveCanonicalToolId(data.toolId),
+    durationMs,
+    isBatch: data.kind === "batch-child",
+    filename: data.filename,
+  });
 }
 
 const ABORT_ERROR_MESSAGE =

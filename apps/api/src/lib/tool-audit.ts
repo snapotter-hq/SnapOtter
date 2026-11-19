@@ -6,6 +6,7 @@ import type { ToolJobData } from "../jobs/types.js";
 import { auditFromRequest, auditLog, isToolAuditEnabled } from "./audit.js";
 import { reportError } from "./error-report.js";
 import { logger } from "./logger.js";
+import { emitInlineToolUsed } from "./tool-used-telemetry.js";
 
 const TOOLS_PREFIX = "/api/v1/tools/";
 
@@ -35,8 +36,12 @@ export interface ToolRequestAuditContext {
   authorized: boolean;
   enqueued: boolean;
   audited: boolean;
+  /** tool_used already sent for this request (#4819). */
+  telemetrySent: boolean;
   inputFileCount: number;
   totalInputSize: number;
+  /** First uploaded file's name, kept in memory only for its safe extension. */
+  inputFilename: string | null;
 }
 
 const toolRequestStorage = new AsyncLocalStorage<ToolRequestAuditContext>();
@@ -64,6 +69,12 @@ export function recordInlineInputFile(request: FastifyRequest | undefined, bytes
   if (!ctx) return;
   ctx.inputFileCount += 1;
   ctx.totalInputSize += bytes;
+}
+
+function recordInlineInputFilename(request: FastifyRequest, filename: unknown): void {
+  const ctx = requestContextMap.get(request);
+  if (!ctx || ctx.inputFilename !== null || typeof filename !== "string") return;
+  ctx.inputFilename = filename;
 }
 
 function trackFilePartStream(request: FastifyRequest, file: unknown): void {
@@ -113,6 +124,7 @@ function wrapRequestPartsForAudit(request: FastifyRequest): void {
         (part as { type?: unknown }).type === "file" &&
         "file" in part
       ) {
+        recordInlineInputFilename(request, (part as { filename?: unknown }).filename);
         trackFilePartStream(request, (part as { file: unknown }).file);
       }
       yield part;
@@ -131,7 +143,13 @@ export function enterToolRequestAuditContext(
   request: FastifyRequest,
   init: Omit<
     ToolRequestAuditContext,
-    "enqueued" | "audited" | "authorized" | "inputFileCount" | "totalInputSize"
+    | "enqueued"
+    | "audited"
+    | "telemetrySent"
+    | "authorized"
+    | "inputFileCount"
+    | "totalInputSize"
+    | "inputFilename"
   > & {
     authorized?: boolean;
   },
@@ -141,8 +159,10 @@ export function enterToolRequestAuditContext(
     authorized: init.authorized ?? true,
     enqueued: false,
     audited: false,
+    telemetrySent: false,
     inputFileCount: 0,
     totalInputSize: 0,
+    inputFilename: null,
   };
   requestContextMap.set(request, ctx);
   toolRequestStorage.enterWith(ctx);
@@ -365,8 +385,9 @@ function parseInlineSizes(payload: unknown): {
 }
 
 /**
- * Emit `TOOL_EXECUTED` for an inline custom HTTP tool route that completed with
- * HTTP 200 without enqueuing a BullMQ job.
+ * Settle an inline custom HTTP tool route that ran without enqueuing a BullMQ
+ * job: send its `tool_used` outcome (success or failure, #4819), and on HTTP
+ * 200 emit `TOOL_EXECUTED`. Both use the same test for what counts as a run.
  */
 export async function emitInlineRequestAuditIfNeeded(
   request: FastifyRequest,
@@ -374,8 +395,10 @@ export async function emitInlineRequestAuditIfNeeded(
   payload?: unknown,
 ): Promise<void> {
   const ctx = requestContextMap.get(request) ?? toolRequestStorage.getStore();
-  if (!ctx || !ctx.authorized || ctx.enqueued || ctx.audited || statusCode !== 200) return;
+  if (!ctx?.authorized || ctx.enqueued) return;
   if (ctx.subRoute !== null && NON_INLINE_TOOL_SUB_ROUTES.has(ctx.subRoute)) return;
+  emitInlineToolUsed(request, ctx, statusCode, payload);
+  if (ctx.audited || statusCode !== 200) return;
 
   ctx.audited = true;
   try {

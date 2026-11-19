@@ -129,11 +129,15 @@ export function FeatureInstallPrompt({
     if (!isAdmin || bundle.status === "installed") return;
     // Install-prompt impression: the top of the AI-adoption funnel
     // (prompted -> ai_bundle_action install -> tool_used is_ai_tool). Non-admins
-    // see a different "not enabled" message, not this prompt.
+    // see a different "not enabled" message, not this prompt. tool_id splits a
+    // tool's opens into "stopped at the bundle gate" and the rest (#4819).
     withAnalytics(({ track }) => {
-      track(ANALYTICS_EVENTS.AI_BUNDLE_PROMPTED, { bundle_id: bundle.id });
+      track(ANALYTICS_EVENTS.AI_BUNDLE_PROMPTED, {
+        bundle_id: bundle.id,
+        ...(toolId && { tool_id: toolId }),
+      });
     });
-  }, [bundle.id, bundle.status, isAdmin]);
+  }, [bundle.id, bundle.status, isAdmin, toolId]);
 
   const eta = (() => {
     if (!progress || !startTime || progress.percent <= 2) return null;
