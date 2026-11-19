@@ -280,6 +280,14 @@ export function registerImageToBase64(app: FastifyInstance) {
         }
       }
 
+      // A 200 with nothing in it reads as success to a caller that checks only
+      // the status (#4409). The body keeps the batch shape so per-file reasons
+      // still reach the client; partial success stays 200.
+      const firstError = errors[0];
+      if (results.length === 0 && firstError) {
+        return reply.status(400).send({ error: firstError.error, results, errors });
+      }
+
       return reply.send({ results, errors });
     },
   );

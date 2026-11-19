@@ -113,6 +113,45 @@ describe("image-to-base64 settings", () => {
     ]);
   });
 
+  it("shows the per-file reason when the server answers 400 because no file succeeded (#4409)", async () => {
+    const { fetchMock, encode } = encodeServer(
+      () =>
+        respond(
+          {
+            error: "Unrecognized image format",
+            results: [],
+            errors: [{ filename: "image.png", error: "Unrecognized image format" }],
+          },
+          400,
+        ),
+      () => respond({ error: "Invalid settings" }, 400),
+      () => respond({ results: [serverResult("image.png", "dGhpcmQ=")], errors: [] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const [first, second, third] = useFileStore.getState().entries;
+
+    const { getByTestId } = render(
+      <I18nProvider>
+        <ImageToBase64Settings />
+      </I18nProvider>,
+    );
+    fireEvent.click(getByTestId("base64-submit"));
+    await waitFor(() => expect(encode).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(useBase64Store.getState().processing).toBe(false));
+
+    const { results, errors } = useBase64Store.getState();
+    expect(results).toEqual([expect.objectContaining({ entryId: third.id, base64: "dGhpcmQ=" })]);
+    expect(errors).toEqual([
+      expect.objectContaining({
+        entryId: first.id,
+        filename: "image.png",
+        error: "Unrecognized image format",
+      }),
+      // A 400 without the batch shape still reads as the generic failure.
+      expect.objectContaining({ entryId: second.id, error: "Failed: 400" }),
+    ]);
+  });
+
   it("stamps a failed request with the entry it was for", async () => {
     const fail = () => Promise.reject(new TypeError("Failed to fetch"));
     const { fetchMock, encode } = encodeServer(fail, fail, fail);
