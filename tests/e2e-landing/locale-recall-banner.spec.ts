@@ -100,6 +100,18 @@ test.describe("locale recall revert banner", () => {
     await expect(page.locator("[data-recall-banner]")).toBeHidden();
   });
 
+  test("a broken English URL stays on the 404 instead of recalling the locale", async ({
+    page,
+  }) => {
+    await storeLocale(page, "es");
+    // A typo of /tools/image/compress/. Asserting on content, not status,
+    // keeps this valid under both astro preview and Cloudflare Pages.
+    await page.goto("/tools/image/compress-image/");
+    await expect(page.locator("main h1")).toHaveText("Page not found");
+    await expect(page).toHaveURL(/\/tools\/image\/compress-image\/$/);
+    expect(await page.evaluate(() => sessionStorage.getItem("snapotter:recall"))).toBeNull();
+  });
+
   test("banner notice is localized on the target page", async ({ page }) => {
     await storeLocale(page, "de");
     await page.goto("/");
