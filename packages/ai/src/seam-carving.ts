@@ -133,11 +133,15 @@ export async function seamCarve(
 
     // Seam carving can only reduce each axis by ~75% per pass. If the target
     // is further away, do a standard resize first to bring it within range.
+    // "fill" scales each axis on its own: "inside" would keep the source
+    // aspect and shrink the axis the caller left alone (#4362). Each axis is
+    // capped at the source size so an enlarged axis still grows through
+    // caire's seam insertion rather than a plain stretch.
     const MIN_RATIO = 0.25;
     if (wRatio < MIN_RATIO || hRatio < MIN_RATIO) {
-      const safeW = Math.max(targetW, Math.ceil(width * MIN_RATIO));
-      const safeH = Math.max(targetH, Math.ceil(height * MIN_RATIO));
-      const preResized = sharp(inputBuffer).resize(safeW, safeH, { fit: "inside" });
+      const safeW = Math.min(width, Math.max(targetW, Math.ceil(width * MIN_RATIO)));
+      const safeH = Math.min(height, Math.max(targetH, Math.ceil(height * MIN_RATIO)));
+      const preResized = sharp(inputBuffer).resize(safeW, safeH, { fit: "fill" });
       preResizedBuffer = await preResized.toBuffer();
       const preMeta = await sharp(preResizedBuffer).metadata();
       currentW = preMeta.width ?? safeW;

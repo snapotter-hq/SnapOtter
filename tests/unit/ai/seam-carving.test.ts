@@ -467,6 +467,84 @@ describe("seamCarve", () => {
     expect(caireCall).toBeDefined();
   });
 
+  describe("pre-resize keeps the axis the caller did not reduce (#4362)", () => {
+    async function runPreResize(
+      source: { width: number; height: number },
+      options: { width?: number; height?: number; square?: boolean },
+    ) {
+      const { seamCarve } = await importFresh();
+      const { default: moduleSharp } = await import("sharp");
+      const resizeCalls: unknown[][] = [];
+      let metadataCalls = 0;
+      vi.mocked(moduleSharp).mockImplementation(() => {
+        const instance = {
+          jpeg: vi.fn().mockReturnThis(),
+          resize: vi.fn((...args: unknown[]) => {
+            resizeCalls.push(args);
+            return instance;
+          }),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          metadata: vi.fn().mockImplementation(() => {
+            metadataCalls++;
+            if (metadataCalls === 1) return Promise.resolve(source);
+            // Emulate sharp's geometry so the caire args reflect what the pre-resize really produced.
+            const [w, h, opts] = resizeCalls[0] as [number, number, { fit?: string }];
+            if (opts?.fit === "inside") {
+              const scale = Math.min(w / source.width, h / source.height);
+              return Promise.resolve({
+                width: Math.round(source.width * scale),
+                height: Math.round(source.height * scale),
+              });
+            }
+            return Promise.resolve({ width: w, height: h });
+          }),
+        };
+        return instance as unknown as ReturnType<typeof sharp>;
+      });
+      await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, options);
+      const caireArgs = mockExecFileAsync.mock.calls
+        .map((c: unknown[]) => c[1])
+        .find((a: unknown) => Array.isArray(a) && a.includes("-in")) as string[];
+      return { resizeCalls, caireArgs };
+    }
+
+    it("width-only reduction below 25% leaves the height at the original size", async () => {
+      const { resizeCalls, caireArgs } = await runPreResize(
+        { width: 800, height: 500 },
+        { width: 120 },
+      );
+      expect(resizeCalls).toEqual([[200, 500, { fit: "fill" }]]);
+      expect(caireArgs[caireArgs.indexOf("-width") + 1]).toBe("120");
+      expect(caireArgs).not.toContain("-height");
+    });
+
+    it("leaves an enlarged axis at the source size for caire to grow by seam insertion", async () => {
+      const { resizeCalls, caireArgs } = await runPreResize(
+        { width: 800, height: 500 },
+        { width: 1200, height: 100 },
+      );
+      expect(resizeCalls).toEqual([[800, 125, { fit: "fill" }]]);
+      expect(caireArgs[caireArgs.indexOf("-width") + 1]).toBe("1200");
+      expect(caireArgs[caireArgs.indexOf("-height") + 1]).toBe("100");
+    });
+
+    it("height-only reduction below 25% leaves the width at the original size", async () => {
+      const { resizeCalls } = await runPreResize({ width: 800, height: 500 }, { height: 60 });
+      expect(resizeCalls).toEqual([[800, 125, { fit: "fill" }]]);
+    });
+
+    it("square mode reaches the requested side when only one axis is below 25%", async () => {
+      const { resizeCalls, caireArgs } = await runPreResize(
+        { width: 800, height: 500 },
+        { width: 150, height: 150, square: true },
+      );
+      expect(resizeCalls).toEqual([[200, 150, { fit: "fill" }]]);
+      const widthArg = caireArgs[caireArgs.indexOf("-width") + 1];
+      const heightArg = caireArgs[caireArgs.indexOf("-height") + 1];
+      expect([widthArg, heightArg]).toEqual(["150", "150"]);
+    });
+  });
+
   it("passes only width when height is not specified", async () => {
     const { seamCarve } = await importFresh();
     await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 600 });
