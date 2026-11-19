@@ -5397,6 +5397,10 @@ export const ar: TranslationKeys = {
     password: "كلمة المرور",
     loginButton: "تسجيل الدخول",
     loggingIn: "جاري تسجيل الدخول...",
+    forgotPassword: "هل نسيت كلمة المرور؟",
+    forgotPasswordHelp:
+      "اطلب من أحد المسؤولين إعادة تعيينها من الإعدادات > الأعضاء. إذا كنت المسؤول الوحيد، فشغّل هذا الأمر على الخادم:",
+    forgotPasswordGuide: "دليل استعادة الحساب",
     invalidCredentials: "اسم المستخدم أو كلمة المرور غير صحيحة",
     connectionError: "خطأ في الاتصال",
     signInWith: "تسجيل الدخول بـ {provider}",
@@ -5490,6 +5494,7 @@ export const ar: TranslationKeys = {
     generatedTitle: "كلمة المرور القوية جاهزة",
     regenerateButton: "إنشاء كلمة أخرى",
     generatedHint: "تم إدخالها في الأسفل. انسخها إلى مكان آمن أو دع متصفحك يحفظها.",
+    savedConfirm: "لقد حفظت كلمة المرور هذه في مكان آمن",
     newPasswordPlaceholder: "أدخل كلمة المرور الجديدة",
     confirmPasswordLabel: "تأكيد كلمة المرور الجديدة",
     confirmPasswordPlaceholder: "أعد كتابة كلمة المرور الجديدة",

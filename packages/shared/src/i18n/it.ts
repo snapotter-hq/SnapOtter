@@ -5464,6 +5464,10 @@ export const it: TranslationKeys = {
     password: "Password",
     loginButton: "Accedi",
     loggingIn: "Accesso in corso...",
+    forgotPassword: "Password dimenticata?",
+    forgotPasswordHelp:
+      "Chiedi a un amministratore di reimpostarla in Impostazioni > Persone. Se sei l'unico amministratore, esegui questo sul server:",
+    forgotPasswordGuide: "Guida al recupero dell'account",
     invalidCredentials: "Nome utente o password non validi",
     connectionError: "Errore di connessione",
     signInWith: "Accedi con {provider}",
@@ -5561,6 +5565,7 @@ export const it: TranslationKeys = {
     regenerateButton: "Generane un'altra",
     generatedHint:
       "È già inserita qui sotto. Copiala in un posto sicuro o lascia che il browser la salvi.",
+    savedConfirm: "Ho salvato questa password in un posto sicuro",
     newPasswordPlaceholder: "Inserisci la nuova password",
     confirmPasswordLabel: "Conferma nuova password",
     confirmPasswordPlaceholder: "Ripeti la nuova password",

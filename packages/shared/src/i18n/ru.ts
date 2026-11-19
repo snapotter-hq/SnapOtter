@@ -5453,6 +5453,10 @@ export const ru: TranslationKeys = {
     password: "Пароль",
     loginButton: "Войти",
     loggingIn: "Вход...",
+    forgotPassword: "Забыли пароль?",
+    forgotPasswordHelp:
+      "Попросите администратора сбросить его в разделе Настройки > Пользователи. Если вы единственный администратор, выполните на сервере:",
+    forgotPasswordGuide: "Руководство по восстановлению доступа",
     invalidCredentials: "Неверное имя пользователя или пароль",
     connectionError: "Ошибка подключения",
     signInWith: "Войти через {provider}",
@@ -5550,6 +5554,7 @@ export const ru: TranslationKeys = {
     regenerateButton: "Сгенерировать другой",
     generatedHint:
       "Он уже вписан ниже. Скопируйте его в надёжное место или позвольте браузеру его сохранить.",
+    savedConfirm: "Этот пароль сохранён в надёжном месте",
     newPasswordPlaceholder: "Введите новый пароль",
     confirmPasswordLabel: "Подтвердите новый пароль",
     confirmPasswordPlaceholder: "Повторите новый пароль",

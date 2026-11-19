@@ -103,6 +103,9 @@ export function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
+  // People forgot generated passwords right after setting them, so a generated
+  // one can't be submitted until the user says they've kept it.
+  const [savedConfirmed, setSavedConfirmed] = useState(false);
   const copyButtonRef = useRef<HTMLButtonElement>(null);
   // The minimum length from the server's last refusal. This page can't read the
   // policy, so Generate starts at the default and meets the minimum once the
@@ -115,6 +118,7 @@ export function ChangePasswordPage() {
     setConfirmPassword(pw);
     setShowGenerated(true);
     setCopyStatus(null);
+    setSavedConfirmed(false);
   };
 
   // Generate swaps itself for the generated-password panel, so move focus to
@@ -371,9 +375,26 @@ export function ChangePasswordPage() {
                 </ul>
               </div>
             )}
+            {showGenerated && (
+              <label className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={savedConfirmed}
+                  onChange={(e) => setSavedConfirmed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+                />
+                {t.changePassword.savedConfirm}
+              </label>
+            )}
             <button
               type="submit"
-              disabled={loading || !currentPassword || !newPassword || !confirmPassword}
+              disabled={
+                loading ||
+                !currentPassword ||
+                !newPassword ||
+                !confirmPassword ||
+                (showGenerated && !savedConfirmed)
+              }
               className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? t.changePassword.changingButton : t.changePassword.changeButton}

@@ -5451,6 +5451,10 @@ export const tr: TranslationKeys = {
     password: "Parola",
     loginButton: "Giriş Yap",
     loggingIn: "Giriş yapılıyor...",
+    forgotPassword: "Parolanızı mı unuttunuz?",
+    forgotPasswordHelp:
+      "Bir yöneticiden Ayarlar > Kişiler bölümünden sıfırlamasını isteyin. Tek yönetici sizseniz sunucuda şunu çalıştırın:",
+    forgotPasswordGuide: "Hesap kurtarma kılavuzu",
     invalidCredentials: "Geçersiz kullanıcı adı veya parola",
     connectionError: "Bağlantı hatası",
     signInWith: "{provider} ile giriş yap",
@@ -5548,6 +5552,7 @@ export const tr: TranslationKeys = {
     regenerateButton: "Başka bir tane oluştur",
     generatedHint:
       "Aşağıya girildi. Güvenli bir yere kopyalayın ya da tarayıcınızın kaydetmesine izin verin.",
+    savedConfirm: "Bu parolayı güvenli bir yere kaydettim",
     newPasswordPlaceholder: "Yeni parolayı girin",
     confirmPasswordLabel: "Yeni parolayı onaylayın",
     confirmPasswordPlaceholder: "Yeni parolayı tekrarlayın",

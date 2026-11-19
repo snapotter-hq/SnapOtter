@@ -5459,6 +5459,10 @@ export const pl: TranslationKeys = {
     password: "Hasło",
     loginButton: "Zaloguj",
     loggingIn: "Logowanie...",
+    forgotPassword: "Nie pamiętasz hasła?",
+    forgotPasswordHelp:
+      "Poproś administratora o zresetowanie go w Ustawienia > Użytkownicy. Jeśli jesteś jedynym administratorem, uruchom to na serwerze:",
+    forgotPasswordGuide: "Przewodnik odzyskiwania konta",
     invalidCredentials: "Nieprawidłowa nazwa użytkownika lub hasło",
     connectionError: "Błąd połączenia",
     signInWith: "Zaloguj przez {provider}",
@@ -5558,6 +5562,7 @@ export const pl: TranslationKeys = {
     regenerateButton: "Wygeneruj inne",
     generatedHint:
       "Jest już wpisane poniżej. Skopiuj je w bezpieczne miejsce albo pozwól przeglądarce je zapisać.",
+    savedConfirm: "To hasło jest zapisane w bezpiecznym miejscu",
     newPasswordPlaceholder: "Wprowadź nowe hasło",
     confirmPasswordLabel: "Potwierdź nowe hasło",
     confirmPasswordPlaceholder: "Powtórz nowe hasło",

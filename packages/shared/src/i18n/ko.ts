@@ -5357,6 +5357,10 @@ export const ko: TranslationKeys = {
     password: "비밀번호",
     loginButton: "로그인",
     loggingIn: "로그인 중...",
+    forgotPassword: "비밀번호를 잊으셨나요?",
+    forgotPasswordHelp:
+      "관리자에게 설정 > 멤버에서 재설정을 요청하세요. 관리자가 본인뿐이라면 서버에서 다음을 실행하세요:",
+    forgotPasswordGuide: "계정 복구 가이드",
     invalidCredentials: "사용자명 또는 비밀번호가 올바르지 않습니다",
     connectionError: "연결 오류",
     signInWith: "{provider}(으)로 로그인",
@@ -5449,6 +5453,7 @@ export const ko: TranslationKeys = {
     generatedTitle: "강력한 비밀번호가 준비되었습니다",
     regenerateButton: "다시 생성",
     generatedHint: "아래에 입력되었습니다. 안전한 곳에 복사하거나 브라우저에 저장하세요.",
+    savedConfirm: "이 비밀번호를 안전한 곳에 저장했습니다",
     newPasswordPlaceholder: "새 비밀번호 입력",
     confirmPasswordLabel: "새 비밀번호 확인",
     confirmPasswordPlaceholder: "새 비밀번호 다시 입력",

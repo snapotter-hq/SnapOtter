@@ -5440,6 +5440,10 @@ export const sv: TranslationKeys = {
     password: "Lösenord",
     loginButton: "Logga in",
     loggingIn: "Loggar in...",
+    forgotPassword: "Glömt lösenordet?",
+    forgotPasswordHelp:
+      "Be en administratör återställa det under Inställningar > Personer. Om du är den enda administratören kör du detta på servern:",
+    forgotPasswordGuide: "Guide för kontoåterställning",
     invalidCredentials: "Ogiltigt användarnamn eller lösenord",
     connectionError: "Anslutningsfel",
     signInWith: "Logga in med {provider}",
@@ -5537,6 +5541,7 @@ export const sv: TranslationKeys = {
     regenerateButton: "Generera ett nytt",
     generatedHint:
       "Det är ifyllt nedan. Kopiera det till en säker plats eller låt webbläsaren spara det.",
+    savedConfirm: "Jag har sparat lösenordet på ett säkert ställe",
     newPasswordPlaceholder: "Ange nytt lösenord",
     confirmPasswordLabel: "Bekräfta nytt lösenord",
     confirmPasswordPlaceholder: "Upprepa nytt lösenord",

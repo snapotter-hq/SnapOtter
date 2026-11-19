@@ -3,10 +3,12 @@ import {
   generatePassword,
   passwordLengthFor,
 } from "../../../apps/web/src/lib/generate-password.js";
+import { PASSPHRASE_WORDS } from "../../../apps/web/src/lib/passphrase-words.js";
 
 // The server's special-character rule in apps/api/src/plugins/auth.ts (#1568).
 const SERVER_SPECIAL = /[\p{P}\p{S}\p{Zs}]/u;
-const ALPHABET = /^[A-Za-z0-9!@#$%&*()\-_=+]+$/;
+// Capitalised words joined by hyphens, then a two-digit number with no 0 or 1.
+const PASSPHRASE = /^(?:[A-Z][a-z]{3,6}-){4,}[2-9]{2}$/;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -33,18 +35,14 @@ describe("passwordLengthFor", () => {
   it("rounds a fractional minimum up so the password still meets it", () => {
     expect(passwordLengthFor(24.2)).toBe(25);
   });
-
-  it("produces a password of that length", () => {
-    expect(generatePassword(passwordLengthFor(64))).toHaveLength(64);
-  });
 });
 
 describe("generatePassword", () => {
-  it("satisfies upper, lower, digit and special-character rules every time", () => {
+  it("makes a passphrase that satisfies upper, lower, digit and special-character rules", () => {
     for (let i = 0; i < 500; i++) {
       const pw = generatePassword();
-      expect(pw).toHaveLength(20);
-      expect(pw).toMatch(ALPHABET);
+      expect(pw).toMatch(PASSPHRASE);
+      expect(pw.length).toBeGreaterThanOrEqual(20);
       expect(pw).toMatch(/[A-Z]/);
       expect(pw).toMatch(/[a-z]/);
       expect(pw).toMatch(/[0-9]/);
@@ -52,12 +50,27 @@ describe("generatePassword", () => {
     }
   });
 
-  it("honours a longer requested length", () => {
-    expect(generatePassword(64)).toHaveLength(64);
+  it("uses four words by default and adds words to reach a longer minimum", () => {
+    expect(generatePassword().split("-")).toHaveLength(5);
+    for (const min of [40, 64, 128]) {
+      const pw = generatePassword(passwordLengthFor(min));
+      expect(pw.length).toBeGreaterThanOrEqual(min);
+      expect(pw).toMatch(PASSPHRASE);
+    }
   });
 
-  it("never goes below the four required classes", () => {
-    expect(generatePassword(2)).toHaveLength(4);
+  it("never uses characters that read as each other", () => {
+    for (let i = 0; i < 500; i++) {
+      expect(generatePassword()).not.toMatch(/[01]/);
+    }
+  });
+
+  it("only uses words from the list, capitalised", () => {
+    const words = new Set(PASSPHRASE_WORDS);
+    const pw = generatePassword(64);
+    for (const word of pw.split("-").slice(0, -1)) {
+      expect(words.has(word.toLowerCase())).toBe(true);
+    }
   });
 
   it("does not repeat itself", () => {
@@ -65,26 +78,17 @@ describe("generatePassword", () => {
     expect(seen.size).toBe(50);
   });
 
-  it("shuffles the required characters instead of leading with them", () => {
-    const firstCharClasses = new Set<string>();
-    for (let i = 0; i < 200; i++) {
-      const first = generatePassword()[0];
-      firstCharClasses.add(
-        /[A-Z]/.test(first)
-          ? "upper"
-          : /[a-z]/.test(first)
-            ? "lower"
-            : /\d/.test(first)
-              ? "digit"
-              : "special",
-      );
-    }
-    expect(firstCharClasses.size).toBeGreaterThan(1);
-  });
-
   it("draws from the secure random source", () => {
     const spy = vi.spyOn(crypto, "getRandomValues");
     generatePassword();
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("PASSPHRASE_WORDS", () => {
+  it("has enough unique, plain words for about 10 bits each", () => {
+    expect(new Set(PASSPHRASE_WORDS).size).toBe(PASSPHRASE_WORDS.length);
+    expect(PASSPHRASE_WORDS.length).toBeGreaterThanOrEqual(1024);
+    for (const word of PASSPHRASE_WORDS) expect(word).toMatch(/^[a-z]{4,7}$/);
   });
 });

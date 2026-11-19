@@ -5393,6 +5393,10 @@ export const ja: TranslationKeys = {
     password: "パスワード",
     loginButton: "ログイン",
     loggingIn: "ログイン中...",
+    forgotPassword: "パスワードをお忘れですか？",
+    forgotPasswordHelp:
+      "管理者に 設定 > メンバー からリセットを依頼してください。管理者があなただけの場合は、サーバーで次を実行してください:",
+    forgotPasswordGuide: "アカウント復旧ガイド",
     invalidCredentials: "ユーザー名またはパスワードが無効です",
     connectionError: "接続エラー",
     signInWith: "{provider}でサインイン",
@@ -5491,6 +5495,7 @@ export const ja: TranslationKeys = {
     generatedTitle: "強力なパスワードを用意しました",
     regenerateButton: "別のパスワードを生成",
     generatedHint: "下の欄に入力済みです。安全な場所にコピーするか、ブラウザーに保存してください。",
+    savedConfirm: "このパスワードを安全な場所に保存しました",
     newPasswordPlaceholder: "新しいパスワードを入力",
     confirmPasswordLabel: "新しいパスワードの確認",
     confirmPasswordPlaceholder: "新しいパスワードを再入力",

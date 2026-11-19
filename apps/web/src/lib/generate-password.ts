@@ -1,10 +1,15 @@
-const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const LOWER = "abcdefghijklmnopqrstuvwxyz";
-const DIGITS = "0123456789";
-// The server policy can require a special character (passwordRequireSpecial), so
-// always include one. These all satisfy its check in apps/api/src/plugins/auth.ts.
-const SPECIAL = "!@#$%&*()-_=+";
-const ALL = UPPER + LOWER + DIGITS + SPECIAL;
+import { PASSPHRASE_WORDS } from "./passphrase-words.js";
+
+// Generated passwords are word passphrases (Maple-Otter-River-Candle-47) because
+// people forgot random 20-character strings right after setting them. Capitalised
+// words give the uppercase and lowercase rules, the number gives the digit rule,
+// and "-" satisfies the special-character rule in apps/api/src/plugins/auth.ts.
+// Digits skip 0 and 1, which read as O and l.
+const DIGITS = "23456789";
+const SEPARATOR = "-";
+// Four words from ~1,250 plus two digits is about 47 bits, which scrypt hashing
+// and login rate limiting put far out of reach of guessing.
+const MIN_WORDS = 4;
 
 // 20 clears the default minimum with room to spare. The forced change-password
 // page can't read passwordMinLength (the user has no access to /v1/settings yet),
@@ -21,23 +26,35 @@ export function passwordLengthFor(minLength: unknown): number {
   return Number.isFinite(min) ? Math.max(DEFAULT_LENGTH, Math.ceil(min)) : DEFAULT_LENGTH;
 }
 
+/** A uniform integer in [0, max), rejecting the values that would bias the modulo. */
 function secureRandom(max: number): number {
+  const limit = Math.floor(0x1_0000_0000 / max) * max;
   const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
+  do {
+    crypto.getRandomValues(array);
+  } while (array[0] >= limit);
   return array[0] % max;
 }
 
-function pick(chars: string): string {
-  return chars[secureRandom(chars.length)];
+function pick<T>(items: ArrayLike<T>): T {
+  return items[secureRandom(items.length)];
 }
 
-export function generatePassword(length = DEFAULT_LENGTH): string {
-  const required = [pick(UPPER), pick(LOWER), pick(DIGITS), pick(SPECIAL)];
-  const rest = Array.from({ length: Math.max(0, length - required.length) }, () => pick(ALL));
-  const chars = [...required, ...rest];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = secureRandom(i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
+function capitalise(word: string): string {
+  return word[0].toUpperCase() + word.slice(1);
+}
+
+/**
+ * A passphrase of at least `minLength` characters: capitalised words joined by
+ * hyphens, ending in a two-digit number. Words are added past the first four
+ * until the minimum is met.
+ */
+export function generatePassword(minLength = DEFAULT_LENGTH): string {
+  const words: string[] = [];
+  const number = pick(DIGITS) + pick(DIGITS);
+  const length = () => words.join(SEPARATOR).length + SEPARATOR.length + number.length;
+  while (words.length < MIN_WORDS || length() < minLength) {
+    words.push(capitalise(pick(PASSPHRASE_WORDS)));
   }
-  return chars.join("");
+  return [...words, number].join(SEPARATOR);
 }
