@@ -82,9 +82,13 @@ describe("api mutation lane (#4749)", () => {
     expect(laneExr?.if).toBe("${{ matrix.apt }}");
   });
 
-  it("runs on the Unit job's runner image", () => {
-    const unitRunner = readWorkflow("ci.yml").jobs["test-unit"]["runs-on"];
-    expect(unitRunner).toBeDefined();
-    expect(readWorkflow("mutation.yml").jobs.mutation["runs-on"]).toBe(unitRunner);
+  it("runs on the Unit job's hosted runner image", () => {
+    // Unit picks a self-hosted fleet runner for trusted events and falls back
+    // to a hosted image otherwise (#4965); the mutation lane matches the
+    // hosted image.
+    const unitRunsOn = readWorkflow("ci.yml").jobs["test-unit"]["runs-on"] ?? "";
+    const hostedImage = unitRunsOn.match(/\|\| '([^']+)' \}\}$/)?.[1];
+    expect(hostedImage).toMatch(/^ubuntu-/);
+    expect(readWorkflow("mutation.yml").jobs.mutation["runs-on"]).toBe(hostedImage);
   });
 });

@@ -564,12 +564,33 @@ describe("update-visual-baselines.yml", () => {
     stub(join(bin, "uname"), "echo Linux");
     const linux = spawnSync("bash", [PLAYWRIGHT_INSTALL], {
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BROWSERS: "chromium" },
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        BROWSERS: "chromium",
+        RUNNER_ENVIRONMENT: "github-hosted",
+      },
     });
     expect(linux.status, linux.stderr).toBe(0);
     expect(readFileSync(log, "utf8").trim().split("\n")).toEqual([
       "pnpm playwright install chromium",
       "pnpm playwright install-deps chromium",
+    ]);
+
+    // The fleet runners have no sudo and carry the libraries already (#4965).
+    writeFileSync(log, "");
+    const selfHosted = spawnSync("bash", [PLAYWRIGHT_INSTALL], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        BROWSERS: "chromium",
+        RUNNER_ENVIRONMENT: "self-hosted",
+      },
+    });
+    expect(selfHosted.status, selfHosted.stderr).toBe(0);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual([
+      "pnpm playwright install chromium",
     ]);
   });
 
