@@ -48,17 +48,11 @@ export function trackCtaClick(
   posthog.capture(CTA_EVENT, ctaEventProperties(el, locale));
 }
 
-declare global {
-  interface Window {
-    posthog?: PostHogLike;
-  }
-}
-
 export function installCtaTracking(): void {
   const track = (event: Event) =>
     trackCtaClick(
       event.target as ClickTarget | null,
-      window.posthog,
+      (window as { posthog?: PostHogLike }).posthog,
       document.documentElement.lang || "en",
     );
   // Capture phase, so the event is queued before a same-tab link navigates;
