@@ -6191,6 +6191,200 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
   );
 });
 
+describe("tool_used fires once per job across retries (#4450)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  async function setupImageProcessor() {
+    const { TOOLS } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/constants.js")
+    >("../../../../packages/shared/src/constants.js");
+    const {
+      SafeError,
+      isSafeMessageError,
+      isToolInputError,
+      hasServerErrorStatus,
+      toolInputErrorCode,
+    } = await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
+    const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/image-mime.js")
+    >("../../../../packages/shared/src/image-mime.js");
+
+    const processV2Mock = vi.fn();
+    const trackEventMock = vi.fn();
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/shared", () => ({
+        SafeError,
+        isSafeMessageError,
+        isToolInputError,
+        toolInputErrorCode,
+        hasServerErrorStatus,
+        IMAGE_EXT_TO_MIME,
+        ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
+        TOOLS,
+        COMPRESS_PRESETS: [],
+        CAMERA_RAW_INPUTS: [],
+        ONBOARDING_FIRST_PROCESSED_KEY: "onboarding_first_processed_at",
+        extractErrorCode: vi.fn(() => undefined),
+        getBundleForTool: vi.fn(() => null),
+        getOptionalBundleForTool: vi.fn(() => null),
+      }));
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics.js", () => ({
+        captureException: vi.fn(),
+        trackEvent: trackEventMock,
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics-gate.js", () => ({
+        analyticsEnabled: vi.fn(() => true),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "bug"),
+        reportError: vi.fn(),
+        safeFormatTag: vi.fn((name?: string) => name?.split(".").pop()?.toLowerCase()),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
+        setSettingIfAbsent: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    const runAttempt = (attemptsMade: number) =>
+      processor({
+        id: "job-4450",
+        attemptsMade,
+        opts: { attempts: 2 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-4450",
+          toolId: "resize",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-4450/in.png"],
+          filename: "in.png",
+          settings: {},
+          kind: "tool",
+          analyticsDistinctId: "distinct-4450",
+        },
+      });
+
+    return { processV2Mock, trackEventMock, runAttempt };
+  }
+
+  it("sends nothing from an attempt that will be retried", async () => {
+    const { processV2Mock, trackEventMock, runAttempt } = await setupImageProcessor();
+    processV2Mock.mockRejectedValueOnce(new Error("encode failed"));
+
+    await expect(runAttempt(0)).rejects.toThrow("encode failed");
+
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("sends one failed event, with the input size, from the final attempt", async () => {
+    const { processV2Mock, trackEventMock, runAttempt } = await setupImageProcessor();
+    processV2Mock.mockRejectedValueOnce(new Error("encode failed"));
+
+    await expect(runAttempt(1)).rejects.toThrow("encode failed");
+
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+    expect(trackEventMock).toHaveBeenCalledWith(
+      "tool_used",
+      expect.objectContaining({
+        tool_id: "resize",
+        status: "failed",
+        bytes_in: Buffer.byteLength("input-bytes"),
+      }),
+      "distinct-4450",
+    );
+  });
+
+  it("sends only completed when a retried job then succeeds", async () => {
+    const { processV2Mock, trackEventMock, runAttempt } = await setupImageProcessor();
+    processV2Mock.mockRejectedValueOnce(new Error("encode failed")).mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.png",
+      contentType: "image/png",
+    });
+
+    await expect(runAttempt(0)).rejects.toThrow("encode failed");
+    await runAttempt(1);
+
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+    expect(trackEventMock).toHaveBeenCalledWith(
+      "tool_used",
+      expect.objectContaining({ tool_id: "resize", status: "completed" }),
+      "distinct-4450",
+    );
+  });
+
+  it("still reports an unrecoverable failure on the first attempt", async () => {
+    const { processV2Mock, trackEventMock, runAttempt } = await setupImageProcessor();
+    processV2Mock.mockRejectedValueOnce(
+      Object.assign(new Error("bad width"), { name: "InputValidationError", statusCode: 400 }),
+    );
+
+    await expect(runAttempt(0)).rejects.toThrow("bad width");
+
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+    expect(trackEventMock).toHaveBeenCalledWith(
+      "tool_used",
+      expect.objectContaining({ tool_id: "resize", status: "failed" }),
+      "distinct-4450",
+    );
+  });
+});
+
 describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
   afterEach(() => {
     vi.clearAllMocks();

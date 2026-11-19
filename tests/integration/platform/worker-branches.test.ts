@@ -601,14 +601,16 @@ describe("tool job failure paths", () => {
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Tool wt-no-output returned neither buffer nor scratchPath");
 
-    // The failure analytics block runs on every attempt with the coarse
-    // "bug" classification and the "processing" code for uncoded errors.
-    const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId, 2);
-    expect(events).toHaveLength(2);
+    // Only the final attempt reports (#4450), with the coarse "bug"
+    // classification, the "processing" code for uncoded errors, and the
+    // input size.
+    const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+    expect(events).toHaveLength(1);
     const props = events[0];
     expect(props.status).toBe("failed");
     expect(props.error_code).toBe("processing");
     expect(props.error_kind).toBe("bug");
+    expect(props.bytes_in).toBe(1);
     // Not a catalog tool, so the base props fall back.
     expect(props.category).toBe("unknown");
     expect(props.execution_hint).toBe("fast");
@@ -857,11 +859,14 @@ describe("tool job failure paths", () => {
       expect(row.attempts).toBe(2);
       expect(row.error?.message).toMatch(/timed out after 1s/i);
 
-      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId, 2);
+      // The first attempt's timeout is retried, so only the second reports (#4450).
+      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+      expect(events).toHaveLength(1);
       const props = events[0];
       expect(props.status).toBe("failed");
       expect(props.error_code).toBe("timeout");
       expect(props.error_kind).toBe("timeout");
+      expect(props.bytes_in).toBe(1);
     } finally {
       mutableEnv.JOB_TIMEOUT_FAST_S = originalTimeout;
     }

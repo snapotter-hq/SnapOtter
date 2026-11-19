@@ -213,6 +213,9 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
     // deadline can't be the cause of a later error.
     let handlerReturned = false;
     let finalizeClaimed = false;
+    // Hoisted so a failure's tool_used carries the input size too (#4450);
+    // stays undefined when the inputs never loaded.
+    let originalSize: number | undefined;
 
     try {
       await mkdir(scratchDir, { recursive: true });
@@ -257,13 +260,15 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
         })
         .where(eq(schema.jobs.id, jobId));
 
-      const { inputs, inputBuffer, pathInput, originalSize } = await loadToolInputs(
+      const loaded = await loadToolInputs(
         data.toolId,
         data.inputRefs,
         data.filename,
         scratchDir,
         signal,
       );
+      const { inputs, inputBuffer, pathInput } = loaded;
+      originalSize = loaded.originalSize;
 
       // Progress reporter: emits both Redis pub/sub and BullMQ job progress.
       // Wrapped so a tool that reports from more than one source (a two-pass
@@ -903,8 +908,9 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
         });
       }
 
-      // Analytics: emit tool_used on failure
-      if (analyticsEnabled()) {
+      // Analytics: emit tool_used on failure, from the final attempt only, so a
+      // job that fails once and then succeeds isn't counted as both (#4450)
+      if (!willRetry && analyticsEnabled()) {
         const errorClass = isTimeout
           ? "timeout"
           : isCanceled
@@ -924,6 +930,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
             // answerable without leaking messages: bad input, environment, or
             // our bug (classifyError's "expected" == bad user input).
             error_kind: errorClass === "expected" ? "input" : errorClass,
+            ...(originalSize !== undefined && { bytes_in: originalSize }),
           },
           data.analyticsDistinctId,
         );
