@@ -116,6 +116,12 @@ describe("an x-to-y query no preset handles leads with the converter (#4818)", (
     expect(search(q)[0]).toBe(id);
   });
 
+  it("never offers a converter the caller filtered out (a disabled tool)", () => {
+    const visible = TOOLS.filter((tool) => tool.id !== "convert-audio");
+    const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "mp3 to ogg");
+    expect(results.map((tool) => tool.id)).not.toContain("convert-audio");
+  });
+
   it("leaves a pair with its own preset alone", () => {
     expect(search("mp4 to mp3")[0]).toBe("mp4-to-mp3");
     expect(search("jpg to png")[0]).toBe("jpg-to-png");
@@ -154,6 +160,11 @@ describe("a query with no real match reaches the empty state (#4818)", () => {
     ["slow motion", "video-speed"],
     ["voice to text", "transcribe-audio"],
     ["change format", "convert"],
+    ["png till ico", "favicon"],
+    ["make image smaller", "compress"],
+    ["make pdf smaller", "compress-pdf"],
+    ["make video smaller", "compress-video"],
+    ["jpg naar png", "jpg-to-png"],
   ])("a typo or synonym like %s still finds %s", (q, id) => {
     expect(search(q).slice(0, 3)).toContain(id);
   });

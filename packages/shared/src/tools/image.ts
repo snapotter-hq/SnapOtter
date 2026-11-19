@@ -71,7 +71,13 @@ export const IMAGE_TOOLS: Tool[] = [
     executionHint: "fast",
     // An exact "compress" keeps this ahead of the compress-image-to-N-kb
     // presets, whose many "compress ..." keywords otherwise win a bare query (#1322).
-    keywords: ["compress", "compress image", "reduce file size", "shrink image"],
+    keywords: [
+      "compress",
+      "compress image",
+      "reduce file size",
+      "shrink image",
+      "make image smaller",
+    ],
   },
   // Optimization
   {

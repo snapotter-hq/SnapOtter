@@ -11,8 +11,30 @@ export interface SearchableTool {
   keywords?: readonly string[];
 }
 
-/** Query words too common to require a match for ("fill and sign", "pdf for print"). */
-const STOP_WORDS = new Set(["and", "or", "with", "for", "my", "of", "in", "on", "by", "at", "how"]);
+/**
+ * Query words too common to require a match for ("fill and sign", "pdf for
+ * print"), plus the "to", "from" and "into" of our Latin-script locales, since
+ * people type "png till ico" (sv) or "jpg naar png" (nl) into the English
+ * catalog. Words of one or two letters are never required, so "zu", "en" or
+ * "do" don't need listing.
+ */
+const STOP_WORDS = new Set([
+  ...["and", "or", "with", "for", "my", "of", "in", "on", "by", "at", "how"],
+  ...[
+    "nach",
+    "von",
+    "aus",
+    "als",
+    "para",
+    "vers",
+    "menjadi",
+    "dari",
+    "naar",
+    "van",
+    "till",
+    "sang",
+  ],
+]);
 
 const splitWords = (text: string) => text.split(/[^a-z0-9]+/).filter(Boolean);
 

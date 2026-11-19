@@ -21,6 +21,7 @@ export const VIDEO_TOOLS: Tool[] = [
     id: "compress-video",
     name: "Compress Video",
     description: "Shrink video file size with quality control",
+    keywords: ["make video smaller"],
     category: "video-convert",
     icon: "FileVideo",
     route: "/compress-video",
