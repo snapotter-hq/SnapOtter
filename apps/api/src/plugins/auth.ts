@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
   type AuthLoginFailureReason,
+  DEFAULT_PASSWORD_MIN_LENGTH,
   isPasswordRuleEnabled,
   PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
@@ -237,7 +238,7 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
   const minLength = parseNumericSettingValue(
     "passwordMinLength",
     await getSettingStrict("passwordMinLength"),
-    8,
+    DEFAULT_PASSWORD_MIN_LENGTH,
   );
   const requireUpper = isPasswordRuleEnabled(
     "passwordRequireUppercase",
@@ -262,9 +263,8 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
   // allowlist of those three classes rather than "not a letter or number", which
   // would also pass invisible and control characters (a zero-width space, a tab,
   // NUL) that nobody can see or that the login page can't send.
-  // The three default-on rules are off only when stored as "false", which is
-  // how the Security tab reads them via isPasswordRuleEnabled (#2026, #2036).
-  // Special defaults off and is on only for "true".
+  // Every rule is on only when stored as "true", which is how the Security tab
+  // reads them via isPasswordRuleEnabled (#2026, #2036).
   const broken: { rule: PasswordRule; message: string }[] = [];
   // Characters, not UTF-16 code units: an astral character is two units, so four
   // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP

@@ -61,21 +61,25 @@ export function isPasswordRuleSettingKey(key: string): key is PasswordRuleSettin
 }
 
 /**
+ * The minimum password length when the admin has not set one. New installs
+ * accept any non-empty password; installs that existed before this default
+ * changed had the old minimum of 8 pinned by migration 0013.
+ */
+export const DEFAULT_PASSWORD_MIN_LENGTH = 1;
+
+/**
  * Whether a stored boolean password-rule setting is enabled (#2026, #2036).
  *
- * The three default-on rules (uppercase, lowercase, digit) are off only when
- * stored as `"false"`, so a missing row or a non-canonical value (`"TRUE"`,
- * `"1"`) fails closed and matches the Security tab switch. The special-character
- * rule defaults off and is enabled only when stored as `"true"`.
+ * Every rule defaults off and is enabled only when stored as `"true"`, so a
+ * missing row means no rule, matching the Security tab switch. Migration 0013
+ * stored `"true"` for uppercase, lowercase and digit on installs that already
+ * had users, so those keep enforcing what they always did.
  */
 export function isPasswordRuleEnabled(
-  key: PasswordRuleSettingKey,
+  _key: PasswordRuleSettingKey,
   storedValue: string | null | undefined,
 ): boolean {
-  if (key === "passwordRequireSpecial") {
-    return storedValue === "true";
-  }
-  return storedValue !== "false";
+  return storedValue === "true";
 }
 
 /**
