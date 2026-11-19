@@ -15379,6 +15379,16 @@ paths:
                       chars:
                         type: integer
                         description: Número de caracteres extraídos
+                      unreadablePages:
+                        type: object
+                        description: Solo aparece cuando algunas páginas tenían caracteres que no se leían como texto (fuentes sin un mapa ToUnicode utilizable). Esas páginas se mantienen en el .txt tal como se extrajeron.
+                        properties:
+                          count:
+                            type: integer
+                            description: Páginas cuya capa de texto no se leyó como texto
+                          total:
+                            type: integer
+                            description: Páginas del PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33725,6 +33735,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: e65fa9c46706
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: c4cce1359b5e
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 64a93fd5dafc
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 5f155187c90f
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

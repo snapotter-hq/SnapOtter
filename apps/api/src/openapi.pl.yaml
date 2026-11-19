@@ -15377,6 +15377,16 @@ paths:
                       chars:
                         type: integer
                         description: Liczba wyodrębnionych znaków
+                      unreadablePages:
+                        type: object
+                        description: Występuje tylko wtedy, gdy niektóre strony zawierały znaki, których nie dało się odczytać jako tekstu (czcionki bez użytecznej mapy ToUnicode). Te strony pozostają w pliku .txt w postaci, w jakiej zostały wyodrębnione.
+                        properties:
+                          count:
+                            type: integer
+                            description: Strony, których warstwy tekstowej nie dało się odczytać jako tekstu
+                          total:
+                            type: integer
+                            description: Liczba stron w pliku PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33723,6 +33733,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 967aaefd4841
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: 0c215fd2e1ef
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 7e78854552a9
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: a6b58404eb56
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
