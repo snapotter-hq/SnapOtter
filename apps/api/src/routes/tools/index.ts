@@ -101,6 +101,7 @@ import { registerNupPdf } from "./nup-pdf.js";
 import { registerOcr } from "./ocr.js";
 import { registerOcrPdf } from "./ocr-pdf.js";
 import { registerOptimizeForWeb } from "./optimize-for-web.js";
+import { registerOptimizeSvg } from "./optimize-svg.js";
 import { registerOrganizePdf } from "./organize-pdf.js";
 import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfMetadata } from "./pdf-metadata.js";
@@ -296,6 +297,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "favicon", register: registerFavicon },
     { id: "image-to-pdf", register: registerImageToPdf },
     { id: "optimize-for-web", register: registerOptimizeForWeb },
+    { id: "optimize-svg", register: registerOptimizeSvg },
 
     // Adjustments extra
     { id: "replace-color", register: registerReplaceColor },

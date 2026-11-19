@@ -760,6 +760,10 @@ export const de: TranslationKeys = {
       description:
         "Bilder für das Web optimieren mit Formatkonvertierung, Qualitätssteuerung und Vorschau",
     },
+    "optimize-svg": {
+      name: "SVG optimieren",
+      description: "SVG-Code mit svgo verkleinern und als Vektor-SVG behalten",
+    },
     "strip-metadata": {
       name: "Bildmetadaten entfernen",
       description: "EXIF-, GPS- und Kamerainformationen entfernen",
@@ -1734,6 +1738,17 @@ export const de: TranslationKeys = {
       larger: "{percent}% größer",
       submit: "Verarbeiten & Herunterladen",
       submitBatch: "Verarbeiten & Herunterladen ({count} Dateien)",
+      progressLabel: "Wird optimiert",
+    },
+    "optimize-svg": {
+      precision: "Dezimalgenauigkeit",
+      precisionHint:
+        "Nachkommastellen in Koordinaten. Weniger Stellen ergeben eine kleinere Datei.",
+      removeMetadata: "Kommentare und Metadaten entfernen",
+      multipass: "Mehrere Durchläufe ausführen",
+      pretty: "Ausgabe lesbar formatieren",
+      submit: "SVG optimieren",
+      submitBatch: "SVG optimieren ({count} Dateien)",
       progressLabel: "Wird optimiert",
     },
     "strip-metadata": {
@@ -6182,6 +6197,7 @@ export const de: TranslationKeys = {
         "Die Installation aktualisiert gerade die AI-Umgebung und kann jetzt nicht gestoppt werden. Sie ist gleich fertig.",
       MULTI_FRAME_UNSUPPORTED:
         "Dieses Werkzeug bearbeitet jeweils nur ein Bild. Teilen Sie die Seiten oder Frames zuerst in einzelne Bilder auf.",
+      SVG_TOO_LARGE: "Diese SVG-Datei ist zu groß oder zu komplex, um optimiert zu werden.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
       PAGE_OUT_OF_RANGE:
         "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",

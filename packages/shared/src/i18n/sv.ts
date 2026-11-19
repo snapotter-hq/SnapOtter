@@ -757,6 +757,10 @@ export const sv: TranslationKeys = {
       description:
         "Optimera bilder för webben med formatkonvertering, kvalitetskontroll och förhandsvisning",
     },
+    "optimize-svg": {
+      name: "Optimera SVG",
+      description: "Minifiera SVG-kod med svgo och behåll resultatet som vektor-SVG",
+    },
     "strip-metadata": {
       name: "Ta bort bildmetadata",
       description: "Ta bort EXIF, GPS och kamerainformation",
@@ -1723,6 +1727,16 @@ export const sv: TranslationKeys = {
       larger: "{percent}% större",
       submit: "Bearbeta & Ladda ner",
       submitBatch: "Bearbeta & Ladda ner ({count} filer)",
+      progressLabel: "Optimerar",
+    },
+    "optimize-svg": {
+      precision: "Decimalprecision",
+      precisionHint: "Antal decimaler i koordinater. Färre decimaler ger en mindre fil.",
+      removeMetadata: "Ta bort kommentarer och metadata",
+      multipass: "Kör flera omgångar",
+      pretty: "Formatera utdata läsbart",
+      submit: "Optimera SVG",
+      submitBatch: "Optimera SVG ({count} filer)",
       progressLabel: "Optimerar",
     },
     "strip-metadata": {
@@ -6119,6 +6133,7 @@ export const sv: TranslationKeys = {
         "Installationen uppdaterar AI-miljön och kan inte stoppas just nu. Den blir klar snart.",
       MULTI_FRAME_UNSUPPORTED:
         "Det här verktyget redigerar en bild åt gången. Dela först upp sidorna eller bildrutorna i separata bilder.",
+      SVG_TOO_LARGE: "Den här SVG-filen är för stor eller komplex för att optimeras.",
       CANCELED: "Åtgärden avbröts.",
       PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",

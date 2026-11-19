@@ -334,6 +334,9 @@ importers:
       sharp:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@22.20.5)
+      svgo:
+        specifier: ^4.1.0
+        version: 4.1.0
       tar:
         specifier: '>=7.5.21'
         version: 7.5.22

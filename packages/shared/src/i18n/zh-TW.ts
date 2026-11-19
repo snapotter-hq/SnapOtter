@@ -523,6 +523,10 @@ export const zhTW: TranslationKeys = {
       name: "網頁最佳化",
       description: "透過格式轉換、品質控制和即時預覽來最佳化網頁影像",
     },
+    "optimize-svg": {
+      name: "SVG 最佳化",
+      description: "使用 svgo 壓縮 SVG 程式碼，結果仍保留為向量 SVG",
+    },
     "strip-metadata": {
       name: "移除影像中繼資料",
       description: "移除EXIF、GPS和相機資訊",
@@ -1437,6 +1441,16 @@ export const zhTW: TranslationKeys = {
       larger: "增大了{percent}%",
       submit: "處理並下載",
       submitBatch: "處理並下載（{count}個檔案）",
+      progressLabel: "最佳化中",
+    },
+    "optimize-svg": {
+      precision: "小數精度",
+      precisionHint: "座標中保留的小數位數。位數越少，檔案越小。",
+      removeMetadata: "移除註解和中繼資料",
+      multipass: "執行多輪最佳化",
+      pretty: "格式化輸出",
+      submit: "最佳化 SVG",
+      submitBatch: "最佳化 SVG（{count}個檔案）",
       progressLabel: "最佳化中",
     },
     "strip-metadata": {
@@ -5738,6 +5752,7 @@ export const zhTW: TranslationKeys = {
       TOO_MANY_FRAMES: "此檔案的影格數過多，無法處理。",
       FEATURE_INSTALL_BUSY: "安裝正在更新 AI 環境，目前無法停止。很快就會完成。",
       MULTI_FRAME_UNSUPPORTED: "此工具一次只能編輯一張圖片。請先將各頁或各影格拆分為單獨的圖片。",
+      SVG_TOO_LARGE: "此 SVG 過大或過於複雜，無法最佳化。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "此頁碼範圍包含這份 PDF 沒有的頁面。",
       INVALID_PAGE_RANGE: "此頁碼範圍無效。請使用像 1-3,5 這樣的頁碼。",

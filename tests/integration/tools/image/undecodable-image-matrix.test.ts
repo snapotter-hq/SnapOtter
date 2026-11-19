@@ -81,6 +81,7 @@ const EXEMPT_IMAGE_TOOLS = new Set([
   "aspect-ratio-calculator",
   "stitch",
   "svg-to-raster",
+  "optimize-svg",
   // AI bundle-gated routes (tested at worker/registry level in image-error.test.ts)
   "smart-crop",
   "remove-background",
