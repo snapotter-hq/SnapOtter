@@ -50,6 +50,30 @@ export function mp4TimescaleArgs(ext: string): string[] {
 }
 
 /**
+ * libvpx-vp9 constant-quality args. With only -crf, libvpx runs at its
+ * slowest settings: noisy 1080p encoded at about 29x realtime, so a 150 s
+ * clip sat at 41% after half an hour (#4347). cpu-used 4 with row
+ * multithreading measured about 9x faster at near-identical size; 5 was
+ * slower on the same noisy clip, so 4 is the pick.
+ */
+export function vp9EncodeArgs(crf: number): string[] {
+  return [
+    "-c:v",
+    resolveEncoder("vp9"),
+    "-crf",
+    String(crf),
+    "-b:v",
+    "0",
+    "-deadline",
+    "good",
+    "-cpu-used",
+    "4",
+    "-row-mt",
+    "1",
+  ];
+}
+
+/**
  * Video encode args valid for the given OUTPUT container extension.
  * WebM accepts only VP8/VP9/AV1, OGV only Theora; everything else
  * (mp4/mov/mkv/avi/ts) gets H.264. Hardcoding H.264 into a preserved
@@ -63,7 +87,7 @@ export function videoEncodeArgsForContainer(ext: string): string[] {
     return ["-c:v", "mpeg2video", "-q:v", "4", "-pix_fmt", "yuv420p"];
   }
   if (lower === ".webm") {
-    return ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"];
+    return vp9EncodeArgs(30);
   }
   if (lower === ".ogv" || lower === ".ogg") {
     return ["-c:v", resolveEncoder("theora"), "-q:v", "7"];

@@ -1,7 +1,7 @@
-import { resolveEncoder, videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
+import { videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { mp4TimescaleArgs, runMediaTool } from "../../lib/media-tool.js";
+import { mp4TimescaleArgs, runMediaTool, vp9EncodeArgs } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -34,12 +34,7 @@ export function registerGifToVideo(app: FastifyInstance) {
             inPath,
             "-vf",
             "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-            "-c:v",
-            resolveEncoder("vp9"),
-            "-b:v",
-            "0",
-            "-crf",
-            "32",
+            ...vp9EncodeArgs(32),
             // GIFs decode to bgra/gbrap (alpha); libvpx-vp9 rejects those pixel
             // formats, so flatten to yuv420p just like the mp4 branch does.
             "-pix_fmt",

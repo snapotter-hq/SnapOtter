@@ -1,7 +1,7 @@
 import { resolveEncoder, videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { mp4TimescaleArgs, runMediaTool } from "../../lib/media-tool.js";
+import { mp4TimescaleArgs, runMediaTool, vp9EncodeArgs } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -39,12 +39,7 @@ export function registerConvertVideo(app: FastifyInstance) {
           return [
             "-i",
             inPath,
-            "-c:v",
-            resolveEncoder("vp9"),
-            "-crf",
-            String(CRF[settings.quality].vp9),
-            "-b:v",
-            "0",
+            ...vp9EncodeArgs(CRF[settings.quality].vp9),
             "-c:a",
             resolveEncoder("opus"),
             out,
