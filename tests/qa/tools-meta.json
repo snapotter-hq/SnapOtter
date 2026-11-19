@@ -5477,6 +5477,15 @@
     "isAI": false
   },
   {
+    "id": "resize-pdf-pages",
+    "name": "Resize PDF Pages",
+    "modality": "document",
+    "route": "/pdf/resize-pdf-pages",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "nup-pdf",
     "name": "Pages Per Sheet (N-up)",
     "modality": "document",

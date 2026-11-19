@@ -202,6 +202,47 @@ export async function pdfcpuNup(
   await runPdfcpu(["nup", outPath, String(n), inputPath], opts);
 }
 
+export interface PdfResizeOptions {
+  /** Target page width in points. */
+  width: number;
+  /** Target page height in points. */
+  height: number;
+  /** Swap the target per page to match each page's orientation instead of forcing width x height. */
+  keepOrientation: boolean;
+}
+
+/** The PDF spec caps a page side at 14400 points (200 in); pdfcpu writes bigger pages anyway. */
+const MAX_PAGE_SIDE_POINTS = 14400;
+const MIN_PAGE_SIDE_POINTS = 36;
+
+/**
+ * Resize every page to a target size. pdfcpu scales the content to fit,
+ * centred, keeps vectors (so barcodes stay sharp), and measures from the
+ * CropBox when a page has one, so crop-pdf followed by this works as a chain.
+ *
+ * Verified CLI shape (pdfcpu v0.13.0):
+ *   pdfcpu resize 'dim:<w> <h>, enforce:<bool>' inFile outFile
+ * Dimensions are in points (the default display unit). Without enforce,
+ * pdfcpu turns the target to each page's own orientation.
+ */
+export async function pdfcpuResize(
+  inputPath: string,
+  opts: PdfResizeOptions,
+  outPath: string,
+  runOpts?: PdfcpuOptions,
+): Promise<void> {
+  const inRange = (v: number) =>
+    Number.isFinite(v) && v >= MIN_PAGE_SIDE_POINTS && v <= MAX_PAGE_SIDE_POINTS;
+  if (!inRange(opts.width) || !inRange(opts.height)) {
+    throw new Error(
+      `Page size must be ${MIN_PAGE_SIDE_POINTS}-${MAX_PAGE_SIDE_POINTS} points on each side`,
+    );
+  }
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const desc = `dim:${round(opts.width)} ${round(opts.height)}, enforce:${!opts.keepOrientation}`;
+  await runPdfcpu(["resize", desc, inputPath, outPath], runOpts);
+}
+
 /** Valid booklet values per pdfcpu v0.13.0 help. */
 export type BookletValue = 2 | 4 | 6 | 8;
 

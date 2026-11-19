@@ -126,6 +126,7 @@ import { registerRepairPdf } from "./repair-pdf.js";
 import { registerReplaceAudio } from "./replace-audio.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
+import { registerResizePdfPages } from "./resize-pdf-pages.js";
 import { registerResizeVideo } from "./resize-video.js";
 import { registerRestorePhoto } from "./restore-photo.js";
 import { registerReverseAudio } from "./reverse-audio.js";
@@ -372,6 +373,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "grayscale-pdf", register: registerGrayscalePdf },
     { id: "pdfa-convert", register: registerPdfaConvert },
     { id: "crop-pdf", register: registerCropPdf },
+    { id: "resize-pdf-pages", register: registerResizePdfPages },
     { id: "nup-pdf", register: registerNupPdf },
     { id: "booklet-pdf", register: registerBookletPdf },
     { id: "watermark-pdf", register: registerWatermarkPdf },

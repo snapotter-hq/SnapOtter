@@ -1278,6 +1278,10 @@ export const ptBR: TranslationKeys = {
       name: "Recortar PDF",
       description: "Recorte todas as páginas com uma margem uniforme",
     },
+    "resize-pdf-pages": {
+      name: "Redimensionar páginas PDF",
+      description: "Mude as páginas para A4, Carta ou etiqueta de 4x6 pol",
+    },
     "nup-pdf": {
       name: "Páginas por Folha (N-up)",
       description: "Organize várias páginas por folha",
@@ -4109,6 +4113,28 @@ export const ptBR: TranslationKeys = {
       submit: "Recortar",
       submitBatch: "Recortar ({count} arquivos)",
       progressLabel: "Recortando",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Tamanho da página",
+      width: "Largura",
+      height: "Altura",
+      unit: "Unidade",
+      keepOrientation: "Manter a orientação de cada página",
+      fitHint:
+        "O conteúdo é ajustado e centralizado, então textos e códigos de barras continuam nítidos.",
+      submit: "Redimensionar",
+      submitBatch: "Redimensionar ({count} arquivos)",
+      progressLabel: "Redimensionando",
+      sizes: {
+        "4x6in": "4 x 6 in (etiqueta de envio)",
+        "100x150mm": "100 x 150 mm (etiqueta de envio)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "Carta (EUA)",
+        legal: "Ofício (EUA)",
+        custom: "Personalizado",
+      },
     },
     "nup-pdf": {
       perSheet: "Páginas por folha",

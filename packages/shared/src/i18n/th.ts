@@ -1265,6 +1265,10 @@ export const th: TranslationKeys = {
       name: "ครอป PDF",
       description: "ครอปทุกหน้าด้วยขอบเท่ากัน",
     },
+    "resize-pdf-pages": {
+      name: "ปรับขนาดหน้า PDF",
+      description: "ปรับหน้าเป็น A4, Letter หรือฉลาก 4x6 นิ้ว",
+    },
     "nup-pdf": {
       name: "หน้าต่อแผ่น (N-up)",
       description: "จัดวางหลายหน้าในแผ่นเดียว",
@@ -4044,6 +4048,27 @@ export const th: TranslationKeys = {
       submit: "ครอป",
       submitBatch: "ครอป ({count} ไฟล์)",
       progressLabel: "กำลังครอป",
+    },
+    "resize-pdf-pages": {
+      pageSize: "ขนาดหน้า",
+      width: "ความกว้าง",
+      height: "ความสูง",
+      unit: "หน่วย",
+      keepOrientation: "คงแนวของแต่ละหน้า",
+      fitHint: "เนื้อหาจะถูกย่อขยายให้พอดีและจัดกึ่งกลาง ข้อความและบาร์โค้ดจึงยังคมชัด",
+      submit: "ปรับขนาด",
+      submitBatch: "ปรับขนาด ({count} ไฟล์)",
+      progressLabel: "กำลังปรับขนาด",
+      sizes: {
+        "4x6in": "4 x 6 in (ฉลากจัดส่ง)",
+        "100x150mm": "100 x 150 mm (ฉลากจัดส่ง)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "กำหนดเอง",
+      },
     },
     "nup-pdf": {
       perSheet: "จำนวนหน้าต่อแผ่น",

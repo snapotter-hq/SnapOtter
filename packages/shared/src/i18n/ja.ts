@@ -1243,6 +1243,10 @@ export const ja: TranslationKeys = {
       name: "PDF クロップ",
       description: "全ページを均一な余白でクロップ",
     },
+    "resize-pdf-pages": {
+      name: "PDF ページサイズ変更",
+      description: "ページを A4、レター、4x6 インチのラベルサイズに変更",
+    },
     "nup-pdf": {
       name: "1枚あたりのページ数 (N-up)",
       description: "1枚のシートに複数ページを配置",
@@ -4056,6 +4060,28 @@ export const ja: TranslationKeys = {
       submit: "切り抜き",
       submitBatch: "切り抜き ({count}ファイル)",
       progressLabel: "切り抜き中",
+    },
+    "resize-pdf-pages": {
+      pageSize: "ページサイズ",
+      width: "幅",
+      height: "高さ",
+      unit: "単位",
+      keepOrientation: "各ページの向きに合わせる",
+      fitHint:
+        "内容は収まるように拡大縮小して中央に配置されるため、文字やバーコードは鮮明なままです。",
+      submit: "サイズ変更",
+      submitBatch: "サイズ変更 ({count}ファイル)",
+      progressLabel: "サイズ変更中",
+      sizes: {
+        "4x6in": "4 x 6 in (配送ラベル)",
+        "100x150mm": "100 x 150 mm (配送ラベル)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "USレター",
+        legal: "USリーガル",
+        custom: "カスタム",
+      },
     },
     "nup-pdf": {
       perSheet: "1枚あたりのページ数",

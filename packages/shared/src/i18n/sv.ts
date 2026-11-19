@@ -1277,6 +1277,10 @@ export const sv: TranslationKeys = {
       name: "Beskär PDF",
       description: "Beskär alla sidor med en enhetlig marginal",
     },
+    "resize-pdf-pages": {
+      name: "Ändra storlek på PDF-sidor",
+      description: "Gör om sidor till A4, Letter eller en 4x6-tumsetikett",
+    },
     "nup-pdf": {
       name: "Sidor per ark (N-up)",
       description: "Placera flera sidor per ark",
@@ -4098,6 +4102,28 @@ export const sv: TranslationKeys = {
       submit: "Beskär",
       submitBatch: "Beskär ({count} filer)",
       progressLabel: "Beskär",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Sidstorlek",
+      width: "Bredd",
+      height: "Höjd",
+      unit: "Enhet",
+      keepOrientation: "Behåll varje sidas orientering",
+      fitHint:
+        "Innehållet skalas för att passa och centreras, så text och streckkoder förblir skarpa.",
+      submit: "Ändra storlek",
+      submitBatch: "Ändra storlek ({count} filer)",
+      progressLabel: "Ändrar storlek",
+      sizes: {
+        "4x6in": "4 x 6 in (fraktetikett)",
+        "100x150mm": "100 x 150 mm (fraktetikett)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Anpassad",
+      },
     },
     "nup-pdf": {
       perSheet: "Sidor per ark",

@@ -1021,6 +1021,10 @@ export const zhTW: TranslationKeys = {
       name: "裁切 PDF",
       description: "以統一邊距裁切所有頁面",
     },
+    "resize-pdf-pages": {
+      name: "調整 PDF 頁面尺寸",
+      description: "將頁面調整為 A4、Letter 或 4x6 英吋標籤",
+    },
     "nup-pdf": {
       name: "每張紙頁數 (N-up)",
       description: "在單張紙上排列多個頁面",
@@ -3790,6 +3794,27 @@ export const zhTW: TranslationKeys = {
       submit: "裁剪",
       submitBatch: "裁剪（{count} 個檔案）",
       progressLabel: "正在裁剪",
+    },
+    "resize-pdf-pages": {
+      pageSize: "頁面尺寸",
+      width: "寬度",
+      height: "高度",
+      unit: "單位",
+      keepOrientation: "保留每頁的方向",
+      fitHint: "內容會等比縮放並置中，文字和條碼保持清晰。",
+      submit: "調整尺寸",
+      submitBatch: "調整尺寸（{count} 個檔案）",
+      progressLabel: "正在調整尺寸",
+      sizes: {
+        "4x6in": "4 x 6 in (貨運標籤)",
+        "100x150mm": "100 x 150 mm (貨運標籤)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "美國信紙 (Letter)",
+        legal: "美國法律文件紙 (Legal)",
+        custom: "自訂",
+      },
     },
     "nup-pdf": {
       perSheet: "每張頁數",

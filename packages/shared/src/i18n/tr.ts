@@ -1281,6 +1281,10 @@ export const tr: TranslationKeys = {
       name: "PDF Kırp",
       description: "Tüm sayfaları tek tip kenar boşluğuyla kırp",
     },
+    "resize-pdf-pages": {
+      name: "PDF Sayfalarını Yeniden Boyutlandır",
+      description: "Sayfaları A4, Letter veya 4x6 inç etikete dönüştür",
+    },
     "nup-pdf": {
       name: "Yaprak Başına Sayfa (N-up)",
       description: "Tek sayfaya birden fazla sayfa yerleştir",
@@ -4108,6 +4112,28 @@ export const tr: TranslationKeys = {
       submit: "Kırp",
       submitBatch: "Kırp ({count} dosya)",
       progressLabel: "Kırpılıyor",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Sayfa boyutu",
+      width: "Genişlik",
+      height: "Yükseklik",
+      unit: "Birim",
+      keepOrientation: "Her sayfanın yönünü koru",
+      fitHint:
+        "İçerik sığacak şekilde ölçeklenir ve ortalanır, böylece metin ve barkodlar net kalır.",
+      submit: "Yeniden boyutlandır",
+      submitBatch: "Yeniden boyutlandır ({count} dosya)",
+      progressLabel: "Yeniden boyutlandırılıyor",
+      sizes: {
+        "4x6in": "4 x 6 in (kargo etiketi)",
+        "100x150mm": "100 x 150 mm (kargo etiketi)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Özel",
+      },
     },
     "nup-pdf": {
       perSheet: "Yaprak başına sayfa",

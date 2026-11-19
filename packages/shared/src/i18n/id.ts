@@ -1278,6 +1278,10 @@ export const id: TranslationKeys = {
       name: "Potong PDF",
       description: "Potong semua halaman dengan margin seragam",
     },
+    "resize-pdf-pages": {
+      name: "Ubah Ukuran Halaman PDF",
+      description: "Ubah halaman ke A4, Letter, atau label 4x6 inci",
+    },
     "nup-pdf": {
       name: "Halaman Per Lembar (N-up)",
       description: "Tata beberapa halaman per lembar",
@@ -4103,6 +4107,28 @@ export const id: TranslationKeys = {
       submit: "Pangkas",
       submitBatch: "Pangkas ({count} file)",
       progressLabel: "Memangkas",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Ukuran halaman",
+      width: "Lebar",
+      height: "Tinggi",
+      unit: "Satuan",
+      keepOrientation: "Ikuti orientasi tiap halaman",
+      fitHint:
+        "Konten diskalakan agar pas dan diletakkan di tengah, jadi teks dan barcode tetap tajam.",
+      submit: "Ubah ukuran",
+      submitBatch: "Ubah ukuran ({count} file)",
+      progressLabel: "Mengubah ukuran",
+      sizes: {
+        "4x6in": "4 x 6 in (label pengiriman)",
+        "100x150mm": "100 x 150 mm (label pengiriman)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Kustom",
+      },
     },
     "nup-pdf": {
       perSheet: "Halaman per lembar",
