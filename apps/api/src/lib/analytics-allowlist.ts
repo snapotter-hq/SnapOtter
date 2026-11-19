@@ -1,4 +1,4 @@
-import { AUTH_LOGIN_FAILURE_REASONS } from "@snapotter/shared";
+import { AI_INSTALL_ERROR_KINDS, AUTH_LOGIN_FAILURE_REASONS } from "@snapotter/shared";
 
 // Defense in depth: only these keys may leave the server per event, and only as
 // primitives. Free-text fields (error_message, params, search query) are never
@@ -30,7 +30,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
     "error_code",
     "app_version",
   ]),
-  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "app_version"]),
+  ai_bundle_action: new Set(["bundle_id", "action", "duration_ms", "error_kind", "app_version"]),
   instance_started: new Set(["arch", "os_platform", "deploy_mode", "gpu_present", "app_version"]),
   auth_login: new Set(["method", "app_version"]),
   auth_login_failed: new Set(["method", "reason", "app_version"]),
@@ -40,6 +40,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
 // string passed by mistake is dropped instead of forwarded (#4216).
 const ALLOWED_VALUES: Record<string, Record<string, ReadonlySet<string>>> = {
   auth_login_failed: { reason: new Set<string>(AUTH_LOGIN_FAILURE_REASONS) },
+  ai_bundle_action: { error_kind: new Set<string>(AI_INSTALL_ERROR_KINDS) },
 };
 
 function isAllowedValue(value: unknown): boolean {

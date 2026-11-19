@@ -1,3 +1,4 @@
+import { AI_INSTALL_ERROR_KINDS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { sanitizeEventProperties } from "../../../apps/api/src/lib/analytics-allowlist.js";
 
@@ -104,5 +105,28 @@ describe("auth_login_failed reason (#4216)", () => {
     expect(
       sanitizeEventProperties("auth_login_failed", { method: "password", reason: "alice" }),
     ).toEqual({ method: "password" });
+  });
+});
+
+describe("ai_bundle_action install failure (#4821)", () => {
+  it.each(AI_INSTALL_ERROR_KINDS)("keeps the closed-set error_kind %s", (kind) => {
+    expect(
+      sanitizeEventProperties("ai_bundle_action", {
+        bundle_id: "ocr",
+        action: "install_failed",
+        duration_ms: 12,
+        error_kind: kind,
+        error_message: "/data/ai/venv: Permission denied",
+      }),
+    ).toEqual({ bundle_id: "ocr", action: "install_failed", duration_ms: 12, error_kind: kind });
+  });
+
+  it("drops an error_kind outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("ai_bundle_action", {
+        bundle_id: "ocr",
+        error_kind: "Permission denied: /data/ai/cache",
+      }),
+    ).toEqual({ bundle_id: "ocr" });
   });
 });
