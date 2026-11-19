@@ -102,18 +102,20 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
  * on the single-frame path, which is the correct result for them anyway.
  */
 export async function readAnimationFor(buffer: Buffer, outputFormat: string): Promise<FrameInfo> {
-  if (!animatedContainerFor(outputFormat)) return STILL;
+  const container = animatedContainerFor(outputFormat);
+  if (!container) return STILL;
+  if (container === "tiff") return await readTiffPagesFor(buffer, outputFormat);
   return await readAnimation(buffer);
 }
 
 /**
  * Page stack for a multi-page TIFF that is going back out as TIFF (#4419).
  *
- * TIFF pages are not an animation, so readAnimationFor leaves them out and a
- * TIFF converted to a still format keeps page 1, like an animated GIF does.
+ * A TIFF converted to a still format keeps page 1, like an animated GIF does.
  * TIFF out is different: dropping every page after the first there is silent
- * data loss. This is for page-aware pipelines (`resize`, `extract`), which
- * handle the stacked strip that `openAnimated` gives them on their own.
+ * data loss, so readAnimationFor and runPerFrame answer through here whenever
+ * the output is TIFF (#4850). Pages carry no delay or loop, so the stack goes
+ * through the same strip handling an animation does.
  *
  * libvips only stacks pages that share one size, so a TIFF with mixed page
  * sizes is refused with the page count rather than cut down to page 1.
@@ -177,12 +179,13 @@ export function openAnimated(buffer: Buffer, info: FrameInfo): Sharp {
   return info.animated ? sharp(buffer, { animated: true }) : sharp(buffer);
 }
 
-/** Containers that can actually hold an animation on the way out. */
-type AnimatedContainer = "gif" | "webp";
+/** Containers that can hold more than one frame or page on the way out. */
+type AnimatedContainer = "gif" | "webp" | "tiff";
 
 function animatedContainerFor(format: string): AnimatedContainer | undefined {
   if (format === "gif") return "gif";
   if (format === "webp") return "webp";
+  if (format === "tiff") return "tiff";
   return undefined;
 }
 
@@ -237,6 +240,9 @@ async function mapFrames(
   }
 
   const joined = sharp(rebuilt, { join: { across: 1, animated: true } });
+  // LZW to match outputFormatFor's TIFF encoder; Sharp's own default is JPEG,
+  // which would cost every page a lossy generation.
+  if (container === "tiff") return await joined.tiff({ compression: "lzw" }).toBuffer();
   return container === "gif"
     ? await joined.gif({ delay: info.delay, loop: info.loop }).toBuffer()
     : await joined.webp({ delay: info.delay, loop: info.loop }).toBuffer();
@@ -263,7 +269,10 @@ export async function runPerFrame(
   const container = animatedContainerFor(outputFormat);
   if (!container) return undefined;
 
-  const info = await readAnimation(inputBuffer);
+  const info =
+    container === "tiff"
+      ? await readTiffPagesFor(inputBuffer, outputFormat)
+      : await readAnimation(inputBuffer);
   if (!info.animated) return undefined;
 
   return await mapFrames(inputBuffer, info, container, (frame) => still(frame));
