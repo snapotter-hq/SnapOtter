@@ -1,6 +1,6 @@
 // tests/unit/scripts/i18n/core.test.ts
 import { describe, expect, it, vi } from "vitest";
-import { collectPending, runTranslation } from "../../../../scripts/i18n/core.mjs";
+import { collectPending, reportPending, runTranslation } from "../../../../scripts/i18n/core.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 import { makeFakeAdapter } from "./fake-adapter";
 
@@ -97,5 +97,71 @@ describe("collectPending", () => {
     expect(pending).toEqual([]);
     expect(stats.stale).toBe(1);
     expect(merged.get("a")).toMatchObject({ provenance: "human", stale: true, text: "menschlich" });
+  });
+});
+
+describe("reportPending", () => {
+  it("counts pending, skipped, and stale units per locale without writing (#916)", async () => {
+    const units = [
+      { id: "new", sourceText: "fresh" },
+      { id: "same", sourceText: "hi" },
+      { id: "edited", sourceText: "hello" },
+    ];
+    const adapter = makeFakeAdapter(units);
+    adapter._store.set(
+      "de",
+      new Map<string, any>([
+        [
+          "same",
+          {
+            text: "de:hi",
+            sourceHash: hash("hi"),
+            provenance: "machine",
+            outputHash: hash("de:hi"),
+          },
+        ],
+        [
+          "edited",
+          {
+            text: "menschlich",
+            sourceHash: hash("hey"),
+            provenance: "human",
+            outputHash: hash("x"),
+          },
+        ],
+      ]),
+    );
+    const before = new Map(adapter._store.get("de"));
+    const write = vi.spyOn(adapter, "write");
+
+    const summary = await reportPending({ adapter, locales: ["en", "de", "fr"] });
+
+    expect(write).not.toHaveBeenCalled();
+    expect(adapter._store.get("de")).toEqual(before);
+    expect(adapter._store.has("fr")).toBe(false);
+    expect(summary).toEqual({
+      de: { pending: 1, skipped: 1, stale: 1 },
+      fr: { pending: 3, skipped: 0, stale: 0 },
+    });
+  });
+
+  it("counts stale human units as pending under refreshStale", async () => {
+    const adapter = makeFakeAdapter([{ id: "a", sourceText: "hello" }]);
+    adapter._store.set(
+      "de",
+      new Map<string, any>([
+        [
+          "a",
+          {
+            text: "menschlich",
+            sourceHash: hash("hi"),
+            provenance: "human",
+            outputHash: hash("x"),
+          },
+        ],
+      ]),
+    );
+    const summary = await reportPending({ adapter, locales: ["de"], refreshStale: true });
+    expect(summary.de).toEqual({ pending: 1, skipped: 0, stale: 0 });
   });
 });
