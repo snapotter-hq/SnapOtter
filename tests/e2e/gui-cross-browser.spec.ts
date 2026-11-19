@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
+import AdmZip from "adm-zip";
 import { getTestImagePath, test, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
@@ -584,6 +586,47 @@ test.describe("Cross-browser smoke tests", () => {
     expect(pageContent).toBeTruthy();
 
     expect(errors).toHaveLength(0);
+  });
+
+  // #4505: WebKit keeps only the last of several <a download> clicks made in
+  // one task. Playwright's WebKit build saves all of them, so this can't show
+  // the drop itself; it checks that a multi-file selection now leaves as one
+  // ZIP holding every file, in every engine.
+  test("files page bulk download saves every ticked file in one ZIP", async ({
+    loggedInPage: page,
+  }) => {
+    const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
+    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const stem = `bulk-${test.info().project.name}-${Date.now()}`;
+    const names = [1, 2, 3].map((n) => `${stem}-${n}.png`);
+    const png = readFileSync(getTestImagePath());
+    for (const name of names) {
+      const res = await page.request.post("/api/v1/files/upload", {
+        headers,
+        multipart: { file: { name, mimeType: "image/png", buffer: png } },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+    }
+
+    await page.goto("/files");
+    await page.getByPlaceholder("Search files...").fill(stem);
+    for (const name of names) {
+      await page.getByRole("checkbox", { name: `Select File: ${name}` }).check();
+    }
+    await expect(page.getByText("3 selected")).toBeVisible();
+
+    const downloads: string[] = [];
+    page.on("download", (d) => downloads.push(d.suggestedFilename()));
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download", exact: true }).click();
+    const download = await downloadPromise;
+    await expect(page.getByRole("button", { name: "Download", exact: true })).toBeEnabled();
+
+    expect(download.suggestedFilename()).toBe("files.zip");
+    const zipPath = await download.path();
+    const entries = new AdmZip(readFileSync(zipPath)).getEntries().map((e) => e.entryName);
+    expect(entries.sort()).toEqual([...names].sort());
+    expect(downloads).toEqual(["files.zip"]);
   });
 
   // ---- Collage tool (no-dropzone mode) ----
