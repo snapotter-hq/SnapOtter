@@ -10,6 +10,7 @@ import {
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
@@ -25,6 +26,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { encodeJxl } from "../../lib/format-encoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -59,6 +61,47 @@ const settingsSchema = z.object({
   quality: z.union([z.number(), z.string()]).transform(Number).default(90),
 });
 
+type NoiseRemovalSettings = z.infer<typeof settingsSchema>;
+
+const CONTENT_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  webp: "image/webp",
+  avif: "image/avif",
+  jxl: "image/jxl",
+};
+
+// The sidecar has no AVIF or JPEG XL encoder: asked for either, it writes PNG
+// bytes and echoes the requested format back (#4468). Ask it for PNG and
+// encode those two here, as upscale does.
+function sidecarFormat(format: NoiseRemovalSettings["format"]) {
+  return format === "avif" || format === "jxl" ? "png" : format;
+}
+
+async function finishNoiseRemovalOutput(
+  result: Awaited<ReturnType<typeof noiseRemoval>>,
+  settings: NoiseRemovalSettings,
+  filename: string,
+) {
+  let buffer = result.buffer;
+  let format = result.format;
+  if (settings.format === "jxl") {
+    buffer = await encodeJxl(result.buffer, settings.quality);
+    format = "jxl";
+  } else if (settings.format === "avif") {
+    buffer = await sharp(result.buffer).avif({ quality: settings.quality }).toBuffer();
+    format = "avif";
+  }
+
+  const ext = format === "jpeg" ? "jpg" : format;
+  return {
+    buffer,
+    filename: `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`,
+    contentType: CONTENT_TYPES[format] || "image/png",
+  };
+}
+
 // ── AI job handler ────────────────────────────────────────────────
 registerAiJobHandler(
   "noise-removal",
@@ -78,7 +121,7 @@ registerAiJobHandler(
             strength: settings.strength,
             detailPreservation: settings.detailPreservation,
             colorNoise: settings.colorNoise,
-            format: settings.format,
+            format: sidecarFormat(settings.format),
             quality: settings.quality,
             signal: ctx.signal,
           },
@@ -88,22 +131,7 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(input, err);
       }
 
-      const ext = result.format === "jpeg" ? "jpg" : result.format;
-      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
-
-      const CONTENT_TYPES: Record<string, string> = {
-        png: "image/png",
-        jpeg: "image/jpeg",
-        jpg: "image/jpeg",
-        webp: "image/webp",
-        avif: "image/avif",
-      };
-
-      return {
-        buffer: result.buffer,
-        filename: outputFilename,
-        contentType: CONTENT_TYPES[result.format] || "image/png",
-      };
+      return finishNoiseRemovalOutput(result, settings, data.filename);
     },
   ),
 );
@@ -310,7 +338,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
                 strength: s.strength,
                 detailPreservation: s.detailPreservation,
                 colorNoise: s.colorNoise,
-                format: s.format,
+                format: sidecarFormat(s.format),
                 quality: s.quality,
                 signal: ctx?.signal,
               },
@@ -319,20 +347,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
           } catch (err) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
-          const ext = result.format === "jpeg" ? "jpg" : result.format;
-          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
-          const CONTENT_TYPES: Record<string, string> = {
-            png: "image/png",
-            jpeg: "image/jpeg",
-            jpg: "image/jpeg",
-            webp: "image/webp",
-            avif: "image/avif",
-          };
-          return {
-            buffer: result.buffer,
-            filename: outputFilename,
-            contentType: CONTENT_TYPES[result.format] || "image/png",
-          };
+          return finishNoiseRemovalOutput(result, s, filename);
         } finally {
           if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }

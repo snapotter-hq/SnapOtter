@@ -11,6 +11,7 @@ import {
   upscale,
 } from "@snapotter/ai";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
@@ -41,6 +42,16 @@ vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) =>
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
   // Host memory is not what these tests exercise; the gate has its own tests.
   availableMemoryBytes: () => 64 * 1024 ** 3,
+}));
+
+// A JPEG XL codestream starts with FF 0A. The encoder shells out to cjxl, which
+// is not what these tests exercise, so stand in for it with a tagged buffer.
+const FAKE_JXL = Buffer.from([0xff, 0x0a, 0x4a, 0x58, 0x4c]);
+const encoderMocks = vi.hoisted(() => ({ encodeJxl: vi.fn() }));
+
+vi.mock("../../../apps/api/src/lib/format-encoders.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/format-encoders.js")>()),
+  encodeJxl: encoderMocks.encodeJxl,
 }));
 
 vi.mock("@snapotter/ai", () => ({
@@ -129,6 +140,7 @@ function resetAiMocks() {
     format: "png",
   });
   vi.mocked(isMemoryAllocError).mockReturnValue(false);
+  encoderMocks.encodeJxl.mockResolvedValue(FAKE_JXL);
 }
 
 beforeEach(() => {
@@ -195,6 +207,93 @@ describe("AI image job handlers", () => {
     expect(result).toMatchObject({
       filename: "photo_denoised.jpg",
       contentType: "image/jpeg",
+    });
+  });
+
+  // The sidecar has no AVIF or JPEG XL encoder: it writes PNG bytes and echoes
+  // the requested format back (#4468). Node must ask for PNG and encode itself.
+  it("encodes avif denoise output in Node instead of passing sidecar PNG bytes through", async () => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "quick",
+    }));
+
+    const result = await runAiToolJob(
+      job("noise-removal", { tier: "quick", format: "avif", quality: 70 }),
+      PNG,
+      ctx,
+    );
+
+    expect(noiseRemoval).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: "png" }),
+      expect.any(Function),
+    );
+    expect(result).toMatchObject({ filename: "photo_denoised.avif", contentType: "image/avif" });
+    const meta = await sharp(result.buffer).metadata();
+    expect(meta.format).toBe("heif");
+    expect(meta.compression).toBe("av1");
+  });
+
+  it("encodes jxl denoise output in Node with the requested quality", async () => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "balanced",
+    }));
+
+    const result = await runAiToolJob(
+      job("noise-removal", { tier: "balanced", format: "jxl", quality: 65 }),
+      PNG,
+      ctx,
+    );
+
+    expect(noiseRemoval).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: "png" }),
+      expect.any(Function),
+    );
+    expect(encoderMocks.encodeJxl).toHaveBeenCalledWith(PNG, 65);
+    expect(result).toMatchObject({
+      buffer: FAKE_JXL,
+      filename: "photo_denoised.jxl",
+      contentType: "image/jxl",
+    });
+  });
+
+  it("passes sidecar-native denoise formats straight through without re-encoding", async () => {
+    vi.mocked(noiseRemoval).mockResolvedValue({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: "webp",
+      tier: "quick",
+    });
+
+    const result = await runAiToolJob(
+      job("noise-removal", { tier: "quick", format: "webp" }),
+      PNG,
+      ctx,
+    );
+
+    expect(noiseRemoval).toHaveBeenCalledWith(
+      PNG,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: "webp" }),
+      expect.any(Function),
+    );
+    expect(encoderMocks.encodeJxl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      buffer: PNG,
+      filename: "photo_denoised.webp",
+      contentType: "image/webp",
     });
   });
 
@@ -420,6 +519,42 @@ describe("AI image pipeline process registrations", () => {
     registerEnhanceFaces(fakeApp);
     registerRedEyeRemoval(fakeApp);
     registerTransparencyFixer(fakeApp);
+  });
+
+  it("encodes avif and jxl in the noise-removal pipeline processor (#4468)", async () => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "quick",
+    }));
+    const noiseConfig = getToolConfig("noise-removal");
+
+    const avif = await noiseConfig?.process(
+      PNG,
+      { tier: "quick", format: "avif", quality: 70 },
+      "photo.png",
+      ctx,
+    );
+    expect(avif).toMatchObject({ filename: "photo_denoised.avif", contentType: "image/avif" });
+    expect((await sharp(avif?.buffer).metadata()).compression).toBe("av1");
+
+    const jxl = await noiseConfig?.process(
+      PNG,
+      { tier: "quick", format: "jxl", quality: 60 },
+      "photo.png",
+      ctx,
+    );
+    expect(jxl).toMatchObject({
+      buffer: FAKE_JXL,
+      filename: "photo_denoised.jxl",
+      contentType: "image/jxl",
+    });
+    expect(encoderMocks.encodeJxl).toHaveBeenCalledWith(PNG, 60);
+    for (const call of vi.mocked(noiseRemoval).mock.calls) {
+      expect(call[2]).toMatchObject({ format: "png" });
+    }
   });
 
   it("registers pipeline processors for custom AI photo routes", async () => {
