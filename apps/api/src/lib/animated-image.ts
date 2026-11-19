@@ -1,7 +1,7 @@
 import { isToolInputError, ToolInputError } from "@snapotter/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
-import { assertGifWorkload } from "./gif-limits.js";
+import { assertGifWorkload, MAX_GIF_FRAMES } from "./gif-limits.js";
 import { logger } from "./logger.js";
 
 /**
@@ -104,6 +104,61 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
 export async function readAnimationFor(buffer: Buffer, outputFormat: string): Promise<FrameInfo> {
   if (!animatedContainerFor(outputFormat)) return STILL;
   return await readAnimation(buffer);
+}
+
+/**
+ * Page stack for a multi-page TIFF that is going back out as TIFF (#4419).
+ *
+ * TIFF pages are not an animation, so readAnimationFor leaves them out and a
+ * TIFF converted to a still format keeps page 1, like an animated GIF does.
+ * TIFF out is different: dropping every page after the first there is silent
+ * data loss. This is for page-aware pipelines (`resize`, `extract`), which
+ * handle the stacked strip that `openAnimated` gives them on their own.
+ *
+ * libvips only stacks pages that share one size, so a TIFF with mixed page
+ * sizes is refused with the page count rather than cut down to page 1.
+ */
+export async function readTiffPagesFor(buffer: Buffer, outputFormat: string): Promise<FrameInfo> {
+  if (outputFormat !== "tiff") return STILL;
+  let meta: Metadata;
+  try {
+    meta = await sharp(buffer).metadata();
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    // The caller decodes the same buffer next and reports its own error.
+    return STILL;
+  }
+  const pages = meta.pages ?? 1;
+  if (meta.format !== "tiff" || pages <= 1) return STILL;
+
+  if (pages > MAX_GIF_FRAMES) {
+    throw new ToolInputError(
+      `This TIFF has ${pages} pages, and at most ${MAX_GIF_FRAMES} can be edited at once. Split it into smaller files and try again.`,
+      { code: "TOO_MANY_FRAMES" },
+    );
+  }
+
+  let stack: Metadata;
+  try {
+    stack = await sharp(buffer, { pages: -1 }).metadata();
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    if (err instanceof Error && /differs from page/.test(err.message)) {
+      throw new ToolInputError(
+        `This TIFF has ${pages} pages of different sizes. Only a TIFF whose pages all share one size can be edited with every page kept.`,
+        { code: "IMAGE_UNDECODABLE" },
+      );
+    }
+    return STILL;
+  }
+
+  const workload = assertGifWorkload(
+    { width: stack.width, height: stack.pageHeight ?? meta.height, pages },
+    "Multi-page TIFF input",
+  );
+  return { animated: true, pages, pageHeight: workload.height, width: workload.width };
 }
 
 /**

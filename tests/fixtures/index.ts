@@ -96,6 +96,9 @@ export const fixtures = {
       tgaGrayRle: p("image/edge/tga-gray-rle.tga"),
       tgaRgbaRle: p("image/edge/tga-rgba-rle.tga"),
       tga2RleFooter: p("image/edge/tga2-rle-footer.tga"),
+      // Two TIFF pages of different sizes (80x30, then 50x50), which libvips
+      // refuses to load as one page stack (#4419).
+      multipageMixedSizesTiff: p("image/edge/multipage-mixed-sizes.tiff"),
     },
     formats: (ext: string) => p(`image/formats/sample.${ext}`),
     multipageTiff: p("image/formats/multipage.tiff"),

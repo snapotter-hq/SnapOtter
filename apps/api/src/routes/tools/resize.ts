@@ -5,7 +5,7 @@ import {
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { openAnimated, readAnimationFor, readTiffPagesFor } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -31,10 +31,13 @@ export function registerResize(app: FastifyInstance) {
       (s) => s?.fit ?? "contain",
       async (inputBuffer, settings, filename) => {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-        const image = openAnimated(
-          inputBuffer,
-          await readAnimationFor(inputBuffer, outputFormat.format),
-        );
+        // resize is page-aware, so a GIF/WebP animation and a TIFF page stack
+        // both keep every frame through it.
+        const frames =
+          outputFormat.format === "tiff"
+            ? await readTiffPagesFor(inputBuffer, outputFormat.format)
+            : await readAnimationFor(inputBuffer, outputFormat.format);
+        const image = openAnimated(inputBuffer, frames);
         const result = await resize(image, settings);
         let buffer: Buffer;
         try {

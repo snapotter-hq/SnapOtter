@@ -1900,4 +1900,72 @@ describe("Split", () => {
       ]).toEqual([200, 40, 40, 0]);
     }
   });
+
+  describe("multi-page TIFF (#4419)", () => {
+    // multipage.tiff is 10 pages of 800x600. Every tile came from page 1 before.
+    const MULTIPAGE = readFixture(fixtures.image.multipageTiff);
+
+    function multipagePayload(file: Buffer, filename: string) {
+      return createMultipartPayload([
+        { name: "file", filename, contentType: "image/tiff", content: file },
+        { name: "settings", content: JSON.stringify({ columns: 2, rows: 1 }) },
+      ]);
+    }
+
+    async function expectTilesKeepEveryPage(zip: AdmZip) {
+      const entries = zip.getEntries();
+      expect(entries.map((e) => e.entryName).sort()).toEqual([
+        "multipage_r1_c1.tiff",
+        "multipage_r1_c2.tiff",
+      ]);
+      for (const entry of entries) {
+        const meta = await sharp(entry.getData()).metadata();
+        expect(meta.format).toBe("tiff");
+        expect(meta.pages).toBe(10);
+        expect(meta.width).toBe(400);
+        expect(meta.height).toBe(600);
+      }
+    }
+
+    it("keeps every page in each tile", async () => {
+      const { body, contentType } = multipagePayload(MULTIPAGE, "multipage.tiff");
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(200);
+      await expectTilesKeepEveryPage(new AdmZip(res.rawPayload));
+    });
+
+    it("keeps every page in each tile via the batch endpoint", async () => {
+      const { body, contentType } = multipagePayload(MULTIPAGE, "multipage.tiff");
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split/batch",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(200);
+      const inner = new AdmZip(res.rawPayload).getEntry("multipage_split.zip");
+      expect(inner).toBeDefined();
+      await expectTilesKeepEveryPage(new AdmZip(inner?.getData()));
+    });
+
+    it("refuses a TIFF whose pages differ in size with a 400 naming the page count", async () => {
+      const { body, contentType } = multipagePayload(
+        readFixture(fixtures.image.edge.multipageMixedSizesTiff),
+        "mixed.tiff",
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toMatch(/2 pages of different sizes/);
+    });
+  });
 });
