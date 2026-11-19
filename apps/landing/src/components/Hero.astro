@@ -17,8 +17,8 @@ const { locale = "en" } = Astro.props;
 const trustBadges = [
   t(locale, "home.hero.badge.selfHosted"),
   t(locale, "home.hero.badge.openSource"),
-  t(locale, "home.hero.badge.airGap"),
-  t(locale, "home.hero.badge.compliance"),
+  t(locale, "home.hero.badge.noUploads"),
+  t(locale, "home.hero.badge.free"),
 ];
 ---
 
@@ -40,7 +40,7 @@ const trustBadges = [
   <div class="relative mx-auto max-w-4xl text-center">
     <MilestoneBanner locale={locale} />
 
-    <!-- Enterprise trust badges -->
+    <!-- Trust badges -->
     <div class="animate-fade-up flex flex-wrap items-center justify-center gap-2">
       {trustBadges.map((badge) => (
         <span class="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/25 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">

@@ -1,29 +1,21 @@
 <p align="center">
-  <img src="branding/social-preview.png" width="800" alt="SnapOtter - A Self-Hosted File Manipulation Suite">
+  <img src="branding/social-preview.png" width="800" alt="SnapOtter, the open-source file toolkit">
 </p>
 
 <p align="center">
-  <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/v/snapotter/snapotter?label=Docker%20Hub&logo=docker" alt="Docker Hub"></a>
-  <a href="https://github.com/orgs/snapotter-hq/packages/container/package/snapotter"><img src="https://img.shields.io/badge/GHCR-ghcr.io%2Fsnapotter--hq%2Fsnapotter-blue?logo=github" alt="GHCR"></a>
-  <a href="https://github.com/snapotter-hq/snapotter/actions"><img src="https://img.shields.io/github/actions/workflow/status/snapotter-hq/snapotter/ci.yml?label=CI" alt="CI"></a>
-  <a href="https://www.bestpractices.dev/projects/12881"><img src="https://www.bestpractices.dev/projects/12881/badge" alt="OpenSSF Best Practices"></a>
-  <a href="https://github.com/snapotter-hq/snapotter/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-blue" alt="License"></a>
-  <a href="https://github.com/snapotter-hq/snapotter/stargazers"><img src="https://img.shields.io/github/stars/snapotter-hq/snapotter?style=social" alt="Stars"></a>
-  <a href="https://snapotter.com"><img src="https://img.shields.io/badge/Website-snapotter.com-blue?logo=googlechrome&logoColor=white" alt="Website"></a>
-  <a href="https://demo.snapotter.com"><img src="https://img.shields.io/badge/Live%20Demo-Try%20it-blue?logo=googlechrome&logoColor=white" alt="Live Demo"></a>
+  <a href="https://hub.docker.com/r/snapotter/snapotter"><img src="https://img.shields.io/docker/pulls/snapotter/snapotter?label=Docker%20pulls&logo=docker" alt="Docker pulls"></a>
+  <a href="https://github.com/snapotter-hq/SnapOtter/stargazers"><img src="https://img.shields.io/github/stars/snapotter-hq/SnapOtter?style=social" alt="Stars"></a>
+  <a href="https://github.com/snapotter-hq/SnapOtter/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPLv3-blue" alt="License"></a>
   <a href="https://discord.gg/hr3s7HPUsr"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/sponsors/snapotter-hq"><img src="https://img.shields.io/badge/Sponsor-pink?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
 <p align="center">
-  <strong>Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, strip metadata, and run local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. Your files never leave your network.</strong>
+  <strong>Open-source file toolkit for PDFs, images, video and audio.</strong> Compress, convert, OCR, remove backgrounds and transcribe on your own server instead of uploading files to websites. 200+ tools and local AI, through a web UI, REST API and pipelines.
   <br /><br />
-  The one self-hosted stack that replaces CloudConvert, Smallpdf, TinyPNG, TinyWow, and Otter.ai. 200+ tools across five modalities, on hardware you own.
+  Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter covers image, video, audio, PDF and file tools, and your files never leave your server. Edit images, convert video, transcribe audio, repair PDFs, batch your files: one Docker stack, on hardware you own.
 </p>
 
 ![SnapOtter - Dashboard](branding/dashboard.gif)
-
-Stirling-PDF stops at PDFs. ConvertX stops at conversions. SnapOtter runs all five, and your files never leave your server. Edit images, convert video, transcribe audio, repair PDFs, batch your files: one Docker stack, on hardware you own.
 
 ## Quick Start
 
@@ -140,7 +132,7 @@ For Docker Compose, persistent storage, and other setup options, see the [Gettin
 
 We welcome bug reports, feature ideas, and pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, or jump in:
 
-- [Open an issue](https://github.com/snapotter-hq/snapotter/issues)
+- [Open an issue](https://github.com/snapotter-hq/SnapOtter/issues)
 - [Submit a PR](CONTRIBUTING.md#code-requires-cla)
 - [Join Discord](https://discord.gg/hr3s7HPUsr) for help and discussion
 - [Sponsor the project](https://github.com/sponsors/snapotter-hq) to keep SnapOtter free for everyone

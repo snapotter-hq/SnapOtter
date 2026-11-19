@@ -18,7 +18,7 @@ test.describe("Sticky mobile CTA", () => {
       "href",
       "https://demo.snapotter.com",
     );
-    await expect(bar.getByRole("link", { name: "Get Started Free" })).toHaveAttribute(
+    await expect(bar.getByRole("link", { name: "Install" })).toHaveAttribute(
       "href",
       "https://docs.snapotter.com/guide/getting-started.html",
     );

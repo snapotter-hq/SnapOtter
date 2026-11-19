@@ -1,14 +1,14 @@
 # SnapOtter
 
-> SnapOtter is open-source, self-hosted file-processing infrastructure. Conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a UI, REST API, and pipelines. 200+ tools in one stack. Files never leave your network.
+> SnapOtter is an open-source (AGPLv3) file toolkit you host yourself for working with images, PDFs, documents, video and audio. It runs 200+ tools on your own server through a browser UI, a REST API and multi-step pipelines, including local AI for background removal, upscaling, OCR and transcription. People use it as a private alternative to online tools like iLovePDF, remove.bg and CloudConvert. It installs with Docker.
 
-SnapOtter runs entirely on your own infrastructure. Files are processed locally with no data sent to external APIs. Deploy once with Docker and use it as much as you need. Supports GDPR, HIPAA, and CCPA compliance by architecture.
+Files are processed on your own server with no data sent to external APIs. Deploy once with Docker and use it as much as you need.
 
 ## Getting Started
 
 - [Documentation](https://docs.snapotter.com/guide/getting-started): Installation, configuration, and deployment guide
 - [Docker Hub](https://hub.docker.com/r/snapotter/snapotter): Official Docker image with multi-arch support (ARM + x86)
-- [GitHub](https://github.com/snapotter-hq/snapotter): Source code, issues, and contributions
+- [GitHub](https://github.com/snapotter-hq/SnapOtter): Source code, issues, and contributions
 - [API Reference](https://docs.snapotter.com/api/rest): Full REST API with OpenAPI documentation
 - [Demo](https://demo.snapotter.com): Try SnapOtter without installing
 
@@ -80,7 +80,7 @@ SAML SSO (Okta, Azure AD, Google Workspace, any OIDC), SCIM Provisioning, Multi-
 
 - Website: https://snapotter.com
 - Documentation: https://docs.snapotter.com
-- GitHub: https://github.com/snapotter-hq/snapotter
+- GitHub: https://github.com/snapotter-hq/SnapOtter
 - Docker Hub: https://hub.docker.com/r/snapotter/snapotter
 - Discord: https://discord.gg/hr3s7HPUsr
 - Contact: contact@snapotter.com

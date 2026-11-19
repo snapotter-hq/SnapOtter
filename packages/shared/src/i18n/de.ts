@@ -5314,7 +5314,7 @@ export const de: TranslationKeys = {
       heading: "Info",
       appName: "SnapOtter",
       appDescription:
-        "Eine selbst gehostete, datenschutzorientierte Dateiverarbeitungssuite mit 200+ Werkzeugen. Konvertieren, komprimieren, bearbeiten, transkribieren, OCR und Bild-, Video-, Audio-, PDF- und Dateiabläufe automatisieren, ohne Daten in die Cloud zu senden.",
+        "Open-Source-Dateitoolkit mit 200+ Werkzeugen. Konvertieren, komprimieren, bearbeiten, transkribieren, OCR und Bild-, Video-, Audio-, PDF- und Dokumentabläufe automatisieren, auf dem eigenen Server und ohne Daten in die Cloud zu senden.",
       versionLabel: "Version:",
       linksHeading: "Links",
       githubLink: "GitHub-Repository",

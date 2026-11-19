@@ -2,11 +2,11 @@
   "name": "snapotter",
   "version": "2.3.0",
   "private": true,
-  "description": "Open-source, self-hosted file-processing infrastructure with 200+ tools across image, video, audio, PDF, and documents, plus local AI. Runs as a Docker Compose stack with Postgres and Redis.",
+  "description": "Open-source (AGPLv3) file toolkit you host yourself: 200+ tools for images, PDFs, documents, video and audio, plus local AI. Runs on your own server with Docker.",
   "homepage": "https://snapotter.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/snapotter-hq/snapotter.git"
+    "url": "https://github.com/snapotter-hq/SnapOtter.git"
   },
   "keywords": [
     "file-processing",

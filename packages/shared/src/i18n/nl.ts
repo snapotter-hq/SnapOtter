@@ -5293,7 +5293,7 @@ export const nl: TranslationKeys = {
       heading: "Over",
       appName: "SnapOtter",
       appDescription:
-        "Een zelf-gehoste, privacy-first bestandsverwerkingssuite met 200+ tools. Converteren, comprimeren, bewerken, transcriberen, OCR en automatiseer je beeld-, video-, audio-, PDF- en bestandsworkflows zonder data naar de cloud te sturen.",
+        "Open-source bestandstoolkit met 200+ tools. Converteer, comprimeer, bewerk, transcribeer, OCR en automatiseer beeld-, video-, audio-, PDF- en documentworkflows op je eigen server, zonder data naar de cloud te sturen.",
       versionLabel: "Versie:",
       linksHeading: "Koppelingen",
       githubLink: "GitHub-repository",

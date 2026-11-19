@@ -1,8 +1,8 @@
 # SnapOtter
 
-![SnapOtter, a self-hosted file manipulation suite](https://raw.githubusercontent.com/snapotter-hq/SnapOtter/main/branding/social-preview.png)
+![SnapOtter, the open-source file toolkit](https://raw.githubusercontent.com/snapotter-hq/SnapOtter/main/branding/social-preview.png)
 
-Open-source, self-hosted file-processing infrastructure. Convert, compress, OCR, transcribe, and run local AI across image, video, audio, PDF, and documents, via UI, REST API, and pipelines. 200+ tools in one stack, on your own hardware. Your files never leave your network.
+**Open-source file toolkit for PDFs, images, video and audio.** Compress, convert, OCR, remove backgrounds and transcribe on your own server instead of uploading files to websites. 200+ tools and local AI, through a web UI, REST API and pipelines.
 
 [![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue)](https://github.com/snapotter-hq/SnapOtter/blob/main/LICENSE)
 [![Website](https://img.shields.io/badge/Website-snapotter.com-blue?logo=googlechrome&logoColor=white)](https://snapotter.com)
