@@ -4120,6 +4120,7 @@ export const it: TranslationKeys = {
     applyAndDownload: "Applica e scarica",
     andMore: "e altri {count}",
     importFromFiles: "Importa da File",
+    installedReady: "{tool} è pronto. Trascina un file per iniziare.",
     saveToFiles: "Salva su File",
     savedToFiles: "Salvato su File",
     resultExpired: "Questo risultato è scaduto. Esegui di nuovo lo strumento.",
@@ -5255,6 +5256,7 @@ export const it: TranslationKeys = {
       description: "Gestisci pacchetti di modelli di IA per l'elaborazione avanzata dei file.",
       installAll: "Installa tutto",
       diskUsage: "Utilizzo del disco: {size}",
+      readyTools: "Pronto da provare:",
       statusStale:
         "Impossibile aggiornare lo stato dei bundle. L’elenco qui sotto potrebbe non essere aggiornato.",
       sizeOnDisk: "{size} su disco",

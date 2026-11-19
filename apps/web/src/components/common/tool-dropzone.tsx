@@ -20,6 +20,8 @@ interface ToolDropzoneProps {
   onUrlImport?: (file: File) => boolean | undefined;
   bulkModalOpen?: boolean;
   onBulkModalOpenChange?: (open: boolean) => void;
+  /** The tool's AI bundle finished installing on this page; say it's ready for a file. */
+  justInstalled?: boolean;
 }
 
 const FORMATS_LIMIT = 8;
@@ -47,6 +49,7 @@ export function ToolDropzone({
   onUrlImport,
   bulkModalOpen,
   onBulkModalOpenChange,
+  justInstalled = false,
 }: ToolDropzoneProps) {
   const { t } = useTranslation();
 
@@ -75,6 +78,15 @@ export function ToolDropzone({
           {getToolDescription(t, tool.id, tool.description)}
         </p>
       </div>
+
+      {justInstalled && (
+        <p
+          role="status"
+          className="w-full rounded-lg border border-border bg-background px-4 py-2 text-center text-sm font-medium text-foreground"
+        >
+          {format(t.toolPage.installedReady, { tool: getToolName(t, tool.id, tool.name) })}
+        </p>
+      )}
 
       {/* Dropzone */}
       <Dropzone
