@@ -74,7 +74,8 @@ describe("landing alternatives data", () => {
         const alt = bySlug.get(slug);
         expect(alt, slug).toBeDefined();
         expect(alt?.competitorOpenSource, slug).toBe(true);
-        expect(alt?.lastReviewed, slug).toMatch(/^2026-11-\d{2}$/);
+        expect(alt?.lastReviewed, slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect((alt?.lastReviewed ?? "") >= "2026-11-01", slug).toBe(true);
         expect(
           alt?.sources.some((s) => s.url.includes(repo)),
           slug,
@@ -98,9 +99,17 @@ describe("landing alternatives data", () => {
     it("never claims no tracking, fully local, or an exact tool count", () => {
       for (const alt of ALTERNATIVES.filter((a) => a.slug in peers || a.slug === "stirling-pdf")) {
         const text = textOf(alt);
-        expect(text, alt.slug).not.toMatch(/no tracking|fully local|100% (private|local)/i);
-        const counts = [...text.matchAll(/(\d+)\+? tools/g)].map((m) => m[0]);
-        for (const count of counts.filter((c) => c.startsWith("2"))) {
+        expect(text, alt.slug).not.toMatch(
+          /no (tracking|telemetry|analytics)|never tracks|fully local|100% (private|local)/i,
+        );
+        // Competitor cells quote the peer's own count ("50+ tools"); everything
+        // else is about SnapOtter and must use the fixed public phrase.
+        const competitorCells = new Set(alt.rows.map((r) => r.competitor));
+        const ours = textOf(alt)
+          .split("\n")
+          .filter((line) => !competitorCells.has(line))
+          .join("\n");
+        for (const [count] of ours.matchAll(/\d[\d,]*\+? tools/g)) {
           expect(count, alt.slug).toBe("200+ tools");
         }
       }
@@ -111,6 +120,6 @@ describe("landing alternatives data", () => {
     const stirling = ALTERNATIVES.find((a) => a.slug === "stirling-pdf");
     expect(stirling?.rows.some((r) => r.competitor.includes("/mcp"))).toBe(true);
     expect(stirling?.sources.some((s) => s.url === "https://docs.stirlingpdf.com/MCP/")).toBe(true);
-    expect(stirling?.lastReviewed).toMatch(/^2026-11-\d{2}$/);
+    expect((stirling?.lastReviewed ?? "") >= "2026-11-01").toBe(true);
   });
 });

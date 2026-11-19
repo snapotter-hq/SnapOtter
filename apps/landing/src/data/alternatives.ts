@@ -765,8 +765,8 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
       },
       {
         feature: "Automation",
-        snapotter: "REST API, pipelines, and batch jobs",
-        competitor: "Visual workflow builder in the browser",
+        snapotter: "REST API for every tool, plus pipelines and batch jobs",
+        competitor: "Visual workflow builder in the browser; no server, so no server API",
         snapotterWins: true,
       },
       {
@@ -816,7 +816,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
     intro:
       "VERT is an AGPLv3 file converter that runs most conversions in the browser with WebAssembly. SnapOtter is an AGPLv3 server app: it converts on your own hardware, then keeps going with compression, editing, OCR, and transcription.",
     breadth:
-      "Pick VERT if conversion is the job and you'd rather it ran on each person's device. It's lighter to host and its interface is built for exactly that. Video is the exception in VERT's own docs: it goes to a server, either VERT's official instance or a vertd daemon you host. SnapOtter runs every job on your server, video included, and puts conversion next to resizing, compression, redaction, OCR, and pipelines.",
+      "Pick VERT if conversion is the job and you'd rather it ran on each person's device. It's lighter to host and its interface is built for exactly that. Video is the exception: VERT's FAQ says video files are uploaded to its server, and you can host your own vertd daemon instead. SnapOtter runs every job on your server, video included, and puts conversion next to resizing, compression, redaction, OCR, and pipelines.",
     competitorOpenSource: true,
     lastReviewed: PEER_REVIEW_DATE,
     sources: [
@@ -828,7 +828,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
         feature: "Where files are processed",
         snapotter: SNAPOTTER_PROCESSING,
         competitor:
-          "In the browser for images, audio, and documents; video goes to a vertd server, official or self-hosted",
+          "In the browser for images, audio, and documents; its FAQ says video is uploaded to its server, or to a vertd daemon you host",
         snapotterWins: false,
       },
       {
@@ -849,12 +849,6 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
         competitor:
           "Plausible on vert.sh with an opt-out in Settings; a build flag blocks all external requests",
         snapotterWins: false,
-      },
-      {
-        feature: "Automation",
-        snapotter: "REST API, pipelines, and batch jobs",
-        competitor: "Built around the web interface",
-        snapotterWins: true,
       },
       {
         feature: "License",
@@ -926,7 +920,7 @@ curl -s -X POST http://localhost:1349/api/v1/tools/audio/transcribe-audio \\
         feature: "Image, video, audio, and PDF tools",
         snapotter: "200+ tools across five file types",
         competitor: "Not its focus (it has a PDF signature checker)",
-        snapotterWins: true,
+        snapotterWins: false,
       },
       {
         feature: "Usage analytics",
