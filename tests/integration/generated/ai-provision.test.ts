@@ -1,6 +1,6 @@
 /**
- * Installs every AI bundle a tool requires into DATA_DIR, through the real
- * admin install route, so the strict AI matrices (REQUIRE_AI_FEATURES=1) have
+ * Installs every AI feature bundle into DATA_DIR, through the real admin
+ * install route, so the strict AI matrices (REQUIRE_AI_FEATURES=1) have
  * something to run against. Opt-in with AI_PROVISION=1: it downloads several GB
  * from the bundle repo. The ubuntu_gpu release preflight runs it before the
  * matrices against a DATA_DIR that persists between runs, so only a bundle
@@ -9,7 +9,7 @@
  * The AI venv (PYTHON_VENV_PATH) must already hold the base packages; in the
  * image the entrypoint seeds it, on a host the preflight script builds it.
  */
-import { FEATURE_BUNDLES, getRequiredBundlesForTool, TOOLS } from "@snapotter/shared";
+import { FEATURE_BUNDLES } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { invalidateCache, isFeatureInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { buildTestApp, loginAsAdmin, preReadyHooks, type TestApp } from "../test-server.js";
@@ -18,9 +18,10 @@ const PROVISION = process.env.AI_PROVISION === "1" && process.env.REQUIRE_AI_FEA
 const INSTALL_TIMEOUT_MS = 3 * 60 * 60 * 1000;
 const POLL_MS = 10_000;
 
-const REQUIRED_BUNDLES = [
-  ...new Set(TOOLS.flatMap((tool) => getRequiredBundlesForTool(tool.id))),
-].sort();
+// Optional bundles too: a tool's default settings can ask for one (ocr-pdf's
+// "balanced" quality needs the OCR runtime), and the strict matrices fail on
+// FEATURE_INCOMPATIBLE when it is absent.
+const BUNDLES = Object.keys(FEATURE_BUNDLES).sort();
 
 interface BundleState {
   id: string;
@@ -57,12 +58,11 @@ describe.skipIf(!PROVISION)("AI bundle provisioning", () => {
     );
   }
 
-  it("requires at least one bundle, each known to the manifest", () => {
-    expect(REQUIRED_BUNDLES.length).toBeGreaterThan(0);
-    for (const bundleId of REQUIRED_BUNDLES) expect(FEATURE_BUNDLES[bundleId]).toBeDefined();
+  it("has bundles to install", () => {
+    expect(BUNDLES.length).toBeGreaterThan(0);
   });
 
-  for (const bundleId of REQUIRED_BUNDLES) {
+  for (const bundleId of BUNDLES) {
     it(
       `installs ${bundleId}`,
       async () => {

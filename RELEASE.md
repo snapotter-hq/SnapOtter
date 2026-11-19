@@ -65,7 +65,7 @@ If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the
      tests/integration/generated/format-matrix-multimodal.test.ts
    ```
 
-   The first command installs any missing required bundle through the admin install route (several GB on the first run). In the second, a tool whose bundle is missing fails by name instead of skipping. Maintainers run both on the GPU box through the fleet tooling.
+   The first command installs any missing feature bundle through the admin install route (several GB on the first run). In the second, a tool whose bundle is missing fails by name instead of skipping. Maintainers run both on the GPU box through the fleet tooling.
 2. Optional: to override the auto-generated release notes, add a `.release-notes.md` on `main`. If present, it replaces the GitHub release body and seeds the docs changelog.
 3. Dispatch the workflow:
    ```bash
