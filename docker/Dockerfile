@@ -364,6 +364,10 @@ RUN ln -sf ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && \
     chmod -R a+rX /usr/local/share/corepack
 
+# Fontconfig alias that maps Aptos to Carlito (#4879). It sits in conf.d before
+# fontconfig is installed so the apt layer's fc-match guard below can check it.
+COPY docker/fontconfig/35-snapotter-aptos.conf /etc/fonts/conf.d/
+
 # System dependencies (all platforms)
 # Split into runtime deps and build deps to minimize final image size.
 # Retry apt-get update with backoff — Ubuntu mirrors can be flaky on CI runners
@@ -406,6 +410,8 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     && test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && fc-match Calibri | grep -q Carlito \
     && fc-match Cambria | grep -q Caladea \
+    && fc-match Aptos | grep -q Carlito \
+    && fc-match "Aptos Display" | grep -q Carlito \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
          timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
