@@ -124,6 +124,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
   addResponseEnvelope(app);
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     const statusCode = logAndReportRequestError(error, request);
+    // A send that raced one already answered lands here as ERR_HTTP_HEADERS_SENT
+    // after the client has its response; sending again only adds a warning (#4348).
+    if (reply.sent || reply.raw.headersSent) return;
     // An over-limit file whose error escaped a route's multipart read (the
     // routes tests/unit/api/multipart-failure-drift.test.ts pins on this
     // handler) gets the same 413 multipartFailure() gives the routes that
