@@ -5328,6 +5328,7 @@ export const ptBR: TranslationKeys = {
       "Sua conta não está autorizada a acessar esta aplicação. Contate o administrador.",
     samlUserLimitReached: "Limite de usuários atingido. Contate o administrador.",
     ssoEnforcedLocalRestricted: "O login local é restrito a administradores autorizados.",
+    defaultCredentialsHint: "Primeira vez aqui? Entre com {username} / {password}.",
     mfaRequired: "Digite seu código de autenticação",
     mfaRecoveryHint: "Você também pode usar um código de recuperação",
     verify: "Verificar",

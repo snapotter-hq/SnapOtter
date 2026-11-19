@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutta kurun. Docker Compose kurulumunu, kaynak koddan derlemeyi ve özelliklere tam bir genel bakışı içerir."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 2b3adeca8c2d
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` a
 
 Raspberry Pi, eski bir dizüstü bilgisayar veya küçük bir VPS üzerine mi kuruyorsunuz? Ayarlanmış bir adım adım kurulum ve kısıtlı donanımdan ne bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) sayfasına bakın.
 
-İlk girişte parolanızı değiştirmeniz istenir.
+[http://localhost:1349](http://localhost:1349) adresini açın ve `admin` / `admin` ile giriş yapın. İlk girişte parolanızı değiştirmeniz istenir.
 
 ::: tip Anonim Ürün Analitiği
 SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+[http://localhost:1349](http://localhost:1349) adresini açın ve `admin` / `admin` ile giriş yapın.
 
 Kanonik [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tamamını, sağlık denetimlerini, kaynak sınırlarını, kalıcı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek imajlarını ve güncel kapsayıcı sıkılaştırmasını içerir. İlk girişten hemen sonra varsayılan yönetici parolasını değiştirin. Tekrarlanabilir bir dağıtım için `latest` etiketini izlemek yerine SnapOtter uygulama imajını doğruladığınız sürüm etiketine veya özetine (digest) sabitleyin.
 

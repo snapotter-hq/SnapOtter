@@ -1,6 +1,6 @@
 ---
 description: "Installare SnapOtter con Docker in un solo comando. Include la configurazione di Docker Compose, la compilazione da sorgente e una panoramica completa delle funzionalità."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 3b891611a2f6
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ I risultati dei job non vengono conservati nel volume dei dati, quindi scompaion
 
 Sta installando su un Raspberry Pi, un vecchio portatile o un piccolo VPS? Consulti [Configurazioni a risorse limitate](/it/guide/low-resource) per una guida ottimizzata e per sapere cosa aspettarsi da un hardware limitato.
 
-Al primo accesso Le verrà chiesto di cambiare la password.
+Apri [http://localhost:1349](http://localhost:1349) e accedi con `admin` / `admin`. Al primo accesso Le verrà chiesto di cambiare la password.
 
 ::: tip Analytics di prodotto anonime
 SnapOtter include per impostazione predefinita analytics di prodotto anonime. Per disattivarle, apra **Impostazioni → Sistema → Privacy** e disattivi **Analytics di prodotto anonime**. Si interrompono immediatamente per l'intera istanza.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Apri [http://localhost:1349](http://localhost:1349) e accedi con `admin` / `admin`.
 
 Il [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) canonico include tutti e quattro i volumi di runtime, i controlli dello stato, i limiti di risorse, la configurazione Redis durevole, le immagini di database/cache bloccate e l'attuale hardening del container. Cambi subito la password amministratore predefinita dopo il primo accesso. Per una distribuzione riproducibile, blocchi l'immagine applicativa di SnapOtter al tag di rilascio o al digest che ha verificato, invece di seguire `latest`.
 

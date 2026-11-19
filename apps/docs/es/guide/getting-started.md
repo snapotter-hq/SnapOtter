@@ -1,6 +1,6 @@
 ---
 description: "Instale SnapOtter con Docker en un solo comando. Incluye la configuración con Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 98bafaa09848
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Los resultados de los trabajos no se guardan en el volumen de datos, así que de
 
 ¿Va a instalarlo en una Raspberry Pi, un portátil antiguo o un VPS pequeño? Consulte [Configuraciones de bajos recursos](/es/guide/low-resource) para una guía ajustada y lo que cabe esperar de un hardware limitado.
 
-Se le pedirá que cambie su contraseña en el primer inicio de sesión.
+Abre [http://localhost:1349](http://localhost:1349) e inicia sesión con `admin` / `admin`. Se le pedirá que cambie su contraseña en el primer inicio de sesión.
 
 ::: tip Analítica de producto anónima
 SnapOtter incluye analítica de producto anónima de forma predeterminada. Para desactivarla, abra **Settings → System → Privacy** y desactive **Anonymous Product Analytics**. Se detiene de inmediato para toda la instancia.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Abre [http://localhost:1349](http://localhost:1349) e inicia sesión con `admin` / `admin`.
 
 El [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) canónico incluye los cuatro volúmenes de runtime, comprobaciones de estado, límites de recursos, una configuración de Redis duradera, imágenes de base de datos y caché fijadas y el endurecimiento actual de los contenedores. Cambie la contraseña de administrador predeterminada inmediatamente después del primer inicio de sesión. Para un despliegue reproducible, fije la imagen de la aplicación SnapOtter a la etiqueta de versión o al digest que haya verificado, en lugar de seguir `latest`.
 

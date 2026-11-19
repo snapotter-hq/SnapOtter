@@ -5343,6 +5343,7 @@ export const fr: TranslationKeys = {
       "Votre compte n'est pas autorisé à accéder à cette application. Contactez votre administrateur.",
     samlUserLimitReached: "Limite d'utilisateurs atteinte. Contactez votre administrateur.",
     ssoEnforcedLocalRestricted: "La connexion locale est réservée aux administrateurs autorisés.",
+    defaultCredentialsHint: "Première visite ? Connectez-vous avec {username} / {password}.",
     mfaRequired: "Entrez votre code d'authentification",
     mfaRecoveryHint: "Vous pouvez aussi utiliser un code de récupération",
     verify: "Vérifier",

@@ -5004,6 +5004,7 @@ export const zhCN: TranslationKeys = {
     samlUserNotAuthorized: "您的账户无权访问此应用。请联系管理员。",
     samlUserLimitReached: "已达用户上限。请联系管理员。",
     ssoEnforcedLocalRestricted: "本地登录仅限授权管理员使用。",
+    defaultCredentialsHint: "首次使用？请使用 {username} / {password} 登录。",
     mfaRequired: "请输入验证码",
     mfaRecoveryHint: "也可以使用恢复码",
     verify: "验证",

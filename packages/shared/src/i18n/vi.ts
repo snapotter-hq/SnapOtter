@@ -5297,6 +5297,7 @@ export const vi: TranslationKeys = {
       "Tài khoản của bạn không được phép truy cập ứng dụng này. Liên hệ quản trị viên.",
     samlUserLimitReached: "Đã đạt giới hạn người dùng. Liên hệ quản trị viên.",
     ssoEnforcedLocalRestricted: "Đăng nhập cục bộ chỉ dành cho quản trị viên được ủy quyền.",
+    defaultCredentialsHint: "Lần đầu sử dụng? Đăng nhập bằng {username} / {password}.",
     mfaRequired: "Nhập mã xác thực của bạn",
     mfaRecoveryHint: "Bạn cũng có thể dùng mã khôi phục",
     verify: "Xác minh",

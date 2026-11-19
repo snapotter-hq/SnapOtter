@@ -5238,6 +5238,7 @@ export const en = {
       "Your account is not authorized to access this application. Contact your administrator.",
     samlUserLimitReached: "User limit reached. Contact your administrator.",
     ssoEnforcedLocalRestricted: "Local login is restricted to authorized administrators.",
+    defaultCredentialsHint: "First time here? Sign in with {username} / {password}.",
     mfaRequired: "Enter your authentication code",
     mfaRecoveryHint: "You can also use a recovery code",
     verify: "Verify",

@@ -5259,6 +5259,8 @@ export const ja: TranslationKeys = {
       "このアプリケーションへのアクセス権がありません。管理者にお問い合わせください。",
     samlUserLimitReached: "ユーザー数の上限に達しました。管理者にお問い合わせください。",
     ssoEnforcedLocalRestricted: "ローカルログインは許可された管理者のみ使用できます。",
+    defaultCredentialsHint:
+      "初めてご利用ですか？{username} / {password} でサインインしてください。",
     mfaRequired: "認証コードを入力してください",
     mfaRecoveryHint: "リカバリーコードも使用できます",
     verify: "確認",

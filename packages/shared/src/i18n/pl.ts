@@ -5331,6 +5331,7 @@ export const pl: TranslationKeys = {
     samlUserLimitReached: "Osiągnięto limit użytkowników. Skontaktuj się z administratorem.",
     ssoEnforcedLocalRestricted:
       "Logowanie lokalne jest ograniczone do uprawnionych administratorów.",
+    defaultCredentialsHint: "Pierwszy raz tutaj? Zaloguj się jako {username} / {password}.",
     mfaRequired: "Wprowadź kod uwierzytelniający",
     mfaRecoveryHint: "Możesz też użyć kodu odzyskiwania",
     verify: "Zweryfikuj",

@@ -5092,6 +5092,7 @@ export const hi: TranslationKeys = {
     samlUserNotAuthorized: "आपका खाता इस एप्लिकेशन तक पहुंचने के लिए अधिकृत नहीं है। अपने एडमिन से संपर्क करें।",
     samlUserLimitReached: "उपयोगकर्ता सीमा पूरी हुई। अपने एडमिन से संपर्क करें।",
     ssoEnforcedLocalRestricted: "स्थानीय लॉगिन केवल अधिकृत एडमिन तक सीमित है।",
+    defaultCredentialsHint: "पहली बार आए हैं? {username} / {password} से साइन इन करें।",
     mfaRequired: "अपना प्रमाणीकरण कोड दर्ज करें",
     mfaRecoveryHint: "आप रिकवरी कोड भी उपयोग कर सकते हैं",
     verify: "सत्यापित करें",

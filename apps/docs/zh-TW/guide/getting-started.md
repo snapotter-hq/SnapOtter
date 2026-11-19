@@ -1,6 +1,6 @@
 ---
 description: "以單一指令透過 Docker 安裝 SnapOtter。包含 Docker Compose 設定、從原始碼建置，以及完整的功能概覽。"
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 54bc669fa408
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 要安裝在 Raspberry Pi、舊筆電或小型 VPS 上嗎？請參閱[低資源環境設定](/zh-TW/guide/low-resource)，了解調校後的操作步驟，以及在受限硬體上的預期表現。
 
-首次登入時，系統會要求您變更密碼。
+開啟 [http://localhost:1349](http://localhost:1349)，並以 `admin` / `admin` 登入。首次登入時，系統會要求您變更密碼。
 
 ::: tip 匿名產品分析
 SnapOtter 預設包含匿名產品分析。若要關閉，請開啟 **設定 → 系統 → 隱私權**，並關閉 **匿名產品分析**。整個執行個體會立即停止收集。
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+開啟 [http://localhost:1349](http://localhost:1349)，並以 `admin` / `admin` 登入。
 
 標準的 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) 包含全部四個執行階段磁碟區、健康檢查、資源限制、持久化的 Redis 設定、固定版本的資料庫與快取映像檔，以及目前的容器強化設定。首次登入後請立即變更預設的管理員密碼。若要取得可重現的部署，請將 SnapOtter 應用程式映像檔固定在您驗證過的發行標籤或摘要，而不是追蹤 `latest`。
 

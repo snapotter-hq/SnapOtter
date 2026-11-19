@@ -5225,6 +5225,7 @@ export const ko: TranslationKeys = {
     samlUserNotAuthorized: "이 애플리케이션에 대한 접근 권한이 없습니다. 관리자에게 문의하세요.",
     samlUserLimitReached: "사용자 제한에 도달했습니다. 관리자에게 문의하세요.",
     ssoEnforcedLocalRestricted: "로컬 로그인은 승인된 관리자로 제한됩니다.",
+    defaultCredentialsHint: "처음이신가요? {username} / {password}(으)로 로그인하세요.",
     mfaRequired: "인증 코드를 입력하세요",
     mfaRecoveryHint: "복구 코드를 사용할 수도 있습니다",
     verify: "확인",

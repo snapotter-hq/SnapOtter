@@ -1,6 +1,6 @@
 ---
 description: "Docker로 명령 한 줄에 SnapOtter를 설치합니다. Docker Compose 설정, 소스 빌드, 전체 기능 개요를 포함합니다."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: e27cdde9c6c6
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Raspberry Pi, 오래된 노트북, 작은 VPS에 설치하시나요? 튜닝된 안내와 제한된 하드웨어에서 기대할 수 있는 성능은 [저사양 환경 구성](/ko/guide/low-resource)을 참고하세요.
 
-처음 로그인할 때 비밀번호를 변경하라는 안내가 표시됩니다.
+[http://localhost:1349](http://localhost:1349)에 접속한 뒤 `admin` / `admin`(으)로 로그인합니다. 처음 로그인할 때 비밀번호를 변경하라는 안내가 표시됩니다.
 
 ::: tip 익명 제품 분석
 SnapOtter는 기본적으로 익명 제품 분석을 포함합니다. 끄려면 **설정 → 시스템 → 개인정보 보호**를 열고 **익명 제품 분석**을 끄세요. 인스턴스 전체에서 즉시 중단됩니다.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+[http://localhost:1349](http://localhost:1349)에 접속한 뒤 `admin` / `admin`(으)로 로그인합니다.
 
 표준 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml)에는 런타임 볼륨 네 개 전부, 상태 확인, 리소스 제한, 내구성 있는 Redis 구성, 고정된 데이터베이스/캐시 이미지, 현재의 컨테이너 보안 강화 설정이 들어 있습니다. 첫 로그인 직후 기본 관리자 비밀번호를 변경하세요. 재현 가능한 배포를 위해 `latest`를 따르는 대신 SnapOtter 애플리케이션 이미지를 확인한 릴리스 태그나 다이제스트로 고정하세요.
 

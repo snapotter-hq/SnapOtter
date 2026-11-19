@@ -5331,6 +5331,7 @@ export const it: TranslationKeys = {
       "Il tuo account non è autorizzato ad accedere a questa applicazione. Contatta l'amministratore.",
     samlUserLimitReached: "Limite utenti raggiunto. Contatta l'amministratore.",
     ssoEnforcedLocalRestricted: "L'accesso locale è limitato agli amministratori autorizzati.",
+    defaultCredentialsHint: "Prima volta qui? Accedi con {username} / {password}.",
     mfaRequired: "Inserisci il tuo codice di autenticazione",
     mfaRecoveryHint: "Puoi anche usare un codice di recupero",
     verify: "Verifica",

@@ -5005,6 +5005,7 @@ export const zhTW: TranslationKeys = {
     samlUserNotAuthorized: "您的帳戶無權存取此應用程式。請聯絡管理員。",
     samlUserLimitReached: "已達使用者上限。請聯絡管理員。",
     ssoEnforcedLocalRestricted: "本機登入僅限授權管理員使用。",
+    defaultCredentialsHint: "第一次使用？請以 {username} / {password} 登入。",
     mfaRequired: "請輸入您的驗證碼",
     mfaRecoveryHint: "您也可以使用復原碼",
     verify: "驗證",

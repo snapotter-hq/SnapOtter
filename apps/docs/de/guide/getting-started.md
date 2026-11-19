@@ -1,6 +1,6 @@
 ---
 description: "Installieren Sie SnapOtter mit Docker in einem einzigen Befehl. Enthält die Docker-Compose-Einrichtung, den Build aus dem Quellcode und eine vollständige Funktionsübersicht."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 3f1d17388926
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Auftragsergebnisse werden nicht im Daten-Volume gespeichert. Sie gehen verloren,
 
 Installieren Sie auf einem Raspberry Pi, einem alten Notebook oder einem kleinen VPS? Siehe [Ressourcenschonende Setups](/de/guide/low-resource) für eine abgestimmte Anleitung und was Sie von eingeschränkter Hardware erwarten können.
 
-Bei der ersten Anmeldung werden Sie aufgefordert, Ihr Passwort zu ändern.
+Öffnen Sie [http://localhost:1349](http://localhost:1349) und melden Sie sich mit `admin` / `admin` an. Bei der ersten Anmeldung werden Sie aufgefordert, Ihr Passwort zu ändern.
 
 ::: tip Anonyme Produktanalysen
 SnapOtter enthält standardmäßig anonyme Produktanalysen. Um sie auszuschalten, öffnen Sie **Einstellungen → System → Datenschutz** und schalten Sie **Anonyme Produktanalysen** aus. Das wirkt sofort für die gesamte Instanz.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Öffnen Sie [http://localhost:1349](http://localhost:1349) und melden Sie sich mit `admin` / `admin` an.
 
 Die kanonische [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) enthält alle vier Laufzeit-Volumes, Health-Checks, Ressourcenlimits, eine dauerhafte Redis-Konfiguration, fixierte Datenbank-/Cache-Images und die aktuelle Container-Härtung. Ändern Sie das Standard-Administratorpasswort unmittelbar nach der ersten Anmeldung. Für eine reproduzierbare Bereitstellung fixieren Sie das SnapOtter-Anwendungs-Image auf das von Ihnen geprüfte Release-Tag oder den Digest, anstatt `latest` zu folgen.
 

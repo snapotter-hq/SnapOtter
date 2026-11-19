@@ -1,6 +1,6 @@
 ---
 description: "Instal SnapOtter dengan Docker dalam satu perintah. Mencakup pengaturan Docker Compose, build dari source, dan ikhtisar fitur lengkap."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: b76cb0aa6890
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Hasil job tidak disimpan di volume data, jadi hasilnya hilang saat container dig
 
 Menginstal di Raspberry Pi, laptop lama, atau VPS kecil? Lihat [Setup Sumber Daya Rendah](/id/guide/low-resource) untuk panduan yang sudah disetel dan apa yang bisa diharapkan dari perangkat keras terbatas.
 
-Anda akan diminta mengganti password pada login pertama.
+Buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin` / `admin`. Anda akan diminta mengganti password pada login pertama.
 
 ::: tip Analitik Produk Anonim
 SnapOtter menyertakan analitik produk anonim secara default. Untuk mematikannya, buka **Settings → System → Privacy** dan matikan **Anonymous Product Analytics**. Analitik berhenti seketika untuk seluruh instance.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin` / `admin`.
 
 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) kanonis mencakup keempat volume runtime, health check, batas sumber daya, konfigurasi Redis yang tahan lama, image database/cache yang disematkan, dan hardening container terkini. Ganti password admin default segera setelah login pertama. Untuk deployment yang dapat direproduksi, sematkan image aplikasi SnapOtter ke tag rilis atau digest yang sudah Anda verifikasi, alih-alih mengikuti `latest`.
 
