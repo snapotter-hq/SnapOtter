@@ -19,10 +19,13 @@ const TOKEN_PATTERNS = [
 ];
 
 // `password = "..."` style assignments. The value must look like a credential,
-// not a variable reference such as process.env.TOKEN.
+// not a variable reference such as process.env.TOKEN. A `:` followed by another
+// `:` is a Rust or C++ path separator (`crate::token::x`), not a key separator.
 const ASSIGNMENT =
-  /\b(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key)\b["']?\s*[:=]\s*["']?([^\s"'`$(){}]+)/gi;
-const MEMBER_ACCESS = /^[A-Za-z_$][\w$]*(\.[\w$]+)+$/;
+  /\b(?:password|passwd|secret|token|api[_-]?key|private[_-]?key|access[_-]?key)\b["']?\s*(?:=|:(?!:))\s*["']?([^\s"'`$(){}]+)/gi;
+// Dotted or scoped paths (`a.b.c`, `crate::token::new`), with an optional
+// turbofish (`random_bytes::<16>`).
+const MEMBER_ACCESS = /^[A-Za-z_$][\w$]*(?:(?:\.|::)[\w$]+|::<[^<>]*>)+$/;
 
 function looksLikeCredentialValue(raw) {
   // The capture swallows statement punctuation (`token: env.X,`), which would
