@@ -2100,6 +2100,8 @@ export const fr: TranslationKeys = {
       trimTolerance: "Tolérance",
       trimDescription:
         "À quel point un pixel de bordure peut différer de la couleur du bord et être quand même rogné. Plus élevé = plus agressif.",
+      trimMargin: "Marge",
+      trimMarginHint: "Espace supplémentaire conservé autour de l'objet rogné",
       padToSquare: "Remplir en carré",
       targetSizePx: "Taille cible (px)",
       padColor: "Couleur de remplissage",

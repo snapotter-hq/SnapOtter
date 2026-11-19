@@ -2043,6 +2043,8 @@ export const ja: TranslationKeys = {
       trimTolerance: "許容値",
       trimDescription:
         "ボーダーピクセルがエッジカラーとどの程度異なっていてもトリムされるか。値が高いほど積極的にトリムします。",
+      trimMargin: "マージン",
+      trimMarginHint: "トリミングした被写体の周囲に残す余白",
       padToSquare: "正方形にパディング",
       targetSizePx: "ターゲットサイズ（px）",
       padColor: "パディング色",

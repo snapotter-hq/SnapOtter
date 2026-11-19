@@ -2095,6 +2095,8 @@ export const nl: TranslationKeys = {
       trimTolerance: "Tolerantie",
       trimDescription:
         "Hoe veel een randpixel mag afwijken van de randkleur en toch wordt bijgesneden. Hoger = agressiever.",
+      trimMargin: "Marge",
+      trimMarginHint: "Extra ruimte die rond het bijgesneden object blijft",
       padToSquare: "Opvullen tot vierkant",
       targetSizePx: "Doelformaat (px)",
       padColor: "Opvulkleur",

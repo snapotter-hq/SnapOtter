@@ -2092,6 +2092,8 @@ export const ptBR: TranslationKeys = {
       trimTolerance: "Tolerância",
       trimDescription:
         "O quanto um pixel da borda pode diferir da cor da borda e ainda ser cortado. Maior = mais agressivo.",
+      trimMargin: "Margem",
+      trimMarginHint: "Espaço extra mantido ao redor do objeto recortado",
       padToSquare: "Preencher para quadrado",
       targetSizePx: "Tamanho alvo (px)",
       padColor: "Cor de preenchimento",

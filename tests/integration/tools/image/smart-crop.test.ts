@@ -277,6 +277,53 @@ describe("Smart Crop", () => {
     }
   }, 60_000);
 
+  it("trim mode keeps a margin that grows with padding (#1194)", async () => {
+    const red = await sharp({
+      create: { width: 50, height: 30, channels: 3, background: "#ff0000" },
+    })
+      .png()
+      .toBuffer();
+    const product = await sharp({
+      create: { width: 200, height: 100, channels: 3, background: "#808080" },
+    })
+      .composite([{ input: red, left: 60, top: 20 }])
+      .png()
+      .toBuffer();
+
+    for (const [padding, expected] of [
+      [0, [50, 30]],
+      [20, [60, 36]],
+    ] as const) {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "product.png", contentType: "image/png", content: product },
+        { name: "settings", content: JSON.stringify({ mode: "trim", padding }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/smart-crop",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect([200, 202]).toContain(res.statusCode);
+
+      if (res.statusCode === 200) {
+        const result = JSON.parse(res.body);
+        const dlRes = await app.inject({
+          method: "GET",
+          url: result.downloadUrl,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        const meta = await sharp(dlRes.rawPayload).metadata();
+        expect([meta.width, meta.height]).toEqual(expected);
+      }
+    }
+  }, 60_000);
+
   it("handles HEIC input", { timeout: 120_000 }, async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },

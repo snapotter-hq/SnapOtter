@@ -2084,6 +2084,8 @@ export const sv: TranslationKeys = {
       trimTolerance: "Tolerans",
       trimDescription:
         "Hur mycket en kantpixel får skilja sig från kantfärgen och ändå trimmas. Högre = aggressivare.",
+      trimMargin: "Marginal",
+      trimMarginHint: "Extra utrymme som lämnas runt det beskurna objektet",
       padToSquare: "Fyll till kvadrat",
       targetSizePx: "Målstorlek (px)",
       padColor: "Fyllnadsfärg",

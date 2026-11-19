@@ -2092,6 +2092,8 @@ export const pl: TranslationKeys = {
       trimTolerance: "Tolerancja",
       trimDescription:
         "Jak bardzo piksel krawędzi może się różnić od koloru brzegu i nadal zostać przycięty. Wyżej = agresywniej.",
+      trimMargin: "Margines",
+      trimMarginHint: "Dodatkowa przestrzeń zostawiana wokół przyciętego obiektu",
       padToSquare: "Dopełnij do kwadratu",
       targetSizePx: "Docelowy rozmiar (px)",
       padColor: "Kolor wypełnienia",

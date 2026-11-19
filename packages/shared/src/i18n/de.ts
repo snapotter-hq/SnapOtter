@@ -2100,6 +2100,8 @@ export const de: TranslationKeys = {
       trimTolerance: "Toleranz",
       trimDescription:
         "Wie stark sich ein Randpixel von der Kantenfarbe unterscheiden darf und trotzdem beschnitten wird. Höher = aggressiver.",
+      trimMargin: "Rand",
+      trimMarginHint: "Zusätzlicher Freiraum, der um das zugeschnittene Objekt bleibt",
       padToSquare: "Auf Quadrat auffüllen",
       targetSizePx: "Zielgröße (px)",
       padColor: "Auffüllfarbe",

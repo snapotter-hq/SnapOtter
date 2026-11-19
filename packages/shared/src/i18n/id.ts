@@ -2084,6 +2084,8 @@ export const id: TranslationKeys = {
       trimTolerance: "Toleransi",
       trimDescription:
         "Seberapa berbeda piksel border dari warna tepi dan masih dipotong. Lebih tinggi = lebih agresif.",
+      trimMargin: "Margin",
+      trimMarginHint: "Ruang ekstra yang disisakan di sekitar objek hasil trim",
       padToSquare: "Padding ke persegi",
       targetSizePx: "Ukuran target (px)",
       padColor: "Warna padding",
