@@ -107,22 +107,31 @@ RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
       done; \
     fi
 
-# PyMuPDF for the fitz-gated suites: pdf-to-text, sign/redact/flatten-pdf, the
-# fitz block of docs-dispatcher, and the fitz tools in the generated format and
-# settings matrices. PR CI shards don't install it, so before #1610 they skipped
-# in every lane; this nightly lane is now the one that runs them (the fuzz and
-# FULL_MATRIX runs live in a host job that still lacks it). Pinned to the
-# production image's version. It lives at /app/.venv, the repo-root venv
-# tests/helpers/python-gate.ts and the sidecar bridge try first, rather than
-# /opt/venv plus PYTHON_VENV_PATH: the API reads /opt/venv as the baked base it
-# reseeds AI venvs from and PYTHON_VENV_PATH as the venv bundle installs write
-# into, and the feature tests must not see either one. It sits above the
-# workspace COPYs so a lockfile change doesn't reinstall it, and
-# docker-compose.test.yml sets REQUIRE_PYTHON_FITZ=1 so a venv the suite can't
-# find fails the run instead of skipping it.
+# The production Python modules the doc suites gate on: PyMuPDF (pdf-to-text,
+# sign/redact/flatten-pdf, the fitz block of docs-dispatcher), pikepdf
+# (pdf-metadata, the pikepdf block of docs-dispatcher) and pdf2docx
+# (pdf-to-word), plus the generated format and settings matrices for those
+# tools. PR CI shards install none of them, so before #1610 and #1612 they
+# skipped in every lane; this lane and the nightly extended-matrix job are the
+# ones that run them. Every pin, numpy and opencv (pdf2docx's heavy deps)
+# included, matches the production image's, and
+# tests/unit/infra/test-image-python-modules.test.ts keeps it that way. It
+# lives at /app/.venv, the repo-root venv tests/helpers/python-gate.ts and the
+# sidecar bridge try first, rather than /opt/venv plus PYTHON_VENV_PATH: the API
+# reads /opt/venv as the baked base it reseeds AI venvs from and
+# PYTHON_VENV_PATH as the venv bundle installs write into, and the feature
+# tests must not see either one. It sits above the workspace COPYs so a
+# lockfile change doesn't reinstall it, and docker-compose.test.yml sets a
+# REQUIRE_PYTHON_* per module so a venv the suite can't find fails the run
+# instead of skipping it.
 RUN python3 -m venv /app/.venv && \
-    /app/.venv/bin/pip install --no-cache-dir PyMuPDF==1.27.2.3 && \
-    /app/.venv/bin/python -c "import fitz"
+    /app/.venv/bin/pip install --no-cache-dir \
+        numpy==1.26.4 \
+        opencv-python-headless==4.10.0.84 \
+        pikepdf==10.8.0 \
+        PyMuPDF==1.27.2.3 \
+        pdf2docx==0.5.13 && \
+    /app/.venv/bin/python -c "import fitz, pikepdf, pdf2docx"
 
 WORKDIR /app
 
