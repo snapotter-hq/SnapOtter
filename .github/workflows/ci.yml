@@ -28,9 +28,10 @@ permissions:
   contents: read
 
 # Testcontainers' ryuk reaper is redundant here (tests/global-setup.ts explicitly
-# stops its containers and CI runners are ephemeral), and its image pull from Docker
+# stops its containers and hosted runners are ephemeral), and its image pull from Docker
 # Hub is a recurring flake source (HTTP 500 on registry-1.docker.io). Disable it so a
-# registry hiccup pulling ryuk cannot fail the suite.
+# registry hiccup pulling ryuk cannot fail the suite. The Unit step turns it back on
+# for the long-lived fleet runners, which keep the ryuk image cached (#4965).
 env:
   TESTCONTAINERS_RYUK_DISABLED: "true"
 
@@ -42,7 +43,10 @@ jobs:
   # the full pipeline.
   changes:
     name: Changes
-    runs-on: ubuntu-latest
+    # Same condition as the `fleet` output below, inlined because a job can't
+    # read its own outputs; otherwise every fleet job would still wait in the
+    # hosted queue behind this 10-second job (#4965).
+    runs-on: ${{ (vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'))) && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     outputs:
       code: ${{ steps.filter.outputs.code }}
       landing: ${{ steps.filter.outputs.landing }}

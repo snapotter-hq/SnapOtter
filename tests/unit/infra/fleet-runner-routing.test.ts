@@ -218,6 +218,10 @@ function routedJobs(workflow: Workflow): [string, Job][] {
   );
 }
 
+// Every routed job but `changes` reads the decision from its output; `changes`
+// inlines the same condition because a job can't read its own outputs.
+const jobsReadingFleetOutput = routedJobs(ci).filter(([id]) => id !== "changes");
+
 function resolveRunsOn(job: Job, fleet: boolean): unknown {
   const runsOn = job["runs-on"];
   if (typeof runsOn !== "string") return runsOn;
@@ -235,26 +239,40 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     },
   );
 
-  it("routes Lint, Typecheck, Build and Unit to the fleet and nothing else", () => {
+  it.each(Object.entries(EVENTS))(
+    "%s puts the Changes job on the same side as the fleet output",
+    (_name, { context, fleet }) => {
+      const resolved = evaluate(unwrap(String(ci.jobs.changes["runs-on"])), context);
+      expect(resolved).toEqual(fleet ? ["self-hosted", FLEET_LABEL] : "ubuntu-latest");
+    },
+  );
+
+  it("routes Changes, Lint, Typecheck, Build and Unit to the fleet and nothing else", () => {
     expect(
       routedJobs(ci)
         .map(([id]) => id)
         .sort(),
-    ).toEqual(["build", "lint", "test-unit", "typecheck"]);
+    ).toEqual(["build", "changes", "lint", "test-unit", "typecheck"]);
   });
 
-  it.each(routedJobs(ci))("%s never resolves to the fleet label for a fork PR", (_id, job) => {
-    const needs = [job.needs ?? []].flat();
-    expect(needs).toContain("changes");
-    const forkFleet = String(evaluate(unwrap(fleetOutput), EVENTS["fork PR"].context)) === "true";
-    const resolved = resolveRunsOn(job, forkFleet);
-    expect(typeof resolved).toBe("string");
-    expect(String(resolved)).toMatch(/^ubuntu-/);
-  });
+  it.each(jobsReadingFleetOutput)(
+    "%s never resolves to the fleet label for a fork PR",
+    (_id, job) => {
+      const needs = [job.needs ?? []].flat();
+      expect(needs).toContain("changes");
+      const forkFleet = String(evaluate(unwrap(fleetOutput), EVENTS["fork PR"].context)) === "true";
+      const resolved = resolveRunsOn(job, forkFleet);
+      expect(typeof resolved).toBe("string");
+      expect(String(resolved)).toMatch(/^ubuntu-/);
+    },
+  );
 
-  it.each(routedJobs(ci))("%s resolves to exactly the fleet labels when allowed", (_id, job) => {
-    expect(resolveRunsOn(job, true)).toEqual(["self-hosted", FLEET_LABEL]);
-  });
+  it.each(jobsReadingFleetOutput)(
+    "%s resolves to exactly the fleet labels when allowed",
+    (_id, job) => {
+      expect(resolveRunsOn(job, true)).toEqual(["self-hosted", FLEET_LABEL]);
+    },
+  );
 
   it.each(routedJobs(ci))("%s skips every sudo step on a self-hosted runner", (_id, job) => {
     // The fleet runner user has no passwordless sudo; the host carries CI's
