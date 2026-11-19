@@ -4230,6 +4230,7 @@ export const it: TranslationKeys = {
       urlSafe: "Sicuro per URL (- e _, senza riempimento)",
       converting: "Conversione",
       result: "Risultato",
+      tooLong: "Sono {count} caratteri. Il limite è {max}.",
     },
     "create-zip": {
       submit: "Crea ZIP",

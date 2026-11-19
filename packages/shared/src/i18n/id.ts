@@ -4221,6 +4221,7 @@ export const id: TranslationKeys = {
       urlSafe: "Aman untuk URL (- dan _, tanpa padding)",
       converting: "Mengonversi",
       result: "Hasil",
+      tooLong: "Panjangnya {count} karakter. Batasnya {max}.",
     },
     "create-zip": {
       submit: "Buat ZIP",

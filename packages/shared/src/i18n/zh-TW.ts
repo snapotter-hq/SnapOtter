@@ -3944,6 +3944,7 @@ export const zhTW: TranslationKeys = {
       urlSafe: "URL 安全（- 和 _，無填補）",
       converting: "正在轉換",
       result: "結果",
+      tooLong: "目前為 {count} 個字元，上限為 {max}。",
     },
     "create-zip": {
       submit: "建立 ZIP",

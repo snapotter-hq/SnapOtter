@@ -4226,6 +4226,7 @@ export const ptBR: TranslationKeys = {
       urlSafe: "Seguro para URL (- e _, sem preenchimento)",
       converting: "Convertendo",
       result: "Resultado",
+      tooLong: "São {count} caracteres. O limite é {max}.",
     },
     "create-zip": {
       submit: "Criar ZIP",

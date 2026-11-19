@@ -4227,6 +4227,7 @@ export const uk: TranslationKeys = {
       urlSafe: "Безпечно для URL (- і _, без доповнення)",
       converting: "Конвертація",
       result: "Результат",
+      tooLong: "Довжина {count} символів. Максимум {max}.",
     },
     "create-zip": {
       submit: "Створити ZIP",

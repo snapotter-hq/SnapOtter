@@ -4148,6 +4148,7 @@ export const ko: TranslationKeys = {
       urlSafe: "URL 안전 (- 및 _, 패딩 없음)",
       converting: "변환 중",
       result: "결과",
+      tooLong: "{count}자입니다. 최대 {max}자까지 가능합니다.",
     },
     "create-zip": {
       submit: "ZIP 생성",

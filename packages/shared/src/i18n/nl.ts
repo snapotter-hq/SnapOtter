@@ -4238,6 +4238,7 @@ export const nl: TranslationKeys = {
       urlSafe: "URL-veilig (- en _, zonder opvulling)",
       converting: "Bezig met converteren",
       result: "Resultaat",
+      tooLong: "Dit is {count} tekens lang. De limiet is {max}.",
     },
     "create-zip": {
       submit: "ZIP maken",

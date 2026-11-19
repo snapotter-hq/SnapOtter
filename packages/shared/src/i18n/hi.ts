@@ -4019,6 +4019,7 @@ export const hi: TranslationKeys = {
       urlSafe: "URL-सुरक्षित (- और _, बिना पैडिंग)",
       converting: "कन्वर्ट हो रहा है",
       result: "परिणाम",
+      tooLong: "यह {count} अक्षर लंबा है। सीमा {max} है।",
     },
     "create-zip": {
       submit: "ZIP बनाएँ",

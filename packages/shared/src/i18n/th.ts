@@ -4162,6 +4162,7 @@ export const th: TranslationKeys = {
       urlSafe: "ปลอดภัยสำหรับ URL (- และ _ ไม่มีการเติม)",
       converting: "กำลังแปลง",
       result: "ผลลัพธ์",
+      tooLong: "ข้อความนี้ยาว {count} อักขระ เกินขีดจำกัด {max}",
     },
     "create-zip": {
       submit: "สร้าง ZIP",

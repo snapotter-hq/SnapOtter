@@ -7,6 +7,7 @@ import { useTimeouts } from "@/hooks/use-timeouts";
 import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { format } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 
 type Mode = "encode" | "decode";
@@ -37,18 +38,26 @@ export function Base64Settings() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const switchMode = (next: Mode) => {
-    if (next === mode) return;
+  const tooLong = input.length > BASE64_TEXT_MAX_CHARS;
+
+  // Any edit makes a shown result (or one still on its way) answer a question
+  // nobody is asking any more, so drop it rather than leave it to be copied.
+  const discardResult = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     setProcessing(false);
-    setMode(next);
     setResult(null);
     setError(null);
   };
 
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    discardResult();
+    setMode(next);
+  };
+
   const handleProcess = async () => {
-    if (!input) return;
+    if (!input || tooLong) return;
     track(ANALYTICS_EVENTS.TOOL_STARTED, { tool_id: "base64", is_batch: false, file_count: 0 });
 
     abortRef.current?.abort();
@@ -88,6 +97,7 @@ export function Base64Settings() {
   const copyResult = async () => {
     if (result === null) return;
     const ok = await copyToClipboard(result);
+    if (ok) track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "base64" });
     setCopy({ ok });
     later(() => setCopy(null), 1500, "copy");
   };
@@ -105,7 +115,7 @@ export function Base64Settings() {
             onClick={() => switchMode(m)}
             aria-pressed={mode === m}
             className={`flex-1 text-xs py-1.5 rounded ${mode === m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
-            data-testid={`base64-mode-${m}`}
+            data-testid={`base64-text-mode-${m}`}
           >
             {ts[m]}
           </button>
@@ -119,24 +129,39 @@ export function Base64Settings() {
         <textarea
           id={inputId}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            discardResult();
+            setInput(e.target.value);
+          }}
           placeholder={mode === "encode" ? ts.encodePlaceholder : ts.decodePlaceholder}
-          maxLength={BASE64_TEXT_MAX_CHARS}
+          aria-invalid={tooLong || undefined}
           rows={6}
           spellCheck={false}
           className={TEXTAREA_CLASS}
-          data-testid="base64-input"
+          data-testid="base64-text-input"
         />
       </div>
+
+      {tooLong && (
+        <p className="text-xs text-destructive-ink" role="alert" data-testid="base64-text-too-long">
+          {format(ts.tooLong, {
+            count: input.length.toLocaleString(),
+            max: BASE64_TEXT_MAX_CHARS.toLocaleString(),
+          })}
+        </p>
+      )}
 
       {mode === "encode" && (
         <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
           <input
             type="checkbox"
             checked={urlSafe}
-            onChange={(e) => setUrlSafe(e.target.checked)}
+            onChange={(e) => {
+              discardResult();
+              setUrlSafe(e.target.checked);
+            }}
             className="rounded border-border"
-            data-testid="base64-url-safe"
+            data-testid="base64-text-url-safe"
           />
           {ts.urlSafe}
         </label>
@@ -144,9 +169,9 @@ export function Base64Settings() {
 
       <button
         type="button"
-        data-testid="base64-submit"
+        data-testid="base64-text-submit"
         onClick={handleProcess}
-        disabled={!input || processing}
+        disabled={!input || tooLong || processing}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
@@ -154,7 +179,7 @@ export function Base64Settings() {
       </button>
 
       {error && (
-        <p className="text-xs text-destructive-ink" role="alert" data-testid="base64-error">
+        <p className="text-xs text-destructive-ink" role="alert" data-testid="base64-text-error">
           {error}
         </p>
       )}
@@ -169,7 +194,7 @@ export function Base64Settings() {
               type="button"
               onClick={copyResult}
               className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
-              data-testid="base64-copy"
+              data-testid="base64-text-copy"
               title={copy && !copy.ok ? t.common.copyFailed : undefined}
             >
               {copy === null ? (
@@ -190,7 +215,7 @@ export function Base64Settings() {
             rows={6}
             spellCheck={false}
             className={TEXTAREA_CLASS}
-            data-testid="base64-result"
+            data-testid="base64-text-result"
           />
         </div>
       )}

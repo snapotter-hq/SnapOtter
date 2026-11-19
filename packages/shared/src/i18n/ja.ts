@@ -4173,6 +4173,7 @@ export const ja: TranslationKeys = {
       urlSafe: "URL セーフ（- と _、パディングなし）",
       converting: "変換中",
       result: "結果",
+      tooLong: "{count} 文字あります。上限は {max} 文字です。",
     },
     "create-zip": {
       submit: "ZIPを作成",

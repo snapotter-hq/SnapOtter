@@ -4156,6 +4156,7 @@ export const en = {
       urlSafe: "URL-safe (- and _, no padding)",
       converting: "Converting",
       result: "Result",
+      tooLong: "This is {count} characters long. The limit is {max}.",
     },
     "create-zip": {
       submit: "Create ZIP",

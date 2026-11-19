@@ -12306,6 +12306,18 @@
     "invalidProbes": []
   },
   {
+    "id": "base64",
+    "name": "Base64 Encode / Decode",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",

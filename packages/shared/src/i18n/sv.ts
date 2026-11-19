@@ -4217,6 +4217,7 @@ export const sv: TranslationKeys = {
       urlSafe: "URL-säker (- och _, utan utfyllnad)",
       converting: "Konverterar",
       result: "Resultat",
+      tooLong: "Det här är {count} tecken långt. Gränsen är {max}.",
     },
     "create-zip": {
       submit: "Skapa ZIP",

@@ -48,6 +48,7 @@ const NO_413: Record<string, string> = {};
 const NO_UPLOAD_TOOLS = [
   "aspect-ratio-calculator",
   "barcode-generate",
+  "base64",
   "convert-case",
   "html-to-image",
   "passport-photo",

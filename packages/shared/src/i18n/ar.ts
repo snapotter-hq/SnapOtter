@@ -4192,6 +4192,7 @@ export const ar: TranslationKeys = {
       urlSafe: "آمن لعناوين URL (- و _، بدون حشو)",
       converting: "جارٍ التحويل",
       result: "النتيجة",
+      tooLong: "طول النص {count} حرفًا. الحد الأقصى {max}.",
     },
     "create-zip": {
       submit: "إنشاء ZIP",

@@ -4240,6 +4240,7 @@ export const fr: TranslationKeys = {
       urlSafe: "Compatible URL (- et _, sans remplissage)",
       converting: "Conversion",
       result: "Résultat",
+      tooLong: "Ce texte fait {count} caractères. La limite est de {max}.",
     },
     "create-zip": {
       submit: "Créer un ZIP",

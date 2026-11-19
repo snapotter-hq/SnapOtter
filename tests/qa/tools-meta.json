@@ -5738,6 +5738,15 @@
     "isAI": false
   },
   {
+    "id": "base64",
+    "name": "Base64 Encode / Decode",
+    "modality": "file",
+    "route": "/files/base64",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",

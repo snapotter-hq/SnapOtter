@@ -3943,6 +3943,7 @@ export const zhCN: TranslationKeys = {
       urlSafe: "URL 安全（- 和 _，无填充）",
       converting: "正在转换",
       result: "结果",
+      tooLong: "当前为 {count} 个字符，上限为 {max}。",
     },
     "create-zip": {
       submit: "创建 ZIP",

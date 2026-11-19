@@ -4227,6 +4227,7 @@ export const pl: TranslationKeys = {
       urlSafe: "Bezpieczne dla URL (- i _, bez dopełnienia)",
       converting: "Konwertowanie",
       result: "Wynik",
+      tooLong: "Tekst ma {count} znaków. Limit to {max}.",
     },
     "create-zip": {
       submit: "Utwórz ZIP",

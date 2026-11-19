@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, BASE64_TEXT_MAX_CHARS, en } from "@snapotter/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,11 +73,11 @@ describe("base64 settings", () => {
     const { fetchMock } = server(() => respond({ mode: "encode", result: "aGk=" }));
     renderPanel();
 
-    expect(screen.getByTestId("base64-submit")).toBeDisabled();
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
+    expect(screen.getByTestId("base64-text-submit")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
 
-    expect(await screen.findByTestId("base64-result")).toHaveValue("aGk=");
+    expect(await screen.findByTestId("base64-text-result")).toHaveValue("aGk=");
     const { init, body } = toolCall(fetchMock);
     expect(init.method).toBe("POST");
     expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
@@ -92,11 +92,11 @@ describe("base64 settings", () => {
     const { fetchMock } = server(() => respond({ mode: "encode", result: "aGk" }));
     renderPanel();
 
-    fireEvent.click(screen.getByTestId("base64-url-safe"));
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
+    fireEvent.click(screen.getByTestId("base64-text-url-safe"));
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
 
-    await screen.findByTestId("base64-result");
+    await screen.findByTestId("base64-text-result");
     expect(toolCall(fetchMock).body.urlSafe).toBe(true);
   });
 
@@ -104,13 +104,13 @@ describe("base64 settings", () => {
     const { fetchMock } = server(() => respond({ mode: "decode", result: "hi" }));
     renderPanel();
 
-    fireEvent.click(screen.getByTestId("base64-mode-decode"));
-    expect(screen.queryByTestId("base64-url-safe")).toBeNull();
+    fireEvent.click(screen.getByTestId("base64-text-mode-decode"));
+    expect(screen.queryByTestId("base64-text-url-safe")).toBeNull();
     expect(screen.getByLabelText(ts.decodeInput)).toBeInTheDocument();
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "aGk=" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "aGk=" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
 
-    expect(await screen.findByTestId("base64-result")).toHaveValue("hi");
+    expect(await screen.findByTestId("base64-text-result")).toHaveValue("hi");
     expect(toolCall(fetchMock).body).toEqual({ text: "aGk=", mode: "decode", urlSafe: false });
   });
 
@@ -123,12 +123,12 @@ describe("base64 settings", () => {
       server(() => respond({ error: "server text", code }, 400));
       renderPanel();
 
-      fireEvent.click(screen.getByTestId("base64-mode-decode"));
-      fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "!!" } });
-      fireEvent.click(screen.getByTestId("base64-submit"));
+      fireEvent.click(screen.getByTestId("base64-text-mode-decode"));
+      fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "!!" } });
+      fireEvent.click(screen.getByTestId("base64-text-submit"));
 
-      expect(await screen.findByTestId("base64-error")).toHaveTextContent(message);
-      expect(screen.queryByTestId("base64-result")).toBeNull();
+      expect(await screen.findByTestId("base64-text-error")).toHaveTextContent(message);
+      expect(screen.queryByTestId("base64-text-result")).toBeNull();
     },
   );
 
@@ -136,35 +136,66 @@ describe("base64 settings", () => {
     server(() => respond({ mode: "encode", result: "aGk=" }));
     renderPanel();
 
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
-    await screen.findByTestId("base64-result");
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
+    await screen.findByTestId("base64-text-result");
 
-    fireEvent.click(screen.getByTestId("base64-mode-decode"));
-    expect(screen.queryByTestId("base64-result")).toBeNull();
+    fireEvent.click(screen.getByTestId("base64-text-mode-decode"));
+    expect(screen.queryByTestId("base64-text-result")).toBeNull();
   });
 
   it("copies the result", async () => {
     server(() => respond({ mode: "encode", result: "aGk=" }));
     renderPanel();
 
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
-    await screen.findByTestId("base64-result");
-    fireEvent.click(screen.getByTestId("base64-copy"));
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
+    await screen.findByTestId("base64-text-result");
+    fireEvent.click(screen.getByTestId("base64-text-copy"));
 
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith("aGk="));
     expect(await screen.findByRole("status")).toHaveTextContent(en.common.copied);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "base64" });
+  });
+
+  it("refuses over-long input instead of truncating it", () => {
+    const { tool } = server(() => respond({ mode: "encode", result: "x" }));
+    renderPanel();
+
+    const input = screen.getByTestId("base64-text-input");
+    expect(input).not.toHaveAttribute("maxlength");
+    fireEvent.change(input, { target: { value: "a".repeat(BASE64_TEXT_MAX_CHARS + 1) } });
+
+    expect(screen.getByTestId("base64-text-too-long")).toBeInTheDocument();
+    expect(screen.getByTestId("base64-text-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
+    expect(tool).not.toHaveBeenCalled();
+  });
+
+  it("drops the result when the input or the URL-safe box changes", async () => {
+    server(() => respond({ mode: "encode", result: "aGk=" }));
+    renderPanel();
+
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
+    await screen.findByTestId("base64-text-result");
+    fireEvent.click(screen.getByTestId("base64-text-url-safe"));
+    expect(screen.queryByTestId("base64-text-result")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
+    await screen.findByTestId("base64-text-result");
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi!" } });
+    expect(screen.queryByTestId("base64-text-result")).toBeNull();
   });
 
   it("rejects a malformed success body", async () => {
     server(() => respond({ nope: true }));
     renderPanel();
 
-    fireEvent.change(screen.getByTestId("base64-input"), { target: { value: "hi" } });
-    fireEvent.click(screen.getByTestId("base64-submit"));
+    fireEvent.change(screen.getByTestId("base64-text-input"), { target: { value: "hi" } });
+    fireEvent.click(screen.getByTestId("base64-text-submit"));
 
-    expect(await screen.findByTestId("base64-error")).toHaveTextContent(
+    expect(await screen.findByTestId("base64-text-error")).toHaveTextContent(
       en.errors.invalidServerResponse,
     );
   });
