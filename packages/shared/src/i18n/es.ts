@@ -5790,6 +5790,12 @@ export const es: TranslationKeys = {
     currentPasswordPlaceholder: "Ingresa la contraseña actual",
     newPasswordLabel: "Nueva contraseña",
     generateButton: "Generar contraseña segura",
+    generateForMeButton: "Generar una contraseña segura por mí",
+    generateHint: "Recomendado. Tu navegador puede guardarla por ti.",
+    generatedTitle: "Contraseña segura lista",
+    regenerateButton: "Generar otra",
+    generatedHint:
+      "Ya está escrita abajo. Cópiala en un lugar seguro o deja que tu navegador la guarde.",
     newPasswordPlaceholder: "Ingresa la nueva contraseña",
     confirmPasswordLabel: "Confirmar nueva contraseña",
     confirmPasswordPlaceholder: "Repite la nueva contraseña",

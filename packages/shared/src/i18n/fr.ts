@@ -5814,6 +5814,12 @@ export const fr: TranslationKeys = {
     currentPasswordPlaceholder: "Saisissez le mot de passe actuel",
     newPasswordLabel: "Nouveau mot de passe",
     generateButton: "Générer un mot de passe fort",
+    generateForMeButton: "Générer un mot de passe fort pour moi",
+    generateHint: "Recommandé. Votre navigateur peut l'enregistrer pour vous.",
+    generatedTitle: "Mot de passe fort prêt",
+    regenerateButton: "En générer un autre",
+    generatedHint:
+      "Il est saisi ci-dessous. Copiez-le en lieu sûr ou laissez votre navigateur l'enregistrer.",
     newPasswordPlaceholder: "Saisissez le nouveau mot de passe",
     confirmPasswordLabel: "Confirmer le nouveau mot de passe",
     confirmPasswordPlaceholder: "Répétez le nouveau mot de passe",

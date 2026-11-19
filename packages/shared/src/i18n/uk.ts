@@ -5785,6 +5785,12 @@ export const uk: TranslationKeys = {
     currentPasswordPlaceholder: "Введіть поточний пароль",
     newPasswordLabel: "Новий пароль",
     generateButton: "Згенерувати надійний пароль",
+    generateForMeButton: "Згенерувати надійний пароль за мене",
+    generateHint: "Рекомендовано. Браузер може зберегти його за вас.",
+    generatedTitle: "Надійний пароль готовий",
+    regenerateButton: "Згенерувати інший",
+    generatedHint:
+      "Його вже вписано нижче. Скопіюйте його в надійне місце або дозвольте браузеру його зберегти.",
     newPasswordPlaceholder: "Введіть новий пароль",
     confirmPasswordLabel: "Підтвердіть новий пароль",
     confirmPasswordPlaceholder: "Повторіть новий пароль",

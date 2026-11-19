@@ -209,7 +209,7 @@ describe("Generate fills a password the policy accepts (#1567)", () => {
       target: { value: "old-Password1" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: new RegExp(de.changePassword.generateButton) }),
+      screen.getByRole("button", { name: new RegExp(de.changePassword.generateForMeButton) }),
     );
     fireEvent.click(screen.getByRole("button", { name: de.changePassword.changeButton }));
 

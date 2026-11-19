@@ -5786,6 +5786,12 @@ export const tr: TranslationKeys = {
     currentPasswordPlaceholder: "Mevcut parolayı girin",
     newPasswordLabel: "Yeni parola",
     generateButton: "Güçlü parola oluştur",
+    generateForMeButton: "Benim için güçlü bir parola oluştur",
+    generateHint: "Önerilir. Tarayıcınız sizin için kaydedebilir.",
+    generatedTitle: "Güçlü parola hazır",
+    regenerateButton: "Başka bir tane oluştur",
+    generatedHint:
+      "Aşağıya girildi. Güvenli bir yere kopyalayın ya da tarayıcınızın kaydetmesine izin verin.",
     newPasswordPlaceholder: "Yeni parolayı girin",
     confirmPasswordLabel: "Yeni parolayı onaylayın",
     confirmPasswordPlaceholder: "Yeni parolayı tekrarlayın",

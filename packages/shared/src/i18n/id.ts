@@ -5777,6 +5777,12 @@ export const id: TranslationKeys = {
     currentPasswordPlaceholder: "Masukkan kata sandi saat ini",
     newPasswordLabel: "Kata sandi baru",
     generateButton: "Buat kata sandi kuat",
+    generateForMeButton: "Buatkan saya kata sandi yang kuat",
+    generateHint: "Disarankan. Browser Anda dapat menyimpannya untuk Anda.",
+    generatedTitle: "Kata sandi kuat siap",
+    regenerateButton: "Buat yang lain",
+    generatedHint:
+      "Sudah terisi di bawah. Salin ke tempat yang aman, atau biarkan browser Anda menyimpannya.",
     newPasswordPlaceholder: "Masukkan kata sandi baru",
     confirmPasswordLabel: "Konfirmasi kata sandi baru",
     confirmPasswordPlaceholder: "Ulangi kata sandi baru",

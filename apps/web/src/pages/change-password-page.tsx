@@ -1,11 +1,13 @@
-import { Sparkles } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { Check, Copy, RefreshCw, ShieldCheck, Wand2 } from "lucide-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { passwordErrorMessages } from "@/lib/password-errors";
+import { cn, copyToClipboard } from "@/lib/utils";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -100,6 +102,8 @@ export function ChangePasswordPage() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
   // The minimum length from the server's last refusal. This page can't read the
   // policy, so Generate starts at the default and meets the minimum once the
   // server has named it (#2027).
@@ -110,6 +114,23 @@ export function ChangePasswordPage() {
     setNewPassword(pw);
     setConfirmPassword(pw);
     setShowGenerated(true);
+    setCopyStatus(null);
+  };
+
+  // Generate swaps itself for the generated-password panel, so move focus to
+  // that panel's Copy button rather than dropping it on the body.
+  useEffect(() => {
+    if (showGenerated) copyButtonRef.current?.focus();
+  }, [showGenerated]);
+
+  useEffect(() => {
+    if (!copyStatus) return;
+    const timer = setTimeout(() => setCopyStatus(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copyStatus]);
+
+  const handleCopy = async () => {
+    setCopyStatus((await copyToClipboard(newPassword)) ? "copied" : "failed");
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -213,20 +234,86 @@ export function ChangePasswordPage() {
                 required
               />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="new-password" className="text-sm font-medium text-foreground">
-                  {t.changePassword.newPasswordLabel}
-                </label>
-                <button
-                  type="button"
-                  onClick={handleGenerate}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {t.changePassword.generateButton}
-                </button>
+            {showGenerated ? (
+              <div className="flex gap-3 rounded-xl border border-green-500/30 bg-green-500/10 p-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/15 text-success-ink">
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {t.changePassword.generatedTitle}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t.changePassword.generatedHint}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      ref={copyButtonRef}
+                      type="button"
+                      onClick={handleCopy}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        copyStatus === "copied"
+                          ? "border-green-500/40 bg-green-500/10 text-success-ink"
+                          : "border-border bg-background text-foreground hover:bg-muted",
+                      )}
+                    >
+                      {copyStatus === "copied" ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {copyStatus === "copied"
+                        ? t.common.copied
+                        : copyStatus === "failed"
+                          ? t.common.copyFailed
+                          : t.common.copy}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-background text-xs font-medium text-foreground hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t.changePassword.regenerateButton}
+                    </button>
+                    <CopyFeedback status={copyStatus} />
+                  </div>
+                </div>
               </div>
+            ) : (
+              <>
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    aria-describedby="generate-hint"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-center bg-primary text-primary-foreground font-semibold shadow-md shadow-primary/25 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 active:scale-[0.99] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <Wand2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {t.changePassword.generateForMeButton}
+                  </button>
+                  <p
+                    id="generate-hint"
+                    className="mt-1.5 text-center text-xs text-muted-foreground"
+                  >
+                    {t.changePassword.generateHint}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="h-px flex-1 bg-border" />
+                  {t.common.or}
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              </>
+            )}
+            <div>
+              <label
+                htmlFor="new-password"
+                className="block text-sm font-medium mb-1 text-foreground"
+              >
+                {t.changePassword.newPasswordLabel}
+              </label>
               <input
                 id="new-password"
                 type={showGenerated ? "text" : "password"}
