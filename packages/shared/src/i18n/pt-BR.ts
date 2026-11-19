@@ -4119,6 +4119,7 @@ export const ptBR: TranslationKeys = {
     applyAndDownload: "Aplicar e baixar",
     andMore: "e mais {count}",
     importFromFiles: "Importar de Arquivos",
+    installedReady: "{tool} está pronto. Solte um arquivo para começar.",
     saveToFiles: "Salvar em Arquivos",
     savedToFiles: "Salvo em Arquivos",
     resultExpired: "Este resultado expirou. Execute a ferramenta novamente.",
@@ -5250,6 +5251,7 @@ export const ptBR: TranslationKeys = {
       description: "Gerencie pacotes de modelos de IA para processamento avançado de arquivos.",
       installAll: "Instalar tudo",
       diskUsage: "Uso do disco: {size}",
+      readyTools: "Pronto para testar:",
       statusStale:
         "Não foi possível atualizar o status dos pacotes. A lista abaixo pode estar desatualizada.",
       sizeOnDisk: "{size} em disco",

@@ -4107,6 +4107,7 @@ export const es: TranslationKeys = {
     applyAndDownload: "Aplicar y descargar",
     andMore: "y {count} más",
     importFromFiles: "Importar desde Archivos",
+    installedReady: "{tool} está listo. Suelta un archivo para empezar.",
     saveToFiles: "Guardar en Archivos",
     savedToFiles: "Guardado en Archivos",
     resultExpired: "Este resultado ha caducado. Vuelve a ejecutar la herramienta.",
@@ -5243,6 +5244,7 @@ export const es: TranslationKeys = {
       description: "Gestiona paquetes de modelos AI para procesamiento avanzado de archivos.",
       installAll: "Instalar todo",
       diskUsage: "Uso del disco: {size}",
+      readyTools: "Listo para probar:",
       statusStale:
         "No se pudo actualizar el estado de los paquetes. La lista puede estar desactualizada.",
       sizeOnDisk: "{size} en disco",

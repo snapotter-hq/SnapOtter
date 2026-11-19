@@ -4128,6 +4128,7 @@ export const nl: TranslationKeys = {
     applyAndDownload: "Toepassen en downloaden",
     andMore: "en {count} meer",
     importFromFiles: "Importeren uit Bestanden",
+    installedReady: "{tool} is klaar. Sleep een bestand hierheen om te beginnen.",
     saveToFiles: "Opslaan in Bestanden",
     savedToFiles: "Opgeslagen in Bestanden",
     resultExpired: "Dit resultaat is verlopen. Voer de tool opnieuw uit.",
@@ -5256,6 +5257,7 @@ export const nl: TranslationKeys = {
       description: "Beheer AI-modelbundels voor geavanceerde bestandsverwerking.",
       installAll: "Alles installeren",
       diskUsage: "Schijfgebruik: {size}",
+      readyTools: "Klaar om te proberen:",
       statusStale:
         "De bundelstatus kon niet worden bijgewerkt. De lijst hieronder is mogelijk verouderd.",
       sizeOnDisk: "{size} op schijf",
