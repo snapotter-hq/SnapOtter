@@ -145,8 +145,8 @@ The published Compose files pass all of them through from `.env`, so setting the
 
 | Variable | Default | Description |
 |---|---|---|
-| `PUID` | `999` | Run the container process as this UID. Set to match your host user for bind mounts (`id -u`). |
-| `PGID` | `999` | Run the container process as this GID. Set to match your host group for bind mounts (`id -g`). |
+| `PUID` | `999` | Run the container process as this UID. Set to match your host user for bind mounts (`id -u`). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Run the container process as this GID. Set to match your host group for bind mounts (`id -g`). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set). |
 
 ## Docker example {#docker-example}
 

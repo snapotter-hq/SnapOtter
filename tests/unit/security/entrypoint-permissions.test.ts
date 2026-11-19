@@ -101,3 +101,61 @@ describe("entrypoint-lib.sh rewrite_venv_paths", () => {
     expect(readFileSync(binary)).toEqual(Buffer.from([0x00, ...Buffer.from(optVenv), 0x00]));
   });
 });
+
+// The PUID/PGID remap edits /etc/passwd and /etc/group, which fails on a
+// read-only root (#4570). `id` is shadowed with a shell function so the test
+// controls what the user resolves to after the remap.
+describe("entrypoint-lib.sh verify_user_remap", () => {
+  const withId = (uid: string, gid: string, call: string) =>
+    runLib(`id() { case "$1" in -u) echo ${uid} ;; -g) echo ${gid} ;; esac; }\n${call}`);
+
+  it("succeeds when the user already has the requested ids", () => {
+    const { status, stderr } = withId("2345", "2345", "verify_user_remap snapotter 2345 2345");
+    expect(status, stderr).toBe(0);
+    expect(stderr).toBe("");
+  });
+
+  it("treats a zero-padded PUID as the same id", () => {
+    const { status, stderr } = withId("1000", "1000", "verify_user_remap snapotter 01000 01000");
+    expect(status, stderr).toBe(0);
+  });
+
+  it("fails when the user cannot be resolved at all", () => {
+    const { status, stderr } = runLib("id() { return 1; }\nverify_user_remap snapotter 2345 2345");
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("still ?:?");
+  });
+
+  it("fails naming the cause and the --user alternative when the uid did not change", () => {
+    const { status, stderr } = withId("999", "999", "verify_user_remap snapotter 2345 2345");
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("PUID=2345 PGID=2345");
+    expect(stderr).toContain("999:999");
+    expect(stderr).toContain("read-only");
+    expect(stderr).toContain("--user 2345:2345");
+    expect(stderr).toContain("security#why-read-only-is-not-set");
+  });
+
+  it("fails when only the gid did not change", () => {
+    const { status, stderr } = withId("2345", "999", "verify_user_remap snapotter 2345 2345");
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("2345:999");
+  });
+});
+
+// The check has to run before the chown, or a failed remap still re-owns /data.
+describe("entrypoint.sh PUID/PGID remap", () => {
+  const entrypoint = readFileSync(resolve(here, "../../../docker/entrypoint.sh"), "utf-8");
+
+  it("verifies the remap before chowning /data", () => {
+    const verify = entrypoint.indexOf("verify_user_remap snapotter");
+    expect(verify).toBeGreaterThan(-1);
+    expect(verify).toBeLessThan(entrypoint.indexOf("chown -R snapotter:snapotter /data"));
+    expect(verify).toBeLessThan(entrypoint.indexOf("-exec chown -R snapotter:snapotter"));
+  });
+
+  it("lets usermod and groupmod report their own errors", () => {
+    expect(entrypoint).not.toMatch(/usermod -u "\$PUID" snapotter 2>\/dev\/null/);
+    expect(entrypoint).not.toMatch(/groupmod -g "\$PGID" snapotter 2>\/dev\/null/);
+  });
+});

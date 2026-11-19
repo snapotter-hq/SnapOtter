@@ -6,7 +6,7 @@ set -e
 # OpenShift/fsGroup rolling restarts where successive pods use different UIDs.
 umask 0007
 
-# Shared permission helpers (dir_writable, ensure_writable). Lives beside this
+# Shared permission helpers (dir_writable, ensure_writable, verify_user_remap).
 # script in the image; sourcing only defines functions (no side effects).
 . /usr/local/bin/entrypoint-lib.sh
 # Embedded-mode helpers (decide_run_mode, embedded_requires_root,
@@ -225,10 +225,15 @@ if [ "$(id -u)" = "0" ]; then
       if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "snapotter" ]; then
         delgroup "$EXISTING_GROUP" 2>/dev/null || groupdel "$EXISTING_GROUP" 2>/dev/null || true
       fi
-      groupmod -g "$PGID" snapotter 2>/dev/null || true
+      groupmod -g "$PGID" snapotter || true
     fi
     if [ "$CUR_UID" != "$PUID" ]; then
-      usermod -u "$PUID" snapotter 2>/dev/null || true
+      usermod -u "$PUID" snapotter || true
+    fi
+    # Stop before the chown below: a failed remap would otherwise re-own /data
+    # to the image's default 999:999 and lock the PUID user out of a bind mount.
+    if ! verify_user_remap snapotter "$PUID" "$PGID"; then
+      exit 1
     fi
   fi
 
