@@ -106,6 +106,25 @@ describe("videoEncodeArgsForContainer", () => {
     expect(videoEncodeArgsForContainer(".webm")).toContain("-crf");
     expect(videoEncodeArgsForContainer(".ogv")).toEqual(["-c:v", "libtheora", "-q:v", "7"]);
   });
+
+  it("gives a preserved WebM container the libvpx speed flags (#4347)", () => {
+    setEncoderInventoryForTests(WITH_NVENC);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(videoEncodeArgsForContainer(".webm")).toEqual([
+      "-c:v",
+      "libvpx-vp9",
+      "-crf",
+      "30",
+      "-b:v",
+      "0",
+      "-deadline",
+      "good",
+      "-cpu-used",
+      "4",
+      "-row-mt",
+      "1",
+    ]);
+  });
 });
 
 /**

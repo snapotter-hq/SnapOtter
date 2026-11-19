@@ -202,6 +202,43 @@ describe("convert-video quality on an NVENC host", () => {
   });
 });
 
+/**
+ * #4347: libvpx-vp9 with only -crf runs at its slowest defaults, about 29x
+ * realtime on noisy 1080p, so a 150 s clip sat at 41% after 30 minutes.
+ * Every VP9 encode must carry the speed flags.
+ */
+describe("VP9 encodes carry the libvpx speed flags (#4347)", () => {
+  function expectVp9SpeedFlags(args: string[]) {
+    expect(flagValue(args, "-c:v")).toBe("libvpx-vp9");
+    expect(flagValue(args, "-deadline")).toBe("good");
+    expect(flagValue(args, "-cpu-used")).toBe("4");
+    expect(flagValue(args, "-row-mt")).toBe("1");
+    expect(flagValue(args, "-b:v")).toBe("0");
+  }
+
+  it("convert-video (webm) keeps its crf per quality and adds the speed flags", async () => {
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    const seen: string[] = [];
+    for (const quality of ["high", "balanced", "small"]) {
+      const args = await argsFor(registerConvertVideo, "convert-video", {
+        format: "webm",
+        quality,
+      });
+      expectVp9SpeedFlags(args);
+      seen.push(flagValue(args, "-crf") ?? "missing");
+    }
+    expect(seen).toEqual(["24", "32", "40"]);
+  });
+
+  it("gif-to-video (webm) adds the speed flags", async () => {
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    const args = await argsFor(registerGifToVideo, "gif-to-video", { format: "webm" });
+    expectVp9SpeedFlags(args);
+    expect(flagValue(args, "-crf")).toBe("32");
+    expect(flagValue(args, "-pix_fmt")).toBe("yuv420p");
+  });
+});
+
 describe("compress-video and convert-video on a VAAPI host (#3977)", () => {
   beforeEach(() => {
     process.env.SNAPOTTER_HW_ACCEL = "vaapi";
