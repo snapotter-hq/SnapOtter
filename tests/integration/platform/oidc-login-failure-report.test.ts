@@ -60,6 +60,14 @@ const { buildTestApp } = await import("../test-server.js");
 
 import type { TestApp } from "../test-server.js";
 
+// An IdP origin that refuses every connect. A port freed after listen(0) is not
+// safe: the mock IdP's own listen(0) can get it straight back and answer the
+// "unreachable" requests (#4604). Port 2 sits below every ephemeral range. Not
+// port 1 as in posthog-proxy.test.ts (#4594): openid-client calls the global
+// fetch, whose bad-port list blocks port 1 before any connect, so the token
+// case would see "bad port" instead of ECONNREFUSED.
+const REFUSED_ORIGIN = "http://127.0.0.1:2";
+
 const mutableEnv = env as unknown as Record<string, unknown>;
 const CLIENT_SECRET = "i1869-client-secret";
 const TEST_COOKIE_SECRET = "test-cookie-secret";
@@ -127,7 +135,6 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
   let oidcApp: TestApp;
   let mockServer: Server;
   let mockPort: number;
-  let closedPort: number;
 
   const orig = {
     OIDC_ENABLED: env.OIDC_ENABLED,
@@ -149,20 +156,13 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
   }
 
   beforeAll(async () => {
-    // A port nothing listens on: bind, read the port, close.
-    const probe = createServer();
-    await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
-    const probeAddr = probe.address();
-    closedPort = typeof probeAddr === "object" && probeAddr ? probeAddr.port : 0;
-    await new Promise<void>((resolve) => probe.close(() => resolve()));
-
     mockServer = createServer((req, res) => {
       const discovery = req.url?.match(/^\/t\/([\w-]+)\/\.well-known\/openid-configuration$/);
       if (discovery) {
         const kind = discovery[1];
         const tokenEndpoint =
           kind === "unreachable"
-            ? `http://127.0.0.1:${closedPort}/token`
+            ? `${REFUSED_ORIGIN}/token`
             : `http://localhost:${mockPort}/t/${kind}/token`;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(discoveryDocument(`/t/${kind}`, tokenEndpoint));
@@ -301,7 +301,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
     });
 
     it("reports an IdP nothing listens on as a failed discovery", async () => {
-      mutableEnv.OIDC_ISSUER_URL = `http://127.0.0.1:${closedPort}`;
+      mutableEnv.OIDC_ISSUER_URL = REFUSED_ORIGIN;
       const res = await login();
 
       expect(res.headers.location).toBe("/login?error=oidc_provider_unreachable");
