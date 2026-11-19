@@ -297,6 +297,68 @@ describe("AI image job handlers", () => {
     });
   });
 
+  // The bridge converts every input to PNG before the sidecar sees it, so the
+  // sidecar's own "original" always meant PNG (#4469). Node resolves it first.
+  it.each([
+    { input: "jpeg", sidecar: "jpeg", ext: "jpg", contentType: "image/jpeg" },
+    { input: "png", sidecar: "png", ext: "png", contentType: "image/png" },
+    { input: "webp", sidecar: "webp", ext: "webp", contentType: "image/webp" },
+    { input: "gif", sidecar: "gif", ext: "gif", contentType: "image/gif" },
+    { input: "tiff", sidecar: "tiff", ext: "tiff", contentType: "image/tiff" },
+    { input: "avif", sidecar: "png", ext: "avif", contentType: "image/avif" },
+  ] as const)("keeps a $input input's format when denoise format is original", async (c) => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "quick",
+    }));
+    const input = await sharp(PNG).toFormat(c.input).toBuffer();
+
+    const result = await runAiToolJob(
+      job("noise-removal", { tier: "quick", format: "original" }, `photo.${c.ext}`),
+      input,
+      ctx,
+    );
+
+    expect(noiseRemoval).toHaveBeenCalledWith(
+      input,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: c.sidecar }),
+      expect.any(Function),
+    );
+    expect(result).toMatchObject({
+      filename: `photo_denoised.${c.ext}`,
+      contentType: c.contentType,
+    });
+  });
+
+  it("falls back to png when an original-format input has no encoder", async () => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "quick",
+    }));
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>');
+
+    const result = await runAiToolJob(
+      job("noise-removal", { tier: "quick", format: "original" }, "photo.svg"),
+      svg,
+      ctx,
+    );
+
+    expect(noiseRemoval).toHaveBeenCalledWith(
+      svg,
+      SCRATCH_DIR,
+      expect.objectContaining({ format: "png" }),
+      expect.any(Function),
+    );
+    expect(result).toMatchObject({ filename: "photo_denoised.png", contentType: "image/png" });
+  });
+
   it("runs restoration jobs and returns worker result payload details", async () => {
     const result = await runAiToolJob(
       job("restore-photo", {
@@ -555,6 +617,27 @@ describe("AI image pipeline process registrations", () => {
     for (const call of vi.mocked(noiseRemoval).mock.calls) {
       expect(call[2]).toMatchObject({ format: "png" });
     }
+  });
+
+  it("keeps a JPEG input's format in the noise-removal pipeline processor (#4469)", async () => {
+    vi.mocked(noiseRemoval).mockImplementation(async (_input, _scratch, options) => ({
+      buffer: PNG,
+      width: 200,
+      height: 150,
+      format: options?.format ?? "png",
+      tier: "quick",
+    }));
+    const jpeg = await sharp(PNG).jpeg().toBuffer();
+
+    const result = await getToolConfig("noise-removal")?.process(
+      jpeg,
+      { tier: "quick", format: "original" },
+      "photo.jpg",
+      ctx,
+    );
+
+    expect(vi.mocked(noiseRemoval).mock.calls[0]?.[2]).toMatchObject({ format: "jpeg" });
+    expect(result).toMatchObject({ filename: "photo_denoised.jpg", contentType: "image/jpeg" });
   });
 
   it("registers pipeline processors for custom AI photo routes", async () => {
