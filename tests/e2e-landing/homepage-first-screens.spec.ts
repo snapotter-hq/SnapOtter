@@ -24,8 +24,8 @@ test.describe("homepage first screens", () => {
     const docker = page.locator("#hero-docker-copy");
     for (const el of [free, docker]) {
       const box = await el.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.y + box!.height).toBeLessThan(900 * 2);
+      if (!box) throw new Error("element has no layout box");
+      expect(box.y + box.height).toBeLessThan(900 * 2);
     }
   });
 
@@ -50,7 +50,7 @@ test.describe("homepage first screens", () => {
       "/tools/image/ocr/",
     ]);
     for (const href of hrefs) {
-      expect(fs.existsSync(path.join(DIST, href!, "index.html")), href!).toBe(true);
+      expect(fs.existsSync(path.join(DIST, href ?? "", "index.html")), String(href)).toBe(true);
     }
   });
 
@@ -67,6 +67,7 @@ test.describe("homepage first screens", () => {
     const order = await page
       .locator("main > section, main > div")
       .evaluateAll((els) => els.map((el) => el.id).filter(Boolean));
+    for (const id of ["quick-answers", "pricing", "enterprise"]) expect(order).toContain(id);
     expect(order.indexOf("quick-answers")).toBeLessThan(order.indexOf("pricing"));
     expect(order.indexOf("pricing")).toBeLessThan(order.indexOf("enterprise"));
   });
