@@ -5551,6 +5551,12 @@ export const ptBR: TranslationKeys = {
     currentPasswordPlaceholder: "Digite a senha atual",
     newPasswordLabel: "Nova senha",
     generateButton: "Gerar senha forte",
+    generateForMeButton: "Gerar uma senha forte para mim",
+    generateHint: "Recomendado. Seu navegador pode salvá-la para você.",
+    generatedTitle: "Senha forte pronta",
+    regenerateButton: "Gerar outra",
+    generatedHint:
+      "Ela já está preenchida abaixo. Copie para um lugar seguro ou deixe o navegador salvá-la.",
     newPasswordPlaceholder: "Digite a nova senha",
     confirmPasswordLabel: "Confirmar nova senha",
     confirmPasswordPlaceholder: "Repita a nova senha",

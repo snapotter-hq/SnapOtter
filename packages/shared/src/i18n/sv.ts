@@ -5531,6 +5531,12 @@ export const sv: TranslationKeys = {
     currentPasswordPlaceholder: "Ange nuvarande lösenord",
     newPasswordLabel: "Nytt lösenord",
     generateButton: "Generera starkt lösenord",
+    generateForMeButton: "Generera ett starkt lösenord åt mig",
+    generateHint: "Rekommenderas. Webbläsaren kan spara det åt dig.",
+    generatedTitle: "Starkt lösenord klart",
+    regenerateButton: "Generera ett nytt",
+    generatedHint:
+      "Det är ifyllt nedan. Kopiera det till en säker plats eller låt webbläsaren spara det.",
     newPasswordPlaceholder: "Ange nytt lösenord",
     confirmPasswordLabel: "Bekräfta nytt lösenord",
     confirmPasswordPlaceholder: "Upprepa nytt lösenord",

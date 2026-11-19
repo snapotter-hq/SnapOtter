@@ -5557,6 +5557,12 @@ export const nl: TranslationKeys = {
     currentPasswordPlaceholder: "Voer huidig wachtwoord in",
     newPasswordLabel: "Nieuw wachtwoord",
     generateButton: "Sterk wachtwoord genereren",
+    generateForMeButton: "Genereer een sterk wachtwoord voor mij",
+    generateHint: "Aanbevolen. Je browser kan het voor je opslaan.",
+    generatedTitle: "Sterk wachtwoord klaar",
+    regenerateButton: "Nog een genereren",
+    generatedHint:
+      "Het staat hieronder ingevuld. Kopieer het naar een veilige plek of laat je browser het opslaan.",
     newPasswordPlaceholder: "Voer nieuw wachtwoord in",
     confirmPasswordLabel: "Nieuw wachtwoord bevestigen",
     confirmPasswordPlaceholder: "Herhaal nieuw wachtwoord",

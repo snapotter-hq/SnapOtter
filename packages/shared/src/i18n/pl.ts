@@ -5552,6 +5552,12 @@ export const pl: TranslationKeys = {
     currentPasswordPlaceholder: "Wprowadź bieżące hasło",
     newPasswordLabel: "Nowe hasło",
     generateButton: "Wygeneruj silne hasło",
+    generateForMeButton: "Wygeneruj dla mnie silne hasło",
+    generateHint: "Zalecane. Przeglądarka może je dla Ciebie zapisać.",
+    generatedTitle: "Silne hasło gotowe",
+    regenerateButton: "Wygeneruj inne",
+    generatedHint:
+      "Jest już wpisane poniżej. Skopiuj je w bezpieczne miejsce albo pozwól przeglądarce je zapisać.",
     newPasswordPlaceholder: "Wprowadź nowe hasło",
     confirmPasswordLabel: "Potwierdź nowe hasło",
     confirmPasswordPlaceholder: "Powtórz nowe hasło",

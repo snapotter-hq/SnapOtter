@@ -5519,6 +5519,12 @@ export const vi: TranslationKeys = {
     currentPasswordPlaceholder: "Nhập mật khẩu hiện tại",
     newPasswordLabel: "Mật khẩu mới",
     generateButton: "Tạo mật khẩu mạnh",
+    generateForMeButton: "Tạo giúp tôi một mật khẩu mạnh",
+    generateHint: "Khuyên dùng. Trình duyệt có thể lưu giúp bạn.",
+    generatedTitle: "Mật khẩu mạnh đã sẵn sàng",
+    regenerateButton: "Tạo mật khẩu khác",
+    generatedHint:
+      "Mật khẩu đã được điền bên dưới. Hãy sao chép vào nơi an toàn hoặc để trình duyệt lưu lại.",
     newPasswordPlaceholder: "Nhập mật khẩu mới",
     confirmPasswordLabel: "Xác nhận mật khẩu mới",
     confirmPasswordPlaceholder: "Nhập lại mật khẩu mới",

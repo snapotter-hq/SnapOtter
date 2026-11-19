@@ -10,7 +10,7 @@
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 // The jsdom env here has no working localStorage; the provider reads the
 // stored locale choice from it (same stub as change-password-errors.test.tsx).
@@ -290,7 +290,7 @@ describe("Generate sizes the password to the policy", () => {
     });
     await renderWithCurrentPassword();
 
-    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateForMeButton }));
     expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
 
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
@@ -298,7 +298,7 @@ describe("Generate sizes the password to the policy", () => {
       await screen.findByText(format(en.errors.passwordTooShort, { minLength: 24 })),
     ).toBeVisible();
 
-    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.regenerateButton }));
     const generated = field(en.changePassword.newPasswordLabel).value;
     expect(generated).toHaveLength(24);
     expect(field(en.changePassword.confirmPasswordLabel).value).toBe(generated);
@@ -307,12 +307,50 @@ describe("Generate sizes the password to the policy", () => {
   it("stays at the default when the refusal names no minimum", async () => {
     answer(400, { code: "VALIDATION_ERROR", rule: "digit", rules: ["digit"] });
     await renderWithCurrentPassword();
-    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateForMeButton }));
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
     expect(await screen.findByText(en.errors.passwordNeedsDigit)).toBeVisible();
 
-    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.regenerateButton }));
     expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+  });
+});
+
+// Generate swaps itself for a panel holding the password's next steps, so the
+// user can keep a copy even when the browser never offers to save it.
+describe("the generated-password panel", () => {
+  const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+  it("takes focus on Copy, copies the password, and goes away once the user types", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const originalNavigator = navigator;
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    onTestFinished(() => {
+      vi.stubGlobal("navigator", originalNavigator);
+    });
+    render(
+      <I18nProvider>
+        <ChangePasswordPage />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.changePassword.generateForMeButton }),
+    );
+    const copy = screen.getByRole("button", { name: en.common.copy });
+    expect(copy).toHaveFocus();
+
+    fireEvent.click(copy);
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(field(en.changePassword.newPasswordLabel).value),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(en.common.copied);
+
+    fireEvent.change(field(en.changePassword.newPasswordLabel), { target: { value: "mine" } });
+    expect(screen.queryByText(en.changePassword.generatedTitle)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.changePassword.generateForMeButton }),
+    ).toBeInTheDocument();
   });
 });
 

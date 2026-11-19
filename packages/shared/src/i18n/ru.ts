@@ -5544,6 +5544,12 @@ export const ru: TranslationKeys = {
     currentPasswordPlaceholder: "Введите текущий пароль",
     newPasswordLabel: "Новый пароль",
     generateButton: "Сгенерировать надёжный пароль",
+    generateForMeButton: "Сгенерировать надёжный пароль за меня",
+    generateHint: "Рекомендуется. Браузер может сохранить его за вас.",
+    generatedTitle: "Надёжный пароль готов",
+    regenerateButton: "Сгенерировать другой",
+    generatedHint:
+      "Он уже вписан ниже. Скопируйте его в надёжное место или позвольте браузеру его сохранить.",
     newPasswordPlaceholder: "Введите новый пароль",
     confirmPasswordLabel: "Подтвердите новый пароль",
     confirmPasswordPlaceholder: "Повторите новый пароль",
