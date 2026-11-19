@@ -5515,6 +5515,7 @@ export const sv: TranslationKeys = {
     delete: "Ta bort",
     pipeline: "Pipeline",
     download: "Ladda ner",
+    downloadFailed: "Kunde inte ladda ned de valda filerna.",
     details: {
       previewFailedRetry: "Förhandsvisningen kunde inte skapas. Försök igen.",
       loadFailed: "Kunde inte läsa in den här filen.",

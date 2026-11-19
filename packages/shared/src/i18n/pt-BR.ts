@@ -5535,6 +5535,7 @@ export const ptBR: TranslationKeys = {
     delete: "Excluir",
     pipeline: "Pipeline",
     download: "Baixar",
+    downloadFailed: "Não foi possível baixar os arquivos selecionados.",
     details: {
       previewFailedRetry: "Falha ao gerar a pré-visualização. Tente novamente.",
       loadFailed: "Não foi possível carregar este arquivo.",

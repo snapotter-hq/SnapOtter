@@ -5296,6 +5296,7 @@ export const hi: TranslationKeys = {
     delete: "हटाएं",
     pipeline: "पाइपलाइन",
     download: "डाउनलोड",
+    downloadFailed: "चुनी गई फ़ाइलें डाउनलोड नहीं हो सकीं।",
     details: {
       previewFailedRetry: "प्रीव्यू बनाना विफल रहा। पुनः प्रयास करें।",
       loadFailed: "यह फ़ाइल लोड नहीं हो सकी।",

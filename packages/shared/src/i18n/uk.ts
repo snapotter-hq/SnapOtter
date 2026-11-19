@@ -5528,6 +5528,7 @@ export const uk: TranslationKeys = {
     delete: "Видалити",
     pipeline: "Конвеєр",
     download: "Завантажити",
+    downloadFailed: "Не вдалося завантажити вибрані файли.",
     details: {
       previewFailedRetry: "Не вдалося створити попередній перегляд. Спробуйте ще раз.",
       loadFailed: "Не вдалося завантажити цей файл.",

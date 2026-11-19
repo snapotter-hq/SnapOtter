@@ -981,7 +981,7 @@ test("Firefox and WebKit collect the supported cross-browser core suite", () => 
     expect(output, project).toContain("navigation.spec.ts");
     expect(output, project).toContain("home-page.spec.ts");
     expect(output, project).toContain("chunk-reload.spec.ts");
-    expect(output, project).toContain("Total: 59 tests in 6 files");
+    expect(output, project).toContain("Total: 60 tests in 6 files");
   }
 });
 

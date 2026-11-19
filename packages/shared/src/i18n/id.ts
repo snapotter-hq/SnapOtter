@@ -5518,6 +5518,7 @@ export const id: TranslationKeys = {
     delete: "Hapus",
     pipeline: "Pipeline",
     download: "Unduh",
+    downloadFailed: "Gagal mengunduh file yang dipilih.",
     details: {
       previewFailedRetry: "Pembuatan pratinjau gagal. Coba lagi.",
       loadFailed: "Gagal memuat file ini.",

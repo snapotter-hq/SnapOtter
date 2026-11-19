@@ -5541,6 +5541,7 @@ export const nl: TranslationKeys = {
     delete: "Verwijderen",
     pipeline: "Pipeline",
     download: "Downloaden",
+    downloadFailed: "De geselecteerde bestanden downloaden mislukt.",
     details: {
       previewFailedRetry: "Voorbeeld genereren mislukt. Probeer het opnieuw.",
       loadFailed: "Dit bestand kon niet worden geladen.",

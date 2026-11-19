@@ -5566,6 +5566,7 @@ export const de: TranslationKeys = {
     delete: "Löschen",
     pipeline: "Pipeline",
     download: "Herunterladen",
+    downloadFailed: "Die ausgewählten Dateien konnten nicht heruntergeladen werden.",
     details: {
       previewFailedRetry: "Vorschauerzeugung fehlgeschlagen. Erneut versuchen.",
       loadFailed: "Diese Datei konnte nicht geladen werden.",

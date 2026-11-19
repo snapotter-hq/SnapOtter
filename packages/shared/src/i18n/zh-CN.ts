@@ -5203,6 +5203,7 @@ export const zhCN: TranslationKeys = {
     delete: "删除",
     pipeline: "流水线",
     download: "下载",
+    downloadFailed: "无法下载所选文件。",
     details: {
       previewFailedRetry: "预览生成失败。请重试。",
       loadFailed: "无法加载此文件。",

@@ -5554,6 +5554,7 @@ export const fr: TranslationKeys = {
     delete: "Supprimer",
     pipeline: "Pipeline",
     download: "Télécharger",
+    downloadFailed: "Impossible de télécharger les fichiers sélectionnés.",
     details: {
       previewFailedRetry: "Échec de la génération de l'aperçu. Réessayez.",
       loadFailed: "Impossible de charger ce fichier.",

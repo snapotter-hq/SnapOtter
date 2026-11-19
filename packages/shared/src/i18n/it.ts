@@ -5538,6 +5538,7 @@ export const it: TranslationKeys = {
     delete: "Elimina",
     pipeline: "Pipeline",
     download: "Scarica",
+    downloadFailed: "Impossibile scaricare i file selezionati.",
     details: {
       previewFailedRetry: "Generazione dell'anteprima non riuscita. Riprova.",
       loadFailed: "Impossibile caricare questo file.",

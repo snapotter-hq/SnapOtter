@@ -5468,6 +5468,7 @@ export const ja: TranslationKeys = {
     delete: "削除",
     pipeline: "パイプライン",
     download: "ダウンロード",
+    downloadFailed: "選択したファイルをダウンロードできませんでした。",
     details: {
       previewFailedRetry: "プレビューの生成に失敗しました。もう一度お試しください。",
       loadFailed: "このファイルを読み込めませんでした。",
