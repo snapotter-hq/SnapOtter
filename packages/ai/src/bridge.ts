@@ -242,12 +242,15 @@ function checkFsError(message: string): string | undefined {
  */
 export const GPU_OUT_OF_MEMORY_MESSAGE =
   "The GPU ran out of memory on this image. Try a smaller image, or set SNAPOTTER_GPU=false to run AI tools on the CPU.";
-export const CPU_LACKS_AVX_MESSAGE =
-  "This CPU doesn't support the AVX instructions the AI libraries need. Run SnapOtter on a CPU with AVX support.";
+export const CPU_UNSUPPORTED_MESSAGE =
+  "This CPU doesn't support instructions the AI libraries need (such as AVX or AES). If SnapOtter runs in a virtual machine, set its CPU type to host; otherwise run it on a newer CPU.";
 
 const GPU_OOM_TEXT = /cuda out of memory|cudaerrormemoryallocation|cublas_status_alloc_failed/i;
-// TensorFlow Lite and MediaPipe abort with this before running anything (NODE-AC).
-const CPU_LACKS_AVX_TEXT = /compiled with avx\w* enabled, but this feature is not available/i;
+// TensorFlow Lite and MediaPipe abort with this before running anything, naming
+// whichever instruction set is missing: avx, or aes and pclmul on a VM's
+// generic CPU model (NODE-AC). The code stays cpu-no-avx so telemetry keeps
+// counting these as one fault.
+const CPU_UNSUPPORTED_TEXT = /compiled with \w+ enabled, but this feature is not available/i;
 // Pillow's DecompressionBombError: the input has more pixels than Pillow will
 // decode, so it is the same input fault as sharp's pixel limit (NODE-AR).
 // Pillow prints the same text as a DecompressionBombWarning for smaller
@@ -270,8 +273,8 @@ function sidecarFailure(message: string, exitCode: string | undefined): SafeErro
   if (PIL_PIXEL_LIMIT_TEXT.test(message) && !PIL_PIXEL_WARNING_TEXT.test(message)) {
     return pixelLimitImageError();
   }
-  if (CPU_LACKS_AVX_TEXT.test(message)) {
-    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+  if (CPU_UNSUPPORTED_TEXT.test(message)) {
+    return new SafeError(CPU_UNSUPPORTED_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
   }
   if (GPU_OOM_TEXT.test(message)) {
     return new SafeError(GPU_OUT_OF_MEMORY_MESSAGE, { kind: "operational", code: "gpu-oom" });
@@ -320,7 +323,7 @@ function pythonExitError(
     });
   }
   if (signal === "SIGILL" || code === 132) {
-    return new SafeError(CPU_LACKS_AVX_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
+    return new SafeError(CPU_UNSUPPORTED_MESSAGE, { kind: "operational", code: "cpu-no-avx" });
   }
   const message = extracted || `Python script exited with code ${code}`;
   const err = sidecarFailure(message, `exit-${code ?? "unknown"}`);
