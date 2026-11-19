@@ -1,8 +1,8 @@
 ---
-description: "Installera SnapOtter med Docker med ett enda kommando. Omfattar installation med Docker Compose, bygge från källkod och en fullständig funktionsöversikt."
-i18n_source_hash: 2291f9ca0071
+description: "Installera SnapOtter med Docker med ett enda kommando, logga in och öppna ditt första verktyg. Omfattar GPU-acceleration, små maskiner, Docker Compose och bygge från källkod."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 85a2984fe8e1
+i18n_output_hash: 481bc5e0c995
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ Utforska hela gränssnittet på [demo.snapotter.com](https://demo.snapotter.com)
 
 ## Snabbstart {#quick-start}
 
+Kör ett enda kommando:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Den här enda containern kör allt den behöver: utan `DATABASE_URL` startar den sin egen PostgreSQL och Redis på loopback-gränssnittet (inbäddat läge) och lagrar all data i volymen `SnapOtter-data`. Det är det snabbaste sättet att testa SnapOtter eller drifta det själv på ett hemmalabb. I produktion används den [kanoniska Docker Compose-stacken](#docker-compose), som håller PostgreSQL och Redis i egna containrar. Inbäddat läge körs som root (standard) och stängs av automatiskt så snart du anger `DATABASE_URL`.
+Öppna sedan [http://localhost:1349](http://localhost:1349) och logga in med `admin` / `admin`. Du ombeds byta lösenord vid första inloggningen.
 
-Jobbresultat sparas inte i datavolymen, så de försvinner när containern byts ut (vid en avbildsuppgradering, till exempel) och deras nedladdningslänkar slutar fungera. Avsnittet Volymer i driftsättningsguiden förklarar hur du behåller dem.
+Öppna nu ett verktyg. Välj ett i sidofältet, eller gå direkt till [Ändra storlek](http://localhost:1349/image/resize), släpp in en bild och ladda ner resultatet.
 
-Installerar du på en Raspberry Pi, en gammal bärbar dator eller en liten VPS? Se [Miljöer med små resurser](/sv/guide/low-resource) för en anpassad genomgång och vad du kan förvänta dig av begränsad hårdvara.
+Det är hela installationen. Den här enda containern kör allt den behöver: utan `DATABASE_URL` startar den sin egen PostgreSQL och Redis på loopback-gränssnittet (inbäddat läge) och lagrar all data i volymen `SnapOtter-data`. Det är det snabbaste sättet att testa SnapOtter eller drifta det själv på ett hemmalabb. Inbäddat läge körs som root (standard) och stängs av automatiskt så snart du anger `DATABASE_URL`. I produktion använder du [Docker Compose-stacken](#docker-compose), som håller PostgreSQL och Redis i egna containrar.
 
-Öppna [http://localhost:1349](http://localhost:1349) och logga in med `admin` / `admin`. Du ombeds byta lösenord vid första inloggningen.
+Jobbresultat sparas inte i datavolymen, så de försvinner när containern byts ut (vid en avbildsuppgradering, till exempel) och deras nedladdningslänkar slutar fungera. [Behålla jobbresultat](/sv/guide/deployment#keeping-job-output) i driftsättningsguiden visar hur du behåller dem.
+
+::: tip Körning på 4 GB RAM eller mindre
+På en Raspberry Pi, en gammal bärbar dator eller en liten VPS kör du ett jobb i taget och begränsar bildtrådspoolen genom att lägga till `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` i kommandot ovan, och hoppar över de tunga AI-paketen. [Miljöer med små resurser](/sv/guide/low-resource#tuning-knobs) listar de andra gränserna som är värda att ange och vad du kan förvänta dig av begränsad hårdvara.
+:::
 
 ::: tip Anonym produktanalys
 SnapOtter innehåller anonym produktanalys som standard. Du stänger av den genom att öppna **Settings → System → Privacy** och stänga av **Anonymous Product Analytics**. Den slutar omedelbart för hela instansen.
@@ -36,25 +42,51 @@ Felövervakningen drivs av [Sentry](https://sentry.io), som sponsrar SnapOtter g
 Mer information om vad som samlas in finns i [Vad SnapOtter samlar in](/sv/guide/telemetry).
 :::
 
-::: tip NVIDIA CUDA-acceleration
-Lägg till `--gpus all` för CUDA-accelererad bakgrundsborttagning, uppskalning, ansiktsförbättring och restaurering på NVIDIA. OCR förblir CPU-baserad och fungerar i samma avbild med eller utan GPU-åtkomst:
+## GPU-acceleration {#gpu-acceleration}
+
+Ett NVIDIA-grafikkort gör de tunga AI-verktygen mycket snabbare: uppskalning (ungefär 47 gånger), ansiktsförbättring (ungefär 12 gånger), transkribering och bakgrundsborttagning (ungefär 4 gånger vardera). OCR, ansiktsdetektering och fotorestaurering förblir CPU-bundna, så en GPU hjälper inte dem. Samma avbild fungerar för båda; lägg till `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Kräver [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Faller automatiskt tillbaka till CPU när CUDA inte är tillgängligt. Acceleration med Intel/AMD iGPU via VA-API, Quick Sync eller OpenCL stöds inte för AI-inferens i dagsläget. Se [Docker-taggar](/sv/guide/docker-tags) för benchmarks. Om AI-verktygen körs på CPU trots `--gpus all`, se [Verifiera GPU-acceleration](/sv/guide/deployment#verify-gpu-acceleration).
-:::
+Detta kräver [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) på värden. Utan CUDA faller SnapOtter automatiskt tillbaka till CPU. Acceleration med Intel/AMD iGPU via VA-API, Quick Sync eller OpenCL stöds inte för AI-inferens i dagsläget.
 
-::: details Finns även på GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [Maskinvarukrav](/sv/guide/deployment#full-ai-tools-on-nvidia-cuda) har alla tider för GPU och CPU, och [benchmarks för Docker-avbilden](/sv/guide/docker-tags#benchmarks) har siffrorna för varm och kall start.
+- Om AI-verktygen fortfarande körs på CPU, se [Verifiera GPU-acceleration](/sv/guide/deployment#verify-gpu-acceleration).
+- För Compose, använd [snabbstarten för NVIDIA CUDA](/sv/guide/deployment#quick-start-nvidia-cuda) i driftsättningsguiden.
+
+## Andra sätt att installera {#other-ways-to-install}
+
+### Enskild container med Compose {#single-container-compose}
+
+Samma container i inbäddat läge som i Snabbstart, skriven som en Compose-fil så att den är lättare att hålla koll på och ändra. Spara den som `docker-compose.yml` och kör `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Båda registren publicerar samma avbild vid varje utgåva.
-:::
+Precis som kommandot `docker run` är detta tänkt för att testa SnapOtter och för små installationer. Varje inställning i [Konfiguration](/sv/guide/configuration) hamnar under `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (produktion) {#docker-compose}
 
 Använd produktionsfilen som underhålls och testas för varje utgåva i stället för att kopiera ett förkortat Compose-exempel från den här sidan:
 
@@ -80,7 +112,15 @@ Den kanoniska [`docker/docker-compose.yml`](https://github.com/snapotter-hq/Snap
 
 Se [Konfiguration](/sv/guide/configuration) för alla miljövariabler och [Säkerhet och härdning](/sv/guide/security) för hemligheter, nätverkspolicy och vägledning om säkerhetskopiering.
 
-## Bygg från källkod {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Både Docker Hub och GHCR publicerar samma avbild vid varje utgåva. Byt avbildens namn för att hämta från GHCR:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Bygg från källkod {#build-from-source}
 
 **Förutsättningar:** Node.js 22.22+, pnpm 9+, Docker (för Postgres + Redis), Python 3.11+ (för AI-funktioner), Git.
 

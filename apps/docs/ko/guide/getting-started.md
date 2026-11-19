@@ -1,8 +1,8 @@
 ---
-description: "Docker로 명령 한 줄에 SnapOtter를 설치합니다. Docker Compose 설정, 소스 빌드, 전체 기능 개요를 포함합니다."
-i18n_source_hash: 2291f9ca0071
+description: "Docker로 명령 한 줄에 SnapOtter를 설치하고, 로그인한 뒤 첫 번째 도구를 열어 봅니다. GPU 가속, 저사양 장비, Docker Compose, 소스 빌드도 다룹니다."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: e27cdde9c6c6
+i18n_output_hash: 1af3d1e13cfb
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## 빠른 시작 {#quick-start}
 
+명령 하나를 실행합니다.
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-이 컨테이너 하나로 필요한 모든 것이 실행됩니다. `DATABASE_URL`를 설정하지 않으면 루프백 인터페이스에서 자체 PostgreSQL과 Redis를 시작하고(내장 모드) 모든 데이터를 `SnapOtter-data` 볼륨에 보관합니다. SnapOtter를 가장 빠르게 사용해 보거나 홈랩에서 셀프 호스팅하기에 좋은 방법입니다. 프로덕션에서는 PostgreSQL과 Redis를 각자의 컨테이너에 두는 [표준 Docker Compose 스택](#docker-compose)을 사용하세요. 내장 모드는 root(기본값)로 실행되며 `DATABASE_URL`를 설정하는 즉시 자동으로 꺼집니다.
+그런 다음 [http://localhost:1349](http://localhost:1349)에 접속해 `admin` / `admin`(으)로 로그인합니다. 처음 로그인할 때 비밀번호를 변경하라는 안내가 표시됩니다.
 
-작업 결과는 데이터 볼륨에 보관되지 않으므로 컨테이너가 교체되면 (예: 이미지 업그레이드) 사라지고, 다운로드 링크도 더 이상 작동하지 않습니다. 보존하는 방법은 배포 가이드의 볼륨 섹션에 설명되어 있습니다.
+이제 도구를 열어 보세요. 사이드바에서 하나를 고르거나 [크기 조정](http://localhost:1349/image/resize)으로 바로 이동해 이미지를 넣고 결과를 내려받으면 됩니다.
 
-Raspberry Pi, 오래된 노트북, 작은 VPS에 설치하시나요? 튜닝된 안내와 제한된 하드웨어에서 기대할 수 있는 성능은 [저사양 환경 구성](/ko/guide/low-resource)을 참고하세요.
+설치는 이게 전부입니다. 이 컨테이너 하나로 필요한 모든 것이 실행됩니다. `DATABASE_URL`를 설정하지 않으면 루프백 인터페이스에서 자체 PostgreSQL과 Redis를 시작하고(내장 모드) 모든 데이터를 `SnapOtter-data` 볼륨에 보관합니다. SnapOtter를 가장 빠르게 사용해 보거나 홈랩에서 셀프 호스팅하기에 좋은 방법입니다. 내장 모드는 root(기본값)로 실행되며 `DATABASE_URL`를 설정하는 즉시 자동으로 꺼집니다. 프로덕션에서는 PostgreSQL과 Redis를 각자의 컨테이너에 두는 [Docker Compose 스택](#docker-compose)을 사용하세요.
 
-[http://localhost:1349](http://localhost:1349)에 접속한 뒤 `admin` / `admin`(으)로 로그인합니다. 처음 로그인할 때 비밀번호를 변경하라는 안내가 표시됩니다.
+작업 결과는 데이터 볼륨에 보관되지 않으므로 컨테이너가 교체되면 (예: 이미지 업그레이드) 사라지고, 다운로드 링크도 더 이상 작동하지 않습니다. 배포 가이드의 [작업 출력 보존](/ko/guide/deployment#keeping-job-output)에서 보존하는 방법을 안내합니다.
+
+::: tip RAM 4 GB 이하에서 실행하기
+Raspberry Pi, 오래된 노트북, 작은 VPS에서는 작업을 한 번에 하나씩 실행하고, 위 명령에 `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2`를 추가해 이미지 스레드 풀을 제한하며, 무거운 AI 번들은 설치하지 마세요. 함께 설정할 만한 다른 제한과 제한된 하드웨어에서 기대할 수 있는 성능은 [저사양 환경 구성](/ko/guide/low-resource#tuning-knobs)에 정리되어 있습니다.
+:::
 
 ::: tip 익명 제품 분석
 SnapOtter는 기본적으로 익명 제품 분석을 포함합니다. 끄려면 **설정 → 시스템 → 개인정보 보호**를 열고 **익명 제품 분석**을 끄세요. 인스턴스 전체에서 즉시 중단됩니다.
@@ -36,25 +42,51 @@ SnapOtter는 기본적으로 익명 제품 분석을 포함합니다. 끄려면 
 수집되는 항목은 [SnapOtter가 수집하는 정보](/ko/guide/telemetry)를 참고하세요.
 :::
 
-::: tip NVIDIA CUDA 가속
-NVIDIA CUDA로 배경 제거, 업스케일, 얼굴 보정, 복원을 가속하려면 `--gpus all`를 추가하세요. OCR은 계속 CPU 기반이며, GPU 접근 여부와 관계없이 같은 이미지에서 동작합니다.
+## GPU 가속 {#gpu-acceleration}
+
+NVIDIA GPU를 사용하면 무거운 AI 도구가 훨씬 빨라집니다. 업스케일(약 47배), 얼굴 보정(약 12배), 받아쓰기, 배경 제거(각각 약 4배)가 해당합니다. OCR, 얼굴 감지, 사진 복원은 계속 CPU에 의존하므로 GPU가 도움이 되지 않습니다. 같은 이미지로 둘 다 처리할 수 있으며, `--gpus all`를 추가하세요.
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)이 필요합니다. CUDA를 사용할 수 없으면 자동으로 CPU로 전환됩니다. VA-API, Quick Sync, OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론에서 지원되지 않습니다. 벤치마크는 [Docker 태그](/ko/guide/docker-tags)를 참고하세요. `--gpus all`를 설정했는데도 AI 도구가 CPU에서 실행된다면 [GPU 가속 확인](/ko/guide/deployment#verify-gpu-acceleration)을 참고하세요.
-:::
+호스트에 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)이 필요합니다. CUDA를 사용할 수 없으면 SnapOtter가 자동으로 CPU로 전환됩니다. VA-API, Quick Sync, OpenCL을 통한 Intel/AMD iGPU 가속은 현재 AI 추론에서 지원되지 않습니다.
 
-::: details GHCR에서도 제공
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [하드웨어 요구 사항](/ko/guide/deployment#full-ai-tools-on-nvidia-cuda)에 GPU와 CPU의 전체 처리 시간이, [Docker 이미지 벤치마크](/ko/guide/docker-tags#benchmarks)에 웜 스타트와 콜드 스타트 수치가 있습니다.
+- AI 도구가 여전히 CPU에서 실행된다면 [GPU 가속 확인](/ko/guide/deployment#verify-gpu-acceleration)을 참고하세요.
+- Compose를 사용한다면 배포 가이드의 [NVIDIA CUDA 빠른 시작](/ko/guide/deployment#quick-start-nvidia-cuda)을 참고하세요.
+
+## 다른 설치 방법 {#other-ways-to-install}
+
+### Compose로 단일 컨테이너 실행 {#single-container-compose}
+
+빠른 시작과 같은 내장 모드 컨테이너를 Compose 파일로 작성한 것으로, 관리하고 수정하기 더 쉽습니다. `docker-compose.yml`로 저장하고 `docker compose up -d`를 실행하세요.
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-두 레지스트리 모두 릴리스마다 동일한 이미지를 게시합니다.
-:::
+`docker run` 명령과 마찬가지로, 이 방식은 SnapOtter를 사용해 보거나 소규모로 설치하기 위한 것입니다. [구성](/ko/guide/configuration)의 모든 설정은 `environment` 아래에 넣습니다.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (프로덕션) {#docker-compose}
 
 이 페이지의 축약된 Compose 예시를 복사하는 대신, 릴리스마다 관리하고 테스트하는 프로덕션 파일을 사용하세요.
 
@@ -80,7 +112,15 @@ docker compose -f docker-compose.yml up -d --no-build
 
 모든 환경 변수는 [구성](/ko/guide/configuration)을, 시크릿, 네트워크 정책, 백업 안내는 [보안 및 강화](/ko/guide/security)를 참고하세요.
 
-## 소스에서 빌드 {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub와 GHCR 모두 릴리스마다 동일한 이미지를 게시합니다. GHCR에서 받으려면 이미지 이름을 바꾸세요.
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### 소스에서 빌드 {#build-from-source}
 
 **사전 요구 사항:** Node.js 22.22+, pnpm 9+, Docker(Postgres + Redis용), Python 3.11+(AI 기능용), Git.
 

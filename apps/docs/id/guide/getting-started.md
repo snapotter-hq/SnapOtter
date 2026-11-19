@@ -1,30 +1,36 @@
 ---
-description: "Instal SnapOtter dengan Docker dalam satu perintah. Mencakup pengaturan Docker Compose, build dari source, dan ikhtisar fitur lengkap."
-i18n_source_hash: 2291f9ca0071
+description: "Instal SnapOtter dengan Docker dalam satu perintah, masuk, lalu buka alat pertama Anda. Mencakup akselerasi GPU, mesin kecil, Docker Compose, dan build dari source."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: b76cb0aa6890
+i18n_output_hash: b74ee775acaa
 i18n_hash_version: 2
 ---
 
 # Memulai {#getting-started}
 
 ::: tip Coba sebelum menginstal
-Jelajahi UI lengkap di [demo.snapotter.com](https://demo.snapotter.com) - tanpa pendaftaran atau instalasi.
+Jelajahi UI lengkap di [demo.snapotter.com](https://demo.snapotter.com), tanpa pendaftaran atau instalasi.
 :::
 
 ## Mulai Cepat {#quick-start}
+
+Jalankan satu perintah:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Satu container ini menjalankan semua yang dibutuhkan: tanpa `DATABASE_URL` yang diatur, container memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode embedded) dan menyimpan semua data di volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Untuk produksi, gunakan [stack Docker Compose kanonis](#docker-compose), yang menjaga PostgreSQL dan Redis dalam container masing-masing. Mode embedded berjalan sebagai root (default) dan mati secara otomatis begitu Anda mengatur `DATABASE_URL`.
+Lalu buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin` / `admin`. Anda akan diminta mengganti password pada login pertama.
 
-Hasil job tidak disimpan di volume data, jadi hasilnya hilang saat container diganti (misalnya saat upgrade image) dan tautan unduhnya berhenti berfungsi. Bagian Volume di panduan Deployment menjelaskan cara menyimpannya.
+Sekarang buka sebuah alat. Pilih satu dari sidebar, atau langsung ke [Resize](http://localhost:1349/image/resize), letakkan gambar, lalu unduh hasilnya.
 
-Menginstal di Raspberry Pi, laptop lama, atau VPS kecil? Lihat [Setup Sumber Daya Rendah](/id/guide/low-resource) untuk panduan yang sudah disetel dan apa yang bisa diharapkan dari perangkat keras terbatas.
+Hanya itu instalasinya. Satu container ini menjalankan semua yang dibutuhkan: tanpa `DATABASE_URL` yang diatur, container memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode embedded) dan menyimpan semua data di volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Mode embedded berjalan sebagai root (default) dan mati secara otomatis begitu Anda mengatur `DATABASE_URL`. Untuk produksi, gunakan [stack Docker Compose](#docker-compose), yang menjaga PostgreSQL dan Redis dalam container masing-masing.
 
-Buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin` / `admin`. Anda akan diminta mengganti password pada login pertama.
+Hasil job tidak disimpan di volume data, jadi hasilnya hilang saat container diganti (misalnya saat upgrade image) dan tautan unduhnya berhenti berfungsi. [Menyimpan output job](/id/guide/deployment#keeping-job-output) di panduan Deployment menjelaskan cara menyimpannya.
+
+::: tip Menjalankan di RAM 4 GB atau kurang
+Di Raspberry Pi, laptop lama, atau VPS kecil, jalankan satu job dalam satu waktu dan batasi thread pool gambar dengan menambahkan `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` ke perintah di atas, lalu lewati bundle AI yang berat. [Setup Sumber Daya Rendah](/id/guide/low-resource#tuning-knobs) memuat batas lain yang layak diatur dan apa yang bisa diharapkan dari perangkat keras terbatas.
+:::
 
 ::: tip Analitik Produk Anonim
 SnapOtter menyertakan analitik produk anonim secara default. Untuk mematikannya, buka **Settings → System → Privacy** dan matikan **Anonymous Product Analytics**. Analitik berhenti seketika untuk seluruh instance.
@@ -36,25 +42,51 @@ Pemantauan error didukung oleh [Sentry](https://sentry.io), yang mensponsori Sna
 Untuk detail tentang apa yang dikumpulkan, lihat [Apa yang dikumpulkan SnapOtter](/id/guide/telemetry).
 :::
 
-::: tip Akselerasi NVIDIA CUDA
-Tambahkan `--gpus all` untuk penghapusan latar belakang, upscaling, peningkatan wajah, dan pemulihan yang dipercepat NVIDIA CUDA. OCR tetap berbasis CPU dan berfungsi pada image yang sama dengan atau tanpa akses GPU:
+## Akselerasi GPU {#gpu-acceleration}
+
+GPU NVIDIA membuat alat AI yang berat jauh lebih cepat: upscaling (sekitar 47 kali), peningkatan wajah (sekitar 12 kali), transkripsi, dan penghapusan latar belakang (masing-masing sekitar 4 kali). OCR, deteksi wajah, dan pemulihan foto tetap bergantung pada CPU, jadi GPU tidak membantu alat-alat itu. Image yang sama berlaku untuk keduanya; tambahkan `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Memerlukan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Otomatis beralih ke CPU ketika CUDA tidak tersedia. Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini belum didukung untuk inferensi AI. Lihat [Docker Tags](/id/guide/docker-tags) untuk benchmark. Jika alat AI berjalan di CPU meskipun `--gpus all`, lihat [Verifikasi akselerasi GPU](/id/guide/deployment#verify-gpu-acceleration).
-:::
+Ini memerlukan [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) di host. Tanpa CUDA, SnapOtter beralih ke CPU dengan sendirinya. Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini belum didukung untuk inferensi AI.
 
-::: details Tersedia juga di GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [Persyaratan Perangkat Keras](/id/guide/deployment#full-ai-tools-on-nvidia-cuda) memuat waktu proses GPU dan CPU secara lengkap, dan [benchmark Docker Image](/id/guide/docker-tags#benchmarks) memuat angka warm dan cold start.
+- Jika alat AI masih berjalan di CPU, lihat [Verifikasi akselerasi GPU](/id/guide/deployment#verify-gpu-acceleration).
+- Untuk Compose, gunakan [NVIDIA CUDA Quick Start](/id/guide/deployment#quick-start-nvidia-cuda) di panduan Deployment.
+
+## Cara Instalasi Lainnya {#other-ways-to-install}
+
+### Single Container dengan Compose {#single-container-compose}
+
+Container mode embedded yang sama seperti di Mulai Cepat, ditulis sebagai file Compose agar lebih mudah dipantau dan diubah. Simpan sebagai `docker-compose.yml` lalu jalankan `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Kedua registry menerbitkan image yang sama pada setiap rilis.
-:::
+Seperti perintah `docker run`, ini ditujukan untuk mencoba SnapOtter dan instalasi kecil. Setiap pengaturan di [Konfigurasi](/id/guide/configuration) ditempatkan di bawah `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (produksi) {#docker-compose}
 
 Gunakan file produksi yang dirawat dan diuji pada setiap rilis, jangan menyalin contoh Compose ringkas dari halaman ini:
 
@@ -76,11 +108,19 @@ docker compose -f docker-compose.yml up -d --no-build
 
 Buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin` / `admin`.
 
-[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) kanonis mencakup keempat volume runtime, health check, batas sumber daya, konfigurasi Redis yang tahan lama, image database/cache yang disematkan, dan hardening container terkini. Ganti password admin default segera setelah login pertama. Untuk deployment yang dapat direproduksi, sematkan image aplikasi SnapOtter ke tag rilis atau digest yang sudah Anda verifikasi, alih-alih mengikuti `latest`.
+[`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) kanonis mencakup keempat volume runtime, health check, batas sumber daya, konfigurasi Redis yang tahan lama, image database/cache yang dipatok versinya, dan hardening container terkini. Ganti password admin default segera setelah login pertama. Untuk deployment yang dapat direproduksi, patok image aplikasi SnapOtter ke tag rilis atau digest yang telah Anda verifikasi, jangan mengikuti `latest`.
 
 Lihat [Konfigurasi](/id/guide/configuration) untuk semua variabel lingkungan dan [Keamanan & Hardening](/id/guide/security) untuk secret, kebijakan jaringan, dan panduan backup.
 
-## Build dari Source {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub dan GHCR sama-sama menerbitkan image yang sama pada setiap rilis. Untuk menarik dari GHCR, ganti nama image:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Build dari Source {#build-from-source}
 
 **Prasyarat:** Node.js 22.22+, pnpm 9+, Docker (untuk Postgres + Redis), Python 3.11+ (untuk fitur AI), Git.
 
@@ -113,7 +153,7 @@ Rangkai alat menjadi alur kerja multi-langkah dan terapkan pada satu gambar atau
 
 1. Buka **Pipelines** di sidebar.
 2. Tambahkan langkah (alat apa pun, pengaturan apa pun).
-3. Jalankan pada satu file - atau seluruh batch sekaligus.
+3. Jalankan pada satu file, atau seluruh batch sekaligus.
 4. Simpan pipeline untuk digunakan kembali nanti.
 
 Pipeline mengizinkan 20 langkah secara default. Atur `MAX_PIPELINE_STEPS=0` untuk membuat batasnya tanpa batas.
@@ -141,7 +181,7 @@ Buat API key di bawah **Settings → API Keys**. Lihat [referensi REST API](/id/
 
 Aktifkan banyak pengguna dengan kontrol akses berbasis peran:
 
-- **Admin**: akses penuh - kelola pengguna, tim, pengaturan, semua file/pipeline/API key
+- **Admin**: akses penuh, kelola pengguna, tim, pengaturan, semua file/pipeline/API key
 - **User**: gunakan alat, kelola file/pipeline/API key sendiri
 
 Buat tim di bawah **Settings → Teams** untuk mengelompokkan pengguna.
