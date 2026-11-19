@@ -315,6 +315,7 @@ export function LoginPage() {
     samlEnabled,
     samlProviderName,
     ssoEnforced,
+    defaultCredentialsActive,
   } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [username, setUsername] = useState("");
@@ -863,6 +864,17 @@ export function LoginPage() {
                 onSubmit={handleSubmit}
                 className={`space-y-4${ssoEnforced ? " opacity-60" : ""}`}
               >
+                {defaultCredentialsActive && !ssoEnforced && (
+                  <p
+                    data-testid="default-credentials-hint"
+                    className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
+                  >
+                    {format(t.auth.defaultCredentialsHint, {
+                      username: "admin",
+                      password: "admin",
+                    })}
+                  </p>
+                )}
                 <div>
                   <label
                     htmlFor="username"

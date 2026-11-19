@@ -5355,6 +5355,7 @@ export const de: TranslationKeys = {
       "Ihr Konto ist nicht berechtigt, auf diese Anwendung zuzugreifen. Kontaktieren Sie Ihren Administrator.",
     samlUserLimitReached: "Benutzerlimit erreicht. Kontaktieren Sie Ihren Administrator.",
     ssoEnforcedLocalRestricted: "Lokale Anmeldung ist auf autorisierte Administratoren beschränkt.",
+    defaultCredentialsHint: "Zum ersten Mal hier? Melden Sie sich mit {username} / {password} an.",
     mfaRequired: "Geben Sie Ihren Authentifizierungscode ein",
     mfaRecoveryHint: "Sie können auch einen Wiederherstellungscode verwenden",
     verify: "Bestätigen",

@@ -1,6 +1,6 @@
 ---
 description: "Встановіть SnapOtter за допомогою Docker однією командою. Включає налаштування Docker Compose, збірку з вихідного коду та повний огляд можливостей."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 534692cc4879
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Встановлюєте на Raspberry Pi, старий ноутбук або невеликий VPS? Див. [Low-Resource Setups](/uk/guide/low-resource) з налаштованою покроковою інструкцією та очікуваннями від обмеженого обладнання.
 
-Під час першого входу вас попросять змінити пароль.
+Відкрийте [http://localhost:1349](http://localhost:1349) і увійдіть із даними `admin` / `admin`. Під час першого входу вас попросять змінити пароль.
 
 ::: tip Анонімна продуктова аналітика
 SnapOtter за замовчуванням містить анонімну продуктову аналітику. Щоб вимкнути її, відкрийте **Settings → System → Privacy** і вимкніть **Anonymous Product Analytics**. Аналітика одразу припиняється для всього екземпляра.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Відкрийте [http://localhost:1349](http://localhost:1349) і увійдіть із даними `admin` / `admin`.
 
 Канонічний [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) містить усі чотири томи середовища виконання, перевірки стану, обмеження ресурсів, стійку конфігурацію Redis, закріплені образи бази даних і кешу та актуальне посилення безпеки контейнерів. Одразу після першого входу змініть типовий пароль адміністратора. Для відтворюваного розгортання закріпіть образ застосунку SnapOtter на перевіреному вами теґу релізу або digest, замість того щоб відстежувати `latest`.
 

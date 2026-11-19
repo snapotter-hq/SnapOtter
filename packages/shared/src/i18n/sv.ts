@@ -5309,6 +5309,7 @@ export const sv: TranslationKeys = {
       "Ditt konto har inte behörighet att använda denna applikation. Kontakta din administratör.",
     samlUserLimitReached: "Användargränsen nådd. Kontakta din administratör.",
     ssoEnforcedLocalRestricted: "Lokal inloggning är begränsad till behöriga administratörer.",
+    defaultCredentialsHint: "Första gången här? Logga in med {username} / {password}.",
     mfaRequired: "Ange din autentiseringskod",
     mfaRecoveryHint: "Du kan även använda en återställningskod",
     verify: "Verifiera",

@@ -1,6 +1,6 @@
 ---
 description: "Docker を使って SnapOtter を 1 つのコマンドでインストールします。Docker Compose のセットアップ、ソースからのビルド、機能の概要も含まれます。"
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 89935b2562fb
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Raspberry Pi、古いノート PC、小規模な VPS にインストールしますか。調整済みの手順と、制約のあるハードウェアで期待できる動作については[低リソース環境のセットアップ](/ja/guide/low-resource)を参照してください。
 
-初回ログイン時にパスワードの変更を求められます。
+[http://localhost:1349](http://localhost:1349) を開き、`admin` / `admin` でサインインします。初回ログイン時にパスワードの変更を求められます。
 
 ::: tip 匿名のプロダクト分析
 SnapOtter にはデフォルトで匿名のプロダクト分析が含まれています。無効にするには、**Settings → System → Privacy** を開き、**Anonymous Product Analytics** をオフにします。インスタンス全体で即座に停止します。
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+[http://localhost:1349](http://localhost:1349) を開き、`admin` / `admin` でサインインします。
 
 標準の [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) には、4 つのランタイムボリューム、ヘルスチェック、リソース制限、永続的な Redis 設定、固定されたデータベース/キャッシュイメージ、最新のコンテナハードニングがすべて含まれています。初回ログイン後すぐに、デフォルトの管理者パスワードを変更してください。再現性のあるデプロイにするには、`latest` に追従するのではなく、検証済みのリリースタグまたはダイジェストに SnapOtter アプリケーションイメージを固定してください。
 

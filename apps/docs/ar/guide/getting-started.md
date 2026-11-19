@@ -1,6 +1,6 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: c959ff992908
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 هل تثبّت على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير؟ راجع [الإعدادات منخفضة الموارد](/ar/guide/low-resource) للحصول على شرح مضبوط وما يمكن توقعه من العتاد المحدود.
 
-ستُطالَب بتغيير كلمة المرور عند أول تسجيل دخول.
+افتح [http://localhost:1349](http://localhost:1349) وسجّل الدخول باستخدام `admin` / `admin`. ستُطالَب بتغيير كلمة المرور عند أول تسجيل دخول.
 
 ::: tip التحليلات المجهولة للمنتج
 يتضمن SnapOtter تحليلات مجهولة للمنتج افتراضياً. لإيقافها، افتح **Settings → System → Privacy** وأوقف **Anonymous Product Analytics**. تتوقف فوراً على مستوى النسخة بالكامل.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+افتح [http://localhost:1349](http://localhost:1349) وسجّل الدخول باستخدام `admin` / `admin`.
 
 يتضمن [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) المعتمد جميع وحدات التخزين الأربع الخاصة بالتشغيل، وفحوص السلامة، وحدود الموارد، وإعداد Redis الدائم، وصور قاعدة البيانات/الذاكرة المؤقتة المثبَّتة، وتحصين الحاوية الحالي. غيّر كلمة مرور المسؤول الافتراضية فور تسجيل الدخول الأول. للحصول على نشر قابل لإعادة الإنتاج، ثبّت صورة تطبيق SnapOtter على وسم الإصدار أو digest الذي تحققت منه بدلاً من اتباع `latest`.
 

@@ -1,6 +1,6 @@
 ---
 description: "SnapOtter को Docker के साथ एक ही कमांड में इंस्टॉल करें। इसमें Docker Compose सेटअप, source से build, और फ़ीचर्स का पूरा अवलोकन शामिल है।"
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: effb9b0317e5
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Raspberry Pi, पुराने laptop, या छोटे VPS पर इंस्टॉल कर रहे हैं? ट्यून किए गए walkthrough और सीमित hardware से क्या उम्मीद रखें, यह जानने के लिए [Low-Resource Setups](/hi/guide/low-resource) देखें।
 
-पहली बार login करने पर आपसे पासवर्ड बदलने को कहा जाएगा।
+[http://localhost:1349](http://localhost:1349) खोलें और `admin` / `admin` से साइन इन करें। पहली बार login करने पर आपसे पासवर्ड बदलने को कहा जाएगा।
 
 ::: tip गुमनाम Product Analytics
 SnapOtter में डिफ़ॉल्ट रूप से गुमनाम product analytics शामिल हैं। इसे बंद करने के लिए **Settings → System → Privacy** खोलें और **Anonymous Product Analytics** बंद करें। यह पूरे instance के लिए तुरंत बंद हो जाता है।
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+[http://localhost:1349](http://localhost:1349) खोलें और `admin` / `admin` से साइन इन करें।
 
 Canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) में चारों runtime volumes, health checks, resource limits, durable Redis configuration, pinned database/cache images, और मौजूदा container hardening शामिल हैं। पहले login के तुरंत बाद default admin पासवर्ड बदल दें। दोहराने योग्य deployment के लिए, `latest` को फ़ॉलो करने के बजाय SnapOtter application image को उस release tag या digest पर pin करें जिसे आपने सत्यापित किया है।
 

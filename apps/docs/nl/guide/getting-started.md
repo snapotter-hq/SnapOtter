@@ -1,6 +1,6 @@
 ---
 description: "Installeer SnapOtter met Docker in één opdracht. Inclusief Docker Compose-configuratie, bouwen vanaf de broncode en een volledig functieoverzicht."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 42ee500adb31
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Taakresultaten worden niet in het datavolume bewaard, dus ze verdwijnen wanneer 
 
 Installeert u op een Raspberry Pi, een oude laptop of een kleine VPS? Zie [Setups met weinig resources](/nl/guide/low-resource) voor een afgestemde handleiding en wat u van beperkte hardware mag verwachten.
 
-U wordt gevraagd uw wachtwoord te wijzigen bij de eerste aanmelding.
+Open [http://localhost:1349](http://localhost:1349) en log in met `admin` / `admin`. U wordt gevraagd uw wachtwoord te wijzigen bij de eerste aanmelding.
 
 ::: tip Anonieme productanalyse
 SnapOtter bevat standaard anonieme productanalyse. Om dit uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Open [http://localhost:1349](http://localhost:1349) en log in met `admin` / `admin`.
 
 Het canonieke [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) bevat alle vier de runtime-volumes, healthchecks, resourcelimieten, duurzame Redis-configuratie, vastgezette database-/cache-images en de huidige containerhardening. Wijzig het standaard beheerderswachtwoord direct na de eerste aanmelding. Zet voor een reproduceerbare implementatie de SnapOtter-applicatie-image vast op de releasetag of digest die u hebt gecontroleerd, in plaats van `latest` te volgen.
 

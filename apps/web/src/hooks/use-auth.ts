@@ -17,6 +17,8 @@ interface AuthState {
   samlEnabled: boolean;
   samlProviderName: string | null;
   ssoEnforced: boolean;
+  /** The seeded admin still has the shipped admin / admin (#4817). */
+  defaultCredentialsActive: boolean;
   loginMethod: string | null;
   hasLocalPassword: boolean;
   totpEnabled: boolean;
@@ -49,6 +51,7 @@ interface AuthConfig {
   samlEnabled?: boolean;
   samlProviderName?: string | null;
   ssoEnforced?: boolean;
+  defaultCredentialsActive?: boolean;
 }
 
 // /api/v1/config/auth returns instance config (auth mode, OIDC/SAML setup, and
@@ -99,6 +102,7 @@ export function useAuth() {
     samlEnabled: false,
     samlProviderName: null,
     ssoEnforced: false,
+    defaultCredentialsActive: false,
     loginMethod: null,
     hasLocalPassword: false,
     totpEnabled: false,
@@ -133,6 +137,7 @@ export function useAuth() {
               samlEnabled: false,
               samlProviderName: null,
               ssoEnforced: false,
+              defaultCredentialsActive: false,
               loginMethod: null,
               hasLocalPassword: false,
               totpEnabled: false,
@@ -164,6 +169,7 @@ export function useAuth() {
               samlEnabled: config.samlEnabled ?? false,
               samlProviderName: config.samlProviderName ?? null,
               ssoEnforced: config.ssoEnforced ?? false,
+              defaultCredentialsActive: false,
               loginMethod: session.user?.loginMethod ?? null,
               hasLocalPassword: session.user?.hasLocalPassword ?? false,
               totpEnabled: session.user?.totpEnabled === true,
@@ -193,6 +199,7 @@ export function useAuth() {
               samlEnabled: config.samlEnabled ?? false,
               samlProviderName: config.samlProviderName ?? null,
               ssoEnforced: config.ssoEnforced ?? false,
+              defaultCredentialsActive: config.defaultCredentialsActive === true,
               loginMethod: null,
               hasLocalPassword: false,
               totpEnabled: false,

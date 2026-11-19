@@ -1,6 +1,6 @@
 ---
 description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว ครอบคลุมการตั้งค่า Docker Compose การสร้างจากซอร์สโค้ด และภาพรวมฟีเจอร์ทั้งหมด"
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 2475289bf2fc
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 ติดตั้งบน Raspberry Pi แล็ปท็อปเก่า หรือ VPS ขนาดเล็กใช่ไหม ดู [การตั้งค่าสำหรับทรัพยากรจำกัด](/th/guide/low-resource) สำหรับขั้นตอนที่ปรับแต่งแล้วและสิ่งที่คาดหวังได้จากฮาร์ดแวร์ที่มีข้อจำกัด
 
-ระบบจะขอให้คุณเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+เปิด [http://localhost:1349](http://localhost:1349) แล้วเข้าสู่ระบบด้วย `admin` / `admin` ระบบจะขอให้คุณเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
 
 ::: tip การวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน
 SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตนเป็นค่าเริ่มต้น หากต้องการปิด ให้เปิด **Settings → System → Privacy** แล้วปิด **Anonymous Product Analytics** การทำงานจะหยุดทันทีสำหรับทั้งอินสแตนซ์
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+เปิด [http://localhost:1349](http://localhost:1349) แล้วเข้าสู่ระบบด้วย `admin` / `admin`
 
 [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) มาตรฐานประกอบด้วยวอลุ่มรันไทม์ทั้งสี่ การตรวจสอบสถานะ ขีดจำกัดทรัพยากร การกำหนดค่า Redis แบบคงทน อิมเมจฐานข้อมูล/แคชที่ตรึงเวอร์ชัน และการเสริมความแข็งแกร่งของคอนเทนเนอร์ปัจจุบัน ควรเปลี่ยนรหัสผ่านผู้ดูแลระบบเริ่มต้นทันทีหลังเข้าสู่ระบบครั้งแรก เพื่อให้ติดตั้งซ้ำได้ผลเหมือนเดิม ให้ตรึงอิมเมจแอปพลิเคชัน SnapOtter ไว้กับแท็กรุ่นหรือ digest ที่คุณตรวจสอบแล้ว แทนการตาม `latest`
 

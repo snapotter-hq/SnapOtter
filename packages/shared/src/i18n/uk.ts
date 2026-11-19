@@ -5322,6 +5322,7 @@ export const uk: TranslationKeys = {
       "Ваш обліковий запис не має доступу до цього застосунку. Зверніться до адміністратора.",
     samlUserLimitReached: "Ліміт користувачів досягнуто. Зверніться до адміністратора.",
     ssoEnforcedLocalRestricted: "Локальний вхід доступний лише авторизованим адміністраторам.",
+    defaultCredentialsHint: "Уперше тут? Увійдіть із даними {username} / {password}.",
     mfaRequired: "Введіть код автентифікації",
     mfaRecoveryHint: "Також можна використати код відновлення",
     verify: "Перевірити",

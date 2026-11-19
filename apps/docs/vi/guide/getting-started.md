@@ -1,6 +1,6 @@
 ---
 description: "Cài đặt SnapOtter bằng Docker chỉ với một lệnh. Bao gồm thiết lập Docker Compose, build từ mã nguồn và tổng quan đầy đủ các tính năng."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 096343d42686
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Kết quả của các job không được lưu trong volume dữ liệu, nên c
 
 Bạn cài đặt trên Raspberry Pi, laptop cũ hoặc VPS nhỏ? Xem [Thiết lập cho tài nguyên thấp](/vi/guide/low-resource) để có hướng dẫn đã tinh chỉnh và biết nên kỳ vọng gì ở phần cứng hạn chế.
 
-Bạn sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.
+Mở [http://localhost:1349](http://localhost:1349) và đăng nhập bằng `admin` / `admin`. Bạn sẽ được yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.
 
 ::: tip Phân tích sử dụng sản phẩm ẩn danh
 SnapOtter mặc định có phân tích sử dụng sản phẩm ẩn danh. Để tắt, hãy mở **Settings → System → Privacy** và tắt **Anonymous Product Analytics**. Tính năng này dừng ngay lập tức cho toàn bộ instance.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Mở [http://localhost:1349](http://localhost:1349) và đăng nhập bằng `admin` / `admin`.
 
 Tệp [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) chuẩn bao gồm đủ bốn volume runtime, health check, giới hạn tài nguyên, cấu hình Redis bền vững, các image cơ sở dữ liệu/cache đã cố định phiên bản và các biện pháp tăng cường bảo mật container hiện hành. Hãy đổi mật khẩu quản trị mặc định ngay sau lần đăng nhập đầu tiên. Để triển khai có thể tái lập, hãy cố định image ứng dụng SnapOtter theo tag hoặc digest bản phát hành mà bạn đã xác minh thay vì theo dõi `latest`.
 

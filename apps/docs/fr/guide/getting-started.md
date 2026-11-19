@@ -1,6 +1,6 @@
 ---
 description: "Installez SnapOtter avec Docker en une seule commande. Comprend la configuration Docker Compose, la compilation depuis les sources et un aperçu complet des fonctionnalités."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 87e104f43a14
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Les résultats des tâches ne sont pas conservés dans le volume de données : i
 
 Vous installez sur un Raspberry Pi, un vieil ordinateur portable ou un petit VPS ? Consultez [Configurations à faibles ressources](/fr/guide/low-resource) pour un pas-à-pas adapté et ce à quoi vous attendre avec du matériel limité.
 
-Il vous sera demandé de changer votre mot de passe lors de la première connexion.
+Ouvrez [http://localhost:1349](http://localhost:1349) et connectez-vous avec `admin` / `admin`. Il vous sera demandé de changer votre mot de passe lors de la première connexion.
 
 ::: tip Analyses de produit anonymes
 SnapOtter inclut par défaut des analyses de produit anonymes. Pour les désactiver, ouvrez **Paramètres → Système → Confidentialité** et désactivez **Analyses de produit anonymes**. Elles s'arrêtent immédiatement pour toute l'instance.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Ouvrez [http://localhost:1349](http://localhost:1349) et connectez-vous avec `admin` / `admin`.
 
 Le [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) de référence inclut les quatre volumes d'exécution, les contrôles de santé, les limites de ressources, une configuration Redis durable, des images de base de données et de cache épinglées, ainsi que le durcissement actuel des conteneurs. Changez le mot de passe administrateur par défaut dès la première connexion. Pour un déploiement reproductible, épinglez l'image de l'application SnapOtter sur le tag de version ou le digest que vous avez vérifié, au lieu de suivre `latest`.
 

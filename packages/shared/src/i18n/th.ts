@@ -5227,6 +5227,7 @@ export const th: TranslationKeys = {
     samlUserNotAuthorized: "บัญชีของคุณไม่ได้รับอนุญาตให้เข้าถึงแอปพลิเคชันนี้ กรุณาติดต่อผู้ดูแลระบบ",
     samlUserLimitReached: "ถึงจำนวนผู้ใช้สูงสุดแล้ว กรุณาติดต่อผู้ดูแลระบบ",
     ssoEnforcedLocalRestricted: "การเข้าสู่ระบบภายในจำกัดเฉพาะผู้ดูแลที่ได้รับอนุญาตเท่านั้น",
+    defaultCredentialsHint: "ใช้งานครั้งแรกใช่ไหม เข้าสู่ระบบด้วย {username} / {password}",
     mfaRequired: "ป้อนรหัสยืนยันตัวตนของคุณ",
     mfaRecoveryHint: "คุณสามารถใช้รหัสกู้คืนได้เช่นกัน",
     verify: "ยืนยัน",

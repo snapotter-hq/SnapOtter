@@ -5311,6 +5311,7 @@ export const id: TranslationKeys = {
       "Akun Anda tidak diizinkan untuk mengakses aplikasi ini. Hubungi administrator Anda.",
     samlUserLimitReached: "Batas pengguna tercapai. Hubungi administrator Anda.",
     ssoEnforcedLocalRestricted: "Login lokal dibatasi hanya untuk administrator yang berwenang.",
+    defaultCredentialsHint: "Pertama kali di sini? Masuk dengan {username} / {password}.",
     mfaRequired: "Masukkan kode autentikasi Anda",
     mfaRecoveryHint: "Anda juga dapat menggunakan kode pemulihan",
     verify: "Verifikasi",

@@ -5318,6 +5318,7 @@ export const tr: TranslationKeys = {
       "Hesabınız bu uygulamaya erişim yetkisine sahip değil. Yöneticinizle iletişime geçin.",
     samlUserLimitReached: "Kullanıcı sınırına ulaşıldı. Yöneticinizle iletişime geçin.",
     ssoEnforcedLocalRestricted: "Yerel giriş yalnızca yetkili yöneticilerle sınırlıdır.",
+    defaultCredentialsHint: "İlk kez mi buradasınız? {username} / {password} ile giriş yapın.",
     mfaRequired: "Kimlik doğrulama kodunuzu girin",
     mfaRecoveryHint: "Kurtarma kodu da kullanabilirsiniz",
     verify: "Doğrula",

@@ -1,6 +1,6 @@
 ---
 description: "Installera SnapOtter med Docker med ett enda kommando. Omfattar installation med Docker Compose, bygge från källkod och en fullständig funktionsöversikt."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 85a2984fe8e1
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Jobbresultat sparas inte i datavolymen, så de försvinner när containern byts 
 
 Installerar du på en Raspberry Pi, en gammal bärbar dator eller en liten VPS? Se [Miljöer med små resurser](/sv/guide/low-resource) för en anpassad genomgång och vad du kan förvänta dig av begränsad hårdvara.
 
-Du ombeds byta lösenord vid första inloggningen.
+Öppna [http://localhost:1349](http://localhost:1349) och logga in med `admin` / `admin`. Du ombeds byta lösenord vid första inloggningen.
 
 ::: tip Anonym produktanalys
 SnapOtter innehåller anonym produktanalys som standard. Du stänger av den genom att öppna **Settings → System → Privacy** och stänga av **Anonymous Product Analytics**. Den slutar omedelbart för hela instansen.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Öppna [http://localhost:1349](http://localhost:1349) och logga in med `admin` / `admin`.
 
 Den kanoniska [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) omfattar alla fyra körtidsvolymer, hälsokontroller, resursgränser, beständig Redis-konfiguration, låsta databas- och cache-avbilder samt den aktuella containerhärdningen. Byt standardlösenordet för administratören direkt efter första inloggningen. För en reproducerbar driftsättning, lås SnapOtter-appavbilden till den utgåvetagg eller det digest du har verifierat i stället för att följa `latest`.
 

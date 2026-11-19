@@ -5333,6 +5333,7 @@ export const nl: TranslationKeys = {
       "Uw account is niet bevoegd om deze applicatie te gebruiken. Neem contact op met uw beheerder.",
     samlUserLimitReached: "Gebruikerslimiet bereikt. Neem contact op met uw beheerder.",
     ssoEnforcedLocalRestricted: "Lokale aanmelding is beperkt tot bevoegde beheerders.",
+    defaultCredentialsHint: "Voor het eerst hier? Log in met {username} / {password}.",
     mfaRequired: "Voer uw authenticatiecode in",
     mfaRecoveryHint: "U kunt ook een herstelcode gebruiken",
     verify: "Verifieer",

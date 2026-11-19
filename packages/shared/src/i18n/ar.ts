@@ -5264,6 +5264,7 @@ export const ar: TranslationKeys = {
     samlUserNotAuthorized: "حسابك غير مصرّح له بالوصول إلى هذا التطبيق. تواصل مع المسؤول.",
     samlUserLimitReached: "تم الوصول إلى الحد الأقصى للمستخدمين. تواصل مع المسؤول.",
     ssoEnforcedLocalRestricted: "تسجيل الدخول المحلي مقتصر على المسؤولين المصرّح لهم.",
+    defaultCredentialsHint: "هل هذه أول مرة؟ سجّل الدخول باستخدام {username} / {password}.",
     mfaRequired: "أدخل رمز المصادقة",
     mfaRecoveryHint: "يمكنك أيضًا استخدام رمز استرداد",
     verify: "تحقق",

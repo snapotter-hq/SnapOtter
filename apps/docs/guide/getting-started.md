@@ -20,7 +20,7 @@ Job results are not kept in the data volume, so they disappear when the containe
 
 Installing on a Raspberry Pi, an old laptop, or a small VPS? See [Low-Resource Setups](/guide/low-resource) for a tuned walkthrough and what to expect from constrained hardware.
 
-You will be asked to change your password on first login.
+Open [http://localhost:1349](http://localhost:1349) and sign in with `admin` / `admin`. You will be asked to change your password on first login.
 
 ::: tip Anonymous Product Analytics
 SnapOtter includes anonymous product analytics by default. To turn it off, open **Settings → System → Privacy** and switch off **Anonymous Product Analytics**. It stops immediately for the whole instance.
@@ -69,6 +69,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Open [http://localhost:1349](http://localhost:1349) and sign in with `admin` / `admin`.
 
 The canonical [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) includes all four runtime volumes, health checks, resource limits, durable Redis configuration, pinned database/cache images, and the current container hardening. Change the default admin password immediately after first login. For a reproducible deployment, pin the SnapOtter application image to the release tag or digest you verified instead of following `latest`.
 

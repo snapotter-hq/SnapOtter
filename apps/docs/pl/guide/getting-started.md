@@ -1,6 +1,6 @@
 ---
 description: "Instalacja SnapOtter z Docker jednym poleceniem. Obejmuje konfigurację Docker Compose, budowanie ze źródeł i pełny przegląd funkcji."
-i18n_source_hash: 288f6c9218f6
+i18n_source_hash: 2291f9ca0071
 i18n_provenance: machine
 i18n_output_hash: 300d86cef89b
 i18n_hash_version: 2
@@ -24,7 +24,7 @@ Wyniki zadań nie są przechowywane w wolumenie danych, więc znikają po wymian
 
 Instalacja na Raspberry Pi, starym laptopie lub małym VPS? Zobacz [Konfiguracje o ograniczonych zasobach](/pl/guide/low-resource), gdzie opisano dostrojoną instalację i czego można oczekiwać od ograniczonego sprzętu.
 
-Przy pierwszym logowaniu pojawi się prośba o zmianę hasła.
+Otwórz [http://localhost:1349](http://localhost:1349) i zaloguj się jako `admin` / `admin`. Przy pierwszym logowaniu pojawi się prośba o zmianę hasła.
 
 ::: tip Anonimowa analityka produktu
 SnapOtter domyślnie zawiera anonimową analitykę produktu. Aby ją wyłączyć, należy otworzyć **Settings → System → Privacy** i wyłączyć **Anonymous Product Analytics**. Wyłączenie działa natychmiast dla całej instancji.
@@ -73,6 +73,8 @@ printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' \
 docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
+
+Otwórz [http://localhost:1349](http://localhost:1349) i zaloguj się jako `admin` / `admin`.
 
 Kanoniczny [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) zawiera wszystkie cztery woluminy uruchomieniowe, kontrole stanu, limity zasobów, trwałą konfigurację Redis, przypięte obrazy bazy danych i pamięci podręcznej oraz aktualne utwardzenie kontenerów. Hasło domyślnego administratora należy zmienić zaraz po pierwszym logowaniu. Aby wdrożenie było powtarzalne, obraz aplikacji SnapOtter należy przypiąć do zweryfikowanego tagu wydania lub skrótu (digest), zamiast śledzić `latest`.
 
