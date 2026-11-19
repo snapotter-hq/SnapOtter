@@ -669,6 +669,12 @@ export function SystemSection() {
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  // A fresh install that hasn't answered the first-run prompt has no stored
+  // value but sends nothing, so the switch must read off, not on (#4910).
+  const analyticsOn =
+    settings.analyticsEnabled !== undefined
+      ? settings.analyticsEnabled !== "false"
+      : analyticsConfig?.consentPending !== true;
   // Snapshot of the last server state, so a save sends only the fields this tab
   // changed (never a stale value that could clobber another admin's concurrent edit).
   const originalSettingsRef = useRef<Record<string, string>>({});
@@ -964,23 +970,18 @@ export function SystemSection() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.analyticsEnabled !== "false"}
+          aria-checked={analyticsOn}
           aria-label={t.settings.privacy.analyticsLabel}
-          onClick={() =>
-            updateSetting(
-              "analyticsEnabled",
-              settings.analyticsEnabled === "false" ? "true" : "false",
-            )
-          }
+          onClick={() => updateSetting("analyticsEnabled", analyticsOn ? "false" : "true")}
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.analyticsEnabled !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            analyticsOn ? "bg-primary" : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.analyticsEnabled !== "false" ? "translate-x-6" : "translate-x-1",
+              analyticsOn ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>

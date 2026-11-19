@@ -19,6 +19,18 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
 
 let testApp: TestApp;
 
+// A fresh test database has no analyticsEnabled answer, which the gate reads
+// as undecided and sends nothing (#4910). Tests that need analytics on store
+// the admin's yes; afterEach deletes it again.
+async function enableAnalytics(): Promise<void> {
+  process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+  await db
+    .insert(schema.settings)
+    .values({ key: "analyticsEnabled", value: "true" })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+  await refreshAnalyticsGate();
+}
+
 beforeAll(async () => {
   testApp = await buildTestApp();
 });
@@ -100,8 +112,7 @@ describe("GET /api/v1/config/analytics", () => {
   });
 
   it("reports the server's feedback sink, not a copy of the baked key (#2252)", async () => {
-    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    await refreshAnalyticsGate();
+    await enableAnalytics();
 
     feedbackSink.present = true;
     const withSink = JSON.parse(
@@ -121,14 +132,13 @@ describe("GET /api/v1/config/analytics", () => {
   });
 
   it("bake on + admin opt-out: enabled flips true -> false end to end", async () => {
-    // Force the bake on for this test only (non-production override).
-    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     try {
-      // Prime the gate so the GET below doesn't kick off a background refresh
-      // that could race the opt-out write. fetchedAt is now fresh.
-      await refreshAnalyticsGate();
+      // Force the bake on and store the admin's yes. This also primes the gate
+      // so the GET below doesn't kick off a background refresh that could race
+      // the opt-out write. fetchedAt is now fresh.
+      await enableAnalytics();
 
-      // No opt-out setting yet -> effective state is enabled.
+      // Analytics is on before the opt-out.
       const before = JSON.parse(
         (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
       );
@@ -159,6 +169,99 @@ describe("GET /api/v1/config/analytics", () => {
       // afterEach also restores state, but keep the override scoped tightly.
       delete process.env.ANALYTICS_BAKED_OVERRIDE;
     }
+  });
+});
+
+describe("first-run consent (#4910)", () => {
+  afterEach(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsConsentOrigin"));
+  });
+
+  async function readConfig() {
+    return JSON.parse(
+      (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
+    );
+  }
+
+  it("a fresh install sends nothing and asks until the admin answers yes", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await db
+      .insert(schema.settings)
+      .values({ key: "analyticsConsentOrigin", value: "fresh" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "fresh" } });
+    await refreshAnalyticsGate();
+    feedbackSink.present = true;
+
+    const pending = await readConfig();
+    expect(pending.enabled).toBe(false);
+    expect(pending.consentPending).toBe(true);
+    expect(pending.posthogApiKey).toBe("");
+    expect(pending.sentryDsnWeb).toBe("");
+    expect(pending.instanceId).toBe("");
+
+    const token = await loginAsAdmin(testApp.app);
+    const put = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { analyticsEnabled: "true" },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const answered = await readConfig();
+    expect(answered.enabled).toBe(true);
+    expect(answered.consentPending).toBe(false);
+  });
+
+  it("answering no clears the prompt and keeps analytics off", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await db
+      .insert(schema.settings)
+      .values({ key: "analyticsConsentOrigin", value: "fresh" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "fresh" } });
+    await refreshAnalyticsGate();
+
+    const token = await loginAsAdmin(testApp.app);
+    await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { analyticsEnabled: "false" },
+    });
+    const answered = await readConfig();
+    expect(answered.enabled).toBe(false);
+    expect(answered.consentPending).toBe(false);
+  });
+
+  it("an upgraded instance with no stored answer stays on and is never asked", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await db
+      .insert(schema.settings)
+      .values({ key: "analyticsConsentOrigin", value: "upgrade" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "upgrade" } });
+    await refreshAnalyticsGate();
+
+    const config = await readConfig();
+    expect(config.enabled).toBe(true);
+    expect(config.consentPending).toBe(false);
+  });
+
+  it("does not ask when the bake is off, since nothing could be sent", async () => {
+    await refreshAnalyticsGate();
+    const config = await readConfig();
+    expect(config.enabled).toBe(false);
+    expect(config.consentPending).toBe(false);
+  });
+
+  it("the origin marker can't be written through the settings API", async () => {
+    const token = await loginAsAdmin(testApp.app);
+    const res = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { analyticsConsentOrigin: "upgrade" },
+    });
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
   });
 });
 

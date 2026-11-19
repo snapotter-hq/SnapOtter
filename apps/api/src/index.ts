@@ -55,7 +55,7 @@ import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-ru
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { redactUrl } from "./lib/redact-url.js";
 import { requestsInFlight, trackRequestsInFlight } from "./lib/requests-in-flight.js";
-import { ensureDefaultSettings } from "./lib/settings-helpers.js";
+import { classifyAnalyticsConsentOrigin, ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
 import { parseTrustProxy } from "./lib/trust-proxy.js";
@@ -227,6 +227,12 @@ try {
     FILES_STORAGE_PATH: env.FILES_STORAGE_PATH,
   });
 }
+
+// Decide, once, whether this database held an instance before the first-run
+// analytics consent prompt existed (#4910). It has to run after the 1.x import
+// (imported data counts as an upgrade) and before any other boot write, so the
+// rows it looks at can only have come from an earlier release.
+await classifyAnalyticsConsentOrigin();
 
 // Seed built-in roles (admin, editor, user) that legacy SQLite migrations
 // inserted via data statements.  The pg baseline is DDL-only, so roles are

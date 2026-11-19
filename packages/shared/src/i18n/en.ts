@@ -174,6 +174,12 @@ export const en = {
     discoverySourceLabel: "How did you hear about us?",
     optionalHint: "(optional)",
     continueLabel: "Continue",
+    analyticsConsentTitle: "Send anonymous usage stats and crash reports?",
+    analyticsConsentBody: "Your files are never sent. You can change this later in Settings.",
+    analyticsConsentLearnMore: "See what is sent",
+    analyticsConsentYes: "Send",
+    analyticsConsentNo: "Don't send",
+    analyticsConsentSaveFailed: "Couldn't save your choice. Please try again.",
   },
   categories: {
     // Image
@@ -4954,7 +4960,7 @@ export const en = {
     privacy: {
       title: "Privacy",
       description:
-        "Anonymous Product Analytics helps improve SnapOtter. It is on by default and set for the whole instance by an administrator.",
+        "Anonymous Product Analytics helps improve SnapOtter. An administrator sets it for the whole instance.",
       analyticsLabel: "Anonymous Product Analytics",
       analyticsDescription:
         "Share anonymous usage data (which tools run, durations, error codes) and crash reports. No IP address, no account identity. We never collect your file names, file contents, OCR output, image metadata, or document text. Turn this off to stop all of it.",

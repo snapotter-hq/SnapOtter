@@ -179,6 +179,13 @@ export const it: TranslationKeys = {
     discoverySourceLabel: "Come hai saputo di noi?",
     optionalHint: "(facoltativo)",
     continueLabel: "Continua",
+    analyticsConsentTitle: "Inviare statistiche d'uso anonime e segnalazioni di arresto anomalo?",
+    analyticsConsentBody:
+      "I tuoi file non vengono mai inviati. Puoi cambiare idea più tardi nelle Impostazioni.",
+    analyticsConsentLearnMore: "Scopri cosa viene inviato",
+    analyticsConsentYes: "Invia",
+    analyticsConsentNo: "Non inviare",
+    analyticsConsentSaveFailed: "Impossibile salvare la tua scelta. Riprova.",
   },
   categories: {
     essentials: "Essenziali",
@@ -5034,7 +5041,7 @@ export const it: TranslationKeys = {
     privacy: {
       title: "Privacy",
       description:
-        "Le analisi di prodotto anonime aiutano a migliorare SnapOtter. Sono attive per impostazione predefinita e vengono configurate per l'intera istanza da un amministratore.",
+        "Le analisi di prodotto anonime aiutano a migliorare SnapOtter. Un amministratore le configura per l'intera istanza.",
       analyticsLabel: "Analisi di prodotto anonime",
       analyticsDescription:
         "Condividi dati d'uso anonimi (quali strumenti vengono eseguiti, durate, codici di errore) e segnalazioni di arresto anomalo. Nessun indirizzo IP, nessuna identità dell'account. Non raccogliamo mai i nomi dei tuoi file, il contenuto dei file, l'output OCR, i metadati delle immagini o il testo dei documenti. Disattiva questa opzione per fermare tutto.",

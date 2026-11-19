@@ -19,7 +19,7 @@ All configuration is done through environment variables. Every variable has a se
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. The default believes only a private-network peer, so a reverse proxy on a Docker network or a LAN is trusted and a public client's forged header is not. Set `true` only when a proxy you control sits in front on a public address. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Set `off` to start a new instance with "Anonymous Product Analytics" switched off, so it sends nothing from its first boot. It only fills in the setting while nobody has chosen one. Once the setting is saved, by an admin or by this variable, changing the variable does nothing; an admin can still turn analytics on under Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (unset) | Answers the first-run analytics question in advance, so nobody is asked. Unset, a new instance asks its administrator and sends nothing until answered. `off` starts it with "Anonymous Product Analytics" switched off; `on` starts it switched on. It only fills in the setting while nobody has chosen one. Once the setting is saved, by an admin or by this variable, changing the variable does nothing; an admin can still change it under Settings > System > Privacy. |
 
 ### Authentication {#authentication}
 
@@ -82,7 +82,7 @@ Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own Po
 
 Upgrading from 1.x: put your old `snapotter.db` at `/data/snapotter.db` in the volume and embedded mode imports it into the embedded PostgreSQL on first boot. The import runs once; later boots skip it.
 
-Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, set `SNAPOTTER_ANALYTICS_DEFAULT=off` before the first boot, or use the in-app admin opt-out, to disable it.
+Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image can send analytics, but a new instance asks its administrator first and sends nothing until answered. To disable it, answer no, build with `--build-arg SNAPOTTER_ANALYTICS=off`, set `SNAPOTTER_ANALYTICS_DEFAULT=off` before the first boot, or use the in-app admin opt-out.
 
 ### Processing limits {#processing-limits}
 
