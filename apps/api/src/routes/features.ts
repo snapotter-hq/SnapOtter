@@ -37,6 +37,7 @@ import {
   shutdownDispatcher,
 } from "@snapotter/ai";
 import {
+  type AiInstallErrorKind,
   ANALYTICS_EVENTS,
   APP_VERSION,
   FEATURE_BUNDLES,
@@ -45,6 +46,7 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
+import { aiInstallFailureError, classifyAiInstallFailure } from "../lib/ai-install-failure.js";
 import { trackEvent } from "../lib/analytics.js";
 import { reportError } from "../lib/error-report.js";
 import {
@@ -192,6 +194,38 @@ async function handoffInstalledOcrRuntime(
   }
 }
 
+function trackInstallFailed(
+  bundleId: string,
+  installStartTime: number,
+  errorKind: AiInstallErrorKind,
+): void {
+  trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+    bundle_id: bundleId,
+    action: "install_failed",
+    duration_ms: Date.now() - installStartTime,
+    error_kind: errorKind,
+  });
+}
+
+/**
+ * Analytics plus Sentry for a failed venv bundle install. The OCR runtime path
+ * reports its own (structured) error to Sentry, so it only tracks the event.
+ */
+function reportInstallFailure(
+  bundleId: string,
+  installStartTime: number,
+  errorKind: AiInstallErrorKind,
+): void {
+  trackInstallFailed(bundleId, installStartTime, errorKind);
+  // The install can start from pump() after an earlier bundle's install, so
+  // the event inherits that request's transaction; the subsystem names the
+  // bundle that actually failed.
+  void reportError(aiInstallFailureError(errorKind), {
+    source: "ai-install",
+    subsystem: bundleId,
+  });
+}
+
 function startOcrInstall(bundleId: string, jobId: string, installLockFd: number): void {
   const installStartTime = Date.now();
   const installDeadline =
@@ -296,6 +330,11 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
       // background-removal install, say). The subsystem tag names the real one.
       void reportError(error, { source: "ai-install", subsystem: "ocr-runtime" });
       const errorMessage = error instanceof Error ? error.message : String(error);
+      trackInstallFailed(
+        bundleId,
+        installStartTime,
+        classifyAiInstallFailure({ message: errorMessage, error }),
+      );
       setInstallProgress(bundleId, null, errorMessage);
       try {
         await updateSingleFileProgress({
@@ -331,6 +370,11 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
  */
 function startInstall(bundleId: string, jobId: string, installLockFd: number): void {
   void refreshReservedInstall(jobId);
+  trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+    bundle_id: bundleId,
+    action: "install_started",
+    duration_ms: 0,
+  });
   if (bundleId === "ocr") {
     startOcrInstall(bundleId, jobId, installLockFd);
     return;
@@ -536,7 +580,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       }
     });
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (!finalizeOnce()) return;
 
       if (code === 0) {
@@ -600,6 +644,16 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
           { err: new Error(errorMsg), bundleId, jobId },
           "[feature-install] Bundle installation failed",
         );
+        reportInstallFailure(
+          bundleId,
+          installStartTime,
+          classifyAiInstallFailure({
+            exitCode: code,
+            signal,
+            watchdogKilled: watchdogError !== null,
+            message: errorMsg,
+          }),
+        );
         setInstallProgress(bundleId, null, errorMsg);
         void updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
       }
@@ -613,6 +667,11 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     child.on("error", (err) => {
       if (!finalizeOnce()) return;
       const errorMsg = `Failed to spawn install process: ${err.message}`;
+      reportInstallFailure(
+        bundleId,
+        installStartTime,
+        classifyAiInstallFailure({ message: errorMsg, error: err }),
+      );
       setInstallProgress(bundleId, null, errorMsg);
       void updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
       pump();

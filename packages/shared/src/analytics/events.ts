@@ -78,10 +78,28 @@ export interface PipelineExecutedProperties {
   error_code?: string;
 }
 
+/** Closed set so an install failure says why without the raw message, which can
+ * carry paths and hostnames (#4821). `disk` covers the data volume as a whole:
+ * full, read-only, or not writable. */
+export const AI_INSTALL_ERROR_KINDS = [
+  "oom",
+  "network",
+  "disk",
+  "checksum",
+  "cpu_unsupported",
+  "timeout",
+  "other",
+] as const;
+
+export type AiInstallErrorKind = (typeof AI_INSTALL_ERROR_KINDS)[number];
+
 export interface AiBundleActionProperties {
   bundle_id: string;
-  action: "installed" | "uninstalled";
+  action: "install_started" | "installed" | "install_failed" | "uninstalled";
+  /** Time since the install started; 0 for `install_started`. */
   duration_ms: number;
+  /** Only on `install_failed`. */
+  error_kind?: AiInstallErrorKind;
 }
 
 export interface InstanceStartedProperties {

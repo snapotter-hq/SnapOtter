@@ -131,6 +131,7 @@ const hoisted = vi.hoisted(() => {
   // Wraps the real helper, so the tests see what each failure path logged.
   const logErrorWithCausesMock = vi.fn();
   const reportErrorMock = vi.fn();
+  const trackEventMock = vi.fn();
   // The progress phase whose update should throw, or null for none.
   const failProgressPhase = { value: null as string | null };
   const failRefreshStream = { value: false };
@@ -138,6 +139,7 @@ const hoisted = vi.hoisted(() => {
   return {
     logErrorWithCausesMock,
     reportErrorMock,
+    trackEventMock,
     failProgressPhase,
     failRefreshStream,
     spawnCalls,
@@ -209,6 +211,12 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
   hoisted.reportErrorMock.mockImplementation(actual.reportError);
   return { ...actual, reportError: hoisted.reportErrorMock };
+});
+
+vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/analytics.js")>();
+  hoisted.trackEventMock.mockImplementation(actual.trackEvent);
+  return { ...actual, trackEvent: hoisted.trackEventMock };
 });
 
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
@@ -331,6 +339,7 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     hoisted.spawnMock.mockClear();
     hoisted.logErrorWithCausesMock.mockClear();
     hoisted.reportErrorMock.mockClear();
+    hoisted.trackEventMock.mockClear();
     hoisted.failProgressPhase.value = null;
     hoisted.failRefreshStream.value = false;
     hoisted.acquireVenvLockMock.mockClear();
@@ -1368,6 +1377,134 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       env.INSTALL_STALL_MS = originalStall;
       env.INSTALL_MAX_MS = originalMax;
     }
+  });
+
+  // #4821: a failed install used to send nothing, so failures were invisible.
+  function bundleActions(bundleId: string) {
+    return hoisted.trackEventMock.mock.calls
+      .filter((c) => c[0] === "ai_bundle_action" && c[1]?.bundle_id === bundleId)
+      .map((c) => c[1] as Record<string, unknown>);
+  }
+
+  it("tracks the start and an out-of-memory failure of a venv install, and reports it (#4821)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    hoisted.spawnCalls[0].emit("close", 137);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const actions = bundleActions("transcription");
+    expect(actions.map((a) => a.action)).toEqual(["install_started", "install_failed"]);
+    expect(actions[0].duration_ms).toBe(0);
+    expect(actions[1]).toMatchObject({ error_kind: "oom" });
+    expect(typeof actions[1].duration_ms).toBe("number");
+    // Never the raw message: it can carry paths and hostnames.
+    expect(Object.keys(actions[1]).sort()).toEqual([
+      "action",
+      "bundle_id",
+      "duration_ms",
+      "error_kind",
+    ]);
+
+    expect(hoisted.reportErrorMock).toHaveBeenCalledTimes(1);
+    const [err, ctx] = hoisted.reportErrorMock.mock.calls[0];
+    expect(ctx).toEqual({ source: "ai-install", subsystem: "transcription" });
+    expect(err).toMatchObject({
+      name: "SafeError",
+      message: "AI bundle install failed",
+      code: "AI_INSTALL_OOM",
+      kind: "operational",
+    });
+  });
+
+  it("classifies a structured installer error by its cause (#4821)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+    child.stderr.emit(
+      "data",
+      Buffer.from('{"error": "SHA256 checksum mismatch for local file."}\n'),
+    );
+    child.emit("close", 1);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    expect(bundleActions("transcription").at(-1)).toMatchObject({
+      action: "install_failed",
+      error_kind: "checksum",
+    });
+    expect(hoisted.reportErrorMock.mock.calls[0][0]).toMatchObject({
+      code: "AI_INSTALL_CHECKSUM",
+    });
+  });
+
+  it("tracks a spawn failure once even though close follows it (#4821)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+    child.emit("error", Object.assign(new Error("spawn python3 ENOENT"), { code: "ENOENT" }));
+    child.emit("close", 1);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const failed = bundleActions("transcription").filter((a) => a.action === "install_failed");
+    expect(failed).toEqual([expect.objectContaining({ error_kind: "other" })]);
+    expect(hoisted.reportErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("tracks a watchdog kill as a timeout (#4821)", async () => {
+    const originalStall = env.INSTALL_STALL_MS;
+    const originalMax = env.INSTALL_MAX_MS;
+    env.INSTALL_STALL_MS = 1;
+    env.INSTALL_MAX_MS = 0;
+    const intervalCallbacks: Array<() => void> = [];
+    const fakeTimer = { ref: () => {}, unref: () => {} } as unknown as NodeJS.Timeout;
+    vi.stubGlobal("setInterval", (handler: () => void): NodeJS.Timeout => {
+      intervalCallbacks.push(handler);
+      return fakeTimer;
+    });
+    try {
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+      await tick();
+      for (const callback of intervalCallbacks) callback();
+      // The SIGKILL escalation must not read as the OOM killer.
+      child.emit("close", null, "SIGKILL");
+      await waitFor(() => queue.getActiveBundleId() === null);
+      expect(bundleActions("transcription").at(-1)).toMatchObject({
+        action: "install_failed",
+        error_kind: "timeout",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      env.INSTALL_STALL_MS = originalStall;
+      env.INSTALL_MAX_MS = originalMax;
+    }
+  });
+
+  it("tracks a successful install without a failure event (#4821)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    hoisted.spawnCalls[0].emit("close", 0);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    expect(bundleActions("transcription").map((a) => a.action)).toEqual([
+      "install_started",
+      "installed",
+    ]);
+    expect(hoisted.reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("tracks a failed OCR runtime install (#4821)", async () => {
+    hoisted.downloadVerifiedRuntimeReleaseMock.mockRejectedValueOnce(
+      Object.assign(new Error("write failed"), { code: "ENOSPC" }),
+    );
+    await postInstall("ocr");
+    await waitFor(() => bundleActions("ocr").some((a) => a.action === "install_failed"));
+
+    expect(bundleActions("ocr").map((a) => a.action)).toEqual([
+      "install_started",
+      "install_failed",
+    ]);
+    expect(bundleActions("ocr")[1]).toMatchObject({ error_kind: "disk" });
   });
 
   it("refreshes created_at on the reserved jobs row when a queued bundle starts installing (#2819)", async () => {
