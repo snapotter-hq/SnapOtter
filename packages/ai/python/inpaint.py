@@ -78,7 +78,8 @@ def compute_model_window(mask_dil, image_shape, size, margin_min):
     of the fill's sharpness (#4644), so when the dilated mask plus margin_min
     fits in one model-sized window, crop exactly that window and skip the resize.
     The window is centred on the mask and shifted (never shrunk) to stay inside
-    the frame; a frame side shorter than size is taken whole.
+    the frame. A frame side shorter than size is taken whole, and that crop
+    still gets resized to the model's square input.
     """
     h, w = image_shape[:2]
     x0, y0, x1, y1 = _mask_bbox(mask_dil)

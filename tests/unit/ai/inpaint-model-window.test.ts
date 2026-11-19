@@ -30,7 +30,7 @@ def ellipse(cx, cy, rx, ry, h=H, w=W):
 class EchoSession:
     """Returns the model input unchanged, scaled to LaMa's [0, 255] output."""
     def run(self, _outputs, feeds):
-        return [feeds["image"] * 255.0]
+        return [np.rint(feeds["image"] * 255.0)]
 
 seen = []
 def recording(run_model):
@@ -58,13 +58,22 @@ assert not np.array_equal(out_old[mask > 0], img[mask > 0])
 dil = inpaint.dilate_mask(ellipse(60, 760, 40, 30), 6)
 box = inpaint.compute_model_window(dil, img.shape, S, inpaint.MARGIN_MIN)
 assert box == (0, H - S, S, H), box
-dil = inpaint.dilate_mask(ellipse(600, 400, 40, 30), 6)
+dil = inpaint.dilate_mask(ellipse(1150, 60, 40, 30), 6)
 box = inpaint.compute_model_window(dil, img.shape, S, inpaint.MARGIN_MIN)
-assert box[2] - box[0] == S and box[3] - box[1] == S, box
-assert box[0] < 600 < box[2] and box[1] < 400 < box[3], box
+assert box == (W - S, 0, W, S), box
+dil = inpaint.dilate_mask(ellipse(600, 400, 40, 30), 6)
+assert inpaint._mask_bbox(dil) == (554, 364, 647, 437)
+box = inpaint.compute_model_window(dil, img.shape, S, inpaint.MARGIN_MIN)
+assert box == (344, 144, 856, 656), box
 
-# 4. A mask whose bounds plus the minimum margin exceed 512 falls back (None), and
-#    inpaint_array then uses the margin-scaled crop.
+# 4. The fit test is inclusive: bounds plus 2 * MARGIN_MIN of exactly 512 fit, one
+#    more pixel falls back (None), and inpaint_array then uses the margin-scaled crop.
+edge = S - 2 * inpaint.MARGIN_MIN
+fits = np.zeros((H, W), np.uint8)
+fits[100:200, 300 : 300 + edge] = 255
+assert inpaint.compute_model_window(fits, img.shape, S, inpaint.MARGIN_MIN) is not None
+fits[100:200, 300 : 300 + edge + 1] = 255
+assert inpaint.compute_model_window(fits, img.shape, S, inpaint.MARGIN_MIN) is None
 big = ellipse(600, 400, 250, 120)
 assert inpaint.compute_model_window(big, img.shape, S, inpaint.MARGIN_MIN) is None
 inpaint.inpaint_array(img, big, recording(echo), model_window=S)
