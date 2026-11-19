@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -170,7 +170,7 @@ describe.skipIf(!ffmpegAvailable())("split-audio (requires ffmpeg)", () => {
         "part-005.mp3",
       ]);
       for (const entry of entries) {
-        const partPath = join(tmpDir, entry.entryName);
+        const partPath = join(tmpDir, basename(entry.entryName));
         writeFileSync(partPath, entry.getData());
         const info = await probeMedia(partPath);
         expect(info.durationS ?? 0).toBeGreaterThan(9);
