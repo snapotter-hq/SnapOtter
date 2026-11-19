@@ -20,6 +20,7 @@ const selectMock = vi.hoisted(() => vi.fn());
 const updateSetMock = vi.hoisted(() => vi.fn());
 const updateMock = vi.hoisted(() => vi.fn());
 const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn());
 
 // Chain builder for `db.select(...).from(...).where(...).limit(...)`.
 function selectChain<T>(result: T) {
@@ -64,6 +65,7 @@ async function loadEnqueueModule(
   updateSetMock.mockReset();
   updateMock.mockReset();
   clearTerminalReplayKeyMock.mockReset().mockResolvedValue(undefined);
+  reportErrorMock.mockReset().mockResolvedValue(undefined);
 
   queueEventRun.mockReset();
   queueEventOn.mockReset();
@@ -210,6 +212,11 @@ async function loadEnqueueModule(
 
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     clearTerminalReplayKey: clearTerminalReplayKeyMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../../../../apps/api/src/lib/error-report.js")>()),
+    reportError: reportErrorMock,
   }));
 
   const mod = await import("../../../../apps/api/src/jobs/enqueue.js");
@@ -711,15 +718,17 @@ describe("computeDeleteAfter (via enqueueToolJob fire-and-forget)", () => {
     expect(Math.abs(arg.deleteAfter.getTime() - expected)).toBeLessThan(5000);
   });
 
-  it("swallows a computeDeleteAfter failure without rejecting enqueueToolJob", async () => {
+  it("logs and reports a computeDeleteAfter failure without rejecting enqueueToolJob (#1522)", async () => {
     const { mod } = await loadEnqueueModule({
       teamRetentionEnabled: true,
       userRow: [{ team: "team-1" }],
       teamRow: [{ retentionHours: 5 }],
     });
-    // Make the update leg throw; the .catch(() => {}) must absorb it.
+    // Make the update leg throw: enqueue must still resolve, but the job is
+    // left with no deadline, so the failure has to leave a trace.
+    const dbDown = new Error("db down");
     updateSetMock.mockReturnValueOnce({
-      where: vi.fn(() => Promise.reject(new Error("db down"))),
+      where: vi.fn(() => Promise.reject(dbDown)),
     });
 
     await expect(
@@ -735,6 +744,29 @@ describe("computeDeleteAfter (via enqueueToolJob fire-and-forget)", () => {
       } as never),
     ).resolves.toBeDefined();
     await flushMicrotasks();
+
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: dbDown, jobId: "ret-err" },
+      expect.stringContaining("retention deadline"),
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(dbDown, {
+      source: "worker",
+      subsystem: "retention",
+      jobId: "ret-err",
+    });
+  });
+
+  it("does not log or report when the deadline is set", async () => {
+    const { mod } = await loadEnqueueModule({
+      teamRetentionEnabled: true,
+      userRow: [{ team: "team-1" }],
+      teamRow: [{ retentionHours: 5 }],
+    });
+    await enqueueWithUser(mod);
+
+    expect(updateSetMock).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
   });
 });
 

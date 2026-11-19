@@ -12,7 +12,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
-import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, markUpstreamError, reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { bindJobAuditMetadata } from "../lib/tool-audit.js";
@@ -346,9 +346,17 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     }
   }
 
-  // Fire-and-forget: compute deleteAfter from team retention override
+  // Fire-and-forget: compute deleteAfter from team retention override. A
+  // failure leaves delete_after NULL, so the job's files follow the global
+  // FILE_MAX_AGE_HOURS TTL instead of the team's retention (#1522).
   if (data.userId) {
-    void computeDeleteAfter(data.jobId, data.userId).catch(() => {});
+    void computeDeleteAfter(data.jobId, data.userId).catch((err: unknown) => {
+      logger.warn(
+        { err, jobId: data.jobId },
+        "team retention deadline not set; files keep the global TTL",
+      );
+      void reportError(err, { source: "worker", subsystem: "retention", jobId: data.jobId });
+    });
   }
 
   injectTraceContext(data);
