@@ -306,21 +306,25 @@ export function getFirstMissingBundleForTool(toolId: string): string | null {
 
 // ── Install status mutations ────────────────────────────────────────────
 
+// Both edit a copy because readInstalled() returns the cache itself: editing it
+// in place would leave the cache holding a change whose write then failed.
 export function markInstalled(bundleId: string, version: string, models: string[]): void {
   const data = readInstalled();
-  data.bundles[bundleId] = {
+  const bundles = { ...data.bundles };
+  bundles[bundleId] = {
     version,
     installedAt: new Date().toISOString(),
     models,
   };
-  writeInstalled(data);
+  writeInstalled({ ...data, bundles });
   invalidateCache();
 }
 
 export function markUninstalled(bundleId: string): void {
   const data = readInstalled();
-  delete data.bundles[bundleId];
-  writeInstalled(data);
+  const bundles = { ...data.bundles };
+  delete bundles[bundleId];
+  writeInstalled({ ...data, bundles });
   invalidateCache();
 }
 
@@ -1185,9 +1189,6 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
           }
           consumeMarker = true;
         } catch (err) {
-          // markUninstalled edits the cached ledger before writing, so a failed
-          // write would leave the cache disagreeing with installed.json.
-          invalidateCache();
           recoveryIncomplete = true;
           logger.error(
             { err, bundleId: suspectBundleId },

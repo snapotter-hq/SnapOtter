@@ -434,6 +434,46 @@ describe("installed.json management", () => {
     expect(data.bundles.ocr.version).toBe("2.0.0");
     expect(data.bundles.ocr.models).toEqual(["new.onnx"]);
   });
+
+  function failNextLedgerRename(): void {
+    fsFaults.onRenameDestMatch = {
+      match: installedPath,
+      callback: () => {
+        fsFaults.onRenameDestMatch = null;
+        throw Object.assign(new Error("EROFS: read-only file system"), { code: "EROFS" });
+      },
+    };
+  }
+
+  it("markInstalled leaves the cached ledger matching disk when the write fails", () => {
+    failNextLedgerRename();
+    expect(() => mod.markInstalled("face-detection", "1.0.0", [])).toThrow(/EROFS/);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(installedPath)).toBe(false);
+  });
+
+  it("markUninstalled leaves the cached ledger matching disk when the write fails", () => {
+    mod.markInstalled("face-detection", "1.0.0", []);
+    failNextLedgerRename();
+    expect(() => mod.markUninstalled("face-detection")).toThrow(/EROFS/);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+    const data = JSON.parse(readFileSync(installedPath, "utf-8"));
+    expect(data.bundles["face-detection"]).toBeDefined();
+  });
+
+  it("a read during the ledger write sees the last written state", () => {
+    let seenDuringWrite: boolean | null = null;
+    fsFaults.onRenameDestMatch = {
+      match: installedPath,
+      callback: () => {
+        fsFaults.onRenameDestMatch = null;
+        seenDuringWrite = mod.isFeatureInstalled("face-detection");
+      },
+    };
+    mod.markInstalled("face-detection", "1.0.0", []);
+    expect(seenDuringWrite).toBe(false);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+  });
 });
 
 // Regression for NODE-12 (Sentry): installed.json that is *valid JSON* but
