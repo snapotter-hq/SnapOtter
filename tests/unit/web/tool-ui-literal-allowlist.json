@@ -22,6 +22,8 @@
     "apps/web/src/components/settings/settings-dialog.tsx::admin",
     "apps/web/src/components/tools/resize-pdf-pages-settings.tsx::in",
     "apps/web/src/components/tools/split-canvas.tsx::image",
+    "apps/web/src/pages/login-page.tsx::<username>",
+    "apps/web/src/pages/login-page.tsx::docker exec -it snapotter snapotter-admin reset-password",
     "background-sizer",
     "Big5",
     "bytes",
