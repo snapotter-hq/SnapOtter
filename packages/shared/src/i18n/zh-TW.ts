@@ -1024,6 +1024,10 @@ export const zhTW: TranslationKeys = {
       name: "大小寫轉換",
       description: "將文字轉換為大寫、小寫、標題格式、句子格式等",
     },
+    "proportion-calculator": {
+      name: "比例計算機",
+      description: "解比例（三率法）：由三個已知值求出 X",
+    },
     "create-zip": {
       name: "建立 ZIP",
       description: "將多個檔案打包為單一 ZIP 壓縮檔",
@@ -3872,6 +3876,18 @@ export const zhTW: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "類型",
+      direct: "正比",
+      inverse: "反比",
+      directHint: "A 比 B 等於 C 比 X，所以 X = B × C ÷ A",
+      inverseHint: "A × B = C × X，所以 X = A × B ÷ C",
+      calculate: "計算",
+      result: "結果",
+      invalidNumber: "請輸入數字",
+      zeroDivisorDirect: "正比時 A 不能為 0",
+      zeroDivisorInverse: "反比時 C 不能為 0",
     },
     "create-zip": {
       submit: "建立 ZIP",

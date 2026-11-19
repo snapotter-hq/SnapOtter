@@ -381,6 +381,7 @@ describe("toolRegistry", () => {
       "barcode-generate",
       "chart-maker",
       "convert-case",
+      "proportion-calculator",
     ]);
     for (const [toolId, entry] of toolRegistry) {
       if (entry.displayMode === "no-dropzone" && !selfContainedTools.has(toolId)) {

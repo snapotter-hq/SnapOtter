@@ -16283,6 +16283,86 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/proportion-calculator:
+    post:
+      operationId: proportionCalculator
+      tags:
+        - Files
+      summary: Calculadora de proporção
+      description: |
+        Resolve a regra de três: a partir de três valores, encontra o quarto. Recebe um corpo JSON, não multipart, e responde com um número em vez de um arquivo.
+
+        `direct`: A está para B assim como C está para X, então, X = B * C / A. `inverse`: A * B = C * X, então X = A * B / C. O resultado é arredondado para 15 algarismos significativos.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - a
+                - b
+                - c
+              properties:
+                a:
+                  type: number
+                  description: Primeiro valor conhecido. Não pode ser 0 no modo direct.
+                b:
+                  type: number
+                  description: O valor que corresponde a a
+                c:
+                  type: number
+                  description: Terceiro valor conhecido. Não pode ser 0 no modo inverse.
+                mode:
+                  type: string
+                  enum:
+                    - direct
+                    - inverse
+                  default: direct
+                  description: Proporção direta ou inversa
+            example:
+              a: 3
+              b: 6
+              c: 10
+              mode: direct
+      responses:
+        '200':
+          description: O valor que falta
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - x
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - direct
+                      - inverse
+                  x:
+                    type: number
+                    description: O valor que corresponde a c
+              example:
+                mode: direct
+                x: 20
+        '400':
+          description: Entrada inválida, divisor zero ou resultado fora do intervalo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autenticação necessária
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -27163,6 +27243,14 @@ x-i18n:
       sourceHash: 01451dcad982
       provenance: machine
       outputHash: 66dcca2c3797
+    paths./api/v1/tools/files/proportion-calculator.post.summary:
+      sourceHash: 90b715b4351f
+      provenance: machine
+      outputHash: 8bd40e819573
+    paths./api/v1/tools/files/proportion-calculator.post.description:
+      sourceHash: 761348b12560
+      provenance: machine
+      outputHash: ae51ee7ab71b
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33816,6 +33904,38 @@ x-i18n:
       provenance: machine
       outputHash: 9b7b2f558bde
     ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 6e87ce8a1e5f
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/a/description:
+      sourceHash: 2990905e14d9
+      provenance: machine
+      outputHash: 673daaef63d0
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/b/description:
+      sourceHash: af681c11c64e
+      provenance: machine
+      outputHash: 1e07d6e3bc31
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/c/description:
+      sourceHash: 2ded3c6e5910
+      provenance: machine
+      outputHash: 72acb17d9157
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 055edc0f915a
+      provenance: machine
+      outputHash: 7806c27d8cbf
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/description:
+      sourceHash: 7aef4dcae7e5
+      provenance: machine
+      outputHash: 1c2bc950e805
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/content/application~1json/schema/properties/x/description:
+      sourceHash: 3ac0dcdcdc98
+      provenance: machine
+      outputHash: 0eaebd6c74b5
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/400/description:
+      sourceHash: ddad6ca13b12
+      provenance: machine
+      outputHash: f05888c51a3b
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 6e87ce8a1e5f

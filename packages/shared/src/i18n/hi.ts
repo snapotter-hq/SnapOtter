@@ -1072,6 +1072,10 @@ export const hi: TranslationKeys = {
       name: "केस बदलें",
       description: "टेक्स्ट को UPPER, lower, Title, Sentence केस और अन्य में बदलें",
     },
+    "proportion-calculator": {
+      name: "अनुपात कैलकुलेटर",
+      description: "त्रैराशिक नियम हल करें: तीन ज्ञात मानों से X निकालें",
+    },
     "create-zip": {
       name: "ZIP बनाएँ",
       description: "कई फ़ाइलों को एक ZIP आर्काइव में बंडल करें",
@@ -3948,6 +3952,18 @@ export const hi: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "प्रकार",
+      direct: "प्रत्यक्ष",
+      inverse: "व्युत्क्रम",
+      directHint: "A का B से वही अनुपात है जो C का X से, इसलिए X = B × C ÷ A",
+      inverseHint: "A × B = C × X, इसलिए X = A × B ÷ C",
+      calculate: "गणना करें",
+      result: "परिणाम",
+      invalidNumber: "कोई संख्या दर्ज करें",
+      zeroDivisorDirect: "प्रत्यक्ष अनुपात में A का मान 0 नहीं हो सकता",
+      zeroDivisorInverse: "व्युत्क्रम अनुपात में C का मान 0 नहीं हो सकता",
     },
     "create-zip": {
       submit: "ZIP बनाएँ",

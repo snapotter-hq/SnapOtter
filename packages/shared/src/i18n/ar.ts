@@ -1239,6 +1239,10 @@ export const ar: TranslationKeys = {
       name: "تحويل حالة الأحرف",
       description: "حوّل النص إلى أحرف كبيرة أو صغيرة أو حالة العنوان أو الجملة وغيرها",
     },
+    "proportion-calculator": {
+      name: "حاسبة التناسب",
+      description: "حلّ قاعدة الثلاثة: أوجد X من ثلاث قيم معروفة",
+    },
     "create-zip": {
       name: "إنشاء ZIP",
       description: "تجميع ملفات متعددة في أرشيف ZIP واحد",
@@ -4121,6 +4125,18 @@ export const ar: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "النوع",
+      direct: "طردي",
+      inverse: "عكسي",
+      directHint: "نسبة A إلى B كنسبة C إلى X، إذن X = B × C ÷ A",
+      inverseHint: "A × B = C × X، إذن X = A × B ÷ C",
+      calculate: "احسب",
+      result: "النتيجة",
+      invalidNumber: "أدخل رقمًا",
+      zeroDivisorDirect: "لا يمكن أن تكون A صفرًا في التناسب الطردي",
+      zeroDivisorInverse: "لا يمكن أن تكون C صفرًا في التناسب العكسي",
     },
     "create-zip": {
       submit: "إنشاء ZIP",

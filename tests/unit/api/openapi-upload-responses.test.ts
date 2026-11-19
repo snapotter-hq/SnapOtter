@@ -50,6 +50,7 @@ const NO_UPLOAD_TOOLS = [
   "convert-case",
   "html-to-image",
   "passport-photo",
+  "proportion-calculator",
   "qr-generate",
 ];
 

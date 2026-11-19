@@ -12175,6 +12175,18 @@
     "invalidProbes": []
   },
   {
+    "id": "proportion-calculator",
+    "name": "Proportion Calculator",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",

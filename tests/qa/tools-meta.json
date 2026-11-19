@@ -5622,6 +5622,15 @@
     "isAI": false
   },
   {
+    "id": "proportion-calculator",
+    "name": "Proportion Calculator",
+    "modality": "file",
+    "route": "/files/proportion-calculator",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",
