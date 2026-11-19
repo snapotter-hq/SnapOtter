@@ -411,6 +411,71 @@ describe("svg-to-raster", () => {
     expect(batchData[(2 * batchInfo.width + 2) * batchInfo.channels + 3]).toBe(0);
   });
 
+  describe("jpg output of a transparent SVG (#4420)", () => {
+    const blackOnTransparent = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect x="8" y="8" width="12" height="12" fill="#000"/></svg>',
+    );
+
+    async function renderJpg(url: string, settings: Record<string, unknown>) {
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "art.svg",
+          contentType: "image/svg+xml",
+          content: blackOnTransparent,
+        },
+        { name: "settings", content: JSON.stringify({ dpi: 72, ...settings }) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url,
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(200);
+      const dlRes = await app.inject({
+        method: "GET",
+        url: JSON.parse(res.body).downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(dlRes.statusCode).toBe(200);
+      const { data, info } = await sharp(Buffer.from(dlRes.rawPayload))
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const pixel = (x: number, y: number) => {
+        const i = (y * info.width + x) * info.channels;
+        return [data[i], data[i + 1], data[i + 2]];
+      };
+      return { background: pixel(2, 2), artwork: pixel(14, 14) };
+    }
+
+    function expectNear(actual: number[], expected: number[]) {
+      for (let c = 0; c < 3; c++) expect(Math.abs(actual[c] - expected[c])).toBeLessThanOrEqual(8);
+    }
+
+    it("flattens onto white by default on svg-to-raster", async () => {
+      const { background, artwork } = await renderJpg("/api/v1/tools/image/svg-to-raster", {
+        outputFormat: "jpg",
+      });
+      expectNear(background, [255, 255, 255]);
+      expectNear(artwork, [0, 0, 0]);
+    });
+
+    it("flattens onto white by default on the svg-to-jpg preset", async () => {
+      const { background, artwork } = await renderJpg("/api/v1/tools/image/svg-to-jpg", {});
+      expectNear(background, [255, 255, 255]);
+      expectNear(artwork, [0, 0, 0]);
+    });
+
+    it("still honours an explicit background colour", async () => {
+      const { background } = await renderJpg("/api/v1/tools/image/svg-to-raster", {
+        outputFormat: "jpg",
+        backgroundColor: "#00FF00",
+      });
+      expectNear(background, [0, 255, 0]);
+    });
+  });
+
   it("converts to gif format", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
