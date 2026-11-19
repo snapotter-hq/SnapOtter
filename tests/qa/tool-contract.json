@@ -11778,6 +11778,19 @@
     "invalidProbes": []
   },
   {
+    "id": "pdf-to-markdown",
+    "name": "PDF to Markdown",
+    "modality": "document",
+    "section": "pdf",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "long",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "pdf-to-word",
     "name": "PDF to Word",
     "modality": "document",

@@ -1174,6 +1174,10 @@ export const uk: TranslationKeys = {
       name: "PDF у текст",
       description: "Витягти простий текст з PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF у Markdown",
+      description: "Зберігає заголовки, списки й таблиці, якщо вони є в PDF",
+    },
     "pdf-to-word": {
       name: "PDF у Word",
       description: "Найкраще для текстових PDF; скановані сторінки потребують OCR",
@@ -4021,6 +4025,14 @@ export const uk: TranslationKeys = {
       progressLabel: "Витягнення",
       scannedHint:
         "Цей PDF відсканований, тож тексту для вилучення немає. OCR може його прочитати, але це довше й потребує встановленого ШІ-пакета OCR.",
+      runOcr: "Запустити OCR для цього PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Конвертувати у Markdown",
+      submitBatch: "Конвертувати у Markdown ({count} файлів)",
+      progressLabel: "Конвертація",
+      scannedHint:
+        "Цей PDF відсканований, тож у ньому немає тексту для перетворення на Markdown. OCR може прочитати текст, але видасть звичайний текст, це довше й потребує встановленого ШІ-пакета OCR.",
       runOcr: "Запустити OCR для цього PDF",
     },
     "pdf-to-word": {

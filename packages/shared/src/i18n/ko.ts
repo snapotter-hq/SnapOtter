@@ -1118,6 +1118,10 @@ export const ko: TranslationKeys = {
       name: "PDF를 텍스트로",
       description: "PDF에서 일반 텍스트 추출",
     },
+    "pdf-to-markdown": {
+      name: "PDF를 Markdown으로",
+      description: "PDF에 있는 제목, 목록, 표를 유지합니다",
+    },
     "pdf-to-word": {
       name: "PDF를 Word로",
       description: "텍스트 기반 PDF에 최적; 스캔된 페이지는 OCR 필요",
@@ -3939,6 +3943,14 @@ export const ko: TranslationKeys = {
       progressLabel: "추출 중",
       scannedHint:
         "이 PDF는 스캔본이라 추출할 텍스트가 없습니다. OCR로 읽을 수 있지만 시간이 더 걸리고 OCR AI 번들이 설치되어 있어야 합니다.",
+      runOcr: "이 PDF에 OCR 실행",
+    },
+    "pdf-to-markdown": {
+      submit: "Markdown으로 변환",
+      submitBatch: "Markdown으로 변환 ({count}개 파일)",
+      progressLabel: "변환 중",
+      scannedHint:
+        "이 PDF는 스캔본이라 Markdown으로 바꿀 텍스트가 없습니다. OCR로 텍스트를 읽을 수 있지만 일반 텍스트로 나오고, 시간이 더 걸리며 OCR AI 번들이 설치되어 있어야 합니다.",
       runOcr: "이 PDF에 OCR 실행",
     },
     "pdf-to-word": {

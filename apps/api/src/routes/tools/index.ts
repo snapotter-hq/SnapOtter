@@ -103,6 +103,7 @@ import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfMetadata } from "./pdf-metadata.js";
 import { registerPdfPageNumbers } from "./pdf-page-numbers.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
+import { registerPdfToMarkdown } from "./pdf-to-markdown.js";
 import { registerPdfToText } from "./pdf-to-text.js";
 import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
@@ -373,6 +374,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "flatten-pdf", register: registerFlattenPdf },
     { id: "redact-pdf", register: registerRedactPdf },
     { id: "pdf-to-text", register: registerPdfToText },
+    { id: "pdf-to-markdown", register: registerPdfToMarkdown },
     { id: "pdf-to-word", register: registerPdfToWord },
     { id: "pdf-metadata", register: registerPdfMetadata },
     { id: "powerpoint-to-pdf", register: registerPowerpointToPdf },

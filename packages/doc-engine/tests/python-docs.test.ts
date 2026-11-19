@@ -349,6 +349,51 @@ describe("pdfTextPy", () => {
   });
 });
 
+describe("pdfToMarkdownPy", () => {
+  it("calls doc_markdown with a 5-minute timeout and returns the char count", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 120}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToMarkdownPy("/in.pdf", "/out.md")),
+    ).resolves.toEqual({ chars: 120 });
+    expect(firstCall()).toEqual([
+      "doc_markdown",
+      { path: "/in.pdf", out: "/out.md" },
+      { timeoutMs: 300_000 },
+    ]);
+  });
+
+  it("forwards signal alongside the default timeout", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 1}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfToMarkdownPy("/in.pdf", "/out.md", { signal: ac.signal }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_markdown",
+      { path: "/in.pdf", out: "/out.md" },
+      { timeoutMs: 300_000, signal: ac.signal },
+    ]);
+  });
+
+  it("throws the reported error, including an empty one", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": "cannot open"}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToMarkdownPy("/in.pdf", "/out.md")),
+    ).rejects.toThrow("doc_markdown failed: cannot open");
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToMarkdownPy("/in.pdf", "/out.md")),
+    ).rejects.toThrow('doc_markdown failed: {"error": ""}');
+  });
+
+  it("throws when chars is missing", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToMarkdownPy("/in.pdf", "/out.md")),
+    ).rejects.toThrow("doc_markdown failed:");
+  });
+});
+
 describe("pdfToWordPy", () => {
   it("calls doc_to_word with a 5-minute timeout", async () => {
     runDocsScript.mockResolvedValueOnce('{"ok": true}');

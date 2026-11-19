@@ -783,6 +783,11 @@ const PdfToTextSettings = lazy(() =>
     default: m.PdfToTextSettings,
   })),
 );
+const PdfToMarkdownSettings = lazy(() =>
+  import("@/components/tools/pdf-to-markdown-settings").then((m) => ({
+    default: m.PdfToMarkdownSettings,
+  })),
+);
 const PdfToWordSettings = lazy(() =>
   import("@/components/tools/pdf-to-word-settings").then((m) => ({
     default: m.PdfToWordSettings,
@@ -1208,6 +1213,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["redact-pdf", { accept: ".pdf", Settings: RedactPdfSettings }],
   ["sign-pdf", { accept: ".pdf", Settings: SignPdfSettings }],
   ["pdf-to-text", { accept: ".pdf", Settings: PdfToTextSettings }],
+  ["pdf-to-markdown", { accept: ".pdf", Settings: PdfToMarkdownSettings }],
   ["pdf-to-word", { accept: ".pdf", Settings: PdfToWordSettings }],
   ["pdf-metadata", { accept: ".pdf", Settings: PdfMetadataSettings }],
   ["html-to-pdf", { accept: ".html,.htm", Settings: HtmlToPdfSettings }],

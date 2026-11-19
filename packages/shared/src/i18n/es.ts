@@ -1159,6 +1159,10 @@ export const es: TranslationKeys = {
       name: "PDF a texto",
       description: "Extrae texto plano de un PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF a Markdown",
+      description: "Conserva títulos, listas y tablas cuando el PDF los tiene",
+    },
     "pdf-to-word": {
       name: "PDF a Word",
       description: "Ideal para PDFs con texto; las páginas escaneadas necesitan OCR",
@@ -4009,6 +4013,14 @@ export const es: TranslationKeys = {
       progressLabel: "Extrayendo",
       scannedHint:
         "Este PDF está escaneado, así que no hay texto que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
+      runOcr: "Ejecutar OCR en este PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Convertir a Markdown",
+      submitBatch: "Convertir a Markdown ({count} archivos)",
+      progressLabel: "Convirtiendo",
+      scannedHint:
+        "Este PDF está escaneado, así que no hay texto que convertir a Markdown. El OCR puede leer el texto, pero te da texto plano, tarda más y requiere tener instalado el paquete de IA de OCR.",
       runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-to-word": {

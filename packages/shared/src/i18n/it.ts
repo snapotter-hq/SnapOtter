@@ -1176,6 +1176,10 @@ export const it: TranslationKeys = {
       name: "PDF in Testo",
       description: "Estrae testo semplice da un PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF in Markdown",
+      description: "Mantiene titoli, elenchi e tabelle quando il PDF li contiene",
+    },
     "pdf-to-word": {
       name: "PDF in Word",
       description: "Ideale per PDF basati su testo; le pagine scansionate richiedono OCR",
@@ -4022,6 +4026,14 @@ export const it: TranslationKeys = {
       progressLabel: "Estrazione",
       scannedHint:
         "Questo PDF è una scansione, quindi non c'è testo da estrarre. L'OCR può leggerlo, ma richiede più tempo e il pacchetto IA per l'OCR installato.",
+      runOcr: "Esegui l'OCR su questo PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Converti in Markdown",
+      submitBatch: "Converti in Markdown ({count} file)",
+      progressLabel: "Conversione",
+      scannedHint:
+        "Questo PDF è una scansione, quindi non c'è testo da convertire in Markdown. L'OCR può leggere il testo, ma restituisce testo semplice, richiede più tempo e il pacchetto IA per l'OCR installato.",
       runOcr: "Esegui l'OCR su questo PDF",
     },
     "pdf-to-word": {

@@ -1174,6 +1174,10 @@ export const ru: TranslationKeys = {
       name: "PDF в текст",
       description: "Извлечение текста из PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF в Markdown",
+      description: "Сохраняет заголовки, списки и таблицы, если они есть в PDF",
+    },
     "pdf-to-word": {
       name: "PDF в Word",
       description: "Подходит для текстовых PDF; для сканов требуется OCR",
@@ -4021,6 +4025,14 @@ export const ru: TranslationKeys = {
       progressLabel: "Извлечение текста",
       scannedHint:
         "Этот PDF отсканирован, поэтому извлекать из него нечего. OCR может его прочитать, но это дольше и требует установленного ИИ-пакета OCR.",
+      runOcr: "Запустить OCR для этого PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Конвертировать в Markdown",
+      submitBatch: "Конвертировать в Markdown ({count} файлов)",
+      progressLabel: "Конвертация",
+      scannedHint:
+        "Этот PDF отсканирован, поэтому в нём нет текста для преобразования в Markdown. OCR может прочитать текст, но выдаст простой текст, это дольше и требует установленного ИИ-пакета OCR.",
       runOcr: "Запустить OCR для этого PDF",
     },
     "pdf-to-word": {

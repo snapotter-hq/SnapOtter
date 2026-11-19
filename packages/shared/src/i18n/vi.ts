@@ -1174,6 +1174,10 @@ export const vi: TranslationKeys = {
       name: "PDF sang văn bản",
       description: "Trích xuất văn bản thuần từ PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF sang Markdown",
+      description: "Giữ tiêu đề, danh sách và bảng khi PDF có sẵn",
+    },
     "pdf-to-word": {
       name: "PDF sang Word",
       description: "Phù hợp nhất cho PDF dạng văn bản; trang quét cần OCR",
@@ -4007,6 +4011,14 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang trích xuất",
       scannedHint:
         "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+      runOcr: "Chạy OCR cho PDF này",
+    },
+    "pdf-to-markdown": {
+      submit: "Chuyển sang Markdown",
+      submitBatch: "Chuyển sang Markdown ({count} tệp)",
+      progressLabel: "Đang chuyển đổi",
+      scannedHint:
+        "PDF này là bản quét nên không có văn bản để chuyển sang Markdown. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
       runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-to-word": {

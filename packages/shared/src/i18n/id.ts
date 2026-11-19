@@ -1172,6 +1172,10 @@ export const id: TranslationKeys = {
       name: "PDF ke Teks",
       description: "Ekstrak teks biasa dari PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF ke Markdown",
+      description: "Mempertahankan judul, daftar, dan tabel jika ada di PDF",
+    },
     "pdf-to-word": {
       name: "PDF ke Word",
       description: "Terbaik untuk PDF berbasis teks; halaman pindaian memerlukan OCR",
@@ -4014,6 +4018,14 @@ export const id: TranslationKeys = {
       progressLabel: "Mengekstrak",
       scannedHint:
         "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
+      runOcr: "Jalankan OCR pada PDF ini",
+    },
+    "pdf-to-markdown": {
+      submit: "Konversi ke Markdown",
+      submitBatch: "Konversi ke Markdown ({count} file)",
+      progressLabel: "Mengonversi",
+      scannedHint:
+        "PDF ini hasil pindaian, jadi tidak ada teks untuk diubah ke Markdown. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
       runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-to-word": {

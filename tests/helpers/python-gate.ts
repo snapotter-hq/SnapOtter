@@ -81,6 +81,7 @@ const GENERATED_TOOL_MODULES: Readonly<
   "markdown-to-pdf": ["weasyprint", "markdown"],
   "pdf-metadata": ["pikepdf"],
   "pdf-to-text": ["fitz"],
+  "pdf-to-markdown": ["fitz"],
   "pdf-to-word": ["pdf2docx"],
   "redact-pdf": ["fitz"],
   "sign-pdf": ["fitz"],

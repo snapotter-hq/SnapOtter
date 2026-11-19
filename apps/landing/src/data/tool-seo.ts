@@ -7534,6 +7534,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "pdf-to-markdown": {
+    searchTitle: "Convert PDF to Markdown Free",
+    longDescription:
+      "Convert a PDF into a Markdown file with headings, lists, links and ruled tables kept where the PDF has them. Headings are worked out from font size, so the output reads like a document rather than a wall of text. Images are left out. It runs on your self-hosted SnapOtter instance, so the document never leaves your server.",
+    useCases: [
+      "Moving PDF manuals and handbooks into a wiki or docs site",
+      "Feeding reports to an LLM or RAG pipeline as clean Markdown",
+      "Turning a PDF spec into an editable file you can keep in Git",
+      "Pulling tables out of a PDF report into Markdown you can edit",
+    ],
+    features: [
+      "Infers heading levels from font size across the whole document",
+      "Keeps bulleted and numbered lists",
+      "Keeps bold, italic and web links inline",
+      "Turns tables drawn with ruling lines into Markdown tables",
+      "Refuses scanned PDFs with no text layer and points you to OCR",
+    ],
+    faqs: [
+      {
+        q: "Does this work with scanned PDFs?",
+        a: "No. A scanned PDF has no text layer, so there is nothing to convert. The tool tells you so instead of handing back an empty file, and you can run the PDF OCR tool on it instead.",
+      },
+      {
+        q: "How well are tables converted?",
+        a: "Tables drawn with ruling lines usually come out as proper Markdown tables. Tables laid out with spacing alone often come through as plain lines of text, so check them in the output.",
+      },
+      {
+        q: "What happens to images in the PDF?",
+        a: "They're dropped. The output is a single Markdown file with the text, headings, lists, links and tables.",
+      },
+    ],
+  },
   "pdf-to-word": {
     searchTitle: "Convert PDF to Word Document",
     longDescription:

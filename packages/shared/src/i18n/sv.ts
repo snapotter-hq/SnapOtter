@@ -1170,6 +1170,10 @@ export const sv: TranslationKeys = {
       name: "PDF till text",
       description: "Extrahera ren text från en PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF till Markdown",
+      description: "Behåller rubriker, listor och tabeller där PDF:en har dem",
+    },
     "pdf-to-word": {
       name: "PDF till Word",
       description: "Bäst för textbaserade PDF-filer; skannade sidor kräver OCR",
@@ -4009,6 +4013,14 @@ export const sv: TranslationKeys = {
       progressLabel: "Extraherar",
       scannedHint:
         "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
+      runOcr: "Kör OCR på den här PDF:en",
+    },
+    "pdf-to-markdown": {
+      submit: "Konvertera till Markdown",
+      submitBatch: "Konvertera till Markdown ({count} filer)",
+      progressLabel: "Konverterar",
+      scannedHint:
+        "Den här PDF:en är skannad, så det finns ingen text att göra om till Markdown. OCR kan läsa texten, men ger dig ren text, tar längre tid och kräver att OCR-AI-paketet är installerat.",
       runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-to-word": {

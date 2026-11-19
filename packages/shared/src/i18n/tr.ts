@@ -1174,6 +1174,10 @@ export const tr: TranslationKeys = {
       name: "PDF'den Metne",
       description: "PDF'den düz metin çıkar",
     },
+    "pdf-to-markdown": {
+      name: "PDF'den Markdown'a",
+      description: "PDF'de varsa başlıkları, listeleri ve tabloları korur",
+    },
     "pdf-to-word": {
       name: "PDF'den Word'e",
       description: "Metin tabanlı PDF'ler için idealdir; taranmış sayfalar OCR gerektirir",
@@ -4017,6 +4021,14 @@ export const tr: TranslationKeys = {
       progressLabel: "Çıkarılıyor",
       scannedHint:
         "Bu PDF taranmış, bu yüzden çıkarılacak metin yok. OCR okuyabilir, ancak daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
+      runOcr: "Bu PDF'de OCR çalıştır",
+    },
+    "pdf-to-markdown": {
+      submit: "Markdown'a Dönüştür",
+      submitBatch: "Markdown'a Dönüştür ({count} dosya)",
+      progressLabel: "Dönüştürülüyor",
+      scannedHint:
+        "Bu PDF taranmış, bu yüzden Markdown'a dönüştürülecek metin yok. OCR metni okuyabilir, ancak düz metin verir, daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
       runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-to-word": {

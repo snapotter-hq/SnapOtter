@@ -1175,6 +1175,10 @@ export const nl: TranslationKeys = {
       name: "PDF naar tekst",
       description: "Extraheer platte tekst uit een PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF naar Markdown",
+      description: "Behoudt koppen, lijsten en tabellen waar de PDF ze heeft",
+    },
     "pdf-to-word": {
       name: "PDF naar Word",
       description: "Ideaal voor tekst-PDF's; gescande pagina's vereisen OCR",
@@ -4030,6 +4034,14 @@ export const nl: TranslationKeys = {
       progressLabel: "Extraheren",
       scannedHint:
         "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+      runOcr: "OCR uitvoeren op deze pdf",
+    },
+    "pdf-to-markdown": {
+      submit: "Converteren naar Markdown",
+      submitBatch: "Converteren naar Markdown ({count} bestanden)",
+      progressLabel: "Converteren",
+      scannedHint:
+        "Deze pdf is gescand, dus er is geen tekst om naar Markdown om te zetten. OCR kan de tekst lezen, maar levert platte tekst op, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
       runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-to-word": {

@@ -1157,6 +1157,10 @@ export const th: TranslationKeys = {
       name: "PDF เป็นข้อความ",
       description: "แยกข้อความธรรมดาจาก PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF เป็น Markdown",
+      description: "คงหัวข้อ รายการ และตารางไว้เมื่อ PDF มีสิ่งเหล่านี้",
+    },
     "pdf-to-word": {
       name: "PDF เป็น Word",
       description: "เหมาะกับ PDF ที่มีข้อความ หน้าสแกนต้องใช้ OCR",
@@ -3953,6 +3957,14 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแยกข้อความ",
       scannedHint:
         "PDF นี้เป็นไฟล์สแกน จึงไม่มีข้อความให้แยก OCR อ่านได้ แต่ใช้เวลานานกว่าและต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
+      runOcr: "เรียกใช้ OCR กับ PDF นี้",
+    },
+    "pdf-to-markdown": {
+      submit: "แปลงเป็น Markdown",
+      submitBatch: "แปลงเป็น Markdown ({count} ไฟล์)",
+      progressLabel: "กำลังแปลง",
+      scannedHint:
+        "PDF นี้เป็นไฟล์สแกน จึงไม่มีข้อความให้แปลงเป็น Markdown OCR อ่านข้อความได้ แต่จะได้ข้อความธรรมดา ใช้เวลานานกว่า และต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
       runOcr: "เรียกใช้ OCR กับ PDF นี้",
     },
     "pdf-to-word": {

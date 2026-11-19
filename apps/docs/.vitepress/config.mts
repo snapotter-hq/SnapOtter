@@ -601,6 +601,7 @@ function buildBaseTheme() {
               { text: "Redact PDF", link: "/tools/pdf/redact-pdf" },
               { text: "Sign PDF", link: "/tools/pdf/sign-pdf" },
               { text: "PDF to Text", link: "/tools/pdf/pdf-to-text" },
+              { text: "PDF to Markdown", link: "/tools/pdf/pdf-to-markdown" },
               { text: "PDF to Word", link: "/tools/pdf/pdf-to-word" },
               { text: "PDF Metadata", link: "/tools/pdf/pdf-metadata" },
               { text: "PDF OCR", link: "/tools/pdf/ocr-pdf" },

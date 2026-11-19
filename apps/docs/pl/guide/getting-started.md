@@ -144,7 +144,7 @@ pnpm dev
 | **Obraz** | 112 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Powiększanie, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, presety formatów |
 | **Wideo** | 59 | Przycinanie, Kadrowanie, Kompresja, Konwersja, Łączenie, Wyodrębnianie dźwięku, Automatyczne napisy, Wideo do GIF, Zmiana rozmiaru, Stabilizacja, presety formatów |
 | **Audio** | 27 | Przycinanie, Łączenie, Konwersja, Normalizacja, Redukcja szumów, Transkrypcja, Zmiana wysokości dźwięku, Wyciszanie, Kreator dzwonków, presety formatów |
-| **PDF / Dokument** | 35 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redakcja, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |
+| **PDF / Dokument** | 36 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redakcja, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |
 | **Pliki** | 25 | CSV do JSON, JSON do XML, Łączenie CSV, Dzielenie CSV, Tworzenie ZIP, Wyodrębnianie ZIP, Kreator wykresów, YAML/JSON |
 
 ### Potoki {#pipelines}

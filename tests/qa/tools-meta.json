@@ -5460,6 +5460,15 @@
     "isAI": false
   },
   {
+    "id": "pdf-to-markdown",
+    "name": "PDF to Markdown",
+    "modality": "document",
+    "route": "/pdf/pdf-to-markdown",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
     "id": "pdf-to-word",
     "name": "PDF to Word",
     "modality": "document",

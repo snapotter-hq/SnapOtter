@@ -1174,6 +1174,10 @@ export const ptBR: TranslationKeys = {
       name: "PDF para Texto",
       description: "Extraia texto simples de um PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF para Markdown",
+      description: "Mantém títulos, listas e tabelas quando o PDF os tem",
+    },
     "pdf-to-word": {
       name: "PDF para Word",
       description: "Ideal para PDFs baseados em texto; páginas digitalizadas precisam de OCR",
@@ -4021,6 +4025,14 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Extraindo",
       scannedHint:
         "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
+      runOcr: "Executar OCR neste PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Converter para Markdown",
+      submitBatch: "Converter para Markdown ({count} arquivos)",
+      progressLabel: "Convertendo",
+      scannedHint:
+        "Este PDF é digitalizado, então não há texto para converter em Markdown. O OCR consegue ler o texto, mas entrega texto simples, leva mais tempo e exige o pacote de IA de OCR instalado.",
       runOcr: "Executar OCR neste PDF",
     },
     "pdf-to-word": {
