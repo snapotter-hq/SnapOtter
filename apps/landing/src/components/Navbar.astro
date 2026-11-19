@@ -121,18 +121,24 @@ const links: NavItem[] = [
       </a>
     </div>
 
-    <!-- Mobile menu toggle (CSS-only) -->
-    <label for="mobile-menu-toggle" class="cursor-pointer text-muted lg:hidden" aria-label={t(locale, "nav.toggleMenu")}>
-      <svg class="menu-open h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      <svg class="menu-close hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </label>
+    <!-- Mobile menu toggle. A real button: the old label-for-hidden-checkbox
+         wasn't keyboard reachable, never swapped to the close icon, and logged
+         every tap as two clicks, which PostHog read as rage clicks (#5011). -->
+    <button
+      type="button"
+      id="mobile-menu-button"
+      class="cursor-pointer text-muted lg:hidden"
+      aria-label={t(locale, "nav.toggleMenu")}
+      aria-expanded="false"
+      aria-controls="mobile-menu"
+    >
+      <svg class="menu-open h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <svg class="menu-close hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 
-  <!-- Hidden checkbox for CSS toggle -->
-  <input type="checkbox" id="mobile-menu-toggle" class="peer hidden" aria-hidden="true" />
-
   <!-- Mobile menu panel -->
-  <div class="hidden border-t border-border bg-surface px-6 py-4 peer-checked:block lg:hidden">
+  <div id="mobile-menu" class="hidden border-t border-border bg-surface px-6 py-4 lg:hidden">
     {[...productLinks, ...links].map((item) => (
       <a
         href={item.href}
@@ -174,6 +180,18 @@ const links: NavItem[] = [
 </nav>
 
 <script>
+  const menuButton = document.getElementById("mobile-menu-button");
+  const menu = document.getElementById("mobile-menu");
+  if (menuButton && menu) {
+    menuButton.addEventListener("click", () => {
+      const open = menuButton.getAttribute("aria-expanded") !== "true";
+      menuButton.setAttribute("aria-expanded", String(open));
+      menu.classList.toggle("hidden", !open);
+      menuButton.querySelector(".menu-open")?.classList.toggle("hidden", open);
+      menuButton.querySelector(".menu-close")?.classList.toggle("hidden", !open);
+    });
+  }
+
   // Some locales leave no room for the Star label beside the nav links, so drop
   // it (keeping the octocat and count) whenever the row would overflow.
   const row = document.querySelector<HTMLElement>("[data-nav-row]");
@@ -187,20 +205,3 @@ const links: NavItem[] = [
     window.addEventListener("resize", fit);
   }
 </script>
-
-<style>
-  #mobile-menu-toggle:checked ~ nav .menu-open,
-  .menu-close {
-    display: none;
-  }
-  #mobile-menu-toggle:checked ~ nav .menu-close {
-    display: block;
-  }
-  /* Fix: target the label's SVGs via the peer */
-  :global(#mobile-menu-toggle:checked + div .menu-open) {
-    display: none;
-  }
-  :global(#mobile-menu-toggle:checked + div .menu-close) {
-    display: block;
-  }
-</style>

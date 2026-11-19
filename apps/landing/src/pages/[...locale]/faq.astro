@@ -18,7 +18,7 @@ export function getStaticPaths() {
 const { locale } = Astro.props;
 const PATH = "/faq";
 
-const faqKeys = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"];
+const faqKeys = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"];
 const faqs = faqKeys.map((k) => ({
   question: t(locale, `faq.${k}.q`),
   answer: t(locale, `faq.${k}.a`),

@@ -1098,9 +1098,9 @@
     "stale": false
   },
   "faq.q2.a": {
-    "sourceHash": "bfbe1ebc18ca",
-    "provenance": "machine",
-    "outputHash": "2e6fbf409143",
+    "sourceHash": "ace3af49e7e5",
+    "provenance": "human",
+    "outputHash": "edce999bddb6",
     "stale": false
   },
   "faq.q2.q": {
@@ -1110,9 +1110,9 @@
     "stale": false
   },
   "faq.q3.a": {
-    "sourceHash": "42bc2bb71c5d",
+    "sourceHash": "2813b2ad59b2",
     "provenance": "machine",
-    "outputHash": "cc8590500521",
+    "outputHash": "225229538fa3",
     "stale": false
   },
   "faq.q3.q": {
@@ -1146,9 +1146,9 @@
     "stale": false
   },
   "faq.q6.a": {
-    "sourceHash": "fa3161521426",
+    "sourceHash": "603f9acfab9d",
     "provenance": "machine",
-    "outputHash": "5e902cf79ad8",
+    "outputHash": "58b09e074684",
     "stale": false
   },
   "faq.q6.q": {
@@ -1179,6 +1179,18 @@
     "sourceHash": "1f6adabd77cb",
     "provenance": "machine",
     "outputHash": "2065200c5f86",
+    "stale": false
+  },
+  "faq.q9.a": {
+    "sourceHash": "f80f11232990",
+    "provenance": "machine",
+    "outputHash": "b4e230d477a3",
+    "stale": false
+  },
+  "faq.q9.q": {
+    "sourceHash": "c97cab035595",
+    "provenance": "machine",
+    "outputHash": "fc3b3f2026df",
     "stale": false
   },
   "faq.stillHave.body": {
@@ -1517,6 +1529,18 @@
     "outputHash": "b814626570f6",
     "stale": false
   },
+  "home.faq.more": {
+    "sourceHash": "5314becbd61c",
+    "provenance": "machine",
+    "outputHash": "68685820dece",
+    "stale": false
+  },
+  "home.faq.title": {
+    "sourceHash": "c196cc1390f0",
+    "provenance": "machine",
+    "outputHash": "34feaf7ec1f9",
+    "stale": false
+  },
   "home.features.ai.bgReplace": {
     "sourceHash": "5fc4b6767cf1",
     "provenance": "machine",
@@ -1785,6 +1809,12 @@
     "sourceHash": "beafec79ffdd",
     "provenance": "machine",
     "outputHash": "48f00fdd1717",
+    "stale": false
+  },
+  "home.hero.popularLabel": {
+    "sourceHash": "bc7ce76ee7ca",
+    "provenance": "machine",
+    "outputHash": "55aa3ee50d00",
     "stale": false
   },
   "home.hero.searchEmpty": {
@@ -2082,9 +2112,9 @@
     "stale": false
   },
   "home.pricing.subtitle": {
-    "sourceHash": "e7445f399d28",
+    "sourceHash": "af8b9de99a27",
     "provenance": "machine",
-    "outputHash": "b39d0087aa23",
+    "outputHash": "bc007ecf403c",
     "stale": false
   },
   "home.pricing.title": {
@@ -2117,10 +2147,22 @@
     "outputHash": "c6019f9ffb64",
     "stale": false
   },
+  "home.quickstart.freeLine": {
+    "sourceHash": "fcb325be07a1",
+    "provenance": "machine",
+    "outputHash": "db137a9aa1b0",
+    "stale": false
+  },
   "home.quickstart.label": {
     "sourceHash": "a13fd69781a3",
     "provenance": "machine",
     "outputHash": "0ca7f603eae6",
+    "stale": false
+  },
+  "home.quickstart.loginHint": {
+    "sourceHash": "5d61a89c4037",
+    "provenance": "machine",
+    "outputHash": "b1253776a8b7",
     "stale": false
   },
   "home.quickstart.tryDemo": {
