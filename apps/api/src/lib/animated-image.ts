@@ -148,6 +148,7 @@ export async function readTiffPagesFor(buffer: Buffer, outputFormat: string): Pr
     if (err instanceof Error && /differs from page/.test(err.message)) {
       throw new ToolInputError(
         `This TIFF has ${pages} pages of different sizes. Only a TIFF whose pages all share one size can be edited with every page kept.`,
+        { code: "IMAGE_UNDECODABLE" },
       );
     }
     return STILL;
