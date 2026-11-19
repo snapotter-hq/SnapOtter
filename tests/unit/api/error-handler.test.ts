@@ -1,4 +1,4 @@
-import type { Readable } from "node:stream";
+import { type Readable, Writable } from "node:stream";
 import {
   PIXEL_LIMIT_IMAGE_MESSAGE,
   pixelLimitImageError,
@@ -511,6 +511,62 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       );
     } finally {
       selectSpy.mockRestore();
+      await app.close();
+    }
+  });
+});
+
+// #4348: when a hook or handler sends and then resolves undefined (the bug
+// class fixed in #4657), Fastify sends a second time while the async onSend
+// hooks run. That second writeHead throws ERR_HTTP_HEADERS_SENT and lands in
+// the error handler after the client already has its response. The handler
+// must log it once and not try to answer again.
+describe("an error reaching the handler after the reply went out (#4348)", () => {
+  async function appSendingTwice() {
+    const lines: Array<{ msg?: string; err?: { code?: string } }> = [];
+    const sink = new Writable({
+      write(chunk, _encoding, callback) {
+        for (const line of String(chunk).split("\n")) {
+          if (line.trim()) lines.push(JSON.parse(line));
+        }
+        callback();
+      },
+    });
+    const app = Fastify({ logger: { level: "warn", stream: sink } });
+    registerErrorHandler(app);
+    // Stands in for the app's slower onSend hooks (tool-access awaits the
+    // audit helper), which keep the first send in flight past the handler.
+    app.addHook("onSend", async (_request, _reply, payload) => {
+      await new Promise((resolve) => setImmediate(resolve));
+      return payload;
+    });
+    app.addHook("preHandler", async (_request, reply) => {
+      reply.status(403).send({ error: "Insufficient permissions" });
+    });
+    app.get("/teams", async () => ({ teams: [] }));
+    await registerScimRoutes(app);
+    await app.ready();
+    return { app, lines };
+  }
+
+  it.each([
+    ["the app's handler", "/teams"],
+    ["the SCIM handler", "/api/v1/scim/v2/ServiceProviderConfig"],
+  ])("%s logs the late error once and does not send again", async (_label, url) => {
+    const { app, lines } = await appSendingTwice();
+    try {
+      const res = await app.inject({ method: "GET", url });
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body)).toMatchObject({ error: "Insufficient permissions" });
+
+      await vi.waitFor(() => {
+        expect(lines.filter((line) => line.err?.code === "ERR_HTTP_HEADERS_SENT")).toHaveLength(1);
+      });
+      expect(lines.filter((line) => line.msg === "Unhandled request error")).toHaveLength(1);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError.mock.calls[0]?.[0]).toMatchObject({ code: "ERR_HTTP_HEADERS_SENT" });
+      expect(lines.filter((line) => line.err?.code === "FST_ERR_REP_ALREADY_SENT")).toEqual([]);
+    } finally {
       await app.close();
     }
   });

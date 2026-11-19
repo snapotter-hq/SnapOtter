@@ -572,6 +572,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
   // shape, while still logging and reporting to Sentry (#2230).
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     const statusCode = logAndReportRequestError(error, request);
+    // Already answered: see the same guard in registerErrorHandler (#4348).
+    if (reply.sent || reply.raw.headersSent) return;
     const safe = isSafeMessageError(error) && error.statusCode !== undefined;
     const detail =
       statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message);
