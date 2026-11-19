@@ -1,5 +1,6 @@
 import { expandCompressPresets } from "./compress-presets.js";
 import { expandConversionPresets } from "./conversion-presets.js";
+import { unnamedFormatKeywords } from "./search/format-aliases.js";
 import { toolSection } from "./section.js";
 import { AUDIO_TOOLS } from "./tools/audio.js";
 import { DOCUMENT_TOOLS } from "./tools/documents.js";
@@ -84,6 +85,13 @@ export const TOOLS: Tool[] = [
   ...expandConversionPresets(BASE_TOOLS),
   ...expandCompressPresets(BASE_TOOLS),
 ];
+
+// A format nothing in the catalog names ("opus", camera raw) would be
+// unfindable by search (#4818).
+for (const [id, formats] of unnamedFormatKeywords(TOOLS)) {
+  const tool = TOOLS.find((entry) => entry.id === id);
+  if (tool) tool.keywords = [...(tool.keywords ?? []), ...formats];
+}
 
 for (const tool of TOOLS) {
   const slug = `/${toolSection(tool)}`;

@@ -44,6 +44,7 @@ export const AUDIO_TOOLS: Tool[] = [
     id: "volume-adjust",
     name: "Adjust Volume",
     description: "Increase or decrease audio volume by a fixed gain",
+    keywords: ["louder"],
     category: "audio-edit",
     icon: "Volume2",
     route: "/volume-adjust",

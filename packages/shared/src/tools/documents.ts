@@ -40,7 +40,13 @@ export const DOCUMENT_TOOLS: Tool[] = [
     executionHint: "long",
     // The compress-pdf-to-N presets repeat these words in every keyword; without
     // its own, the base tool lost "shrink pdf" to them (#1070, same as #1322).
-    keywords: ["compress pdf", "shrink pdf", "reduce pdf size", "pdf compressor"],
+    keywords: [
+      "compress pdf",
+      "shrink pdf",
+      "reduce pdf size",
+      "pdf compressor",
+      "make pdf smaller",
+    ],
   },
   {
     id: "rotate-pdf",

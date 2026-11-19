@@ -10,6 +10,45 @@ export const FORMAT_ALIASES: Record<string, string[]> = {
   image: ["photo", "pic", "picture", "img"],
 };
 
+/** The modality-wide converters: Convert Image and the convert-* tools. */
+export function isFormatConverter(tool: { id: string }): boolean {
+  return tool.id === "convert" || tool.id.startsWith("convert-");
+}
+
+type FormatKeywordTool = {
+  id: string;
+  acceptedInputs: readonly string[];
+  keywords?: readonly string[];
+};
+
+/**
+ * Keywords for the accepted formats ("opus", "nef", "vtt") that no tool names in
+ * its id or keywords, keyed by tool id. Without them a query naming only that
+ * format finds nothing, or whatever fuzzy match is nearby (#4818). Each format
+ * goes to the converters that accept it, or to every tool that accepts it when
+ * no converter does. Formats a preset already names ("png", "ico") are left
+ * out, so those presets keep ranking first.
+ */
+export function unnamedFormatKeywords(tools: readonly FormatKeywordTool[]): Map<string, string[]> {
+  const named = new Set<string>();
+  for (const tool of tools) {
+    for (const text of [tool.id, ...(tool.keywords ?? [])]) {
+      for (const word of text.toLowerCase().split(/[^a-z0-9]+/)) named.add(word);
+    }
+  }
+  const formats = new Set(tools.flatMap((tool) => tool.acceptedInputs.map((ext) => ext.slice(1))));
+  const keywords = new Map<string, string[]>();
+  for (const format of formats) {
+    if (named.has(format)) continue;
+    const takers = tools.filter((tool) => tool.acceptedInputs.includes(`.${format}`));
+    const converters = takers.filter(isFormatConverter);
+    for (const tool of converters.length > 0 ? converters : takers) {
+      keywords.set(tool.id, [...(keywords.get(tool.id) ?? []), format]);
+    }
+  }
+  return keywords;
+}
+
 /** Reverse lookup: any alias -> its canonical form. */
 const ALIAS_TO_CANONICAL: Record<string, string> = (() => {
   const map: Record<string, string> = {};

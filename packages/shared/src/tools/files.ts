@@ -110,6 +110,7 @@ export const FILE_TOOLS: Tool[] = [
     name: "Extract ZIP",
     description:
       "Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly.",
+    keywords: ["unzip"],
     category: "archives",
     icon: "FolderOpen",
     route: "/extract-zip",

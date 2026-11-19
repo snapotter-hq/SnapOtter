@@ -54,6 +54,8 @@ export const IMAGE_TOOLS: Tool[] = [
       "heic to jpg",
       "webp to png",
       "convert image format",
+      "change format",
+      "camera raw",
     ],
     executionHint: "fast",
   },
@@ -69,7 +71,13 @@ export const IMAGE_TOOLS: Tool[] = [
     executionHint: "fast",
     // An exact "compress" keeps this ahead of the compress-image-to-N-kb
     // presets, whose many "compress ..." keywords otherwise win a bare query (#1322).
-    keywords: ["compress", "compress image", "reduce file size", "shrink image"],
+    keywords: [
+      "compress",
+      "compress image",
+      "reduce file size",
+      "shrink image",
+      "make image smaller",
+    ],
   },
   // Optimization
   {
@@ -237,6 +245,7 @@ export const IMAGE_TOOLS: Tool[] = [
     id: "erase-object",
     name: "Object Eraser",
     description: "Remove unwanted objects with AI",
+    keywords: ["remove object", "remove watermark", "inpaint"],
     category: "enhance",
     icon: "Wand",
     route: "/erase-object",
@@ -394,6 +403,7 @@ export const IMAGE_TOOLS: Tool[] = [
     id: "transcribe-audio",
     name: "Transcribe Audio",
     description: "Convert speech to text with AI-powered transcription",
+    keywords: ["voice to text"],
     category: "audio-convert",
     icon: "MicVocal",
     route: "/transcribe-audio",
@@ -541,6 +551,7 @@ export const IMAGE_TOOLS: Tool[] = [
     id: "color-palette",
     name: "Color Palette",
     description: "Extract dominant colors from image",
+    keywords: ["color picker"],
     category: "utilities",
     icon: "Droplets",
     route: "/color-palette",
@@ -717,6 +728,7 @@ export const IMAGE_TOOLS: Tool[] = [
     id: "pixelate",
     name: "Pixelate",
     description: "Apply a pixelation effect to the full image or a specific region",
+    keywords: ["censor", "redact image", "mosaic"],
     category: "adjustments",
     icon: "Grid2x2",
     route: "/pixelate",

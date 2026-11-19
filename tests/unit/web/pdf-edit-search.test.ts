@@ -1,14 +1,12 @@
-import { normalizeSearchQuery, TOOLS } from "@snapotter/shared";
+import { TOOLS } from "@snapotter/shared";
 import Fuse from "fuse.js";
 import { describe, expect, it } from "vitest";
-import { FUSE_OPTIONS } from "@/hooks/use-fuse-search";
+import { FUSE_OPTIONS, searchToolList } from "@/hooks/use-fuse-search";
 
-// Uses the same FUSE_OPTIONS the app ships, imported rather than copied, so a
-// ranking change in production cannot pass here on a stale config.
+// Runs the same config and pipeline the app ships, imported rather than
+// copied, so a ranking change in production cannot pass here on a stale copy.
 function search(q: string): string[] {
-  const fuse = new Fuse(TOOLS, FUSE_OPTIONS);
-  const n = normalizeSearchQuery(q);
-  return fuse.search(n || q).map((r) => r.item.id);
+  return searchToolList(new Fuse(TOOLS, FUSE_OPTIONS), TOOLS, q).map((tool) => tool.id);
 }
 
 const PDF_EDIT_TOOLS = new Set(TOOLS.filter((t) => t.category === "pdf-edit").map((t) => t.id));
