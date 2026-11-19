@@ -1711,6 +1711,7 @@ export const zhCN: TranslationKeys = {
       progressLabel: "正在放大图片",
       progressLabelBatch: "正在放大 {count} 张图片",
       cpuNote: "AI 放大对算力要求很高。若没有 GPU，处理大图可能需要几分钟。",
+      cpuResizedNote: "此服务器没有 GPU，因此在放大前已将图片缩小到 {width} × {height}。",
       qualityFast: "快速",
       qualityBalanced: "均衡",
       qualityBest: "最佳",

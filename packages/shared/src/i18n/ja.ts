@@ -1915,6 +1915,8 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像をアップスケール中",
       cpuNote:
         "AIアップスケーリングは処理負荷が高い処理です。GPUがない場合、大きな画像には数分かかることがあります。",
+      cpuResizedNote:
+        "このサーバーにはGPUがないため、アップスケールの前に画像を{width} × {height}に縮小しました。",
       qualityFast: "高速",
       qualityBalanced: "バランス",
       qualityBest: "最高",

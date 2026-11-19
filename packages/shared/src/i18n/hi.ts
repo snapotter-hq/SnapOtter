@@ -1768,6 +1768,8 @@ export const hi: TranslationKeys = {
       progressLabel: "इमेज अपस्केल हो रही है",
       progressLabelBatch: "{count} इमेज अपस्केल हो रही हैं",
       cpuNote: "AI अपस्केलिंग कंप्यूट-हैवी है। GPU के बिना, बड़ी इमेज में कई मिनट लग सकते हैं।",
+      cpuResizedNote:
+        "इस सर्वर में GPU नहीं है, इसलिए अपस्केल करने से पहले इमेज को {width} × {height} तक छोटा किया गया।",
       qualityFast: "तेज़",
       qualityBalanced: "संतुलित",
       qualityBest: "सर्वोत्तम",

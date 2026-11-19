@@ -1949,6 +1949,8 @@ export const es: TranslationKeys = {
       progressLabelBatch: "Escalando {count} imágenes",
       cpuNote:
         "El escalado con IA consume muchos recursos. Sin GPU, una imagen grande puede tardar varios minutos.",
+      cpuResizedNote:
+        "Este servidor no tiene GPU, así que la imagen se redujo a {width} × {height} antes de escalarla.",
       qualityFast: "Rápido",
       qualityBalanced: "Equilibrado",
       qualityBest: "Mejor",

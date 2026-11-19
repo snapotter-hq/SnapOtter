@@ -1964,6 +1964,8 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Збільшення {count} зображень",
       cpuNote:
         "Масштабування ШІ потребує багато обчислень. Без GPU обробка великого зображення може зайняти кілька хвилин.",
+      cpuResizedNote:
+        "На цьому сервері немає GPU, тому перед масштабуванням зображення зменшено до {width} × {height}.",
       qualityFast: "Швидко",
       qualityBalanced: "Збалансовано",
       qualityBest: "Найкраще",

@@ -1962,6 +1962,8 @@ export const pl: TranslationKeys = {
       progressLabel: "Powiększanie obrazu",
       progressLabelBatch: "Powiększanie {count} obrazów",
       cpuNote: "Skalowanie AI mocno obciąża procesor. Bez GPU duży obraz może zająć kilka minut.",
+      cpuResizedNote:
+        "Ten serwer nie ma GPU, więc przed skalowaniem obraz zmniejszono do {width} × {height}.",
       qualityFast: "Szybko",
       qualityBalanced: "Zrównoważona",
       qualityBest: "Najlepsza",

@@ -1963,6 +1963,8 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Увеличение {count} изображений",
       cpuNote:
         "Масштабирование ИИ требует много ресурсов. Без GPU обработка большого изображения может занять несколько минут.",
+      cpuResizedNote:
+        "На этом сервере нет GPU, поэтому перед масштабированием изображение уменьшено до {width} × {height}.",
       qualityFast: "Быстро",
       qualityBalanced: "Сбалансированно",
       qualityBest: "Наилучшее",

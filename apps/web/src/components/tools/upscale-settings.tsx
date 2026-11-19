@@ -211,6 +211,21 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
   );
 }
 
+/**
+ * Says when a CPU-only server reduced the input before upscaling it (#4820),
+ * so a result smaller than expected isn't a mystery.
+ */
+export function UpscaleCpuResizeNote({ resizedTo }: { resizedTo: unknown }) {
+  const { t } = useTranslation();
+  const size = resizedTo as { width?: unknown; height?: unknown } | null | undefined;
+  if (typeof size?.width !== "number" || typeof size?.height !== "number") return null;
+  return (
+    <p className="text-xs text-foreground" data-testid="upscale-cpu-resized-note">
+      {format(t.toolSettings.upscale.cpuResizedNote, { width: size.width, height: size.height })}
+    </p>
+  );
+}
+
 export function UpscaleSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
@@ -223,6 +238,7 @@ export function UpscaleSettings() {
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   } = useToolProcessor("upscale");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
@@ -254,6 +270,11 @@ export function UpscaleSettings() {
             {format(t.toolSettings.upscale.upscaledKb, { size: (processedSize / 1024).toFixed(1) })}
           </p>
         </div>
+      )}
+
+      {/* Single-file only, like the download link; resultPayload outlives a file swap, downloadUrl does not */}
+      {!hasMultiple && downloadUrl && (
+        <UpscaleCpuResizeNote resizedTo={resultPayload?.inputResizedTo} />
       )}
 
       {/* Process buttons / progress */}

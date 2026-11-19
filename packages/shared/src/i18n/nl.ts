@@ -1964,6 +1964,8 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "{count} afbeeldingen opschalen",
       cpuNote:
         "AI-opschaling is rekenintensief. Zonder GPU kan een grote afbeelding enkele minuten duren.",
+      cpuResizedNote:
+        "Deze server heeft geen GPU, dus de afbeelding is vóór het opschalen verkleind tot {width} × {height}.",
       qualityFast: "Snel",
       qualityBalanced: "Gebalanceerd",
       qualityBest: "Beste",

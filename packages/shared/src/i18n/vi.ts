@@ -1957,6 +1957,8 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang phóng to {count} ảnh",
       cpuNote:
         "Nâng cấp bằng AI tiêu tốn nhiều tài nguyên tính toán. Không có GPU, ảnh lớn có thể mất vài phút.",
+      cpuResizedNote:
+        "Máy chủ này không có GPU nên ảnh đã được thu nhỏ còn {width} × {height} trước khi phóng to.",
       qualityFast: "Nhanh",
       qualityBalanced: "Cân bằng",
       qualityBest: "Tốt nhất",
