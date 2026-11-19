@@ -4,7 +4,7 @@ description: Security hardening guide for SnapOtter. Container security, network
 
 # Security & Hardening {#security-hardening}
 
-SnapOtter processes files entirely on your infrastructure. It sends anonymous, content-free product analytics and crash reports by default to help improve the project. It never sends your files, file names, file contents, OCR output, image metadata, or document text. Optional feedback is sent only after a user submits it, only when analytics is enabled, and contact fields are included only with explicit contact consent. An administrator can turn analytics and feedback capture off in one click under Settings > System > Privacy, no rebuild required. File processing always stays inside your container.
+SnapOtter processes files entirely on your infrastructure. It can send anonymous, content-free product analytics and crash reports to help improve the project, but a new instance asks its administrator first and sends nothing until answered. It never sends your files, file names, file contents, OCR output, image metadata, or document text. Optional feedback is sent only after a user submits it, only when analytics is enabled, and contact fields are included only with explicit contact consent. An administrator can turn analytics and feedback capture off in one click under Settings > System > Privacy, no rebuild required. File processing always stays inside your container.
 
 The container runs as a dedicated non-root user (`snapotter`) with all Linux capabilities dropped except the minimum required set. For the full vulnerability disclosure policy and security architecture, see [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) on GitHub.
 
