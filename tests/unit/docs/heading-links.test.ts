@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   headingAnchorFor,
   installHeadingLinks,
@@ -47,22 +47,46 @@ describe("headingAnchorFor", () => {
 });
 
 describe("installHeadingLinks", () => {
-  beforeEach(renderDoc);
+  beforeEach(() => {
+    renderDoc();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
 
-  it("clicks the anchor for a plain left click and skips modified clicks", () => {
+  function setup() {
     const doc = document.implementation.createHTMLDocument();
     doc.body.innerHTML = document.body.innerHTML;
     installHeadingLinks(doc);
-    const anchor = doc.querySelector("#gpu a.header-anchor") as HTMLAnchorElement;
     const follow = vi.fn((e: Event) => e.preventDefault());
-    anchor.addEventListener("click", follow);
+    doc.querySelector("#gpu a.header-anchor")?.addEventListener("click", follow);
     const text = doc.querySelector("#gpu .txt") as HTMLElement;
+    const click = (init: MouseEventInit = {}) =>
+      text.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0, detail: 1, ...init }));
+    return { follow, click };
+  }
 
-    text.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0 }));
+  it("follows the anchor once the double-click window passes", () => {
+    const { follow, click } = setup();
+    click();
+    expect(follow).not.toHaveBeenCalled();
+    vi.runAllTimers();
     expect(follow).toHaveBeenCalledTimes(1);
+  });
 
-    text.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0, metaKey: true }));
-    text.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 1 }));
-    expect(follow).toHaveBeenCalledTimes(1);
+  it("does not jump on a double-click, which is a reader selecting a word", () => {
+    const { follow, click } = setup();
+    click({ detail: 1 });
+    click({ detail: 2 });
+    vi.runAllTimers();
+    expect(follow).not.toHaveBeenCalled();
+  });
+
+  it("skips modified and non-primary clicks", () => {
+    const { follow, click } = setup();
+    click({ metaKey: true });
+    click({ ctrlKey: true });
+    click({ button: 1 });
+    vi.runAllTimers();
+    expect(follow).not.toHaveBeenCalled();
   });
 });

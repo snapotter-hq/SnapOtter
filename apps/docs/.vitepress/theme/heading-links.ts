@@ -16,11 +16,21 @@ export function headingAnchorFor(
 
 // Readers click heading text expecting a section link, but only the hover-only
 // "#" beside it is one (#5008). Following that same anchor keeps VitePress's
-// own router in charge of the hash change and the scroll.
+// own router in charge of the hash change and the scroll. The jump waits out
+// the double-click window: the first click of a double-click has no selection
+// yet, and a reader selecting a word shouldn't get a scroll jump.
+const DOUBLE_CLICK_WINDOW_MS = 250;
+
 export function installHeadingLinks(doc: Document): void {
+  let pending: ReturnType<typeof setTimeout> | undefined;
   doc.addEventListener("click", (event) => {
-    if (event.defaultPrevented || event.button !== 0) return;
+    clearTimeout(pending);
+    if (event.defaultPrevented || event.button !== 0 || event.detail > 1) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    headingAnchorFor(event.target, doc.getSelection()?.toString() ?? "")?.click();
+    const anchor = headingAnchorFor(event.target, doc.getSelection()?.toString() ?? "");
+    if (!anchor) return;
+    pending = setTimeout(() => {
+      if (!doc.getSelection()?.toString()) anchor.click();
+    }, DOUBLE_CLICK_WINDOW_MS);
   });
 }

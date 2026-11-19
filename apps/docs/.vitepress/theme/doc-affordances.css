@@ -4,10 +4,15 @@
   opacity: 1;
 }
 
-/* The language label sits under the copy button; VitePress hides it on hover
-   for the same reason. */
-.vp-doc [class*="language-"] > button.copy + span.lang {
-  opacity: 0;
+/* The language label sits where the copy button is; VitePress hides it while
+   the button shows. Move it beside the button so it stays readable. */
+.vp-doc [class*="language-"] > span.lang {
+  right: 60px;
+}
+
+.vp-doc [class*="language-"]:hover > button.copy + span.lang,
+.vp-doc [class*="language-"] > button.copy:focus + span.lang {
+  opacity: 1;
 }
 
 /* Heading text links to its section (heading-links.ts). */
