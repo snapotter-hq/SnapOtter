@@ -3966,6 +3966,9 @@ export const ptBR: TranslationKeys = {
       submit: "Converter para Word",
       submitBatch: "Converter para Word ({count} arquivos)",
       progressLabel: "Convertendo",
+      scannedHint:
+        "Este PDF é digitalizado, então um arquivo do Word teria apenas imagens das páginas. O OCR consegue ler o texto, mas entrega texto simples em vez de um arquivo do Word, leva mais tempo e exige o pacote de IA de OCR instalado.",
+      runOcr: "Executar OCR neste PDF",
     },
     "pdf-metadata": {
       title: "Título",

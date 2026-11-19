@@ -3952,6 +3952,9 @@ export const vi: TranslationKeys = {
       submit: "Chuyển sang Word",
       submitBatch: "Chuyển sang Word ({count} tệp)",
       progressLabel: "Đang chuyển đổi",
+      scannedHint:
+        "PDF này là bản quét nên tệp Word sẽ chỉ chứa hình ảnh của các trang. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần chứ không phải tệp Word, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+      runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-metadata": {
       title: "Tiêu đề",

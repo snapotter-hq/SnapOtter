@@ -3975,6 +3975,9 @@ export const nl: TranslationKeys = {
       submit: "Converteren naar Word",
       submitBatch: "Converteren naar Word ({count} bestanden)",
       progressLabel: "Converteren",
+      scannedHint:
+        "Deze pdf is gescand, dus een Word-bestand zou alleen afbeeldingen van de pagina's bevatten. OCR kan de tekst lezen, maar levert platte tekst op in plaats van een Word-bestand, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+      runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-metadata": {
       title: "Titel",

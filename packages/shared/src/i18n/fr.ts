@@ -3978,6 +3978,9 @@ export const fr: TranslationKeys = {
       submit: "Convertir en Word",
       submitBatch: "Convertir en Word ({count} fichiers)",
       progressLabel: "Conversion",
+      scannedHint:
+        "Ce PDF est numérisé, un fichier Word ne contiendrait donc que des images des pages. L'OCR peut lire le texte, mais il produit du texte brut et non un fichier Word, c'est plus long et cela demande que le pack d'IA OCR soit installé.",
+      runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-metadata": {
       title: "Titre",

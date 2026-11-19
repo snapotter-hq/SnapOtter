@@ -3910,6 +3910,9 @@ export const ja: TranslationKeys = {
       submit: "Wordに変換",
       submitBatch: "Wordに変換 ({count}ファイル)",
       progressLabel: "変換中",
+      scannedHint:
+        "このPDFはスキャンされた画像のため、Wordファイルにしてもページの画像しか入りません。OCRならテキストを読み取れますが、結果はWordファイルではなくプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+      runOcr: "このPDFでOCRを実行",
     },
     "pdf-metadata": {
       title: "タイトル",

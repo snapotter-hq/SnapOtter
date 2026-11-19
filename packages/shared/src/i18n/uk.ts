@@ -3966,6 +3966,9 @@ export const uk: TranslationKeys = {
       submit: "Конвертувати у Word",
       submitBatch: "Конвертувати у Word ({count} файлів)",
       progressLabel: "Конвертація",
+      scannedHint:
+        "Цей PDF відсканований, тож файл Word міститиме лише зображення сторінок. OCR може прочитати текст, але видасть звичайний текст, а не файл Word, це довше й потребує встановленого ШІ-пакета OCR.",
+      runOcr: "Запустити OCR для цього PDF",
     },
     "pdf-metadata": {
       title: "Назва",

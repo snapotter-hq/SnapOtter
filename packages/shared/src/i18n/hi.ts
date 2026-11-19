@@ -3756,6 +3756,9 @@ export const hi: TranslationKeys = {
       submit: "Word में रूपांतरित करें",
       submitBatch: "Word में रूपांतरित करें ({count} फ़ाइलें)",
       progressLabel: "रूपांतरित हो रहा है",
+      scannedHint:
+        "यह PDF स्कैन किया हुआ है, इसलिए Word फ़ाइल में सिर्फ़ पृष्ठों की तस्वीरें होंगी। OCR टेक्स्ट पढ़ सकता है, लेकिन इससे Word फ़ाइल नहीं, सादा टेक्स्ट मिलता है, ज़्यादा समय लगता है और OCR AI बंडल इंस्टॉल होना चाहिए।",
+      runOcr: "इस PDF पर OCR चलाएँ",
     },
     "pdf-metadata": {
       title: "शीर्षक",

@@ -3967,6 +3967,9 @@ export const pl: TranslationKeys = {
       submit: "Konwertuj do Word",
       submitBatch: "Konwertuj do Word ({count} plików)",
       progressLabel: "Konwersja",
+      scannedHint:
+        "Ten PDF jest skanem, więc plik Word zawierałby tylko obrazy stron. OCR może odczytać tekst, ale daje zwykły tekst zamiast pliku Word, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+      runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-metadata": {
       title: "Tytuł",

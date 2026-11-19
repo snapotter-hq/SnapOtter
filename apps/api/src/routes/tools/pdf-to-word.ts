@@ -1,8 +1,10 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pdfToWordPy } from "@snapotter/doc-engine";
+import { pdfTextPy, pdfToWordPy } from "@snapotter/doc-engine";
+import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
@@ -19,6 +21,24 @@ export function registerPdfToWord(app: FastifyInstance) {
       const base = input.filename.replace(/\.[^.]+$/, "");
       const inPath = join(ctx.scratchDir, `in-${input.filename.replace(/[^A-Za-z0-9._-]/g, "_")}`);
       await writeFile(inPath, input.buffer);
+
+      // pdf2docx copies a scanned page into the .docx as a picture, so a PDF
+      // with no text layer came back as a "successful" Word file with nothing
+      // to edit (#4838). Probe with the same check pdf-to-text uses and refuse
+      // with its code, which lets the web app offer OCR. The probe only
+      // refuses when no page has text, so a partly scanned PDF still converts.
+      ctx.report(5, "Checking for text");
+      const probe = await pdfTextPy(inPath, join(ctx.scratchDir, "text-probe.txt"), {
+        signal: ctx.signal,
+      });
+      if (!probe.hasText) {
+        throw new InputValidationError(
+          "This PDF has no extractable text layer. It looks scanned or image-only, so a Word file would only hold pictures of the pages. Use the PDF OCR tool to read its text instead.",
+          422,
+          undefined,
+          NO_TEXT_LAYER_CODE,
+        );
+      }
 
       const outPath = join(ctx.scratchDir, `${base}.docx`);
       ctx.report(10, "Converting");

@@ -1,18 +1,14 @@
-import { NO_TEXT_LAYER_CODE, TOOLS } from "@snapotter/shared";
-import { useNavigate } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
+import { ScannedPdfOcrHandoff } from "@/components/common/scanned-pdf-ocr-handoff";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
-const OCR_TOOL = TOOLS.find((tool) => tool.id === "ocr-pdf");
-
 export function PdfToTextSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["pdf-to-text"];
-  const { files, errorCode } = useFileStore();
-  const navigate = useNavigate();
+  const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("pdf-to-text");
 
@@ -28,39 +24,10 @@ export function PdfToTextSettings() {
     }
   };
 
-  // A batch only carries the code when every file failed on it (the server
-  // withholds it from a mixed batch), so the handoff never drags readable PDFs
-  // into OCR (#4143).
-  const offerOcr = OCR_TOOL !== undefined && !!error && errorCode === NO_TEXT_LAYER_CODE;
-
-  // The files stay in the store across the navigation (`fromLibrary`), so OCR
-  // starts with the PDF already loaded and nothing is uploaded until it runs.
-  const handoffToOcr = () => {
-    if (!OCR_TOOL) return;
-    const store = useFileStore.getState();
-    store.setError(null);
-    store.entries.forEach((entry) => {
-      store.updateEntryById(entry.id, { status: "pending", error: null });
-    });
-    navigate(OCR_TOOL.route, { state: { fromLibrary: true } });
-  };
-
   return (
     <div className="space-y-4">
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
-      {offerOcr && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">{s.scannedHint}</p>
-          <button
-            type="button"
-            data-testid="pdf-to-text-run-ocr"
-            onClick={handoffToOcr}
-            className="w-full py-2.5 rounded-lg border border-border font-medium hover:bg-muted"
-          >
-            {s.runOcr}
-          </button>
-        </div>
-      )}
+      <ScannedPdfOcrHandoff hint={s.scannedHint} label={s.runOcr} testId="pdf-to-text-run-ocr" />
 
       {processing ? (
         <ProgressCard
