@@ -381,8 +381,11 @@ export async function applyCorrections(
   // white and its text black, not lifted shadows (#4842).
   const backlit = corrections.backlit === true && mode !== "document";
 
-  if (toggles.exposure !== false && !backlit) {
-    const baseClip = 5 - (intensity / 100) * 4.5;
+  // The clip narrows as intensity rises above the default, so below it the
+  // ramp scales it back down: otherwise intensity 0, which should leave the
+  // image alone, clipped hardest of all (#4369).
+  if (toggles.exposure !== false && !backlit && intensity > 0) {
+    const baseClip = (5 - (intensity / 100) * 4.5) * Math.min(1, intensity / 50);
     const clipPct = clamp(Math.round(baseClip * presets.normalise), 0, 10);
     const lower = clipPct;
     const upper = 100 - clipPct;

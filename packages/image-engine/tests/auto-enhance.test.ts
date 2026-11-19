@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,6 +7,10 @@ import {
   scaleCorrections,
 } from "../src/operations/auto-enhance.js";
 import type { CorrectionParams, EnhancementMode, Sharp } from "../src/types.js";
+
+const SCENE_PATH = fileURLToPath(
+  new URL("../../../tests/fixtures/image/valid/test-scene.png", import.meta.url),
+);
 
 // ---------------------------------------------------------------------------
 // Synthetic-image builders with KNOWN Sharp stats.
@@ -894,6 +899,37 @@ describe("applyCorrections normalise", () => {
       height: 64,
     });
     expect(await channelMeans(out)).toEqual([128, 128, 128]);
+  });
+
+  it("returns the input pixels at intensity 0 with every correction enabled (#4369)", async () => {
+    // Every intensity-scaled step is inert at 0; the stretch used to clip 5%
+    // at each end here, its strongest setting, and darken this scene.
+    const scene = await sharp(SCENE_PATH).removeAlpha().png().toBuffer();
+    const { width, height } = await sharp(scene).metadata();
+    const analysis = await analyzeImage(scene);
+    for (const mode of ["auto", "food", "document"] as const) {
+      const out = await run(scene, analysis.corrections, mode, 0, {}, { width, height });
+      const [a, b] = await Promise.all([
+        sharp(scene).raw().toBuffer(),
+        sharp(out).raw().toBuffer(),
+      ]);
+      expect(b.equals(a)).toBe(true);
+    }
+  });
+
+  it("stretches less below the default intensity, not more (#4369)", async () => {
+    // Uniform 60-200 texture, fine enough that each 1% of clip moves stdev.
+    const tex = await texturedGray(400, 400, 60, 200);
+    const size = { width: 400, height: 400 };
+    const stdevAt = async (intensity: number) =>
+      (
+        await channelStdevs(
+          await run(tex, NO_CORR, "auto", intensity, onlyEnabled("exposure"), size),
+        )
+      )[0];
+    const [s10, s25, s50] = [await stdevAt(10), await stdevAt(25), await stdevAt(50)];
+    expect(s10).toBeLessThan(s25);
+    expect(s25).toBeLessThan(s50);
   });
 });
 
