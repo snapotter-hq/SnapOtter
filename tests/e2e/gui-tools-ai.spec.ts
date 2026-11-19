@@ -43,7 +43,11 @@ test.describe("GUI AI Tools", () => {
       await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
-      // People is default -- Ultra should be visible
+      // General is the default (#4841), so Ultra starts hidden
+      await expect(page.getByRole("button", { name: "Ultra" })).not.toBeVisible();
+
+      // Switch to People -- Ultra should appear
+      await page.getByRole("button", { name: "People" }).click();
       await expect(page.getByRole("button", { name: "Ultra" })).toBeVisible();
 
       // Switch to Products -- Ultra should disappear
@@ -138,7 +142,7 @@ test.describe("GUI AI Tools", () => {
       await page.goto("/image/remove-background");
       await uploadTestImage(page);
 
-      // People is default -- Ultra visible
+      await page.getByRole("button", { name: "People" }).click();
       await expect(page.getByRole("button", { name: "Ultra" })).toBeVisible();
 
       // Switch to General -- Ultra should also disappear

@@ -97,6 +97,51 @@ describe("remove-background Phase 1 request (#2077)", () => {
   });
 });
 
+// The page used to open on People + HD + Passport, which picks birefnet-portrait.
+// That model erases logos, text and graphics, and the API's own default is
+// birefnet-general-lite, so the page now opens on General + HD (#4841).
+describe("remove-background default model (#4841)", () => {
+  it("opens on General + HD with birefnet-general-lite and no Passport checkbox", () => {
+    const onChange = vi.fn();
+    render(<RemoveBgControls settings={{}} onChange={onChange} />);
+
+    expect((onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>)?.model).toBe(
+      "birefnet-general-lite",
+    );
+    expect(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+    ).toHaveClass("border-primary");
+    expect(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }),
+    ).toHaveClass("border-primary");
+    expect(
+      screen.queryByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).not.toBeInTheDocument();
+  });
+
+  it("submits the first run with birefnet-general-lite", async () => {
+    deployment.beforeRun = true;
+    render(<RemoveBgSettings />);
+
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    expect(deployment.processFiles.mock.calls[0][1]).toEqual({ model: "birefnet-general-lite" });
+  });
+
+  it("still seeds People + Passport for a saved step that names birefnet-portrait", () => {
+    const onChange = vi.fn();
+    render(<RemoveBgControls settings={{ model: "birefnet-portrait" }} onChange={onChange} />);
+
+    expect(
+      screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).toBeChecked();
+    expect((onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>)?.model).toBe(
+      "birefnet-portrait",
+    );
+  });
+});
+
 // Edge smoothing and decontamination are sidecar options: only a new removal can
 // apply them. Changing them after a result leaves the download as it was, so the
 // panel says so and offers to run again (#2112).
@@ -229,8 +274,9 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     await screen.findByTestId("remove-background-download");
     expect(stale()).not.toBeInTheDocument();
 
+    // People at HD turns Passport on, which swaps the default general-lite for birefnet-portrait.
     fireEvent.click(
-      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
     );
     expect(stale()).toBeInTheDocument();
   });
@@ -256,16 +302,20 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
 
     fireEvent.click(
-      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
     );
     expect(stale()).not.toBeInTheDocument();
   });
 
   it("offers to run again when Passport or Quality changes the model and re-runs with the new model (#2488)", async () => {
     const view = render(<RemoveBgSettings />);
+    // People at HD turns Passport on, so the first run uses birefnet-portrait.
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
     await runAndLand(view);
 
-    // Uncheck Passport / ID photo at the default HD tier: model switches from
+    // Uncheck Passport / ID photo at the HD tier: model switches from
     // birefnet-portrait to birefnet-general-lite and flags the cutout as stale (#2503).
     fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
     expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
@@ -303,6 +353,10 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     const onChange = vi.fn();
     const lastModel = () => (onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>)?.model;
     render(<RemoveBgControls settings={{}} onChange={onChange} />);
+    // People at HD turns Passport on.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
 
     const passportCheckbox = screen.getByLabelText(
       en.toolSettings["remove-background"].passportIdPhoto,
@@ -397,7 +451,10 @@ describe("remove-background refinements changed after the first run (#2112)", ()
       render(<RemoveBgSettings />);
 
       fireEvent.click(
-        await screen.findByRole("button", {
+        await screen.findByRole("button", { name: en.toolSettings["remove-background"].people }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", {
           name: en.toolSettings["remove-background"][labelKey],
         }),
       );
@@ -418,7 +475,7 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     expect(stale()).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
     );
     expect(stale()).toBeInTheDocument();
   });
