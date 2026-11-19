@@ -8,7 +8,8 @@ import LocaleRecallBanner from "@/components/LocaleRecallBanner.astro";
 import MachineTranslationBanner from "@/components/MachineTranslationBanner.astro";
 import StickyMobileCta from "@/components/StickyMobileCta.astro";
 import { LANDING_LOCALES, t } from "@/i18n";
-import { altLinks, dirFor, ogLocale } from "@/lib/i18n-page";
+import { altLinks, dirFor, localizeHref, ogLocale } from "@/lib/i18n-page";
+import { isNoindexPath } from "@/lib/index-policy";
 
 interface Props {
   title?: string;
@@ -38,7 +39,10 @@ const {
   mobileCta = true,
 } = Astro.props;
 
-const alternates = altLinks(path);
+// A page the index policy drops (#4833) keeps crawlers following its links but
+// advertises no hreflang set: alternates only mean something between indexed pages.
+const policyNoindex = isNoindexPath(localizeHref(locale, path));
+const alternates = policyNoindex ? [] : altLinks(path);
 const htmlDir = dirFor(locale);
 ---
 
@@ -88,6 +92,7 @@ const htmlDir = dirFor(locale);
     {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
 
     {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {!noindex && policyNoindex && <meta name="robots" content="noindex, follow" />}
 
     <!-- Favicons -->
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png" />
