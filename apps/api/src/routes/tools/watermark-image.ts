@@ -124,9 +124,15 @@ export function registerWatermarkImage(app: FastifyInstance) {
       const mainW = mainMeta.width ?? 800;
       const mainH = mainMeta.height ?? 600;
 
-      // Scale watermark
+      // Scale by width, but cap the height at the base's: sharp refuses to
+      // composite an overlay larger than the base, which a tall watermark on a
+      // landscape base would otherwise be (#4399).
       const wmWidth = Math.round((mainW * settings.scale) / 100);
-      let wmImage = sharp(watermarkBuffer).resize({ width: wmWidth });
+      let wmImage = sharp(watermarkBuffer).resize({
+        width: wmWidth,
+        height: mainH,
+        fit: "inside",
+      });
 
       // Apply opacity via ensureAlpha + modulate
       if (settings.opacity < 100) {

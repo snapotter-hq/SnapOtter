@@ -439,10 +439,19 @@ describe("watermark-image", () => {
       body,
     });
 
-    // scale=100 causes the watermark to be resized to full main-image width,
-    // which can exceed the main image dimensions when composited. The route
-    // returns 422 because Sharp's composite rejects overlapping bounds.
-    expect(res.statusCode).toBe(422);
+    // The square watermark at full width (200x200) would be taller than the
+    // 200x150 base, so the route fits it to the base height instead (#4399).
+    expect(res.statusCode, res.body).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const sharp = (await import("sharp")).default;
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
   });
 
   // ── Minimum opacity (0%) ─────────────────────────────────────────
@@ -577,6 +586,63 @@ describe("watermark-image", () => {
     const meta = await sharp(dlRes.rawPayload).metadata();
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(150);
+  });
+
+  // #4399: scaling by width alone made a tall watermark taller than the base,
+  // and sharp refuses to composite an overlay larger than the base (422).
+  it.each([
+    {
+      name: "portrait watermark at scale 50",
+      wm: fixtures.image.portrait.jpg,
+      filename: "wm.jpg",
+      scale: 50,
+      opacity: 50,
+    },
+    {
+      name: "square watermark at scale 100",
+      wm: fixtures.image.code.qrPng,
+      filename: "wm.png",
+      scale: 100,
+      opacity: 50,
+    },
+    {
+      name: "square watermark at full opacity",
+      wm: fixtures.image.code.qrPng,
+      filename: "wm.png",
+      scale: 100,
+      opacity: 100,
+    },
+  ])("fits a $name inside a landscape base", async ({ wm, filename, scale, opacity }) => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "main.png", contentType: "image/png", content: PNG },
+      {
+        name: "watermark",
+        filename,
+        contentType: "application/octet-stream",
+        content: readFixture(wm),
+      },
+      { name: "settings", content: JSON.stringify({ scale, opacity, position: "center" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    const json = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const sharp = (await import("sharp")).default;
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.width).toBe(200);
+    expect(meta.height).toBe(150);
+    expect(Buffer.from(dlRes.rawPayload).equals(PNG)).toBe(false);
   });
 
   // ── TIFF watermark image ────────────────────────────────────────
