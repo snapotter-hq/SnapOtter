@@ -2,7 +2,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { SUPPORTED_LOCALES, TOOLS, toolSection } from "@snapotter/shared";
+import {
+  COMPRESS_PRESET_BY_ID,
+  CONVERSION_PRESET_BY_ID,
+  SUPPORTED_LOCALES,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import { ALTERNATIVES } from "../../apps/landing/src/data/alternatives";
 import { INDEXED_KEEP_PATHS } from "../../apps/landing/src/lib/index-policy";
 
@@ -71,7 +77,8 @@ function expectedNoindex(): Set<string> {
     expected.add(`/${code}/alternatives/`);
     for (const alt of ALTERNATIVES) expected.add(`/${code}/alternatives/${alt.slug}/`);
   }
-  for (const tool of TOOLS.filter((t) => t.id.includes("-to-"))) {
+  const isPreset = (id: string) => id in CONVERSION_PRESET_BY_ID || id in COMPRESS_PRESET_BY_ID;
+  for (const tool of TOOLS.filter((t) => isPreset(t.id))) {
     expected.add(`/tools/${toolSection(tool)}/${tool.id}/`);
   }
   for (const keep of INDEXED_KEEP_PATHS) expected.delete(keep);
@@ -79,7 +86,7 @@ function expectedNoindex(): Set<string> {
 }
 
 test.describe("landing index policy", () => {
-  test("noindexes the localized alternatives copies and the converter tool pages", () => {
+  test("noindexes the localized alternatives copies and the preset tool pages", () => {
     const noindexed = new Set(
       readPages()
         .filter((p) => p.noindex && p.pathname !== "/404/")
@@ -91,6 +98,7 @@ test.describe("landing index policy", () => {
     expect(noindexed.has("/de/alternatives/bentopdf/")).toBe(true);
     expect(noindexed.has("/tools/image/jpg-to-png/")).toBe(true);
     expect(noindexed.has("/tools/image/compress-image-to-100kb/")).toBe(true);
+    expect(noindexed.has("/tools/pdf/pdf-to-word/")).toBe(false);
   });
 
   test("keeps the English alternatives and the pages that earned impressions indexed", () => {
@@ -101,6 +109,10 @@ test.describe("landing index policy", () => {
       "/alternatives/",
       ...ALTERNATIVES.map((a) => `/alternatives/${a.slug}/`),
       "/tools/image/resize/",
+      // Hand-written x-to-y tools, not presets (#4913).
+      "/tools/pdf/pdf-to-word/",
+      "/tools/files/word-to-pdf/",
+      "/tools/video/video-to-gif/",
     ];
     // The English-only open-source peer pages (#5029) are in ALTERNATIVES too; name
     // one so a regression in that data shows up here by slug.
