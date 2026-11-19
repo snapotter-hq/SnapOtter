@@ -25,6 +25,7 @@ export * from "./password-policy.js";
 export * from "./permissions.js";
 export * from "./pipeline-templates.js";
 export * from "./search/format-aliases.js";
+export * from "./search/relevance.js";
 export * from "./section.js";
 export * from "./subprocess-limit.js";
 export * from "./target-size.js";

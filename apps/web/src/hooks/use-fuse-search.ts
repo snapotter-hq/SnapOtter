@@ -1,5 +1,9 @@
 import type { Tool } from "@snapotter/shared";
-import { normalizeSearchQuery } from "@snapotter/shared";
+import {
+  filterRelevantTools,
+  normalizeSearchQuery,
+  withConverterFallback,
+} from "@snapotter/shared";
 import type { IFuseOptions } from "fuse.js";
 import Fuse from "fuse.js";
 import { useMemo } from "react";
@@ -21,6 +25,18 @@ export const FUSE_OPTIONS: IFuseOptions<Tool> = {
 };
 
 /**
+ * The ranking behind useFuseSearch, exported so tests run the shipped pipeline.
+ * Hits that don't contain every query word are dropped so a query with no real
+ * match reaches the empty state, and an "x to y" query no preset handles leads
+ * with the modality's converter (#4818).
+ */
+export function searchToolList(fuse: Fuse<Tool>, tools: Tool[], query: string): Tool[] {
+  const normalized = normalizeSearchQuery(query);
+  const hits = fuse.search(normalized || query).map((r) => r.item);
+  return withConverterFallback(query, filterRelevantTools(query, hits), tools);
+}
+
+/**
  * Wraps a tool list with Fuse.js fuzzy search.
  * Returns all tools when query is empty; ranked fuzzy results otherwise.
  * Queries are normalized (synonyms, compact forms like "jpg2png", filler
@@ -32,7 +48,6 @@ export function useFuseSearch(tools: Tool[], query: string): Tool[] {
 
   return useMemo(() => {
     if (!query) return tools;
-    const normalized = normalizeSearchQuery(query);
-    return fuse.search(normalized || query).map((r) => r.item);
+    return searchToolList(fuse, tools, query);
   }, [fuse, query, tools]);
 }
