@@ -20,4 +20,8 @@ describe("MULTI_FILE_TOOLS drift (issue #627)", () => {
       ).toBe(true);
     }
   });
+
+  it("includes the base image-to-pdf tool its presets copy (#4836)", () => {
+    expect(MULTI_FILE_TOOLS.has("image-to-pdf")).toBe(true);
+  });
 });

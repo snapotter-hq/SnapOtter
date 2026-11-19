@@ -5757,6 +5757,7 @@ export const th: TranslationKeys = {
     resultResizedToFit: "ย่อขนาดให้ไม่เกินขนาดเป้าหมาย",
     resultMissedTarget: "ไม่ถึงขนาดเป้าหมาย",
     reverseOrder: "กลับลำดับ",
+    removeFile: "นำ {name} ออก",
     whiteBackground: "พื้นหลังสีขาว",
     blackBackground: "พื้นหลังสีดำ",
     expandPanel: "ขยายแผง",

@@ -255,6 +255,7 @@ const multiFileTools = new Set<string>([
   "embed-subtitles",
   "images-to-video",
   "sprite-sheet",
+  "image-to-pdf",
 ]);
 for (const preset of CONVERSION_PRESETS) {
   if (BASE_CONFIG[preset.base].group === "image-to-pdf") {
@@ -281,6 +282,7 @@ const reorderableTools = new Set<string>([
   "stitch",
   "collage",
   "create-zip",
+  "image-to-pdf",
 ]);
 for (const preset of CONVERSION_PRESETS) {
   if (BASE_CONFIG[preset.base].group === "image-to-pdf") {

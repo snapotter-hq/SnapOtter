@@ -5533,6 +5533,7 @@ export const zhTW: TranslationKeys = {
     resultResizedToFit: "已縮小以符合目標大小",
     resultMissedTarget: "未達到目標大小",
     reverseOrder: "反轉順序",
+    removeFile: "移除 {name}",
     whiteBackground: "白色背景",
     blackBackground: "黑色背景",
     expandPanel: "展開面板",

@@ -5829,6 +5829,7 @@ export const ja: TranslationKeys = {
     resultResizedToFit: "目標サイズに収めるため縮小しました",
     resultMissedTarget: "目標サイズに届きませんでした",
     reverseOrder: "順序を逆にする",
+    removeFile: "{name} を削除",
     whiteBackground: "白背景",
     blackBackground: "黒背景",
     expandPanel: "パネルを展開",

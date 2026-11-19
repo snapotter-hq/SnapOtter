@@ -5872,6 +5872,7 @@ export const id: TranslationKeys = {
     resultResizedToFit: "Diperkecil agar muat dalam ukuran target",
     resultMissedTarget: "Tidak mencapai ukuran target",
     reverseOrder: "Balik urutan",
+    removeFile: "Hapus {name}",
     whiteBackground: "Latar belakang putih",
     blackBackground: "Latar belakang hitam",
     expandPanel: "Perluas panel",

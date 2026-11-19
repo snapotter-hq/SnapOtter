@@ -5886,6 +5886,7 @@ export const ru: TranslationKeys = {
     resultResizedToFit: "Уменьшено, чтобы уложиться в целевой размер",
     resultMissedTarget: "Целевой размер не достигнут",
     reverseOrder: "Обратить порядок",
+    removeFile: "Удалить {name}",
     whiteBackground: "Белый фон",
     blackBackground: "Чёрный фон",
     expandPanel: "Развернуть панель",

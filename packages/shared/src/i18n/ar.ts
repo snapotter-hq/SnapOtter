@@ -5811,6 +5811,7 @@ export const ar: TranslationKeys = {
     resultResizedToFit: "تم تصغيرها لتناسب الحجم المستهدف",
     resultMissedTarget: "لم تصل إلى الحجم المستهدف",
     reverseOrder: "عكس الترتيب",
+    removeFile: "إزالة {name}",
     whiteBackground: "خلفية بيضاء",
     blackBackground: "خلفية سوداء",
     expandPanel: "توسيع اللوحة",

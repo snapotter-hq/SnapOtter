@@ -5871,6 +5871,7 @@ export const sv: TranslationKeys = {
     resultResizedToFit: "Förminskad för att rymmas inom målstorleken",
     resultMissedTarget: "Nådde inte målstorleken",
     reverseOrder: "Omvänd ordning",
+    removeFile: "Ta bort {name}",
     whiteBackground: "Vit bakgrund",
     blackBackground: "Svart bakgrund",
     expandPanel: "Expandera panel",

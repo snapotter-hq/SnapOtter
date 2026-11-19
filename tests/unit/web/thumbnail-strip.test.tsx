@@ -464,4 +464,54 @@ describe("ThumbnailStrip", () => {
       expect(onReorder).not.toHaveBeenCalled();
     });
   });
+
+  // #4836: one wrong file used to mean Clear all and starting over.
+  describe("per-file remove (#4836)", () => {
+    it("renders a remove control per tile that calls onRemove with its index", () => {
+      const entries = stage("a.png", "b.png", "c.png");
+      const onRemove = vi.fn();
+      const onSelect = vi.fn();
+      render(
+        <ThumbnailStrip
+          entries={entries}
+          selectedIndex={0}
+          onSelect={onSelect}
+          onRemove={onRemove}
+        />,
+      );
+
+      expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(3);
+      fireEvent.click(screen.getByRole("button", { name: "Remove b.png" }));
+
+      expect(onRemove).toHaveBeenCalledWith(1);
+      // The click must not also select the tile it sits on.
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("keeps the remove control on drag-sortable tiles", () => {
+      const entries = stage("a.png", "b.png");
+      const onRemove = vi.fn();
+      render(
+        <ThumbnailStrip
+          entries={entries}
+          selectedIndex={0}
+          onSelect={() => {}}
+          onReorder={() => {}}
+          onRemove={onRemove}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove a.png" }));
+
+      expect(onRemove).toHaveBeenCalledWith(0);
+      expect(screen.getAllByLabelText(/drag to reorder/i)).toHaveLength(2);
+    });
+
+    it("renders no remove controls when onRemove is absent", () => {
+      const entries = stage("a.png", "b.png");
+      render(<ThumbnailStrip entries={entries} selectedIndex={0} onSelect={() => {}} />);
+
+      expect(screen.queryAllByRole("button", { name: /^Remove / })).toHaveLength(0);
+    });
+  });
 });

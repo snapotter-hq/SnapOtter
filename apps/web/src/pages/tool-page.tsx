@@ -20,6 +20,7 @@ import {
   Loader2,
   MessageSquare,
   Upload,
+  X,
   XCircle,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -150,6 +151,7 @@ function FileSelectionInfo({
   fileEntries,
   selectedIndex,
   onSelect,
+  onRemove,
   onClear,
   onAddMore,
 }: {
@@ -157,6 +159,7 @@ function FileSelectionInfo({
   fileEntries: FileEntry[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  onRemove: (index: number) => void;
   onClear: () => void;
   onAddMore: () => void;
 }) {
@@ -192,24 +195,40 @@ function FileSelectionInfo({
         {visible.map((file, i) => {
           const isSelected = i === selectedIndex;
           const entry = fileEntries[i];
+          const removeLabel = format(t.a11y.removeFile, { name: file.name });
           return (
-            <button
-              key={entry?.blobUrl ?? `${file.name}-${file.size}-${file.lastModified}`}
-              type="button"
-              onClick={() => onSelect(i)}
-              className={`w-full flex items-center gap-1.5 text-xs rounded px-2 py-1.5 text-start transition-colors ${isSelected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            <div
+              key={entry?.id ?? `${file.name}-${file.size}-${file.lastModified}`}
+              className={`flex items-center rounded transition-colors ${isSelected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              {hasAnyProcessed && entry ? (
-                <FileStatusIcon status={entry.status} />
-              ) : (
-                isSelected && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
-              )}
-              <span className="truncate flex-1 min-w-0">{file.name}</span>
-              <span className="shrink-0 text-[10px] text-muted-foreground">
-                {getFileFormat(file.name)}
-              </span>
-              <span className="shrink-0 text-[10px] tabular-nums">{formatFileSize(file.size)}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                className="flex-1 min-w-0 flex items-center gap-1.5 text-xs px-2 py-1.5 text-start"
+              >
+                {hasAnyProcessed && entry ? (
+                  <FileStatusIcon status={entry.status} />
+                ) : (
+                  isSelected && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
+                )}
+                <span className="truncate flex-1 min-w-0">{file.name}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {getFileFormat(file.name)}
+                </span>
+                <span className="shrink-0 text-[10px] tabular-nums">
+                  {formatFileSize(file.size)}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                aria-label={removeLabel}
+                title={removeLabel}
+                className="shrink-0 p-1.5 rounded text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -460,6 +479,7 @@ function ToolPageContent({
     selectedFileName,
     selectedFileSize,
     undoProcessing,
+    removeFile,
     batchZipBlob,
     batchZipFilename,
     selectedIndex,
@@ -712,6 +732,19 @@ function ToolPageContent({
     useDuplicateStore.getState().reset();
     useSplitStore.getState().reset();
   }, [allowIntake, reset]);
+
+  // Same guard as Clear all: a run in flight keeps its file set (#4836).
+  const handleRemoveFile = useCallback(
+    (index: number) => {
+      if (!allowIntake()) return;
+      if (entries.length <= 1) {
+        handleClearAll();
+        return;
+      }
+      removeFile(index);
+    },
+    [allowIntake, entries.length, handleClearAll, removeFile],
+  );
 
   const handleAddMore = useCallback(() => {
     if (!allowIntake()) return;
@@ -1575,6 +1608,7 @@ function ToolPageContent({
               fileEntries={entries}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
+              onRemove={handleRemoveFile}
               onClear={handleClearAll}
               onAddMore={handleAddMore}
             />
@@ -1753,6 +1787,7 @@ function ToolPageContent({
                 onSelect={setSelectedIndex}
                 onReorder={canReorder ? reorderFiles : undefined}
                 onReverse={canReorder ? reverseFiles : undefined}
+                onRemove={handleRemoveFile}
               />
             )}
           </section>
@@ -1888,6 +1923,7 @@ function ToolPageContent({
               onSelect={setSelectedIndex}
               onReorder={canReorder ? reorderFiles : undefined}
               onReverse={canReorder ? reverseFiles : undefined}
+              onRemove={handleRemoveFile}
             />
           )}
         </section>

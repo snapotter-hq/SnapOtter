@@ -5898,6 +5898,7 @@ export const it: TranslationKeys = {
     resultResizedToFit: "Ridimensionata per stare nella dimensione di destinazione",
     resultMissedTarget: "Dimensione di destinazione non raggiunta",
     reverseOrder: "Inverti ordine",
+    removeFile: "Rimuovi {name}",
     whiteBackground: "Sfondo bianco",
     blackBackground: "Sfondo nero",
     expandPanel: "Espandi pannello",

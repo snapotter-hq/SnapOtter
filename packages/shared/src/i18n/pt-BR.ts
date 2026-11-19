@@ -5898,6 +5898,7 @@ export const ptBR: TranslationKeys = {
     resultResizedToFit: "Reduzida para caber no tamanho desejado",
     resultMissedTarget: "Não atingiu o tamanho desejado",
     reverseOrder: "Inverter ordem",
+    removeFile: "Remover {name}",
     whiteBackground: "Fundo branco",
     blackBackground: "Fundo preto",
     expandPanel: "Expandir painel",
