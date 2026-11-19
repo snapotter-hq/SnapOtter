@@ -1,9 +1,9 @@
 ---
 title: "Codici di errore"
 description: "La struttura del corpo dell'errore, i codici stabili e cosa fare per ciascuno."
-i18n_source_hash: d4ea74165166
+i18n_source_hash: dd2420de1d32
 i18n_provenance: machine
-i18n_output_hash: 56ec542dc5fe
+i18n_output_hash: 16db947b21c9
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Ogni risposta di errore JSON ha la stessa struttura:
 ```
 
 | Campo | Sempre presente | Significato |
-|-------|-----------------|-------------|
+|-------|----------------|---------|
 | `error` | Sì | Un messaggio leggibile. Può essere mostrato agli utenti. Non lo analizzi (parsing). |
 | `code` | Sì | Un codice stabile, leggibile da una macchina. Basi la logica di diramazione su questo. |
 | `requestId` | Sì | L'ID che il server assegna a questa richiesta. Lo citi quando segnala un problema: corrisponde al log del server. |
@@ -69,6 +69,159 @@ L'account amministratore del primo avvio è `admin` con la password `admin`, a m
 
 Un job che fallisce riporta il motivo nel job stesso, non nell'errore HTTP. Legga `error.code` e `error.message` da `GET /api/v1/jobs/{jobId}`. Vedere [Monitoraggio dell'avanzamento](/it/api/rest#progress-tracking).
 
-## Non ancora catalogati {#not-yet-cataloged}
+Un job fallito conserva `error.code` solo quando il fallimento è un errore di input o un guasto del server. Gli altri fallimenti riportano soltanto il messaggio.
 
-I codici generati dalle singole funzionalità (ad esempio crittografia, OIDC, SCIM e team) non sono ancora descritti in questa pagina. Ciascuno è un codice stabile; tratti un codice non elencato come opaco e lo gestisca in base al suo stato.
+| `code` | Significato | Cosa fare |
+|--------|---------|------------|
+| `CANCELED` | Il job è stato annullato da un utente. Non è uno stato HTTP. Gli eventi di avanzamento riportano `phase: failed` con questo codice. | Lo tratti come un annullamento dell'utente. Non lo riprovi automaticamente. |
+| `INPUT_MISSING` | L'input è stato rimosso prima dell'esecuzione del job. | Carichi di nuovo il file. |
+| `ENGINE_UNAVAILABLE` | Un motore necessario non è riuscito ad avviarsi sul server. | Riprovi dopo che un amministratore ha riparato l'installazione. |
+| `JOB_STALLED` | Non viene restituito ai client: etichetta il report di errore del server. Il worker ha perso il lock del job più volte di quante la coda consenta, di solito perché il server si è riavviato o ha esaurito memoria o CPU. Il job fallisce con un messaggio che indica che è stato interrotto. | Riprovi. Se continua a succedere, assegni più memoria al server o riduca `CONCURRENT_JOBS`. |
+
+## Autenticazione e MFA {#mfa-codes}
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `MFA_ENROLLMENT_REQUIRED` | 403 | Il criterio MFA richiede la registrazione, e questa istanza non può registrare l'utente (nessuna licenza enterprise). Le istanze con licenza restituiscono 200 con `requiresMfaEnrollment: true` e guidano invece l'utente nella registrazione. | Non riprovi. Un amministratore deve modificare il criterio o usare la CLI di ripristino offline. |
+| `MFA_POLICY_UNAVAILABLE` | 503 | Il server non ha potuto leggere il criterio MFA durante l'accesso. | Riprovi l'accesso a breve. |
+| `INVALID_CODE` | 401 | Il codice TOTP o di ripristino è errato. | Chieda all'utente un nuovo codice e riprovi. Gli errori ripetuti terminano con `MFA_ATTEMPTS_EXHAUSTED`. |
+| `MFA_ATTEMPTS_EXHAUSTED` | 401 | Troppi codici errati. La sfida viene scartata. | Avvii di nuovo l'accesso per ottenere una nuova sfida. |
+| `MFA_EXPIRED` | 401 | La sfida MFA o di registrazione è scaduta oppure non corrisponde. | Avvii di nuovo l'accesso. |
+| `MFA_NOT_CONFIGURED` | 401 | L'account non ha un segreto TOTP, quindi non è possibile verificare un codice. | Registri l'MFA prima di accedere con un codice. |
+| `MFA_ALREADY_ENABLED` | 409 | L'MFA è già attiva sull'account. | Non effettui di nuovo la registrazione. |
+| `NO_PENDING_ENROLLMENT` | 400 | È arrivata una conferma di registrazione senza alcuna registrazione in sospeso. | Chiami prima l'endpoint di registrazione. |
+| `MFA_NOT_ENABLED` | 400 | L'azione richiede che l'MFA sia attiva, e per questo utente è disattivata. | Salti l'azione, oppure attivi prima l'MFA. |
+| `MFA_DECRYPTION_FAILED` | 500 | Il segreto TOTP memorizzato non può essere decifrato. | Intervento dell'operatore. Di solito significa che la chiave di crittografia è cambiata. Controlli `DATA_ENCRYPTION_KEY` e `DATA_ENCRYPTION_KEY_PREVIOUS`. |
+| `DECRYPTION_FAILED` | 500 | Un valore memorizzato (un'impostazione, un header di autenticazione di un webhook o un segreto TOTP) non può essere decifrato. | Intervento dell'operatore, come sopra. Non riprovi. |
+| `IDLE_TIMEOUT` | 401 | La sessione è scaduta dopo un periodo di inattività. | Acceda di nuovo. |
+| `INVALID_PASSWORD` | 401 | La password attuale è errata durante un cambio password. | Chieda all'utente la password attuale. |
+| `PASSWORD_CHANGED` | 409 | La password è stata cambiata in un'altra sessione, oppure un amministratore l'ha reimpostata, mentre questa richiesta era in esecuzione. | Acceda di nuovo. |
+| `OIDC_NO_PASSWORD` | 400 | È stato richiesto un cambio o una reimpostazione della password per un account creato tramite SSO. | Indirizzi l'utente al provider di identità. |
+
+## OIDC {#oidc-codes}
+
+Gli errori OIDC durante l'accesso non restituiscono un corpo JSON. La route di login reindirizza alla pagina di accesso con un motivo generico, e il log di audit registra il codice. La route di logout termina comunque la sessione locale quando il provider di identità non è raggiungibile.
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `OIDC_ISSUER_SCHEME_MISMATCH` | Nessuno (reindirizzamento) | L'URL dell'issuer è `http`, ma `EXTERNAL_URL` è `https`, quindi il client rifiuta la discovery. | Amministratore: esponga l'issuer tramite `https`, oppure esegua l'istanza tramite `http`. |
+| `OIDC_DISCOVERY_TIMEOUT` | Nessuno (reindirizzamento) | La discovery dell'issuer è andata in timeout. | Verifichi che il server possa raggiungere l'issuer, quindi riprovi. |
+| `OIDC_DISCOVERY_FAILED` | Nessuno (reindirizzamento) | La discovery è fallita per un altro motivo. | Controlli l'URL dell'issuer e l'accesso in uscita del server. |
+| `OIDC_END_SESSION_INVALID` | Nessuno (il logout prosegue) | `end_session_endpoint` del provider di identità non è un URL valido. La sessione locale viene comunque cancellata. | Amministratore: corregga i metadati del provider. |
+| `OIDC_END_SESSION_SCHEME` | Nessuno (il logout prosegue) | `end_session_endpoint` usa uno schema che il server non consente. La sessione locale viene comunque cancellata. | Amministratore: corregga i metadati del provider. |
+
+## SAML {#saml-codes}
+
+Gli errori SAML non impostano un `code`. Un'asserzione fallita reindirizza alla pagina di accesso con `saml_auth_failed`, e l'evento di audit `SAML_LOGIN_FAILED` registra il motivo.
+
+## SCIM {#scim-codes}
+
+Le route SCIM rispondono con l'envelope di errore RFC 7644 (`schemas`, `detail`, `status` e a volte `scimType`). Non impostano `code`. Basi la logica sullo stato HTTP.
+
+## Team, ruoli e utenti {#team-role-codes}
+
+I nomi duplicati di team o ruoli restituiscono il generico `CONFLICT`, e un team o un ruolo mancante restituisce `NOT_FOUND`.
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `ESCALATION_DENIED` | 403 | Il ruolo del chiamante non consente la modifica. Il bersaglio ha un'autorità superiore a quella del chiamante, il ruolo è integrato, oppure la richiesta concede permessi che il chiamante non possiede. | Non riprovi. Si rivolga a un utente con più autorità. |
+| `UNKNOWN_ROLE` | 400 | L'ID del ruolo non corrisponde a un ruolo esistente. | Corregga l'ID del ruolo. Elenchi i ruoli per trovarlo. |
+| `UNKNOWN_TEAM` | 400 | L'ID del team non corrisponde a un team esistente. | Corregga l'ID del team. |
+| `SELF_DEMOTE` | 400 | Un amministratore ha tentato di rimuovere il proprio ruolo di amministratore. | Faccia effettuare la modifica a un altro amministratore. |
+| `SELF_DELETE` | 400 | Un amministratore ha tentato di eliminare il proprio account. | Lo faccia eliminare a un altro amministratore. |
+| `LAST_ADMIN` | 400 sulle route utente, 409 sulle route di eliminazione GDPR | La modifica non lascerebbe alcun amministratore, oppure eliminerebbe un team che contiene tutti gli amministratori. | Nomini prima amministratore un altro utente. |
+| `USER_LIMIT_REACHED` | 403 | L'istanza ha raggiunto il limite `MAX_USERS`. | Rimuova un utente, oppure aumenti `MAX_USERS`. |
+
+## Funzionalità e bundle AI {#feature-codes}
+
+Gli strumenti, le esecuzioni batch e le pipeline che richiedono un bundle AI opzionale usano questi codici.
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `FEATURE_NOT_INSTALLED` | 501, oppure 400 dalla modalità volto di Smart Crop | Lo strumento, o un passaggio di una pipeline o di un batch, richiede un bundle che non è installato. Il corpo include `feature` (l'ID del bundle) e `featureName`. | Installi il bundle in Impostazioni, quindi riprovi. |
+| `FEATURE_CPU_UNSUPPORTED` | 409 | Un'installazione o un'importazione offline è stata rifiutata perché le librerie x86-64 del bundle richiedono AVX e la CPU di questo server non le supporta. Non è stato scaricato né installato nulla. Il corpo include `feature` (l'ID del bundle) e `reason` (`cpu-no-avx`). `GET /api/v1/features` riporta lo stesso bundle con `compatibility: "incompatible"` e `compatibilityReason: "cpu-no-avx"`. | Esegua SnapOtter su una CPU con AVX, oppure su arm64. Gli altri bundle si installano comunque. |
+| `FEATURE_INCOMPATIBLE` | 501, oppure 400 quando Fast OCR riceve una lingua che non può leggere | La funzionalità installata non supporta la qualità o la lingua richiesta. | Modifichi l'impostazione, oppure installi un bundle che la supporti. |
+| `ENGINE_UNAVAILABLE` | 503 | Un motore necessario non è riuscito ad avviarsi, oppure un runtime OCR è stato rimosso dopo la validazione della richiesta. | Riprovi dopo che un amministratore ha riparato o reinstallato la funzionalità. |
+| `BROWSER_NOT_AVAILABLE` | 503 | Chromium non è installato, quindi HTML to image non può essere eseguito. | Chieda a un amministratore di installare il browser. |
+| `BROWSER_CRASHED` | 503 | Il browser degli screenshot è andato in crash durante il rendering. | Riprovi la richiesta. |
+
+## Strumenti {#tool-codes}
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `INPUT_MISSING` | 410 | L'input caricato è stato rimosso prima dell'esecuzione del job. | Carichi di nuovo il file e invii il job. |
+| `ANALYSIS_EXPIRED` | 410 | L'analisi della foto tessera è scaduta prima della generazione. | Analizzi di nuovo la foto, quindi generi. |
+| `BACKGROUND_REMOVAL_EXPIRED` | 410 | Il risultato della rimozione dello sfondo è scaduto prima del passaggio successivo. | Rimuova di nuovo lo sfondo. |
+| `NOT_ANIMATED` | 400 | Remove GIF Background ha ricevuto un'immagine statica. | Usi Remove Background per le immagini statiche. |
+| `TOO_MANY_FRAMES` | 400 | L'animazione ha più fotogrammi di quanti il server ne consenta (`GIF_BG_MAX_FRAMES`). | Invii un'animazione più breve, oppure chieda a un amministratore di aumentare il limite. |
+| `TOO_MANY_PIXELS` | 400 | Il canvas dell'animazione moltiplicato per il numero di fotogrammi supera il limite del server: 268,402,689 pixel (16383 x 16383) per Remove GIF Background, oppure il limite del carico di lavoro GIF per gli altri strumenti animati. | Invii meno fotogrammi o un'animazione più piccola. |
+| `IMAGE_TOO_LARGE` | 400 | L'immagine ha più pixel di quanti il decoder ne accetti. | Invii un'immagine più piccola. |
+| `RESULT_TOO_LARGE` | 400 | Le impostazioni produrrebbero un'immagine più grande di quanto consentano l'encoder o il limite di pixel. | Usi un'immagine più piccola o impostazioni che producano un risultato più piccolo. |
+| `DOCUMENT_UNREADABLE` | 400 | LibreOffice o pandoc non è riuscito ad aprire il documento. Potrebbe essere danneggiato, protetto da password o non essere nel formato indicato dalla sua estensione. | Verifichi che il file si apra in un'applicazione office, quindi lo invii di nuovo. |
+| `PDF_DAMAGED` | 400 | Il motore PDF ha trovato una struttura del documento danneggiata. | Passi il file in Repair PDF, quindi riprovi. |
+| `PDF_PASSWORD_PROTECTED` | 400 | Il PDF è cifrato e questo strumento non può aprirlo. | Lo sblocchi prima con Unlock PDF. |
+| `NO_AUDIO_TRACK` | 400 | Il file non ha un flusso audio che uno strumento audio possa usare. | Invii un file che contenga audio. |
+| `MEDIA_UNDECODABLE` | 400 | ffmpeg non è riuscito a leggere l'audio o il video: non ha trovato pacchetti, parametri del codec, l'atom `moov`, oppure ha trovato dati che non riesce ad analizzare. | Verifichi che il file venga riprodotto in un lettore multimediale, oppure lo riesporti, quindi riprovi. |
+| `PAGE_OUT_OF_RANGE` | 400 | L'intervallo di pagine indica una pagina che il PDF non ha. | Controlli il numero di pagine e invii un intervallo al suo interno. |
+| `INVALID_PAGE_RANGE` | 400 | L'intervallo di pagine non ha una sintassi valida. | Usi numeri di pagina come `1-3,5`. |
+| `CANNOT_REMOVE_ALL_PAGES` | 400 | A Remove Pages è stato chiesto di rimuovere tutte le pagine. | Mantenga almeno una pagina. |
+| `NESTING_TOO_DEEP` | 400 | Il JSON o l'XML è annidato per più di 100 livelli. | Appiattisca il documento, quindi lo converta. |
+| `IMAGE_UNDECODABLE` | 400 | L'immagine non può essere decodificata, oppure non è possibile leggerne le dimensioni. Il file potrebbe essere danneggiato o usare una codifica che il decoder non supporta. | Riesporti l'immagine da un'altra applicazione, oppure la converta prima in PNG o JPEG. |
+| `INVALID_SETTINGS` | 400 | Un'impostazione è fuori intervallo o non è adatta a questo file: un ritaglio fuori dall'immagine, un ridimensionamento a zero, un fotogramma GIF che l'animazione non ha, una specifica di foto tessera che non esiste. Il testo di `error` indica l'impostazione. | Corregga l'impostazione indicata in `error`, quindi riprovi. |
+| `CHART_DATA_INVALID` | 400 | Chart Maker non è riuscito a leggere i dati del grafico dal file: il CSV o il JSON non viene analizzato, non ha colonne numeriche, ha più di 100 righe oppure contiene un valore negativo. Il testo di `error` indica quale. | Invii un CSV o un JSON con al massimo 100 righe, ciascuna con un'etichetta e un numero maggiore o uguale a zero. |
+| `NO_FACE_DETECTED` | 400 | Passport Photo non ha trovato alcun volto nell'immagine. | Invii una foto nitida, frontale e ben illuminata. |
+| `TARGET_SIZE_UNREACHABLE` | 400 | La compressione, o il limite di dimensione di una foto tessera, non riesce a portare il file sotto la dimensione richiesta, nemmeno riducendone la scala. | Richieda una dimensione di destinazione maggiore, oppure ritagli prima l'immagine. |
+| `TOO_MANY_PAGES` | 400 | All'OCR sono state richieste più pagine di quante ne elabori in un solo job. | Selezioni meno pagine con l'intervallo di pagine. |
+| `METADATA_DAMAGED` | 400 | Edit Metadata ha trovato danneggiati i dati EXIF esistenti dell'immagine, quindi non può riscriverli in sicurezza. | Rimuova prima i metadati con Remove Image Metadata, quindi li modifichi. |
+| `REMOTE_RESOURCES_DISABLED` | 400 | La conversione da HTML o Markdown a PDF ha trovato un riferimento a un'immagine, un foglio di stile o un font in rete, che il server non recupera. | Incorpori la risorsa nel file (ad esempio come URI `data:`), quindi riprovi. |
+
+## File {#file-codes}
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `STORAGE_QUOTA_EXCEEDED` | 413 | Il salvataggio in File supererebbe la quota di archiviazione dell'utente. | Elimini dei file, oppure chieda più spazio a un amministratore. |
+| `INVALID_STORED_NAME` | 400 | Il server ha rifiutato il nome di un file memorizzato. | Carichi di nuovo il file. |
+
+## Pipeline e batch {#pipeline-codes}
+
+Le richieste di pipeline e batch restituiscono i codici delle funzionalità indicati sopra per ogni passaggio che richiede un bundle. Un ID di job già in uso restituisce `CONFLICT` con stato 409. Invii un nuovo ID di job.
+
+## Impostazioni {#settings-codes}
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `UNKNOWN_SETTING` | 400 | La chiave non è un'impostazione nota. | Controlli il nome della chiave. |
+| `READONLY_SETTING` | 400 | L'impostazione non può essere modificata tramite l'API. | La modifichi tramite l'ambiente o l'interfaccia di amministrazione. |
+| `DEPENDENCY_VALIDATION_FAILED` | 400 | Il nuovo valore è in conflitto con altre impostazioni. Il corpo indica l'impostazione in `setting` ed elenca i problemi in `validationErrors`. | Corregga le impostazioni elencate, quindi riprovi. |
+| `SETTING_DECRYPTION_FAILED` | 500 | Un'impostazione memorizzata non può essere decifrata. | Intervento dell'operatore, come per `DECRYPTION_FAILED`. |
+
+Per `VALIDATION_ERROR` su un'impostazione, `details` contiene i problemi dello schema.
+
+## Enterprise {#enterprise-codes}
+
+| `code` | Stato | Significato | Cosa fare |
+|--------|--------|---------|------------|
+| `FEATURE_NOT_LICENSED` | 403 | L'impostazione o il criterio richiede una licenza enterprise, ad esempio l'applicazione obbligatoria di SSO o il criterio MFA. | Usi un'istanza con licenza, oppure lasci l'impostazione disattivata. |
+| `IP_NOT_ALLOWED` | 403 | L'indirizzo IP della richiesta non è nella allowlist. | Si connetta da una rete consentita. |
+| `INVALID_CIDR` | 400 | Una voce della allowlist non è un CIDR valido. Il messaggio elenca le voci errate. | Corregga le voci e salvi di nuovo. |
+| `SELF_LOCKOUT` | 400 | Il salvataggio della allowlist bloccherebbe l'IP attuale del chiamante. | Aggiunga prima il suo IP attuale all'elenco. |
+
+Le route di eliminazione GDPR restituiscono un semplice `CONFLICT` con stato 409 quando un utente o un team è sotto blocco legale.
+
+## Codici che i client non ricevono {#internal-codes}
+
+Questi codici esistono nel sorgente del server per log, telemetria o per gli errori propri di Fastify. Un client non li riceve in un corpo di risposta o in una riga di job, quindi non scriva logica del client basata su di essi.
+
+| `code` | Dove finisce |
+|--------|---------------|
+| `ALERT_DECRYPTION_FAILED` | Segnalato al tracciamento degli errori dal valutatore degli alert. L'header di autenticazione di un webhook di alert non può essere decifrato. |
+| `SIEM_DECRYPTION_FAILED` | Segnalato al tracciamento degli errori dall'inoltro SIEM. L'header di autenticazione del SIEM non può essere decifrato. |
+| `WEBHOOK_DECRYPTION_FAILED` | Segnalato al tracciamento degli errori. La richiesta che ha incontrato lo stesso errore risponde con `DECRYPTION_FAILED`. |
+| `STAGED_DISCARD_FAILED` | Segnalato al tracciamento degli errori quando un upload in staging non può essere rimosso. |
+| `USERNAME_RACE_EXHAUSTED` | Generato quando la creazione automatica SSO perde la competizione sul nome utente a ogni tentativo. La pagina di accesso mostra invece un errore. |
+| `ERR_OUT_OF_RANGE` | Generato dal lettore dell'object storage per un intervallo di byte non valido. |
+| `ETIMEDOUT` | Impostato sull'errore di timeout di un'esportazione GDPR. L'esportazione fallisce e può essere richiesta di nuovo. |
+| `FST_REQ_FILE_TOO_LARGE` | Il codice di Fastify per un upload oltre il limite. I client ricevono un 413 con `PAYLOAD_TOO_LARGE`, oppure il messaggio 413 proprio della route. |
+| `TARGET_SIZE_EXCEEDED` | Generato quando una compressione con dimensione di destinazione non raggiunge l'obiettivo. L'errore non ha stato né codice, quindi i client ricevono un errore generico. |
+| `OCR_CACHE_PERMISSIONS` | Segnalato al tracciamento degli errori come guasto operativo quando il volume dati AI lascia la cache del runtime OCR scrivibile da tutti. Il job di installazione fallisce con un messaggio che indica il problema di archiviazione. |
+| `OCR_RUNTIME_UNREACHABLE` | Segnalato al tracciamento degli errori come guasto operativo quando il server non ha mai raggiunto huggingface.co per scaricare il runtime OCR. Il job di installazione fallisce con un messaggio sull'accesso alla rete, `HTTPS_PROXY` e l'importazione offline. |
