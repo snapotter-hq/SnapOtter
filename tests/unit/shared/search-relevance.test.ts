@@ -73,7 +73,6 @@ describe("filterRelevantTools", () => {
   });
 
   it("matches a plural of an aliased word in its canonical form", () => {
-    // The normalizer maps "photo" to "image" but leaves "photos" alone.
     const imageToPdf = tool("image-to-pdf");
     expect(filterRelevantTools("photos to pdf", [imageToPdf])).toEqual([imageToPdf]);
   });

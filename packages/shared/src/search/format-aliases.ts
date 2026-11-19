@@ -169,7 +169,13 @@ export function normalizeSearchQuery(raw: string): string {
     if (tok === "2") tok = "to";
     // Own-property checks: "constructor" must not resolve to Object's.
     if (Object.hasOwn(MISSPELLINGS, tok)) tok = MISSPELLINGS[tok];
-    if (Object.hasOwn(ALIAS_TO_CANONICAL, tok)) tok = ALIAS_TO_CANONICAL[tok];
+    if (Object.hasOwn(ALIAS_TO_CANONICAL, tok)) {
+      tok = ALIAS_TO_CANONICAL[tok];
+    } else if (tok.endsWith("s") && Object.hasOwn(ALIAS_TO_CANONICAL, tok.slice(0, -1))) {
+      // A plural alias ("photos", "jpegs") reads as its singular (#4900). Only a
+      // known alias loses its "s": "ts" and "ass" are formats in their own right.
+      tok = ALIAS_TO_CANONICAL[tok.slice(0, -1)];
+    }
     if (tok === "to") {
       out.push("to");
       continue;
