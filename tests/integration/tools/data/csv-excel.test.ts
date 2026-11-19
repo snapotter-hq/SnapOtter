@@ -1,4 +1,7 @@
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import AdmZip from "adm-zip";
+import type ExcelJSType from "exceljs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -11,6 +14,10 @@ import {
 const CSV = readFixture(fixtures.data.csv);
 const TSV = readFixture(fixtures.data.tsv);
 const XLSX_FIXTURE = readFixture(fixtures.document.tiny("xlsx"));
+// exceljs is an apps/api dependency, not a root one.
+const ExcelJS = createRequire(resolve(__dirname, "../../../../apps/api/package.json"))(
+  "exceljs",
+) as typeof ExcelJSType;
 
 let testApp: TestApp;
 let adminToken: string;
@@ -118,6 +125,24 @@ describe("csv-excel (pure JS, no skipIf)", () => {
       url: JSON.parse(toCsv.body).downloadUrl,
     });
     expect(back.payload).toBe(csv);
+  }, 30_000);
+
+  it("converts the requested sheet of a multi-sheet XLSX (#4846)", async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.addWorksheet("One").addRow(["sheet", "one"]);
+    const two = workbook.addWorksheet("Two");
+    two.addRow(["sheet", "two"]);
+    two.addRow([3, new Date(Date.UTC(2024, 0, 2))]);
+    const xlsx = Buffer.from(await workbook.xlsx.writeBuffer());
+
+    const res = await runTool("two.xlsx", xlsx, { sheet: 2 });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    expect(dl.payload).toBe("sheet,two\r\n3,2024-01-02T00:00:00.000Z");
+
+    const missing = await runTool("two.xlsx", xlsx, { sheet: 3 });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.body).toContain("Worksheet 3 not found (workbook has 2 sheets)");
   }, 30_000);
 
   it("converts XLSX to CSV containing the fixture content", async () => {
