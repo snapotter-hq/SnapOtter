@@ -216,6 +216,35 @@ describe("conversion presets (all)", () => {
   }
 });
 
+describe("Sony .hif input (#4825)", () => {
+  // Sony cameras name HEIF files .HIF; the bytes are the same ISO BMFF HEIF.
+  it("heic-to-jpg converts a HEIF file named .HIF", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "DSC00001.HIF",
+        contentType: "image/heif",
+        content: readFixture(fixtures.image.base.heic200),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/heic-to-jpg",
+      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
+      body,
+    });
+
+    expect([200, 202], res.body.slice(0, 500)).toContain(res.statusCode);
+    const { jobId } = JSON.parse(res.body);
+    expect(jobId).toBeTruthy();
+    if (res.statusCode === 202) {
+      const jobRow = await pollJob(jobId);
+      expect(jobRow?.status, JSON.stringify(jobRow?.error)).toBe("completed");
+    }
+  }, 90_000);
+});
+
 describe("PDF to image conversion presets", () => {
   it.each([
     ["pdf-to-png", "png"],

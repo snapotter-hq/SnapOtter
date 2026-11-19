@@ -116,6 +116,13 @@ describe("an x-to-y query no preset handles leads with the converter (#4818)", (
     expect(search(q)[0]).toBe(id);
   });
 
+  it.each([
+    ["hif to jpg", "heic-to-jpg"],
+    ["hif2png", "heic-to-png"],
+  ])("Sony's hif finds the HEIC converter: %s leads with %s (#4825)", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
   it("never offers a converter the caller filtered out (a disabled tool)", () => {
     const visible = TOOLS.filter((tool) => tool.id !== "convert-audio");
     const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "mp3 to ogg");

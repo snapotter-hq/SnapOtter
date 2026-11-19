@@ -249,6 +249,7 @@ describe("saveFile", () => {
       ".gif",
       ".svg",
       ".heic",
+      ".hif",
       ".tiff",
       ".avif",
     ];

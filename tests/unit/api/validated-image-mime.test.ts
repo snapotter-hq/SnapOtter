@@ -56,6 +56,7 @@ describe("validatedImageMime", () => {
   it("tells HEIC from HEIF by extension, and only by a .heic one", () => {
     expect(validatedImageMime(found("heif"), "photo.HEIC")).toBe("image/heic");
     expect(validatedImageMime(found("heif"), "photo.heif")).toBe("image/heif");
+    expect(validatedImageMime(found("heif"), "DSC00001.HIF")).toBe("image/heif");
     expect(validatedImageMime(found("heif"), "photo.png")).toBe("image/heif");
     expect(validatedImageMime(found("heif"), "heic")).toBe("image/heif");
     expect(validatedImageMime(found("heif"), ".heic")).toBe("image/heif");

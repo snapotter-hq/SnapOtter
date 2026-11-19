@@ -42,6 +42,10 @@ describe("normalizeSearchQuery", () => {
   it("expands synonyms jpeg -> jpg", () => {
     expect(normalizeSearchQuery("jpeg to png")).toBe("jpg to png");
   });
+  it("reads Sony's hif as heic (#4825)", () => {
+    expect(normalizeSearchQuery("hif to jpg")).toBe("heic to jpg");
+    expect(normalizeSearchQuery("hif2jpg")).toBe("heic to jpg");
+  });
   it("drops filler words convert/file/online but keeps formats", () => {
     expect(normalizeSearchQuery("convert mp4 to mp3 file online")).toBe("mp4 to mp3");
   });

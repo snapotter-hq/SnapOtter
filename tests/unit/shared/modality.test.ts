@@ -63,6 +63,14 @@ describe("modality metadata", () => {
     }
   });
 
+  it("accepts Sony's .hif wherever it accepts .heif (#4825)", () => {
+    const heifTools = TOOLS.filter((t) => t.acceptedInputs.includes(".heif"));
+    expect(heifTools.map((t) => t.id)).toContain("heic-to-jpg");
+    for (const t of heifTools) {
+      expect(t.acceptedInputs, t.id).toContain(".hif");
+    }
+  });
+
   it("detects modality from mime", () => {
     expect(detectModalityFromMime("image/png")).toBe("image");
     expect(detectModalityFromMime("video/mp4")).toBe("video");

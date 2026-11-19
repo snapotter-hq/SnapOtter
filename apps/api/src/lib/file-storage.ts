@@ -49,6 +49,7 @@ const SAFE_STORAGE_EXTENSIONS = new Set([
   ".pdf",
   ".heic",
   ".heif",
+  ".hif",
   ".jxl",
   ".ico",
   ...CAMERA_RAW_INPUTS,

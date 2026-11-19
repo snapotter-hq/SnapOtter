@@ -16,6 +16,7 @@ export const IMAGE_EXT_TO_MIME: Readonly<Record<string, string>> = {
   svg: "image/svg+xml",
   ico: "image/x-icon",
   heif: "image/heif",
+  hif: "image/heif",
   heic: "image/heic",
   jxl: "image/jxl",
   dng: "image/x-adobe-dng",
