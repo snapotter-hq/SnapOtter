@@ -3,6 +3,7 @@ import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 import { isEnglishOnlyUrl } from "./src/lib/en-only-paths.ts";
+import { isNoindexUrl } from "./src/lib/index-policy.ts";
 
 const LOCALES = SUPPORTED_LOCALES.map((l) => l.code);
 
@@ -21,7 +22,9 @@ export default defineConfig({
   },
   integrations: [
     sitemap({
-      filter: (page) => !page.includes("/404"),
+      // Noindexed pages stay out of the sitemap. The integration builds each entry's
+      // hreflang links from the filtered list, so no alternate points at one either.
+      filter: (page) => !page.includes("/404") && !isNoindexUrl(page),
       i18n: {
         defaultLocale: "en",
         locales: Object.fromEntries(LOCALES.map((c) => [c, c])),

@@ -2,6 +2,7 @@
 import { getRelativeLocaleUrl } from "astro:i18n";
 import { isRtl, LANDING_LOCALES } from "@/i18n";
 import { isEnglishOnlyPath } from "@/lib/en-only-paths";
+import { isNoindexPath } from "@/lib/index-policy";
 
 /** Absolute site origin used for canonical + hreflang hrefs. */
 export const SITE = "https://snapotter.com";
@@ -50,6 +51,9 @@ export function dirFor(locale: string): "ltr" | "rtl" {
  * them out across every locale would advertise twenty URLs the build never wrote,
  * which is a soft 404 per tag to a crawler and a dead link to anything following the
  * head. The sitemap has always dropped these alternates; the head now agrees.
+ *
+ * Locale copies the index policy noindexes are left out too, so an indexed page never
+ * names a noindexed one as its alternate. The sitemap drops the same URLs.
  */
 export function altLinks(path: string): Array<{ hreflang: string; href: string }> {
   const english = `${SITE}${localizeHref("en", path)}`;
@@ -59,10 +63,12 @@ export function altLinks(path: string): Array<{ hreflang: string; href: string }
       { hreflang: "x-default", href: english },
     ];
   }
-  const links = LANDING_LOCALES.map((code) => ({
-    hreflang: code,
-    href: `${SITE}${localizeHref(code, path)}`,
-  }));
+  const links = LANDING_LOCALES.filter((code) => !isNoindexPath(localizeHref(code, path))).map(
+    (code) => ({
+      hreflang: code,
+      href: `${SITE}${localizeHref(code, path)}`,
+    }),
+  );
   links.push({ hreflang: "x-default", href: english });
   return links;
 }
