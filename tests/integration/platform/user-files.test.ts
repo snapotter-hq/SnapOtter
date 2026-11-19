@@ -658,14 +658,15 @@ describe("Bulk download", () => {
       .where(eq(schema.userFiles.id, gone));
     await unlink(getStoredFilePath(row.storedName));
 
-    const outcome = await bulkDownload(adminToken, [kept, gone]).then(
-      (res) => res,
-      (err: unknown) => err,
-    );
-    if (outcome instanceof Error) return; // the stream was cut, as intended
+    let payload: Buffer;
+    try {
+      payload = (await bulkDownload(adminToken, [kept, gone])).rawPayload;
+    } catch {
+      return; // the stream was cut, as intended
+    }
     let names: string[] = [];
     try {
-      names = new AdmZip(outcome.rawPayload).getEntries().map((e) => e.entryName);
+      names = new AdmZip(payload).getEntries().map((e) => e.entryName);
     } catch {
       return; // truncated archive
     }
