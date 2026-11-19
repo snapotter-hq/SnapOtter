@@ -1,3 +1,4 @@
+import { isToolInputError } from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
@@ -56,9 +57,10 @@ function isLosslessWebP(buffer: Buffer): boolean {
  * A bare `sharp(buffer).rotate()` decodes page 1 only, which would hand every
  * tool after this a one-page TIFF.
  *
- * libvips only writes a page stack whose pages share one size. When the
- * rotated pages don't, this returns null and the caller keeps page 1, as it
- * did before; the warn line says the other pages were left behind.
+ * Returns null, and the caller keeps page 1 as it did before, when the stack
+ * is over the multi-frame workload caps or when the rotated pages differ in
+ * size (libvips only writes a page stack whose pages share one size). The warn
+ * line says the other pages were left behind.
  */
 async function rotateTiffPages(
   buffer: Buffer,
@@ -66,7 +68,16 @@ async function rotateTiffPages(
   log: Pick<FastifyBaseLogger, "warn">,
 ): Promise<Sharp | null> {
   const pages = meta.pages ?? 1;
-  assertGifWorkload({ width: meta.width, height: meta.height, pages }, "Multi-page TIFF input");
+  try {
+    assertGifWorkload({ width: meta.width, height: meta.height, pages }, "Multi-page TIFF input");
+  } catch (err) {
+    if (!isToolInputError(err)) throw err;
+    log.warn(
+      { err, orientation: meta.orientation, pages, bytes: buffer.length },
+      "autoOrient: TIFF page stack is over the workload cap, keeping page 1 only",
+    );
+    return null;
+  }
   const frames: Buffer[] = [];
   let size: string | undefined;
   for (let page = 0; page < pages; page++) {

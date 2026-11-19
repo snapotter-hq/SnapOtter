@@ -11,6 +11,7 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import { MAX_GIF_FRAMES } from "../../../apps/api/src/lib/gif-limits.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 beforeEach(() => {
@@ -692,5 +693,66 @@ describe("autoOrient", () => {
       expect.objectContaining({ pages: 2, orientation: 6 }),
       expect.stringContaining("different sizes"),
     );
+  });
+
+  it("rotates page 1 and says so when a multi-page TIFF is over the workload cap (#4849)", async () => {
+    // One page more than MAX_GIF_FRAMES; tiny pages keep the fixture cheap.
+    const page = await sharp({
+      create: { width: 4, height: 2, channels: 3, background: { r: 0, g: 0, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+    const tiff = await sharp(Array(MAX_GIF_FRAMES + 1).fill(page), {
+      join: { across: 1, animated: true },
+    })
+      .withMetadata({ orientation: 6 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.pages ?? 1).toBe(1);
+    expect([meta.width, meta.height]).toEqual([2, 4]);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ pages: MAX_GIF_FRAMES + 1, orientation: 6 }),
+      expect.stringContaining("workload cap"),
+    );
+  });
+
+  it("keeps 16-bit samples when rotating a multi-page TIFF (#4849)", async () => {
+    const raw = Buffer.alloc(32 * 24 * 3 * 2);
+    for (let i = 0; i < raw.length; i += 2) raw.writeUInt16LE(40000, i);
+    const page = await sharp(raw, { raw: { width: 32, height: 24, channels: 3, depth: "ushort" } })
+      .toColorspace("rgb16")
+      .png()
+      .toBuffer();
+    const tiff = await sharp([page, page], { join: { across: 1, animated: true } })
+      .toColorspace("rgb16")
+      .withMetadata({ orientation: 6 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    const firstSample16 = async (buffer: Buffer, page: number) => {
+      const { data, info } = await sharp(buffer, { page, pages: 1 })
+        .toColorspace("rgb16")
+        .raw({ depth: "ushort" })
+        .toBuffer({ resolveWithObject: true });
+      return { info, rgb: Array.from(new Uint16Array(data.buffer, data.byteOffset, 3)) };
+    };
+    const before = await firstSample16(tiff, 0);
+    expect((await sharp(tiff).metadata()).depth).toBe("ushort");
+    // A sample an 8-bit round trip can't produce (8-bit values widen to n * 257).
+    expect(before.rgb.some((v) => v % 257 !== 0)).toBe(true);
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.pages).toBe(2);
+    expect(meta.depth).toBe("ushort");
+    for (let page = 0; page < 2; page++) {
+      const after = await firstSample16(result, page);
+      expect([after.info.width, after.info.height]).toEqual([24, 32]);
+      expect(after.rgb).toEqual(before.rgb);
+    }
   });
 });
