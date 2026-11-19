@@ -438,6 +438,9 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "background box off", settings: { text: "TEST", backgroundBox: false } },
     { label: "shadow on", settings: { text: "TEST", shadow: true } },
     { label: "shadow off", settings: { text: "TEST", shadow: false } },
+    { label: "custom position", settings: { text: "TEST", position: "custom", x: 25, y: 75 } },
+    { label: "wrap off", settings: { text: "TEST", wrap: false } },
+    { label: "narrow max width", settings: { text: "TEST TEST TEST", maxWidth: 10 } },
   ],
 
   "replace-color": [

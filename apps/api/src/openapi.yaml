@@ -2700,7 +2700,11 @@ paths:
                     - `text` (string 1-500, required) - Overlay text
                     - `fontSize` (number 8-200, default 48) - Font size in pixels
                     - `color` (hex string, default "#FFFFFF") - Text color
-                    - `position` (string, default "bottom") - One of: top, center, bottom
+                    - `position` (string, default "bottom") - One of: top, center, bottom, custom
+                    - `x` (number 0-100, default 50) - Horizontal centre of the text as a percentage of image width; used when position is custom
+                    - `y` (number 0-100, default 50) - Vertical centre of the text as a percentage of image height; used when position is custom
+                    - `wrap` (boolean, default true) - Wrap long text onto several lines
+                    - `maxWidth` (number 10-100, default 90) - Widest a wrapped line may get, as a percentage of image width
                     - `backgroundBox` (boolean, default false) - Show background box behind text
                     - `backgroundColor` (hex string, default "#000000") - Background box color
                     - `shadow` (boolean, default true) - Add text shadow

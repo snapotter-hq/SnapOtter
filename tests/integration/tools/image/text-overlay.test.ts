@@ -1046,4 +1046,121 @@ describe("text-overlay", () => {
     const json = JSON.parse(res.body);
     expect(json.downloadUrl).toBeDefined();
   });
+
+  // ── Wrapping and free positioning (#777) ────────────────────────
+
+  async function overlayDownload(settings: Record<string, unknown>) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const dl = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    return Buffer.from(dl.rawPayload);
+  }
+
+  /** Columns where the output differs from the input, i.e. where text landed. */
+  async function changedColumns(output: Buffer) {
+    const a = await sharp(PNG).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const b = await sharp(output).removeAlpha().raw().toBuffer();
+    const { width, height, channels } = a.info;
+    const cols: number[] = [];
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        const i = (y * width + x) * channels;
+        if (Math.abs(a.data[i] - b[i]) + Math.abs(a.data[i + 1] - b[i + 1]) > 60) {
+          cols.push(x);
+          break;
+        }
+      }
+    }
+    return { cols, width };
+  }
+
+  const LONG = "This caption is much too long to fit on a single line of the image";
+
+  it("wraps long text inside the image by default", async () => {
+    const out = await overlayDownload({ text: LONG, fontSize: 24, shadow: false });
+    const { cols, width } = await changedColumns(out);
+    expect(cols.length).toBeGreaterThan(0);
+    expect(cols[0]).toBeGreaterThan(5);
+    expect(cols.at(-1)).toBeLessThan(width - 5);
+  });
+
+  it("keeps the single clipped line when wrap is false", async () => {
+    const out = await overlayDownload({ text: LONG, fontSize: 24, shadow: false, wrap: false });
+    const { cols, width } = await changedColumns(out);
+    // Glyph gaps can leave the outermost column untouched, so allow a few pixels.
+    expect(cols[0]).toBeLessThan(5);
+    expect(cols.at(-1)).toBeGreaterThan(width - 5);
+  });
+
+  it("places text at a custom x, y", async () => {
+    const out = await overlayDownload({
+      text: "Hi",
+      fontSize: 24,
+      shadow: false,
+      position: "custom",
+      x: 10,
+      y: 50,
+    });
+    const { cols, width } = await changedColumns(out);
+    expect(cols.length).toBeGreaterThan(0);
+    expect(cols.at(-1)).toBeLessThan(width / 2);
+  });
+
+  it("returns the image unchanged in size for whitespace-only text", async () => {
+    const out = await overlayDownload({ text: "   " });
+    expect((await sharp(out).metadata()).width).toBe(200);
+  });
+
+  it("rejects text too large to render with a 400, not a 500", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "W".repeat(500), fontSize: 100, wrap: false }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it.each([
+    ["x above 100", { x: 101 }],
+    ["y below 0", { y: -1 }],
+    ["maxWidth below 10", { maxWidth: 5 }],
+    ["wrap as a string", { wrap: "yes" }],
+  ])("rejects %s", async (_label, extra) => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ text: "Bad", position: "custom", ...extra }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/text-overlay",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+  });
 });

@@ -6,6 +6,8 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
+type TextPosition = "top" | "center" | "bottom" | "custom";
+
 export interface TextOverlayControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
@@ -20,7 +22,11 @@ export function TextOverlayControls({
   const [text, setText] = useState(ts.defaultText);
   const [fontSize, setFontSize] = useState(48);
   const [color, setColor] = useState("#FFFFFF");
-  const [position, setPosition] = useState<"top" | "center" | "bottom">("bottom");
+  const [position, setPosition] = useState<TextPosition>("bottom");
+  const [x, setX] = useState(50);
+  const [y, setY] = useState(50);
+  const [wrap, setWrap] = useState(true);
+  const [maxWidth, setMaxWidth] = useState(90);
   const [backgroundBox, setBackgroundBox] = useState(false);
   const [backgroundColor, setBackgroundColor] = useState("#000000");
   const [shadow, setShadow] = useState(true);
@@ -32,8 +38,11 @@ export function TextOverlayControls({
     if (initialSettings.text != null) setText(String(initialSettings.text));
     if (initialSettings.fontSize != null) setFontSize(Number(initialSettings.fontSize));
     if (initialSettings.color != null) setColor(String(initialSettings.color));
-    if (initialSettings.position != null)
-      setPosition(initialSettings.position as "top" | "center" | "bottom");
+    if (initialSettings.position != null) setPosition(initialSettings.position as TextPosition);
+    if (initialSettings.x != null) setX(Number(initialSettings.x));
+    if (initialSettings.y != null) setY(Number(initialSettings.y));
+    if (initialSettings.wrap != null) setWrap(Boolean(initialSettings.wrap));
+    if (initialSettings.maxWidth != null) setMaxWidth(Number(initialSettings.maxWidth));
     if (initialSettings.backgroundBox != null)
       setBackgroundBox(Boolean(initialSettings.backgroundBox));
     if (initialSettings.backgroundColor != null)
@@ -52,11 +61,27 @@ export function TextOverlayControls({
       fontSize,
       color,
       position,
+      x,
+      y,
+      wrap,
+      maxWidth,
       backgroundBox,
       backgroundColor,
       shadow,
     });
-  }, [text, fontSize, color, position, backgroundBox, backgroundColor, shadow]);
+  }, [
+    text,
+    fontSize,
+    color,
+    position,
+    x,
+    y,
+    wrap,
+    maxWidth,
+    backgroundBox,
+    backgroundColor,
+    shadow,
+  ]);
 
   return (
     <div className="space-y-4">
@@ -111,14 +136,84 @@ export function TextOverlayControls({
         <select
           id="text-overlay-position"
           value={position}
-          onChange={(e) => setPosition(e.target.value as "top" | "center" | "bottom")}
+          onChange={(e) => setPosition(e.target.value as TextPosition)}
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
           <option value="top">{ts.top}</option>
           <option value="center">{ts.center}</option>
           <option value="bottom">{ts.bottom}</option>
+          <option value="custom">{ts.custom}</option>
         </select>
       </div>
+
+      {position === "custom" && (
+        <>
+          <div>
+            <div className="flex justify-between items-center">
+              <label htmlFor="text-overlay-x" className="text-xs text-muted-foreground">
+                {ts.horizontalPosition}
+              </label>
+              <span className="text-xs font-mono text-foreground">{x}%</span>
+            </div>
+            <input
+              id="text-overlay-x"
+              type="range"
+              min={0}
+              max={100}
+              value={x}
+              onChange={(e) => setX(Number(e.target.value))}
+              className="w-full mt-1"
+            />
+          </div>
+          <div>
+            <div className="flex justify-between items-center">
+              <label htmlFor="text-overlay-y" className="text-xs text-muted-foreground">
+                {ts.verticalPosition}
+              </label>
+              <span className="text-xs font-mono text-foreground">{y}%</span>
+            </div>
+            <input
+              id="text-overlay-y"
+              type="range"
+              min={0}
+              max={100}
+              value={y}
+              onChange={(e) => setY(Number(e.target.value))}
+              className="w-full mt-1"
+            />
+          </div>
+        </>
+      )}
+
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          checked={wrap}
+          onChange={(e) => setWrap(e.target.checked)}
+          className="rounded"
+        />
+        {ts.wrapText}
+      </label>
+
+      {wrap && (
+        <div>
+          <div className="flex justify-between items-center">
+            <label htmlFor="text-overlay-max-width" className="text-xs text-muted-foreground">
+              {ts.maxWidth}
+            </label>
+            <span className="text-xs font-mono text-foreground">{maxWidth}%</span>
+          </div>
+          <input
+            id="text-overlay-max-width"
+            type="range"
+            min={10}
+            max={100}
+            value={maxWidth}
+            onChange={(e) => setMaxWidth(Number(e.target.value))}
+            className="w-full mt-1"
+          />
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input
