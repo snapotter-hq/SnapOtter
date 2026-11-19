@@ -16825,6 +16825,106 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/tools/image/aspect-ratio-calculator:
+    post:
+      operationId: calculateAspectRatio
+      tags:
+        - Image
+      summary: Calculadora de relación de aspecto
+      description: Calcula el ancho o el alto que mantiene una relación de aspecto y la relación simplificada (1920x1080 es 16:9). Envía newWidth o newHeight, no ambos; sin ninguno, solo se devuelve la relación. Esta herramienta acepta un cuerpo JSON, no multipart.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - width
+                - height
+              properties:
+                width:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Ancho original
+                height:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Alto original
+                newWidth:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Nuevo ancho a partir del cual se calcula el alto
+                newHeight:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Nuevo alto a partir del cual se calcula el ancho
+                round:
+                  type: boolean
+                  default: true
+                  description: Redondea la dimensión calculada a píxeles enteros (mínimo 1); si no, conserva dos decimales
+            example:
+              width: 1920
+              height: 1080
+              newWidth: 1280
+              round: true
+      responses:
+        '200':
+          description: Dimensiones calculadas y relación simplificada
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - width
+                  - height
+                  - ratio
+                  - ratioDecimal
+                  - newWidth
+                  - newHeight
+                properties:
+                  width:
+                    type: number
+                  height:
+                    type: number
+                  ratio:
+                    type: string
+                    description: Relación simplificada, por ejemplo 16:9
+                  ratioDecimal:
+                    type: number
+                    description: Ancho dividido entre alto, con cuatro decimales
+                  newWidth:
+                    type:
+                      - number
+                      - 'null'
+                  newHeight:
+                    type:
+                      - number
+                      - 'null'
+              example:
+                width: 1920
+                height: 1080
+                ratio: '16:9'
+                ratioDecimal: 1.7778
+                newWidth: 1280
+                newHeight: 720
+        '400':
+          description: Entrada no válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autenticación requerida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
   /api/v1/tools/image/circle-crop:
     post:
       operationId: circleCrop
@@ -27383,6 +27483,14 @@ x-i18n:
       sourceHash: e174f8923d5d
       provenance: machine
       outputHash: 803edd2bec20
+    paths./api/v1/tools/image/aspect-ratio-calculator.post.summary:
+      sourceHash: 863888e1f339
+      provenance: machine
+      outputHash: f3b74f0af7c1
+    paths./api/v1/tools/image/aspect-ratio-calculator.post.description:
+      sourceHash: 81eac19f3787
+      provenance: machine
+      outputHash: bd0893f17f7d
     paths./api/v1/tools/image/circle-crop.post.summary:
       sourceHash: d76473270976
       provenance: machine
@@ -34204,6 +34312,46 @@ x-i18n:
       provenance: machine
       outputHash: 2a1311c973c9
     ptr:/paths/~1api~1v1~1tools~1image~1barcode-generate/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 36908be02d35
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/requestBody/content/application~1json/schema/properties/width/description:
+      sourceHash: bae56707a9a2
+      provenance: machine
+      outputHash: 207d59581241
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/requestBody/content/application~1json/schema/properties/height/description:
+      sourceHash: 5b5674a33fe8
+      provenance: machine
+      outputHash: 48844668a680
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/requestBody/content/application~1json/schema/properties/newWidth/description:
+      sourceHash: 8d87d8c66c95
+      provenance: machine
+      outputHash: 7f30f6318eed
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/requestBody/content/application~1json/schema/properties/newHeight/description:
+      sourceHash: 2d6595066f83
+      provenance: machine
+      outputHash: 80a1ac94f56b
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/requestBody/content/application~1json/schema/properties/round/description:
+      sourceHash: 15616490b3f9
+      provenance: machine
+      outputHash: b133e4eb3e8b
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/responses/200/description:
+      sourceHash: 19cc822adf5c
+      provenance: machine
+      outputHash: 7a621fbd5c28
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/responses/200/content/application~1json/schema/properties/ratio/description:
+      sourceHash: 09cfc089ea41
+      provenance: machine
+      outputHash: 5b5c931a9ca5
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/responses/200/content/application~1json/schema/properties/ratioDecimal/description:
+      sourceHash: 0642d0055016
+      provenance: machine
+      outputHash: 0faa4962a6f3
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 2a1311c973c9
+    ptr:/paths/~1api~1v1~1tools~1image~1aspect-ratio-calculator/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 36908be02d35

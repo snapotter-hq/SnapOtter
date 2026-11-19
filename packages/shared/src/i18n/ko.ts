@@ -813,6 +813,10 @@ export const ko: TranslationKeys = {
       name: "바코드 생성기",
       description: "Code 128, EAN-13, UPC-A, Code 39, ITF-14, Data Matrix 형식의 바코드 생성",
     },
+    "aspect-ratio-calculator": {
+      name: "화면 비율 계산기",
+      description: "화면 비율을 유지하는 너비나 높이를 계산하고 비율을 약분",
+    },
     "chart-maker": {
       name: "차트 만들기",
       description: "CSV 또는 JSON 데이터로 막대, 선, 원형 차트 생성 (최대 100행)",
@@ -3285,6 +3289,20 @@ export const ko: TranslationKeys = {
       submit: "바코드 생성",
       download: "바코드 다운로드",
       generateFailed: "바코드 생성에 실패했습니다",
+    },
+    "aspect-ratio-calculator": {
+      preset: "일반 비율",
+      custom: "사용자 지정",
+      originalWidth: "원본 너비",
+      originalHeight: "원본 높이",
+      newWidth: "새 너비",
+      newHeight: "새 높이",
+      hint: "새 너비나 높이를 입력하면 나머지 값이 계산됩니다.",
+      swap: "가로세로 바꾸기",
+      round: "정수 픽셀로 반올림",
+      ratio: "화면 비율",
+      submit: "계산",
+      calculateFailed: "화면 비율을 계산하지 못했습니다",
     },
     "chart-maker": {
       optionalChartTitle: "차트 제목 (선택)",

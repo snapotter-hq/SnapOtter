@@ -864,6 +864,11 @@ export const nl: TranslationKeys = {
       name: "Barcodegenerator",
       description: "Genereer barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14 en Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Beeldverhouding-calculator",
+      description:
+        "Bereken de ontbrekende breedte of hoogte bij dezelfde beeldverhouding en vereenvoudig die",
+    },
     "chart-maker": {
       name: "Grafiekmaker",
       description:
@@ -3371,6 +3376,20 @@ export const nl: TranslationKeys = {
       submit: "Barcode genereren",
       download: "Barcode downloaden",
       generateFailed: "Barcode genereren mislukt",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Gangbare verhouding",
+      custom: "Aangepast",
+      originalWidth: "Oorspronkelijke breedte",
+      originalHeight: "Oorspronkelijke hoogte",
+      newWidth: "Nieuwe breedte",
+      newHeight: "Nieuwe hoogte",
+      hint: "Vul een nieuwe breedte of hoogte in en de andere wordt berekend.",
+      swap: "Oriëntatie omwisselen",
+      round: "Afronden op hele pixels",
+      ratio: "Beeldverhouding",
+      submit: "Berekenen",
+      calculateFailed: "Beeldverhouding berekenen mislukt",
     },
     "chart-maker": {
       optionalChartTitle: "Optionele grafiektitel",

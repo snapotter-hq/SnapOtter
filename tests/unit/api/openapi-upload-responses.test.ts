@@ -46,6 +46,7 @@ const NO_413: Record<string, string> = {};
 // Catalog tools that make something from settings or a JSON body alone, so
 // take no upload.
 const NO_UPLOAD_TOOLS = [
+  "aspect-ratio-calculator",
   "barcode-generate",
   "convert-case",
   "html-to-image",

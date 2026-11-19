@@ -860,6 +860,11 @@ export const sv: TranslationKeys = {
       name: "Streckkodsgenerator",
       description: "Skapa streckkoder i Code 128, EAN-13, UPC-A, Code 39, ITF-14 och Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Bildförhållanderäknare",
+      description:
+        "Räkna ut bredden eller höjden som saknas med samma bildförhållande och förenkla det",
+    },
     "chart-maker": {
       name: "Diagramskapare",
       description:
@@ -3350,6 +3355,20 @@ export const sv: TranslationKeys = {
       submit: "Generera streckkod",
       download: "Ladda ner streckkod",
       generateFailed: "Kunde inte generera streckkod",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Vanligt förhållande",
+      custom: "Anpassat",
+      originalWidth: "Ursprunglig bredd",
+      originalHeight: "Ursprunglig höjd",
+      newWidth: "Ny bredd",
+      newHeight: "Ny höjd",
+      hint: "Ange en ny bredd eller höjd så räknas den andra ut åt dig.",
+      swap: "Byt orientering",
+      round: "Avrunda till hela pixlar",
+      ratio: "Bildförhållande",
+      submit: "Beräkna",
+      calculateFailed: "Det gick inte att beräkna bildförhållandet",
     },
     "chart-maker": {
       optionalChartTitle: "Valfri diagramtitel",

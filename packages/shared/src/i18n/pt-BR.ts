@@ -861,6 +861,10 @@ export const ptBR: TranslationKeys = {
       description:
         "Gere códigos de barras em Code 128, EAN-13, UPC-A, Code 39, ITF-14 e Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Calculadora de proporção",
+      description: "Calcule a largura ou altura que falta para manter a proporção e simplifique-a",
+    },
     "chart-maker": {
       name: "Criador de Gráficos",
       description:
@@ -3360,6 +3364,20 @@ export const ptBR: TranslationKeys = {
       submit: "Gerar código de barras",
       download: "Baixar código de barras",
       generateFailed: "Falha ao gerar o código de barras",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Proporção comum",
+      custom: "Personalizada",
+      originalWidth: "Largura original",
+      originalHeight: "Altura original",
+      newWidth: "Nova largura",
+      newHeight: "Nova altura",
+      hint: "Digite uma nova largura ou altura e a outra é calculada para você.",
+      swap: "Inverter orientação",
+      round: "Arredondar para pixels inteiros",
+      ratio: "Proporção",
+      submit: "Calcular",
+      calculateFailed: "Falha ao calcular a proporção",
     },
     "chart-maker": {
       optionalChartTitle: "Título do gráfico (opcional)",

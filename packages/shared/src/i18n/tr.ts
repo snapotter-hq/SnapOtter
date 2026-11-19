@@ -863,6 +863,11 @@ export const tr: TranslationKeys = {
       description:
         "Code 128, EAN-13, UPC-A, Code 39, ITF-14 ve Data Matrix formatlarında barkod oluştur",
     },
+    "aspect-ratio-calculator": {
+      name: "En boy oranı hesaplayıcı",
+      description:
+        "En boy oranını koruyan eksik genişliği veya yüksekliği bulun ve oranı sadeleştirin",
+    },
     "chart-maker": {
       name: "Grafik Oluşturucu",
       description:
@@ -3359,6 +3364,20 @@ export const tr: TranslationKeys = {
       submit: "Barkod Oluştur",
       download: "Barkodu İndir",
       generateFailed: "Barkod oluşturulamadı",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Yaygın oran",
+      custom: "Özel",
+      originalWidth: "Orijinal genişlik",
+      originalHeight: "Orijinal yükseklik",
+      newWidth: "Yeni genişlik",
+      newHeight: "Yeni yükseklik",
+      hint: "Yeni bir genişlik veya yükseklik girin, diğeri sizin için hesaplanır.",
+      swap: "Yönü değiştir",
+      round: "Tam piksele yuvarla",
+      ratio: "En boy oranı",
+      submit: "Hesapla",
+      calculateFailed: "En boy oranı hesaplanamadı",
     },
     "chart-maker": {
       optionalChartTitle: "İsteğe bağlı grafik başlığı",

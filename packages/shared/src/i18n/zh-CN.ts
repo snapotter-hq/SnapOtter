@@ -643,6 +643,10 @@ export const zhCN: TranslationKeys = {
       name: "条形码生成器",
       description: "生成 Code 128、EAN-13、UPC-A、Code 39、ITF-14 和 Data Matrix 条形码",
     },
+    "aspect-ratio-calculator": {
+      name: "宽高比计算器",
+      description: "计算保持宽高比所需的宽度或高度，并化简比例",
+    },
     "chart-maker": {
       name: "图表制作器",
       description: "从 CSV 或 JSON 数据创建柱状图、折线图或饼图，最多 100 行",
@@ -3084,6 +3088,20 @@ export const zhCN: TranslationKeys = {
       submit: "生成条形码",
       download: "下载条形码",
       generateFailed: "生成条码失败",
+    },
+    "aspect-ratio-calculator": {
+      preset: "常用比例",
+      custom: "自定义",
+      originalWidth: "原始宽度",
+      originalHeight: "原始高度",
+      newWidth: "新宽度",
+      newHeight: "新高度",
+      hint: "输入新的宽度或高度，另一个值会自动算出。",
+      swap: "交换方向",
+      round: "四舍五入到整像素",
+      ratio: "宽高比",
+      submit: "计算",
+      calculateFailed: "宽高比计算失败",
     },
     "chart-maker": {
       optionalChartTitle: "图表标题（可选）",

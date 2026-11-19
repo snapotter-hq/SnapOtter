@@ -103,7 +103,7 @@ The same image runs on CPU or NVIDIA CUDA. Intel/AMD iGPU acceleration through V
 ## Features
 
 - **200+ tools across 5 modalities**
-  - **Image (112):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats.
+  - **Image (113):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats.
   - **Video (59):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn, extract or convert subtitles, and more.
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge or split, waveform, and more.
   - **Documents / PDF (36):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, multi-tool page editor, OCR, and more.

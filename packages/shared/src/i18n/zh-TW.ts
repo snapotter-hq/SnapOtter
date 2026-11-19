@@ -644,6 +644,10 @@ export const zhTW: TranslationKeys = {
       name: "條碼產生器",
       description: "產生 Code 128、EAN-13、UPC-A、Code 39、ITF-14 及 Data Matrix 條碼",
     },
+    "aspect-ratio-calculator": {
+      name: "長寬比計算器",
+      description: "計算維持長寬比所需的寬度或高度，並化簡比例",
+    },
     "chart-maker": {
       name: "圖表製作",
       description: "從 CSV 或 JSON 資料建立長條圖、折線圖或圓餅圖，最多 100 列",
@@ -3085,6 +3089,20 @@ export const zhTW: TranslationKeys = {
       submit: "產生條碼",
       download: "下載條碼",
       generateFailed: "無法產生條碼",
+    },
+    "aspect-ratio-calculator": {
+      preset: "常用比例",
+      custom: "自訂",
+      originalWidth: "原始寬度",
+      originalHeight: "原始高度",
+      newWidth: "新寬度",
+      newHeight: "新高度",
+      hint: "輸入新的寬度或高度，另一個值會自動算出。",
+      swap: "交換方向",
+      round: "四捨五入到整數像素",
+      ratio: "長寬比",
+      submit: "計算",
+      calculateFailed: "長寬比計算失敗",
     },
     "chart-maker": {
       optionalChartTitle: "圖表標題（選填）",

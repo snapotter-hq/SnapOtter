@@ -11,6 +11,7 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { AspectRatioCalculatorSettings } from "@/components/tools/aspect-ratio-calculator-settings";
 import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
 import { BeautifySettings } from "@/components/tools/beautify-settings";
 import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
@@ -580,6 +581,16 @@ interface FetchFileStorePanelCase {
 }
 
 const fetchFileStorePanels: FetchFileStorePanelCase[] = [
+  {
+    name: "aspect-ratio-calculator",
+    Panel: AspectRatioCalculatorSettings,
+    submitId: "aspect-ratio-calculator-submit",
+    needsSecondaryFile: false,
+    goodResponse: () =>
+      new Response(JSON.stringify({ ratio: "16:9", newWidth: null, newHeight: null }), {
+        status: 200,
+      }),
+  },
   {
     name: "barcode-generate",
     Panel: BarcodeGenerateSettings,

@@ -853,6 +853,10 @@ export const th: TranslationKeys = {
       name: "สร้างบาร์โค้ด",
       description: "สร้างบาร์โค้ดแบบ Code 128, EAN-13, UPC-A, Code 39, ITF-14 และ Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "เครื่องคำนวณอัตราส่วนภาพ",
+      description: "คำนวณความกว้างหรือความสูงที่ขาดไปโดยคงอัตราส่วนภาพไว้ และทำอัตราส่วนให้อยู่ในรูปอย่างต่ำ",
+    },
     "chart-maker": {
       name: "สร้างแผนภูมิ",
       description: "สร้างแผนภูมิแท่ง เส้น หรือวงกลมจากข้อมูล CSV หรือ JSON สูงสุด 100 แถว",
@@ -3303,6 +3307,20 @@ export const th: TranslationKeys = {
       submit: "สร้างบาร์โค้ด",
       download: "ดาวน์โหลดบาร์โค้ด",
       generateFailed: "สร้างบาร์โค้ดไม่สำเร็จ",
+    },
+    "aspect-ratio-calculator": {
+      preset: "อัตราส่วนยอดนิยม",
+      custom: "กำหนดเอง",
+      originalWidth: "ความกว้างเดิม",
+      originalHeight: "ความสูงเดิม",
+      newWidth: "ความกว้างใหม่",
+      newHeight: "ความสูงใหม่",
+      hint: "ป้อนความกว้างหรือความสูงใหม่ แล้วระบบจะคำนวณอีกค่าให้",
+      swap: "สลับแนว",
+      round: "ปัดเป็นพิกเซลเต็ม",
+      ratio: "อัตราส่วนภาพ",
+      submit: "คำนวณ",
+      calculateFailed: "คำนวณอัตราส่วนภาพไม่สำเร็จ",
     },
     "chart-maker": {
       optionalChartTitle: "ชื่อแผนภูมิ (ไม่บังคับ)",

@@ -855,6 +855,11 @@ export const ar: TranslationKeys = {
       name: "مولّد الباركود",
       description: "إنشاء باركود بصيغ Code 128 وEAN-13 وUPC-A وCode 39 وITF-14 وData Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "حاسبة نسبة العرض إلى الارتفاع",
+      description:
+        "احسب العرض أو الارتفاع الناقص مع الحفاظ على نسبة العرض إلى الارتفاع وبسّط النسبة",
+    },
     "chart-maker": {
       name: "صانع المخططات",
       description: "إنشاء مخططات أعمدة أو خطية أو دائرية من بيانات CSV أو JSON، حتى 100 صف",
@@ -3328,6 +3333,20 @@ export const ar: TranslationKeys = {
       submit: "إنشاء باركود",
       download: "تنزيل الباركود",
       generateFailed: "فشل إنشاء الباركود",
+    },
+    "aspect-ratio-calculator": {
+      preset: "نسبة شائعة",
+      custom: "مخصصة",
+      originalWidth: "العرض الأصلي",
+      originalHeight: "الارتفاع الأصلي",
+      newWidth: "العرض الجديد",
+      newHeight: "الارتفاع الجديد",
+      hint: "أدخل عرضًا أو ارتفاعًا جديدًا وستُحسب القيمة الأخرى تلقائيًا.",
+      swap: "تبديل الاتجاه",
+      round: "التقريب إلى بكسلات كاملة",
+      ratio: "نسبة العرض إلى الارتفاع",
+      submit: "احسب",
+      calculateFailed: "تعذّر حساب نسبة العرض إلى الارتفاع",
     },
     "chart-maker": {
       optionalChartTitle: "عنوان الرسم البياني (اختياري)",

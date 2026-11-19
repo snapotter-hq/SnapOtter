@@ -688,6 +688,10 @@ export const hi: TranslationKeys = {
       name: "बारकोड जनरेटर",
       description: "Code 128, EAN-13, UPC-A, Code 39, ITF-14, और Data Matrix में बारकोड बनाएँ",
     },
+    "aspect-ratio-calculator": {
+      name: "आस्पेक्ट रेशियो कैलकुलेटर",
+      description: "आस्पेक्ट रेशियो बनाए रखने वाली गायब चौड़ाई या ऊँचाई निकालें और अनुपात को सरल करें",
+    },
     "chart-maker": {
       name: "चार्ट मेकर",
       description: "CSV या JSON डेटा से बार, लाइन, या पाई चार्ट बनाएँ, अधिकतम 100 पंक्तियाँ",
@@ -3158,6 +3162,20 @@ export const hi: TranslationKeys = {
       submit: "बारकोड बनाएँ",
       download: "बारकोड डाउनलोड करें",
       generateFailed: "बारकोड बनाने में विफल",
+    },
+    "aspect-ratio-calculator": {
+      preset: "सामान्य अनुपात",
+      custom: "कस्टम",
+      originalWidth: "मूल चौड़ाई",
+      originalHeight: "मूल ऊँचाई",
+      newWidth: "नई चौड़ाई",
+      newHeight: "नई ऊँचाई",
+      hint: "नई चौड़ाई या ऊँचाई दर्ज करें, दूसरा मान अपने आप निकल आएगा।",
+      swap: "दिशा बदलें",
+      round: "पूरे पिक्सेल तक राउंड करें",
+      ratio: "आस्पेक्ट रेशियो",
+      submit: "गणना करें",
+      calculateFailed: "आस्पेक्ट रेशियो की गणना विफल रही",
     },
     "chart-maker": {
       optionalChartTitle: "वैकल्पिक चार्ट शीर्षक",

@@ -161,6 +161,7 @@ const SETTINGS: Record<string, Record<string, unknown>> = {
  * this environment instead, and only the reason text carries it.
  */
 const NOT_SINGLE_IMAGE: Record<string, string> = {
+  "aspect-ratio-calculator": "calculator: answers from typed dimensions, takes no file",
   "barcode-generate": "generator: draws from settings, ignores the input pixels",
   "barcode-read": "reads the image, answers with JSON",
   "bulk-rename": "renames files, never decodes them",

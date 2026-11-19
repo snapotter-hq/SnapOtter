@@ -864,6 +864,11 @@ export const vi: TranslationKeys = {
       name: "Tạo mã vạch",
       description: "Tạo mã vạch định dạng Code 128, EAN-13, UPC-A, Code 39, ITF-14 và Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Máy tính tỷ lệ khung hình",
+      description:
+        "Tính chiều rộng hoặc chiều cao còn thiếu để giữ nguyên tỷ lệ khung hình và rút gọn tỷ lệ",
+    },
     "chart-maker": {
       name: "Tạo biểu đồ",
       description: "Tạo biểu đồ cột, đường hoặc tròn từ dữ liệu CSV hoặc JSON, tối đa 100 hàng",
@@ -3351,6 +3356,20 @@ export const vi: TranslationKeys = {
       submit: "Tạo mã vạch",
       download: "Tải mã vạch",
       generateFailed: "Không thể tạo mã vạch",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Tỷ lệ phổ biến",
+      custom: "Tùy chỉnh",
+      originalWidth: "Chiều rộng gốc",
+      originalHeight: "Chiều cao gốc",
+      newWidth: "Chiều rộng mới",
+      newHeight: "Chiều cao mới",
+      hint: "Nhập chiều rộng hoặc chiều cao mới, giá trị còn lại sẽ được tính giúp bạn.",
+      swap: "Đổi hướng",
+      round: "Làm tròn đến pixel nguyên",
+      ratio: "Tỷ lệ khung hình",
+      submit: "Tính",
+      calculateFailed: "Không thể tính tỷ lệ khung hình",
     },
     "chart-maker": {
       optionalChartTitle: "Tiêu đề biểu đồ (tùy chọn)",

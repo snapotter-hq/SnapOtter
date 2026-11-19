@@ -895,6 +895,11 @@ const ExtractZipSettings = lazy(() =>
 );
 
 // Wave 5a: Image gap-fill tools
+const AspectRatioCalculatorSettings = lazy(() =>
+  import("@/components/tools/aspect-ratio-calculator-settings").then((m) => ({
+    default: m.AspectRatioCalculatorSettings,
+  })),
+);
 const BarcodeGenerateSettings = lazy(() =>
   import("@/components/tools/barcode-generate-settings").then((m) => ({
     default: m.BarcodeGenerateSettings,
@@ -1035,6 +1040,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["html-to-image", { Settings: HtmlToImageSettings, ResultsPanel: HtmlToImageResults }],
   ["barcode-read", { Settings: BarcodeReadSettings }],
   ["barcode-generate", { Settings: BarcodeGenerateSettings }],
+  ["aspect-ratio-calculator", { Settings: AspectRatioCalculatorSettings }],
   ["image-to-base64", { Settings: ImageToBase64Settings, ResultsPanel: ImageToBase64Results }],
 
   // Layout & Composition

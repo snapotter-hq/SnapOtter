@@ -865,6 +865,11 @@ export const it: TranslationKeys = {
       description:
         "Genera codici a barre in Code 128, EAN-13, UPC-A, Code 39, ITF-14 e Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Calcolatore proporzioni",
+      description:
+        "Calcola la larghezza o l'altezza mancante che mantiene le proporzioni e semplificale",
+    },
     "chart-maker": {
       name: "Generatore di Grafici",
       description: "Crea grafici a barre, lineari o a torta da dati CSV o JSON, fino a 100 righe",
@@ -3363,6 +3368,20 @@ export const it: TranslationKeys = {
       submit: "Genera Codice a Barre",
       download: "Scarica Codice a Barre",
       generateFailed: "Impossibile generare il codice a barre",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Proporzione comune",
+      custom: "Personalizzata",
+      originalWidth: "Larghezza originale",
+      originalHeight: "Altezza originale",
+      newWidth: "Nuova larghezza",
+      newHeight: "Nuova altezza",
+      hint: "Inserisci una nuova larghezza o altezza e l'altra viene calcolata.",
+      swap: "Inverti orientamento",
+      round: "Arrotonda ai pixel interi",
+      ratio: "Proporzioni",
+      submit: "Calcola",
+      calculateFailed: "Impossibile calcolare le proporzioni",
     },
     "chart-maker": {
       optionalChartTitle: "Titolo del grafico (opzionale)",

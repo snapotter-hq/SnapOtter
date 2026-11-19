@@ -52,6 +52,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "html-to-image": "no-dropzone",
   "barcode-read": "before-after",
   "barcode-generate": "no-dropzone",
+  "aspect-ratio-calculator": "no-dropzone",
   "image-to-base64": "custom-results",
 
   // Layout & composition

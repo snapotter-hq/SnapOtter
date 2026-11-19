@@ -596,6 +596,7 @@ const NO_DROPZONE_TOOLS = [
   "qr-generate",
   "html-to-image",
   "barcode-generate",
+  "aspect-ratio-calculator",
   "collage",
   "chart-maker",
 ];

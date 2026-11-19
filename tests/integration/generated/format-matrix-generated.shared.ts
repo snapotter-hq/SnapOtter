@@ -57,6 +57,7 @@ const fixtureFiles = process.env.FULL_MATRIX ? ALL_FIXTURE_FILES : CORE_FORMATS;
 const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422]);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const CUSTOM_ROUTE_TOOLS = new Set([
+  "aspect-ratio-calculator",
   "barcode-generate",
   "chart-maker",
   "html-to-image",

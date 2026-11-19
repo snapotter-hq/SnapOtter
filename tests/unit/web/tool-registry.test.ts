@@ -382,6 +382,7 @@ describe("toolRegistry", () => {
       "chart-maker",
       "convert-case",
       "proportion-calculator",
+      "aspect-ratio-calculator",
     ]);
     for (const [toolId, entry] of toolRegistry) {
       if (entry.displayMode === "no-dropzone" && !selfContainedTools.has(toolId)) {

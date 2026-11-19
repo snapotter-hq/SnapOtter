@@ -16525,6 +16525,94 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
+  /api/v1/tools/image/aspect-ratio-calculator:
+    post:
+      operationId: calculateAspectRatio
+      tags: [Image]
+      summary: Aspect ratio calculator
+      description: Work out the width or height that keeps an aspect ratio, and the simplified ratio (1920x1080 is 16:9). Send newWidth or newHeight, not both; with neither, only the ratio comes back. This tool accepts a JSON body, not multipart.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [width, height]
+              properties:
+                width:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Original width
+                height:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Original height
+                newWidth:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: New width to solve the height from
+                newHeight:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: New height to solve the width from
+                round:
+                  type: boolean
+                  default: true
+                  description: Round the solved dimension to whole pixels (minimum 1); otherwise keep two decimals
+            example:
+              width: 1920
+              height: 1080
+              newWidth: 1280
+              round: true
+      responses:
+        "200":
+          description: Solved dimensions and simplified ratio
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [width, height, ratio, ratioDecimal, newWidth, newHeight]
+                properties:
+                  width:
+                    type: number
+                  height:
+                    type: number
+                  ratio:
+                    type: string
+                    description: Simplified ratio, such as 16:9
+                  ratioDecimal:
+                    type: number
+                    description: Width divided by height, to four decimals
+                  newWidth:
+                    type: [number, "null"]
+                  newHeight:
+                    type: [number, "null"]
+              example:
+                width: 1920
+                height: 1080
+                ratio: "16:9"
+                ratioDecimal: 1.7778
+                newWidth: 1280
+                newHeight: 720
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
   /api/v1/tools/image/circle-crop:
     post:
       operationId: circleCrop
