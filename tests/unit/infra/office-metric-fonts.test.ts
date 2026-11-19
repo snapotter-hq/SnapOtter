@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const dockerfile = readFileSync(resolve(process.cwd(), "docker/Dockerfile"), "utf8");
+const aptosConfPath = "docker/fontconfig/35-snapotter-aptos.conf";
 
 function runtimeAptBlock(): string {
   const start = dockerfile.indexOf("libreoffice-calc libreoffice-impress libreoffice-writer");
@@ -35,5 +36,35 @@ describe("office metric-compatible fonts (#4834)", () => {
 
   it("never bundles Microsoft's own fonts", () => {
     expect(dockerfile).not.toMatch(/ttf-mscorefonts|fonts-microsoft|mscorefonts/i);
+    expect(dockerfile).not.toMatch(/aptos[^\s]*\.(ttf|otf)/i);
+  });
+});
+
+// Aptos replaced Calibri as Office's default in 2024 and has no free clone, so
+// without an alias it lands on DejaVu Sans like Calibri used to. Carlito is the
+// closest free sans already in the image (#4879). The theme pairs Aptos body
+// text with Aptos Display headings, so both need the alias.
+describe("Aptos stand-in (#4879)", () => {
+  const conf = readFileSync(resolve(process.cwd(), aptosConfPath), "utf8");
+
+  it.each(["Aptos", "Aptos Display"])("aliases %s to Carlito", (family) => {
+    const alias = conf
+      .split("<alias")
+      .slice(1)
+      .find((block) => block.includes(`<family>${family}</family>`));
+    expect(alias, `${family} should have an alias`).toBeDefined();
+    expect(alias).toMatch(/<accept>\s*<family>Carlito<\/family>\s*<\/accept>/);
+  });
+
+  it("installs the alias into fontconfig before the guarded apt layer", () => {
+    const copy = dockerfile.indexOf(`COPY ${aptosConfPath} /etc/fonts/conf.d/`);
+    expect(copy, "Dockerfile should copy the Aptos alias into conf.d").toBeGreaterThan(0);
+    expect(copy).toBeLessThan(dockerfile.indexOf("fc-match Calibri"));
+  });
+
+  it("fails the build when Aptos stops resolving to Carlito", () => {
+    const block = runtimeAptBlock();
+    expect(block).toContain("fc-match Aptos | grep -q Carlito");
+    expect(block).toContain('fc-match "Aptos Display" | grep -q Carlito');
   });
 });
