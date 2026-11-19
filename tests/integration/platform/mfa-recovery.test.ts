@@ -29,6 +29,19 @@ async function countAudit(action: string): Promise<number> {
   return rows.length;
 }
 
+// New installs have no password rules, so a weak-password case needs one set.
+async function withMinPasswordLength<T>(minLength: number, fn: () => Promise<T>): Promise<T> {
+  await db
+    .insert(schema.settings)
+    .values({ key: "passwordMinLength", value: String(minLength) })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value: String(minLength) } });
+  try {
+    return await fn();
+  } finally {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "passwordMinLength"));
+  }
+}
+
 describe("resetMfaPolicy", () => {
   it("sets mfaPolicy to optional even when it was required", async () => {
     await db
@@ -446,7 +459,7 @@ describe("resetUserPassword (#812)", () => {
     });
     const beforeAudit = await countAudit("PASSWORD_RESET");
 
-    const result = await resetUserPassword(username, "short");
+    const result = await withMinPasswordLength(12, () => resetUserPassword(username, "short"));
 
     expect(result.status).toBe("weak-password");
     const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id));
@@ -549,7 +562,7 @@ describe("createAdminUser (#812)", () => {
 
   it("returns weak-password when an explicit password violates the policy", async () => {
     const username = `weak_admin_${Date.now()}`;
-    const result = await createAdminUser(username, "weak");
+    const result = await withMinPasswordLength(12, () => createAdminUser(username, "weak"));
     expect(result.status).toBe("weak-password");
 
     const [row] = await db.select().from(schema.users).where(eq(schema.users.username, username));
