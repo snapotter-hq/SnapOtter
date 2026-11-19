@@ -75,6 +75,10 @@ Tools with cross-bundle dependencies:
 
 A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
 
+### Downloading through a mirror {#downloading-through-a-mirror}
+
+Bundle archives and the accurate OCR runtime download from huggingface.co. Where that host is blocked or slow, set `HF_ENDPOINT` on the app container to a Hugging Face mirror, for example `HF_ENDPOINT=https://hf-mirror.com`. Every bundle download and the OCR runtime use it, including the fallback downloader and the manual-download link in an install error. Use an `https` URL without credentials; the OCR runtime install refuses anything else. Integrity doesn't depend on the mirror: each bundle archive is checked against its SHA-256 and the OCR runtime index is signed, so a mirror that serves altered files fails the install. If the server reaches the internet through a proxy instead, see [Outbound proxy and private CA](/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Installing every bundle at once {#installing-every-bundle-at-once}
 
 Settings, AI Features has an **Install All** button that queues every bundle the host can run. It skips anything already installed, skips bundles reported incompatible with the host, and retries a failed bundle once before moving on. For a normal instance that button is the whole answer, and nothing below is needed.

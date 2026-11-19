@@ -516,6 +516,8 @@ services:
 
 Keep the proxy credentials outside the Compose file (for example in a protected `.env` file or secret). Do not disable TLS verification: the signed OCR index authenticates release metadata, while normal TLS validation still protects transport and every other outbound request.
 
+If huggingface.co itself is blocked or throttled rather than needing a proxy, point AI downloads at a Hugging Face mirror with `HF_ENDPOINT` (for example `HF_ENDPOINT: https://hf-mirror.com`). See [Downloading through a mirror](/api/ai#downloading-through-a-mirror).
+
 ## Health Check {#health-check}
 
 The container includes a built-in health check:

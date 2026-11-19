@@ -195,6 +195,7 @@ export class OcrRuntimeUnreachableError extends SafeError {
     super(
       "SnapOtter could not reach huggingface.co to download the accurate OCR runtime. " +
         "Check that the server has outbound HTTPS access, set HTTPS_PROXY if it must use a proxy, " +
+        "set HF_ENDPOINT to a Hugging Face mirror if huggingface.co is blocked, " +
         "or install the runtime offline by importing the OCR bundle archive.",
       { kind: "operational", code: "OCR_RUNTIME_UNREACHABLE", statusCode: 502, cause },
     );
@@ -538,13 +539,40 @@ function releaseUrl(bundleRepo: string, version: string, relativePath: string): 
     .split("/")
     .map((component) => encodeURIComponent(component))
     .join("/");
-  return `https://huggingface.co/${bundleRepo}/resolve/main/v${encodeURIComponent(version)}/v3/${path}`;
+  return `${huggingFaceEndpoint().href}/${bundleRepo}/resolve/main/v${encodeURIComponent(version)}/v3/${path}`;
+}
+
+/**
+ * HF_ENDPOINT points every Hugging Face download at a mirror, the same
+ * variable huggingface_hub and the bundle installer read (#4843). The mirror is
+ * trusted like huggingface.co itself: the signed index and the per-archive
+ * SHA-256 are the integrity guarantee, not the host.
+ */
+function huggingFaceEndpoint(): { href: string; host: string } {
+  const raw = process.env.HF_ENDPOINT?.trim();
+  if (!raw) return { href: "https://huggingface.co", host: "huggingface.co" };
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("HF_ENDPOINT must be an https URL such as https://hf-mirror.com");
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("HF_ENDPOINT must be an https URL without credentials");
+  }
+  return {
+    href: `${url.origin}${url.pathname}`.replace(/\/+$/, ""),
+    host: url.hostname.toLowerCase(),
+  };
 }
 
 function assertTrustedDownloadUrl(value: string): URL {
   const url = new URL(value);
   const host = url.hostname.toLowerCase();
+  const mirrorHost = huggingFaceEndpoint().host;
   const trustedHost =
+    host === mirrorHost ||
+    host.endsWith(`.${mirrorHost}`) ||
     host === "huggingface.co" ||
     host.endsWith(".huggingface.co") ||
     host === "hf.co" ||

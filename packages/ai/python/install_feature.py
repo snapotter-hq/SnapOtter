@@ -29,6 +29,7 @@ import sys
 import tarfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -852,6 +853,13 @@ def _retry_or_raise(err, attempt, max_retries, bytes_downloaded, meta_path,
         raise RuntimeError(f"Failed to download after {max_retries} attempts: {err}")
 
 
+def hf_endpoint() -> str:
+    """Base URL for Hugging Face downloads, read the way huggingface_hub reads
+    it, so a mirror set in HF_ENDPOINT covers the sequential fallback and the
+    manual hint as well as the accelerated client (#4843)."""
+    return (os.environ.get("HF_ENDPOINT", "").strip() or "https://huggingface.co").rstrip("/")
+
+
 def download_and_verify(
     bundle_repo: str,
     archive_file: str,
@@ -871,10 +879,14 @@ def download_and_verify(
     (When the accelerated client was unavailable, the first attempt was
     already sequential and the retry is simply a fresh download.)
     """
-    url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
+    url = f"{hf_endpoint()}/{bundle_repo}/resolve/main/{archive_file}"
+    # The hint lands in the install error the admin UI shows and the logs keep,
+    # so a mirror's user:password never goes into it.
+    parts = urllib.parse.urlsplit(url)
+    display_url = parts._replace(netloc=parts.netloc.rpartition("@")[2]).geturl()
     manual_hint = (
         f"You can download the bundle manually from:\n"
-        f"  {url}\n"
+        f"  {display_url}\n"
         f"Then upload it via Settings > AI Features > Offline Import."
     )
 
