@@ -7,8 +7,9 @@
 // build time (the deploy workflow passes it), so forks and PR previews carry
 // nothing; the Playwright harness passes a placeholder key aimed at an
 // unroutable host so tests/e2e-landing/analytics-snippet.spec.ts can check
-// the emitted pages. CTA clicks arrive through autocapture; name them as
-// PostHog Actions, no code needed.
+// the emitted pages. Primary CTAs also send a named landing_cta_clicked event
+// (lib/cta-tracking.ts, keyed on data-cta attributes), because autocapture
+// can't tell the hero install path from the navbar's.
 //
 // This is a STANDALONE acquisition funnel: a self-hosted app instance mints its
 // own anonymous id, so landing -> app cannot be joined; correlate landing
