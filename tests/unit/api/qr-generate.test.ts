@@ -166,3 +166,69 @@ describe("qr-generate route (#3604)", () => {
     }
   });
 });
+
+describe("qr-generate capacity per error-correction level (#4402)", () => {
+  beforeEach(() => {
+    putObject.mockReset();
+    putObject.mockResolvedValue(undefined);
+  });
+
+  async function post(payload: Record<string, unknown>) {
+    const app = await buildApp();
+    try {
+      return await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/qr-generate",
+        payload,
+      });
+    } finally {
+      await app.close();
+    }
+  }
+
+  it("accepts byte-mode text at exactly the level H capacity", async () => {
+    const res = await post({ text: "a".repeat(1273), errorCorrection: "H" });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each([
+    ["L", 2953],
+    ["M", 2331],
+    ["Q", 1663],
+    ["H", 1273],
+  ] as const)(
+    "returns 400 naming the %s limit when byte-mode text overflows it",
+    async (level, limit) => {
+      // Level L and M overflow only past the 2000-character cap, so use 2-byte characters there.
+      const text = limit < 2000 ? "a".repeat(limit + 1) : "é".repeat(Math.ceil((limit + 1) / 2));
+      const bytes = Buffer.byteLength(text, "utf8");
+      const res = await post({ text, errorCorrection: level });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({
+        error: "Invalid settings",
+        details: `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${limit} bytes. Shorten the text or choose a lower error correction level.`,
+      });
+      expect(putObject).not.toHaveBeenCalled();
+    },
+  );
+
+  it("names level H when a logo forces it, even if a lower level was requested", async () => {
+    const res = await post({
+      text: "a".repeat(1274),
+      errorCorrection: "L",
+      logoDataUri:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().details).toBe(
+      "text: 1274 bytes is too long for error correction level H, which holds at most 1273 bytes. A logo always uses level H. Shorten the text or remove the logo.",
+    );
+  });
+
+  it("still accepts numeric text longer than the byte-mode limit, since numeric mode packs denser", async () => {
+    const res = await post({ text: "1".repeat(2000), errorCorrection: "H" });
+    expect(res.statusCode).toBe(200);
+  });
+});

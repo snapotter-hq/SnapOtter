@@ -442,6 +442,27 @@ describe("QR Generate", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("returns 400 naming the level H byte limit when text overflows it (#4402)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/qr-generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        text: "a".repeat(1274),
+        errorCorrection: "H",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.error).toBe("Invalid settings");
+    expect(body.details).toContain("1274 bytes");
+    expect(body.details).toContain("at most 1273 bytes");
+  });
+
   it("generates QR code at large size (2000)", async () => {
     const res = await app.inject({
       method: "POST",
