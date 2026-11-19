@@ -25,7 +25,7 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
 });
 
 import {
-  CPU_LACKS_AVX_MESSAGE,
+  CPU_UNSUPPORTED_MESSAGE,
   GPU_OUT_OF_MEMORY_MESSAGE,
   toSidecarError,
 } from "../../../packages/ai/src/bridge.js";
@@ -101,10 +101,23 @@ describe("toSidecarError", () => {
       "FATAL ERROR: This binary was compiled with avx enabled, but this feature is not available on this processor (go/sigill-fail-fast).",
       "Photo restoration failed",
     ) as SafeError;
-    expect(err.message).toBe(CPU_LACKS_AVX_MESSAGE);
+    expect(err.message).toBe(CPU_UNSUPPORTED_MESSAGE);
     expect(err.kind).toBe("operational");
     expect(err.code).toBe("cpu-no-avx");
   });
+
+  it.each(["aes", "pclmul"])(
+    "treats the same abort for a missing %s instruction set as a host fault (NODE-AC)",
+    (feature) => {
+      const err = toSidecarError(
+        `[gpu] CUDA available via ONNX Runtime: NVIDIA GeForce RTX 3060 FATAL ERROR: This binary was compiled with ${feature} enabled, but this feature is not available on this processor (go/sigill-fail-fast).`,
+        "Face enhancement failed",
+      ) as SafeError;
+      expect(err.message).toBe(CPU_UNSUPPORTED_MESSAGE);
+      expect(err.kind).toBe("operational");
+      expect(err.code).toBe("cpu-no-avx");
+    },
+  );
 
   it("turns Pillow's decompression-bomb refusal into the same input error sharp's pixel limit gives (NODE-AR)", () => {
     const err = toSidecarError(

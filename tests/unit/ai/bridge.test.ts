@@ -759,7 +759,7 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
       kind?: string;
       code?: string;
     };
-    expect(err.message).toMatch(/doesn't support the AVX instructions/);
+    expect(err.message).toMatch(/doesn't support instructions the AI libraries need/);
     expect(err.kind).toBe("operational");
     expect(err.code).toBe("cpu-no-avx");
   });
@@ -781,7 +781,7 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
       kind?: string;
       code?: string;
     };
-    expect(err.message).toMatch(/doesn't support the AVX instructions/);
+    expect(err.message).toMatch(/doesn't support instructions the AI libraries need/);
     expect(err.kind).toBe("operational");
     expect(err.code).toBe("cpu-no-avx");
   });
