@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 1b4c50f7fe2d
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 7cae3ce7d025
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `merge-csvs` | CSVs zusammenführen | - (Mehrfachdatei, übereinstimmende Spalten) |
 | `yaml-json` | YAML / JSON | - (bidirektional) |
 | `xml-to-csv` | XML zu CSV | - (findet automatisch sich wiederholende Elemente) |
+| `convert-font` | Schrift konvertieren | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel zu CSV | dediziertes Konvertierungs-Preset, gestützt auf `convert-spreadsheet` |
 | `create-zip` | ZIP erstellen | - (Mehrfachdatei, 2-50 Dateien) |
 | `extract-zip` | ZIP extrahieren | - (Bomben-geschützt) |

@@ -5831,6 +5831,8 @@ export const es: TranslationKeys = {
         "Esta animación tiene demasiados píxeles entre todos sus fotogramas. Usa menos fotogramas o un tamaño menor.",
       MEDIA_UNDECODABLE:
         "No se puede leer este archivo. Puede que esté dañado, no tenga pista de audio ni de vídeo o use un formato que esta herramienta no admite.",
+      FONT_UNSUPPORTED:
+        "Esta fuente no se puede convertir. Puede estar dañada, ser demasiado grande, ser una colección de fuentes (.ttc) o una fuente variable que este formato no admite.",
     },
     generic: "Ocurrió un error",
     offline: "Estás sin conexión",

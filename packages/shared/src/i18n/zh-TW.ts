@@ -5475,6 +5475,8 @@ export const zhTW: TranslationKeys = {
       TOO_MANY_PIXELS: "此動畫所有影格的像素總數過多。請使用較少的影格或較小的尺寸。",
       MEDIA_UNDECODABLE:
         "無法讀取此檔案。檔案可能已損壞、沒有音訊或視訊串流，或使用了此工具不支援的格式。",
+      FONT_UNSUPPORTED:
+        "無法轉換此字型。它可能已損毀、過大、是字型集合（.ttc），或是此格式不支援的可變字型。",
     },
     generic: "發生錯誤",
     offline: "您已離線",

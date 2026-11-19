@@ -5809,6 +5809,8 @@ export const id: TranslationKeys = {
         "Animasi ini memiliki terlalu banyak piksel di seluruh frame-nya. Gunakan lebih sedikit frame atau ukuran yang lebih kecil.",
       MEDIA_UNDECODABLE:
         "File ini tidak dapat dibaca. File mungkin rusak, tidak memiliki aliran audio atau video, atau memakai format yang tidak didukung alat ini.",
+      FONT_UNSUPPORTED:
+        "Font ini tidak dapat dikonversi. Font mungkin rusak, terlalu besar, berupa koleksi font (.ttc), atau font variabel yang tidak didukung format ini.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",

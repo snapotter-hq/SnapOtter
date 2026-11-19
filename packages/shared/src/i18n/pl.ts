@@ -5835,6 +5835,8 @@ export const pl: TranslationKeys = {
         "Ta animacja ma zbyt wiele pikseli we wszystkich klatkach. Użyj mniej klatek lub mniejszego rozmiaru.",
       MEDIA_UNDECODABLE:
         "Nie można odczytać tego pliku. Może być uszkodzony, nie mieć strumienia audio ani wideo lub używać formatu, którego to narzędzie nie obsługuje.",
+      FONT_UNSUPPORTED:
+        "Nie można przekonwertować tej czcionki. Może być uszkodzona, zbyt duża, być kolekcją czcionek (.ttc) lub czcionką zmienną, której ten format nie obsługuje.",
     },
     generic: "Wystąpił błąd",
     offline: "Jesteś offline",

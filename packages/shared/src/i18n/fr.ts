@@ -5858,6 +5858,8 @@ export const fr: TranslationKeys = {
         "Cette animation compte trop de pixels sur l'ensemble de ses images. Utilisez moins d'images ou une taille plus petite.",
       MEDIA_UNDECODABLE:
         "Impossible de lire ce fichier. Il est peut-être endommagé, sans flux audio ou vidéo, ou dans un format que cet outil ne prend pas en charge.",
+      FONT_UNSUPPORTED:
+        "Cette police ne peut pas être convertie. Elle est peut-être endommagée, trop volumineuse, une collection de polices (.ttc) ou une police variable que ce format ne prend pas en charge.",
     },
     generic: "Une erreur est survenue",
     offline: "Vous êtes hors ligne",

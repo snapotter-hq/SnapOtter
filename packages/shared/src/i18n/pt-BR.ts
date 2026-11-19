@@ -5834,6 +5834,8 @@ export const ptBR: TranslationKeys = {
         "Esta animação tem pixels demais somando todos os quadros. Use menos quadros ou um tamanho menor.",
       MEDIA_UNDECODABLE:
         "Não foi possível ler este arquivo. Ele pode estar danificado, não ter faixa de áudio ou vídeo ou usar um formato que esta ferramenta não suporta.",
+      FONT_UNSUPPORTED:
+        "Esta fonte não pode ser convertida. Ela pode estar danificada, ser grande demais, ser uma coleção de fontes (.ttc) ou uma fonte variável que este formato não suporta.",
     },
     generic: "Ocorreu um erro",
     offline: "Você está offline",

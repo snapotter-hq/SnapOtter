@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 1842790d29ca
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 6759a474a7d1
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `merge-csvs` | CSV 병합 | - (다중 파일, 일치하는 열) |
 | `yaml-json` | YAML / JSON | - (양방향) |
 | `xml-to-csv` | XML을 CSV로 | - (반복 요소 자동 탐지) |
+| `convert-font` | 글꼴 변환 | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel을 CSV로 | `convert-spreadsheet`로 지원되는 전용 변환 프리셋 |
 | `create-zip` | ZIP 생성 | - (다중 파일, 2-50개 파일) |
 | `extract-zip` | ZIP 추출 | - (봄 보호) |

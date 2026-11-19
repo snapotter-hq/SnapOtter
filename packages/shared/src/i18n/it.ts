@@ -5834,6 +5834,8 @@ export const it: TranslationKeys = {
         "Questa animazione ha troppi pixel nell'insieme dei suoi fotogrammi. Usa meno fotogrammi o una dimensione più piccola.",
       MEDIA_UNDECODABLE:
         "Impossibile leggere questo file. Potrebbe essere danneggiato, non avere tracce audio o video o usare un formato che questo strumento non supporta.",
+      FONT_UNSUPPORTED:
+        "Questo font non può essere convertito. Potrebbe essere danneggiato, troppo grande, una raccolta di font (.ttc) o un font variabile che questo formato non supporta.",
     },
     generic: "Si è verificato un errore",
     offline: "Sei offline",

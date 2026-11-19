@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: eec37ee9258a
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 5faff88c6e61
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `merge-csvs` | CSV मर्ज करें | - (मल्टी-फ़ाइल, मेल खाते कॉलम) |
 | `yaml-json` | YAML / JSON | - (द्विदिशात्मक) |
 | `xml-to-csv` | XML से CSV | - (दोहराए जाने वाले तत्व स्वतः खोजता है) |
+| `convert-font` | फ़ॉन्ट कन्वर्ट | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel से CSV | `convert-spreadsheet` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
 | `create-zip` | ZIP बनाएँ | - (मल्टी-फ़ाइल, 2-50 फ़ाइलें) |
 | `extract-zip` | ZIP निकालें | - (bomb-संरक्षित) |

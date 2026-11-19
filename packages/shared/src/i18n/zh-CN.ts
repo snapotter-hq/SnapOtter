@@ -5474,6 +5474,8 @@ export const zhCN: TranslationKeys = {
       TOO_MANY_PIXELS: "此动画所有帧的像素总数过多。请使用更少的帧或更小的尺寸。",
       MEDIA_UNDECODABLE:
         "无法读取此文件。文件可能已损坏、没有音频或视频流，或使用了此工具不支持的格式。",
+      FONT_UNSUPPORTED:
+        "无法转换此字体。它可能已损坏、过大、是字体集合（.ttc），或是此格式不支持的可变字体。",
     },
     generic: "发生错误",
     offline: "您已离线",

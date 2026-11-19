@@ -5837,6 +5837,8 @@ export const nl: TranslationKeys = {
         "Deze animatie heeft over al haar frames te veel pixels. Gebruik minder frames of een kleiner formaat.",
       MEDIA_UNDECODABLE:
         "Dit bestand kan niet worden gelezen. Het is mogelijk beschadigd, heeft geen audio- of videostream of gebruikt een formaat dat deze tool niet ondersteunt.",
+      FONT_UNSUPPORTED:
+        "Dit lettertype kan niet worden geconverteerd. Het is mogelijk beschadigd, te groot, een lettertypeverzameling (.ttc) of een variabel lettertype dat dit formaat niet ondersteunt.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",

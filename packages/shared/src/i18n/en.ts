@@ -5727,6 +5727,8 @@ export const en = {
         "This animation has too many pixels across its frames. Use fewer frames or a smaller size.",
       MEDIA_UNDECODABLE:
         "This file can't be read. It may be damaged, have no audio or video stream, or use a format this tool doesn't support.",
+      FONT_UNSUPPORTED:
+        "This font can't be converted. It may be damaged, too large, a font collection (.ttc), or a variable font this format can't hold.",
     },
     generic: "An error occurred",
     offline: "You're offline",

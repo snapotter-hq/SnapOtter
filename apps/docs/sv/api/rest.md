@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 1ecedfc5e98c
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 049c53123332
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `merge-csvs` | Slå ihop CSV:er | - (flerfil, matchande kolumner) |
 | `yaml-json` | YAML / JSON | - (dubbelriktad) |
 | `xml-to-csv` | XML till CSV | - (hittar automatiskt upprepade element) |
+| `convert-font` | Konvertera typsnitt | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel till CSV | dedikerad konverteringsförinställning som backas upp av `convert-spreadsheet` |
 | `create-zip` | Skapa ZIP | - (flerfil, 2-50 filer) |
 | `extract-zip` | Extrahera ZIP | - (bombskyddad) |

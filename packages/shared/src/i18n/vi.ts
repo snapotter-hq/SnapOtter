@@ -5790,6 +5790,8 @@ export const vi: TranslationKeys = {
         "Ảnh động này có quá nhiều điểm ảnh trên tất cả các khung hình. Hãy dùng ít khung hình hơn hoặc kích thước nhỏ hơn.",
       MEDIA_UNDECODABLE:
         "Không thể đọc tệp này. Tệp có thể bị hỏng, không có luồng âm thanh hoặc video, hoặc dùng định dạng mà công cụ này không hỗ trợ.",
+      FONT_UNSUPPORTED:
+        "Không thể chuyển đổi phông chữ này. Phông chữ có thể bị hỏng, quá lớn, là bộ sưu tập phông chữ (.ttc) hoặc phông chữ biến thiên mà định dạng này không hỗ trợ.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",

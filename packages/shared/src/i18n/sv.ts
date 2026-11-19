@@ -5809,6 +5809,8 @@ export const sv: TranslationKeys = {
         "Animeringen har för många pixlar sammanlagt över sina bildrutor. Använd färre bildrutor eller en mindre storlek.",
       MEDIA_UNDECODABLE:
         "Filen kan inte läsas. Den kan vara skadad, sakna ljud- eller videoström eller använda ett format som det här verktyget inte stöder.",
+      FONT_UNSUPPORTED:
+        "Det här typsnittet kan inte konverteras. Det kan vara skadat, för stort, en typsnittssamling (.ttc) eller ett variabelt typsnitt som det här formatet inte stöder.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",

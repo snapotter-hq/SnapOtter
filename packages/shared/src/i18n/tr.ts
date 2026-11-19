@@ -5813,6 +5813,8 @@ export const tr: TranslationKeys = {
         "Bu animasyonun tüm karelerindeki toplam piksel sayısı çok fazla. Daha az kare veya daha küçük bir boyut kullanın.",
       MEDIA_UNDECODABLE:
         "Bu dosya okunamıyor. Dosya bozuk olabilir, ses veya video akışı içermiyor olabilir ya da bu aracın desteklemediği bir biçimde olabilir.",
+      FONT_UNSUPPORTED:
+        "Bu yazı tipi dönüştürülemiyor. Hasarlı, çok büyük, bir yazı tipi koleksiyonu (.ttc) ya da bu biçimin desteklemediği bir değişken yazı tipi olabilir.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",

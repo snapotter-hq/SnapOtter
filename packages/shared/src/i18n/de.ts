@@ -5874,6 +5874,8 @@ export const de: TranslationKeys = {
         "Diese Animation hat über alle Frames hinweg zu viele Pixel. Verwende weniger Frames oder eine kleinere Größe.",
       MEDIA_UNDECODABLE:
         "Diese Datei kann nicht gelesen werden. Sie ist möglicherweise beschädigt, hat keine Audio- oder Videospur oder nutzt ein Format, das dieses Werkzeug nicht unterstützt.",
+      FONT_UNSUPPORTED:
+        "Diese Schrift kann nicht konvertiert werden. Sie ist möglicherweise beschädigt, zu groß, eine Schriftsammlung (.ttc) oder eine variable Schrift, die dieses Format nicht unterstützt.",
     },
     generic: "Ein Fehler ist aufgetreten",
     offline: "Sie sind offline",
