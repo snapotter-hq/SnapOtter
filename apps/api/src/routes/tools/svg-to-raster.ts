@@ -49,6 +49,9 @@ function matchesAccept(filename: string, accept: string[]): boolean {
   return accept.some((ext) => lower.endsWith(ext.toLowerCase()));
 }
 
+const TRANSPARENT_BACKGROUND = "#00000000";
+const FORMATS_WITHOUT_ALPHA = new Set(["jpg"]);
+
 const settingsSchema = z.object({
   width: z.number().min(1).max(65536).optional(),
   height: z.number().min(1).max(65536).optional(),
@@ -57,7 +60,7 @@ const settingsSchema = z.object({
   backgroundColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6,8}$/)
-    .default("#00000000"),
+    .default(TRANSPARENT_BACKGROUND),
   outputFormat: z.enum(["png", "jpg", "webp", "avif", "tiff", "gif", "heif", "jxl"]).default("png"),
 });
 
@@ -78,11 +81,15 @@ async function convertSvg(
     image = image.resize(settings.width, settings.height, { fit: "inside" });
   }
 
-  if (settings.backgroundColor !== "#00000000") {
+  if (settings.backgroundColor !== TRANSPARENT_BACKGROUND) {
     const bgR = parseInt(settings.backgroundColor.slice(1, 3), 16);
     const bgG = parseInt(settings.backgroundColor.slice(3, 5), 16);
     const bgB = parseInt(settings.backgroundColor.slice(5, 7), 16);
     image = image.flatten({ background: { r: bgR, g: bgG, b: bgB } });
+  } else if (FORMATS_WITHOUT_ALPHA.has(settings.outputFormat)) {
+    // Encoding a transparent render without flattening drops alpha and leaves
+    // the transparent pixels black, hiding dark artwork entirely (#4420).
+    image = image.flatten({ background: { r: 255, g: 255, b: 255 } });
   }
 
   let buffer: Buffer;
