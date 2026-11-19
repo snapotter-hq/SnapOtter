@@ -55,9 +55,8 @@ test.describe("Remove Background tool", () => {
     await expect(page.getByText("HD")).toBeVisible();
     await expect(page.getByText("Max")).toBeVisible();
 
-    // Passport checkbox visible and checked by default
-    const passportCheckbox = page.locator("input[type='checkbox']").first();
-    await expect(passportCheckbox).toBeChecked();
+    // General is the default subject (#4841), so the Passport checkbox starts hidden
+    await expect(page.getByText("Passport / ID photo")).not.toBeVisible();
 
     // Background type buttons
     await expect(page.getByText("Transparent")).toBeVisible();
@@ -69,12 +68,14 @@ test.describe("Remove Background tool", () => {
     await expect(page.getByText("Effects")).toBeVisible();
   });
 
-  test("passport checkbox defaults ON for people, OFF for other subjects", async ({
+  test("passport checkbox turns ON when People is selected, hidden for other subjects", async ({
     loggedInPage: page,
   }) => {
     await skipIfFeatureNotInstalled(page);
 
-    const passportCheckbox = page.locator("input[type='checkbox']").first();
+    await expect(page.getByText("Passport / ID photo")).not.toBeVisible();
+    await page.getByText("People").click();
+    const passportCheckbox = page.getByLabel("Passport / ID photo");
     await expect(passportCheckbox).toBeChecked();
 
     await page.getByText("Products").click();
@@ -125,7 +126,9 @@ test.describe("Remove Background tool", () => {
   test("Ultra quality visible for People, hidden for Products", async ({ loggedInPage: page }) => {
     await skipIfFeatureNotInstalled(page);
 
-    // People is default - Ultra should be visible
+    // General is the default (#4841) - Ultra starts hidden, People shows it
+    await expect(page.getByRole("button", { name: "Ultra" })).not.toBeVisible();
+    await page.getByText("People").click();
     await expect(page.getByRole("button", { name: "Ultra" })).toBeVisible();
 
     // Switch to Products - Ultra should disappear
@@ -141,9 +144,10 @@ test.describe("Remove Background tool", () => {
     await skipIfFeatureNotInstalled(page);
     await uploadFile(page, fixturePath("test-portrait.jpg"));
 
-    // Select Ultra quality (unchecks Passport / ID photo so birefnet-hr-matting runs)
+    // Select People, then Ultra (unchecks Passport / ID photo so birefnet-hr-matting runs)
+    await page.getByText("People").click();
     await page.getByRole("button", { name: "Ultra" }).click();
-    await expect(page.locator("input[type='checkbox']").first()).not.toBeChecked();
+    await expect(page.getByLabel("Passport / ID photo")).not.toBeChecked();
 
     await removeBgAndWait(page);
     await expect(page.locator("section[aria-label='Image area'] img").first()).toBeVisible();

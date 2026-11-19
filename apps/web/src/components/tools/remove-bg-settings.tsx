@@ -43,6 +43,10 @@ const MODEL_MAP: Record<SubjectType, Partial<Record<Quality, BgModel>>> = {
   general: { fast: "u2net", balanced: "birefnet-general-lite", best: "birefnet-general" },
 };
 
+// Matches the API's own default in remove_bg.py. birefnet-portrait is only for
+// headshots: it erases logos, text and graphics entirely (#4841).
+const DEFAULT_MODEL: BgModel = "birefnet-general-lite";
+
 const SUBJECT_OPTIONS: { value: SubjectType; icon: typeof User }[] = [
   { value: "people", icon: User },
   { value: "products", icon: Package },
@@ -174,8 +178,10 @@ function seedModelState(model: unknown): {
       return { subject: "general", quality: "balanced", isPassport: false };
     case "birefnet-general":
       return { subject: "general", quality: "best", isPassport: false };
-    default:
+    case "birefnet-portrait":
       return { subject: "people", quality: "balanced", isPassport: true };
+    default:
+      return { subject: "general", quality: "balanced", isPassport: false };
   }
 }
 
@@ -473,7 +479,7 @@ export function RemoveBgControls({
         })}
       </div>
 
-      {/* Passport checkbox - only for people, default ON */}
+      {/* Passport checkbox - only for people */}
       {subject === "people" && (
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -1143,13 +1149,13 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const activeRemovalRefine =
     removalRefine && removalRefine.file === (files[0] ?? null) ? removalRefine : null;
   const ranWith = activeRemovalRefine ?? {
-    model: "birefnet-portrait",
+    model: DEFAULT_MODEL,
     edgeRefine: 0,
     decontaminate: false,
   };
   const refineChanged =
     bgRemoved &&
-    (String(settings.model ?? "birefnet-portrait") !== ranWith.model ||
+    (String(settings.model ?? DEFAULT_MODEL) !== ranWith.model ||
       Number(settings.edgeRefine ?? 0) !== ranWith.edgeRefine ||
       Boolean(settings.decontaminate) !== ranWith.decontaminate);
 
@@ -1269,7 +1275,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     runFileRef.current = files[0] ?? null;
     setRemovalRefine({
       file: files[0] ?? null,
-      model: String(settings.model ?? "birefnet-portrait"),
+      model: String(settings.model ?? DEFAULT_MODEL),
       edgeRefine: Number(settings.edgeRefine ?? 0),
       decontaminate: Boolean(settings.decontaminate),
     });
