@@ -147,6 +147,11 @@ jobs:
     runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    env:
+      # Node sizes its default heap from the cgroup memory limit, and the fleet
+      # runners are capped (#4965), which left tsc about 1.5 GB and an OOM.
+      # 4 GB is what an uncapped 16 GB hosted runner gives it by default.
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
