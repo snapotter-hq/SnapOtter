@@ -638,7 +638,9 @@ describe("runRecoveryCli for reset-password, create-admin, and unlock-user (#812
     try {
       expect(await runRecoveryCli(["reset-password"])).toBe(1);
       expect(await runRecoveryCli(["reset-password", "no-such-user"])).toBe(1);
-      expect(await runRecoveryCli(["reset-password", username, "weak"])).toBe(1);
+      expect(
+        await withMinPasswordLength(12, () => runRecoveryCli(["reset-password", username, "weak"])),
+      ).toBe(1);
       expect(await runRecoveryCli(["reset-password", username, "NewValidPass1"])).toBe(0);
       expect(await runRecoveryCli(["reset-password", username])).toBe(0);
     } finally {
@@ -653,7 +655,9 @@ describe("runRecoveryCli for reset-password, create-admin, and unlock-user (#812
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       expect(await runRecoveryCli(["create-admin", "ab"])).toBe(1);
-      expect(await runRecoveryCli(["create-admin", username, "weak"])).toBe(1);
+      expect(
+        await withMinPasswordLength(12, () => runRecoveryCli(["create-admin", username, "weak"])),
+      ).toBe(1);
       expect(await runRecoveryCli(["create-admin", username, "ValidPass1"])).toBe(0);
       expect(await runRecoveryCli(["create-admin", username, "ValidPass1"])).toBe(1);
     } finally {
