@@ -64,6 +64,20 @@ function readSitemap(): { locs: Set<string>; links: string[] } {
   return { locs, links };
 }
 
+/** The pages #4833 noindexes, derived from the source data rather than the build. */
+function expectedNoindex(): Set<string> {
+  const expected = new Set<string>();
+  for (const code of SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en")) {
+    expected.add(`/${code}/alternatives/`);
+    for (const alt of ALTERNATIVES) expected.add(`/${code}/alternatives/${alt.slug}/`);
+  }
+  for (const tool of TOOLS.filter((t) => t.id.includes("-to-"))) {
+    expected.add(`/tools/${toolSection(tool)}/${tool.id}/`);
+  }
+  for (const keep of INDEXED_KEEP_PATHS) expected.delete(keep);
+  return expected;
+}
+
 test.describe("landing index policy", () => {
   test("noindexes the localized alternatives copies and the converter tool pages", () => {
     const noindexed = new Set(
@@ -71,18 +85,7 @@ test.describe("landing index policy", () => {
         .filter((p) => p.noindex && p.pathname !== "/404/")
         .map((p) => p.pathname),
     );
-    const locales = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
-
-    const expected = new Set<string>();
-    for (const code of locales) {
-      expected.add(`/${code}/alternatives/`);
-      for (const alt of ALTERNATIVES) expected.add(`/${code}/alternatives/${alt.slug}/`);
-    }
-    for (const tool of TOOLS.filter((t) => t.id.includes("-to-"))) {
-      expected.add(`/tools/${toolSection(tool)}/${tool.id}/`);
-    }
-    for (const keep of INDEXED_KEEP_PATHS) expected.delete(keep);
-
+    const expected = expectedNoindex();
     expect([...noindexed].sort()).toEqual([...expected].sort());
     expect(noindexed.has("/de/alternatives/removebg/")).toBe(true);
     expect(noindexed.has("/tools/image/jpg-to-png/")).toBe(true);
@@ -109,13 +112,16 @@ test.describe("landing index policy", () => {
     const { locs } = readSitemap();
     const indexable = pages.filter((p) => !p.noindex).map((p) => p.pathname);
     expect([...locs].sort()).toEqual(indexable.sort());
+    const listed = [...expectedNoindex()].filter((p) => locs.has(p));
+    expect(listed, "noindexed pages must stay out of the sitemap").toEqual([]);
   });
 
   test("no hreflang alternate, in a page head or the sitemap, points at a noindexed page", () => {
     const pages = readPages();
-    const noindexed = new Set(pages.filter((p) => p.noindex).map((p) => p.pathname));
+    const noindexed = expectedNoindex();
+    for (const p of pages) if (p.noindex) noindexed.add(p.pathname);
     const offenders: string[] = [];
-    for (const page of pages.filter((p) => !p.noindex)) {
+    for (const page of pages.filter((p) => !noindexed.has(p.pathname))) {
       for (const target of page.alternates) {
         if (noindexed.has(target)) offenders.push(`${page.pathname} -> ${target}`);
       }
@@ -130,8 +136,9 @@ test.describe("landing index policy", () => {
   });
 
   test("noindexed pages advertise no hreflang set", () => {
+    const noindexed = expectedNoindex();
     const offenders = readPages()
-      .filter((p) => p.noindex && p.alternates.length > 0)
+      .filter((p) => (p.noindex || noindexed.has(p.pathname)) && p.alternates.length > 0)
       .map((p) => p.pathname);
     expect(offenders).toEqual([]);
   });
