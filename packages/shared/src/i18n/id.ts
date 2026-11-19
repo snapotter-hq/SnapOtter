@@ -5274,7 +5274,7 @@ export const id: TranslationKeys = {
       heading: "Tentang",
       appName: "SnapOtter",
       appDescription:
-        "Suite pemrosesan file self-hosted yang mengutamakan privasi dengan 200+ alat. Konversi, kompres, edit, transkrip, OCR, dan otomasi alur kerja gambar, video, audio, PDF, dan file tanpa mengirim data ke cloud.",
+        "Toolkit file open-source dengan 200+ alat. Konversi, kompres, edit, transkripsi, OCR, dan otomatisasi alur kerja gambar, video, audio, PDF, dan dokumen di server Anda sendiri, tanpa mengirim data ke cloud.",
       versionLabel: "Versi:",
       linksHeading: "Tautan",
       githubLink: "Repositori GitHub",

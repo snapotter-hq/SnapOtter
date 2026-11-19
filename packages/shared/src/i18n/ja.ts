@@ -5222,7 +5222,7 @@ export const ja: TranslationKeys = {
       heading: "SnapOtterについて",
       appName: "SnapOtter",
       appDescription:
-        "セルフホスト型、プライバシー第一のファイル処理スイート。200+のツールを搭載。変換、圧縮、編集、文字起こし、OCRなど、画像・動画・音声・PDF・ファイルのワークフローをクラウドにデータを送ることなく自動化できます。",
+        "200+ のツールを備えたオープンソースのファイルツールキット。画像、動画、音声、PDF、ドキュメントの変換、圧縮、編集、文字起こし、OCR、ワークフローの自動化を、データをクラウドに送ることなく、自分のサーバー上で実行できます。",
       versionLabel: "バージョン：",
       linksHeading: "リンク",
       githubLink: "GitHubリポジトリ",

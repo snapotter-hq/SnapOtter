@@ -131,7 +131,7 @@ function localizeSidebar(items: any[], locale: string): any[] {
 export default defineConfig({
   title: "SnapOtter",
   description:
-    "Documentation for SnapOtter - A Self-Hosted File Manipulation Suite. 200+ tools for image, video, audio, PDF, and file processing. Local AI, pipelines, REST API.",
+    "Documentation for SnapOtter, the open-source file toolkit. 200+ tools for image, video, audio, PDF, and file processing. Local AI, pipelines, REST API.",
   base: "/",
   appearance: { initialValue: "light" },
   srcDir: ".",

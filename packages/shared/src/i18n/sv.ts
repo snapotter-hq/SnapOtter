@@ -5272,7 +5272,7 @@ export const sv: TranslationKeys = {
       heading: "Om",
       appName: "SnapOtter",
       appDescription:
-        "En självhostad, integritetsfokuserad filbehandlingssvit med 200+ verktyg. Konvertera, komprimera, redigera, transkribera, OCR, och automatisera bild-, video-, ljud-, PDF- och filarbetsflöden utan att skicka data till molnet.",
+        "Verktygslåda för filer med öppen källkod och 200+ verktyg. Konvertera, komprimera, redigera, transkribera, OCR och automatisera arbetsflöden för bild, video, ljud, PDF och dokument på din egen server, utan att skicka data till molnet.",
       versionLabel: "Version:",
       linksHeading: "Länkar",
       githubLink: "GitHub-arkiv",

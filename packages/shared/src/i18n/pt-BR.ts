@@ -5290,7 +5290,7 @@ export const ptBR: TranslationKeys = {
       heading: "Sobre",
       appName: "SnapOtter",
       appDescription:
-        "Uma suite de processamento de arquivos auto-hospedada e focada em privacidade, com 200+ ferramentas. Converta, comprima, edite, transcreva, OCR, e automatize fluxos de trabalho de imagem, vídeo, áudio, PDF e arquivos sem enviar dados para a nuvem.",
+        "Kit de ferramentas de arquivos de código aberto, auto-hospedado, com 200+ ferramentas. Converta, comprima, edite, transcreva, aplique OCR e automatize fluxos de trabalho de imagem, vídeo, áudio, PDF e documentos no seu próprio servidor, sem enviar dados para a nuvem.",
       versionLabel: "Versão:",
       linksHeading: "Links",
       githubLink: "Repositório no GitHub",

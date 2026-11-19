@@ -235,7 +235,7 @@
   },
   "banner.localeRecall": {
     "sourceHash": "f14d32ca69c8",
-    "provenance": "machine",
+    "provenance": "human",
     "outputHash": "55928b89a2c8",
     "stale": false
   },
@@ -1068,9 +1068,9 @@
     "stale": false
   },
   "faq.metaDescription": {
-    "sourceHash": "bceab6cf5e55",
+    "sourceHash": "add750d716e9",
     "provenance": "machine",
-    "outputHash": "1b7717ca13f0",
+    "outputHash": "1dc58b346a29",
     "stale": false
   },
   "faq.metaTitle": {
@@ -1404,9 +1404,9 @@
     "stale": false
   },
   "footer.tagline": {
-    "sourceHash": "3b1e77c7b8b6",
+    "sourceHash": "2d54091a8276",
     "provenance": "machine",
-    "outputHash": "250b2e71b922",
+    "outputHash": "206948b81ea1",
     "stale": false
   },
   "home.categoryCards.audio.blurb": {
@@ -1475,16 +1475,10 @@
     "outputHash": "562594ac098f",
     "stale": false
   },
-  "home.enterprise.auditReadyFor": {
-    "sourceHash": "18a5d9e4c4bf",
-    "provenance": "machine",
-    "outputHash": "8d906e6fe009",
-    "stale": false
-  },
   "home.enterprise.badge": {
-    "sourceHash": "c198759070c0",
+    "sourceHash": "7b11bd08f4db",
     "provenance": "machine",
-    "outputHash": "f703ec462a3a",
+    "outputHash": "a4c0e1d5bc6d",
     "stale": false
   },
   "home.enterprise.bookDemo": {
@@ -1499,148 +1493,22 @@
     "outputHash": "059170275d79",
     "stale": false
   },
-  "home.enterprise.feature.audit.description": {
-    "sourceHash": "eea2c86f29fd",
+  "home.enterprise.learnMore": {
+    "sourceHash": "c75a66e47a00",
     "provenance": "machine",
-    "outputHash": "9786b331942a",
-    "stale": false
-  },
-  "home.enterprise.feature.audit.title": {
-    "sourceHash": "11d28f9ba789",
-    "provenance": "machine",
-    "outputHash": "0f900b60071f",
-    "stale": false
-  },
-  "home.enterprise.feature.mfa.description": {
-    "sourceHash": "11c83c6cfae0",
-    "provenance": "machine",
-    "outputHash": "90a3402cd1cf",
-    "stale": false
-  },
-  "home.enterprise.feature.mfa.title": {
-    "sourceHash": "544ab84b90a6",
-    "provenance": "machine",
-    "outputHash": "b95ed771d083",
-    "stale": false
-  },
-  "home.enterprise.feature.multiTenancy.description": {
-    "sourceHash": "1d2622fb7f39",
-    "provenance": "machine",
-    "outputHash": "2fc9dbe04f8f",
-    "stale": false
-  },
-  "home.enterprise.feature.multiTenancy.title": {
-    "sourceHash": "91d3baf4ccfb",
-    "provenance": "machine",
-    "outputHash": "9c658b3905a7",
-    "stale": false
-  },
-  "home.enterprise.feature.permissions.description": {
-    "sourceHash": "20360c3d7703",
-    "provenance": "machine",
-    "outputHash": "affdbd8384cf",
-    "stale": false
-  },
-  "home.enterprise.feature.permissions.title": {
-    "sourceHash": "1afe95754d62",
-    "provenance": "machine",
-    "outputHash": "2877b9e72a12",
-    "stale": false
-  },
-  "home.enterprise.feature.s3.description": {
-    "sourceHash": "3a6ee101e3b1",
-    "provenance": "machine",
-    "outputHash": "8692e4807a04",
-    "stale": false
-  },
-  "home.enterprise.feature.s3.title": {
-    "sourceHash": "b712a485c53a",
-    "provenance": "machine",
-    "outputHash": "36a2be7b56e5",
-    "stale": false
-  },
-  "home.enterprise.feature.scim.description": {
-    "sourceHash": "f80b514d4041",
-    "provenance": "machine",
-    "outputHash": "6abab54bc55f",
-    "stale": false
-  },
-  "home.enterprise.feature.scim.title": {
-    "sourceHash": "c922e3f64220",
-    "provenance": "machine",
-    "outputHash": "2c90485c8966",
-    "stale": false
-  },
-  "home.enterprise.feature.sso.description": {
-    "sourceHash": "2dc77e292a21",
-    "provenance": "machine",
-    "outputHash": "6933dcedd593",
-    "stale": false
-  },
-  "home.enterprise.feature.sso.title": {
-    "sourceHash": "405e739d53d2",
-    "provenance": "machine",
-    "outputHash": "405e739d53d2",
-    "stale": false
-  },
-  "home.enterprise.feature.webhooks.description": {
-    "sourceHash": "0b742b25b2b9",
-    "provenance": "machine",
-    "outputHash": "c087c8537e41",
-    "stale": false
-  },
-  "home.enterprise.feature.webhooks.title": {
-    "sourceHash": "45808d75bf89",
-    "provenance": "machine",
-    "outputHash": "45808d75bf89",
+    "outputHash": "9fb56363f346",
     "stale": false
   },
   "home.enterprise.subtitle": {
-    "sourceHash": "9c8cc4bb4c9c",
+    "sourceHash": "8553cafceab3",
     "provenance": "machine",
-    "outputHash": "3b5a2f0b7455",
-    "stale": false
-  },
-  "home.enterprise.tag.access": {
-    "sourceHash": "ec5ba0abb717",
-    "provenance": "machine",
-    "outputHash": "31a5292e71ef",
-    "stale": false
-  },
-  "home.enterprise.tag.compliance": {
-    "sourceHash": "4a109cc49467",
-    "provenance": "machine",
-    "outputHash": "0873cffc3b4f",
-    "stale": false
-  },
-  "home.enterprise.tag.identity": {
-    "sourceHash": "999f23fcd7be",
-    "provenance": "machine",
-    "outputHash": "e1d9222fd0b4",
-    "stale": false
-  },
-  "home.enterprise.tag.infrastructure": {
-    "sourceHash": "ce0cff719a94",
-    "provenance": "machine",
-    "outputHash": "c81f78bb1f4a",
-    "stale": false
-  },
-  "home.enterprise.tag.integration": {
-    "sourceHash": "9a42d40a3f31",
-    "provenance": "machine",
-    "outputHash": "75440c375d7a",
-    "stale": false
-  },
-  "home.enterprise.tag.isolation": {
-    "sourceHash": "45c4fc064e52",
-    "provenance": "machine",
-    "outputHash": "ce78ec4aabd0",
+    "outputHash": "defcab470ffb",
     "stale": false
   },
   "home.enterprise.title": {
-    "sourceHash": "c3385077abb7",
+    "sourceHash": "fea7c650ad38",
     "provenance": "machine",
-    "outputHash": "c6b5e7f47221",
+    "outputHash": "7b406f8dba17",
     "stale": false
   },
   "home.features.ai.bgReplace": {
@@ -1758,15 +1626,15 @@
     "stale": false
   },
   "home.features.badge": {
-    "sourceHash": "48ada97f5b53",
+    "sourceHash": "485ca594ccc9",
     "provenance": "machine",
-    "outputHash": "ca2f26a45083",
+    "outputHash": "98f4ceda049c",
     "stale": false
   },
   "home.features.f1.body": {
-    "sourceHash": "9545a0006f97",
+    "sourceHash": "d62f9cd0ee72",
     "provenance": "machine",
-    "outputHash": "2f1197bb5b5c",
+    "outputHash": "670dcb3911db",
     "stale": false
   },
   "home.features.f1.dataBoundary": {
@@ -1794,9 +1662,9 @@
     "stale": false
   },
   "home.features.f1.title": {
-    "sourceHash": "e23acfff8ed6",
+    "sourceHash": "0840ad08d83c",
     "provenance": "machine",
-    "outputHash": "8e9c826e849b",
+    "outputHash": "faf39c2d59ef",
     "stale": false
   },
   "home.features.f1.yourFiles": {
@@ -1860,9 +1728,9 @@
     "stale": false
   },
   "home.features.f4.body": {
-    "sourceHash": "d2caded7d5b9",
+    "sourceHash": "730682f983d6",
     "provenance": "machine",
-    "outputHash": "81bcea379f2e",
+    "outputHash": "cb7fa1564fea",
     "stale": false
   },
   "home.features.f4.kicker": {
@@ -1878,27 +1746,27 @@
     "stale": false
   },
   "home.features.subtitle": {
-    "sourceHash": "18b5abeeac20",
+    "sourceHash": "bfc19b053622",
     "provenance": "machine",
-    "outputHash": "517a4e9d5897",
+    "outputHash": "75a554509ede",
     "stale": false
   },
   "home.features.title": {
-    "sourceHash": "1060d8dba498",
+    "sourceHash": "964fb58abdd4",
     "provenance": "machine",
-    "outputHash": "95f6c3ea5e80",
+    "outputHash": "aac10ef66393",
     "stale": false
   },
-  "home.hero.badge.airGap": {
-    "sourceHash": "d3abfa604932",
+  "home.hero.badge.free": {
+    "sourceHash": "ebf40440a07f",
     "provenance": "machine",
-    "outputHash": "98187361d0ec",
+    "outputHash": "f412b4b484a4",
     "stale": false
   },
-  "home.hero.badge.compliance": {
-    "sourceHash": "fc1e85a3c25b",
+  "home.hero.badge.noUploads": {
+    "sourceHash": "6d155cf4d312",
     "provenance": "machine",
-    "outputHash": "cc6e1aa78f7c",
+    "outputHash": "33b5c28af247",
     "stale": false
   },
   "home.hero.badge.openSource": {
@@ -1938,27 +1806,27 @@
     "stale": false
   },
   "home.hero.subtitle": {
-    "sourceHash": "dfe178b3af59",
+    "sourceHash": "8118b4f80fa9",
     "provenance": "machine",
-    "outputHash": "5a2a73268f46",
+    "outputHash": "df143a69c04c",
     "stale": false
   },
   "home.hero.title": {
-    "sourceHash": "b8c7a261cd14",
+    "sourceHash": "5c3102371135",
     "provenance": "machine",
-    "outputHash": "cba9651b0847",
+    "outputHash": "d858ed3b27a9",
     "stale": false
   },
   "home.metaDescription": {
-    "sourceHash": "0bdf920ee18c",
-    "provenance": "human",
-    "outputHash": "d67e248b5277",
+    "sourceHash": "2c960fefd0ea",
+    "provenance": "machine",
+    "outputHash": "2b6198e2534b",
     "stale": false
   },
   "home.metaTitle": {
-    "sourceHash": "89afd0597e8c",
-    "provenance": "human",
-    "outputHash": "210dc56ed4d1",
+    "sourceHash": "323b9fd3810d",
+    "provenance": "machine",
+    "outputHash": "e9c0b4b3cfd7",
     "stale": false
   },
   "home.milestone.cta": {
@@ -1968,15 +1836,9 @@
     "stale": false
   },
   "home.milestone.release": {
-    "sourceHash": "5654e3f7f44c",
+    "sourceHash": "fe8e86c786e6",
     "provenance": "machine",
-    "outputHash": "4efa1fea9b64",
-    "stale": false
-  },
-  "home.milestone.thanksPullsStars": {
-    "sourceHash": "06635e39eec9",
-    "provenance": "machine",
-    "outputHash": "fe10894d2afd",
+    "outputHash": "5cddfd870034",
     "stale": false
   },
   "home.openSource.discord": {
@@ -2663,10 +2525,10 @@
     "outputHash": "25f5ce57a190",
     "stale": false
   },
-  "nav.getStartedFree": {
-    "sourceHash": "6bb5a4a7be14",
+  "nav.install": {
+    "sourceHash": "569ca49f4aaf",
     "provenance": "machine",
-    "outputHash": "0a38129eb03e",
+    "outputHash": "54cbbf8c26b9",
     "stale": false
   },
   "nav.pricing": {

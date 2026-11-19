@@ -8,7 +8,7 @@ const EN = {
   // DocsHome.vue - hero
   "home.title": "SnapOtter Documentation",
   "home.heroSub":
-    "Install, operate, and build on your self-hosted file-processing infrastructure. Get running in one command:",
+    "Install, operate, and build on your self-hosted file toolkit. Get running in one command:",
   "home.copy": "Copy",
   "home.copied": "Copied!",
   "home.clickToCopy": "Click to copy",

@@ -15,9 +15,7 @@ test.describe("docs homepage (Two Doors)", () => {
 
   test("hero renders name and value prop", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "SnapOtter Documentation" })).toBeVisible();
-    await expect(
-      page.getByText("self-hosted file-processing infrastructure", { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByText("self-hosted file toolkit", { exact: false })).toBeVisible();
   });
 
   test("hero shows the quick-start docker command", async ({ page }) => {

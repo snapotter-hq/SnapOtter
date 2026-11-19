@@ -11,7 +11,7 @@
 export const OVERRIDES = {
   "zh-CN": {
     "home.title": "SnapOtter 文档",
-    "home.heroSub": "安装、运维并在你自托管的文件处理基础设施上进行构建。一条命令即可运行：",
+    "home.heroSub": "安装、运维并在你自托管的文件工具箱上进行构建。一条命令即可运行：",
     "home.copy": "复制",
     "home.copied": "已复制！",
     "home.clickToCopy": "点击复制",
@@ -96,7 +96,7 @@ export const OVERRIDES = {
   },
   "zh-TW": {
     "home.title": "SnapOtter 文件",
-    "home.heroSub": "安裝、營運並基於你自架的檔案處理基礎架構進行開發。一行指令即可啟動：",
+    "home.heroSub": "安裝、營運並基於你自架的檔案工具箱進行開發。一行指令即可啟動：",
     "home.copy": "複製",
     "home.copied": "已複製！",
     "home.clickToCopy": "點擊以複製",
@@ -182,7 +182,7 @@ export const OVERRIDES = {
   ja: {
     "home.title": "SnapOtter ドキュメント",
     "home.heroSub":
-      "セルフホスト型のファイル処理基盤をインストールし、運用し、その上に構築しましょう。ワンコマンドで起動できます:",
+      "セルフホスト型のファイルツールキットをインストールし、運用し、その上に構築しましょう。ワンコマンドで起動できます:",
     "home.copy": "コピー",
     "home.copied": "コピーしました！",
     "home.clickToCopy": "クリックしてコピー",
@@ -268,7 +268,7 @@ export const OVERRIDES = {
   ko: {
     "home.title": "SnapOtter 문서",
     "home.heroSub":
-      "자체 호스팅하는 파일 처리 인프라를 설치하고, 운영하고, 그 위에 직접 구축하세요. 명령어 하나로 실행할 수 있습니다:",
+      "자체 호스팅하는 파일 툴킷을 설치하고, 운영하고, 그 위에 직접 구축하세요. 명령어 하나로 실행할 수 있습니다:",
     "home.copy": "복사",
     "home.copied": "복사되었습니다!",
     "home.clickToCopy": "클릭하여 복사",
@@ -354,7 +354,7 @@ export const OVERRIDES = {
   es: {
     "home.title": "Documentación de SnapOtter",
     "home.heroSub":
-      "Instala, opera y desarrolla sobre tu infraestructura autoalojada de procesamiento de archivos. Ponlo en marcha con un solo comando:",
+      "Instala, opera y desarrolla sobre tu kit de herramientas de archivos autoalojado. Ponlo en marcha con un solo comando:",
     "home.copy": "Copiar",
     "home.copied": "¡Copiado!",
     "home.clickToCopy": "Haz clic para copiar",
@@ -440,7 +440,7 @@ export const OVERRIDES = {
   fr: {
     "home.title": "Documentation SnapOtter",
     "home.heroSub":
-      "Installez, exploitez et développez sur votre infrastructure de traitement de fichiers auto-hébergée. Lancez-vous en une seule commande :",
+      "Installez, exploitez et développez sur votre boîte à outils de fichiers auto-hébergée. Lancez-vous en une seule commande :",
     "home.copy": "Copier",
     "home.copied": "Copié !",
     "home.clickToCopy": "Cliquer pour copier",
@@ -526,7 +526,7 @@ export const OVERRIDES = {
   it: {
     "home.title": "Documentazione di SnapOtter",
     "home.heroSub":
-      "Installa, gestisci e sviluppa sulla tua infrastruttura di elaborazione file self-hosted. Parti con un solo comando:",
+      "Installa, gestisci e sviluppa sul tuo toolkit di file self-hosted. Parti con un solo comando:",
     "home.copy": "Copia",
     "home.copied": "Copiato!",
     "home.clickToCopy": "Fai clic per copiare",
@@ -612,7 +612,7 @@ export const OVERRIDES = {
   "pt-BR": {
     "home.title": "Documentação do SnapOtter",
     "home.heroSub":
-      "Instale, opere e desenvolva sobre a sua infraestrutura auto-hospedada de processamento de arquivos. Comece a usar com um único comando:",
+      "Instale, opere e desenvolva sobre o seu kit de ferramentas de arquivos auto-hospedado. Comece a usar com um único comando:",
     "home.copy": "Copiar",
     "home.copied": "Copiado!",
     "home.clickToCopy": "Clique para copiar",
@@ -698,7 +698,7 @@ export const OVERRIDES = {
   de: {
     "home.title": "SnapOtter Dokumentation",
     "home.heroSub":
-      "Installieren, betreiben und erweitern Sie Ihre selbst gehostete Infrastruktur zur Dateiverarbeitung. Mit einem einzigen Befehl loslegen:",
+      "Installieren, betreiben und erweitern Sie Ihr selbst gehostetes Dateitoolkit. Mit einem einzigen Befehl loslegen:",
     "home.copy": "Kopieren",
     "home.copied": "Kopiert!",
     "home.clickToCopy": "Zum Kopieren klicken",
@@ -784,7 +784,7 @@ export const OVERRIDES = {
   nl: {
     "home.title": "SnapOtter-documentatie",
     "home.heroSub":
-      "Installeer, beheer en bouw op je zelf gehoste infrastructuur voor bestandsverwerking. Aan de slag met één commando:",
+      "Installeer, beheer en bouw op je zelf gehoste bestandstoolkit. Aan de slag met één commando:",
     "home.copy": "Kopiëren",
     "home.copied": "Gekopieerd!",
     "home.clickToCopy": "Klik om te kopiëren",
@@ -870,7 +870,7 @@ export const OVERRIDES = {
   sv: {
     "home.title": "SnapOtter-dokumentation",
     "home.heroSub":
-      "Installera, drift och bygg vidare på din egenhostade infrastruktur för filbearbetning. Kom igång med ett enda kommando:",
+      "Installera, drifta och bygg vidare på din egenhostade filverktygslåda. Kom igång med ett enda kommando:",
     "home.copy": "Kopiera",
     "home.copied": "Kopierat!",
     "home.clickToCopy": "Klicka för att kopiera",
@@ -956,7 +956,7 @@ export const OVERRIDES = {
   ru: {
     "home.title": "Документация SnapOtter",
     "home.heroSub":
-      "Устанавливайте, обслуживайте и создавайте на основе собственной инфраструктуры обработки файлов. Запуск одной командой:",
+      "Устанавливайте, обслуживайте и развивайте свой самостоятельно размещаемый набор файловых инструментов. Запуск одной командой:",
     "home.copy": "Копировать",
     "home.copied": "Скопировано!",
     "home.clickToCopy": "Нажмите, чтобы скопировать",
@@ -1042,7 +1042,7 @@ export const OVERRIDES = {
   pl: {
     "home.title": "Dokumentacja SnapOtter",
     "home.heroSub":
-      "Zainstaluj, zarządzaj i rozwijaj swoją samodzielnie hostowaną infrastrukturę do przetwarzania plików. Uruchom ją jednym poleceniem:",
+      "Zainstaluj, zarządzaj i rozwijaj swój samodzielnie hostowany zestaw narzędzi do plików. Uruchom go jednym poleceniem:",
     "home.copy": "Kopiuj",
     "home.copied": "Skopiowano!",
     "home.clickToCopy": "Kliknij, aby skopiować",
@@ -1128,7 +1128,7 @@ export const OVERRIDES = {
   uk: {
     "home.title": "Документація SnapOtter",
     "home.heroSub":
-      "Встановлюйте, керуйте та розробляйте на власній інфраструктурі обробки файлів. Запуск однією командою:",
+      "Встановлюйте, керуйте та розробляйте на власному наборі інструментів для файлів. Запуск однією командою:",
     "home.copy": "Копіювати",
     "home.copied": "Скопійовано!",
     "home.clickToCopy": "Натисніть, щоб скопіювати",
@@ -1213,8 +1213,7 @@ export const OVERRIDES = {
   },
   ar: {
     "home.title": "توثيق SnapOtter",
-    "home.heroSub":
-      "ثبّت البنية التحتية لمعالجة الملفات المستضافة ذاتيًا وشغّلها وابنِ عليها. ابدأ التشغيل بأمر واحد:",
+    "home.heroSub": "ثبّت أدوات الملفات المستضافة ذاتيًا وشغّلها وابنِ عليها. ابدأ التشغيل بأمر واحد:",
     "home.copy": "نسخ",
     "home.copied": "تم النسخ!",
     "home.clickToCopy": "اضغط للنسخ",
@@ -1300,7 +1299,7 @@ export const OVERRIDES = {
   tr: {
     "home.title": "SnapOtter Belgeleri",
     "home.heroSub":
-      "Kendi barındırdığınız dosya işleme altyapınızı kurun, işletin ve üzerine geliştirin. Tek komutla çalışır hale getirin:",
+      "Kendi barındırdığınız dosya araç setini kurun, işletin ve üzerine geliştirin. Tek komutla çalışır hale getirin:",
     "home.copy": "Kopyala",
     "home.copied": "Kopyalandı!",
     "home.clickToCopy": "Kopyalamak için tıklayın",
@@ -1386,7 +1385,7 @@ export const OVERRIDES = {
   hi: {
     "home.title": "SnapOtter दस्तावेज़",
     "home.heroSub":
-      "अपने सेल्फ-होस्टेड फ़ाइल-प्रोसेसिंग इंफ्रास्ट्रक्चर को इंस्टॉल करें, चलाएँ और उस पर बनाएँ। सिर्फ़ एक कमांड में शुरू करें:",
+      "अपने सेल्फ-होस्टेड फ़ाइल टूलकिट को इंस्टॉल करें, चलाएँ और उस पर बनाएँ। सिर्फ़ एक कमांड में शुरू करें:",
     "home.copy": "कॉपी करें",
     "home.copied": "कॉपी हो गया!",
     "home.clickToCopy": "कॉपी करने के लिए क्लिक करें",
@@ -1472,7 +1471,7 @@ export const OVERRIDES = {
   vi: {
     "home.title": "Tài liệu SnapOtter",
     "home.heroSub":
-      "Cài đặt, vận hành và phát triển trên hạ tầng xử lý tệp tự lưu trữ của bạn. Khởi chạy chỉ với một lệnh:",
+      "Cài đặt, vận hành và phát triển trên bộ công cụ tệp tự lưu trữ của bạn. Khởi chạy chỉ với một lệnh:",
     "home.copy": "Sao chép",
     "home.copied": "Đã sao chép!",
     "home.clickToCopy": "Nhấn để sao chép",
@@ -1558,7 +1557,7 @@ export const OVERRIDES = {
   id: {
     "home.title": "Dokumentasi SnapOtter",
     "home.heroSub":
-      "Pasang, operasikan, dan bangun di atas infrastruktur pemrosesan file swakelola Anda. Jalankan hanya dengan satu perintah:",
+      "Instal, operasikan, dan bangun di atas toolkit file self-hosted Anda. Jalankan hanya dengan satu perintah:",
     "home.copy": "Salin",
     "home.copied": "Disalin!",
     "home.clickToCopy": "Klik untuk menyalin",
@@ -1644,7 +1643,7 @@ export const OVERRIDES = {
   th: {
     "home.title": "เอกสารประกอบ SnapOtter",
     "home.heroSub":
-      "ติดตั้ง ดูแล และต่อยอดโครงสร้างพื้นฐานการประมวลผลไฟล์แบบ self-hosted ของคุณ เริ่มใช้งานได้ด้วยคำสั่งเดียว:",
+      "ติดตั้ง ดูแล และต่อยอดชุดเครื่องมือจัดการไฟล์แบบ self-hosted ของคุณ เริ่มใช้งานได้ด้วยคำสั่งเดียว:",
     "home.copy": "คัดลอก",
     "home.copied": "คัดลอกแล้ว!",
     "home.clickToCopy": "คลิกเพื่อคัดลอก",

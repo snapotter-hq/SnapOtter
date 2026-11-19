@@ -5260,7 +5260,7 @@ export const vi: TranslationKeys = {
       heading: "Giới thiệu",
       appName: "SnapOtter",
       appDescription:
-        "Bộ công cụ xử lý tệp tự lưu trữ, ưu tiên quyền riêng tư với 200+ công cụ. Chuyển đổi, nén, chỉnh sửa, phiên âm, OCR và tự động hóa quy trình xử lý ảnh, video, âm thanh, PDF và tệp mà không cần gửi dữ liệu lên đám mây.",
+        "Bộ công cụ tệp mã nguồn mở với 200+ công cụ. Chuyển đổi, nén, chỉnh sửa, phiên âm, OCR và tự động hóa quy trình xử lý ảnh, video, âm thanh, PDF và tài liệu trên máy chủ của riêng bạn mà không cần gửi dữ liệu lên đám mây.",
       versionLabel: "Phiên bản:",
       linksHeading: "Liên kết",
       githubLink: "Kho mã nguồn GitHub",

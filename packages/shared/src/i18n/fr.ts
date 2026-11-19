@@ -5305,7 +5305,7 @@ export const fr: TranslationKeys = {
       heading: "À propos",
       appName: "SnapOtter",
       appDescription:
-        "Une suite de traitement de fichiers auto-hébergée, axée sur la confidentialité, avec 200+ outils. Convertissez, compressez, éditez, transcrivez, OCR et automatisez vos flux de travail image, vidéo, audio, PDF et fichiers sans envoyer de données vers le cloud.",
+        "Boîte à outils de fichiers open source avec 200+ outils. Convertissez, compressez, éditez, transcrivez, OCR et automatisez vos flux de travail image, vidéo, audio, PDF et documents sur votre propre serveur, sans envoyer de données vers le cloud.",
       versionLabel: "Version :",
       linksHeading: "Liens",
       githubLink: "Dépôt GitHub",

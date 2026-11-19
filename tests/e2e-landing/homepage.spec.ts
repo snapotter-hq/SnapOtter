@@ -6,7 +6,7 @@ test.describe("Landing Homepage", () => {
   });
 
   test("page loads with self-hosted title", async ({ page }) => {
-    await expect(page).toHaveTitle(/SnapOtter \| Self-Hosted File-Processing Infrastructure/);
+    await expect(page).toHaveTitle(/SnapOtter: open-source file toolkit/);
   });
 
   test("navbar renders brand and navigation links", async ({ page }) => {
@@ -31,20 +31,19 @@ test.describe("Landing Homepage", () => {
   });
 
   test("hero renders the headline", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Private file processing for data that");
+    await expect(page.locator("h1")).toContainText("Free file tools that run on your own server.");
   });
 
   test("hero renders the subtitle", async ({ page }) => {
     await expect(
-      page.getByText("run local AI across image, video, audio, PDF, and documents"),
+      page.getByText("200+ open-source tools and local AI, installed with one Docker command."),
     ).toBeVisible();
   });
 
   test("hero renders the milestone banner linking to the v2.3.0 release", async ({ page }) => {
     const banner = page.locator("[data-milestone-banner]");
     await expect(banner).toBeVisible();
-    await expect(banner).toContainText(/1 million pulls and 3,000 GitHub stars\. Thank you\./);
-    await expect(banner).toContainText("SnapOtter v2.3.0 is our thank-you release.");
+    await expect(banner).toContainText("SnapOtter v2.3.0 is out.");
     await expect(banner).toHaveAttribute(
       "href",
       "https://github.com/snapotter-hq/SnapOtter/releases/tag/v2.3.0",
@@ -62,7 +61,7 @@ test.describe("Landing Homepage", () => {
   });
 
   test("hero renders trust badges", async ({ page }) => {
-    for (const badge of ["Self-hosted", "Open source", "Air-gap capable", "Compliance-friendly"]) {
+    for (const badge of ["Self-hosted", "Open source", "No uploads", "Free to use"]) {
       await expect(page.getByText(badge, { exact: true }).first()).toBeVisible();
     }
   });
@@ -184,27 +183,24 @@ test.describe("Landing Homepage", () => {
     await expect(results.getByRole("link", { name: /Trim Video/ })).toBeVisible();
   });
 
-  test("enterprise section renders eyebrow and feature cards", async ({ page }) => {
-    await expect(page.getByText("Built for enterprise deployment.")).toBeVisible();
-    await expect(page.getByText("Enterprise-grade security")).toBeVisible();
-    const features = [
-      "SAML SSO",
-      "SCIM Provisioning",
-      "Multi-Factor Auth",
-      "Multi-Tenancy",
-      "Per-Tool Permissions",
-      "Audit Export",
-      "S3-Compatible Storage",
-      "Webhooks",
-    ];
-    for (const feature of features) {
-      await expect(page.getByText(feature, { exact: true }).first()).toBeVisible();
-    }
+  test("enterprise section is a short pointer to /enterprise", async ({ page }) => {
+    const section = page.locator("#enterprise");
+    await expect(section.getByText("Running this for a team?")).toBeVisible();
+    await expect(section.getByRole("link", { name: "See enterprise features" })).toHaveAttribute(
+      "href",
+      "/enterprise/",
+    );
+    await expect(section.getByRole("link", { name: "Book a Demo" })).toHaveAttribute(
+      "href",
+      "/contact/",
+    );
   });
 
-  test("regulated-environments section renders heading and features", async ({ page }) => {
-    await expect(page.getByText("Built for regulated environments.")).toBeVisible();
-    await expect(page.getByText("Compliant by architecture")).toBeVisible();
+  test("privacy section renders heading and features", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { name: "Your files stay on your server." }),
+    ).toBeVisible();
+    await expect(page.getByText("Private by architecture")).toBeVisible();
     await expect(page.getByText("AI processing without external APIs")).toBeVisible();
     await expect(page.getByText("Fits your infrastructure")).toBeVisible();
   });
@@ -245,11 +241,11 @@ test.describe("Navbar Star button", () => {
     await expect(star).toHaveAccessibleName(/^Star on GitHub \(.+\)$/);
   });
 
-  // The Ukrainian nav has no room for the label at this width, so it drops to
+  // The Ukrainian nav has no room for the label at the 1024px desktop breakpoint, so it drops to
   // octocat + count. The row can still overflow without the label (#4521, and
   // wider on Linux fonts), so assert only that the label is what gives way.
   test("drops the label when a localized nav would overflow", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.setViewportSize({ width: 1024, height: 800 });
     await page.goto("/uk/");
     const star = page.locator("[data-star-button]");
     await expect(star).toHaveAttribute("data-compact", "");
