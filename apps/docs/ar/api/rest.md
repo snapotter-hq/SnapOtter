@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: c7df8dada0ae
-i18n_source_hash: a305a62638f0
+i18n_output_hash: e92a25eb5648
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | توقيع PDF | مسار multipart مخصص مع PDF `file`، وملفات التوقيع `sig0`، و`sig1`، ومصفوفة JSON `placements` |
 | `pdf-to-text` | PDF إلى نص | - |
 | `pdf-to-word` | PDF إلى Word | - |
-| `pdf-metadata` | البيانات الوصفية لـ PDF | `title`، `author`، `subject`، `keywords` |
+| `pdf-metadata` | البيانات الوصفية لـ PDF | `title`، `author`، `subject`، `keywords`، `stripAll` |
 | `convert-document` | تحويل مستند | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | تحويل عرض تقديمي | `format` (pptx/odp) |
 | `convert-spreadsheet` | تحويل جدول بيانات | `format` (xlsx/ods/csv) |

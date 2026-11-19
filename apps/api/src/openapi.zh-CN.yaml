@@ -15543,6 +15543,7 @@ paths:
                     - `author`（字符串，可选，最多 500）- 文档作者
                     - `subject`（字符串，可选，最多 500）- 文档主题
                     - `keywords`（字符串，可选，最多 500）- 文档关键词
+                    - `stripAll`（布尔值，可选）- 在写入上述字段之前，删除整个 Info 字典（日期、Creator、Producer、自定义键）和 XMP 流。删除 XMP 会破坏 PDF/A 合规性。
             example:
               file: photo.png
               settings: '{}'
@@ -15559,6 +15560,22 @@ paths:
                       metadata:
                         type: object
                         description: 生成的 PDF 元数据字段
+                      stripped:
+                        type: object
+                        description: 设置了 `stripAll` 时出现。删除了哪些内容。
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: 原先存在的 Info 字典键
+                          xmpRemoved:
+                            type: boolean
+                            description: 是否删除了 XMP 元数据流
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: 输入文件声明的 PDF/A 级别（例如 2B），没有时为 null
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33897,9 +33914,9 @@ x-i18n:
       provenance: machine
       outputHash: 7062afb9380c
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 268cad6002d3
+      sourceHash: 69e35e648fd4
       provenance: machine
-      outputHash: e62209c534ea
+      outputHash: ed3631105e28
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/description:
       sourceHash: a19925f5e3bb
       provenance: machine
@@ -33908,6 +33925,22 @@ x-i18n:
       sourceHash: 33fe6b2474bb
       provenance: machine
       outputHash: 9893fcd52a54
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/description:
+      sourceHash: 0635dbe78956
+      provenance: machine
+      outputHash: e0fd873c8ae1
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/removed/description:
+      sourceHash: e5d9ea51f978
+      provenance: machine
+      outputHash: b932c2b5dafc
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/xmpRemoved/description:
+      sourceHash: 5e04b469fa79
+      provenance: machine
+      outputHash: 6de3d43b83b1
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/pdfa/description:
+      sourceHash: 34f912bbf4bf
+      provenance: machine
+      outputHash: 202a4b5d7ab2
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

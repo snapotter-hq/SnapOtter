@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 06c8988d7297
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 5894e0f9554b
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `sign-pdf` | Signer un PDF | Route multipart personnalisée avec le PDF `file`, les fichiers de signature `sig0`, `sig1`, et le tableau JSON `placements` |
 | `pdf-to-text` | PDF vers texte | - |
 | `pdf-to-word` | PDF vers Word | - |
-| `pdf-metadata` | Métadonnées du PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | Métadonnées du PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Convertir un document | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Convertir une présentation | `format` (pptx/odp) |
 | `convert-spreadsheet` | Convertir une feuille de calcul | `format` (xlsx/ods/csv) |

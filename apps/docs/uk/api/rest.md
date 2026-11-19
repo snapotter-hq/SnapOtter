@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 673c38ed3595
+i18n_output_hash: 6c7dfb805df7
 i18n_hash_version: 2
-i18n_source_hash: a305a62638f0
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -345,7 +345,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | Підпис PDF | Власний multipart-маршрут з PDF `file`, файлами підписів `sig0`, `sig1` і JSON-масивом `placements` |
 | `pdf-to-text` | PDF у текст | - |
 | `pdf-to-word` | PDF у Word | - |
-| `pdf-metadata` | Метадані PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | Метадані PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Конвертація документа | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Конвертація презентації | `format` (pptx/odp) |
 | `convert-spreadsheet` | Конвертація електронної таблиці | `format` (xlsx/ods/csv) |

@@ -15597,6 +15597,7 @@ paths:
                     - `author` (문자열, 선택, 최대 500) - 문서 작성자
                     - `subject` (문자열, 선택, 최대 500) - 문서 주제
                     - `keywords` (문자열, 선택, 최대 500) - 문서 키워드
+                    - `stripAll` (불리언, 선택) - 위 필드를 쓰기 전에 Info 사전 전체(날짜, Creator, Producer, 사용자 지정 키)와 XMP 스트림을 제거합니다. XMP를 제거하면 PDF/A 준수가 깨집니다.
             example:
               file: photo.png
               settings: '{}'
@@ -15613,6 +15614,22 @@ paths:
                       metadata:
                         type: object
                         description: 결과 PDF 메타데이터 필드
+                      stripped:
+                        type: object
+                        description: '`stripAll`를 설정한 경우에 포함됩니다. 제거된 항목입니다.'
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: 존재했던 Info 사전 키
+                          xmpRemoved:
+                            type: boolean
+                            description: XMP 메타데이터 스트림을 제거했는지 여부
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: '입력 파일이 선언한 PDF/A 수준(예: 2B), 없으면 null'
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33968,9 +33985,9 @@ x-i18n:
       provenance: machine
       outputHash: 612434be3282
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 268cad6002d3
+      sourceHash: 69e35e648fd4
       provenance: machine
-      outputHash: a329e310f761
+      outputHash: a91b409b0039
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/description:
       sourceHash: a19925f5e3bb
       provenance: machine
@@ -33979,6 +33996,22 @@ x-i18n:
       sourceHash: 33fe6b2474bb
       provenance: machine
       outputHash: 08558239e2a1
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/description:
+      sourceHash: 0635dbe78956
+      provenance: machine
+      outputHash: 90e36c69c4f3
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/removed/description:
+      sourceHash: e5d9ea51f978
+      provenance: machine
+      outputHash: 39e2d6611a3a
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/xmpRemoved/description:
+      sourceHash: 5e04b469fa79
+      provenance: machine
+      outputHash: 8611c28bd3d0
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/pdfa/description:
+      sourceHash: 34f912bbf4bf
+      provenance: machine
+      outputHash: 86117f13e0c0
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

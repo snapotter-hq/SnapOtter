@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 6fb46cccd8fa
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 6d0c6033ed7e
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | 簽署 PDF | 自訂 multipart 路由，含 PDF `file`、簽名檔案 `sig0`、`sig1` 與 `placements` JSON 陣列 |
 | `pdf-to-text` | PDF 轉文字 | - |
 | `pdf-to-word` | PDF 轉 Word | - |
-| `pdf-metadata` | PDF 中繼資料 | `title`、`author`、`subject`、`keywords` |
+| `pdf-metadata` | PDF 中繼資料 | `title`、`author`、`subject`、`keywords`、`stripAll` |
 | `convert-document` | 轉換文件 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | 轉換簡報 | `format`（pptx/odp） |
 | `convert-spreadsheet` | 轉換試算表 | `format`（xlsx/ods/csv） |

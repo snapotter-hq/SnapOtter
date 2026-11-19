@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: f778ef8496f2
-i18n_source_hash: a305a62638f0
+i18n_output_hash: a6fce017a806
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `sign-pdf` | Ký PDF | Route multipart tùy chỉnh với PDF `file`, tệp chữ ký `sig0`, `sig1`, và mảng JSON `placements` |
 | `pdf-to-text` | PDF sang Text | - |
 | `pdf-to-word` | PDF sang Word | - |
-| `pdf-metadata` | Metadata PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | Metadata PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Chuyển đổi tài liệu | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Chuyển đổi bản trình bày | `format` (pptx/odp) |
 | `convert-spreadsheet` | Chuyển đổi bảng tính | `format` (xlsx/ods/csv) |

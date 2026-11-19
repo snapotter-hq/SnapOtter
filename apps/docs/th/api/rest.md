@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 3f70b805dc00
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 916ea03b9099
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | ลงนาม PDF | เส้นทาง multipart กำหนดเองพร้อม PDF `file`, ไฟล์ลายเซ็น `sig0`, `sig1` และอาร์เรย์ JSON `placements` |
 | `pdf-to-text` | PDF เป็นข้อความ | - |
 | `pdf-to-word` | PDF เป็น Word | - |
-| `pdf-metadata` | เมทาดาทา PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | เมทาดาทา PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | แปลงเอกสาร | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | แปลงงานนำเสนอ | `format` (pptx/odp) |
 | `convert-spreadsheet` | แปลงสเปรดชีต | `format` (xlsx/ods/csv) |

@@ -15605,6 +15605,7 @@ paths:
                     - `author` (نص، اختياري، بحد أقصى 500) - مؤلف المستند
                     - `subject` (نص، اختياري، بحد أقصى 500) - موضوع المستند
                     - `keywords` (نص، اختياري، بحد أقصى 500) - الكلمات المفتاحية للمستند
+                    - `stripAll` (منطقي، اختياري) - حذف قاموس Info بالكامل (التواريخ وCreator وProducer والمفاتيح المخصصة) وتدفق XMP قبل كتابة الحقول أعلاه. حذف XMP يُفقد الملف توافقه مع PDF/A.
             example:
               file: photo.png
               settings: '{}'
@@ -15621,6 +15622,22 @@ paths:
                       metadata:
                         type: object
                         description: حقول البيانات الوصفية الناتجة لملف PDF
+                      stripped:
+                        type: object
+                        description: يظهر عند تعيين `stripAll`. ما أزالته عملية الحذف.
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: مفاتيح قاموس Info التي كانت موجودة
+                          xmpRemoved:
+                            type: boolean
+                            description: هل أُزيل تدفق بيانات XMP الوصفية
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: مستوى PDF/A الذي أعلنه الملف المُدخل (مثل 2B)، أو null إن لم يوجد
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33976,9 +33993,9 @@ x-i18n:
       provenance: machine
       outputHash: 21219199b49c
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 268cad6002d3
+      sourceHash: 69e35e648fd4
       provenance: machine
-      outputHash: 3d9ef4444bb6
+      outputHash: 94afd27fd0fd
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/description:
       sourceHash: a19925f5e3bb
       provenance: machine
@@ -33987,6 +34004,22 @@ x-i18n:
       sourceHash: 33fe6b2474bb
       provenance: machine
       outputHash: 4b7edb14d191
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/description:
+      sourceHash: 0635dbe78956
+      provenance: machine
+      outputHash: 7d4c84ed5313
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/removed/description:
+      sourceHash: e5d9ea51f978
+      provenance: machine
+      outputHash: ce516c26f573
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/xmpRemoved/description:
+      sourceHash: 5e04b469fa79
+      provenance: machine
+      outputHash: 602aa0451374
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/pdfa/description:
+      sourceHash: 34f912bbf4bf
+      provenance: machine
+      outputHash: d6a7bf995b3c
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
