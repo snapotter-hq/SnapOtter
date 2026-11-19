@@ -12,17 +12,18 @@ export interface AiInstallFailure {
   error?: unknown;
 }
 
-const STORAGE_ERRNOS = new Set(["ENOSPC", "EDQUOT", "EROFS", "EACCES", "EPERM"]);
+const STORAGE_ERRNOS = new Set(["ENOSPC", "EDQUOT", "EROFS", "EACCES", "EPERM", "EIO"]);
 
-// Order matters: the checksum retry message mentions a failed re-download, and
-// a disk-full download names the download too, so both win over network.
+// Order matters. A repeat checksum mismatch blames the storage and offers a
+// manual download, so checksum goes first. A disk-full download or an
+// unreadable downloaded archive names the download too, so disk beats network.
 const MESSAGE_KINDS: ReadonlyArray<[RegExp, AiInstallErrorKind]> = [
   [/illegal instruction|SIGILL|\bAVX\b/i, "cpu_unsupported"],
+  [/checksum|sha-?256|integrity|signature/i, "checksum"],
   [
-    /disk space|no space left|ENOSPC|EDQUOT|read-only file system|permission denied|EACCES|EROFS/i,
+    /disk space|no space left|ENOSPC|EDQUOT|read-only file system|permission denied|EACCES|EROFS|input\/output error|\bEIO\b|storage/i,
     "disk",
   ],
-  [/checksum|sha-?256|integrity|signature/i, "checksum"],
   [
     /download|HTTP \d{3}|connection|network|name resolution|getaddrinfo|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|urlopen|SSL/i,
     "network",

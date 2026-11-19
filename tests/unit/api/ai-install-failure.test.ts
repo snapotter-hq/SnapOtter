@@ -25,10 +25,18 @@ describe("classifyAiInstallFailure (#4821)", () => {
     ["OSError: [Errno 28] No space left on device", "disk"],
     ["PermissionError: [Errno 13] Permission denied: '/data/ai/cache'", "disk"],
     [
+      "Could not read back the downloaded archive to verify it ([Errno 5] Input/output error). This points at the storage backing the data volume.",
+      "disk",
+    ],
+    [
       "Checksum mismatch on the first download (expected a, got b), and the sequential re-download then failed: x",
       "checksum",
     ],
     ["SHA256 checksum mismatch for local file.", "checksum"],
+    [
+      "SHA256 checksum mismatch after re-download. A repeat mismatch usually points at the storage backing the data volume. You can download the bundle manually.",
+      "checksum",
+    ],
     ["Failed to download after 5 attempts: <urlopen error timed out>", "network"],
     ["Download failed with HTTP 404 (Not Found). The archive URL may be wrong.", "network"],
     ["Installation verification timed out. Please retry the install.", "timeout"],
