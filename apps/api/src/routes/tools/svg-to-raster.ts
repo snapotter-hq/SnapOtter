@@ -30,6 +30,7 @@ import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { openSvgAtDensity } from "../../lib/svg-density.js";
 import {
   decompressSvgz,
   isSvgBuffer,
@@ -75,7 +76,7 @@ async function convertSvg(
   filename: string,
   settings: z.infer<typeof settingsSchema>,
 ): Promise<{ buffer: Buffer; filename: string; ext: string }> {
-  let image = sharp(svgBuffer, { density: settings.dpi });
+  let image = openSvgAtDensity(svgBuffer, settings.dpi);
 
   if (settings.width || settings.height) {
     image = image.resize(settings.width, settings.height, { fit: "inside" });

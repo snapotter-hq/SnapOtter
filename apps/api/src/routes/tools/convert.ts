@@ -6,7 +6,6 @@ import { extname, join } from "node:path";
 import { promisify } from "node:util";
 import { convert } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import {
@@ -21,6 +20,7 @@ import {
 } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { openSvgAtDensity } from "../../lib/svg-density.js";
 import { isSvgBuffer } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -129,7 +129,7 @@ export function registerConvert(app: FastifyInstance) {
 
         // Preserve animation frames when both input and output are animatable formats
         const image = isSvgBuffer(inputBuffer)
-          ? sharp(inputBuffer, { density: 300 })
+          ? openSvgAtDensity(inputBuffer, 300)
           : openAnimated(inputBuffer, await readAnimationFor(inputBuffer, settings.format));
 
         let buffer: Buffer;
