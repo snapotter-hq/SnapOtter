@@ -84,7 +84,7 @@ async function runOcr(buffer: Buffer, filename: string) {
     filename,
     { scratchDir, signal: new AbortController().signal, report },
   );
-  return { output, report, payload: output.resultPayload as OcrResult };
+  return { output, report, payload: output.resultPayload as unknown as OcrResult };
 }
 
 beforeAll(async () => {
