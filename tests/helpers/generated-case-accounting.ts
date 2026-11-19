@@ -225,3 +225,40 @@ export function featureUnavailableDisposition({
   }
   return "skip";
 }
+
+export type RequiredAiGate =
+  | { kind: "run" }
+  | { kind: "skip"; reason: string }
+  | { kind: "fail"; reason: string };
+
+interface RequiredAiGateInput {
+  requireAiFeatures: boolean;
+  /** First bundle the tool needs that DATA_DIR lacks, or null when none is missing. */
+  firstMissingBundle: (toolId: string) => string | null;
+  dataDir: string | undefined;
+}
+
+/**
+ * Whether a generated matrix runs an AI tool. Ordinary runs skip them: each
+ * fork's DATA_DIR is fresh, so no bundle is ever installed there. The strict
+ * lane (REQUIRE_AI_FEATURES=1, the ubuntu_gpu release preflight) runs them
+ * against a provisioned DATA_DIR, and a bundle missing from it fails the tool
+ * by name before any request, so a half-provisioned host can't pass.
+ */
+export function requiredAiGate(
+  toolId: string,
+  { requireAiFeatures, firstMissingBundle, dataDir }: RequiredAiGateInput,
+): RequiredAiGate {
+  if (!requireAiFeatures) {
+    return {
+      kind: "skip",
+      reason: `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+    };
+  }
+  const missing = firstMissingBundle(toolId);
+  if (!missing) return { kind: "run" };
+  return {
+    kind: "fail",
+    reason: `${toolId}: REQUIRE_AI_FEATURES=1 but bundle "${missing}" is not installed in DATA_DIR=${dataDir || "(unset)"}`,
+  };
+}

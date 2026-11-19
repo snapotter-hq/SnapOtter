@@ -4,6 +4,7 @@ import {
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 
 describe("isEngineUnavailableFailure", () => {
@@ -210,5 +211,63 @@ describe("isRecordedRejection", () => {
     ["a missing row", undefined],
   ])("does not count %s as a rejection", (_label, row) => {
     expect(isRecordedRejection(row, ALLOWED)).toBe(false);
+  });
+});
+
+describe("requiredAiGate", () => {
+  const installed = () => null;
+  const missing = () => "background-removal";
+
+  it("skips an AI tool in an ordinary run, installed or not", () => {
+    for (const firstMissingBundle of [installed, missing]) {
+      expect(
+        requiredAiGate("remove-background", {
+          requireAiFeatures: false,
+          firstMissingBundle,
+          dataDir: "/data",
+        }),
+      ).toEqual({
+        kind: "skip",
+        reason:
+          "remove-background: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install",
+      });
+    }
+  });
+
+  it("runs an AI tool whose bundles are installed in the strict lane", () => {
+    expect(
+      requiredAiGate("remove-background", {
+        requireAiFeatures: true,
+        firstMissingBundle: installed,
+        dataDir: "/srv/ai-data",
+      }),
+    ).toEqual({ kind: "run" });
+  });
+
+  // The strict lane exists to prove the bundles work. A host whose DATA_DIR
+  // lacks one must fail and say which bundle and where it looked, not skip or
+  // pass on a pile of anonymous 501s.
+  it("fails the strict lane when a required bundle is missing, naming it and the DATA_DIR", () => {
+    expect(
+      requiredAiGate("remove-background", {
+        requireAiFeatures: true,
+        firstMissingBundle: missing,
+        dataDir: "/srv/ai-data",
+      }),
+    ).toEqual({
+      kind: "fail",
+      reason:
+        'remove-background: REQUIRE_AI_FEATURES=1 but bundle "background-removal" is not installed in DATA_DIR=/srv/ai-data',
+    });
+  });
+
+  it("says DATA_DIR is unset when the strict lane runs without one", () => {
+    const gate = requiredAiGate("remove-background", {
+      requireAiFeatures: true,
+      firstMissingBundle: missing,
+      dataDir: undefined,
+    });
+    expect(gate.kind).toBe("fail");
+    expect(gate.kind === "fail" && gate.reason).toContain("DATA_DIR=(unset)");
   });
 });

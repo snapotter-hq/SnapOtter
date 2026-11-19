@@ -569,8 +569,9 @@ jobs:
           FUZZ: "1"
           FUZZ_RUNS: "50"
           # This lane installs no AI bundles, so it must not run the strict
-          # required-AI contract (that 501s every installed-contract case). The
-          # strict contract runs on the release-QA fleet, which has bundles.
+          # required-AI contract (that fails every AI tool here). The strict
+          # contract runs in the release preflight on ubuntu_gpu, against a
+          # DATA_DIR with every bundle installed (ai-matrix.sh, #4443).
           # Full-matrix tests iterate every format x tool; with 4 forks the heavy
           # media conversions starve and hit the 30s default. Fewer forks (more
           # CPU each) plus a generous timeout keeps them from flaking.

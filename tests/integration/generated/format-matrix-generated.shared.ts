@@ -3,12 +3,14 @@ import { extname, join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import { getRegisteredToolIds, getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtureDir } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
@@ -158,10 +160,14 @@ export function registerToolFormatMatrix(part: number): void {
         continue;
       }
       it(`${toolId} handles every input format cleanly`, async (context) => {
-        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
-          return context.skip(
-            `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
-          );
+        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId)) {
+          const aiGate = requiredAiGate(toolId, {
+            requireAiFeatures: REQUIRE_AI_FEATURES,
+            firstMissingBundle: getFirstMissingBundleForTool,
+            dataDir: process.env.DATA_DIR,
+          });
+          if (aiGate.kind === "skip") return context.skip(aiGate.reason);
+          if (aiGate.kind === "fail") throw new Error(aiGate.reason);
         }
         const missingPrerequisite = await findMissingGeneratedPrerequisite(toolId);
         if (missingPrerequisite) return context.skip(`${toolId}: ${missingPrerequisite}`);

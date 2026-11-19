@@ -211,6 +211,12 @@ isolated `BULLMQ_PREFIX` via `tests/setup/per-fork-env.ts` (testcontainers for P
 `DATA_DIR` is ignored. The exception is `REQUIRE_AI_FEATURES=1`, which keeps your `DATA_DIR` so the
 installed-AI contracts can find the bundles installed there. 30s test timeouts.
 
+Ordinary runs skip AI tools in the generated matrices (`settings-matrix`, `format-matrix-generated-*`,
+`format-matrix-multimodal`), because a fresh per-fork `DATA_DIR` never has bundles. With
+`REQUIRE_AI_FEATURES=1` they run, and a tool whose bundle is missing from `DATA_DIR` fails by name
+before any request. No CI lane installs bundles, so that strict run happens in the release preflight on
+the `ubuntu_gpu` fleet host, against a persistent `DATA_DIR` with every bundle installed (#4443).
+
 ### E2E Projects
 
 The main Playwright config defines three projects:

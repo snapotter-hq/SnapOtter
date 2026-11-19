@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
   isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -165,7 +167,21 @@ describe("multi-modality tool x format matrix", () => {
       continue;
     }
 
-    describe.skipIf(isAiTool && !REQUIRE_AI_FEATURES)(toolId, () => {
+    const aiGate = isAiTool
+      ? requiredAiGate(toolId, {
+          requireAiFeatures: REQUIRE_AI_FEATURES,
+          firstMissingBundle: getFirstMissingBundleForTool,
+          dataDir: process.env.DATA_DIR,
+        })
+      : undefined;
+    if (aiGate?.kind === "fail") {
+      it(`${toolId} -- required AI bundle installed`, () => {
+        throw new Error(aiGate.reason);
+      });
+      continue;
+    }
+
+    describe.skipIf(aiGate?.kind === "skip")(toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {
         expectedAttempts: effectiveFixtures.length,
       });
