@@ -88,6 +88,37 @@ describe("filterRelevantTools", () => {
   it("keeps everything for a query made only of filler", () => {
     expect(filterRelevantTools("the", [watermark, crop])).toEqual([watermark, crop]);
   });
+
+  describe("with alias groups (#4899)", () => {
+    const groups = [
+      ["merge", "combine", "join"],
+      ["remove background", "background remover", "cutout"],
+    ];
+    const merge = tool("merge-pdf", { description: "Merge PDF files into one" });
+    const compressPdf = tool("compress-pdf");
+    const bg = tool("remove-background");
+
+    it("matches a query word through another phrase of its group", () => {
+      expect(filterRelevantTools("combine pdf", [merge, compressPdf], groups)).toEqual([merge]);
+      expect(filterRelevantTools("cutout", [bg, crop], groups)).toEqual([bg]);
+    });
+
+    it("needs every word of the alternative phrase", () => {
+      const removePages = tool("remove-pages");
+      expect(filterRelevantTools("cutout", [removePages], groups)).toEqual([]);
+    });
+
+    it("only expands words whose whole phrase is in the query", () => {
+      // "remove" alone is not "remove background", so watermark-image can't
+      // borrow the group's "cutout".
+      const cutoutWatermark = tool("watermark-image", { keywords: ["cutout"] });
+      expect(filterRelevantTools("remove watermark", [cutoutWatermark], groups)).toEqual([]);
+    });
+
+    it("leaves the default behaviour alone without groups", () => {
+      expect(filterRelevantTools("combine pdf", [merge])).toEqual([]);
+    });
+  });
 });
 
 describe("withConverterFallback", () => {

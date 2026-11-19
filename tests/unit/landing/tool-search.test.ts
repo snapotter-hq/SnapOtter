@@ -700,6 +700,56 @@ describe("landing searchTools with real catalog metadata", () => {
 
     expect(result.results[0]?.item.id).toBe("extract-pages");
   });
+
+  // #4899: a tool that shares one word with the query used to stay in the list
+  // whenever its score cleared the threshold.
+  describe("drops tools missing a query word", () => {
+    const search = (query: string) => searchTools(realTools, { query, modality: "all", limit: 12 });
+    const ids = (results: { item: ToolSearchItem }[]) => results.map((result) => result.item.id);
+
+    it("keeps only the eraser for remove watermark", () => {
+      const result = search("remove watermark");
+      expect(ids(result.results)).toEqual(["erase-object"]);
+      expect(result.related).toEqual([]);
+      expect(result.hasConfidentMatch).toBe(true);
+    });
+
+    it("keeps only the redaction tools for redact image", () => {
+      const result = search("redact image");
+      expect(ids(result.results)).toEqual(["pixelate", "blur-faces"]);
+      expect(ids(result.related)).toEqual([]);
+    });
+
+    it.each(["curve text", "base64 decode"])("shows the empty state for %j", (query) => {
+      const result = search(query);
+      expect(result.results).toEqual([]);
+      expect(result.related).toEqual([]);
+      expect(result.totalMatches).toBe(0);
+      expect(result.hasConfidentMatch).toBe(false);
+    });
+
+    it("offers no close tools for text to audio", () => {
+      // transcribe-audio has both words but goes the other way. It stays below
+      // the confident bar, so ToolGrid shows the request prompt.
+      const result = search("Text to Audio");
+      expect(ids(result.results)).toEqual(["transcribe-audio"]);
+      expect(result.related).toEqual([]);
+      expect(result.hasConfidentMatch).toBe(false);
+    });
+
+    it.each([
+      ["combine pdf", "merge-pdf"],
+      ["remove bg", "remove-background"],
+      ["cutout", "remove-gif-background"],
+      ["shrink pdf", "compress-pdf"],
+    ])("still finds an alias match: %j keeps %s", (query, id) => {
+      expect(ids(search(query).results)).toContain(id);
+    });
+
+    it("keeps a converter that names the format only in acceptedInputs", () => {
+      expect(ids(search("orf to gif").results)).toContain("convert");
+    });
+  });
 });
 
 describe("buildToolRequestDiscussionUrl", () => {
