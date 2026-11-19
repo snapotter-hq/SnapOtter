@@ -10,6 +10,8 @@ export interface PreviewTransform {
   rotate: number;
   flipH: boolean;
   flipV: boolean;
+  /** A level grid helps line up horizons, so it shows for any angle off the quarter turns. */
+  showGrid: boolean;
 }
 
 export interface RotateControlsProps {
@@ -57,7 +59,7 @@ export function RotateControls({
 
   // Emit preview transform on every change
   useEffect(() => {
-    onPreviewTransform?.({ rotate: totalAngle, flipH, flipV });
+    onPreviewTransform?.({ rotate: totalAngle, flipH, flipV, showGrid: totalAngle % 90 !== 0 });
   }, [totalAngle, flipH, flipV, onPreviewTransform]);
 
   // Reset controls when resetSignal increments

@@ -425,6 +425,20 @@ test.describe("GUI Essential Tools", () => {
       await expect(slider).toHaveAttribute("type", "range");
     });
 
+    test("straightening shows a level grid over the preview", async ({ loggedInPage: page }) => {
+      await page.goto("/image/rotate");
+      await uploadTestImage(page);
+
+      const grid = page.getByTestId("image-viewer-grid");
+      await expect(grid).toHaveCount(0);
+
+      await page.locator("#rotate-straighten").fill("5");
+      await expect(grid).toBeVisible();
+
+      await page.locator("#rotate-straighten").fill("0");
+      await expect(grid).toHaveCount(0);
+    });
+
     test("processes rotation and shows result", async ({ loggedInPage: page }) => {
       await page.goto("/image/rotate");
       await uploadTestImage(page);
