@@ -917,6 +917,16 @@ describe("applyCorrections normalise", () => {
     }
   });
 
+  it("skips the stretch at low intensity once the ramped clip rounds to 0 (#4369)", async () => {
+    // auto at 5: (5 - 0.225) * 0.1 = 0.48 -> clip 0 -> no 0-100 min-max stretch.
+    const tt = await twoTone(110, 146);
+    const out = await run(tt, NO_CORR, "auto", 5, onlyEnabled("exposure"), {
+      width: 64,
+      height: 64,
+    });
+    expect(await channelMeans(out)).toEqual(await channelMeans(tt));
+  });
+
   it("stretches less below the default intensity, not more (#4369)", async () => {
     // Uniform 60-200 texture, fine enough that each 1% of clip moves stdev.
     const tex = await texturedGray(400, 400, 60, 200);
