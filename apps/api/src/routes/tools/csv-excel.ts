@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
 import { csvParseFailure } from "../../lib/csv-parse.js";
+import { rowsToXlsx } from "../../lib/csv-to-xlsx.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -64,10 +65,7 @@ export function registerCsvExcel(app: FastifyInstance) {
       if (parseFailure) {
         throw new InputValidationError(`CSV parse failed: ${parseFailure}`);
       }
-      const workbook = new ExcelJS.Workbook();
-      const ws = workbook.addWorksheet("Sheet1");
-      ws.addRows(parsed.data);
-      const xlsxBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      const xlsxBuffer = await rowsToXlsx(parsed.data);
       return {
         buffer: xlsxBuffer,
         filename: `${base}.xlsx`,
