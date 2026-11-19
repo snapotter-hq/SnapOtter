@@ -1,7 +1,12 @@
 // apps/web/src/hooks/use-editor-shortcuts.ts
 
-import { useCallback, useEffect, useRef } from "react";
-import { useHotkeys } from "react-hotkeys-hook";
+import { type DependencyList, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  type HotkeyCallback,
+  type Keys,
+  type Options,
+  useHotkeys as useHotkeysImpl,
+} from "react-hotkeys-hook";
 import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { polygonalLassoRefHolder } from "@/components/editor/tools/selection-tool";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -58,6 +63,104 @@ function cycleSubtool(current: ToolType, cycle: ToolType[]): ToolType {
   const idx = cycle.indexOf(current);
   if (idx === -1) return cycle[0];
   return cycle[(idx + 1) % cycle.length];
+}
+
+type HotkeyEvent = Parameters<HotkeyCallback>[1];
+
+/** Mutually exclusive code gates for the primary and fallback bindings. */
+const isEmptyCode = (event: KeyboardEvent): boolean => event.code === "";
+const hasCode = (event: KeyboardEvent): boolean => event.code !== "";
+
+// useKey compares event.key literally. These are the only bindings whose real
+// key differs from the hotkey spelling: shifted brackets and the plus key.
+// "|" is the split key because "+" cannot express a literal plus.
+const EMPTY_CODE_KEY_OVERRIDES: Record<string, { keys: string; splitKey: string }> = {
+  "mod+=,mod+plus": { keys: "mod|=,mod|+", splitKey: "|" },
+  "mod+shift+]": { keys: "mod|shift|],mod|shift|}", splitKey: "|" },
+  "mod+shift+[": { keys: "mod|shift|[,mod|shift|{", splitKey: "|" },
+};
+
+/**
+ * Registers each hotkey by `event.code`, plus a `useKey` fallback that only
+ * handles events with an empty `code` (remote-desktop/automation sources).
+ */
+function useHotkeys(
+  keys: Keys,
+  callback: HotkeyCallback,
+  options: Options = {},
+  dependencies?: DependencyList,
+): void {
+  const enabled = options.enabled;
+  const preventDefault = options.preventDefault;
+  const enabledRef = useRef(enabled);
+  const preventDefaultRef = useRef(preventDefault);
+  enabledRef.current = enabled;
+  preventDefaultRef.current = preventDefault;
+
+  const latestEnabled = useCallback((event: KeyboardEvent, hotkeysEvent: HotkeyEvent): boolean => {
+    const current = enabledRef.current;
+    return typeof current === "function" ? current(event, hotkeysEvent) : current !== false;
+  }, []);
+
+  // react-hotkeys-hook calls preventDefault before enabled, so the enabled
+  // gate has to be repeated here.
+  const latestPreventDefault = useCallback(
+    (event: KeyboardEvent, hotkeysEvent: HotkeyEvent): boolean => {
+      if (!latestEnabled(event, hotkeysEvent)) return false;
+      const current = preventDefaultRef.current;
+      return typeof current === "function" ? current(event, hotkeysEvent) : current === true;
+    },
+    [latestEnabled],
+  );
+
+  // One stable predicate per binding/gate pair; no listener churn on re-render.
+  const gates = useMemo(
+    () => ({
+      primaryEnabled: (event: KeyboardEvent, hotkeysEvent: HotkeyEvent) =>
+        hasCode(event) && latestEnabled(event, hotkeysEvent),
+      fallbackEnabled: (event: KeyboardEvent, hotkeysEvent: HotkeyEvent) =>
+        isEmptyCode(event) && latestEnabled(event, hotkeysEvent),
+      primaryPreventDefault: (event: KeyboardEvent, hotkeysEvent: HotkeyEvent) =>
+        hasCode(event) && latestPreventDefault(event, hotkeysEvent),
+      fallbackPreventDefault: (event: KeyboardEvent, hotkeysEvent: HotkeyEvent) =>
+        isEmptyCode(event) && latestPreventDefault(event, hotkeysEvent),
+    }),
+    [latestEnabled, latestPreventDefault],
+  );
+
+  const primaryEnabled =
+    typeof enabled === "function" ? gates.primaryEnabled : enabled !== false && hasCode;
+  const fallbackEnabled =
+    typeof enabled === "function" ? gates.fallbackEnabled : enabled !== false && isEmptyCode;
+
+  let primaryPreventDefault: Options["preventDefault"] = false;
+  let fallbackPreventDefault: Options["preventDefault"] = false;
+  if (enabled !== false && (preventDefault === true || typeof preventDefault === "function")) {
+    const useFunctionGate = typeof preventDefault === "function" || typeof enabled === "function";
+    primaryPreventDefault = useFunctionGate ? gates.primaryPreventDefault : hasCode;
+    fallbackPreventDefault = useFunctionGate ? gates.fallbackPreventDefault : isEmptyCode;
+  }
+
+  useHotkeysImpl(
+    keys,
+    callback,
+    { ...options, enabled: primaryEnabled, preventDefault: primaryPreventDefault },
+    dependencies,
+  );
+
+  const override = typeof keys === "string" ? EMPTY_CODE_KEY_OVERRIDES[keys] : undefined;
+  useHotkeysImpl(
+    override?.keys ?? keys,
+    callback,
+    {
+      ...options,
+      useKey: true,
+      ...(override ? { splitKey: override.splitKey } : {}),
+      enabled: fallbackEnabled,
+      preventDefault: fallbackPreventDefault,
+    },
+    dependencies,
+  );
 }
 
 /**
