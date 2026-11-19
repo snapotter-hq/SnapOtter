@@ -1656,6 +1656,88 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     error.mockRestore();
   });
 
+  it("names the interrupted bundle and drops only it from the ledger on a native install (#1136)", () => {
+    // Without a base venv to reseed from, the venv may be half-written. The
+    // ledger must stop claiming the interrupted bundle is installed, so the
+    // Install button becomes the repair, and the warning must say which one.
+    writeTestManifest({
+      "background-removal": { models: [] },
+      transcription: { models: [] },
+    });
+    mod.markInstalled("background-removal", "2.1.0", []);
+    mod.markInstalled("transcription", "2.1.0", []);
+    fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(
+      marker,
+      JSON.stringify({ bundleId: "background-removal", startedAt: "2026-01-01T00:00:00Z" }),
+    );
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+
+    expect(existsSync(marker)).toBe(false);
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/background-removal/);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(false);
+    expect(mod.isFeatureInstalled("transcription")).toBe(true);
+    expect(Object.keys(JSON.parse(readFileSync(installedPath, "utf-8")).bundles)).toEqual([
+      "transcription",
+    ]);
+    warn.mockRestore();
+  });
+
+  it("retains the marker and defers recovery when the ledger cannot be rewritten (#1136)", () => {
+    writeTestManifest({ "background-removal": { models: [] } });
+    mod.markInstalled("background-removal", "2.1.0", []);
+    fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(marker, JSON.stringify({ bundleId: "background-removal" }));
+    fsFaults.onRenameDestMatch = {
+      match: installedPath,
+      callback: () => {
+        throw Object.assign(new Error("EROFS: read-only file system"), { code: "EROFS" });
+      },
+    };
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(false);
+
+    expect(existsSync(marker)).toBe(true);
+    expect(error.mock.calls.flat().join(" ")).toMatch(/installed\.json/);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
+  it.each([
+    ["empty", ""],
+    ["truncated", '{"bundleId":"backgr'],
+    ["missing bundleId", JSON.stringify({ startedAt: "2026-01-01T00:00:00Z" })],
+    ["non-string bundleId", JSON.stringify({ bundleId: 42 })],
+    ["a JSON array", "[]"],
+  ])("keeps the ledger and warns without a name when the marker is %s (#1136)", (_label, body) => {
+    writeTestManifest({ "background-removal": { models: [] } });
+    mod.markInstalled("background-removal", "2.1.0", []);
+    fsFaults.forceNonDocker = true;
+    markNoReseedAvailable();
+    const marker = join(aiDir, "venv.writing");
+    writeFileSync(marker, body);
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+
+    expect(existsSync(marker)).toBe(false);
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/interrupted/i);
+    expect(mod.isFeatureInstalled("background-removal")).toBe(true);
+    expect(error).not.toHaveBeenCalled();
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
   it("completes recovery when a base venv exists but the reseed script does not", () => {
     // /opt/venv doubles as a native install's own venv path, so gating the
     // reseed on the directory alone put that host straight back into the
