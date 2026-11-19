@@ -115,6 +115,17 @@ describe("entrypoint-lib.sh verify_user_remap", () => {
     expect(stderr).toBe("");
   });
 
+  it("treats a zero-padded PUID as the same id", () => {
+    const { status, stderr } = withId("1000", "1000", "verify_user_remap snapotter 01000 01000");
+    expect(status, stderr).toBe(0);
+  });
+
+  it("fails when the user cannot be resolved at all", () => {
+    const { status, stderr } = runLib("id() { return 1; }\nverify_user_remap snapotter 2345 2345");
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("still ?:?");
+  });
+
   it("fails naming the cause and the --user alternative when the uid did not change", () => {
     const { status, stderr } = withId("999", "999", "verify_user_remap snapotter 2345 2345");
     expect(status).not.toBe(0);

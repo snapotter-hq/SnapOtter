@@ -69,7 +69,9 @@ verify_user_remap() {
   _vr_gid="$3"
   _vr_cur_uid="$(id -u "$_vr_user" 2>/dev/null || echo '?')"
   _vr_cur_gid="$(id -g "$_vr_user" 2>/dev/null || echo '?')"
-  if [ "$_vr_cur_uid" = "$_vr_uid" ] && [ "$_vr_cur_gid" = "$_vr_gid" ]; then
+  # Numeric compare so PUID=01000 matches uid 1000; a non-numeric value makes
+  # -eq error, which reads as a mismatch, and usermod would have refused it too.
+  if [ "$_vr_cur_uid" -eq "$_vr_uid" ] 2>/dev/null && [ "$_vr_cur_gid" -eq "$_vr_gid" ] 2>/dev/null; then
     return 0
   fi
   {
