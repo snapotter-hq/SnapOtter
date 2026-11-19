@@ -41,10 +41,11 @@ describe.skipIf(!hasPikepdf)("pdf-metadata (requires pikepdf)", () => {
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
     expect(envelope.downloadUrl).toBeDefined();
-    expect(envelope.resultPayload).toBeDefined();
-    expect(envelope.resultPayload.metadata).toBeDefined();
-    expect(envelope.resultPayload.metadata.Title).toBe("Test Title");
-    expect(envelope.resultPayload.metadata.Author).toBe("Test Author");
+    // resultPayload spreads flat into the sync envelope (tool-factory.ts), so
+    // the metadata lands at envelope.metadata, not envelope.resultPayload.metadata.
+    expect(envelope.resultPayload).toBeUndefined();
+    expect(envelope.metadata.Title).toBe("Test Title");
+    expect(envelope.metadata.Author).toBe("Test Author");
 
     const dl = await testApp.app.inject({
       method: "GET",
