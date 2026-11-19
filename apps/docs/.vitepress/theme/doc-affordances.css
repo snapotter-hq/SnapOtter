@@ -1,0 +1,16 @@
+/* Readers click code blocks to copy them (#5008), so the copy button stays
+   visible instead of appearing only on hover. */
+.vp-doc [class*="language-"] > button.copy {
+  opacity: 1;
+}
+
+/* The language label sits under the copy button; VitePress hides it on hover
+   for the same reason. */
+.vp-doc [class*="language-"] > button.copy + span.lang {
+  opacity: 0;
+}
+
+/* Heading text links to its section (heading-links.ts). */
+.vp-doc :is(h2, h3, h4)[id] {
+  cursor: pointer;
+}
