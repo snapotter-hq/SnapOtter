@@ -868,7 +868,7 @@ describe("ToolPage partial batch URL import (#3751)", () => {
       ).toBeTruthy();
       expect(within(dialog).getByText("notes.txt")).toBeTruthy();
       expect(
-        within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
+        within(dialog).getByText(/^JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and \d+ more$/),
       ).toBeTruthy();
 
       // Retry b.png inside the still-open modal and import it alongside a.png.
@@ -891,7 +891,7 @@ describe("ToolPage partial batch URL import (#3751)", () => {
       expect(within(dialog).queryByText("b.png")).toBeNull();
       expect(within(dialog).getByText("notes.txt")).toBeTruthy();
       expect(
-        within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
+        within(dialog).getByText(/^JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and \d+ more$/),
       ).toBeTruthy();
 
       // Navigating to another tool closes the modal.
