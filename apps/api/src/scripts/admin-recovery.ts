@@ -1,11 +1,10 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { eq } from "drizzle-orm";
-import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { closeDb, db, schema } from "../db/index.js";
 import { closeRedis, sharedRedis } from "../jobs/connection.js";
-import { auditLog } from "../lib/audit.js";
+import { type AuditLogger, auditLog } from "../lib/audit.js";
 import { loginThrottleKey } from "../lib/login-throttle.js";
 import { normalizePassword } from "../lib/password-form.js";
 import {
@@ -24,14 +23,14 @@ import {
 } from "../plugins/auth.js";
 import { type MfaPolicy, readMfaPolicySetting } from "../plugins/mfa.js";
 
-// auditLog's first parameter is a FastifyBaseLogger, but a CLI has no request.
-// It only calls .info(obj, msg) and .warn(obj, msg), so a console-backed shim
-// satisfies it. Cast through unknown because we intentionally implement only
-// the two methods auditLog uses.
-const cliLogger = {
+// A CLI has no request logger, so auditLog gets a console-backed one. Typed as
+// AuditLogger with no cast: if auditLog starts calling another method, tsc
+// fails here rather than the command throwing after its write committed.
+const cliLogger: AuditLogger = {
   info: (obj: unknown, msg?: string) => console.log(`[audit] ${msg ?? ""}`.trim(), obj),
   warn: (obj: unknown, msg?: string) => console.warn(`[audit] ${msg ?? ""}`.trim(), obj),
-} as unknown as FastifyBaseLogger;
+  error: (obj: unknown, msg?: string) => console.error(`[audit] ${msg ?? ""}`.trim(), obj),
+};
 
 const PASSWORD_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const PASSWORD_LOWER = "abcdefghijklmnopqrstuvwxyz";
