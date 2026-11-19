@@ -1,19 +1,21 @@
 ---
-description: "패턴 템플릿을 사용하여 여러 파일의 이름을 바꾸고 ZIP으로 다운로드합니다."
-i18n_source_hash: 2776dcc2f71c
+description: "패턴 템플릿을 사용하여 여러 이미지의 이름을 바꾸고 ZIP으로 다운로드합니다."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 0fb2e63efe9d
 ---
 
 # Bulk Rename {#bulk-rename}
 
-인덱스, 자릿수를 맞춘 인덱스, 원본 파일명에 대한 자리 표시자가 있는 패턴 템플릿을 사용하여 여러 파일의 이름을 바꿉니다. 이름이 바뀐 모든 파일을 담은 ZIP 아카이브를 반환합니다.
+인덱스, 자릿수를 맞춘 인덱스, 원본 파일명에 대한 자리 표시자가 있는 패턴 템플릿을 사용하여 여러 이미지의 이름을 바꿉니다. 이름이 바뀐 모든 이미지를 담은 ZIP 아카이브를 반환합니다.
 
 ## API 엔드포인트 {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-여러 파일과 JSON `settings` 필드가 포함된 multipart form data를 받습니다.
+여러 이미지 파일과 JSON `settings` 필드가 포함된 multipart form data를 받습니다.
+
+업로드하는 파일은 모두 이미지여야 합니다. 각 파일의 헤더는 ZIP 생성을 시작하기 전에 검사되며, 바이트는 그대로 ZIP에 담깁니다(재인코딩 없음). 인식할 수 없는 이미지 파일이 있거나 `MAX_MEGAPIXELS`를 초과하는 파일이 하나라도 있으면 전체 요청이 `400`으로 실패하고, 해당 파일 이름이 담긴 오류가 반환됩니다. 예: `Invalid file "notes.txt": Unrecognized image format`
 
 ## 매개변수 {#parameters}
 

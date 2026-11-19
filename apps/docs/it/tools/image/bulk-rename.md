@@ -1,19 +1,21 @@
 ---
-description: "Rinomina più file usando un modello di pattern e li scarica come ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Rinomina più immagini usando un modello di pattern e le scarica come ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: e89cd776d886
 ---
 
 # Rinomina in blocco {#bulk-rename}
 
-Rinomina più file usando un modello di pattern con segnaposto per indice, indice con riempimento e nome del file originale. Restituisce un archivio ZIP contenente tutti i file rinominati.
+Rinomina più immagini usando un modello di pattern con segnaposto per indice, indice con riempimento e nome del file originale. Restituisce un archivio ZIP contenente tutte le immagini rinominate.
 
 ## Endpoint API {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Accetta dati di form multipart con più file e un campo JSON `settings`.
+Accetta dati di form multipart con più file immagine e un campo JSON `settings`.
+
+Ogni file caricato deve essere un'immagine. L'intestazione di ogni file viene controllata prima che lo ZIP inizi, e i byte vengono poi inseriti senza modifiche (nessuna ricodifica). Se un file non è un'immagine riconosciuta, o supera `MAX_MEGAPIXELS`, l'intera richiesta fallisce con `400` e un errore che nomina quel file, ad esempio `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parametri {#parameters}
 
