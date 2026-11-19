@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ffmpegAvailable, probeMedia } from "@snapotter/media-engine";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -81,4 +82,47 @@ describe.skipIf(!ffmpegAvailable())("images-to-video (requires ffmpeg)", () => {
     const parsed = JSON.parse(res.body);
     expect(parsed.error).toMatch(/at least 2 files/i);
   }, 60_000);
+});
+
+// Built with Sharp, so this runs on CI shards that have no ffmpeg (#4826).
+describe("images-to-video animated output", () => {
+  it.each([
+    ["gif", "image/gif"],
+    ["webp", "image/webp"],
+  ])(
+    "builds an animated %s with one frame per image",
+    async (format, mime) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        {
+          name: "settings",
+          content: JSON.stringify({ outputFormat: format, frameDelayMs: 250, loop: 2 }),
+        },
+      ]);
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/tools/video/images-to-video",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const envelope = JSON.parse(res.body);
+      expect(envelope.downloadUrl).toContain(`slideshow.${format}`);
+
+      const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+      expect(dl.statusCode).toBe(200);
+      expect(dl.headers["content-type"]).toContain(mime);
+
+      const meta = await sharp(dl.rawPayload).metadata();
+      const first = await sharp(JPG).metadata();
+      expect(meta.format).toBe(format);
+      expect(meta.pages).toBe(2);
+      expect(meta.width).toBe(first.width);
+      expect(meta.delay).toEqual([250, 250]);
+      expect(meta.loop).toBe(2);
+    },
+    60_000,
+  );
 });

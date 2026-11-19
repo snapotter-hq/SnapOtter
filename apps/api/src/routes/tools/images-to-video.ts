@@ -1,9 +1,10 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { framesToAnimation } from "../../lib/frames-to-animation.js";
 import { asInputErrorIfUndecodable, withImageEncodeContextV2 } from "../../lib/image-error.js";
 import { mp4TimescaleArgs, runFfmpegWithProgress } from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -19,7 +20,13 @@ const settingsSchema = z.object({
   secondsPerImage: z.number().min(0.5).max(10).default(2),
   resolution: z.enum(["1080p", "720p", "square"]).default("720p"),
   fps: z.number().int().min(10).max(60).default(30),
+  outputFormat: z.enum(["mp4", "gif", "webp"]).default("mp4"),
+  // GIF and WebP only. Browsers stretch delays under 20 ms to 100 ms.
+  frameDelayMs: z.number().int().min(20).max(10_000).default(500),
+  loop: z.number().int().min(0).max(100).default(0),
 });
+
+type Settings = z.infer<typeof settingsSchema>;
 
 export function registerImagesToVideo(app: FastifyInstance) {
   createToolRoute(app, {
@@ -37,6 +44,9 @@ export function registerImagesToVideo(app: FastifyInstance) {
       }
 
       const settings = settingsSchema.parse(ctx.settings);
+      if (settings.outputFormat !== "mp4") {
+        return await writeAnimation(ctx, { ...settings, outputFormat: settings.outputFormat });
+      }
       const { w: W, h: H } = DIMS[settings.resolution];
 
       const paths = await stageImageFrames(ctx, settings.resolution);
@@ -77,6 +87,28 @@ export function registerImagesToVideo(app: FastifyInstance) {
     },
   });
 }
+
+const writeAnimation = (
+  ctx: ToolProcessCtxV2,
+  settings: Settings & { outputFormat: "gif" | "webp" },
+) =>
+  withImageEncodeContextV2<Settings>(
+    "Animated image creation failed",
+    (s) => s.outputFormat,
+    async (innerCtx) => {
+      const { outputFormat: format, frameDelayMs, loop } = settings;
+      const buffer = await framesToAnimation(
+        innerCtx.inputs.map((input) => input.buffer),
+        { format, frameDelayMs, loop },
+      );
+      const dir = join(innerCtx.scratchDir, "media");
+      await mkdir(dir, { recursive: true });
+      const filename = `slideshow.${format}`;
+      const scratchPath = join(dir, filename);
+      await writeFile(scratchPath, buffer);
+      return { scratchPath, filename, contentType: `image/${format}` };
+    },
+  )({ ...ctx, settings });
 
 async function stageImageFrames(ctx: ToolProcessCtxV2, resolution: string): Promise<string[]> {
   return withImageEncodeContextV2<string>(

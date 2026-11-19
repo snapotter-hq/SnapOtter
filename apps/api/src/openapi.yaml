@@ -11391,9 +11391,12 @@ paths:
                   type: string
                   description: |
                     JSON string with options:
-                    - `secondsPerImage` (number 0.5-10, default 2) - Display duration per image in seconds
-                    - `resolution` (string, default "720p") - One of: 1080p, 720p, square
-                    - `fps` (integer 10-60, default 30) - Output frame rate
+                    - `outputFormat` (string, default "mp4") - One of: mp4, gif, webp
+                    - `secondsPerImage` (number 0.5-10, default 2) - MP4 only. Display duration per image in seconds
+                    - `resolution` (string, default "720p") - MP4 only. One of: 1080p, 720p, square
+                    - `fps` (integer 10-60, default 30) - MP4 only. Output frame rate
+                    - `frameDelayMs` (integer 20-10000, default 500) - GIF and WebP only. Time each image is shown, in milliseconds
+                    - `loop` (integer 0-100, default 0) - GIF and WebP only. Times the animation plays; 0 loops forever
             example:
               file:
                 - photo.png

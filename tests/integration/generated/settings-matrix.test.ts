@@ -806,6 +806,9 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "resolution square", settings: { resolution: "square" } },
     { label: "fps 10", settings: { fps: 10 } },
     { label: "fps 60", settings: { fps: 60 } },
+    { label: "gif output", settings: { outputFormat: "gif" } },
+    { label: "webp output", settings: { outputFormat: "webp" } },
+    { label: "gif 20ms once", settings: { outputFormat: "gif", frameDelayMs: 20, loop: 1 } },
   ],
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

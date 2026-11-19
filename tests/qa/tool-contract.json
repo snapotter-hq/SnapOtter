@@ -10083,6 +10083,18 @@
       {
         "key": "fps",
         "values": [10, 35, 60, null]
+      },
+      {
+        "key": "outputFormat",
+        "values": ["mp4", "gif", "webp", null]
+      },
+      {
+        "key": "frameDelayMs",
+        "values": [20, 5010, 10000, null]
+      },
+      {
+        "key": "loop",
+        "values": [0, 50, 100, null]
       }
     ],
     "invalidProbes": [
@@ -10123,6 +10135,46 @@
       },
       {
         "key": "fps",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "outputFormat",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "outputFormat",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": 19,
+        "why": "below declared min"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": 10001,
+        "why": "above declared max"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "loop",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "loop",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "loop",
         "value": "not-a-number",
         "why": "wrong type"
       }
