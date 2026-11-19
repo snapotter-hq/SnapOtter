@@ -3,6 +3,7 @@ import Papa from "papaparse";
 import { z } from "zod";
 import { csvParseFailure } from "../../lib/csv-parse.js";
 import { rowsToXlsx } from "../../lib/csv-to-xlsx.js";
+import { xlsxToCsv } from "../../lib/xlsx-to-csv.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -23,34 +24,9 @@ export function registerCsvExcel(app: FastifyInstance) {
       const base = input.filename.replace(/\.[^.]+$/, "");
       const lower = input.filename.toLowerCase();
 
-      // Dynamic import: exceljs is heavy; load it only when this tool runs.
-      // exceljs is CJS, so under ESM the constructor lives on the default export
-      // (namespace `.Workbook` is undefined -> "is not a constructor").
-      const { default: ExcelJS } = await import("exceljs");
-
       if (lower.endsWith(".xlsx")) {
-        // xlsx -> csv: load workbook, pick the Nth worksheet, extract rows
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(input.buffer as unknown as ArrayBuffer);
-        const ws = workbook.worksheets[settings.sheet - 1];
-        if (!ws) {
-          throw new InputValidationError(
-            `Worksheet ${settings.sheet} not found (workbook has ${workbook.worksheets.length} sheets)`,
-          );
-        }
-        const rows: string[][] = [];
-        ws.eachRow((row) => {
-          const cells: string[] = [];
-          row.eachCell({ includeEmpty: true }, (cell) => {
-            // cell.text renders dates via Date.toString() (timezone-dependent and
-            // not round-trippable); emit ISO 8601 for Date values instead.
-            cells.push(cell.value instanceof Date ? cell.value.toISOString() : cell.text);
-          });
-          rows.push(cells);
-        });
-        const csv = Papa.unparse(rows);
         return {
-          buffer: Buffer.from(csv, "utf8"),
+          buffer: await xlsxToCsv(input.buffer, settings.sheet),
           filename: `${base}.csv`,
           contentType: "text/csv",
         };
