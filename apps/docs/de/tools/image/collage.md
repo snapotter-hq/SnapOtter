@@ -1,6 +1,6 @@
 ---
 description: "Kombiniert mehrere Bilder zu Rastercollagen mit über 25 Vorlagen, einstellbaren Abständen und Ecken sowie Schwenken und Zoomen pro Zelle."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 480169ab7be2
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Hinweise {#notes}
 
 - Laden Sie mehrere Bilddateien in der Multipart-Anfrage hoch. Die Bilder werden den Vorlagenzellen in der Reihenfolge des Hochladens zugewiesen.
-- Werden mehr Bilder hochgeladen, als die Vorlage unterstützt, werden die überzähligen Bilder ignoriert.
+- Ohne `cells` senden Sie ein Bild pro Vorlagenzelle. Bei zu wenigen Bildern antwortet der Server mit 400, dem Code `INVALID_SETTINGS` und der Anzahl, die die Vorlage braucht. Um Zellen leer zu lassen, senden Sie `cells` und setzen `imageIndex` für jede leere Zelle auf `-1`.
+- Werden mehr Bilder hochgeladen, als die Vorlage aufnimmt, werden die überzähligen Bilder ignoriert, und das Array `warnings` in der Antwort nennt sie.
 - Unterstützt HEIC-, RAW-, PSD- und SVG-Eingabeformate (werden automatisch dekodiert).
 - Die Basisgröße der Leinwand beträgt 2400 px an der längsten Seite und wird anhand des gewählten Seitenverhältnisses skaliert.
 - Wenn `aspectRatio` `"free"` ist, verwendet die Leinwand standardmäßig 4:3 (2400x1800).

@@ -1,6 +1,6 @@
 ---
 description: "Gabungkan beberapa gambar menjadi kolase grid dengan 25+ template, jarak dan sudut yang dapat disesuaikan, serta pan dan zoom per sel."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: e7c79856f0ca
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Catatan {#notes}
 
 - Unggah beberapa file gambar dalam permintaan multipart. Gambar ditempatkan ke sel template sesuai urutan unggahan.
-- Jika jumlah gambar yang diunggah lebih banyak dari yang didukung template, gambar tambahan diabaikan.
+- Tanpa `cells`, kirim satu gambar untuk setiap sel template. Jika gambarnya kurang, respons berupa 400 dengan kode `INVALID_SETTINGS` dan jumlah gambar yang dibutuhkan template. Untuk mengosongkan sel, kirim `cells` dan atur `imageIndex` ke `-1` untuk setiap sel kosong.
+- Jika jumlah gambar yang diunggah melebihi kapasitas template, gambar tambahan diabaikan dan array `warnings` di respons menyebutkan namanya.
 - Mendukung format input HEIC, RAW, PSD, dan SVG (didekode otomatis).
 - Ukuran dasar kanvas adalah 2400px pada sisi terpanjang, diskalakan sesuai rasio aspek yang dipilih.
 - Ketika `aspectRatio` adalah `"free"`, kanvas secara default menggunakan 4:3 (2400x1800).

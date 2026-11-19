@@ -1,6 +1,6 @@
 ---
 description: "使用 25 多种模板将多张图片合成为网格拼贴，可调整间距与圆角，并支持逐单元格平移与缩放。"
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: a4e5c1913881
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## 注意事项 {#notes}
 
 - 在 multipart 请求中上传多个图片文件。图片按上传顺序分配到模板单元格。
-- 如果上传的图片数量超过模板支持的数量，多余的图片会被忽略。
+- 不传 `cells` 时，模板的每个单元格需要一张图片。图片数量不足时返回 400，附带代码 `INVALID_SETTINGS` 和模板所需的图片数量。如需留空单元格，请传入 `cells`，并将每个空单元格的 `imageIndex` 设为 `-1`。
+- 如果上传的图片数量超过模板可容纳的数量，多余的图片会被忽略，响应中的 `warnings` 数组会列出它们的名称。
 - 支持 HEIC、RAW、PSD 和 SVG 输入格式（自动解码）。
 - 画布基础尺寸为最长边 2400px，并按所选宽高比缩放。
 - 当 `aspectRatio` 为 `"free"` 时，画布默认为 4:3（2400x1800）。

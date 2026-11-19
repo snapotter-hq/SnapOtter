@@ -1,6 +1,6 @@
 ---
 description: "使用 25+ 種範本、可調整的間距與圓角，以及每格的平移與縮放，將多張圖片組合成網格拼貼。"
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 562975f3d64d
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## 備註 {#notes}
 
 - 在 multipart 請求中上傳多個圖片檔案。圖片會依上傳順序指派到範本格子。
-- 若上傳的圖片數量超過範本所支援的數量，多餘的圖片會被忽略。
+- 未傳入 `cells` 時，範本的每個格子都需要一張圖片。圖片數量不足時會回傳 400，並附上代碼 `INVALID_SETTINGS` 與範本所需的圖片數量。若要讓格子留空，請傳入 `cells`，並將每個空格子的 `imageIndex` 設為 `-1`。
+- 若上傳的圖片數量超過範本可容納的數量，多餘的圖片會被忽略，回應中的 `warnings` 陣列會列出它們的名稱。
 - 支援 HEIC、RAW、PSD 與 SVG 輸入格式（自動解碼）。
 - 畫布基準尺寸為最長邊 2400px，並依所選長寬比縮放。
 - 當 `aspectRatio` 為 `"free"` 時，畫布預設為 4:3（2400x1800）。

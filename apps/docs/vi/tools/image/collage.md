@@ -1,6 +1,6 @@
 ---
 description: "Ghép nhiều ảnh thành các bố cục ghép ảnh dạng lưới với hơn 25 mẫu, khoảng cách và bo góc điều chỉnh được, cùng thao tác di chuyển và phóng to theo từng ô."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: d0c4f3ac88f9
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Ghi chú {#notes}
 
 - Tải lên nhiều tệp ảnh trong yêu cầu multipart. Các ảnh được gán vào ô mẫu theo thứ tự tải lên.
-- Nếu tải lên nhiều ảnh hơn mức mẫu hỗ trợ, các ảnh dư sẽ bị bỏ qua.
+- Khi không gửi `cells`, hãy gửi một ảnh cho mỗi ô của mẫu. Nếu gửi ít ảnh hơn, phản hồi là 400 kèm mã `INVALID_SETTINGS` và số ảnh mà mẫu cần. Để để trống ô, hãy gửi `cells` và đặt `imageIndex` thành `-1` cho mỗi ô trống.
+- Nếu tải lên nhiều ảnh hơn số ô của mẫu, các ảnh dư sẽ bị bỏ qua và mảng `warnings` trong phản hồi sẽ nêu tên chúng.
 - Hỗ trợ định dạng đầu vào HEIC, RAW, PSD và SVG (được giải mã tự động).
 - Kích thước gốc của canvas là 2400px ở cạnh dài nhất, được co giãn theo tỷ lệ khung hình đã chọn.
 - Khi `aspectRatio` là `"free"`, canvas mặc định là 4:3 (2400x1800).

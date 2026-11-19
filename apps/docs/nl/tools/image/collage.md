@@ -1,6 +1,6 @@
 ---
 description: "Combineer meerdere afbeeldingen tot rastercollages met meer dan 25 sjablonen, aanpasbare tussenruimtes en hoeken, en pannen en zoomen per cel."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: a9345e0095b7
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Opmerkingen {#notes}
 
 - Upload meerdere afbeeldingsbestanden in het multipart-verzoek. De afbeeldingen worden in uploadvolgorde aan de sjablooncellen toegewezen.
-- Als er meer afbeeldingen worden geüpload dan het sjabloon ondersteunt, worden de extra afbeeldingen genegeerd.
+- Stuur zonder `cells` één afbeelding per sjablooncel. Bij te weinig afbeeldingen volgt een 400 met code `INVALID_SETTINGS` en het aantal dat het sjabloon nodig heeft. Wil je cellen leeg laten, stuur dan `cells` mee en zet `imageIndex` op `-1` voor elke lege cel.
+- Als er meer afbeeldingen worden geüpload dan in het sjabloon passen, worden de extra afbeeldingen genegeerd en noemt de array `warnings` in het antwoord ze bij naam.
 - Ondersteunt HEIC-, RAW-, PSD- en SVG-invoerformaten (automatisch gedecodeerd).
 - De basisgrootte van het canvas is 2400px aan de langste zijde, geschaald op basis van de gekozen beeldverhouding.
 - Als `aspectRatio` `"free"` is, staat het canvas standaard op 4:3 (2400x1800).

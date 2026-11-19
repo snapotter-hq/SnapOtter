@@ -1,6 +1,6 @@
 ---
 description: "Combina varias imágenes en collages de cuadrícula con más de 25 plantillas, espacios y esquinas ajustables, y desplazamiento y zoom por celda."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 76d7bdb22d30
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Notas {#notes}
 
 - Sube varios archivos de imagen en la solicitud multipart. Las imágenes se asignan a las celdas de la plantilla en el orden de carga.
-- Si se suben más imágenes de las que admite la plantilla, las imágenes sobrantes se ignoran.
+- Sin `cells`, envía una imagen por cada celda de la plantilla. Si envías menos, la respuesta es 400 con el código `INVALID_SETTINGS` y el número de imágenes que necesita la plantilla. Para dejar celdas vacías, envía `cells` y pon `imageIndex` en `-1` en cada celda vacía.
+- Si se suben más imágenes de las que caben en la plantilla, las sobrantes se ignoran y el array `warnings` de la respuesta las nombra.
 - Admite los formatos de entrada HEIC, RAW, PSD y SVG (decodificados automáticamente).
 - El tamaño base del lienzo es de 2400 px en el lado más largo, escalado según la relación de aspecto elegida.
 - Cuando `aspectRatio` es `"free"`, el lienzo usa de forma predeterminada 4:3 (2400x1800).

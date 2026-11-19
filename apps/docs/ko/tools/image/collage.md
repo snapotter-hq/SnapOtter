@@ -1,6 +1,6 @@
 ---
 description: "25개 이상의 템플릿, 조정 가능한 간격과 모서리, 셀별 이동 및 확대/축소로 여러 이미지를 그리드 콜라주로 결합합니다."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 5f0f00e8ca46
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## 참고 사항 {#notes}
 
 - multipart 요청에 여러 이미지 파일을 업로드하세요. 이미지는 업로드 순서대로 템플릿 셀에 할당됩니다.
-- 템플릿이 지원하는 것보다 많은 이미지가 업로드되면 초과된 이미지는 무시됩니다.
+- `cells` 없이 보낼 때는 템플릿 셀마다 이미지를 한 장씩 보내세요. 이미지가 부족하면 코드 `INVALID_SETTINGS`와 템플릿에 필요한 개수가 담긴 400이 반환됩니다. 셀을 비워 두려면 `cells`를 보내고 빈 셀마다 `imageIndex`를 `-1`로 설정하세요.
+- 템플릿에 들어갈 수 있는 것보다 많은 이미지가 업로드되면 초과된 이미지는 무시되고, 응답의 `warnings` 배열에 그 이름이 표시됩니다.
 - HEIC, RAW, PSD, SVG 입력 형식을 지원합니다(자동 디코딩).
 - 캔버스 기본 크기는 가장 긴 변 기준 2400px이며, 선택한 화면비에 따라 조정됩니다.
 - `aspectRatio`이(가) `"free"`일 때 캔버스는 기본적으로 4:3(2400x1800)으로 설정됩니다.

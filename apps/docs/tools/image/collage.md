@@ -81,7 +81,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Notes {#notes}
 
 - Upload multiple image files in the multipart request. The images are assigned to template cells in upload order.
-- If more images are uploaded than the template supports, extra images are ignored.
+- Without `cells`, send one image per template cell. Fewer images return 400 with code `INVALID_SETTINGS` and the count the template needs. To leave cells empty, send `cells` and set `imageIndex` to `-1` for each empty cell.
+- If more images are uploaded than the template holds, the extra images are ignored and the response's `warnings` array names them.
 - Supports HEIC, RAW, PSD, and SVG input formats (automatically decoded).
 - The canvas base size is 2400px on the longest side, scaled by the chosen aspect ratio.
 - When `aspectRatio` is `"free"`, the canvas defaults to 4:3 (2400x1800).

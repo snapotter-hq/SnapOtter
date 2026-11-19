@@ -1,6 +1,6 @@
 ---
 description: "Combine várias imagens em colagens em grade com mais de 25 modelos, espaçamentos e cantos ajustáveis, além de deslocamento e zoom por célula."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 5d70719c40fc
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Notas {#notes}
 
 - Envie vários arquivos de imagem na requisição multipart. As imagens são atribuídas às células do modelo na ordem de upload.
-- Se forem enviadas mais imagens do que o modelo suporta, as imagens extras são ignoradas.
+- Sem `cells`, envie uma imagem para cada célula do modelo. Com menos imagens, a resposta é 400 com o código `INVALID_SETTINGS` e a quantidade que o modelo precisa. Para deixar células vazias, envie `cells` e defina `imageIndex` como `-1` em cada célula vazia.
+- Se forem enviadas mais imagens do que o modelo comporta, as extras são ignoradas e o array `warnings` da resposta informa os nomes delas.
 - Suporta os formatos de entrada HEIC, RAW, PSD e SVG (decodificados automaticamente).
 - O tamanho base do canvas é de 2400px no lado mais longo, escalado conforme a proporção escolhida.
 - Quando `aspectRatio` é `"free"`, o canvas assume 4:3 por padrão (2400x1800).

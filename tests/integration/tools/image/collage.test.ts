@@ -58,6 +58,7 @@ describe("Collage", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+    expect(result).not.toHaveProperty("warnings");
   });
 
   it("creates a 2-image vertical collage", async () => {
@@ -114,6 +115,63 @@ describe("Collage", () => {
   });
 
   it("handles single image with a 2-image template (fills first cell only)", async () => {
+    // A partial collage is opted into with explicit cells and imageIndex -1,
+    // which is what the web UI sends for empty cells (#4405).
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          cells: [
+            { imageIndex: 0, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+          ],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+  });
+
+  it("rejects too few images for the template when cells are omitted (#4405)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "6-grid-2x3" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.code).toBe("INVALID_SETTINGS");
+    expect(result.error).toMatch(/needs 6 images, 1 given/);
+  });
+
+  it("rejects one image short of a 2-image template when cells are omitted (#4405)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
       {
@@ -132,9 +190,31 @@ describe("Collage", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(200);
-    const result = JSON.parse(res.body);
-    expect(result.downloadUrl).toBeDefined();
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/needs 2 images, 1 given/);
+  });
+
+  it("treats an empty cells array like omitted cells when images are short (#4405)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "solo.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ templateId: "2-h-equal", cells: [] }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("INVALID_SETTINGS");
   });
 
   it("applies custom gap between cells", async () => {
@@ -1981,7 +2061,7 @@ describe("Collage", () => {
 
   // ── Extra images beyond template capacity are truncated ───────────
 
-  it("truncates extra images beyond template capacity", async () => {
+  it("warns about extra images beyond template capacity", async () => {
     // 4-grid only takes 4 images; sending 6 should still succeed
     const images = Array.from({ length: 6 }, (_, i) => ({
       name: `f${i + 1}`,
@@ -2012,6 +2092,12 @@ describe("Collage", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+    // The dropped files are named instead of vanishing silently (#4405).
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toMatch(/holds 4 images/);
+    expect(result.warnings[0]).toContain("4.png");
+    expect(result.warnings[0]).toContain("5.png");
+    expect(result.warnings[0]).not.toContain("3.png");
   });
 
   // ── AVIF format input ─────────────────────────────────────────────
@@ -2735,11 +2821,21 @@ describe("Collage pan range and cover cells (#718)", () => {
   });
 
   it("rounded corners stay clean for JPEG inputs in cover mode", async () => {
-    // No cells at all: the default fit is cover. The cell buffer used to keep
-    // the input format, so the cornerRadius dest-in mask re-encoded to JPEG,
-    // dropped the masked alpha, and the corners flattened to black.
+    // Cover is the default fit. The cell buffer used to keep the input
+    // format, so the cornerRadius dest-in mask re-encoded to JPEG, dropped
+    // the masked alpha, and the corners flattened to black.
     const markerJpeg = await sharp(marker).jpeg({ quality: 95 }).toBuffer();
-    const res = await submitCollage({ cornerRadius: 200 }, markerJpeg, "jpeg");
+    const res = await submitCollage(
+      {
+        cornerRadius: 200,
+        cells: [
+          { imageIndex: 0, objectFit: "cover", panX: 0, panY: 0, zoom: 1 },
+          { imageIndex: -1, objectFit: "cover", panX: 0, panY: 0, zoom: 1 },
+        ],
+      },
+      markerJpeg,
+      "jpeg",
+    );
     expect(res.statusCode).toBe(200);
 
     const output = await download(res);
