@@ -4979,7 +4979,8 @@ export const hi: TranslationKeys = {
       editCancelButton: "रद्द करें",
       updateSuccess: "भूमिका अपडेट की गई",
       updateFailed: "भूमिका अपडेट करने में विफल",
-      deleteConfirm: 'भूमिका "{name}" हटाएं? {count} उपयोगकर्ता(ओं) को पुनः असाइन करना होगा।',
+      deleteConfirm:
+        'भूमिका "{name}" हटाएं? इसके {count} उपयोगकर्ता(ओं) को बिल्ट-इन "user" भूमिका में ले जाया जाएगा।',
       deleteConfirmSimple: 'भूमिका "{name}" हटाएं?',
       deleteSuccess: 'भूमिका "{name}" हटाई गई',
       deleteFailed: "भूमिका हटाने में विफल",

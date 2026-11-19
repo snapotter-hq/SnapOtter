@@ -5189,7 +5189,8 @@ export const sv: TranslationKeys = {
       editCancelButton: "Avbryt",
       updateSuccess: "Roll uppdaterad",
       updateFailed: "Kunde inte uppdatera roll",
-      deleteConfirm: 'Radera roll "{name}"? {count} användare måste omtilldelas.',
+      deleteConfirm:
+        'Radera roll "{name}"? Dess {count} användare flyttas till den inbyggda rollen "user".',
       deleteConfirmSimple: 'Radera roll "{name}"?',
       deleteSuccess: 'Roll "{name}" raderad',
       deleteFailed: "Kunde inte radera roll",

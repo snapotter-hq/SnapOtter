@@ -5205,7 +5205,8 @@ export const ptBR: TranslationKeys = {
       editCancelButton: "Cancelar",
       updateSuccess: "Função atualizada",
       updateFailed: "Falha ao atualizar a função",
-      deleteConfirm: 'Excluir função "{name}"? {count} usuário(s) precisarão ser reatribuídos.',
+      deleteConfirm:
+        'Excluir função "{name}"? Seus {count} usuário(s) serão movidos para a função integrada "user".',
       deleteConfirmSimple: 'Excluir função "{name}"?',
       deleteSuccess: 'Função "{name}" excluída',
       deleteFailed: "Falha ao excluir a função",

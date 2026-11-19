@@ -143,7 +143,16 @@ When `tool` mode is set but the enterprise feature is not available, SnapOtter d
 
 ### Deleting a custom role {#deleting-a-custom-role}
 
-When a custom role is deleted, all users assigned to it are automatically reassigned to the `user` role.
+When a custom role is deleted, all users assigned to it are automatically reassigned to the built-in `user` role. Disabled members stay disabled as `disabled:user`. The settings dialog says this in its delete confirmation, along with how many users will move.
+
+The `DELETE /api/v1/roles/{id}` response lists the users who were moved, and the `ROLE_DELETED` audit entry records the same list under `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Teams {#teams}
 

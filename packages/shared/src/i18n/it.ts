@@ -5209,7 +5209,8 @@ export const it: TranslationKeys = {
       editCancelButton: "Annulla",
       updateSuccess: "Ruolo aggiornato",
       updateFailed: "Aggiornamento del ruolo non riuscito",
-      deleteConfirm: 'Eliminare il ruolo "{name}"? {count} utente/i dovranno essere riassegnati.',
+      deleteConfirm:
+        'Eliminare il ruolo "{name}"? I suoi {count} utente/i passeranno al ruolo predefinito "user".',
       deleteConfirmSimple: 'Eliminare il ruolo "{name}"?',
       deleteSuccess: 'Ruolo "{name}" eliminato',
       deleteFailed: "Eliminazione del ruolo non riuscita",

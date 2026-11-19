@@ -5182,7 +5182,8 @@ export const vi: TranslationKeys = {
       editCancelButton: "Hủy",
       updateSuccess: "Đã cập nhật vai trò",
       updateFailed: "Cập nhật vai trò thất bại",
-      deleteConfirm: 'Xóa vai trò "{name}"? {count} người dùng sẽ cần được phân công lại.',
+      deleteConfirm:
+        'Xóa vai trò "{name}"? {count} người dùng của vai trò này sẽ được chuyển sang vai trò tích hợp "user".',
       deleteConfirmSimple: 'Xóa vai trò "{name}"?',
       deleteSuccess: 'Đã xóa vai trò "{name}"',
       deleteFailed: "Xóa vai trò thất bại",

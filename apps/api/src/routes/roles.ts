@@ -447,7 +447,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         if (!(await canAssignRole(currentActor, "user", tx))) {
           return "reassign-denied" as const;
         }
-        await tx
+        const reassignedUsers = await tx
           .update(schema.users)
           .set({
             role: sql<string>`CASE
@@ -456,9 +456,10 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
             END`,
             updatedAt: new Date(),
           })
-          .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${locked.name}`);
+          .where(sql`regexp_replace(${schema.users.role}, '^(disabled:)+', '') = ${locked.name}`)
+          .returning({ id: schema.users.id, username: schema.users.username });
         await tx.delete(schema.roles).where(eq(schema.roles.id, id));
-        return locked;
+        return { role: locked, reassignedUsers };
       });
       if (removed === "vanished") {
         request.log.info({ roleId: id }, "role deleted between its pre-checks and the row lock");
@@ -476,14 +477,18 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           code: "ESCALATION_DENIED",
         });
       }
+      // The demoted members go under reassignedUsers, never userId or
+      // targetUserId: auditLog reads those keys as the row's actor and target,
+      // which must stay the admin and the role (#4350).
       await auditFromRequest(request)("ROLE_DELETED", {
         adminId: user.id,
         username: user.username,
         roleId: id,
-        roleName: removed.name,
+        roleName: removed.role.name,
+        reassignedUsers: removed.reassignedUsers,
       });
 
-      return reply.send({ ok: true });
+      return reply.send({ ok: true, reassignedUsers: removed.reassignedUsers });
     },
   );
 

@@ -5201,7 +5201,8 @@ export const uk: TranslationKeys = {
       editCancelButton: "Скасувати",
       updateSuccess: "Роль оновлено",
       updateFailed: "Не вдалося оновити роль",
-      deleteConfirm: 'Видалити роль "{name}"? {count} користувачу(ам) потрібне перепризначення.',
+      deleteConfirm:
+        'Видалити роль "{name}"? Її {count} користувача(ів) буде переміщено до вбудованої ролі "user".',
       deleteConfirmSimple: 'Видалити роль "{name}"?',
       deleteSuccess: 'Роль "{name}" видалено',
       deleteFailed: "Не вдалося видалити роль",

@@ -5221,7 +5221,8 @@ export const fr: TranslationKeys = {
       editCancelButton: "Annuler",
       updateSuccess: "Rôle mis à jour",
       updateFailed: "Échec de la mise à jour du rôle",
-      deleteConfirm: 'Supprimer le rôle "{name}" ? {count} utilisateur(s) devront être réassignés.',
+      deleteConfirm:
+        'Supprimer le rôle "{name}" ? Ses {count} utilisateur(s) passeront au rôle intégré "user".',
       deleteConfirmSimple: 'Supprimer le rôle "{name}" ?',
       deleteSuccess: 'Rôle "{name}" supprimé',
       deleteFailed: "Échec de la suppression du rôle",

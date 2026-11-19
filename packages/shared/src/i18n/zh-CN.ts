@@ -4891,7 +4891,7 @@ export const zhCN: TranslationKeys = {
       editCancelButton: "取消",
       updateSuccess: "角色已更新",
       updateFailed: "角色更新失败",
-      deleteConfirm: "删除角色「{name}」？{count} 个用户需要重新分配角色。",
+      deleteConfirm: "删除角色「{name}」？该角色的 {count} 个用户将被移至内置的「user」角色。",
       deleteConfirmSimple: "删除角色「{name}」？",
       deleteSuccess: "角色「{name}」已删除",
       deleteFailed: "角色删除失败",
