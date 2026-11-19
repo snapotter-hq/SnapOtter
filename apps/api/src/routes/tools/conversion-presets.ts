@@ -6,7 +6,12 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { createToolRoute, getToolConfig } from "../tool-factory.js";
+import {
+  type AnyToolRouteConfig,
+  createToolRoute,
+  getToolConfig,
+  type ToolProcessV2,
+} from "../tool-factory.js";
 import { registerImageToPdfPreset } from "./image-to-pdf.js";
 import { registerPdfToImagePreset } from "./pdf-to-image.js";
 import { registerSvgToRasterPreset } from "./svg-to-raster.js";
@@ -14,9 +19,9 @@ import { registerSvgToRasterPreset } from "./svg-to-raster.js";
 /**
  * Narrow settings schema per preset base. Presets lock the output format, so
  * they expose only an optional quality/video knob (or nothing). The locked
- * format is merged in before the base's own processV2 re-validates. Only
- * registry-group bases reach this; the three custom ZIP bases register through
- * their own parameterized registrars.
+ * format is merged in and the result parsed through the base's own schema (see
+ * delegateToBase). Only registry-group bases reach this; the three custom ZIP
+ * bases register through their own parameterized registrars.
  */
 function presetSchema(base: string) {
   if (base === "convert") {
@@ -26,6 +31,32 @@ function presetSchema(base: string) {
     return z.object({ quality: z.enum(["high", "balanced", "small"]).optional() });
   }
   return z.object({});
+}
+
+/**
+ * Run a preset through its base tool. The merged settings go through the
+ * base's schema first so its defaults apply: a base whose processV2 never
+ * re-parses (vectorize wraps a legacy process function) otherwise gets
+ * `undefined` for every setting the preset leaves out, and potrace with
+ * `threshold: undefined` returned a blank SVG for every raster-to-SVG preset
+ * (#4417).
+ */
+function delegateToBase(
+  presetId: string,
+  baseId: string,
+  baseConfig: AnyToolRouteConfig,
+  locked: Record<string, unknown>,
+): ToolProcessV2 {
+  return async (ctx) => {
+    if (!baseConfig.processV2) {
+      throw new Error(`Base "${baseId}" has no processV2 for preset "${presetId}"`);
+    }
+    const settings = baseConfig.settingsSchema.parse({
+      ...locked,
+      ...(ctx.settings as Record<string, unknown>),
+    });
+    return baseConfig.processV2({ ...ctx, settings });
+  };
 }
 
 /**
@@ -86,13 +117,7 @@ export function registerConversionPresets(
       process: async () => {
         throw new Error(`${preset.id} is v2-only`);
       },
-      processV2: async (ctx) => {
-        const merged = { ...preset.locked, ...(ctx.settings as Record<string, unknown>) };
-        if (!baseConfig.processV2) {
-          throw new Error(`Base "${preset.base}" has no processV2 for preset "${preset.id}"`);
-        }
-        return baseConfig.processV2({ ...ctx, settings: merged });
-      },
+      processV2: delegateToBase(preset.id, preset.base, baseConfig, preset.locked),
     });
   }
 
@@ -116,13 +141,7 @@ export function registerConversionPresets(
       process: async () => {
         throw new Error(`${preset.id} is v2-only`);
       },
-      processV2: async (ctx) => {
-        const merged = { ...preset.locked, ...(ctx.settings as Record<string, unknown>) };
-        if (!baseConfig.processV2) {
-          throw new Error(`Base "${preset.base}" has no processV2 for preset "${preset.id}"`);
-        }
-        return baseConfig.processV2({ ...ctx, settings: merged });
-      },
+      processV2: delegateToBase(preset.id, preset.base, baseConfig, preset.locked),
     });
   }
 
