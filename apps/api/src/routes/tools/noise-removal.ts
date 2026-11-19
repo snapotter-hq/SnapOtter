@@ -41,6 +41,7 @@ import {
   normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
+import { resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -62,43 +63,58 @@ const settingsSchema = z.object({
 });
 
 type NoiseRemovalSettings = z.infer<typeof settingsSchema>;
+type OutputFormat = Exclude<NoiseRemovalSettings["format"], "original"> | "gif" | "tiff";
 
-const CONTENT_TYPES: Record<string, string> = {
+const CONTENT_TYPES: Record<OutputFormat, string> = {
   png: "image/png",
   jpeg: "image/jpeg",
-  jpg: "image/jpeg",
   webp: "image/webp",
   avif: "image/avif",
   jxl: "image/jxl",
+  gif: "image/gif",
+  tiff: "image/tiff",
 };
+
+// The bridge hands the sidecar PNG bytes whatever was uploaded, so the
+// sidecar's own "original" always meant PNG (#4469). Resolve it here from the
+// input, falling back to PNG for formats nothing here can encode.
+async function resolveOutputFormatFor(
+  input: Buffer,
+  format: NoiseRemovalSettings["format"],
+): Promise<OutputFormat> {
+  if (format !== "original") return format;
+  const detected = (await resolveOutputFormat(input, "")).format;
+  return Object.hasOwn(CONTENT_TYPES, detected) ? (detected as OutputFormat) : "png";
+}
 
 // The sidecar has no AVIF or JPEG XL encoder: asked for either, it writes PNG
 // bytes and echoes the requested format back (#4468). Ask it for PNG and
 // encode those two here, as upscale does.
-function sidecarFormat(format: NoiseRemovalSettings["format"]) {
+function sidecarFormat(format: OutputFormat) {
   return format === "avif" || format === "jxl" ? "png" : format;
 }
 
 async function finishNoiseRemovalOutput(
   result: Awaited<ReturnType<typeof noiseRemoval>>,
-  settings: NoiseRemovalSettings,
+  format: OutputFormat,
+  quality: number,
   filename: string,
 ) {
   let buffer = result.buffer;
-  let format = result.format;
-  if (settings.format === "jxl") {
-    buffer = await encodeJxl(result.buffer, settings.quality);
-    format = "jxl";
-  } else if (settings.format === "avif") {
-    buffer = await sharp(result.buffer).avif({ quality: settings.quality }).toBuffer();
-    format = "avif";
+  let outFormat = result.format;
+  if (format === "jxl") {
+    buffer = await encodeJxl(result.buffer, quality);
+    outFormat = "jxl";
+  } else if (format === "avif") {
+    buffer = await sharp(result.buffer).avif({ quality }).toBuffer();
+    outFormat = "avif";
   }
 
-  const ext = format === "jpeg" ? "jpg" : format;
+  const ext = outFormat === "jpeg" ? "jpg" : outFormat;
   return {
     buffer,
     filename: `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`,
-    contentType: CONTENT_TYPES[format] || "image/png",
+    contentType: CONTENT_TYPES[outFormat as OutputFormat] || "image/png",
   };
 }
 
@@ -110,6 +126,7 @@ registerAiJobHandler(
     (s) => s?.tier ?? "balanced",
     async (input, data, ctx) => {
       const settings = settingsSchema.parse(data.settings);
+      const format = await resolveOutputFormatFor(input, settings.format);
 
       let result: Awaited<ReturnType<typeof noiseRemoval>>;
       try {
@@ -121,7 +138,7 @@ registerAiJobHandler(
             strength: settings.strength,
             detailPreservation: settings.detailPreservation,
             colorNoise: settings.colorNoise,
-            format: sidecarFormat(settings.format),
+            format: sidecarFormat(format),
             quality: settings.quality,
             signal: ctx.signal,
           },
@@ -131,7 +148,7 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(input, err);
       }
 
-      return finishNoiseRemovalOutput(result, settings, data.filename);
+      return finishNoiseRemovalOutput(result, format, settings.quality, data.filename);
     },
   ),
 );
@@ -324,6 +341,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       async (inputBuffer, settings, filename, ctx) => {
         const s = settings as z.infer<typeof settingsSchema>;
         const orientedBuffer = await autoOrient(inputBuffer);
+        const format = await resolveOutputFormatFor(orientedBuffer, s.format);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
@@ -338,7 +356,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
                 strength: s.strength,
                 detailPreservation: s.detailPreservation,
                 colorNoise: s.colorNoise,
-                format: sidecarFormat(s.format),
+                format: sidecarFormat(format),
                 quality: s.quality,
                 signal: ctx?.signal,
               },
@@ -347,7 +365,7 @@ export function registerNoiseRemoval(app: FastifyInstance) {
           } catch (err) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
-          return finishNoiseRemovalOutput(result, s, filename);
+          return finishNoiseRemovalOutput(result, format, s.quality, filename);
         } finally {
           if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
