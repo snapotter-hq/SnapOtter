@@ -1,8 +1,8 @@
 ---
 description: "مخطط قاعدة بيانات PostgreSQL والجداول وعمليات الترحيل وإجراءات النسخ الاحتياطي في SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 91226ffe5e79
+i18n_output_hash: 72c455796c92
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ i18n_hash_version: 2
 
 | العمود | النوع | ملاحظات |
 |---|---|---|
-| `id` | varchar | المفتاح الأساسي (رمز الجلسة) |
+| `id` | varchar | المفتاح الأساسي (تجزئة SHA-256 لرمز الجلسة) |
 | `userId` | uuid | مفتاح خارجي يشير إلى `users.id` |
 | `expiresAt` | timestamp | وقت انتهاء الصلاحية |
 | `createdAt` | timestamp | وقت الإنشاء |

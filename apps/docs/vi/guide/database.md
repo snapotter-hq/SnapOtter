@@ -1,8 +1,8 @@
 ---
 description: "Lược đồ cơ sở dữ liệu PostgreSQL, các bảng, migration và quy trình sao lưu của SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 4b1965276998
+i18n_output_hash: c5036acac00a
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Các phiên đăng nhập đang hoạt động. Mỗi dòng gắn một token ph
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
-| `id` | varchar | Khóa chính (token phiên) |
+| `id` | varchar | Khóa chính (mã băm SHA-256 của token phiên) |
 | `userId` | uuid | Khóa ngoại tới `users.id` |
 | `expiresAt` | timestamp | Thời điểm hết hạn |
 | `createdAt` | timestamp | Thời điểm tạo |

@@ -1,8 +1,8 @@
 ---
 description: "สคีมาฐานข้อมูล PostgreSQL ตาราง การย้ายข้อมูล และขั้นตอนการสำรองข้อมูลของ SnapOtter"
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 11e48e0ca011
+i18n_output_hash: 831c7aa8c913
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter ใช้ PostgreSQL 17 ร่วมกับ [Drizzle ORM](https://or
 
 | คอลัมน์ | ชนิด | หมายเหตุ |
 |---|---|---|
-| `id` | varchar | คีย์หลัก (โทเคนเซสชัน) |
+| `id` | varchar | คีย์หลัก (แฮช SHA-256 ของโทเคนเซสชัน) |
 | `userId` | uuid | คีย์นอกที่อ้างอิง `users.id` |
 | `expiresAt` | timestamp | เวลาหมดอายุ |
 | `createdAt` | timestamp | เวลาที่สร้าง |

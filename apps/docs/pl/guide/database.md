@@ -1,8 +1,8 @@
 ---
 description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych dla SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: e30652f35103
+i18n_output_hash: 9b65c3c55ab7
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Aktywne sesje logowania. Każdy wiersz łączy token sesji z użytkownikiem.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
-| `id` | varchar | Klucz główny (token sesji) |
+| `id` | varchar | Klucz główny (skrót SHA-256 tokenu sesji) |
 | `userId` | uuid | Klucz obcy do `users.id` |
 | `expiresAt` | timestamp | Czas wygaśnięcia |
 | `createdAt` | timestamp | Czas utworzenia |

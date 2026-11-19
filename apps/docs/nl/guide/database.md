@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: f85602dbff85
+i18n_output_hash: 2b38ff13811f
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Actieve loginsessies. Elke rij koppelt een sessietoken aan een gebruiker.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
-| `id` | varchar | Primaire sleutel (sessietoken) |
+| `id` | varchar | Primaire sleutel (SHA-256-hash van het sessietoken) |
 | `userId` | uuid | Foreign key naar `users.id` |
 | `expiresAt` | timestamp | Vervaltijd |
 | `createdAt` | timestamp | Aanmaaktijd |

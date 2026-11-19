@@ -1,8 +1,8 @@
 ---
 description: "Схема бази даних PostgreSQL, таблиці, міграції та процедури резервного копіювання для SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 41c0d178e879
+i18n_output_hash: 77e519f29c8b
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter використовує PostgreSQL 17 з [Drizzle ORM](https://orm.dr
 
 | Стовпець | Тип | Примітки |
 |---|---|---|
-| `id` | varchar | Первинний ключ (токен сеансу) |
+| `id` | varchar | Первинний ключ (хеш SHA-256 токена сеансу) |
 | `userId` | uuid | Зовнішній ключ на `users.id` |
 | `expiresAt` | timestamp | Час завершення дії |
 | `createdAt` | timestamp | Час створення |

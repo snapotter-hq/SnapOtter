@@ -59,7 +59,8 @@ export async function readMaxSessionsPerUser(): Promise<number> {
  * Takes a per-user transaction advisory lock before reading `schema.sessions`
  * so concurrent logins for the same user under `READ COMMITTED` serialize their
  * count-and-evict pass, and keeps `currentSessionId` last when breaking
- * same-millisecond `createdAt` ties.
+ * same-millisecond `createdAt` ties. `currentSessionId` is the stored row id,
+ * `hashSessionToken(token)`, not the raw token (#4579).
  */
 export async function evictExcessUserSessions(
   tx: Tx,

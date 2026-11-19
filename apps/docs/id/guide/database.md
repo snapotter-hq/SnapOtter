@@ -1,8 +1,8 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur backup untuk SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 23e987ca5c08
+i18n_output_hash: 7d0bf2812aae
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Sesi login yang aktif. Setiap baris mengaitkan token sesi dengan seorang penggun
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | varchar | Primary key (token sesi) |
+| `id` | varchar | Kunci utama (hash SHA-256 dari token sesi) |
 | `userId` | uuid | Foreign key ke `users.id` |
 | `expiresAt` | timestamp | Waktu kedaluwarsa |
 | `createdAt` | timestamp | Waktu pembuatan |

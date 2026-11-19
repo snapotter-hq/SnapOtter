@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter için PostgreSQL veritabanı şeması, tablolar, migrasyonlar ve yedekleme prosedürleri."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: bd5835bc1dc0
+i18n_output_hash: 398e0b7b2e4a
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Etkin oturum açma oturumları. Her satır bir oturum belirtecini bir kullanıc�
 
 | Sütun | Tür | Notlar |
 |---|---|---|
-| `id` | varchar | Birincil anahtar (oturum belirteci) |
+| `id` | varchar | Birincil anahtar (oturum belirtecinin SHA-256 özeti) |
 | `userId` | uuid | `users.id` tablosuna yabancı anahtar |
 | `expiresAt` | timestamp | Sona erme zamanı |
 | `createdAt` | timestamp | Oluşturma zamanı |

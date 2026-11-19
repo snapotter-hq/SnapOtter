@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
 import { normalizePassword } from "../../../apps/api/src/lib/password-form.js";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import { hashPassword } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -278,7 +279,7 @@ describe("Session edge cases", () => {
     await db
       .update(schema.sessions)
       .set({ expiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(schema.sessions.id, token));
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
 
     const res = await testApp.app.inject({
       method: "GET",
@@ -286,6 +287,33 @@ describe("Session edge cases", () => {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("stores only the token's digest, and the stored value is not a credential (#4579)", async () => {
+    const { username, password, id } = await createUser();
+    const token = await loginAs(username, password);
+
+    const rows = await db
+      .select({ id: schema.sessions.id })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, id));
+    expect(rows.map((r) => r.id)).toEqual([hashSessionToken(token)]);
+    expect(rows[0]?.id).toMatch(/^[0-9a-f]{64}$/);
+
+    const withToken = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(withToken.statusCode).toBe(200);
+
+    for (const headers of [
+      { authorization: `Bearer ${rows[0]?.id}` },
+      { cookie: `snapotter-session=${rows[0]?.id}` },
+    ]) {
+      const res = await testApp.app.inject({ method: "GET", url: "/api/auth/session", headers });
+      expect(res.statusCode).toBe(401);
+    }
   });
 });
 
@@ -958,7 +986,10 @@ describe("Disabled user paths", () => {
     expect(res.statusCode).toBe(401);
 
     // The session row is purged as a side effect.
-    const [row] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
+    const [row] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
     expect(row).toBeUndefined();
   });
 
@@ -976,7 +1007,10 @@ describe("Disabled user paths", () => {
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body).code).toBe("USER_DISABLED");
 
-    const [row] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
+    const [row] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
     expect(row).toBeUndefined();
   });
 });
@@ -1007,12 +1041,12 @@ describe("Concurrent session limit", () => {
       // on the count rather than a specific victim keeps this robust even if
       // t1 and t2 share a createdAt tick.
       expect(ids).toHaveLength(2);
-      expect(ids).toContain(t3);
-      const survivingEarlier = [t1, t2].filter((t) => ids.includes(t));
+      expect(ids).toContain(hashSessionToken(t3));
+      const survivingEarlier = [t1, t2].filter((t) => ids.includes(hashSessionToken(t)));
       expect(survivingEarlier).toHaveLength(1);
 
       // The evicted earlier token no longer authenticates.
-      const evictedToken = [t1, t2].find((t) => !ids.includes(t)) as string;
+      const evictedToken = [t1, t2].find((t) => !ids.includes(hashSessionToken(t))) as string;
       const evicted = await testApp.app.inject({
         method: "GET",
         url: "/api/auth/session",
@@ -1036,7 +1070,7 @@ describe("Concurrent session limit", () => {
       await db
         .update(schema.sessions)
         .set({ createdAt: new Date(Date.now() - 60_000) })
-        .where(eq(schema.sessions.id, t0));
+        .where(eq(schema.sessions.id, hashSessionToken(t0)));
 
       let insertedCount = 0;
       let releaseBothInserts!: () => void;
@@ -1101,8 +1135,8 @@ describe("Concurrent session limit", () => {
       const concurrentIds = remainingAfterConcurrent.map((r) => r.id);
 
       expect(concurrentIds).toHaveLength(1);
-      expect(concurrentIds[0]).not.toBe(t0);
-      expect([t1, t2]).toContain(concurrentIds[0]);
+      expect(concurrentIds[0]).not.toBe(hashSessionToken(t0));
+      expect([t1, t2].map(hashSessionToken)).toContain(concurrentIds[0]);
 
       // 2. Same-millisecond createdAt tie: updating the prior surviving session after
       // inserting t3 places the prior session's tuple after t3 on the heap page, so
@@ -1157,7 +1191,7 @@ describe("Concurrent session limit", () => {
         .select({ id: schema.sessions.id })
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, id));
-      expect(remainingAfterTie.map((r) => r.id)).toEqual([t3]);
+      expect(remainingAfterTie.map((r) => r.id)).toEqual([hashSessionToken(t3)]);
 
       const survivingRes = await testApp.app.inject({
         method: "GET",
@@ -1194,7 +1228,7 @@ describe("Concurrent session limit", () => {
         .select({ id: schema.sessions.id })
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, id));
-      expect(remaining.map((r) => r.id)).toEqual([t1]);
+      expect(remaining.map((r) => r.id)).toEqual([hashSessionToken(t1)]);
     } finally {
       await clearSetting("maxSessionsPerUser");
     }
@@ -1243,7 +1277,7 @@ describe("Concurrent session limit", () => {
         .select({ id: schema.sessions.id })
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, id));
-      expect(remaining.map((r) => r.id)).toEqual([t1]);
+      expect(remaining.map((r) => r.id)).toEqual([hashSessionToken(t1)]);
     } finally {
       await clearSetting("maxSessionsPerUser");
     }
@@ -1341,7 +1375,7 @@ describe("Concurrent session limit", () => {
         .select({ id: schema.sessions.id })
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, id));
-      expect(remainingAfterFault.map((r) => r.id)).toEqual([t1]);
+      expect(remainingAfterFault.map((r) => r.id)).toEqual([hashSessionToken(t1)]);
 
       const loginSuccessAfterFault = await db
         .select()
@@ -1378,7 +1412,7 @@ describe("Concurrent session limit", () => {
         .select({ id: schema.sessions.id })
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, id));
-      expect(remainingAfterRetry.map((r) => r.id)).toEqual([retryBody.token]);
+      expect(remainingAfterRetry.map((r) => r.id)).toEqual([hashSessionToken(retryBody.token)]);
 
       // If the user's team changes between the initial select and db.transaction,
       // login resolves teamName from lockedUser.team inside the transaction.
@@ -1451,7 +1485,7 @@ describe("Session idle timeout", () => {
     await db
       .update(schema.sessions)
       .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
-      .where(eq(schema.sessions.id, token));
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
 
     await setSetting("sessionIdleTimeoutMinutes", "1");
     try {
@@ -1463,7 +1497,10 @@ describe("Session idle timeout", () => {
       expect(res.statusCode).toBe(401);
       expect(JSON.parse(res.body).code).toBe("IDLE_TIMEOUT");
 
-      const [row] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
+      const [row] = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, hashSessionToken(token)));
       expect(row).toBeUndefined();
     } finally {
       await clearSetting("sessionIdleTimeoutMinutes");
@@ -1477,7 +1514,7 @@ describe("Session idle timeout", () => {
     await db
       .update(schema.sessions)
       .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
-      .where(eq(schema.sessions.id, token));
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
 
     await setSetting("sessionIdleTimeoutMinutes", "1");
     try {
@@ -1521,7 +1558,7 @@ describe("Session idle timeout", () => {
     await db
       .update(schema.sessions)
       .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
-      .where(eq(schema.sessions.id, token));
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
 
     try {
       for (const bad of ["", "-1", "Infinity"]) {
@@ -1546,7 +1583,7 @@ describe("Session idle timeout", () => {
     const [before] = await db
       .select({ lastActivity: schema.sessions.lastActivity })
       .from(schema.sessions)
-      .where(eq(schema.sessions.id, token));
+      .where(eq(schema.sessions.id, hashSessionToken(token)));
     expect(before.lastActivity).toBeNull();
 
     await setSetting("sessionIdleTimeoutMinutes", "30");
@@ -1562,7 +1599,7 @@ describe("Session idle timeout", () => {
       const [after] = await db
         .select({ lastActivity: schema.sessions.lastActivity })
         .from(schema.sessions)
-        .where(eq(schema.sessions.id, token));
+        .where(eq(schema.sessions.id, hashSessionToken(token)));
       expect(after.lastActivity).not.toBeNull();
     } finally {
       await clearSetting("sessionIdleTimeoutMinutes");

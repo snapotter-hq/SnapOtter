@@ -8,6 +8,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -376,7 +377,7 @@ describe("Cross-role isolation", () => {
     await db
       .update(schema.sessions)
       .set({ expiresAt: new Date(Date.now() - 60_000) })
-      .where(eq(schema.sessions.id, expiredToken));
+      .where(eq(schema.sessions.id, hashSessionToken(expiredToken)));
 
     const res = await testApp.app.inject({
       method: "GET",

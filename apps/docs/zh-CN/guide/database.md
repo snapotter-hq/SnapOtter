@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。"
-i18n_source_hash: 2150213f21da
+i18n_source_hash: 83a63d444827
 i18n_provenance: machine
-i18n_output_hash: 72b25076da96
+i18n_output_hash: 0e155d403dbf
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter 使用 PostgreSQL 17 和 [Drizzle ORM](https://orm.drizzle.team/)（pg
 
 | 列 | 类型 | 备注 |
 |---|---|---|
-| `id` | varchar | 主键（会话令牌） |
+| `id` | varchar | 主键（会话令牌的 SHA-256 哈希） |
 | `userId` | uuid | 指向 `users.id` 的外键 |
 | `expiresAt` | timestamp | 过期时间 |
 | `createdAt` | timestamp | 创建时间 |
