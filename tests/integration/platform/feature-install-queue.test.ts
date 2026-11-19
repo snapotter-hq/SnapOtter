@@ -1270,6 +1270,33 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(detail?.error).toMatch(/mem_limit/);
   });
 
+  it("maps a SIGKILL from the OOM killer to the out-of-memory explanation (#4884)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    // pip's progress on stdout must not replace the memory hint.
+    child.stdout.emit("data", Buffer.from("Collecting torch\n"));
+    child.emit("close", null, "SIGKILL");
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toMatch(/insufficient memory/i);
+    expect(detail?.error).toMatch(/mem_limit/);
+  });
+
+  it("names the signal when the installer is stopped by one (#4884)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+
+    hoisted.spawnCalls[0].emit("close", null, "SIGTERM");
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("Install was stopped by signal SIGTERM");
+  });
+
   it("filters progress-bar noise out of the reported failure lines", async () => {
     await postInstall("transcription");
     await waitFor(() => hoisted.spawnCalls.length === 1);
@@ -1473,6 +1500,8 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
         action: "install_failed",
         error_kind: "timeout",
       });
+      const detail = await getFeatureDetail("transcription");
+      expect(detail?.error).not.toMatch(/insufficient memory/i);
     } finally {
       vi.unstubAllGlobals();
       env.INSTALL_STALL_MS = originalStall;

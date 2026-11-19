@@ -620,7 +620,10 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
           }
         }
         if (!errorMsg) {
-          if (code === 137) {
+          // Node spawns the installer directly, so an OOM kill arrives as
+          // signal SIGKILL with a null code; 137 is the shell-wrapped form.
+          // The watchdog's own SIGKILL already set errorMsg above.
+          if (code === 137 || signal === "SIGKILL") {
             errorMsg =
               "Installation was killed due to insufficient memory. " +
               "Try increasing the container's memory limit (e.g. mem_limit: 6g in docker-compose.yml) and retry.";
@@ -636,7 +639,9 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
             errorMsg =
               meaningful.join("\n") ||
               stdoutBuffer.trim() ||
-              `Install failed with exit code ${code}`;
+              (signal
+                ? `Install was stopped by signal ${signal}`
+                : `Install failed with exit code ${code}`);
           }
         }
         logErrorWithCauses(
