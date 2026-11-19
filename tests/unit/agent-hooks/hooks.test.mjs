@@ -181,6 +181,20 @@ describe("credential content guard", () => {
     expect(findCredential(["secret=", value, ";"].join(""))).toMatch(/credential assignment/);
   });
 
+  it("does not flag Rust or C++ scoped paths", () => {
+    expect(findCredential("let token = crate::token::new_session_token();")).toBeNull();
+    expect(findCredential("x = hex::encode(crate::token::random_bytes::<16>())")).toBeNull();
+    expect(findCredential("let token = crate::rand::bytes::<32>();")).toBeNull();
+  });
+
+  it("still flags a quoted literal assigned to a token key", () => {
+    const value = "a1b2c3d4e5f6g7h8i9j0k1";
+    expect(findCredential(["let token = ", '"', value, '";'].join(""))).toMatch(
+      /credential assignment/,
+    );
+    expect(findCredential(["token: ", '"', value, '",'].join(""))).toMatch(/credential assignment/);
+  });
+
   it("denies a token pasted into a command", () => {
     expect(secretContentVerdict(`echo ${FAKE_GH_TOKEN}`, scratch)?.level).toBe("deny");
   });
