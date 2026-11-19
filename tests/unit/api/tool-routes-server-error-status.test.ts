@@ -2164,6 +2164,21 @@ describe("compose programming errors (#4441)", () => {
     });
   }
 
+  it("keeps the 503 for a storage network failure that surfaces as a TypeError", async () => {
+    const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9000"), {
+      code: "ECONNREFUSED",
+    });
+    putObject.mockRejectedValue(new TypeError("fetch failed", { cause: refused }));
+    const app = await buildApp(registerCompose);
+    try {
+      const res = await sendCompose(app, await png());
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ code: "storage-unavailable" });
+    } finally {
+      await app.close();
+    }
+  });
+
   it("still answers 422 when a decode step fails with an ordinary error", async () => {
     const compositeSpy = vi.spyOn(sharp.prototype, "composite").mockImplementationOnce(() => {
       throw new Error("Input buffer has corrupt header");
