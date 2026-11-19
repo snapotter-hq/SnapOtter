@@ -96,5 +96,5 @@ Up to 2.3.0 this endpoint always held the request open until the capture finishe
 - The output filename is `screenshot.<format>`.
 - If the page takes too long to load, the capture fails with HTTP 504 (gateway timeout).
 - If the browser service crashes repeatedly, it is temporarily disabled and the capture fails with HTTP 503 and code `BROWSER_CRASHED`.
-- A capture that fails with a 5xx status is retried once before it reports the failure, like other queued image jobs.
+- A browser crash (HTTP 503) is retried once before it reports the failure, like other queued image jobs. A page-load timeout is not retried.
 - A capture that has already answered `202` reports a failure on its progress stream instead of in the HTTP status.

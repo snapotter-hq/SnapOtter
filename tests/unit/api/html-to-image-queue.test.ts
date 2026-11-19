@@ -367,6 +367,7 @@ describe("html-to-image job process fn", () => {
       message: "Page took too long to load",
       statusCode: 504,
       details: "page.setContent: Timeout 30000ms",
+      code: "PAGE_LOAD_TIMEOUT",
     });
 
     vi.mocked(captureHtml).mockRejectedValueOnce(new Error("Browser is temporarily unavailable"));

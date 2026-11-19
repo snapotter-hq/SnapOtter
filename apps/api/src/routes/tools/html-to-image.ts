@@ -64,7 +64,9 @@ const CONTENT_TYPES = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" 
  * Render the queued source. A URL capture reads `settings.url`; an HTML capture
  * reads the input object, which holds the HTML the request sent. Failures keep
  * the statuses the inline route answered: 504 for a page that never loaded, 503
- * for a browser that is down, 422 for any other capture failure.
+ * for a browser that is down, 422 for any other capture failure. The 504 carries
+ * PAGE_LOAD_TIMEOUT so the worker fails it once: a retry would hold the slot for
+ * another full page-load timeout on a page that already timed out.
  */
 export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw, report }) => {
   const settings = captureSettingsSchema.parse(raw);
@@ -95,6 +97,7 @@ export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw,
         "Page took too long to load",
         504,
         stripInternalPaths(message),
+        "PAGE_LOAD_TIMEOUT",
       );
     }
     if (message.includes("permanently disabled") || message.includes("temporarily unavailable")) {
