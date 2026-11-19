@@ -213,6 +213,31 @@ def _drop_prefix(line, count):
     return {**line, "spans": spans}
 
 
+_RENDERED_ITEM_RE = re.compile(r"^(?:(- )|\d+\. )")
+
+
+def _item_kind(line):
+    """"-" or "1." for a rendered list item line, None for anything else."""
+    m = _RENDERED_ITEM_RE.match(line)
+    return None if not m else ("-" if m.group(1) else "1.")
+
+
+def join_parts(parts):
+    """Join rendered blocks with blank lines, keeping a list tight across them.
+
+    MuPDF often puts each list item in a block of its own, and a blank line
+    between items would make a loose list.
+    """
+    out = []
+    for part in parts:
+        if out:
+            kind = _item_kind(part)
+            tight = kind is not None and kind == _item_kind(out[-1].rsplit("\n", 1)[-1])
+            out.append("\n" if tight else "\n\n")
+        out.append(part)
+    return "".join(out)
+
+
 def _inside(bbox, rect):
     x0, y0, x1, y1 = bbox
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -241,7 +266,7 @@ def page_markdown(blocks, levels, tables=(), links=()):
         if rendered:
             parts.append(rendered)
     parts.extend(md.strip() for i, (_rect, md) in enumerate(tables) if i not in emitted and md.strip())
-    return "\n\n".join(parts)
+    return join_parts(parts)
 
 
 def table_markdown(rows):
@@ -323,7 +348,7 @@ def main():
                     rendered.append(text)
         finally:
             doc.close()
-        markdown = "\n\n".join(rendered).strip() + "\n"
+        markdown = join_parts(rendered).strip() + "\n"
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(markdown)
         print(json.dumps({"chars": len(markdown)}))

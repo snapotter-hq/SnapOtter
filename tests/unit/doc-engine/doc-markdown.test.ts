@@ -134,6 +134,17 @@ describe.skipIf(!hasPython)("doc_markdown structure helpers", () => {
     );
   });
 
+  it("keeps a list tight when MuPDF splits its items into separate blocks", () => {
+    const md = render([
+      block([span("- Health cover", 11)]),
+      block([span("- Paid leave", 11)]),
+      block([span("1. Step one", 11)]),
+      block([span("2. Step two", 11)]),
+      block([span("After the list.", 11)]),
+    ]);
+    expect(md).toBe("- Health cover\n- Paid leave\n\n1. Step one\n2. Step two\n\nAfter the list.");
+  });
+
   it("keeps a number inside a paragraph from starting a list", () => {
     const md = render([block([span("Sales rose in", 11)], [span("2024. Costs fell.", 11)])]);
     expect(md).toBe("Sales rose in 2024. Costs fell.");
