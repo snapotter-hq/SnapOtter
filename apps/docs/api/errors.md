@@ -168,6 +168,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `NO_FACE_DETECTED` | 400 | Passport Photo found no face in the image. | Send a clear, front-facing photo with good lighting. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Compression, or a passport photo's size limit, can't get the file under the requested size, even after scaling it down. | Ask for a larger target size, or crop the image first. |
 | `TOO_MANY_PAGES` | 400 | OCR was asked for more pages than it processes in one job. | Select fewer pages with the page range. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR on a multi-page TIFF read more than 1,000,000 bytes of text across its pages, which is more than one result can store. | Split the TIFF into smaller files and run OCR on each. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata found the image's existing EXIF data damaged, so it can't rewrite it safely. | Strip the metadata with Remove Image Metadata first, then edit. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML or Markdown to PDF found a reference to an image, stylesheet, or font on the network, which the server doesn't fetch. | Embed the resource in the file (for example as a `data:` URI), then retry. |
 
