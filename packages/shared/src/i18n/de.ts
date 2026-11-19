@@ -558,6 +558,126 @@ export const de: TranslationKeys = {
       name: "FLAC in MP3 umwandeln",
       description: "FLAC online in MP3 umwandeln. Schnell, kostenlos und privat.",
     },
+    "mp3-to-flac": {
+      name: "MP3 in FLAC umwandeln",
+      description: "MP3 online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 in OGG umwandeln",
+      description: "MP3 online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 in M4A umwandeln",
+      description: "MP3 online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wav-to-flac": {
+      name: "WAV in FLAC umwandeln",
+      description: "WAV online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wav-to-ogg": {
+      name: "WAV in OGG umwandeln",
+      description: "WAV online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wav-to-m4a": {
+      name: "WAV in M4A umwandeln",
+      description: "WAV online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "flac-to-wav": {
+      name: "FLAC in WAV umwandeln",
+      description: "FLAC online in WAV umwandeln. Schnell, kostenlos und privat.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC in OGG umwandeln",
+      description: "FLAC online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC in M4A umwandeln",
+      description: "FLAC online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "ogg-to-flac": {
+      name: "OGG in FLAC umwandeln",
+      description: "OGG online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG in M4A umwandeln",
+      description: "OGG online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "m4a-to-flac": {
+      name: "M4A in FLAC umwandeln",
+      description: "M4A online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A in OGG umwandeln",
+      description: "M4A online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aac-to-ogg": {
+      name: "AAC in OGG umwandeln",
+      description: "AAC online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aac-to-m4a": {
+      name: "AAC in M4A umwandeln",
+      description: "AAC online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "opus-to-mp3": {
+      name: "Opus in MP3 umwandeln",
+      description: "Opus online in MP3 umwandeln. Schnell, kostenlos und privat.",
+    },
+    "opus-to-wav": {
+      name: "Opus in WAV umwandeln",
+      description: "Opus online in WAV umwandeln. Schnell, kostenlos und privat.",
+    },
+    "opus-to-flac": {
+      name: "Opus in FLAC umwandeln",
+      description: "Opus online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "opus-to-ogg": {
+      name: "Opus in OGG umwandeln",
+      description: "Opus online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "opus-to-m4a": {
+      name: "Opus in M4A umwandeln",
+      description: "Opus online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wma-to-mp3": {
+      name: "WMA in MP3 umwandeln",
+      description: "WMA online in MP3 umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wma-to-wav": {
+      name: "WMA in WAV umwandeln",
+      description: "WMA online in WAV umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wma-to-flac": {
+      name: "WMA in FLAC umwandeln",
+      description: "WMA online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wma-to-ogg": {
+      name: "WMA in OGG umwandeln",
+      description: "WMA online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "wma-to-m4a": {
+      name: "WMA in M4A umwandeln",
+      description: "WMA online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF in MP3 umwandeln",
+      description: "AIFF online in MP3 umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF in WAV umwandeln",
+      description: "AIFF online in WAV umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF in FLAC umwandeln",
+      description: "AIFF online in FLAC umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF in OGG umwandeln",
+      description: "AIFF online in OGG umwandeln. Schnell, kostenlos und privat.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF in M4A umwandeln",
+      description: "AIFF online in M4A umwandeln. Schnell, kostenlos und privat.",
+    },
     "excel-to-csv": {
       name: "Excel in CSV umwandeln",
       description: "Excel online in CSV umwandeln. Schnell, kostenlos und privat.",

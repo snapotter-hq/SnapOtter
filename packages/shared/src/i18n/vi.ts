@@ -557,6 +557,126 @@ export const vi: TranslationKeys = {
       name: "FLAC sang MP3",
       description: "Chuyển đổi FLAC sang MP3 trực tuyến. Nhanh, miễn phí và riêng tư.",
     },
+    "mp3-to-flac": {
+      name: "MP3 sang FLAC",
+      description: "Chuyển đổi MP3 sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 sang OGG",
+      description: "Chuyển đổi MP3 sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 sang M4A",
+      description: "Chuyển đổi MP3 sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wav-to-flac": {
+      name: "WAV sang FLAC",
+      description: "Chuyển đổi WAV sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wav-to-ogg": {
+      name: "WAV sang OGG",
+      description: "Chuyển đổi WAV sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wav-to-m4a": {
+      name: "WAV sang M4A",
+      description: "Chuyển đổi WAV sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "flac-to-wav": {
+      name: "FLAC sang WAV",
+      description: "Chuyển đổi FLAC sang WAV trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC sang OGG",
+      description: "Chuyển đổi FLAC sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC sang M4A",
+      description: "Chuyển đổi FLAC sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "ogg-to-flac": {
+      name: "OGG sang FLAC",
+      description: "Chuyển đổi OGG sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG sang M4A",
+      description: "Chuyển đổi OGG sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "m4a-to-flac": {
+      name: "M4A sang FLAC",
+      description: "Chuyển đổi M4A sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A sang OGG",
+      description: "Chuyển đổi M4A sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aac-to-ogg": {
+      name: "AAC sang OGG",
+      description: "Chuyển đổi AAC sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aac-to-m4a": {
+      name: "AAC sang M4A",
+      description: "Chuyển đổi AAC sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "opus-to-mp3": {
+      name: "Opus sang MP3",
+      description: "Chuyển đổi Opus sang MP3 trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "opus-to-wav": {
+      name: "Opus sang WAV",
+      description: "Chuyển đổi Opus sang WAV trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "opus-to-flac": {
+      name: "Opus sang FLAC",
+      description: "Chuyển đổi Opus sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "opus-to-ogg": {
+      name: "Opus sang OGG",
+      description: "Chuyển đổi Opus sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "opus-to-m4a": {
+      name: "Opus sang M4A",
+      description: "Chuyển đổi Opus sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wma-to-mp3": {
+      name: "WMA sang MP3",
+      description: "Chuyển đổi WMA sang MP3 trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wma-to-wav": {
+      name: "WMA sang WAV",
+      description: "Chuyển đổi WMA sang WAV trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wma-to-flac": {
+      name: "WMA sang FLAC",
+      description: "Chuyển đổi WMA sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wma-to-ogg": {
+      name: "WMA sang OGG",
+      description: "Chuyển đổi WMA sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "wma-to-m4a": {
+      name: "WMA sang M4A",
+      description: "Chuyển đổi WMA sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF sang MP3",
+      description: "Chuyển đổi AIFF sang MP3 trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF sang WAV",
+      description: "Chuyển đổi AIFF sang WAV trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF sang FLAC",
+      description: "Chuyển đổi AIFF sang FLAC trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF sang OGG",
+      description: "Chuyển đổi AIFF sang OGG trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF sang M4A",
+      description: "Chuyển đổi AIFF sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
     "excel-to-csv": {
       name: "Excel sang CSV",
       description: "Chuyển đổi Excel sang CSV trực tuyến. Nhanh, miễn phí và riêng tư.",

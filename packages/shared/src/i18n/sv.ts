@@ -555,6 +555,126 @@ export const sv: TranslationKeys = {
       name: "FLAC till MP3",
       description: "Konvertera FLAC till MP3 online. Snabbt, gratis och privat.",
     },
+    "mp3-to-flac": {
+      name: "MP3 till FLAC",
+      description: "Konvertera MP3 till FLAC online. Snabbt, gratis och privat.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 till OGG",
+      description: "Konvertera MP3 till OGG online. Snabbt, gratis och privat.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 till M4A",
+      description: "Konvertera MP3 till M4A online. Snabbt, gratis och privat.",
+    },
+    "wav-to-flac": {
+      name: "WAV till FLAC",
+      description: "Konvertera WAV till FLAC online. Snabbt, gratis och privat.",
+    },
+    "wav-to-ogg": {
+      name: "WAV till OGG",
+      description: "Konvertera WAV till OGG online. Snabbt, gratis och privat.",
+    },
+    "wav-to-m4a": {
+      name: "WAV till M4A",
+      description: "Konvertera WAV till M4A online. Snabbt, gratis och privat.",
+    },
+    "flac-to-wav": {
+      name: "FLAC till WAV",
+      description: "Konvertera FLAC till WAV online. Snabbt, gratis och privat.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC till OGG",
+      description: "Konvertera FLAC till OGG online. Snabbt, gratis och privat.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC till M4A",
+      description: "Konvertera FLAC till M4A online. Snabbt, gratis och privat.",
+    },
+    "ogg-to-flac": {
+      name: "OGG till FLAC",
+      description: "Konvertera OGG till FLAC online. Snabbt, gratis och privat.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG till M4A",
+      description: "Konvertera OGG till M4A online. Snabbt, gratis och privat.",
+    },
+    "m4a-to-flac": {
+      name: "M4A till FLAC",
+      description: "Konvertera M4A till FLAC online. Snabbt, gratis och privat.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A till OGG",
+      description: "Konvertera M4A till OGG online. Snabbt, gratis och privat.",
+    },
+    "aac-to-ogg": {
+      name: "AAC till OGG",
+      description: "Konvertera AAC till OGG online. Snabbt, gratis och privat.",
+    },
+    "aac-to-m4a": {
+      name: "AAC till M4A",
+      description: "Konvertera AAC till M4A online. Snabbt, gratis och privat.",
+    },
+    "opus-to-mp3": {
+      name: "Opus till MP3",
+      description: "Konvertera Opus till MP3 online. Snabbt, gratis och privat.",
+    },
+    "opus-to-wav": {
+      name: "Opus till WAV",
+      description: "Konvertera Opus till WAV online. Snabbt, gratis och privat.",
+    },
+    "opus-to-flac": {
+      name: "Opus till FLAC",
+      description: "Konvertera Opus till FLAC online. Snabbt, gratis och privat.",
+    },
+    "opus-to-ogg": {
+      name: "Opus till OGG",
+      description: "Konvertera Opus till OGG online. Snabbt, gratis och privat.",
+    },
+    "opus-to-m4a": {
+      name: "Opus till M4A",
+      description: "Konvertera Opus till M4A online. Snabbt, gratis och privat.",
+    },
+    "wma-to-mp3": {
+      name: "WMA till MP3",
+      description: "Konvertera WMA till MP3 online. Snabbt, gratis och privat.",
+    },
+    "wma-to-wav": {
+      name: "WMA till WAV",
+      description: "Konvertera WMA till WAV online. Snabbt, gratis och privat.",
+    },
+    "wma-to-flac": {
+      name: "WMA till FLAC",
+      description: "Konvertera WMA till FLAC online. Snabbt, gratis och privat.",
+    },
+    "wma-to-ogg": {
+      name: "WMA till OGG",
+      description: "Konvertera WMA till OGG online. Snabbt, gratis och privat.",
+    },
+    "wma-to-m4a": {
+      name: "WMA till M4A",
+      description: "Konvertera WMA till M4A online. Snabbt, gratis och privat.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF till MP3",
+      description: "Konvertera AIFF till MP3 online. Snabbt, gratis och privat.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF till WAV",
+      description: "Konvertera AIFF till WAV online. Snabbt, gratis och privat.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF till FLAC",
+      description: "Konvertera AIFF till FLAC online. Snabbt, gratis och privat.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF till OGG",
+      description: "Konvertera AIFF till OGG online. Snabbt, gratis och privat.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF till M4A",
+      description: "Konvertera AIFF till M4A online. Snabbt, gratis och privat.",
+    },
     "excel-to-csv": {
       name: "Excel till CSV",
       description: "Konvertera Excel till CSV online. Snabbt, gratis och privat.",

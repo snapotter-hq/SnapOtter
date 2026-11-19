@@ -557,6 +557,126 @@ export const ja: TranslationKeys = {
       name: "FLACをMP3に変換",
       description: "FLACをMP3にオンラインで変換。高速、無料、プライベート。",
     },
+    "mp3-to-flac": {
+      name: "MP3をFLACに変換",
+      description: "MP3をFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "mp3-to-ogg": {
+      name: "MP3をOGGに変換",
+      description: "MP3をOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "mp3-to-m4a": {
+      name: "MP3をM4Aに変換",
+      description: "MP3をM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wav-to-flac": {
+      name: "WAVをFLACに変換",
+      description: "WAVをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wav-to-ogg": {
+      name: "WAVをOGGに変換",
+      description: "WAVをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wav-to-m4a": {
+      name: "WAVをM4Aに変換",
+      description: "WAVをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "flac-to-wav": {
+      name: "FLACをWAVに変換",
+      description: "FLACをWAVにオンラインで変換。高速、無料、プライベート。",
+    },
+    "flac-to-ogg": {
+      name: "FLACをOGGに変換",
+      description: "FLACをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "flac-to-m4a": {
+      name: "FLACをM4Aに変換",
+      description: "FLACをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "ogg-to-flac": {
+      name: "OGGをFLACに変換",
+      description: "OGGをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "ogg-to-m4a": {
+      name: "OGGをM4Aに変換",
+      description: "OGGをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "m4a-to-flac": {
+      name: "M4AをFLACに変換",
+      description: "M4AをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "m4a-to-ogg": {
+      name: "M4AをOGGに変換",
+      description: "M4AをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aac-to-ogg": {
+      name: "AACをOGGに変換",
+      description: "AACをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aac-to-m4a": {
+      name: "AACをM4Aに変換",
+      description: "AACをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "opus-to-mp3": {
+      name: "OpusをMP3に変換",
+      description: "OpusをMP3にオンラインで変換。高速、無料、プライベート。",
+    },
+    "opus-to-wav": {
+      name: "OpusをWAVに変換",
+      description: "OpusをWAVにオンラインで変換。高速、無料、プライベート。",
+    },
+    "opus-to-flac": {
+      name: "OpusをFLACに変換",
+      description: "OpusをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "opus-to-ogg": {
+      name: "OpusをOGGに変換",
+      description: "OpusをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "opus-to-m4a": {
+      name: "OpusをM4Aに変換",
+      description: "OpusをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wma-to-mp3": {
+      name: "WMAをMP3に変換",
+      description: "WMAをMP3にオンラインで変換。高速、無料、プライベート。",
+    },
+    "wma-to-wav": {
+      name: "WMAをWAVに変換",
+      description: "WMAをWAVにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wma-to-flac": {
+      name: "WMAをFLACに変換",
+      description: "WMAをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wma-to-ogg": {
+      name: "WMAをOGGに変換",
+      description: "WMAをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "wma-to-m4a": {
+      name: "WMAをM4Aに変換",
+      description: "WMAをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aiff-to-mp3": {
+      name: "AIFFをMP3に変換",
+      description: "AIFFをMP3にオンラインで変換。高速、無料、プライベート。",
+    },
+    "aiff-to-wav": {
+      name: "AIFFをWAVに変換",
+      description: "AIFFをWAVにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aiff-to-flac": {
+      name: "AIFFをFLACに変換",
+      description: "AIFFをFLACにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aiff-to-ogg": {
+      name: "AIFFをOGGに変換",
+      description: "AIFFをOGGにオンラインで変換。高速、無料、プライベート。",
+    },
+    "aiff-to-m4a": {
+      name: "AIFFをM4Aに変換",
+      description: "AIFFをM4Aにオンラインで変換。高速、無料、プライベート。",
+    },
     "excel-to-csv": {
       name: "ExcelをCSVに変換",
       description: "ExcelをCSVにオンラインで変換。高速、無料、プライベート。",
