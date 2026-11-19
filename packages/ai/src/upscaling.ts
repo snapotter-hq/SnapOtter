@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -42,7 +43,7 @@ function resolveMaxCpuUpscaleMp(): number {
  * people with nothing, so the input shrinks to the largest size both ceilings
  * allow: `maxCpuMp` for the AI models (lanczos is exempt), and the output
  * ceiling `maxCpuMp * 16` divided by the scale squared. Floors keep the result
- * at or under the budget; 0 disables both.
+ * within the budget (bar the 1 px minimum side); 0 disables both.
  */
 export function cpuFitDimensions(
   width: number,
@@ -109,7 +110,20 @@ export async function upscale(
         pythonOptions.model,
         resolveMaxCpuUpscaleMp(),
       );
-  if (fit) image.resize(fit.width, fit.height, { fit: "fill", kernel: "lanczos3" });
+  if (fit) {
+    // Past the point where the fitted result would be no bigger than the
+    // original (a 48 MP photo at 2x lands at 16 MP), an "upscaled" file is a
+    // downgrade, so that case still refuses rather than hand it back.
+    const fittedOutputPx = fit.width * fit.height * scale ** 2;
+    if (fittedOutputPx <= (meta.width ?? 0) * (meta.height ?? 0)) {
+      const maxOutputMp = (fittedOutputPx / 1_000_000).toFixed(1);
+      throw new ToolInputError(
+        `Image is too large to upscale ${scale}x without a GPU: the result would be smaller than the original (about ${maxOutputMp} MP at most on CPU). Use a higher scale factor, a smaller image, or a GPU host.`,
+        { code: "RESULT_TOO_LARGE" },
+      );
+    }
+    image.resize(fit.width, fit.height, { fit: "fill", kernel: "lanczos3" });
+  }
   const width = fit?.width ?? meta.width ?? 0;
   const height = fit?.height ?? meta.height ?? 0;
   const effectiveMp = ((width * height) / 1_000_000) * scale ** 2;

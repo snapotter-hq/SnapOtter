@@ -27,6 +27,7 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   gpuMayBeAvailable: vi.fn().mockReturnValue(false),
 }));
 
+import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -601,7 +602,7 @@ describe("upscale", () => {
       expect(resize).not.toHaveBeenCalled();
 
       process.env.MAX_CPU_UPSCALE_MP = "2";
-      const two = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      const two = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
       expect(two.inputResizedTo).toEqual({ width: 1632, height: 1224 });
       expect(1632 * 1224).toBeLessThanOrEqual(2_000_000);
 
@@ -620,7 +621,29 @@ describe("upscale", () => {
       expect(invalid.inputResizedTo).toEqual({ width: 2309, height: 1732 });
     });
 
-    it("never refuses on size: an extreme panorama still fits with both sides at least 1 px", async () => {
+    it("still refuses when the fitted result would be no bigger than the original (48 MP at 2x lands at 16 MP)", async () => {
+      const resize = mockImage(8064, 6048);
+
+      let caught: unknown;
+      try {
+        await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(isToolInputError(caught)).toBe(true);
+      expect((caught as { code?: string }).code).toBe("RESULT_TOO_LARGE");
+      expect((caught as Error).message).toMatch(/smaller than the original.*16\.0 MP/);
+      expect(resize).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
+
+      // A higher scale has room to grow it: 4x fits to 4 MP and returns 64 MP.
+      const fourX = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      expect(fourX.inputResizedTo).toBeDefined();
+    });
+
+    it("an extreme panorama still fits with both sides at least 1 px", async () => {
       mockImage(200_000, 10);
 
       const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 8 });
