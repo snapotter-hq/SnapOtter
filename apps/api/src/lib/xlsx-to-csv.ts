@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import type { Readable } from "node:stream";
 import Papa from "papaparse";
 import { type Entry, fromBuffer, type ZipFile } from "yauzl";
+import { MAX_BUFFERED_OUTPUT_BYTES } from "../jobs/output-resolve.js";
 import { InputValidationError } from "../modality/contract.js";
 
 // Rows read between event-loop yields, matching csv-to-xlsx.ts.
@@ -18,6 +19,11 @@ const MAX_ROWS = 1_048_576;
 // Merged ranges are repeated into every cell they cover, so a single crafted range
 // like A2:XFD60000 would do the same. Real sheets merge headers, not a million cells.
 const MAX_MERGED_CELLS = 1_000_000;
+// Neither bound above caps the total: one cell at XFD on every row is about 40 bytes of
+// XML and 16 KB of CSV, so a small upload could still ask for gigabytes (#4857). The
+// CSV is held in memory as one buffer, so it gets the same ceiling as any buffered
+// tool output.
+const DEFAULT_MAX_OUTPUT_BYTES = MAX_BUFFERED_OUTPUT_BYTES;
 
 type SharedString = string | null | { richText: { text: string | null }[] };
 
@@ -203,7 +209,11 @@ async function readMergeRanges(stream: Readable): Promise<MergeRange[]> {
  * this for plain date cells), and a formula's cached boolean or error renders as Excel
  * shows it ("true", "#DIV/0!") instead of "1" or "[object Object]".
  */
-export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Buffer> {
+export async function xlsxToCsv(
+  buffer: Buffer,
+  sheetNumber: number,
+  { maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES }: { maxOutputBytes?: number } = {},
+): Promise<Buffer> {
   // exceljs is CJS, so under ESM the constructor lives on the default export.
   const { default: ExcelJS } = await import("exceljs");
   const requireFromExceljs = createRequire(createRequire(import.meta.url).resolve("exceljs"));
@@ -302,6 +312,7 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
       output.push(Buffer.from(separator + batch.join("\r\n"), "utf8"));
       batch = [];
     };
+    let outputBytes = 0;
     let nextMerge = 0;
     let activeMerges: MergeRange[] = [];
     let lastRow = 0;
@@ -328,7 +339,16 @@ export async function xlsxToCsv(buffer: Buffer, sheetNumber: number): Promise<Bu
       }
       lastRow = rowNumber;
       if (!hasValue) return;
-      batch.push(Papa.unparse([cells]));
+      const line = Papa.unparse([cells]);
+      // Counted per row, so a sheet over the cap stops before another batch is built.
+      outputBytes += Buffer.byteLength(line, "utf8") + (outputBytes > 0 ? 2 : 0);
+      if (outputBytes > maxOutputBytes) {
+        const limitMb = Math.max(1, Math.floor(maxOutputBytes / (1024 * 1024)));
+        throw new InputValidationError(
+          `The CSV would be larger than ${limitMb.toLocaleString("en-US")} MB; split the sheet into smaller ones and try again`,
+        );
+      }
+      batch.push(line);
       if (batch.length === ROWS_PER_YIELD) {
         flush();
         await yieldToEventLoop();
