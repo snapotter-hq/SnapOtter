@@ -21,6 +21,7 @@ const WEBP = readFixture(fixtures.image.base.webp50);
 const TINY_PNG = readFixture(fixtures.image.edge.px1);
 const SVG = readFixture(fixtures.image.base.svg100);
 const GIF = readFixture(fixtures.image.animated.gif);
+const TXT = readFixture(fixtures.document.tiny("txt"));
 
 /** Extract sorted filenames from a ZIP buffer. */
 function zipEntryNames(buf: Buffer): string[] {
@@ -469,6 +470,52 @@ describe("Bulk Rename", () => {
     expect(filenames).toHaveLength(1);
     // No extension to preserve
     expect(filenames[0]).toBe("renamed-1");
+  });
+
+  it("rejects a non-image file with 400 naming it, instead of zipping it (#4401)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "tiny.txt", contentType: "text/plain", content: TXT },
+      { name: "settings", content: JSON.stringify({ pattern: "x-{{index}}" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain('"tiny.txt"');
+  });
+
+  it("rejects garbage bytes behind an image extension (#4401)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "fake.png",
+        contentType: "image/png",
+        content: Buffer.from("definitely not a png"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain('"fake.png"');
   });
 
   it("handles startIndex of 0", async () => {

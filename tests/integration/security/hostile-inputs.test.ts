@@ -34,10 +34,10 @@ const MISMATCH_FIXTURE = "png-bytes.jpg";
 const REJECT_STATUSES = new Set([400, 413, 415, 422, 501]);
 
 // Tools that never decode the uploaded pixel data: no-dropzone generators take
-// input from settings, bulk-rename zips bytes verbatim, and the metadata tools
-// operate on metadata segments only. Succeeding on a file with a valid header
-// but broken pixel data is correct behavior for them; everything else must
-// reject.
+// input from settings, bulk-rename checks only the header before zipping the
+// bytes verbatim, and the metadata tools operate on metadata segments only.
+// Succeeding on a file with a valid header but broken pixel data is correct
+// behavior for them; everything else must reject.
 const INPUT_AGNOSTIC = new Set(
   TOOLS.filter((t) => TOOL_DISPLAY_MODES[t.id] === "no-dropzone").map((t) => t.id),
 );
