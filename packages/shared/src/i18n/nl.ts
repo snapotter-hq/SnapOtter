@@ -5861,6 +5861,7 @@ export const nl: TranslationKeys = {
     conversionFailed: "Conversie mislukt",
     installFailed: "Installatie starten mislukt",
     uninstallFailed: "Verwijderen van de installatie mislukt",
+    cancelInstallFailed: "Installatie annuleren mislukt",
     resetFailed: "Resetten mislukt",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5925,6 +5926,8 @@ export const nl: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Opslagquotum overschreden.",
       TARGET_SIZE_EXCEEDED: "Het resultaat kan de doelgrootte niet halen.",
       TOO_MANY_FRAMES: "Dit bestand heeft te veel frames om te verwerken.",
+      FEATURE_INSTALL_BUSY:
+        "De installatie werkt de AI-omgeving bij en kan nu niet worden gestopt. Ze is zo klaar.",
       CANCELED: "De bewerking is geannuleerd.",
       PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",

@@ -5847,6 +5847,7 @@ export const ru: TranslationKeys = {
     conversionFailed: "Ошибка преобразования",
     installFailed: "Не удалось начать установку",
     uninstallFailed: "Не удалось удалить",
+    cancelInstallFailed: "Не удалось отменить установку",
     resetFailed: "Не удалось выполнить сброс",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5910,6 +5911,8 @@ export const ru: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Квота хранилища превышена.",
       TARGET_SIZE_EXCEEDED: "Результат не может достичь целевого размера.",
       TOO_MANY_FRAMES: "В этом файле слишком много кадров для обработки.",
+      FEATURE_INSTALL_BUSY:
+        "Установка обновляет среду AI, и её сейчас нельзя остановить. Она скоро завершится.",
       CANCELED: "Операция отменена.",
       PAGE_OUT_OF_RANGE: "В этом диапазоне есть страница, которой нет в этом PDF.",
       INVALID_PAGE_RANGE:

@@ -5853,6 +5853,7 @@ export const ptBR: TranslationKeys = {
     conversionFailed: "Falha na conversão",
     installFailed: "Falha ao iniciar a instalação",
     uninstallFailed: "Falha ao desinstalar",
+    cancelInstallFailed: "Não foi possível cancelar a instalação",
     resetFailed: "Falha ao redefinir",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5919,6 +5920,8 @@ export const ptBR: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Cota de armazenamento excedida.",
       TARGET_SIZE_EXCEEDED: "O resultado não consegue atingir o tamanho desejado.",
       TOO_MANY_FRAMES: "Este arquivo tem quadros demais para processar.",
+      FEATURE_INSTALL_BUSY:
+        "A instalação está atualizando o ambiente de IA e não pode ser interrompida agora. Ela terminará em breve.",
       CANCELED: "A operação foi cancelada.",
       PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
       INVALID_PAGE_RANGE:

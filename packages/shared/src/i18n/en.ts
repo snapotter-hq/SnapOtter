@@ -5759,6 +5759,7 @@ export const en = {
     conversionFailed: "Conversion failed",
     installFailed: "Failed to start installation",
     uninstallFailed: "Uninstall failed",
+    cancelInstallFailed: "Couldn't cancel the install",
     resetFailed: "Reset failed",
     codes: {
       ANALYSIS_EXPIRED: "This analysis has expired. Start again.",
@@ -5819,6 +5820,8 @@ export const en = {
       STORAGE_QUOTA_EXCEEDED: "Storage quota exceeded.",
       TARGET_SIZE_EXCEEDED: "The result can't reach the target size.",
       TOO_MANY_FRAMES: "This file has too many frames to process.",
+      FEATURE_INSTALL_BUSY:
+        "The install is updating the AI environment and can't be stopped right now. It will finish shortly.",
       CANCELED: "The operation was canceled.",
       PAGE_OUT_OF_RANGE: "That page range includes a page this PDF doesn't have.",
       INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",

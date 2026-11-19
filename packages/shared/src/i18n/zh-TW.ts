@@ -5517,6 +5517,7 @@ export const zhTW: TranslationKeys = {
     conversionFailed: "轉換失敗",
     installFailed: "無法開始安裝",
     uninstallFailed: "解除安裝失敗",
+    cancelInstallFailed: "無法取消安裝",
     resetFailed: "重設失敗",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "管理員要求啟用雙重驗證。請先設定以繼續。",
@@ -5574,6 +5575,7 @@ export const zhTW: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "已超出儲存空間配額。",
       TARGET_SIZE_EXCEEDED: "結果無法達到目標大小。",
       TOO_MANY_FRAMES: "此檔案的影格數過多，無法處理。",
+      FEATURE_INSTALL_BUSY: "安裝正在更新 AI 環境，目前無法停止。很快就會完成。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "此頁碼範圍包含這份 PDF 沒有的頁面。",
       INVALID_PAGE_RANGE: "此頁碼範圍無效。請使用像 1-3,5 這樣的頁碼。",
