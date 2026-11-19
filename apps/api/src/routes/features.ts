@@ -376,7 +376,7 @@ export type InstallCancelResult =
 
 // Cancel hooks for running venv installers, keyed by job id. startInstall
 // registers one per child and finalizeOnce removes it.
-const activeInstallCancels = new Map<string, () => InstallCancelResult>();
+const activeInstallCancels = new Map<string, { cancel: () => InstallCancelResult }>();
 
 /**
  * Cancel a feature install by its job id. A queued install leaves the queue
@@ -389,8 +389,8 @@ export async function cancelFeatureInstall(jobId: string): Promise<InstallCancel
     await cancelSingleJobGuarded({ jobId });
     return { canceled: true };
   }
-  const cancelActive = activeInstallCancels.get(jobId);
-  if (cancelActive) return cancelActive();
+  const activeInstall = activeInstallCancels.get(jobId);
+  if (activeInstall) return activeInstall.cancel();
   if (getActiveInstallJobId() === jobId) return { canceled: false, reason: "ocr" };
   return { canceled: false, reason: "not-found" };
 }
@@ -511,7 +511,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       } catch {
         // child already gone
       }
-      // Escalate to SIGKILL if SIGTERM does not land (e.g. a C extension
+      // Escalate to SIGKILL if the signal does not land (e.g. a C extension
       // ignoring the signal); the close handler clears this grace timer.
       killGrace ??= setTimeout(() => {
         try {
@@ -522,14 +522,16 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       }, 10_000);
     };
 
-    activeInstallCancels.set(jobId, () => {
-      // Once granted, the installer may be mid-write into the shared venv.
-      if (releaseVenv) return { canceled: false, reason: "venv-write" };
-      // A second signal could land inside the installer's cleanup and cut it short.
-      if (canceled) return { canceled: true };
-      canceled = true;
-      terminateChild("SIGINT");
-      return { canceled: true };
+    activeInstallCancels.set(jobId, {
+      cancel: () => {
+        // Once granted, the installer may be mid-write into the shared venv.
+        if (releaseVenv) return { canceled: false, reason: "venv-write" };
+        // A second signal could land inside the installer's cleanup and cut it short.
+        if (canceled) return { canceled: true };
+        canceled = true;
+        terminateChild("SIGINT");
+        return { canceled: true };
+      },
     });
 
     const grantVenvLock = () => {
