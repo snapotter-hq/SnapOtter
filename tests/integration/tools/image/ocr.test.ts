@@ -18,6 +18,7 @@ import {
 const PNG = readFixture(fixtures.image.base.png200);
 const HEIC = readFixture(fixtures.image.base.heic200);
 const TINY = readFixture(fixtures.image.edge.px1);
+const MULTIPAGE_TIFF = readFixture(fixtures.image.multipageTiff);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -35,7 +36,7 @@ afterAll(async () => {
 
 async function awaitOcrResult(
   response: { statusCode: number; body: string },
-  options: { allowFailure?: boolean } = {},
+  options: { allowFailure?: boolean; timeoutMs?: number } = {},
 ): Promise<Record<string, unknown> | undefined> {
   if (response.statusCode === 501) return undefined;
 
@@ -43,7 +44,11 @@ async function awaitOcrResult(
   const accepted = JSON.parse(response.body) as { jobId?: string; async?: boolean };
   expect(accepted).toMatchObject({ jobId: expect.any(String), async: true });
   try {
-    const result = await waitForAcceptedJobOrCancel(accepted.jobId as string, "ai", 25_000);
+    const result = await waitForAcceptedJobOrCancel(
+      accepted.jobId as string,
+      "ai",
+      options.timeoutMs ?? 25_000,
+    );
     return (result?.resultPayload ?? {}) as Record<string, unknown>;
   } catch (error) {
     if (error instanceof AcceptedJobTimeoutError) throw error;
@@ -180,6 +185,34 @@ describe("ocr", () => {
     });
 
     await awaitOcrResult(res);
+  });
+
+  // #4364: only page 1 of a multi-page TIFF used to reach the OCR engine.
+  it("reads every page of a multi-page TIFF", { timeout: 120_000 }, async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "multipage.tiff",
+        contentType: "image/tiff",
+        content: MULTIPAGE_TIFF,
+      },
+      { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // Ten pages of OCR, one after another.
+    const result = await awaitOcrResult(res, { timeoutMs: 100_000 });
+    const text = String(result?.text ?? "");
+    expect(text.match(/^--- Page \d+ ---$/gm)).toHaveLength(10);
+    expect(text.match(/Multipage/g)).toHaveLength(10);
+    expect(text).toMatch(/--- Page 10 ---\s+Multipage[\s\S]*Page\s*10/);
+    expect(result?.warnings).toEqual([]);
   });
 
   it("handles a 1x1 pixel input without leaking its async job", async () => {

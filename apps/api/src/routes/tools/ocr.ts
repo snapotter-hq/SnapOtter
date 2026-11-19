@@ -4,9 +4,18 @@ import {
   getOcrRuntimeCapability,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
+  MAX_OCR_OUTPUT_BYTES,
+  MAX_PDF_OCR_PAGES,
+  type OcrResult,
 } from "@snapotter/ai";
-import { getOptionalBundleForTool, TOOL_OPTIONAL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getOptionalBundleForTool,
+  SafeError,
+  TOOL_OPTIONAL_BUNDLE_MAP,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
@@ -19,6 +28,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -55,6 +65,108 @@ function resolveWorkerQuality(settings: OcrSettings): "fast" | "balanced" | "bes
   return capability.available && capability.qualities.includes("best") ? "best" : "fast";
 }
 
+function clampPercent(percent: number): number {
+  return Math.max(0, Math.min(100, percent));
+}
+
+/**
+ * Page count of a multi-page TIFF, or 1 for anything else.
+ *
+ * Sharp decodes page 1 of a TIFF unless told otherwise, so OCR on a scanned
+ * multi-page TIFF used to return page 1's text and say nothing about the rest
+ * (#4364). An unreadable header counts as one page: extractText decodes the
+ * same buffer next and reports its own error.
+ */
+async function countTiffPages(buffer: Buffer): Promise<number> {
+  try {
+    const meta = await sharp(buffer).metadata();
+    return meta.format === "tiff" ? (meta.pages ?? 1) : 1;
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    return 1;
+  }
+}
+
+/**
+ * One TIFF page as an upright PNG. The input handler checked page 1's size
+ * only, and TIFF pages can each have their own, so every page gets the same
+ * safety limits before OCR allocates for it.
+ */
+async function renderTiffPage(buffer: Buffer, page: number): Promise<Buffer> {
+  const handle = sharp(buffer, { page, limitInputPixels: MAX_OCR_INPUT_PIXELS });
+  const { width = 0, height = 0 } = await handle.metadata();
+  if (width > MAX_OCR_INPUT_DIMENSION || height > MAX_OCR_INPUT_DIMENSION) {
+    throw new ToolInputError(
+      `Page ${page + 1} exceeds the ${MAX_OCR_INPUT_DIMENSION.toLocaleString("en-US")} pixel dimension safety limit (${width.toLocaleString("en-US")}x${height.toLocaleString("en-US")})`,
+      { code: "IMAGE_TOO_LARGE" },
+    );
+  }
+  return await handle.rotate().png().toBuffer();
+}
+
+/**
+ * OCR every page of a multi-page TIFF, framed the way ocr-pdf frames PDF
+ * pages. The page budget and the aggregate output cap are the PDF tool's and
+ * the single-image tool's, so a TIFF can't fan out further than either.
+ */
+async function extractTiffPages(
+  buffer: Buffer,
+  pageCount: number,
+  options: Parameters<typeof extractText>[2],
+  ctx: {
+    scratchDir: string;
+    signal: AbortSignal;
+    report: (percent: number, stage?: string) => void;
+  },
+): Promise<OcrResult> {
+  const pagesToRead = Math.min(pageCount, MAX_PDF_OCR_PAGES);
+  const share = 90 / pagesToRead;
+  const pageTexts: string[] = [];
+  const warnings = new Set<string>();
+  let first: OcrResult | undefined;
+  let degraded = false;
+  let outputBytes = 0;
+
+  for (let page = 0; page < pagesToRead; page++) {
+    ctx.signal.throwIfAborted();
+    const pageStart = 10 + share * page;
+    let pageResult: OcrResult;
+    try {
+      const pageBuffer = await renderTiffPage(buffer, page);
+      pageResult = await extractText(pageBuffer, ctx.scratchDir, options, (percent, stage) =>
+        ctx.report(pageStart + (clampPercent(percent) / 100) * share, stage),
+      );
+    } catch (err) {
+      throw await asInputErrorIfUndecodable(buffer, err);
+    }
+
+    const pageText = `${pageTexts.length === 0 ? "" : "\n\n"}--- Page ${page + 1} ---\n\n${pageResult.text.trim()}`;
+    outputBytes += Buffer.byteLength(pageText, "utf8");
+    if (outputBytes > MAX_OCR_OUTPUT_BYTES) {
+      throw new SafeError(
+        `OCR output exceeds the ${MAX_OCR_OUTPUT_BYTES.toLocaleString("en-US")} byte safety limit`,
+        { kind: "operational", code: "OCR_OUTPUT_TOO_LARGE", statusCode: 500 },
+      );
+    }
+    pageTexts.push(pageText);
+    first ??= pageResult;
+    degraded ||= pageResult.degraded;
+    for (const warning of pageResult.warnings) warnings.add(warning);
+  }
+
+  if (pageCount > pagesToRead) {
+    warnings.add(`Only the first ${pagesToRead} of ${pageCount} pages were read.`);
+  }
+  // pagesToRead is at least 2 here, so the loop assigned first.
+  return {
+    ...(first as OcrResult),
+    text: pageTexts.join(""),
+    degraded,
+    warnings: [...warnings],
+  };
+}
+
 async function processOcrJob(
   input: Buffer,
   settingsValue: unknown,
@@ -85,21 +197,24 @@ async function processOcrJob(
   ctx.signal.throwIfAborted();
   ctx.report(10, "Preparing OCR");
 
-  let result: Awaited<ReturnType<typeof extractText>>;
-  try {
-    result = await extractText(
-      prepared.buffer,
-      ctx.scratchDir,
-      {
-        quality,
-        language: settings.language,
-        enhance: settings.enhance ?? quality === "best",
-        signal: ctx.signal,
-      },
-      (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
-    );
-  } catch (err) {
-    throw await asInputErrorIfUndecodable(prepared.buffer, err);
+  const ocrOptions = {
+    quality,
+    language: settings.language,
+    enhance: settings.enhance ?? quality === "best",
+    signal: ctx.signal,
+  };
+  const pageCount = await countTiffPages(prepared.buffer);
+  let result: OcrResult;
+  if (pageCount > 1) {
+    result = await extractTiffPages(prepared.buffer, pageCount, ocrOptions, ctx);
+  } else {
+    try {
+      result = await extractText(prepared.buffer, ctx.scratchDir, ocrOptions, (percent, stage) =>
+        ctx.report(10 + clampPercent(percent) * 0.9, stage),
+      );
+    } catch (err) {
+      throw await asInputErrorIfUndecodable(prepared.buffer, err);
+    }
   }
   const base = prepared.filename.replace(/\.[^.]+$/, "");
   return {

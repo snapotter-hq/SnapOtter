@@ -67,6 +67,7 @@ export {
   fastLanguageUnsupportedReason,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
+  MAX_OCR_OUTPUT_BYTES,
 } from "./ocr.js";
 export type {
   OcrRuntimeRunOptions,
