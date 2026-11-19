@@ -1101,9 +1101,10 @@ describe("text-overlay", () => {
   it("keeps the single clipped line when wrap is false", async () => {
     const out = await overlayDownload({ text: LONG, fontSize: 24, shadow: false, wrap: false });
     const { cols, width } = await changedColumns(out);
-    // Glyph gaps can leave the outermost column untouched, so allow a few pixels.
-    expect(cols[0]).toBeLessThan(5);
-    expect(cols.at(-1)).toBeGreaterThan(width - 5);
+    // A word gap can leave the outermost column untouched (where depends on the
+    // host's sans-serif font), so only require the line to pass the 90% wrap box.
+    expect(cols[0]).toBeLessThan(width * 0.05);
+    expect(cols.at(-1)).toBeGreaterThan(width * 0.95);
   });
 
   it("places text at a custom x, y", async () => {
