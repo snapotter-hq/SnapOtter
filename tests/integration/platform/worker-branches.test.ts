@@ -866,6 +866,7 @@ describe("tool job failure paths", () => {
       expect(props.status).toBe("failed");
       expect(props.error_code).toBe("timeout");
       expect(props.error_kind).toBe("timeout");
+      expect(props.bytes_in).toBe(1);
     } finally {
       mutableEnv.JOB_TIMEOUT_FAST_S = originalTimeout;
     }
