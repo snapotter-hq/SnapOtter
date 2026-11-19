@@ -1106,6 +1106,7 @@ export const zhCN: TranslationKeys = {
       enhance: "增强",
       sharpenFilter: "锐化滤镜",
       whiteBalanceTemperatureFilter: "白平衡色温滤镜",
+      exposureFilter: "曝光滤镜",
       originalSizeKb: "原始：{size} KB",
       enhancedSizeKb: "增强后：{size} KB",
     },

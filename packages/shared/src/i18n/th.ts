@@ -1319,6 +1319,7 @@ export const th: TranslationKeys = {
       enhance: "ปรับปรุง",
       sharpenFilter: "ฟิลเตอร์เพิ่มความคมชัด",
       whiteBalanceTemperatureFilter: "ฟิลเตอร์อุณหภูมิไวต์บาลานซ์",
+      exposureFilter: "ฟิลเตอร์ค่าแสง",
       originalSizeKb: "ต้นฉบับ: {size} KB",
       enhancedSizeKb: "ปรับปรุงแล้ว: {size} KB",
     },

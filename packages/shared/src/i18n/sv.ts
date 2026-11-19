@@ -1339,6 +1339,7 @@ export const sv: TranslationKeys = {
       enhance: "Förstärkt",
       sharpenFilter: "Skärpefilter",
       whiteBalanceTemperatureFilter: "Vitbalans-temperaturfilter",
+      exposureFilter: "Exponeringsfilter",
       originalSizeKb: "Original: {size} KB",
       enhancedSizeKb: "Förstärkt: {size} KB",
     },

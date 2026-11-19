@@ -15,6 +15,27 @@ import type {
  */
 const MAX_CLAHE_PIXELS = 16_000_000;
 
+/** Longest edge of the thumbnail the tone histogram is measured on. */
+const TONE_SAMPLE_EDGE = 256;
+
+/**
+ * A photo counts as backlit when at least this share of it sits in deep
+ * shadow (luminance below 64) while BACKLIT_HIGHLIGHT_SHARE sits in bright
+ * highlights (192 and up): a dark subject against a bright sky or window.
+ */
+const BACKLIT_SHADOW_SHARE = 0.15;
+const BACKLIT_HIGHLIGHT_SHARE = 0.25;
+
+/** Channel-mean red/blue gap (0-255) below which white balance is left alone. */
+const WB_DEAD_ZONE = 12.5;
+
+interface ToneDistribution {
+  /** Share of pixels with luminance below 64. */
+  shadows: number;
+  /** Share of pixels with luminance of 192 or more. */
+  highlights: number;
+}
+
 /**
  * Preset multipliers applied to auto-computed corrections.
  * Each value scales the corresponding correction (1.0 = unchanged).
@@ -123,11 +144,40 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
     isGrayscale,
     stats.entropy,
   );
-  const corrections = computeCorrections(scores);
-  const issues = detectIssues(scores);
+  const tones = await measureTones(buffer);
+  const backlit =
+    tones.shadows >= BACKLIT_SHADOW_SHARE && tones.highlights >= BACKLIT_HIGHLIGHT_SHARE;
+  const corrections = computeCorrections(scores, {
+    redBlueGap: isGrayscale ? 0 : rCh.mean - bCh.mean,
+    backlit,
+    shadows: tones.shadows,
+  });
+  const issues = detectIssues(scores, backlit);
   const suggestedMode = suggestMode(scores, meta);
 
   return { scores, corrections, issues, suggestedMode };
+}
+
+/**
+ * Luminance histogram shape, which the channel means can't show: a backlit
+ * photo and an evenly bright one can share a mean. Measured on a thumbnail
+ * because only the proportions matter.
+ */
+async function measureTones(buffer: Buffer): Promise<ToneDistribution> {
+  const { data } = await sharp(buffer)
+    .removeAlpha()
+    .resize(TONE_SAMPLE_EDGE, TONE_SAMPLE_EDGE, { fit: "inside", withoutEnlargement: true })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let shadows = 0;
+  let highlights = 0;
+  for (const v of data) {
+    if (v < 64) shadows++;
+    else if (v >= 192) highlights++;
+  }
+  const total = Math.max(1, data.length);
+  return { shadows: shadows / total, highlights: highlights / total };
 }
 
 function computeScores(
@@ -166,10 +216,19 @@ function computeScores(
   };
 }
 
-function computeCorrections(scores: AnalysisScores): CorrectionParams {
-  const brightness = deadZoneCorrection(scores.exposure, 40, 60, 0.8);
+function computeCorrections(
+  scores: AnalysisScores,
+  tone: { redBlueGap: number; backlit: boolean; shadows: number },
+): CorrectionParams {
+  // A backlit photo's mean is pulled up by the background, so the mean-based
+  // correction would darken a subject that needs lifting. Lift in proportion
+  // to how much of the frame is in shadow instead, and never darken.
+  const meanBased = deadZoneCorrection(scores.exposure, 40, 60, 0.8);
+  const brightness = tone.backlit
+    ? Math.max(meanBased, clamp(Math.round(tone.shadows * 100), 10, 40))
+    : meanBased;
   const contrast = deadZoneCorrection(scores.contrast, 40, 60, 0.6);
-  const temperature = deadZoneCorrection(scores.whiteBalance, 40, 60, 0.5);
+  const temperature = whiteBalanceCorrection(tone.redBlueGap);
 
   const saturation =
     scores.saturation < 40
@@ -183,7 +242,28 @@ function computeCorrections(scores: AnalysisScores): CorrectionParams {
 
   const denoise = scores.noise < 25 ? 5 : scores.noise < 35 ? 3 : 0;
 
-  return { brightness, contrast, temperature, saturation, sharpness, denoise };
+  return {
+    brightness,
+    contrast,
+    temperature,
+    saturation,
+    sharpness,
+    denoise,
+    ...(tone.backlit && { backlit: true }),
+  };
+}
+
+/**
+ * Gray-world white balance on the red/blue axis: a red-heavy (warm) cast gets
+ * a negative temperature that cools it, a blue-heavy one a positive temperature
+ * that warms it. Same 0.4-per-level slope and 60 cap as the old spread-based
+ * formula, which only ever warmed (#4842).
+ */
+function whiteBalanceCorrection(redBlueGap: number): number {
+  const excess = Math.abs(redBlueGap) - WB_DEAD_ZONE;
+  if (excess <= 0) return 0;
+  const magnitude = clamp(Math.round(excess * 0.4), 0, 60);
+  return redBlueGap > 0 ? -magnitude : magnitude;
 }
 
 /**
@@ -196,10 +276,11 @@ function deadZoneCorrection(score: number, lo: number, hi: number, factor: numbe
   return clamp(Math.round((hi - score) * factor), -60, 0);
 }
 
-function detectIssues(scores: AnalysisScores): string[] {
+function detectIssues(scores: AnalysisScores, backlit: boolean): string[] {
   const issues: string[] = [];
   if (scores.exposure < 35) issues.push("underexposed");
-  if (scores.exposure > 70) issues.push("overexposed");
+  // A backlit photo reads bright on average but its subject is dark.
+  if (scores.exposure > 70 && !backlit) issues.push("overexposed");
   if (scores.contrast < 35) issues.push("low-contrast");
   if (scores.whiteBalance < 35) issues.push("color-cast");
   if (scores.saturation < 30) issues.push("desaturated");
@@ -216,15 +297,23 @@ function suggestMode(scores: AnalysisScores, _meta: SharpMetadata): EnhancementM
 
 /**
  * Apply auto-enhancement corrections to a Sharp pipeline.
+ *
+ * Sharp runs a pipeline's operations in its own fixed order, not the order
+ * they are chained in: gamma-in, modulate, sharpen, gamma-out, linear,
+ * normalise, then CLAHE. Anything tonal chained here therefore runs before
+ * the normalise stretch, which re-maps the histogram's ends and cancels a
+ * linear contrast change outright and most of an exposure curve. So the
+ * exposure curve and global contrast run as a second pipeline over the first
+ * one's pixels, after normalise and CLAHE (#4842).
  */
-export function applyCorrections(
+export async function applyCorrections(
   image: Sharp,
   corrections: CorrectionParams,
   mode: EnhancementMode,
   intensity: number,
   toggles: Record<string, boolean>,
   imageSize?: { width: number; height: number },
-): Sharp {
+): Promise<Sharp> {
   const presets = PRESET_MULTIPLIERS[mode];
   const scale = intensity / 50;
 
@@ -257,22 +346,13 @@ export function applyCorrections(
   // Step 2: Normalise - auto-levels histogram stretch
   // lower = percentile below which pixels are clipped to black (0-99)
   // upper = percentile above which pixels are clipped to white (1-100)
-  if (toggles.exposure !== false) {
+  if (toggles.exposure !== false && !corrections.backlit) {
     const baseClip = 5 - (intensity / 100) * 4.5;
     const clipPct = clamp(Math.round(baseClip * presets.normalise), 0, 10);
     const lower = clipPct;
     const upper = 100 - clipPct;
     if (lower < upper) {
       result = result.normalise({ lower, upper });
-    }
-  }
-
-  // Step 3: Gamma - perceptual exposure correction (only outside dead zone)
-  if (toggles.exposure !== false) {
-    const adj = corrections.brightness * presets.brightness * scale;
-    if (Math.abs(adj) > 2) {
-      const gamma = clamp(1 + adj / 100, 1.0, 3.0);
-      result = result.gamma(gamma);
     }
   }
 
@@ -314,7 +394,47 @@ export function applyCorrections(
     }
   }
 
-  return result;
+  // Second pipeline (see above): the exposure curve, then contrast, the same
+  // order the preview's filters use. Each only outside its dead zone.
+  const exposureAdj =
+    toggles.exposure !== false ? corrections.brightness * presets.brightness * scale : 0;
+  const contrastAdj =
+    toggles.contrast !== false ? corrections.contrast * presets.contrast * scale : 0;
+  const applyExposure = Math.abs(exposureAdj) > 2;
+  const applyContrast = Math.abs(contrastAdj) > 2;
+  if (!applyExposure && !applyContrast) return result;
+
+  // .png() only sets a default output: a pipeline opened on raw pixels would
+  // otherwise encode raw bytes when the caller doesn't pick a format. A
+  // caller's own png()/jpeg()/toFormat() still replaces it.
+  const { data, info } = await result.raw().toBuffer({ resolveWithObject: true });
+  let tone = sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  }).png();
+
+  // Step 7: Exposure as a power curve. Sharp's gamma(in, out) darkens by `in`
+  // before its resize and brightens by `out` after it. A single argument sets
+  // both, and with no resize they cancel, so exactly one side is set.
+  if (applyExposure) {
+    const gamma = exposureGamma(exposureAdj);
+    tone = exposureAdj > 0 ? tone.gamma(1, gamma) : tone.gamma(gamma, 1);
+  }
+
+  // Step 8: Global contrast around mid-grey, matching the preview's CSS contrast().
+  if (applyContrast) {
+    const factor = clamp(1 + contrastAdj / 100, 0.2, 3.0);
+    tone = tone.linear(factor, 128 * (1 - factor));
+  }
+
+  return tone;
+}
+
+/**
+ * The gamma exponent for a scaled exposure adjustment: 1 + |adj| / 100,
+ * capped at Sharp's limit of 3. The preview's SVG gamma uses the same value.
+ */
+function exposureGamma(adj: number): number {
+  return clamp(1 + Math.abs(adj) / 100, 1.0, 3.0);
 }
 
 /**

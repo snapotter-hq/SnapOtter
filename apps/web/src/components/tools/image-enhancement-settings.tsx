@@ -220,9 +220,9 @@ export function ImageEnhancementControls({
     const c = analysis.corrections;
     const parts: string[] = [];
 
-    if (toggles.exposure && Math.abs(c.brightness) > 2) {
-      const adj = c.brightness * (presets.brightness ?? 1) * scale;
-      parts.push(`brightness(${1 + adj / 100})`);
+    // Same order as the server: the exposure curve, then contrast.
+    if (toggles.exposure && Math.abs(c.brightness * (presets.brightness ?? 1) * scale) > 2) {
+      parts.push("url(#snapotter-enhance-exposure-filter)");
     }
     if (toggles.contrast && Math.abs(c.contrast) > 2) {
       const adj = c.contrast * (presets.contrast ?? 1) * scale;
@@ -246,6 +246,16 @@ export function ImageEnhancementControls({
     setToggles((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // The server's exposure step is a power curve (Sharp gamma), not a linear
+  // gain, so the preview mirrors it with an SVG gamma transfer: exponent 1/g
+  // lifts, g darkens, with g = 1 + |adj| / 100 capped at 3 (#4842).
+  const exposureAdj = analysis
+    ? (analysis.corrections.brightness * (PRESET_MULTIPLIERS[mode].brightness ?? 1) * intensity) /
+      50
+    : 0;
+  const exposureGamma = Math.min(3, 1 + Math.abs(exposureAdj) / 100);
+  const exposureExponent = exposureAdj > 0 ? 1 / exposureGamma : exposureGamma;
+
   const tempAdj = analysis
     ? (analysis.corrections.temperature * (PRESET_MULTIPLIERS[mode].temperature ?? 1) * intensity) /
       50 /
@@ -260,6 +270,18 @@ export function ImageEnhancementControls({
   return (
     <>
       {/* Hidden SVG filters for preview */}
+      {toggles.exposure && Math.abs(exposureAdj) > 2 && (
+        <svg width="0" height="0" style={{ position: "absolute" }}>
+          <title>{t.toolSettings["image-enhancement"].exposureFilter}</title>
+          <filter id="snapotter-enhance-exposure-filter" colorInterpolationFilters="sRGB">
+            <feComponentTransfer>
+              <feFuncR type="gamma" amplitude="1" exponent={exposureExponent} offset="0" />
+              <feFuncG type="gamma" amplitude="1" exponent={exposureExponent} offset="0" />
+              <feFuncB type="gamma" amplitude="1" exponent={exposureExponent} offset="0" />
+            </feComponentTransfer>
+          </filter>
+        </svg>
+      )}
       {toggles.whiteBalance && Math.abs(tempAdj) > 0.02 && (
         <svg width="0" height="0" style={{ position: "absolute" }}>
           <title>{t.toolSettings["image-enhancement"].whiteBalanceTemperatureFilter}</title>

@@ -1274,6 +1274,7 @@ export const en = {
       enhancedSizeKb: "Enhanced: {size} KB",
       originalSizeKb: "Original: {size} KB",
       whiteBalanceTemperatureFilter: "White balance temperature filter",
+      exposureFilter: "Exposure filter",
       sharpenFilter: "Sharpen filter",
       removesNoiseAndArtifactsUsing: "Removes noise and artifacts using AI",
       analyzingImage: "Analyzing image...",

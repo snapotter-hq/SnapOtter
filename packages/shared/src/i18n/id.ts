@@ -1340,6 +1340,7 @@ export const id: TranslationKeys = {
       enhance: "Tingkatkan",
       sharpenFilter: "Filter penajaman",
       whiteBalanceTemperatureFilter: "Filter suhu white balance",
+      exposureFilter: "Filter eksposur",
       originalSizeKb: "Asli: {size} KB",
       enhancedSizeKb: "Ditingkatkan: {size} KB",
     },

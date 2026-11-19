@@ -1343,6 +1343,7 @@ export const ru: TranslationKeys = {
       enhance: "Улучшить",
       sharpenFilter: "Фильтр резкости",
       whiteBalanceTemperatureFilter: "Фильтр температуры баланса белого",
+      exposureFilter: "Фильтр экспозиции",
       originalSizeKb: "Оригинал: {size} KB",
       enhancedSizeKb: "Улучшено: {size} KB",
     },

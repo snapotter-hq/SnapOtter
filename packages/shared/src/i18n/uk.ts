@@ -1342,6 +1342,7 @@ export const uk: TranslationKeys = {
       enhance: "Поліпшити",
       sharpenFilter: "Фільтр різкості",
       whiteBalanceTemperatureFilter: "Фільтр температури балансу білого",
+      exposureFilter: "Фільтр експозиції",
       originalSizeKb: "Оригінал: {size} KB",
       enhancedSizeKb: "Поліпшено: {size} KB",
     },

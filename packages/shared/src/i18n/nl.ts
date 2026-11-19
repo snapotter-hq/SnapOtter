@@ -1346,6 +1346,7 @@ export const nl: TranslationKeys = {
       enhance: "Verbeteren",
       sharpenFilter: "Verscherpingsfilter",
       whiteBalanceTemperatureFilter: "Witbalans-temperatuurfilter",
+      exposureFilter: "Belichtingsfilter",
       originalSizeKb: "Origineel: {size} KB",
       enhancedSizeKb: "Verbeterd: {size} KB",
     },

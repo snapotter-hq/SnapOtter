@@ -1329,6 +1329,7 @@ export const es: TranslationKeys = {
       enhance: "Mejorar",
       sharpenFilter: "Filtro de enfoque",
       whiteBalanceTemperatureFilter: "Filtro de temperatura de balance de blancos",
+      exposureFilter: "Filtro de exposición",
       originalSizeKb: "Original: {size} KB",
       enhancedSizeKb: "Mejorado: {size} KB",
     },
