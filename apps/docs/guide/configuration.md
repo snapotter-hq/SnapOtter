@@ -103,6 +103,7 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_SVG_SIZE_MB` | `50` | Largest SVG accepted before sanitizing, in megabytes. `0` behaves differently here than in the rows around it. It removes the pre-parse size cap entirely rather than raising it, so leave this one set. |
 | `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Largest `settings` field a tool request may carry, in kilobytes, counted in UTF-8 bytes. Requests over the limit get a `400`. Set to 0 for no limit. Real tool settings are far smaller than 64 KB, so raise this only if a client sends unusually large settings. |
+| `MAX_SUBTITLE_SIZE_MB` | `1` | Largest subtitle file (`.srt`, `.vtt`, `.ass`) Burn Subtitles and Embed Subtitles accept, in megabytes. Larger files get a `400` that names the file size and the limit. Set to 0 for no limit. A feature-length subtitle file is usually well under 1 MB. |
 
 ### Engines {#engines}
 

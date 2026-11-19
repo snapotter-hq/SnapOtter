@@ -19,7 +19,6 @@ export function noAudioTrackError(): InputValidationError {
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
 
 const SUBTITLE_EXT_SET = new Set<string>(SUBTITLE_INPUTS);
-const MAX_SUBTITLE_BYTES = 1 * 1024 * 1024; // 1 MiB
 
 /** instanceof plus name/message checks so a dual copy of media-engine cannot revert timeouts to "Unrecognized". */
 function isFfprobeTimeout(err: unknown): boolean {
@@ -169,8 +168,12 @@ export class MediaInputHandler implements InputHandler {
     if (!SUBTITLE_EXT_SET.has(ext)) {
       throw new InputValidationError("Not a valid subtitle file (.srt, .vtt, .ass)");
     }
-    if (raw.length > MAX_SUBTITLE_BYTES) {
-      throw new InputValidationError("Not a valid subtitle file (.srt, .vtt, .ass)");
+    const limitMb = env.MAX_SUBTITLE_SIZE_MB;
+    if (limitMb > 0 && raw.length > limitMb * 1024 * 1024) {
+      const sizeMb = (raw.length / (1024 * 1024)).toFixed(1);
+      throw new InputValidationError(
+        `Subtitle file is ${sizeMb} MB, over the ${limitMb} MB limit (MAX_SUBTITLE_SIZE_MB)`,
+      );
     }
     const text = new TextDecoder("utf-8", { fatal: false }).decode(raw);
     // Detect the SRT/VTT cue timecode arrow (e.g. "00:00:01,000 --> 00:00:04,000")
