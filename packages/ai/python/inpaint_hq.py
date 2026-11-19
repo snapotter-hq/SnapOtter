@@ -31,8 +31,9 @@ def emit_progress(percent, stage):
 _MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
 SD_MODEL_DIR = os.environ.get("SD15_INPAINT_DIR", os.path.join(_MODELS_BASE, "sd15-inpainting"))
 
-# Diffusion runs at SD1.5's native 512. Crops are resized to this and the result
-# resized back, so the crop-HD property (small objects keep resolution) still holds.
+# Diffusion runs at SD1.5's native 512. A mask that fits gets a native 512 crop
+# (inpaint.compute_model_window) and skips the resize. A bigger crop, or one from
+# a frame side shorter than 512, is resized to 512 and back.
 MODEL_SIZE = 512
 
 # Inference defaults. Overridable by env for tuning without a rebuild. An empty
@@ -56,7 +57,9 @@ def make_run_model(pipe, device, steps=STEPS, guidance=GUIDANCE, prompt=PROMPT,
 
     Matches inpaint.py's run_model contract: crop in (HxWx3 uint8 RGB), inpainted
     crop out (same HxWx3). Resizes the crop to the model's 512, runs the pipe with
-    the (dilated) mask, and resizes the result back to the native crop size.
+    the (dilated) mask, and resizes the result back to the native crop size. A crop
+    that is already 512x512 passes through unchanged, since cv2.resize to the same
+    size is an exact copy.
 
     `pipe` is any callable with the diffusers inpaint signature; injecting a fake
     keeps this unit-testable without torch/diffusers or a real model.
@@ -115,6 +118,18 @@ def make_run_model(pipe, device, steps=STEPS, guidance=GUIDANCE, prompt=PROMPT,
         return out_arr
 
     return run_model
+
+
+def erase(img_array, mask_array, run_model, progress=None):
+    """Crop, run the diffusion model and composite, using the native 512 window.
+
+    Without model_window, inpaint_array uses the margin-scaled crop and resizes
+    it to 512 and back, which cost LaMa about a fifth of the fill's sharpness
+    (#4644). SD1.5 also runs at 512, so it gets the same native window.
+    """
+    return inpaint.inpaint_array(
+        img_array, mask_array, run_model, progress=progress, model_window=MODEL_SIZE
+    )
 
 
 def _resolve_device():
@@ -209,9 +224,7 @@ def main():
             )
 
         run_model = make_run_model(pipe, device, progress=emit_progress)
-        result = inpaint.inpaint_array(
-            img_array, mask_array, run_model, progress=emit_progress
-        )
+        result = erase(img_array, mask_array, run_model, progress=emit_progress)
 
         emit_progress(90, "Saving")
         Image.fromarray(result).save(output_path)
