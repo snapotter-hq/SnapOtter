@@ -250,7 +250,7 @@ export function ImageViewer({
   );
 
   return (
-    <div className="flex flex-col w-full h-full max-w-3xl mx-auto min-h-0">
+    <div className="flex flex-col w-full h-full min-h-0">
       {/* Toolbar */}
       <div className="flex items-center justify-center gap-1 py-2 px-3 border-b border-border shrink-0">
         <button

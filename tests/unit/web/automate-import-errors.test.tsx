@@ -68,6 +68,15 @@ const storageMap = new Map<string, string>();
 
 beforeEach(() => {
   storageMap.clear();
+  // The before/after slider re-measures its layers through a ResizeObserver,
+  // which jsdom lacks.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => storageMap.get(key) ?? null,
     setItem: (key: string, value: string) => storageMap.set(key, value),

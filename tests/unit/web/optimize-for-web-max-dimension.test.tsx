@@ -60,6 +60,15 @@ function guardWork(route = ROUTE) {
 
 beforeEach(() => {
   processFiles.mockReset();
+  // The before/after slider re-measures its layers through a ResizeObserver,
+  // which jsdom lacks.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   processAllFiles.mockReset();
   vi.mocked(captureHandledError).mockClear();
   Element.prototype.scrollIntoView = vi.fn();

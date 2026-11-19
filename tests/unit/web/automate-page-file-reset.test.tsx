@@ -133,6 +133,15 @@ function arrive(state?: { libraryFileIds: string[] }, strict = false) {
 
 beforeEach(() => {
   configure({ asyncUtilTimeout: 5000 });
+  // The before/after slider re-measures its layers through a ResizeObserver,
+  // which jsdom lacks.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   storageMap.clear();
   xhrs = [];
   MockEventSource.instances = [];
