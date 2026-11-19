@@ -959,7 +959,10 @@ async function decodePsd(buffer: Buffer, options: DecodeSafetyOptions): Promise<
 }
 
 /**
- * Decode TGA to PNG.
+ * Decode TGA to PNG. ImageMagick 6.9.11 (Debian bookworm, the arm64 image)
+ * keeps a bottom-left TGA's rows as stored and only reports the origin as
+ * orientation, so without -auto-orient the PNG comes out upside down (#4400).
+ * Newer versions flip while reading and report TopLeft, making it a no-op.
  */
 async function decodeTga(buffer: Buffer, options: DecodeSafetyOptions): Promise<Buffer> {
   const cmd = await findMagickCmd(options);
@@ -971,7 +974,7 @@ async function decodeTga(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     await writeTempExclusive(inputPath, buffer);
     await execFileAsync(
       cmd,
-      magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
+      magickArgs(cmd, [inputPath, "-auto-orient", `png:${outputPath}`], options),
       commandOptions(options, 120_000),
     );
     return await readFile(outputPath);
