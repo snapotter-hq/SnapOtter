@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 收集哪些匿名使用数据、何时发送，以及如何关闭实例范围的产品分析。"
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: c479d51d3493
+i18n_output_hash: b32fbbe74f15
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ i18n_hash_version: 2
 
 - tool_used：工具 id、状态、耗时、类别、是否为 AI 工具，以及失败时的错误代码。
 - pipeline_executed：步骤数、工具 id、批处理标志、文件数、耗时、状态。
-- ai_bundle_action：功能包 id、操作、耗时。
+- ai_bundle_action：功能包 id、操作（`install_started`、`installed`、`install_failed`、`uninstalled`、`reset_environment`、`imported`）、耗时，安装失败时还包括来自固定列表的失败类别（`oom`、`network`、`disk`、`checksum`、`cpu_unsupported`、`timeout`、`other`）。安装程序输出、路径和错误消息绝不会发送。
 - 前端使用：打开了哪些工具页面、添加的文件（仅数量）、工具启动、下载、保存、搜索（仅结果数量）、批处理。
 - 崩溃报告：错误类型、经过脱敏的错误消息（已移除文件名、路径、电子邮件地址和带引号的值）、仅含文件基本名称的源堆栈，以及（AI 工具的）仅含文件基本名称的 Python 回溯。
 

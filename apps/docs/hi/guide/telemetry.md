@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter कौन सा अनाम usage data एकत्र करता है, इसे कब भेजा जाता है, और instance-wide product analytics को कैसे बंद करें।"
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: 26977ce70891
+i18n_output_hash: ccd578c58b62
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Anonymous Product Analytics default रूप से चालू है और 
 
 - tool_used: tool id, status, duration, category, यह एक AI tool है या नहीं, विफलता पर एक error code।
 - pipeline_executed: step count, tool ids, batch flag, file count, duration, status।
-- ai_bundle_action: bundle id, action, duration।
+- ai_bundle_action: bundle id, action (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), duration, और इंस्टॉल विफल होने पर एक तय सूची से विफलता की श्रेणी (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`)। इंस्टॉलर का आउटपुट, पाथ और त्रुटि संदेश कभी नहीं भेजे जाते।
 - Frontend usage: कौन से tool pages खुलते हैं, जोड़ी गई files (केवल counts), tool शुरू हुआ, downloads, saves, search (केवल result count), batch processed।
 - Crash reports: error type, एक redacted error message (file names, paths, emails और quoted values हटाकर), file basenames के साथ एक source stack, और AI tools के लिए केवल file basenames वाला एक Python traceback।
 

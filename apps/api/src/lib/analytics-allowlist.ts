@@ -3,7 +3,7 @@ import { AI_INSTALL_ERROR_KINDS, AUTH_LOGIN_FAILURE_REASONS } from "@snapotter/s
 // Defense in depth: only these keys may leave the server per event, and only as
 // primitives. Free-text fields (error_message, params, search query) are never
 // allow-listed, so tool settings and filenames cannot reach PostHog.
-const ALLOWED: Record<string, ReadonlySet<string>> = {
+export const ALLOWED: Record<string, ReadonlySet<string>> = {
   tool_used: new Set([
     "tool_id",
     "status",

@@ -1,8 +1,8 @@
 ---
 description: "Welche anonymen Nutzungsdaten SnapOtter erfasst, wann sie gesendet werden und wie Sie instanzweite Produktanalysen deaktivieren."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: d31042eb45dd
+i18n_output_hash: af98342c00cf
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Anonyme Produktanalysen sind standardmäßig aktiviert und werden von einem Admi
 
 - tool_used: Werkzeug-ID, Status, Dauer, Kategorie, ob es ein AI-Werkzeug ist, ein Fehlercode bei Fehlschlag.
 - pipeline_executed: Schrittanzahl, Werkzeug-IDs, Batch-Flag, Dateianzahl, Dauer, Status.
-- ai_bundle_action: Bündel-ID, Aktion, Dauer.
+- ai_bundle_action: Bündel-ID, Aktion (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), Dauer und bei einer fehlgeschlagenen Installation eine Fehlerkategorie aus einer festen Liste (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Installer-Ausgaben, Pfade und Fehlermeldungen werden nie gesendet.
 - Frontend-Nutzung: welche Werkzeugseiten geöffnet werden, hinzugefügte Dateien (nur Anzahl), gestartetes Werkzeug, Downloads, Speicherungen, Suche (nur Ergebnisanzahl), Batch verarbeitet.
 - Absturzberichte: Fehlertyp, eine bereinigte Fehlermeldung (Dateinamen, Pfade, E-Mail-Adressen und Werte in Anführungszeichen entfernt), ein Quell-Stack mit Datei-Basisnamen und bei AI-Werkzeugen ein Python-Traceback nur mit Datei-Basisnamen.
 

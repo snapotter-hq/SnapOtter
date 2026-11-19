@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter thu thập dữ liệu sử dụng ẩn danh nào, khi nào nó được gửi, và cách tắt phân tích sản phẩm trên toàn phiên bản."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: 05c300999c48
+i18n_output_hash: 82646264db25
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Phân tích Sản phẩm Ẩn danh được bật theo mặc định và đượ
 
 - tool_used: id công cụ, trạng thái, thời lượng, danh mục, có phải là công cụ AI hay không, mã lỗi khi thất bại.
 - pipeline_executed: số bước, id công cụ, cờ batch, số lượng tệp, thời lượng, trạng thái.
-- ai_bundle_action: id gói, hành động, thời lượng.
+- ai_bundle_action: id gói, hành động (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), thời lượng và, khi cài đặt thất bại, một loại lỗi từ danh sách cố định (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Đầu ra của trình cài đặt, đường dẫn và thông báo lỗi không bao giờ được gửi.
 - Sử dụng frontend: những trang công cụ nào được mở, tệp được thêm (chỉ số lượng), công cụ được khởi động, lượt tải xuống, lượt lưu, tìm kiếm (chỉ số lượng kết quả), batch được xử lý.
 - Báo cáo sự cố: loại lỗi, thông báo lỗi đã được lược bỏ thông tin nhạy cảm (bỏ tên tệp, đường dẫn, email và các giá trị trong dấu ngoặc kép), một stack nguồn với tên cơ sở của tệp, và với các công cụ AI là một traceback Python chỉ chứa tên cơ sở của tệp.
 
