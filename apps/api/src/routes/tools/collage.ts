@@ -568,8 +568,22 @@ export function registerCollage(app: FastifyInstance) {
         return reply.status(400).send({ error: `Unknown template: ${settings.templateId}` });
       }
 
+      // Without cells every slot expects an upload, so a short count is a
+      // mistake, not a partial collage. Partial collages opt in through
+      // explicit cells with imageIndex -1, which is what the web UI sends.
+      if (!settings.cells && files.length < template.imageCount) {
+        return reply.status(400).send({
+          error: `Template "${template.id}" needs ${template.imageCount} images, ${files.length} given. Upload more images, or send cells with imageIndex -1 for the slots to leave empty.`,
+          code: "INVALID_SETTINGS",
+        });
+      }
+
+      const warnings: string[] = [];
       if (files.length > template.imageCount) {
-        files.length = template.imageCount;
+        const dropped = files.splice(template.imageCount);
+        warnings.push(
+          `Template "${template.id}" holds ${template.imageCount} images, so ${dropped.length} extra were ignored: ${dropped.map((f) => f.filename).join(", ")}`,
+        );
       }
 
       // Determine output canvas size
@@ -832,6 +846,7 @@ export function registerCollage(app: FastifyInstance) {
         downloadUrl: `/api/v1/download/${jobId}/${filename}`,
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: finalBuffer.length,
+        ...(warnings.length > 0 && { warnings }),
       });
     } catch (err) {
       const tooLarge = imageSizeLimitError(err);

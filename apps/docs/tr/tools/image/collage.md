@@ -1,6 +1,6 @@
 ---
 description: "Birden fazla görüntüyü 25'ten fazla şablon, ayarlanabilir boşluklar ve köşeler ve hücre başına kaydırma ve yakınlaştırma ile ızgara kolajlarında birleştirin."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 32baf2d667fc
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Notlar {#notes}
 
 - Çok parçalı istekte birden fazla görüntü dosyası yükleyin. Görüntüler, yükleme sırasına göre şablon hücrelerine atanır.
-- Şablonun desteklediğinden daha fazla görüntü yüklenirse, fazladan görüntüler yok sayılır.
+- `cells` olmadan, şablondaki her hücre için bir görüntü gönderin. Daha az görüntü gönderilirse yanıt, `INVALID_SETTINGS` kodu ve şablonun gerektirdiği görüntü sayısıyla birlikte 400 olur. Hücreleri boş bırakmak için `cells` gönderin ve her boş hücre için `imageIndex` değerini `-1` yapın.
+- Şablonun alabileceğinden daha fazla görüntü yüklenirse fazladan görüntüler yok sayılır ve yanıttaki `warnings` dizisi bunların adlarını verir.
 - HEIC, RAW, PSD ve SVG giriş biçimlerini destekler (otomatik olarak çözülür).
 - Tuvalin temel boyutu en uzun kenarda 2400px'dir ve seçilen en boy oranına göre ölçeklenir.
 - `aspectRatio` değeri `"free"` olduğunda, tuval varsayılan olarak 4:3'e (2400x1800) ayarlanır.

@@ -1,6 +1,6 @@
 ---
 description: "Combinez plusieurs images en collages en grille avec plus de 25 modèles, des espacements et coins réglables, ainsi qu'un panoramique et un zoom par cellule."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: d23b0c41aa81
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Notes {#notes}
 
 - Téléversez plusieurs fichiers image dans la requête multipart. Les images sont attribuées aux cellules du modèle dans l'ordre de téléversement.
-- Si plus d'images sont téléversées que le modèle n'en accepte, les images supplémentaires sont ignorées.
+- Sans `cells`, envoyez une image par cellule du modèle. Avec moins d'images, la réponse est 400 avec le code `INVALID_SETTINGS` et le nombre d'images attendu par le modèle. Pour laisser des cellules vides, envoyez `cells` et mettez `imageIndex` à `-1` pour chaque cellule vide.
+- Si plus d'images sont téléversées que le modèle n'en contient, les images supplémentaires sont ignorées et le tableau `warnings` de la réponse les nomme.
 - Prend en charge les formats d'entrée HEIC, RAW, PSD et SVG (décodés automatiquement).
 - La taille de base du canevas est de 2400 px sur le côté le plus long, mise à l'échelle selon le rapport d'aspect choisi.
 - Lorsque `aspectRatio` vaut `"free"`, le canevas prend par défaut le rapport 4:3 (2400x1800).

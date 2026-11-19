@@ -1,6 +1,6 @@
 ---
 description: "Kombinera flera bilder till rutnätscollage med 25+ mallar, justerbara mellanrum och hörn samt panorering och zoom per cell."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 8f2a14aa47e4
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Anteckningar {#notes}
 
 - Ladda upp flera bildfiler i multipart-begäran. Bilderna tilldelas mallcellerna i uppladdningsordning.
-- Om fler bilder laddas upp än vad mallen stöder ignoreras de extra bilderna.
+- Utan `cells` skickar du en bild per mallcell. Med för få bilder svarar servern 400 med koden `INVALID_SETTINGS` och antalet bilder som mallen behöver. Om du vill lämna celler tomma skickar du `cells` och sätter `imageIndex` till `-1` för varje tom cell.
+- Om fler bilder laddas upp än vad mallen rymmer ignoreras de extra bilderna, och arrayen `warnings` i svaret namnger dem.
 - Stöder indataformaten HEIC, RAW, PSD och SVG (avkodas automatiskt).
 - Ritytans basstorlek är 2400px på den längsta sidan, skalad efter valt bildförhållande.
 - När `aspectRatio` är `"free"` blir ritytan som standard 4:3 (2400x1800).

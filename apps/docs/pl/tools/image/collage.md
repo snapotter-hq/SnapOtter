@@ -1,6 +1,6 @@
 ---
 description: "Łącz wiele obrazów w kolaże siatkowe z ponad 25 szablonami, regulowanymi odstępami i narożnikami oraz przesuwaniem i powiększaniem dla każdej komórki."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 12ed9b5e0135
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Uwagi {#notes}
 
 - Prześlij wiele plików obrazów w żądaniu multipart. Obrazy są przypisywane do komórek szablonu w kolejności przesyłania.
-- Jeśli prześlesz więcej obrazów, niż obsługuje szablon, dodatkowe obrazy są ignorowane.
+- Bez `cells` wyślij jeden obraz na każdą komórkę szablonu. Przy zbyt małej liczbie obrazów odpowiedź to 400 z kodem `INVALID_SETTINGS` i liczbą obrazów, której wymaga szablon. Aby zostawić komórki puste, wyślij `cells` i ustaw `imageIndex` na `-1` dla każdej pustej komórki.
+- Jeśli prześlesz więcej obrazów, niż mieści szablon, dodatkowe obrazy są ignorowane, a tablica `warnings` w odpowiedzi podaje ich nazwy.
 - Obsługuje formaty wejściowe HEIC, RAW, PSD i SVG (automatycznie dekodowane).
 - Bazowy rozmiar płótna wynosi 2400 px po najdłuższym boku, skalowany zgodnie z wybranymi proporcjami.
 - Gdy `aspectRatio` ma wartość `"free"`, płótno domyślnie przyjmuje proporcje 4:3 (2400x1800).

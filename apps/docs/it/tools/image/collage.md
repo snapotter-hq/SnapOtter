@@ -1,6 +1,6 @@
 ---
 description: "Combina più immagini in collage a griglia con oltre 25 modelli, spazi e angoli regolabili e pan e zoom per singola cella."
-i18n_source_hash: cd50a782239d
+i18n_source_hash: ea97ca9060ed
 i18n_provenance: human
 i18n_output_hash: 6a2fb7cb8440
 ---
@@ -84,7 +84,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/collage \
 ## Note {#notes}
 
 - Carica più file immagine nella richiesta multipart. Le immagini vengono assegnate alle celle del modello nell'ordine di caricamento.
-- Se vengono caricate più immagini di quante il modello ne supporti, le immagini in eccesso vengono ignorate.
+- Senza `cells`, invia un'immagine per ogni cella del modello. Con meno immagini la risposta è 400 con il codice `INVALID_SETTINGS` e il numero di immagini richiesto dal modello. Per lasciare celle vuote, invia `cells` e imposta `imageIndex` a `-1` per ogni cella vuota.
+- Se vengono caricate più immagini di quante il modello ne contenga, quelle in eccesso vengono ignorate e l'array `warnings` della risposta le elenca per nome.
 - Supporta i formati di input HEIC, RAW, PSD e SVG (decodificati automaticamente).
 - La dimensione base della tela è di 2400px sul lato più lungo, scalata in base alle proporzioni scelte.
 - Quando `aspectRatio` è `"free"`, la tela usa come predefinito 4:3 (2400x1800).
