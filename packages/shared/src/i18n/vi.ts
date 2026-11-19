@@ -2084,6 +2084,8 @@ export const vi: TranslationKeys = {
       trimTolerance: "Dung sai",
       trimDescription:
         "Mức độ khác biệt của pixel viền so với màu cạnh mà vẫn bị cắt. Cao hơn = cắt mạnh hơn.",
+      trimMargin: "Lề",
+      trimMarginHint: "Khoảng trống thêm giữ lại quanh vật thể đã cắt",
       padToSquare: "Đệm thành hình vuông",
       targetSizePx: "Kích thước mục tiêu (px)",
       padColor: "Màu đệm",

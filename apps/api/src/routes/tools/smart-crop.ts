@@ -98,6 +98,52 @@ function clampRegion(
   };
 }
 
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// Padding grows the box by that percent of its own size, half on each side, as
+// in subject and face modes. Each edge stops at the image border on its own, so
+// an object touching the frame keeps its margin on the other sides rather than
+// being shifted off centre the way clampRegion would.
+export function growTrimBox(box: Box, padding: number, imgW: number, imgH: number): Box {
+  const marginX = Math.round((box.width * padding) / 200);
+  const marginY = Math.round((box.height * padding) / 200);
+  const left = Math.max(0, box.left - marginX);
+  const top = Math.max(0, box.top - marginY);
+  const right = Math.min(imgW, box.left + box.width + marginX);
+  const bottom = Math.min(imgH, box.top + box.height + marginY);
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+// Trim, then put back the margin from the original pixels, so it is real
+// backdrop rather than a padded canvas.
+async function trimWithMargin(
+  inputBuffer: Buffer,
+  settings: z.output<typeof settingsSchema>,
+  imgW: number,
+  imgH: number,
+): Promise<Buffer> {
+  if (settings.padding === 0) {
+    return sharp(inputBuffer).trim({ threshold: settings.threshold }).png().toBuffer();
+  }
+  const { info } = await sharp(inputBuffer)
+    .trim({ threshold: settings.threshold })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const trimmed = {
+    left: -(info.trimOffsetLeft ?? 0),
+    top: -(info.trimOffsetTop ?? 0),
+    width: info.width,
+    height: info.height,
+  };
+  const region = growTrimBox(trimmed, settings.padding, imgW, imgH);
+  return sharp(inputBuffer).extract(region).png().toBuffer();
+}
+
 // The three crop strategies below hand their result back as a buffer for the
 // route to encode once, at the output format it resolved. Every one of those
 // hand-offs names PNG: an intermediate that names no format is written back in
@@ -238,14 +284,10 @@ async function processTrim(
     );
   }
 
-  if (settings.padToSquare || settings.targetSize) {
-    const trimmed = await sharp(inputBuffer)
-      .trim({ threshold: settings.threshold })
-      .png()
-      .toBuffer({ resolveWithObject: true });
+  const trimmed = await trimWithMargin(inputBuffer, settings, width, height);
 
-    const w = trimmed.info.width;
-    const h = trimmed.info.height;
+  if (settings.padToSquare || settings.targetSize) {
+    const { width: w, height: h } = await sharp(trimmed).metadata();
     const target = settings.targetSize || Math.max(w, h);
     // The padded square is re-read below; one past the 64 MP limit would allocate
     // an oversized intermediate. Only reachable without a targetSize, since that is
@@ -260,7 +302,7 @@ async function processTrim(
     const padG = Math.round(Number.parseInt(settings.padColor.slice(3, 5), 16));
     const padB = Math.round(Number.parseInt(settings.padColor.slice(5, 7), 16));
 
-    return sharp(trimmed.data)
+    return sharp(trimmed)
       .resize({
         width: target,
         height: target,
@@ -271,7 +313,7 @@ async function processTrim(
       .toBuffer();
   }
 
-  return sharp(inputBuffer).trim({ threshold: settings.threshold }).png().toBuffer();
+  return trimmed;
 }
 
 export function registerSmartCrop(app: FastifyInstance) {

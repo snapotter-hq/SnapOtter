@@ -51,7 +51,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
   const [facePreset, setFacePreset] = useState("head-shoulders");
   const [sensitivity, setSensitivity] = useState(50);
 
-  // Shared subject/face state
+  // Shared subject/face/trim state
   const [width, setWidth] = useState("1080");
   const [height, setHeight] = useState("1080");
   const [padding, setPadding] = useState(0);
@@ -114,6 +114,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
       onChangeRef.current?.({
         mode: "trim",
         threshold,
+        padding,
         padToSquare,
         padColor,
         quality,
@@ -537,6 +538,28 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
             <p className="text-[10px] text-muted-foreground mt-0.5">
               {t.toolSettings["smart-crop"].trimDescription}
             </p>
+          </div>
+
+          {/* Margin */}
+          <div>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="sc-trim-margin" className="text-xs text-muted-foreground">
+                  {t.toolSettings["smart-crop"].trimMargin}
+                </label>
+                <HintIcon text={t.toolSettings["smart-crop"].trimMarginHint} />
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums">{padding}%</span>
+            </div>
+            <input
+              id="sc-trim-margin"
+              type="range"
+              min={0}
+              max={50}
+              value={padding}
+              onChange={(e) => setPadding(Number(e.target.value))}
+              className="w-full mt-1"
+            />
           </div>
 
           {/* Pad to square */}

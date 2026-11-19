@@ -1833,6 +1833,8 @@ export const zhCN: TranslationKeys = {
       faceDescription: "使用 AI 人脸检测保持人脸正确构图。若未检测到人脸，则回退到主体聚焦。",
       trimTolerance: "容差",
       trimDescription: "边缘像素与边框颜色的最大差异值。数值越高裁切越激进。",
+      trimMargin: "边距",
+      trimMarginHint: "裁切后在对象周围保留的额外空间",
       padToSquare: "填充为正方形",
       targetSizePx: "目标大小（px）",
       padColor: "填充颜色",

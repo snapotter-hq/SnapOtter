@@ -570,6 +570,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "mode subject", settings: { mode: "subject", width: 100, height: 100 } },
     { label: "mode face", settings: { mode: "face", width: 100, height: 100 } },
     { label: "mode trim", settings: { mode: "trim" } },
+    { label: "trim padding", settings: { mode: "trim", padding: 20 } },
     { label: "mode attention alias", settings: { mode: "attention", width: 100, height: 100 } },
     { label: "mode content alias", settings: { mode: "content" } },
     {

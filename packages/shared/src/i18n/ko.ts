@@ -2021,6 +2021,8 @@ export const ko: TranslationKeys = {
       trimTolerance: "허용치",
       trimDescription:
         "테두리 픽셀이 엣지 색상과 얼마나 다를 수 있는지. 값이 높을수록 더 적극적으로 트림합니다.",
+      trimMargin: "여백",
+      trimMarginHint: "트리밍한 대상 주변에 남길 여분의 공간",
       padToSquare: "정사각형으로 패딩",
       targetSizePx: "목표 크기 (px)",
       padColor: "패딩 색상",

@@ -2091,6 +2091,8 @@ export const ru: TranslationKeys = {
       trimTolerance: "Допуск",
       trimDescription:
         "Насколько пиксель рамки может отличаться от цвета края и всё ещё быть обрезанным. Выше = агрессивнее.",
+      trimMargin: "Поля",
+      trimMarginHint: "Дополнительное пространство вокруг обрезанного объекта",
       padToSquare: "Дополнить до квадрата",
       targetSizePx: "Целевой размер (px)",
       padColor: "Цвет заполнения",

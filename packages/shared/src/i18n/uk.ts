@@ -2094,6 +2094,8 @@ export const uk: TranslationKeys = {
       trimTolerance: "Допуск",
       trimDescription:
         "Наскільки піксель рамки може відрізнятися від кольору краю і все ще бути обрізаним. Вище = агресивніше.",
+      trimMargin: "Поля",
+      trimMarginHint: "Додатковий простір навколо обрізаного об’єкта",
       padToSquare: "Доповнити до квадрату",
       targetSizePx: "Цільовий розмір (px)",
       padColor: "Колір заповнення",

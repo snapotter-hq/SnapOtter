@@ -1834,6 +1834,8 @@ export const zhTW: TranslationKeys = {
       faceDescription: "使用AI臉部偵測保持臉部正確構圖。如未偵測到臉部，將回退到主體對焦。",
       trimTolerance: "容差",
       trimDescription: "邊框像素與邊緣色彩的最大差異仍可被修剪。數值越高修剪越積極。",
+      trimMargin: "邊距",
+      trimMarginHint: "裁切後在物件周圍保留的額外空間",
       padToSquare: "填充為正方形",
       targetSizePx: "目標大小（px）",
       padColor: "填充色彩",

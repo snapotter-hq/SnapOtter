@@ -2079,6 +2079,8 @@ export const es: TranslationKeys = {
       trimTolerance: "Tolerancia",
       trimDescription:
         "Qué tan diferente puede ser un píxel del borde respecto al color del borde y aún así ser recortado. Mayor = más agresivo.",
+      trimMargin: "Margen",
+      trimMarginHint: "Espacio extra que se conserva alrededor del objeto recortado",
       padToSquare: "Rellenar a cuadrado",
       targetSizePx: "Tamaño objetivo (px)",
       padColor: "Color de relleno",

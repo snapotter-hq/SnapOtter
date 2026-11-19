@@ -2090,6 +2090,8 @@ export const tr: TranslationKeys = {
       trimTolerance: "Tolerans",
       trimDescription:
         "Bir kenar pikselinin kenar renginden ne kadar farklı olabileceği ve yine de kırpılabilir olması. Yüksek = daha agresif.",
+      trimMargin: "Kenar boşluğu",
+      trimMarginHint: "Kırpılan nesnenin çevresinde bırakılacak ek alan",
       padToSquare: "Kare olarak doldur",
       targetSizePx: "Hedef boyut (px)",
       padColor: "Dolgu rengi",

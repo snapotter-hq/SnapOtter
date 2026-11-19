@@ -2030,6 +2030,8 @@ export const en = {
       trimTolerance: "Tolerance",
       trimDescription:
         "How different a border pixel can be from the edge color and still be trimmed. Higher = more aggressive.",
+      trimMargin: "Margin",
+      trimMarginHint: "Extra space to keep around the trimmed object",
       padToSquare: "Pad to square",
       targetSizePx: "Target size (px)",
       padColor: "Pad color",

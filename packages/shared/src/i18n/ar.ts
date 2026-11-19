@@ -2067,6 +2067,8 @@ export const ar: TranslationKeys = {
       trimTolerance: "التسامح",
       trimDescription:
         "مقدار اختلاف بكسل الحافة عن لون الحد الذي يظل قابلًا للتقليم. الأعلى = أكثر شدة.",
+      trimMargin: "الهامش",
+      trimMarginHint: "مساحة إضافية تُترك حول العنصر بعد القص",
       padToSquare: "ملء إلى مربع",
       targetSizePx: "الحجم المستهدف (px)",
       padColor: "لون الملء",

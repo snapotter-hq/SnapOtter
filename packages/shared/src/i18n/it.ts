@@ -2091,6 +2091,8 @@ export const it: TranslationKeys = {
       trimTolerance: "Tolleranza",
       trimDescription:
         "Quanto un pixel del bordo può differire dal colore del bordo ed essere comunque ritagliato. Più alto = più aggressivo.",
+      trimMargin: "Margine",
+      trimMarginHint: "Spazio extra da lasciare attorno all'oggetto ritagliato",
       padToSquare: "Riempi a quadrato",
       targetSizePx: "Dimensione obiettivo (px)",
       padColor: "Colore di riempimento",

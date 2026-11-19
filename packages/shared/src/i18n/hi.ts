@@ -1895,6 +1895,8 @@ export const hi: TranslationKeys = {
       trimTolerance: "टॉलरेंस",
       trimDescription:
         "बॉर्डर पिक्सेल एज कलर से कितना अलग हो सकता है और फिर भी ट्रिम हो। अधिक = अधिक आक्रामक।",
+      trimMargin: "मार्जिन",
+      trimMarginHint: "ट्रिम किए गए ऑब्जेक्ट के चारों ओर छोड़ी जाने वाली अतिरिक्त जगह",
       padToSquare: "वर्गाकार में पैड करें",
       targetSizePx: "टार्गेट साइज़ (px)",
       padColor: "पैड कलर",
