@@ -1241,6 +1241,10 @@ export const vi: TranslationKeys = {
       name: "XML sang CSV",
       description: "Trích xuất các phần tử lặp lại từ XML thành bảng CSV",
     },
+    "convert-font": {
+      name: "Chuyển đổi phông chữ",
+      description: "Chuyển đổi phông chữ giữa TTF, OTF, WOFF và WOFF2",
+    },
     "create-zip": {
       name: "Tạo ZIP",
       description: "Gộp nhiều tệp thành một kho lưu trữ ZIP",
@@ -4090,6 +4094,13 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang chuyển đổi",
     },
     "xml-to-csv": {
+      submit: "Chuyển đổi",
+      submitBatch: "Chuyển đổi ({count} tệp)",
+      progressLabel: "Đang chuyển đổi",
+    },
+    "convert-font": {
+      format: "Định dạng đầu ra",
+      hint: "Chuyển OTF sang TTF sẽ vẽ lại đường cong với sai số tối đa 1 đơn vị phông. WOFF và WOFF2 giữ nguyên đường viền.",
       submit: "Chuyển đổi",
       submitBatch: "Chuyển đổi ({count} tệp)",
       progressLabel: "Đang chuyển đổi",

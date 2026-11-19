@@ -1012,6 +1012,10 @@ export const zhCN: TranslationKeys = {
       name: "XML 转 CSV",
       description: "将 XML 中的重复元素提取为 CSV 表格",
     },
+    "convert-font": {
+      name: "转换字体",
+      description: "在 TTF、OTF、WOFF 和 WOFF2 之间转换字体",
+    },
     "create-zip": {
       name: "创建 ZIP",
       description: "将多个文件打包为一个 ZIP 压缩包",
@@ -3817,6 +3821,13 @@ export const zhCN: TranslationKeys = {
       progressLabel: "正在转换",
     },
     "xml-to-csv": {
+      submit: "转换",
+      submitBatch: "转换（{count} 个文件）",
+      progressLabel: "正在转换",
+    },
+    "convert-font": {
+      format: "输出格式",
+      hint: "OTF 转 TTF 会以 1 个字体单位以内的误差重绘曲线。WOFF 和 WOFF2 不改变字形轮廓。",
       submit: "转换",
       submitBatch: "转换（{count} 个文件）",
       progressLabel: "正在转换",

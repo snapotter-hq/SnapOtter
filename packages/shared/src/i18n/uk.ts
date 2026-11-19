@@ -1241,6 +1241,10 @@ export const uk: TranslationKeys = {
       name: "XML у CSV",
       description: "Витягти повторювані елементи з XML у таблицю CSV",
     },
+    "convert-font": {
+      name: "Конвертація шрифтів",
+      description: "Конвертуйте шрифти між TTF, OTF, WOFF і WOFF2",
+    },
     "create-zip": {
       name: "Створення ZIP",
       description: "Запакувати кілька файлів в один архів ZIP",
@@ -4103,6 +4107,13 @@ export const uk: TranslationKeys = {
       progressLabel: "Конвертація",
     },
     "xml-to-csv": {
+      submit: "Конвертувати",
+      submitBatch: "Конвертувати ({count} файлів)",
+      progressLabel: "Конвертація",
+    },
+    "convert-font": {
+      format: "Вихідний формат",
+      hint: "Під час перетворення OTF на TTF криві перемальовуються з точністю до 1 одиниці шрифту. WOFF і WOFF2 не змінюють контури.",
       submit: "Конвертувати",
       submitBatch: "Конвертувати ({count} файлів)",
       progressLabel: "Конвертація",

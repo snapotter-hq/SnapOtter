@@ -1185,6 +1185,10 @@ export const ko: TranslationKeys = {
       name: "XML을 CSV로",
       description: "XML에서 반복 요소를 CSV 테이블로 추출",
     },
+    "convert-font": {
+      name: "글꼴 변환",
+      description: "글꼴을 TTF, OTF, WOFF, WOFF2 사이에서 변환",
+    },
     "create-zip": {
       name: "ZIP 만들기",
       description: "여러 파일을 하나의 ZIP 아카이브로 묶기",
@@ -4022,6 +4026,13 @@ export const ko: TranslationKeys = {
       progressLabel: "변환 중",
     },
     "xml-to-csv": {
+      submit: "변환",
+      submitBatch: "변환 ({count}개 파일)",
+      progressLabel: "변환 중",
+    },
+    "convert-font": {
+      format: "출력 형식",
+      hint: "OTF에서 TTF로 변환하면 곡선을 1 글꼴 단위 이내 오차로 다시 그립니다. WOFF와 WOFF2는 윤곽선을 그대로 유지합니다.",
       submit: "변환",
       submitBatch: "변환 ({count}개 파일)",
       progressLabel: "변환 중",

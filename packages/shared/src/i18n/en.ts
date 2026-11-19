@@ -1194,6 +1194,10 @@ export const en = {
       name: "XML to CSV",
       description: "Extract repeating elements from XML into a CSV table",
     },
+    "convert-font": {
+      name: "Convert Font",
+      description: "Convert fonts between TTF, OTF, WOFF, and WOFF2",
+    },
     "create-zip": {
       name: "Create ZIP",
       description: "Bundle multiple files into a single ZIP archive",
@@ -4032,6 +4036,13 @@ export const en = {
       progressLabel: "Converting",
     },
     "xml-to-csv": {
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "convert-font": {
+      format: "Output format",
+      hint: "OTF to TTF redraws curves to within 1 font unit. WOFF and WOFF2 keep the outlines unchanged.",
       submit: "Convert",
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",

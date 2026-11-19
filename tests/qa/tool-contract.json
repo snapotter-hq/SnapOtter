@@ -12122,6 +12122,34 @@
     "invalidProbes": []
   },
   {
+    "id": "convert-font",
+    "name": "Convert Font",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".ttf", ".otf", ".woff", ".woff2"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "format",
+        "values": ["ttf", "otf", "woff", "woff2", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "create-zip",
     "name": "Create ZIP",
     "modality": "file",

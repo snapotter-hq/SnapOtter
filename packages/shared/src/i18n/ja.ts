@@ -1202,6 +1202,10 @@ export const ja: TranslationKeys = {
       name: "XML を CSV に変換",
       description: "XML から繰り返し要素を CSV テーブルに抽出",
     },
+    "convert-font": {
+      name: "フォント変換",
+      description: "フォントを TTF、OTF、WOFF、WOFF2 の間で変換",
+    },
     "create-zip": {
       name: "ZIP 作成",
       description: "複数のファイルを1つの ZIP アーカイブにまとめる",
@@ -4047,6 +4051,13 @@ export const ja: TranslationKeys = {
       progressLabel: "変換中",
     },
     "xml-to-csv": {
+      submit: "変換",
+      submitBatch: "変換 ({count}ファイル)",
+      progressLabel: "変換中",
+    },
+    "convert-font": {
+      format: "出力形式",
+      hint: "OTF から TTF への変換では、曲線を 1 フォント単位以内の誤差で描き直します。WOFF と WOFF2 はアウトラインを変更しません。",
       submit: "変換",
       submitBatch: "変換 ({count}ファイル)",
       progressLabel: "変換中",

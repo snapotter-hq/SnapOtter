@@ -1060,6 +1060,10 @@ export const hi: TranslationKeys = {
       name: "XML से CSV",
       description: "XML से दोहराए जाने वाले एलीमेंट निकालकर CSV टेबल बनाएँ",
     },
+    "convert-font": {
+      name: "फ़ॉन्ट कन्वर्ट",
+      description: "फ़ॉन्ट को TTF, OTF, WOFF और WOFF2 के बीच रूपांतरित करें",
+    },
     "create-zip": {
       name: "ZIP बनाएँ",
       description: "कई फ़ाइलों को एक ZIP आर्काइव में बंडल करें",
@@ -3893,6 +3897,13 @@ export const hi: TranslationKeys = {
       progressLabel: "रूपांतरित हो रहा है",
     },
     "xml-to-csv": {
+      submit: "रूपांतरित करें",
+      submitBatch: "रूपांतरित करें ({count} फ़ाइलें)",
+      progressLabel: "रूपांतरित हो रहा है",
+    },
+    "convert-font": {
+      format: "आउटपुट फ़ॉर्मैट",
+      hint: "OTF से TTF में कर्व 1 फ़ॉन्ट यूनिट की सटीकता से दोबारा बनते हैं। WOFF और WOFF2 आउटलाइन को नहीं बदलते।",
       submit: "रूपांतरित करें",
       submitBatch: "रूपांतरित करें ({count} फ़ाइलें)",
       progressLabel: "रूपांतरित हो रहा है",

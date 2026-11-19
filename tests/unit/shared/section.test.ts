@@ -14,7 +14,7 @@ describe("toolSection", () => {
     expect(toolSection({ modality: "document", acceptedInputs: [".docx", ".odt"] })).toBe("files");
   });
 
-  it("partitions the catalog into exactly 35 PDF and 23 Files tools", () => {
+  it("partitions the catalog into exactly 35 PDF and 24 Files tools", () => {
     const bySection = (s: Section) =>
       TOOLS.filter((t) => toolSection(t) === s)
         .map((t) => t.id)
@@ -23,7 +23,7 @@ describe("toolSection", () => {
     expect(TOOLS.filter((t) => toolSection(t) === "video")).toHaveLength(59);
     expect(TOOLS.filter((t) => toolSection(t) === "audio")).toHaveLength(27);
     expect(bySection("pdf")).toHaveLength(35);
-    expect(bySection("files")).toHaveLength(23);
+    expect(bySection("files")).toHaveLength(24);
     expect(bySection("pdf")).toContain("sign-pdf");
     expect(bySection("pdf")).toContain("merge-pdf");
     expect(bySection("pdf")).toContain("ocr-pdf");

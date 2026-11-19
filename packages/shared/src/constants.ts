@@ -37,6 +37,10 @@ export const MAX_RESIZE_PERCENTAGE = 1000;
  */
 export const MAX_CONTENT_AWARE_RESIZE_PIXELS = 25_000_000;
 
+/** Formats the convert-font tool reads and writes. */
+export const FONT_FORMATS = ["ttf", "otf", "woff", "woff2"] as const;
+export type FontFormat = (typeof FONT_FORMATS)[number];
+
 export const CATEGORIES: CategoryInfo[] = [
   // Image
   { id: "essentials", name: "Essentials", icon: "Layers", color: "#3B82F6" },

@@ -1238,6 +1238,10 @@ export const sv: TranslationKeys = {
       name: "XML till CSV",
       description: "Extrahera upprepade element från XML till en CSV-tabell",
     },
+    "convert-font": {
+      name: "Konvertera typsnitt",
+      description: "Konvertera typsnitt mellan TTF, OTF, WOFF och WOFF2",
+    },
     "create-zip": {
       name: "Skapa ZIP",
       description: "Paketera flera filer i ett enda ZIP-arkiv",
@@ -4092,6 +4096,13 @@ export const sv: TranslationKeys = {
       progressLabel: "Konverterar",
     },
     "xml-to-csv": {
+      submit: "Konvertera",
+      submitBatch: "Konvertera ({count} filer)",
+      progressLabel: "Konverterar",
+    },
+    "convert-font": {
+      format: "Utdataformat",
+      hint: "OTF till TTF ritar om kurvorna med högst 1 typsnittsenhets avvikelse. WOFF och WOFF2 lämnar konturerna oförändrade.",
       submit: "Konvertera",
       submitBatch: "Konvertera ({count} filer)",
       progressLabel: "Konverterar",

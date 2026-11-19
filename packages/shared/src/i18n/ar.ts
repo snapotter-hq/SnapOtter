@@ -1227,6 +1227,10 @@ export const ar: TranslationKeys = {
       name: "XML إلى CSV",
       description: "استخراج العناصر المتكررة من XML إلى جدول CSV",
     },
+    "convert-font": {
+      name: "تحويل خط",
+      description: "حوّل الخطوط بين TTF وOTF وWOFF وWOFF2",
+    },
     "create-zip": {
       name: "إنشاء ZIP",
       description: "تجميع ملفات متعددة في أرشيف ZIP واحد",
@@ -4066,6 +4070,13 @@ export const ar: TranslationKeys = {
       progressLabel: "جارٍ التحويل",
     },
     "xml-to-csv": {
+      submit: "تحويل",
+      submitBatch: "تحويل ({count} ملفات)",
+      progressLabel: "جارٍ التحويل",
+    },
+    "convert-font": {
+      format: "صيغة الإخراج",
+      hint: "التحويل من OTF إلى TTF يعيد رسم المنحنيات بدقة وحدة خط واحدة. يحافظ WOFF وWOFF2 على المخططات دون تغيير.",
       submit: "تحويل",
       submitBatch: "تحويل ({count} ملفات)",
       progressLabel: "جارٍ التحويل",

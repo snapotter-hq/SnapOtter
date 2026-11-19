@@ -15689,6 +15689,63 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags: [Files]
+      summary: Convert Font
+      description: Convert a font between TTF, OTF, WOFF and WOFF2. WOFF and WOFF2 keep the outlines unchanged. OTF to TTF redraws cubic curves as quadratic ones within 1 font unit; TTF to OTF keeps the shapes, rounding control points to whole font units. Embedding permissions (OS/2 fsType) are kept. Font collections (.ttc) are rejected.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: TTF, OTF, WOFF, or WOFF2 font to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - Output format
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        "200":
+          description: Converted font
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip

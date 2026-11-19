@@ -1221,6 +1221,10 @@ export const th: TranslationKeys = {
       name: "XML เป็น CSV",
       description: "แยกองค์ประกอบที่ซ้ำจาก XML เป็นตาราง CSV",
     },
+    "convert-font": {
+      name: "แปลงฟอนต์",
+      description: "แปลงฟอนต์ระหว่าง TTF, OTF, WOFF และ WOFF2",
+    },
     "create-zip": {
       name: "สร้าง ZIP",
       description: "รวมหลายไฟล์เป็นไฟล์ ZIP เดียว",
@@ -4036,6 +4040,13 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแปลง",
     },
     "xml-to-csv": {
+      submit: "แปลง",
+      submitBatch: "แปลง ({count} ไฟล์)",
+      progressLabel: "กำลังแปลง",
+    },
+    "convert-font": {
+      format: "รูปแบบไฟล์ออก",
+      hint: "การแปลง OTF เป็น TTF จะวาดเส้นโค้งใหม่โดยคลาดเคลื่อนไม่เกิน 1 หน่วยฟอนต์ ส่วน WOFF และ WOFF2 จะคงเส้นขอบไว้ตามเดิม",
       submit: "แปลง",
       submitBatch: "แปลง ({count} ไฟล์)",
       progressLabel: "กำลังแปลง",

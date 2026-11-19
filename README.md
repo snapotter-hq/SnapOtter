@@ -36,7 +36,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
   - **Video (59):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract/convert subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
   - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
   - **PDF (35):** merge, split, compress, convert, protect/unlock, redact, sign, watermark, page numbers, multi-tool page editor, OCR, plus PDF to JPG/PNG/TIFF
-  - **Files (23):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, ZIP create/extract
+  - **Files (24):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, font conversion, ZIP create/extract
 - **Image editor:** Free layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser and processes on your hardware
 - **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required. Built-in Fast OCR adds about 25 MiB to the official image; the optional accuracy pack installs on demand
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider

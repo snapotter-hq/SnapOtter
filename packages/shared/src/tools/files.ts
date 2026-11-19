@@ -93,6 +93,18 @@ export const FILE_TOOLS: Tool[] = [
     acceptedInputs: [".xml"],
     executionHint: "fast",
   },
+  {
+    id: "convert-font",
+    name: "Convert Font",
+    description: "Convert fonts between TTF, OTF, WOFF, and WOFF2",
+    keywords: ["font", "fonts", "typeface", "webfont"],
+    category: "data",
+    icon: "Type",
+    route: "/convert-font",
+    modality: "file",
+    acceptedInputs: [".ttf", ".otf", ".woff", ".woff2"],
+    executionHint: "fast",
+  },
   // Archives
   {
     id: "create-zip",

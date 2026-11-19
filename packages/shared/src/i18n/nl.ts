@@ -1244,6 +1244,10 @@ export const nl: TranslationKeys = {
       name: "XML naar CSV",
       description: "Extraheer herhalende elementen uit XML naar een CSV-tabel",
     },
+    "convert-font": {
+      name: "Lettertype converteren",
+      description: "Converteer lettertypen tussen TTF, OTF, WOFF en WOFF2",
+    },
     "create-zip": {
       name: "ZIP maken",
       description: "Bundel meerdere bestanden in een enkel ZIP-archief",
@@ -4113,6 +4117,13 @@ export const nl: TranslationKeys = {
       progressLabel: "Converteren",
     },
     "xml-to-csv": {
+      submit: "Converteren",
+      submitBatch: "Converteren ({count} bestanden)",
+      progressLabel: "Converteren",
+    },
+    "convert-font": {
+      format: "Uitvoerformaat",
+      hint: "Van OTF naar TTF worden curven opnieuw getekend tot op 1 lettertype-eenheid. WOFF en WOFF2 laten de contouren ongewijzigd.",
       submit: "Converteren",
       submitBatch: "Converteren ({count} bestanden)",
       progressLabel: "Converteren",

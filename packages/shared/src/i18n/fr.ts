@@ -1248,6 +1248,10 @@ export const fr: TranslationKeys = {
       name: "XML vers CSV",
       description: "Extrayez les éléments répétitifs d’un XML vers un tableau CSV",
     },
+    "convert-font": {
+      name: "Convertir une police",
+      description: "Convertissez des polices entre TTF, OTF, WOFF et WOFF2",
+    },
     "create-zip": {
       name: "Créer un ZIP",
       description: "Regroupez plusieurs fichiers dans une seule archive ZIP",
@@ -4116,6 +4120,13 @@ export const fr: TranslationKeys = {
       progressLabel: "Conversion",
     },
     "xml-to-csv": {
+      submit: "Convertir",
+      submitBatch: "Convertir ({count} fichiers)",
+      progressLabel: "Conversion",
+    },
+    "convert-font": {
+      format: "Format de sortie",
+      hint: "De OTF vers TTF, les courbes sont redessinées à 1 unité de police près. WOFF et WOFF2 conservent les contours tels quels.",
       submit: "Convertir",
       submitBatch: "Convertir ({count} fichiers)",
       progressLabel: "Conversion",

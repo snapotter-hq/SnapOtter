@@ -858,6 +858,11 @@ const YamlJsonSettings = lazy(() =>
     default: m.YamlJsonSettings,
   })),
 );
+const ConvertFontSettings = lazy(() =>
+  import("@/components/tools/convert-font-settings").then((m) => ({
+    default: m.ConvertFontSettings,
+  })),
+);
 const XmlToCsvSettings = lazy(() =>
   import("@/components/tools/xml-to-csv-settings").then((m) => ({
     default: m.XmlToCsvSettings,
@@ -1212,6 +1217,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["merge-csvs", { accept: ".csv,.tsv", Settings: MergeCsvsSettings }],
   ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
+  ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],
   ["create-zip", { Settings: CreateZipSettings }],
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];

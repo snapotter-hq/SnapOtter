@@ -1239,6 +1239,10 @@ export const id: TranslationKeys = {
       name: "XML ke CSV",
       description: "Ekstrak elemen berulang dari XML ke tabel CSV",
     },
+    "convert-font": {
+      name: "Konversi Font",
+      description: "Konversi font antara TTF, OTF, WOFF, dan WOFF2",
+    },
     "create-zip": {
       name: "Buat ZIP",
       description: "Gabungkan beberapa file menjadi satu arsip ZIP",
@@ -4096,6 +4100,13 @@ export const id: TranslationKeys = {
       progressLabel: "Mengonversi",
     },
     "xml-to-csv": {
+      submit: "Konversi",
+      submitBatch: "Konversi ({count} file)",
+      progressLabel: "Mengonversi",
+    },
+    "convert-font": {
+      format: "Format keluaran",
+      hint: "OTF ke TTF menggambar ulang kurva dengan selisih maksimal 1 unit font. WOFF dan WOFF2 tidak mengubah outline.",
       submit: "Konversi",
       submitBatch: "Konversi ({count} file)",
       progressLabel: "Mengonversi",

@@ -1241,6 +1241,10 @@ export const tr: TranslationKeys = {
       name: "XML'den CSV'ye",
       description: "XML'deki tekrarlayan öğeleri CSV tablosuna çıkar",
     },
+    "convert-font": {
+      name: "Yazı Tipi Dönüştür",
+      description: "Yazı tiplerini TTF, OTF, WOFF ve WOFF2 arasında dönüştürün",
+    },
     "create-zip": {
       name: "ZIP Oluştur",
       description: "Birden fazla dosyayı tek bir ZIP arşivinde paketle",
@@ -4099,6 +4103,13 @@ export const tr: TranslationKeys = {
       progressLabel: "Dönüştürülüyor",
     },
     "xml-to-csv": {
+      submit: "Dönüştür",
+      submitBatch: "Dönüştür ({count} dosya)",
+      progressLabel: "Dönüştürülüyor",
+    },
+    "convert-font": {
+      format: "Çıkış formatı",
+      hint: "OTF'den TTF'ye dönüştürmede eğriler en fazla 1 yazı tipi birimi sapmayla yeniden çizilir. WOFF ve WOFF2 dış hatları değiştirmez.",
       submit: "Dönüştür",
       submitBatch: "Dönüştür ({count} dosya)",
       progressLabel: "Dönüştürülüyor",

@@ -1227,6 +1227,10 @@ export const es: TranslationKeys = {
       name: "XML a CSV",
       description: "Extrae elementos repetitivos de XML a una tabla CSV",
     },
+    "convert-font": {
+      name: "Convertir fuente",
+      description: "Convierte fuentes entre TTF, OTF, WOFF y WOFF2",
+    },
     "create-zip": {
       name: "Crear ZIP",
       description: "Agrupa varios archivos en un solo archivo ZIP",
@@ -4092,6 +4096,13 @@ export const es: TranslationKeys = {
       progressLabel: "Convirtiendo",
     },
     "xml-to-csv": {
+      submit: "Convertir",
+      submitBatch: "Convertir ({count} archivos)",
+      progressLabel: "Convirtiendo",
+    },
+    "convert-font": {
+      format: "Formato de salida",
+      hint: "De OTF a TTF las curvas se redibujan con un margen de 1 unidad de fuente. WOFF y WOFF2 conservan los contornos intactos.",
       submit: "Convertir",
       submitBatch: "Convertir ({count} archivos)",
       progressLabel: "Convirtiendo",
