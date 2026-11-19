@@ -33,6 +33,7 @@ vi.mock("@snapotter/media-engine", async (importOriginal) => ({
   probeMedia: mediaEngine.probeMedia,
 }));
 
+import { env } from "../../../apps/api/src/config.js";
 import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
 
 let scratchDir: string;
@@ -389,5 +390,72 @@ describe("ffprobe spawn failures (#3716)", () => {
       });
     }
     expect(readdirSync(scratchDir)).toEqual([]);
+  });
+});
+
+describe("subtitle size cap (MAX_SUBTITLE_SIZE_MB, #4434)", () => {
+  const originalLimit = env.MAX_SUBTITLE_SIZE_MB;
+  const cue = "1\n00:00:01,000 --> 00:00:04,000\nHello\n\n";
+
+  function srtOfSize(bytes: number): Buffer {
+    return Buffer.from(cue.repeat(Math.ceil(bytes / cue.length)).slice(0, bytes));
+  }
+
+  afterEach(() => {
+    env.MAX_SUBTITLE_SIZE_MB = originalLimit;
+  });
+
+  it("defaults to 1 MB", () => {
+    expect(originalLimit).toBe(1);
+  });
+
+  it("accepts a subtitle exactly at the limit", async () => {
+    env.MAX_SUBTITLE_SIZE_MB = 1;
+    const raw = srtOfSize(1024 * 1024);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(raw, "subs.srt", { scratchDir }),
+    ).resolves.toMatchObject({ filename: "subs.srt" });
+  });
+
+  it("refuses an oversized subtitle with a size message, not an invalid-file message", async () => {
+    env.MAX_SUBTITLE_SIZE_MB = 1;
+    const raw = srtOfSize(5 * 1024 * 1024);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(raw, "big.srt", { scratchDir }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: "Subtitle file is 5.0 MB, over the 1 MB limit (MAX_SUBTITLE_SIZE_MB)",
+    });
+  });
+
+  it("refuses one byte over the limit", async () => {
+    env.MAX_SUBTITLE_SIZE_MB = 1;
+    const raw = srtOfSize(1024 * 1024 + 1);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(raw, "big.srt", { scratchDir }),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/over the 1 MB limit/) });
+  });
+
+  it("honors a raised limit", async () => {
+    env.MAX_SUBTITLE_SIZE_MB = 10;
+    const raw = srtOfSize(5 * 1024 * 1024);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(raw, "big.srt", { scratchDir }),
+    ).resolves.toMatchObject({ filename: "big.srt" });
+  });
+
+  it("disables the cap when set to 0", async () => {
+    env.MAX_SUBTITLE_SIZE_MB = 0;
+    const raw = srtOfSize(5 * 1024 * 1024);
+    await expect(
+      new MediaInputHandler("subtitle").prepare(raw, "big.srt", { scratchDir }),
+    ).resolves.toMatchObject({ filename: "big.srt" });
+  });
+
+  it("still reports a wrong extension as an invalid subtitle file", async () => {
+    await expect(
+      new MediaInputHandler("subtitle").prepare(srtOfSize(100), "subs.txt", { scratchDir }),
+    ).rejects.toMatchObject({ message: "Not a valid subtitle file (.srt, .vtt, .ass)" });
   });
 });
