@@ -552,6 +552,126 @@ export const ar: TranslationKeys = {
       name: "FLAC إلى MP3",
       description: "حوّل FLAC إلى MP3 عبر الإنترنت. سريع ومجاني وخاص.",
     },
+    "mp3-to-flac": {
+      name: "MP3 إلى FLAC",
+      description: "حوّل MP3 إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 إلى OGG",
+      description: "حوّل MP3 إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 إلى M4A",
+      description: "حوّل MP3 إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wav-to-flac": {
+      name: "WAV إلى FLAC",
+      description: "حوّل WAV إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wav-to-ogg": {
+      name: "WAV إلى OGG",
+      description: "حوّل WAV إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wav-to-m4a": {
+      name: "WAV إلى M4A",
+      description: "حوّل WAV إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "flac-to-wav": {
+      name: "FLAC إلى WAV",
+      description: "حوّل FLAC إلى WAV عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC إلى OGG",
+      description: "حوّل FLAC إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC إلى M4A",
+      description: "حوّل FLAC إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "ogg-to-flac": {
+      name: "OGG إلى FLAC",
+      description: "حوّل OGG إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG إلى M4A",
+      description: "حوّل OGG إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "m4a-to-flac": {
+      name: "M4A إلى FLAC",
+      description: "حوّل M4A إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A إلى OGG",
+      description: "حوّل M4A إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aac-to-ogg": {
+      name: "AAC إلى OGG",
+      description: "حوّل AAC إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aac-to-m4a": {
+      name: "AAC إلى M4A",
+      description: "حوّل AAC إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "opus-to-mp3": {
+      name: "Opus إلى MP3",
+      description: "حوّل Opus إلى MP3 عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "opus-to-wav": {
+      name: "Opus إلى WAV",
+      description: "حوّل Opus إلى WAV عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "opus-to-flac": {
+      name: "Opus إلى FLAC",
+      description: "حوّل Opus إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "opus-to-ogg": {
+      name: "Opus إلى OGG",
+      description: "حوّل Opus إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "opus-to-m4a": {
+      name: "Opus إلى M4A",
+      description: "حوّل Opus إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wma-to-mp3": {
+      name: "WMA إلى MP3",
+      description: "حوّل WMA إلى MP3 عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wma-to-wav": {
+      name: "WMA إلى WAV",
+      description: "حوّل WMA إلى WAV عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wma-to-flac": {
+      name: "WMA إلى FLAC",
+      description: "حوّل WMA إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wma-to-ogg": {
+      name: "WMA إلى OGG",
+      description: "حوّل WMA إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "wma-to-m4a": {
+      name: "WMA إلى M4A",
+      description: "حوّل WMA إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF إلى MP3",
+      description: "حوّل AIFF إلى MP3 عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF إلى WAV",
+      description: "حوّل AIFF إلى WAV عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF إلى FLAC",
+      description: "حوّل AIFF إلى FLAC عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF إلى OGG",
+      description: "حوّل AIFF إلى OGG عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF إلى M4A",
+      description: "حوّل AIFF إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
+    },
     "excel-to-csv": {
       name: "Excel إلى CSV",
       description: "حوّل Excel إلى CSV عبر الإنترنت. سريع ومجاني وخاص.",

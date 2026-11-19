@@ -551,6 +551,126 @@ export const th: TranslationKeys = {
       name: "FLAC เป็น MP3",
       description: "แปลง FLAC เป็น MP3 ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
     },
+    "mp3-to-flac": {
+      name: "MP3 เป็น FLAC",
+      description: "แปลง MP3 เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 เป็น OGG",
+      description: "แปลง MP3 เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 เป็น M4A",
+      description: "แปลง MP3 เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wav-to-flac": {
+      name: "WAV เป็น FLAC",
+      description: "แปลง WAV เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wav-to-ogg": {
+      name: "WAV เป็น OGG",
+      description: "แปลง WAV เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wav-to-m4a": {
+      name: "WAV เป็น M4A",
+      description: "แปลง WAV เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "flac-to-wav": {
+      name: "FLAC เป็น WAV",
+      description: "แปลง FLAC เป็น WAV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "flac-to-ogg": {
+      name: "FLAC เป็น OGG",
+      description: "แปลง FLAC เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "flac-to-m4a": {
+      name: "FLAC เป็น M4A",
+      description: "แปลง FLAC เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "ogg-to-flac": {
+      name: "OGG เป็น FLAC",
+      description: "แปลง OGG เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "ogg-to-m4a": {
+      name: "OGG เป็น M4A",
+      description: "แปลง OGG เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "m4a-to-flac": {
+      name: "M4A เป็น FLAC",
+      description: "แปลง M4A เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "m4a-to-ogg": {
+      name: "M4A เป็น OGG",
+      description: "แปลง M4A เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aac-to-ogg": {
+      name: "AAC เป็น OGG",
+      description: "แปลง AAC เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aac-to-m4a": {
+      name: "AAC เป็น M4A",
+      description: "แปลง AAC เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "opus-to-mp3": {
+      name: "Opus เป็น MP3",
+      description: "แปลง Opus เป็น MP3 ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "opus-to-wav": {
+      name: "Opus เป็น WAV",
+      description: "แปลง Opus เป็น WAV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "opus-to-flac": {
+      name: "Opus เป็น FLAC",
+      description: "แปลง Opus เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "opus-to-ogg": {
+      name: "Opus เป็น OGG",
+      description: "แปลง Opus เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "opus-to-m4a": {
+      name: "Opus เป็น M4A",
+      description: "แปลง Opus เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wma-to-mp3": {
+      name: "WMA เป็น MP3",
+      description: "แปลง WMA เป็น MP3 ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wma-to-wav": {
+      name: "WMA เป็น WAV",
+      description: "แปลง WMA เป็น WAV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wma-to-flac": {
+      name: "WMA เป็น FLAC",
+      description: "แปลง WMA เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wma-to-ogg": {
+      name: "WMA เป็น OGG",
+      description: "แปลง WMA เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "wma-to-m4a": {
+      name: "WMA เป็น M4A",
+      description: "แปลง WMA เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF เป็น MP3",
+      description: "แปลง AIFF เป็น MP3 ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aiff-to-wav": {
+      name: "AIFF เป็น WAV",
+      description: "แปลง AIFF เป็น WAV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aiff-to-flac": {
+      name: "AIFF เป็น FLAC",
+      description: "แปลง AIFF เป็น FLAC ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF เป็น OGG",
+      description: "แปลง AIFF เป็น OGG ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF เป็น M4A",
+      description: "แปลง AIFF เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
     "excel-to-csv": {
       name: "Excel เป็น CSV",
       description: "แปลง Excel เป็น CSV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",

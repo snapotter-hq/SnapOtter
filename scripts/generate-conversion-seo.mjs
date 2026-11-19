@@ -165,6 +165,27 @@ const A = {
     pick: "Choose FLAC when you want an exact archival copy at roughly half the size of WAV.",
     tip: "FLAC keeps the full dynamic range. If the destination is a phone or a car stereo, consider normalising while you convert.",
   },
+  Opus: {
+    full: "Opus",
+    lossy: true,
+    note: "the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video",
+    pick: "Choose Opus when you control the player and want the smallest file at a given quality.",
+    tip: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+  },
+  WMA: {
+    full: "Windows Media Audio",
+    lossy: true,
+    note: "Microsoft's legacy codec, which Apple devices and many players will not open",
+    pick: "Choose WMA only when an old Windows tool insists on it.",
+    tip: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+  },
+  AIFF: {
+    full: "AIFF",
+    lossy: false,
+    note: "Apple's uncompressed PCM format, the Mac counterpart of WAV",
+    pick: "Choose AIFF when the audio is going into Logic or another Mac tool that expects it.",
+    tip: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+  },
 };
 
 // Where a family differs only by its source container (four video-to-GIF pages,
@@ -712,7 +733,11 @@ function audioEntry(p) {
       ? "Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving."
       : a.lossy && !b.lossy
         ? `${to} is lossless, but it cannot rebuild what ${from} already threw away. You get a larger file containing exactly what the ${from} held, which helps before editing and achieves nothing as an archive upgrade.`
-        : `${from} is lossless and ${to} is lossy, so this discards audio data in exchange for a much smaller file.`;
+        : !a.lossy && !b.lossy
+          ? to === "WAV"
+            ? "Both formats are lossless, but the WAV is written as 16-bit PCM, so a 24-bit source comes out at CD resolution. A 16-bit source comes through sample for sample."
+            : `Both formats are lossless, so every sample comes through untouched and only the container and the file size change.`
+          : `${from} is lossless and ${to} is lossy, so this discards audio data in exchange for a much smaller file.`;
   return {
     searchTitle: `${from} to ${to} Converter Online Free`,
     longDescription: `Convert ${a.full} audio to ${b.full}. You are starting from ${a.full}, which is ${a.note}. ${b.full} is ${b.note}. ${transcode} ${PRIVACY}`,

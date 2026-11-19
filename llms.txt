@@ -1,6 +1,6 @@
 # SnapOtter
 
-SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 262 tool routes across the five modalities, plus a layer-based image editor.
+SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 292 tool routes across the five modalities, plus a layer-based image editor.
 
 All processing happens locally. Files never leave your infrastructure.
 
@@ -40,7 +40,7 @@ Then run docker compose up -d, open http://localhost:1349, and log in with admin
 
 ## Tools
 
-262 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
+292 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
 ### Image
 
@@ -52,7 +52,7 @@ Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to 
 
 ### Audio
 
-Transcribe Audio, Convert Audio, Trim Audio, Adjust Volume, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels, Silence Removal, Noise Reduction, Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata. Plus format converters: M4A to MP3, M4A to WAV, AAC to MP3, AAC to WAV, AAC to FLAC, OGG to MP3, OGG to WAV, WAV to MP3, MP3 to WAV, FLAC to MP3.
+Transcribe Audio, Convert Audio, Trim Audio, Adjust Volume, Normalize Audio, Fade Audio, Reverse Audio, Audio Speed, Pitch Shift, Audio Channels, Silence Removal, Noise Reduction, Merge Audio, Split Audio, Ringtone Maker, Waveform Image, Audio Metadata. Plus format converters: M4A to MP3, M4A to WAV, AAC to MP3, AAC to WAV, AAC to FLAC, OGG to MP3, OGG to WAV, WAV to MP3, MP3 to WAV, FLAC to MP3, MP3 to FLAC, MP3 to OGG, MP3 to M4A, WAV to FLAC, WAV to OGG, WAV to M4A, FLAC to WAV, FLAC to OGG, FLAC to M4A, OGG to FLAC, OGG to M4A, M4A to FLAC, M4A to OGG, AAC to OGG, AAC to M4A, Opus to MP3, Opus to WAV, Opus to FLAC, Opus to OGG, Opus to M4A, WMA to MP3, WMA to WAV, WMA to FLAC, WMA to OGG, WMA to M4A, AIFF to MP3, AIFF to WAV, AIFF to FLAC, AIFF to OGG, AIFF to M4A.
 
 ### PDF
 

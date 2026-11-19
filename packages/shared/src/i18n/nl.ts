@@ -556,6 +556,126 @@ export const nl: TranslationKeys = {
       name: "FLAC naar MP3",
       description: "Zet FLAC online om naar MP3. Snel, gratis en privé.",
     },
+    "mp3-to-flac": {
+      name: "MP3 naar FLAC",
+      description: "Zet MP3 online om naar FLAC. Snel, gratis en privé.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 naar OGG",
+      description: "Zet MP3 online om naar OGG. Snel, gratis en privé.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 naar M4A",
+      description: "Zet MP3 online om naar M4A. Snel, gratis en privé.",
+    },
+    "wav-to-flac": {
+      name: "WAV naar FLAC",
+      description: "Zet WAV online om naar FLAC. Snel, gratis en privé.",
+    },
+    "wav-to-ogg": {
+      name: "WAV naar OGG",
+      description: "Zet WAV online om naar OGG. Snel, gratis en privé.",
+    },
+    "wav-to-m4a": {
+      name: "WAV naar M4A",
+      description: "Zet WAV online om naar M4A. Snel, gratis en privé.",
+    },
+    "flac-to-wav": {
+      name: "FLAC naar WAV",
+      description: "Zet FLAC online om naar WAV. Snel, gratis en privé.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC naar OGG",
+      description: "Zet FLAC online om naar OGG. Snel, gratis en privé.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC naar M4A",
+      description: "Zet FLAC online om naar M4A. Snel, gratis en privé.",
+    },
+    "ogg-to-flac": {
+      name: "OGG naar FLAC",
+      description: "Zet OGG online om naar FLAC. Snel, gratis en privé.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG naar M4A",
+      description: "Zet OGG online om naar M4A. Snel, gratis en privé.",
+    },
+    "m4a-to-flac": {
+      name: "M4A naar FLAC",
+      description: "Zet M4A online om naar FLAC. Snel, gratis en privé.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A naar OGG",
+      description: "Zet M4A online om naar OGG. Snel, gratis en privé.",
+    },
+    "aac-to-ogg": {
+      name: "AAC naar OGG",
+      description: "Zet AAC online om naar OGG. Snel, gratis en privé.",
+    },
+    "aac-to-m4a": {
+      name: "AAC naar M4A",
+      description: "Zet AAC online om naar M4A. Snel, gratis en privé.",
+    },
+    "opus-to-mp3": {
+      name: "Opus naar MP3",
+      description: "Zet Opus online om naar MP3. Snel, gratis en privé.",
+    },
+    "opus-to-wav": {
+      name: "Opus naar WAV",
+      description: "Zet Opus online om naar WAV. Snel, gratis en privé.",
+    },
+    "opus-to-flac": {
+      name: "Opus naar FLAC",
+      description: "Zet Opus online om naar FLAC. Snel, gratis en privé.",
+    },
+    "opus-to-ogg": {
+      name: "Opus naar OGG",
+      description: "Zet Opus online om naar OGG. Snel, gratis en privé.",
+    },
+    "opus-to-m4a": {
+      name: "Opus naar M4A",
+      description: "Zet Opus online om naar M4A. Snel, gratis en privé.",
+    },
+    "wma-to-mp3": {
+      name: "WMA naar MP3",
+      description: "Zet WMA online om naar MP3. Snel, gratis en privé.",
+    },
+    "wma-to-wav": {
+      name: "WMA naar WAV",
+      description: "Zet WMA online om naar WAV. Snel, gratis en privé.",
+    },
+    "wma-to-flac": {
+      name: "WMA naar FLAC",
+      description: "Zet WMA online om naar FLAC. Snel, gratis en privé.",
+    },
+    "wma-to-ogg": {
+      name: "WMA naar OGG",
+      description: "Zet WMA online om naar OGG. Snel, gratis en privé.",
+    },
+    "wma-to-m4a": {
+      name: "WMA naar M4A",
+      description: "Zet WMA online om naar M4A. Snel, gratis en privé.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF naar MP3",
+      description: "Zet AIFF online om naar MP3. Snel, gratis en privé.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF naar WAV",
+      description: "Zet AIFF online om naar WAV. Snel, gratis en privé.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF naar FLAC",
+      description: "Zet AIFF online om naar FLAC. Snel, gratis en privé.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF naar OGG",
+      description: "Zet AIFF online om naar OGG. Snel, gratis en privé.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF naar M4A",
+      description: "Zet AIFF online om naar M4A. Snel, gratis en privé.",
+    },
     "excel-to-csv": {
       name: "Excel naar CSV",
       description: "Zet Excel online om naar CSV. Snel, gratis en privé.",

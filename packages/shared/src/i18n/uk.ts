@@ -555,6 +555,126 @@ export const uk: TranslationKeys = {
       name: "FLAC у MP3",
       description: "Конвертуйте FLAC у MP3 онлайн. Швидко, безкоштовно та приватно.",
     },
+    "mp3-to-flac": {
+      name: "MP3 у FLAC",
+      description: "Конвертуйте MP3 у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 у OGG",
+      description: "Конвертуйте MP3 у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 у M4A",
+      description: "Конвертуйте MP3 у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wav-to-flac": {
+      name: "WAV у FLAC",
+      description: "Конвертуйте WAV у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wav-to-ogg": {
+      name: "WAV у OGG",
+      description: "Конвертуйте WAV у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wav-to-m4a": {
+      name: "WAV у M4A",
+      description: "Конвертуйте WAV у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "flac-to-wav": {
+      name: "FLAC у WAV",
+      description: "Конвертуйте FLAC у WAV онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC у OGG",
+      description: "Конвертуйте FLAC у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC у M4A",
+      description: "Конвертуйте FLAC у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "ogg-to-flac": {
+      name: "OGG у FLAC",
+      description: "Конвертуйте OGG у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG у M4A",
+      description: "Конвертуйте OGG у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "m4a-to-flac": {
+      name: "M4A у FLAC",
+      description: "Конвертуйте M4A у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A у OGG",
+      description: "Конвертуйте M4A у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aac-to-ogg": {
+      name: "AAC у OGG",
+      description: "Конвертуйте AAC у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aac-to-m4a": {
+      name: "AAC у M4A",
+      description: "Конвертуйте AAC у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "opus-to-mp3": {
+      name: "Opus у MP3",
+      description: "Конвертуйте Opus у MP3 онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "opus-to-wav": {
+      name: "Opus у WAV",
+      description: "Конвертуйте Opus у WAV онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "opus-to-flac": {
+      name: "Opus у FLAC",
+      description: "Конвертуйте Opus у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "opus-to-ogg": {
+      name: "Opus у OGG",
+      description: "Конвертуйте Opus у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "opus-to-m4a": {
+      name: "Opus у M4A",
+      description: "Конвертуйте Opus у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wma-to-mp3": {
+      name: "WMA у MP3",
+      description: "Конвертуйте WMA у MP3 онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wma-to-wav": {
+      name: "WMA у WAV",
+      description: "Конвертуйте WMA у WAV онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wma-to-flac": {
+      name: "WMA у FLAC",
+      description: "Конвертуйте WMA у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wma-to-ogg": {
+      name: "WMA у OGG",
+      description: "Конвертуйте WMA у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "wma-to-m4a": {
+      name: "WMA у M4A",
+      description: "Конвертуйте WMA у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF у MP3",
+      description: "Конвертуйте AIFF у MP3 онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF у WAV",
+      description: "Конвертуйте AIFF у WAV онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF у FLAC",
+      description: "Конвертуйте AIFF у FLAC онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF у OGG",
+      description: "Конвертуйте AIFF у OGG онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF у M4A",
+      description: "Конвертуйте AIFF у M4A онлайн. Швидко, безкоштовно та приватно.",
+    },
     "excel-to-csv": {
       name: "Excel у CSV",
       description: "Конвертуйте Excel у CSV онлайн. Швидко, безкоштовно та приватно.",

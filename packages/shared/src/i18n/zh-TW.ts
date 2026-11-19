@@ -385,6 +385,90 @@ export const zhTW: TranslationKeys = {
       name: "FLAC 轉 MP3",
       description: "線上將 FLAC 轉換為 MP3。快速、免費、私密。",
     },
+    "mp3-to-flac": {
+      name: "MP3 轉 FLAC",
+      description: "線上將 MP3 轉換為 FLAC。快速、免費、私密。",
+    },
+    "mp3-to-ogg": { name: "MP3 轉 OGG", description: "線上將 MP3 轉換為 OGG。快速、免費、私密。" },
+    "mp3-to-m4a": { name: "MP3 轉 M4A", description: "線上將 MP3 轉換為 M4A。快速、免費、私密。" },
+    "wav-to-flac": {
+      name: "WAV 轉 FLAC",
+      description: "線上將 WAV 轉換為 FLAC。快速、免費、私密。",
+    },
+    "wav-to-ogg": { name: "WAV 轉 OGG", description: "線上將 WAV 轉換為 OGG。快速、免費、私密。" },
+    "wav-to-m4a": { name: "WAV 轉 M4A", description: "線上將 WAV 轉換為 M4A。快速、免費、私密。" },
+    "flac-to-wav": {
+      name: "FLAC 轉 WAV",
+      description: "線上將 FLAC 轉換為 WAV。快速、免費、私密。",
+    },
+    "flac-to-ogg": {
+      name: "FLAC 轉 OGG",
+      description: "線上將 FLAC 轉換為 OGG。快速、免費、私密。",
+    },
+    "flac-to-m4a": {
+      name: "FLAC 轉 M4A",
+      description: "線上將 FLAC 轉換為 M4A。快速、免費、私密。",
+    },
+    "ogg-to-flac": {
+      name: "OGG 轉 FLAC",
+      description: "線上將 OGG 轉換為 FLAC。快速、免費、私密。",
+    },
+    "ogg-to-m4a": { name: "OGG 轉 M4A", description: "線上將 OGG 轉換為 M4A。快速、免費、私密。" },
+    "m4a-to-flac": {
+      name: "M4A 轉 FLAC",
+      description: "線上將 M4A 轉換為 FLAC。快速、免費、私密。",
+    },
+    "m4a-to-ogg": { name: "M4A 轉 OGG", description: "線上將 M4A 轉換為 OGG。快速、免費、私密。" },
+    "aac-to-ogg": { name: "AAC 轉 OGG", description: "線上將 AAC 轉換為 OGG。快速、免費、私密。" },
+    "aac-to-m4a": { name: "AAC 轉 M4A", description: "線上將 AAC 轉換為 M4A。快速、免費、私密。" },
+    "opus-to-mp3": {
+      name: "Opus 轉 MP3",
+      description: "線上將 Opus 轉換為 MP3。快速、免費、私密。",
+    },
+    "opus-to-wav": {
+      name: "Opus 轉 WAV",
+      description: "線上將 Opus 轉換為 WAV。快速、免費、私密。",
+    },
+    "opus-to-flac": {
+      name: "Opus 轉 FLAC",
+      description: "線上將 Opus 轉換為 FLAC。快速、免費、私密。",
+    },
+    "opus-to-ogg": {
+      name: "Opus 轉 OGG",
+      description: "線上將 Opus 轉換為 OGG。快速、免費、私密。",
+    },
+    "opus-to-m4a": {
+      name: "Opus 轉 M4A",
+      description: "線上將 Opus 轉換為 M4A。快速、免費、私密。",
+    },
+    "wma-to-mp3": { name: "WMA 轉 MP3", description: "線上將 WMA 轉換為 MP3。快速、免費、私密。" },
+    "wma-to-wav": { name: "WMA 轉 WAV", description: "線上將 WMA 轉換為 WAV。快速、免費、私密。" },
+    "wma-to-flac": {
+      name: "WMA 轉 FLAC",
+      description: "線上將 WMA 轉換為 FLAC。快速、免費、私密。",
+    },
+    "wma-to-ogg": { name: "WMA 轉 OGG", description: "線上將 WMA 轉換為 OGG。快速、免費、私密。" },
+    "wma-to-m4a": { name: "WMA 轉 M4A", description: "線上將 WMA 轉換為 M4A。快速、免費、私密。" },
+    "aiff-to-mp3": {
+      name: "AIFF 轉 MP3",
+      description: "線上將 AIFF 轉換為 MP3。快速、免費、私密。",
+    },
+    "aiff-to-wav": {
+      name: "AIFF 轉 WAV",
+      description: "線上將 AIFF 轉換為 WAV。快速、免費、私密。",
+    },
+    "aiff-to-flac": {
+      name: "AIFF 轉 FLAC",
+      description: "線上將 AIFF 轉換為 FLAC。快速、免費、私密。",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF 轉 OGG",
+      description: "線上將 AIFF 轉換為 OGG。快速、免費、私密。",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF 轉 M4A",
+      description: "線上將 AIFF 轉換為 M4A。快速、免費、私密。",
+    },
     "excel-to-csv": {
       name: "Excel 轉 CSV",
       description: "線上將 Excel 轉換為 CSV。快速、免費、私密。",

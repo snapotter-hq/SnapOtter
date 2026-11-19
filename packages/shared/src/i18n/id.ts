@@ -555,6 +555,126 @@ export const id: TranslationKeys = {
       name: "FLAC ke MP3",
       description: "Konversi FLAC ke MP3 online. Cepat, gratis, dan privat.",
     },
+    "mp3-to-flac": {
+      name: "MP3 ke FLAC",
+      description: "Konversi MP3 ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 ke OGG",
+      description: "Konversi MP3 ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 ke M4A",
+      description: "Konversi MP3 ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "wav-to-flac": {
+      name: "WAV ke FLAC",
+      description: "Konversi WAV ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "wav-to-ogg": {
+      name: "WAV ke OGG",
+      description: "Konversi WAV ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "wav-to-m4a": {
+      name: "WAV ke M4A",
+      description: "Konversi WAV ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "flac-to-wav": {
+      name: "FLAC ke WAV",
+      description: "Konversi FLAC ke WAV online. Cepat, gratis, dan privat.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC ke OGG",
+      description: "Konversi FLAC ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC ke M4A",
+      description: "Konversi FLAC ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "ogg-to-flac": {
+      name: "OGG ke FLAC",
+      description: "Konversi OGG ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG ke M4A",
+      description: "Konversi OGG ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "m4a-to-flac": {
+      name: "M4A ke FLAC",
+      description: "Konversi M4A ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A ke OGG",
+      description: "Konversi M4A ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "aac-to-ogg": {
+      name: "AAC ke OGG",
+      description: "Konversi AAC ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "aac-to-m4a": {
+      name: "AAC ke M4A",
+      description: "Konversi AAC ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "opus-to-mp3": {
+      name: "Opus ke MP3",
+      description: "Konversi Opus ke MP3 online. Cepat, gratis, dan privat.",
+    },
+    "opus-to-wav": {
+      name: "Opus ke WAV",
+      description: "Konversi Opus ke WAV online. Cepat, gratis, dan privat.",
+    },
+    "opus-to-flac": {
+      name: "Opus ke FLAC",
+      description: "Konversi Opus ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "opus-to-ogg": {
+      name: "Opus ke OGG",
+      description: "Konversi Opus ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "opus-to-m4a": {
+      name: "Opus ke M4A",
+      description: "Konversi Opus ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "wma-to-mp3": {
+      name: "WMA ke MP3",
+      description: "Konversi WMA ke MP3 online. Cepat, gratis, dan privat.",
+    },
+    "wma-to-wav": {
+      name: "WMA ke WAV",
+      description: "Konversi WMA ke WAV online. Cepat, gratis, dan privat.",
+    },
+    "wma-to-flac": {
+      name: "WMA ke FLAC",
+      description: "Konversi WMA ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "wma-to-ogg": {
+      name: "WMA ke OGG",
+      description: "Konversi WMA ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "wma-to-m4a": {
+      name: "WMA ke M4A",
+      description: "Konversi WMA ke M4A online. Cepat, gratis, dan privat.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF ke MP3",
+      description: "Konversi AIFF ke MP3 online. Cepat, gratis, dan privat.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF ke WAV",
+      description: "Konversi AIFF ke WAV online. Cepat, gratis, dan privat.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF ke FLAC",
+      description: "Konversi AIFF ke FLAC online. Cepat, gratis, dan privat.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF ke OGG",
+      description: "Konversi AIFF ke OGG online. Cepat, gratis, dan privat.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF ke M4A",
+      description: "Konversi AIFF ke M4A online. Cepat, gratis, dan privat.",
+    },
     "excel-to-csv": {
       name: "Excel ke CSV",
       description: "Konversi Excel ke CSV online. Cepat, gratis, dan privat.",
