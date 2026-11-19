@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
@@ -15,8 +16,9 @@ const settingsSchema = z.object({
 });
 
 /**
- * Bulk rename files with a pattern and return as ZIP.
- * No image processing - just renames.
+ * Bulk rename images with a pattern and return as ZIP. Each upload must pass
+ * the image validator (header and size, no pixel decode); the bytes are then
+ * zipped unchanged.
  */
 export function registerBulkRename(app: FastifyInstance) {
   app.post("/api/v1/tools/image/bulk-rename", async (request, reply) => {
@@ -63,6 +65,15 @@ export function registerBulkRename(app: FastifyInstance) {
       settings = result.data;
     } catch {
       return reply.status(400).send({ error: "Settings must be valid JSON" });
+    }
+
+    for (const file of files) {
+      const validation = await validateImageBuffer(file.buffer, file.filename);
+      if (!validation.valid) {
+        return reply
+          .status(400)
+          .send({ error: `Invalid file "${file.filename}": ${validation.reason}` });
+      }
     }
 
     try {
