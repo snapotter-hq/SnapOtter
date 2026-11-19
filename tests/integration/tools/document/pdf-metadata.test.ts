@@ -54,11 +54,33 @@ describe.skipIf(!hasPikepdf)("pdf-metadata (requires pikepdf)", () => {
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
   }, 60_000);
+
+  it("stripAll replaces the Info dictionary with only the given fields", async () => {
+    const res = await runTool({ stripAll: true, title: "Public title" });
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.metadata).toEqual({ Title: "Public title" });
+    // The fixture is a PDFKit file: Creator, Producer and CreationDate, no XMP.
+    expect(envelope.stripped).toEqual({
+      removed: expect.arrayContaining(["Creator", "Producer", "CreationDate"]),
+      xmpRemoved: false,
+      pdfa: null,
+    });
+
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+  }, 60_000);
 });
 
 describe("pdf-metadata validation (ungated)", () => {
   it("rejects title longer than 500 characters with 400", async () => {
     const res = await runTool({ title: "A".repeat(501) });
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
+  it("rejects a non-boolean stripAll with 400", async () => {
+    const res = await runTool({ stripAll: "yes" });
     expect(res.statusCode).toBe(400);
   }, 30_000);
 });

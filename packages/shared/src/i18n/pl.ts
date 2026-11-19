@@ -4096,6 +4096,9 @@ export const pl: TranslationKeys = {
       runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-metadata": {
+      stripAll: "Usuń metadane dokumentu",
+      stripAllHint:
+        "Usuwa daty, Creator, Producer, pola niestandardowe i XMP przed zapisaniem pól poniżej. Pliki PDF/A tracą zgodność.",
       title: "Tytuł",
       author: "Autor",
       subject: "Temat",

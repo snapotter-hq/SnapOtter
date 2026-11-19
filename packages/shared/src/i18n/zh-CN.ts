@@ -3812,6 +3812,9 @@ export const zhCN: TranslationKeys = {
       runOcr: "对此 PDF 运行 OCR",
     },
     "pdf-metadata": {
+      stripAll: "清除文档元数据",
+      stripAllHint:
+        "在写入下方字段之前，清除日期、Creator、Producer、自定义字段和 XMP。PDF/A 文件将不再符合规范。",
       title: "标题",
       author: "作者",
       subject: "主题",

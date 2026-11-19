@@ -4061,6 +4061,9 @@ export const ar: TranslationKeys = {
       runOcr: "تشغيل OCR على هذا الملف",
     },
     "pdf-metadata": {
+      stripAll: "إزالة البيانات الوصفية للمستند",
+      stripAllHint:
+        "يمسح التواريخ وCreator وProducer والحقول المخصصة وبيانات XMP قبل كتابة الحقول أدناه. تفقد ملفات PDF/A توافقها.",
       title: "العنوان",
       author: "المؤلف",
       subject: "الموضوع",

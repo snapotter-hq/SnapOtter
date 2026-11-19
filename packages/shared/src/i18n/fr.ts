@@ -4109,6 +4109,9 @@ export const fr: TranslationKeys = {
       runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-metadata": {
+      stripAll: "Supprimer les métadonnées du document",
+      stripAllHint:
+        "Efface les dates, Creator, Producer, les champs personnalisés et le XMP avant d'écrire les champs ci-dessous. Les fichiers PDF/A perdent leur conformité.",
       title: "Titre",
       author: "Auteur",
       subject: "Sujet",

@@ -4107,6 +4107,9 @@ export const nl: TranslationKeys = {
       runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-metadata": {
+      stripAll: "Documentmetadata verwijderen",
+      stripAllHint:
+        "Wist datums, Creator, Producer, aangepaste velden en XMP voordat de velden hieronder worden geschreven. PDF/A-bestanden verliezen hun conformiteit.",
       title: "Titel",
       author: "Auteur",
       subject: "Onderwerp",

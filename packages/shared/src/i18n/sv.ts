@@ -4086,6 +4086,9 @@ export const sv: TranslationKeys = {
       runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-metadata": {
+      stripAll: "Ta bort dokumentets metadata",
+      stripAllHint:
+        "Rensar datum, Creator, Producer, egna fält och XMP innan fälten nedan skrivs. PDF/A-filer förlorar sin överensstämmelse.",
       title: "Titel",
       author: "Författare",
       subject: "Ämne",

@@ -553,6 +553,58 @@ describe("pdfMetadataSetPy", () => {
   });
 });
 
+describe("pdfMetadataStripPy", () => {
+  it("calls doc_metadata mode:strip and returns what was removed", async () => {
+    runDocsScript.mockResolvedValueOnce(
+      '{"ok": true, "removed": ["Author", "Creator"], "xmpRemoved": true, "pdfa": "2B"}',
+    );
+    const result = await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataStripPy("/in.pdf", "/out.pdf", { Title: "Public" }),
+    );
+    expect(result).toEqual({ removed: ["Author", "Creator"], xmpRemoved: true, pdfa: "2B" });
+    expect(firstCall()).toEqual([
+      "doc_metadata",
+      { path: "/in.pdf", out: "/out.pdf", mode: "strip", metadata: { Title: "Public" } },
+      undefined,
+    ]);
+  });
+
+  it("normalizes a missing PDF/A level and XMP flag", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true, "removed": [], "pdfa": ""}');
+    const result = await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {}),
+    );
+    expect(result).toEqual({ removed: [], xmpRemoved: false, pdfa: null });
+  });
+
+  it("throws the reported error", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": "cannot open"}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {})),
+    ).rejects.toThrow("doc_metadata strip failed: cannot open");
+  });
+
+  it("throws when removed is missing", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {})),
+    ).rejects.toThrow("doc_metadata strip failed:");
+  });
+
+  it("forwards signal and timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true, "removed": []}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {}, { signal: ac.signal, timeoutMs: 25_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_metadata",
+      { path: "/in.pdf", out: "/out.pdf", mode: "strip", metadata: {} },
+      { signal: ac.signal, timeoutMs: 25_000 },
+    ]);
+  });
+});
+
 describe("htmlToPdfPy", () => {
   it("calls doc_html_pdf with the mode and a 2-minute timeout", async () => {
     runDocsScript.mockResolvedValueOnce('{"ok": true}');

@@ -4096,6 +4096,9 @@ export const uk: TranslationKeys = {
       runOcr: "Запустити OCR для цього PDF",
     },
     "pdf-metadata": {
+      stripAll: "Видалити метадані документа",
+      stripAllHint:
+        "Видаляє дати, Creator, Producer, користувацькі поля та XMP перед записом полів нижче. Файли PDF/A втрачають відповідність стандарту.",
       title: "Назва",
       author: "Автор",
       subject: "Тема",

@@ -4118,6 +4118,9 @@ export const de: TranslationKeys = {
       runOcr: "OCR auf dieses PDF anwenden",
     },
     "pdf-metadata": {
+      stripAll: "Dokument-Metadaten entfernen",
+      stripAllHint:
+        "Entfernt Datumsangaben, Creator, Producer, benutzerdefinierte Felder und XMP, bevor die Felder unten geschrieben werden. PDF/A-Dateien verlieren ihre Konformität.",
       title: "Titel",
       author: "Autor",
       subject: "Betreff",

@@ -4017,6 +4017,9 @@ export const ko: TranslationKeys = {
       runOcr: "이 PDF에 OCR 실행",
     },
     "pdf-metadata": {
+      stripAll: "문서 메타데이터 제거",
+      stripAllHint:
+        "아래 항목을 쓰기 전에 날짜, Creator, Producer, 사용자 지정 필드, XMP를 지웁니다. PDF/A 파일은 규격 준수가 해제됩니다.",
       title: "제목",
       author: "저자",
       subject: "주제",

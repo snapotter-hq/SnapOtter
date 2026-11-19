@@ -4095,6 +4095,9 @@ export const ptBR: TranslationKeys = {
       runOcr: "Executar OCR neste PDF",
     },
     "pdf-metadata": {
+      stripAll: "Remover os metadados do documento",
+      stripAllHint:
+        "Apaga datas, Creator, Producer, campos personalizados e XMP antes de gravar os campos abaixo. Arquivos PDF/A perdem a conformidade.",
       title: "Título",
       author: "Autor",
       subject: "Assunto",

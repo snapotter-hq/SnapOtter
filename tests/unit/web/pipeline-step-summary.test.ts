@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { getSettingsSummary } from "../../../apps/web/src/components/tools/pipeline-step-summary";
 
 describe("getSettingsSummary", () => {
+  it("summarizes pdf-metadata strip, field edits, and no-op settings", () => {
+    expect(getSettingsSummary("pdf-metadata", { stripAll: true, title: "T" })).toBe(
+      "Remove metadata",
+    );
+    expect(getSettingsSummary("pdf-metadata", { title: "T" })).toBe("Metadata");
+    expect(getSettingsSummary("pdf-metadata", {})).toBe("");
+  });
+
   it("returns dimensions for resize with width and height", () => {
     expect(getSettingsSummary("resize", { width: 1920, height: 1080 })).toBe("1920 x 1080");
   });

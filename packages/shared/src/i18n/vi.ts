@@ -4084,6 +4084,9 @@ export const vi: TranslationKeys = {
       runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-metadata": {
+      stripAll: "Xóa siêu dữ liệu tài liệu",
+      stripAllHint:
+        "Xóa ngày tháng, Creator, Producer, các trường tùy chỉnh và XMP trước khi ghi các trường bên dưới. Tệp PDF/A sẽ mất tính tuân thủ.",
       title: "Tiêu đề",
       author: "Tác giả",
       subject: "Chủ đề",

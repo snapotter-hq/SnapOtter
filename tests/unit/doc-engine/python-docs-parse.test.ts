@@ -14,6 +14,7 @@ import {
   pdfFlattenPy,
   pdfMetadataGetPy,
   pdfMetadataSetPy,
+  pdfMetadataStripPy,
   pdfPageCountPy,
   pdfRedactPy,
   pdfScrubProducerPy,
@@ -316,6 +317,11 @@ describe("python-docs sidecar JSON parsing", () => {
     ["pdfToWordPy", "doc_to_word", () => pdfToWordPy("/in.pdf", "/out.docx")],
     ["pdfMetadataGetPy", "doc_metadata get", () => pdfMetadataGetPy("/in.pdf")],
     ["pdfMetadataSetPy", "doc_metadata set", () => pdfMetadataSetPy("/in.pdf", "/out.pdf", {})],
+    [
+      "pdfMetadataStripPy",
+      "doc_metadata strip",
+      () => pdfMetadataStripPy("/in.pdf", "/out.pdf", {}),
+    ],
     ["htmlToPdfPy", "doc_html_pdf", () => htmlToPdfPy("/in.html", "/out.pdf", "html")],
     [
       "pdfSignPy",
