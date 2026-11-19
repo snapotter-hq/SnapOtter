@@ -1464,6 +1464,7 @@ export const ru: TranslationKeys = {
       customSize: "Пользовательский размер",
       scale: "Масштаб",
       presets: "Шаблоны",
+      presetsCropNote: "Шаблоны обрезают изображение, чтобы оно точно заполнило размер.",
       contentAware: "Контентно-зависимый",
       aspectRatio: "Соотношение сторон",
       ratioFree: "Свободно",

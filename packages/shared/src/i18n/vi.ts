@@ -1461,6 +1461,7 @@ export const vi: TranslationKeys = {
       customSize: "Kích thước tùy chỉnh",
       scale: "Tỷ lệ",
       presets: "Mẫu có sẵn",
+      presetsCropNote: "Mẫu có sẵn sẽ cắt ảnh để lấp đầy đúng kích thước.",
       contentAware: "Nhận diện nội dung",
       aspectRatio: "Tỷ lệ khung hình",
       ratioFree: "Tự do",

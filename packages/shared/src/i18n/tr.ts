@@ -1465,6 +1465,7 @@ export const tr: TranslationKeys = {
       customSize: "Özel Boyut",
       scale: "Ölçek",
       presets: "Şablonlar",
+      presetsCropNote: "Şablonlar, görseli tam boyutu dolduracak şekilde kırpar.",
       contentAware: "İçerik Duyarlı",
       aspectRatio: "En Boy Oranı",
       ratioFree: "Serbest",

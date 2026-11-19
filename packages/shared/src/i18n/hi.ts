@@ -1281,6 +1281,7 @@ export const hi: TranslationKeys = {
       customSize: "कस्टम साइज़",
       scale: "स्केल",
       presets: "प्रीसेट",
+      presetsCropNote: "प्रीसेट इमेज को क्रॉप करके ठीक उसी आकार में भरते हैं।",
       contentAware: "कंटेंट-अवेयर",
       aspectRatio: "आस्पेक्ट अनुपात",
       ratioFree: "मुक्त",

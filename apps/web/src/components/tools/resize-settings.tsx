@@ -40,7 +40,8 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
   const [width, setWidth] = useState<string>("");
   const [height, setHeight] = useState<string>("");
   const [percentage, setPercentage] = useState<string>("50");
-  const [fit, setFit] = useState<FitMode>("cover");
+  // Matches the API default. Cover crops off-ratio sizes, so it's opt-in here (#4824).
+  const [fit, setFit] = useState<FitMode>("contain");
   // "free" = independent width/height (default, unchanged behavior). "original" =
   // lock to the source image's ratio. Otherwise a RESIZE_RATIO_PRESETS id (e.g. "16:9").
   const [ratioId, setRatioId] = useState<string>("free");
@@ -307,6 +308,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
       {/* Presets tab */}
       {tab === "presets" && (
         <div className="space-y-3 max-h-[50dvh] overflow-y-auto pe-1">
+          <p className="text-xs text-muted-foreground">{t.toolSettings.resize.presetsCropNote}</p>
           {dimensionError}
           {platforms.map((platform) => (
             <div key={platform}>
@@ -377,6 +379,7 @@ export function ResizeControls({ settings: initialSettings, onChange }: ResizeCo
                   key={f}
                   type="button"
                   onClick={() => setFit(f)}
+                  aria-pressed={fit === f}
                   className={`flex-1 text-xs py-1.5 rounded ${fit === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                 >
                   {f === "cover"

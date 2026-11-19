@@ -116,7 +116,8 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
     if (height !== undefined && height > sourceHeight) height = sourceHeight;
   }
 
-  const resolvedFit = fit ?? "cover";
+  // Same default as the resize route: a default that crops silently drops content (#4824).
+  const resolvedFit = fit ?? "contain";
   const target = outputDimensions(metadata.width, sourceHeight, width, height, resolvedFit);
   if (target.width > MAX_RESIZE_OUTPUT_DIMENSION || target.height > MAX_RESIZE_OUTPUT_DIMENSION) {
     throw new ToolInputError(

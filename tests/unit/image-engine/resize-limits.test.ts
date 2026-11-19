@@ -32,7 +32,7 @@ describe("resize output allocation limits", () => {
     expect(resizeCall).toHaveBeenCalledWith({
       width: 6400,
       height: 3200,
-      fit: "cover",
+      fit: "contain",
       withoutEnlargement: false,
     });
   });
@@ -109,7 +109,7 @@ describe("resize output allocation limits", () => {
     expect(resizeCall).toHaveBeenCalledWith({
       width: 200,
       height: 150,
-      fit: "cover",
+      fit: "contain",
       withoutEnlargement: true,
     });
   });

@@ -1464,6 +1464,7 @@ export const ptBR: TranslationKeys = {
       customSize: "Tamanho personalizado",
       scale: "Escala",
       presets: "Predefinições",
+      presetsCropNote: "As predefinições cortam a imagem para preencher o tamanho exato.",
       contentAware: "Consciente do conteúdo",
       aspectRatio: "Proporção",
       ratioFree: "Livre",

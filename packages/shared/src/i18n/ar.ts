@@ -1448,6 +1448,7 @@ export const ar: TranslationKeys = {
       customSize: "حجم مخصص",
       scale: "مقياس",
       presets: "قوالب جاهزة",
+      presetsCropNote: "تقص القوالب الجاهزة الصورة لتملأ المقاس المحدد تمامًا.",
       contentAware: "مراعاة المحتوى",
       aspectRatio: "نسبة العرض إلى الارتفاع",
       ratioFree: "حر",

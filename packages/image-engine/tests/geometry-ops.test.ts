@@ -180,12 +180,14 @@ describe("resize (mutation-killing)", () => {
     expect(s.rgb).toEqual([255, 0, 0]);
   });
 
-  it("defaults to fit=cover when fit is omitted", async () => {
-    // resize passes `fit ?? "cover"`; default must behave like cover, not contain.
-    const s = await sample(await resizeOn({ width: 40, height: 40 }), 20, 0);
-    expect(s.width).toBe(40);
-    expect(s.height).toBe(40);
-    expect(s.rgb).toEqual([255, 0, 0]); // red edge = cover, black would mean contain
+  it("defaults to fit=contain when fit is omitted, matching the API route (#4824)", async () => {
+    // A default that crops silently drops content, so the engine letterboxes like the route.
+    const edge = await sample(await resizeOn({ width: 40, height: 40 }), 20, 0);
+    expect(edge.width).toBe(40);
+    expect(edge.height).toBe(40);
+    expect(edge.rgb).toEqual([0, 0, 0]); // black edge = contain, red would mean cover
+    const center = await sample(await resizeOn({ width: 40, height: 40 }), 20, 20);
+    expect(center.rgb).toEqual([255, 0, 0]);
   });
 
   it("width-only preserves aspect and computes the exact height", async () => {
