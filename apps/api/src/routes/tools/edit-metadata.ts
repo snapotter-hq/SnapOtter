@@ -31,6 +31,7 @@ import {
   isSvgClientError,
   sanitizeSvg,
 } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -401,6 +402,9 @@ export function registerEditMetadata(app: FastifyInstance) {
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        if (err instanceof InputValidationError) {
+          return reply.status(err.statusCode).send({ error: err.message });
+        }
         const tooLarge = imageSizeLimitError(err);
         if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         request.log.error({ err, toolId: "edit-metadata" }, "Metadata edit failed");

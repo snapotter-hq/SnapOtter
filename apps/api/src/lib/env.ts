@@ -184,6 +184,8 @@ const envSchema = z
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
     MAX_SETTINGS_PAYLOAD_KB: z.coerce.number().int().min(0).default(64),
     MAX_SUBTITLE_SIZE_MB: z.coerce.number().min(0).default(1),
+    // Longest value edit-metadata writes into one tag, in characters. 0 = unlimited.
+    MAX_METADATA_TAG_LENGTH: z.coerce.number().int().min(0).default(10_000),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),
