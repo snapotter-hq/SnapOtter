@@ -42,6 +42,34 @@ export function withSingleRoot(data: object): object {
   return singleElement ? data : { root: data };
 }
 
+const INVALID_TEXT_NODE = "INVALID_TEXT_NODE";
+
+/**
+ * Reject a `#text` value the builder can't write as element text (#4985). An
+ * array made it throw a plain TypeError, and an object became the text
+ * `[object Object]`. Scalars and null still convert, so XML -> JSON output
+ * (`{"@_id": "1", "#text": "hi"}`) round-trips. Deeper than the nesting cap
+ * the builder refuses the document anyway, so the walk stops there.
+ */
+export function assertScalarTextNodes(value: unknown, depth = 0): void {
+  if (value === null || typeof value !== "object" || depth > MAX_NESTING) return;
+  if (Array.isArray(value)) {
+    for (const item of value) assertScalarTextNodes(item, depth + 1);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "#text" && child !== null && typeof child === "object") {
+      throw new InputValidationError(
+        'JSON "#text" values must be text, a number, a boolean or null',
+        400,
+        undefined,
+        INVALID_TEXT_NODE,
+      );
+    }
+    assertScalarTextNodes(child, depth + 1);
+  }
+}
+
 const settingsSchema = z.object({
   pretty: z.boolean().default(true),
 });
@@ -91,6 +119,7 @@ export function registerJsonXml(app: FastifyInstance) {
       if (data === null || typeof data !== "object") {
         throw new InputValidationError("JSON must be an object or array to convert to XML");
       }
+      assertScalarTextNodes(data);
       const wrapped = withSingleRoot(data);
       const builder = new XMLBuilder({
         format: settings.pretty,
