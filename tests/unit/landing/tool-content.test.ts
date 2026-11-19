@@ -92,6 +92,8 @@ describe("formatBytes", () => {
     expect(formatBytes(4_815_461)).toBe("4.8 MB");
     expect(formatBytes(681_285_280)).toBe("681.3 MB");
     expect(formatBytes(999)).toBe("999 bytes");
+    expect(formatBytes(999_499)).toBe("999 KB");
+    expect(formatBytes(999_999)).toBe("1.0 MB");
   });
 });
 

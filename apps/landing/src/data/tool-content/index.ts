@@ -28,7 +28,8 @@ export const TOOL_CONTENT: Readonly<Record<string, ToolContent>> = Object.fromEn
 
 /** Decimal units, matching what file managers and the compress tools report. */
 export function formatBytes(bytes: number): string {
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  // 999,500 bytes and up would round to "1000 KB", so they switch to MB first.
+  if (bytes >= 999_500) return `${(bytes / 1_000_000).toFixed(1)} MB`;
   if (bytes >= 1_000) return `${Math.round(bytes / 1_000)} KB`;
   return `${bytes} bytes`;
 }
