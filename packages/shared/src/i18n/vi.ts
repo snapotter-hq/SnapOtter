@@ -5502,6 +5502,7 @@ export const vi: TranslationKeys = {
     delete: "Xóa",
     pipeline: "Pipeline",
     download: "Tải xuống",
+    downloadFailed: "Không thể tải xuống các tệp đã chọn.",
     details: {
       previewFailedRetry: "Tạo xem trước thất bại. Hãy thử lại.",
       loadFailed: "Không thể tải tệp này.",

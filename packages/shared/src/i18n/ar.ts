@@ -5469,6 +5469,7 @@ export const ar: TranslationKeys = {
     delete: "حذف",
     pipeline: "سلسلة المعالجة",
     download: "تنزيل",
+    downloadFailed: "تعذّر تنزيل الملفات المحددة.",
     details: {
       previewFailedRetry: "فشل إنشاء المعاينة. حاول مرة أخرى.",
       loadFailed: "تعذّر تحميل هذا الملف.",

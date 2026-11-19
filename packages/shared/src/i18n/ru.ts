@@ -5530,6 +5530,7 @@ export const ru: TranslationKeys = {
     delete: "Удалить",
     pipeline: "Конвейер",
     download: "Скачать",
+    downloadFailed: "Не удалось скачать выбранные файлы.",
     details: {
       previewFailedRetry: "Не удалось сгенерировать предпросмотр. Попробуйте снова.",
       loadFailed: "Не удалось загрузить этот файл.",

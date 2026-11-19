@@ -1,7 +1,9 @@
 import { Download, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
-import { getFileDownloadUrl } from "@/lib/api";
+import { ApiError, apiDownloadUserFiles, getFileDownloadUrl, userErrorMessage } from "@/lib/api";
+import { downloadBlob, triggerDownload } from "@/lib/download";
 import { format } from "@/lib/format";
 import { useFilesPageStore } from "@/stores/files-page-store";
 import { FileListItem, type FileNavigationKey } from "./file-list-item";
@@ -28,6 +30,7 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
   } = useFilesPageStore();
 
   const [inputValue, setInputValue] = useState(searchQuery);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -65,14 +68,27 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
     }, 300);
   }
 
-  function handleBulkDownload() {
-    for (const id of checkedIds) {
-      const a = document.createElement("a");
-      a.href = getFileDownloadUrl(id);
-      a.download = "";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+  // Several files go out as one ZIP: WebKit keeps only the last of several
+  // <a download> clicks made in one task, and saves nothing else (#4505).
+  async function handleBulkDownload() {
+    const ids = [...checkedIds];
+    if (ids.length === 1) {
+      triggerDownload(getFileDownloadUrl(ids[0]), "");
+      return;
+    }
+    setBulkDownloading(true);
+    try {
+      downloadBlob(await apiDownloadUserFiles(ids), "files.zip");
+    } catch (err) {
+      // A stream cut mid-archive rejects with the browser's own wording;
+      // only a server answer carries a message worth showing.
+      toast.error(
+        err instanceof ApiError
+          ? userErrorMessage(t, err, t.files.downloadFailed)
+          : t.files.downloadFailed,
+      );
+    } finally {
+      setBulkDownloading(false);
     }
   }
 
@@ -164,7 +180,9 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
             <button
               type="button"
               onClick={handleBulkDownload}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-foreground hover:bg-muted rounded-lg transition-colors"
+              disabled={bulkDownloading}
+              aria-busy={bulkDownloading}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
               {t.files.download}

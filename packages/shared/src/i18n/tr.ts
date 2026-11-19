@@ -5525,6 +5525,7 @@ export const tr: TranslationKeys = {
     delete: "Sil",
     pipeline: "Pipeline",
     download: "İndir",
+    downloadFailed: "Seçilen dosyalar indirilemedi.",
     details: {
       previewFailedRetry: "Önizleme oluşturulamadı. Tekrar deneyin.",
       loadFailed: "Bu dosya yüklenemedi.",

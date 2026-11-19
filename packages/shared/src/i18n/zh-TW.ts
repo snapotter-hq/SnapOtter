@@ -5204,6 +5204,7 @@ export const zhTW: TranslationKeys = {
     delete: "刪除",
     pipeline: "自動化流程",
     download: "下載",
+    downloadFailed: "無法下載所選檔案。",
     details: {
       previewFailedRetry: "預覽產生失敗。請重試。",
       loadFailed: "無法載入此檔案。",

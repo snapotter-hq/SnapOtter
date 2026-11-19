@@ -5538,6 +5538,7 @@ export const pl: TranslationKeys = {
     delete: "Usuń",
     pipeline: "Pipeline",
     download: "Pobierz",
+    downloadFailed: "Nie udało się pobrać wybranych plików.",
     details: {
       previewFailedRetry: "Generowanie podglądu nie powiodło się. Spróbuj ponownie.",
       loadFailed: "Nie udało się wczytać tego pliku.",

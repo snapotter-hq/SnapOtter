@@ -5530,6 +5530,7 @@ export const es: TranslationKeys = {
     delete: "Eliminar",
     pipeline: "Pipeline",
     download: "Descargar",
+    downloadFailed: "No se pudieron descargar los archivos seleccionados.",
     details: {
       previewFailedRetry: "Error al generar la vista previa. Inténtalo de nuevo.",
       loadFailed: "No se pudo cargar este archivo.",

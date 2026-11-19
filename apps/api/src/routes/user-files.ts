@@ -10,13 +10,16 @@
  * POST   /api/v1/files/save-result: Save a tool processing result (new version)
  */
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { extname } from "node:path";
+import { PassThrough, type Readable } from "node:stream";
 import {
   hasServerErrorStatus,
   IMAGE_EXT_TO_MIME,
   isSafeMessageError,
   SafeError,
 } from "@snapotter/shared";
+import archiver from "archiver";
 import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -39,7 +42,7 @@ import {
   validatedImageMime,
   validateImageBuffer,
 } from "../lib/file-validation.js";
-import { sanitizeFilename } from "../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../lib/filename.js";
 import {
   asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
@@ -74,6 +77,10 @@ import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 // ── Helpers ────────────────────────────────────────────────────────
 
 export const deleteFilesSchema = z.object({
+  ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
+});
+
+export const downloadFilesSchema = z.object({
   ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
 });
 
@@ -705,6 +712,150 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           `attachment; filename="${encodeURIComponent(file.originalName)}"; filename*=UTF-8''${encodeURIComponent(file.originalName)}`,
         )
         .send(stream);
+    },
+  );
+
+  /**
+   * POST /api/v1/files/download
+   *
+   * Bulk download. Body: { ids: string[] }. Streams one ZIP holding every
+   * requested file, in request order, with unique entry names. WebKit drops
+   * all but the last of several `<a download>` clicks made in one task, so
+   * the Files page asks for one archive instead of one download per file
+   * (#4505).
+   */
+  app.post(
+    "/api/v1/files/download",
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = await requireFileAccess(request, reply);
+      if (!user) return reply;
+
+      const parsed = downloadFilesSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.issues.map((i) => i.message).join("; "),
+        });
+      }
+      const ids = [...new Set(parsed.data.ids)];
+
+      const rows = await db
+        .select()
+        .from(schema.userFiles)
+        .where(inArray(schema.userFiles.id, ids));
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const canReadAll = await hasEffectivePermission(user, "files:all");
+      const files = ids.map((id) => byId.get(id));
+
+      // Same answer as the single-file route for a missing or foreign id, and
+      // for the whole request: an archive that quietly left a file out is the
+      // failure this route exists to prevent.
+      if (files.some((file) => !file || (file.userId !== user.id && !canReadAll))) {
+        return reply.status(404).send({ error: "File not found" });
+      }
+      const entries = files as (typeof rows)[number][];
+
+      // A missing blob resolves to null; any other storage fault rethrows,
+      // as in the single-file route (#937, #2808, #2851).
+      const openEntry = async (file: (typeof rows)[number]): Promise<Readable | null> => {
+        try {
+          return await streamStoredFile(file.storedName);
+        } catch (e) {
+          rethrowIfLibraryStorageFault(e);
+          request.log.warn(
+            { fileId: file.id, storedName: file.storedName },
+            "library bulk download: stored blob missing",
+          );
+          return null;
+        }
+      };
+
+      // Open the first entry before the headers go out, so the common
+      // failures still get a real status instead of a truncated ZIP.
+      const first = await openEntry(entries[0]);
+      if (!first) {
+        return reply.status(404).send({ error: "File not found in storage" });
+      }
+
+      const body = new PassThrough();
+      // Destroying body with an error can race Fastify attaching its own
+      // listener; an unheard 'error' would be process-fatal.
+      body.on("error", () => {});
+      const archive = archiver("zip", { zlib: { level: 5 } });
+      const stop = new AbortController();
+      let current: Readable | null = first;
+      let finished = false;
+      const fail = (err: Error) => {
+        if (stop.signal.aborted) return;
+        stop.abort();
+        current?.destroy();
+        archive.abort();
+        body.destroy(err);
+      };
+      archive.on("error", (err) => {
+        request.log.error({ err }, "library bulk download: archive failed");
+        fail(err);
+      });
+      // The client went away: stop reading storage.
+      body.on("close", () => {
+        if (!finished) fail(new Error("Client closed the bulk download"));
+      });
+      archive.pipe(body);
+
+      const uniqueName = createUniqueNamer();
+      void (async () => {
+        for (let i = 0; i < entries.length; i++) {
+          if (i > 0) current = await openEntry(entries[i]);
+          if (stop.signal.aborted) {
+            current?.destroy();
+            return;
+          }
+          if (!current) {
+            fail(new Error("A selected file is missing from storage"));
+            return;
+          }
+          // Never hand archiver a stream that can emit 'error': it re-emits
+          // it on an internal listener-less stream, which is process-fatal
+          // (see buildBatchZip). The wrapper ends quietly once fail() has
+          // already destroyed body, so a truncated entry never looks whole.
+          const source = current;
+          const entryStream = new PassThrough();
+          source.on("error", (err: Error) => {
+            request.log.error(
+              { err, fileId: entries[i].id },
+              "library bulk download: storage read failed",
+            );
+            fail(err);
+            entryStream.end();
+          });
+          source.pipe(entryStream);
+          // One entry at a time keeps a single file handle or S3 stream open.
+          const added = once(archive, "entry", { signal: stop.signal });
+          archive.append(entryStream, {
+            name: uniqueName(sanitizeFilename(entries[i].originalName)),
+          });
+          await added;
+          current = null;
+        }
+        finished = true;
+        await archive.finalize();
+      })().catch((err) => {
+        if (stop.signal.aborted) return;
+        const error = err instanceof Error ? err : new Error(String(err));
+        request.log.error({ err: error }, "library bulk download failed");
+        void reportError(error, {
+          source: "http",
+          route: "/api/v1/files/download",
+          method: "POST",
+          statusCode: 500,
+        });
+        fail(error);
+      });
+
+      return reply
+        .header("Content-Type", "application/zip")
+        .header("Content-Disposition", 'attachment; filename="files.zip"')
+        .send(body);
     },
   );
 

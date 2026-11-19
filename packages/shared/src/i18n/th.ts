@@ -5426,6 +5426,7 @@ export const th: TranslationKeys = {
     delete: "ลบ",
     pipeline: "Pipeline",
     download: "ดาวน์โหลด",
+    downloadFailed: "ดาวน์โหลดไฟล์ที่เลือกไม่สำเร็จ",
     details: {
       previewFailedRetry: "สร้างตัวอย่างไม่สำเร็จ ลองอีกครั้ง",
       loadFailed: "โหลดไฟล์นี้ไม่สำเร็จ",

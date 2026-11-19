@@ -5443,6 +5443,7 @@ export const en = {
     delete: "Delete",
     pipeline: "Pipeline",
     download: "Download",
+    downloadFailed: "Couldn't download the selected files.",
     details: {
       previewFailedRetry: "Preview generation failed. Try again.",
       loadFailed: "Couldn't load this file.",
