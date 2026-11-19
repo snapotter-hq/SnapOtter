@@ -253,6 +253,21 @@ describe("first-run consent (#4910)", () => {
     expect(config.consentPending).toBe(false);
   });
 
+  it("classifies a database that already has users and settings as an upgrade, once", async () => {
+    // buildTestApp seeded an admin and settings, like any earlier release's first boot.
+    const { classifyAnalyticsConsentOrigin } = await import(
+      "../../../apps/api/src/lib/settings-helpers.js"
+    );
+    await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsConsentOrigin"));
+    await expect(classifyAnalyticsConsentOrigin()).resolves.toBe("upgrade");
+    const [row] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "analyticsConsentOrigin"));
+    expect(row?.value).toBe("upgrade");
+    await expect(classifyAnalyticsConsentOrigin()).resolves.toBe("known");
+  });
+
   it("the origin marker can't be written through the settings API", async () => {
     const token = await loginAsAdmin(testApp.app);
     const res = await testApp.app.inject({

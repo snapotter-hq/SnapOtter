@@ -231,8 +231,18 @@ try {
 // Decide, once, whether this database held an instance before the first-run
 // analytics consent prompt existed (#4910). It has to run after the 1.x import
 // (imported data counts as an upgrade) and before any other boot write, so the
-// rows it looks at can only have come from an earlier release.
-await classifyAnalyticsConsentOrigin();
+// rows it looks at can only have come from an earlier release. It must stay
+// fatal: carrying on without the marker would let this boot seed users and
+// settings, and the next boot would then read a fresh install as an upgrade.
+try {
+  await classifyAnalyticsConsentOrigin();
+} catch (err) {
+  console.error(
+    "FATAL: Could not record whether this is a new install, which decides whether analytics needs the admin's consent. Check the database connection.",
+  );
+  console.error(err);
+  process.exit(1);
+}
 
 // Seed built-in roles (admin, editor, user) that legacy SQLite migrations
 // inserted via data statements.  The pg baseline is DDL-only, so roles are

@@ -37,6 +37,7 @@ export function AnalyticsConsentPrompt() {
   const config = useAnalyticsStore((s) => s.config);
   const configLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [dismissed, setDismissed] = useState(readDismissed);
+  const [answered, setAnswered] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
 
@@ -46,7 +47,8 @@ export function AnalyticsConsentPrompt() {
     role === "admin" &&
     !mustChangePassword &&
     !AUTH_GUARD_UNGATED_PATHS.has(location.pathname) &&
-    !dismissed;
+    !dismissed &&
+    !answered;
 
   function dismiss() {
     try {
@@ -75,10 +77,13 @@ export function AnalyticsConsentPrompt() {
         apiPut("/v1/settings", { analyticsEnabled: send ? "true" : "false" }),
         WRITE_TIMEOUT_MS,
       );
-      // The refreshed config clears consentPending, which hides this prompt,
-      // and on "send" carries the keys App.tsx uses to start telemetry.
+      // Saved, so close now: the refetch below keeps the old config on a
+      // failed read, and the prompt must not sit there looking unanswered.
+      setAnswered(true);
+      // On "send" the refreshed config carries the keys App.tsx uses to start telemetry.
       await useAnalyticsStore.getState().fetchConfig();
-    } catch {
+    } catch (err) {
+      console.warn("Saving the analytics choice failed", err);
       setError(true);
     } finally {
       setSaving(false);

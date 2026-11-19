@@ -669,12 +669,13 @@ export function SystemSection() {
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [settings, setSettings] = useState<Record<string, string>>({});
-  // A fresh install that hasn't answered the first-run prompt has no stored
-  // value but sends nothing, so the switch must read off, not on (#4910).
+  // With no stored value the instance is either an upgrade (on) or a fresh
+  // install waiting for the first-run answer (off). Only the loaded config can
+  // tell them apart, so read off until it says nothing is pending (#4910).
   const analyticsOn =
     settings.analyticsEnabled !== undefined
       ? settings.analyticsEnabled !== "false"
-      : analyticsConfig?.consentPending !== true;
+      : analyticsConfigLoaded && analyticsConfig?.consentPending === false;
   // Snapshot of the last server state, so a save sends only the fields this tab
   // changed (never a stale value that could clobber another admin's concurrent edit).
   const originalSettingsRef = useRef<Record<string, string>>({});

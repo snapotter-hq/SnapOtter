@@ -115,6 +115,8 @@ describe("AnalyticsConsentPrompt (#4910)", () => {
     fireEvent.click(screen.getByRole("button", { name: label }));
     await waitFor(() => expect(fetchConfig).toHaveBeenCalledTimes(1));
     expect(apiPut).toHaveBeenCalledWith("/v1/settings", { analyticsEnabled: value });
+    // Closes on the saved answer even though this refetch left the config pending.
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("shows an error and stays open when saving fails", async () => {
