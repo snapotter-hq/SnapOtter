@@ -40,6 +40,7 @@ import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertDocument } from "./convert-document.js";
 import { registerConvertPresentation } from "./convert-presentation.js";
 import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
+import { registerConvertSubtitles } from "./convert-subtitles.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCreateZip } from "./create-zip.js";
 import { registerCrop } from "./crop.js";
@@ -297,6 +298,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "burn-subtitles", register: registerBurnSubtitles },
     { id: "change-fps", register: registerChangeFps },
     { id: "compress-video", register: registerCompressVideo },
+    { id: "convert-subtitles", register: registerConvertSubtitles },
     { id: "convert-video", register: registerConvertVideo },
     { id: "crop-video", register: registerCropVideo },
     { id: "embed-subtitles", register: registerEmbedSubtitles },

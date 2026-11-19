@@ -924,6 +924,11 @@ export const ja: TranslationKeys = {
       name: "字幕抽出",
       description: "動画から字幕トラックを SRT ファイルとして抽出",
     },
+    "convert-subtitles": {
+      name: "字幕変換",
+      description:
+        "SRT、WebVTT、ASS 間で字幕ファイルを変換。ASS の位置指定とエフェクトは失われます",
+    },
     "images-to-video": {
       name: "画像から動画",
       description: "複数の画像からスライドショー動画を作成",
@@ -3512,6 +3517,17 @@ export const ja: TranslationKeys = {
       submit: "字幕を抽出",
       submitBatch: "字幕を抽出 ({count} ファイル)",
       progressLabel: "字幕を抽出中",
+    },
+    "convert-subtitles": {
+      format: "出力形式",
+      encoding: "文字コード",
+      autoDetect: "自動検出",
+      encodingHint: "日本語などの文字が化ける場合は、ファイルの文字コードを選択してください",
+      stylingHint:
+        "ASS から変換すると、斜体などの基本的な書式は残りますが、位置指定とエフェクトは失われます",
+      submit: "字幕を変換",
+      submitBatch: "字幕を変換 ({count} ファイル)",
+      progressLabel: "字幕を変換中",
     },
     "images-to-video": {
       square1080x1080: "正方形（1080x1080）",

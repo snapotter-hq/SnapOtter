@@ -5851,6 +5851,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "convert-subtitles": {
+    searchTitle: "Convert Subtitles: SRT to VTT, ASS to SRT",
+    longDescription:
+      "Convert a subtitle file between SRT, WebVTT and ASS. Timing and dialogue carry over, so an .ass from a fansub release becomes an .srt your TV plays, and an .srt becomes the .vtt a web video player expects. ASS positioning and effects are dropped, since SRT and WebVTT can't hold them; basic formatting such as italics survives. Older SRT files saved in Windows-1252, GB18030 or another legacy encoding come out as clean UTF-8. Conversion runs on your own SnapOtter server.",
+    useCases: [
+      "Turn an SRT into WebVTT for an HTML5 video player",
+      "Convert ASS subtitles to SRT for a TV or media player that only reads SRT",
+      "Fix garbled accents in an old Windows-1252 SRT by re-saving it as UTF-8",
+      "Prepare a plain SRT before embedding or burning it into a video",
+    ],
+    features: [
+      "Converts in any direction between SRT, WebVTT and ASS",
+      "Keeps cue timing and dialogue text",
+      "Reads UTF-8 and legacy encodings such as Windows-1252, Windows-1251, GB18030, Big5 and Shift_JIS",
+      "Always writes UTF-8 output",
+      "Batch converts several subtitle files at once",
+    ],
+    faqs: [
+      {
+        q: "What happens to ASS styling when I convert to SRT?",
+        a: "Timing, dialogue and basic formatting carry over. SRT keeps italics, bold, colour and font size as tags, and WebVTT keeps italics, bold and underline. On-screen positioning, karaoke and other ASS effects are dropped.",
+      },
+      {
+        q: "My converted subtitles show strange characters. What do I do?",
+        a: "The source file probably isn't UTF-8. Auto-detect reads anything that isn't valid UTF-8 as Windows-1252. For Chinese, Cyrillic, Japanese, Korean or Arabic subtitles, pick the file's encoding in the settings and convert again.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any normal feature-length subtitle. An admin can change the cap with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
   "images-to-video": {
     searchTitle: "Create Video Slideshow From Images",
     longDescription:

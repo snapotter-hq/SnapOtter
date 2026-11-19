@@ -962,6 +962,11 @@ export const vi: TranslationKeys = {
       name: "Trích xuất phụ đề",
       description: "Trích xuất rãnh phụ đề từ video thành tệp SRT",
     },
+    "convert-subtitles": {
+      name: "Chuyển đổi phụ đề",
+      description:
+        "Chuyển đổi tệp phụ đề giữa SRT, WebVTT và ASS. Vị trí và hiệu ứng của ASS sẽ bị loại bỏ",
+    },
     "images-to-video": {
       name: "Ảnh sang video",
       description: "Chuyển một bộ ảnh thành video trình chiếu",
@@ -3554,6 +3559,18 @@ export const vi: TranslationKeys = {
       submit: "Trích xuất phụ đề",
       submitBatch: "Trích xuất phụ đề ({count} tệp)",
       progressLabel: "Đang trích xuất phụ đề",
+    },
+    "convert-subtitles": {
+      format: "Định dạng đầu ra",
+      encoding: "Bảng mã văn bản",
+      autoDetect: "Tự động phát hiện",
+      encodingHint:
+        "Chọn bảng mã của tệp nếu ký tự có dấu hoặc không phải chữ Latinh bị lỗi hiển thị",
+      stylingHint:
+        "Chuyển đổi từ ASS giữ định dạng cơ bản như chữ nghiêng nhưng loại bỏ vị trí và hiệu ứng",
+      submit: "Chuyển đổi phụ đề",
+      submitBatch: "Chuyển đổi phụ đề ({count} tệp)",
+      progressLabel: "Đang chuyển đổi phụ đề",
     },
     "images-to-video": {
       square1080x1080: "Vuông (1080x1080)",

@@ -963,6 +963,11 @@ export const nl: TranslationKeys = {
       name: "Ondertitels extraheren",
       description: "Haal het ondertitelspoor uit een video als SRT-bestand",
     },
+    "convert-subtitles": {
+      name: "Ondertitels converteren",
+      description:
+        "Converteer ondertitelbestanden tussen SRT, WebVTT en ASS. ASS-positionering en -effecten gaan verloren",
+    },
     "images-to-video": {
       name: "Afbeeldingen naar video",
       description: "Zet een set afbeeldingen om in een diavoorstellingvideo",
@@ -3575,6 +3580,18 @@ export const nl: TranslationKeys = {
       submit: "Ondertitels extraheren",
       submitBatch: "Ondertitels extraheren ({count} bestanden)",
       progressLabel: "Ondertitels extraheren",
+    },
+    "convert-subtitles": {
+      format: "Uitvoerformaat",
+      encoding: "Tekstcodering",
+      autoDetect: "Automatisch detecteren",
+      encodingHint:
+        "Kies de codering van het bestand als accenten of niet-Latijnse tekens onleesbaar worden",
+      stylingHint:
+        "Bij conversie vanuit ASS blijft eenvoudige opmaak zoals cursief behouden, maar gaan positionering en effecten verloren",
+      submit: "Ondertitels converteren",
+      submitBatch: "Ondertitels converteren ({count} bestanden)",
+      progressLabel: "Ondertitels converteren",
     },
     "images-to-video": {
       square1080x1080: "Vierkant (1080x1080)",

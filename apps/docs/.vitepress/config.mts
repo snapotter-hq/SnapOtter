@@ -545,6 +545,7 @@ function buildBaseTheme() {
               { text: "Burn Subtitles", link: "/tools/video/burn-subtitles" },
               { text: "Embed Subtitles", link: "/tools/video/embed-subtitles" },
               { text: "Extract Subtitles", link: "/tools/video/extract-subtitles" },
+              { text: "Convert Subtitles", link: "/tools/video/convert-subtitles" },
               { text: "Images to Video", link: "/tools/video/images-to-video" },
               { text: "Clean Video Metadata", link: "/tools/video/video-metadata" },
               { text: "Auto Subtitles", link: "/tools/video/auto-subtitles" },

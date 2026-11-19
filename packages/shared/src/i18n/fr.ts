@@ -967,6 +967,11 @@ export const fr: TranslationKeys = {
       name: "Extraire les sous-titres",
       description: "Extrayez la piste de sous-titres d’une vidéo au format SRT",
     },
+    "convert-subtitles": {
+      name: "Convertir les sous-titres",
+      description:
+        "Convertissez des fichiers de sous-titres entre SRT, WebVTT et ASS. Le positionnement et les effets ASS sont perdus",
+    },
     "images-to-video": {
       name: "Images vers vidéo",
       description: "Transformez un ensemble d’images en vidéo diaporama",
@@ -3577,6 +3582,18 @@ export const fr: TranslationKeys = {
       submit: "Extraire les sous-titres",
       submitBatch: "Extraire les sous-titres ({count} fichiers)",
       progressLabel: "Extraction des sous-titres",
+    },
+    "convert-subtitles": {
+      format: "Format de sortie",
+      encoding: "Encodage du texte",
+      autoDetect: "Détection automatique",
+      encodingHint:
+        "Choisissez l’encodage du fichier si les accents ou les caractères non latins s’affichent mal",
+      stylingHint:
+        "La conversion depuis ASS conserve la mise en forme simple comme l’italique, mais supprime le positionnement et les effets",
+      submit: "Convertir les sous-titres",
+      submitBatch: "Convertir les sous-titres ({count} fichiers)",
+      progressLabel: "Conversion des sous-titres",
     },
     "images-to-video": {
       square1080x1080: "Carré (1080x1080)",

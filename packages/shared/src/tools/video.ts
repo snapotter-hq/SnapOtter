@@ -302,6 +302,19 @@ export const VIDEO_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "convert-subtitles",
+    name: "Convert Subtitles",
+    description:
+      "Convert subtitle files between SRT, WebVTT and ASS. ASS positioning and effects are dropped",
+    category: "video-subtitles",
+    icon: "Subtitles",
+    route: "/convert-subtitles",
+    modality: "video",
+    acceptedInputs: [...SUBTITLE_INPUTS],
+    outputModality: "file",
+    executionHint: "fast",
+  },
+  {
     id: "images-to-video",
     name: "Images to Video",
     description: "Turn a set of images into a slideshow video",

@@ -959,6 +959,11 @@ export const sv: TranslationKeys = {
       name: "Extrahera undertexter",
       description: "Hämta undertextspåret från en video som en SRT-fil",
     },
+    "convert-subtitles": {
+      name: "Konvertera undertexter",
+      description:
+        "Konvertera undertextfiler mellan SRT, WebVTT och ASS. ASS-positionering och effekter försvinner",
+    },
     "images-to-video": {
       name: "Bilder till video",
       description: "Gör om en uppsättning bilder till en bildspelsvideo",
@@ -3554,6 +3559,17 @@ export const sv: TranslationKeys = {
       submit: "Extrahera undertexter",
       submitBatch: "Extrahera undertexter ({count} filer)",
       progressLabel: "Extraherar undertexter",
+    },
+    "convert-subtitles": {
+      format: "Utdataformat",
+      encoding: "Textkodning",
+      autoDetect: "Automatisk identifiering",
+      encodingHint: "Välj filens kodning om å, ä, ö eller andra tecken blir fel",
+      stylingHint:
+        "Vid konvertering från ASS behålls enkel formatering som kursiv, men positionering och effekter försvinner",
+      submit: "Konvertera undertexter",
+      submitBatch: "Konvertera undertexter ({count} filer)",
+      progressLabel: "Konverterar undertexter",
     },
     "images-to-video": {
       square1080x1080: "Kvadrat (1080x1080)",

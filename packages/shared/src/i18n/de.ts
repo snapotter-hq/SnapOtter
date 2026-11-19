@@ -964,6 +964,11 @@ export const de: TranslationKeys = {
       name: "Untertitel extrahieren",
       description: "Untertitelspur aus einem Video als SRT-Datei extrahieren",
     },
+    "convert-subtitles": {
+      name: "Untertitel konvertieren",
+      description:
+        "Untertiteldateien zwischen SRT, WebVTT und ASS konvertieren. ASS-Positionierung und -Effekte gehen dabei verloren",
+    },
     "images-to-video": {
       name: "Bilder zu Video",
       description: "Bildersammlung in ein Diashow-Video umwandeln",
@@ -3583,6 +3588,18 @@ export const de: TranslationKeys = {
       submit: "Untertitel extrahieren",
       submitBatch: "Untertitel extrahieren ({count} Dateien)",
       progressLabel: "Untertitel werden extrahiert",
+    },
+    "convert-subtitles": {
+      format: "Ausgabeformat",
+      encoding: "Textkodierung",
+      autoDetect: "Automatisch erkennen",
+      encodingHint:
+        "Wählen Sie die Kodierung der Datei, wenn Umlaute oder nicht-lateinische Zeichen falsch angezeigt werden",
+      stylingHint:
+        "Beim Konvertieren aus ASS bleibt einfache Formatierung wie Kursivschrift erhalten, Positionierung und Effekte gehen verloren",
+      submit: "Untertitel konvertieren",
+      submitBatch: "Untertitel konvertieren ({count} Dateien)",
+      progressLabel: "Untertitel werden konvertiert",
     },
     "images-to-video": {
       square1080x1080: "Quadratisch (1080x1080)",

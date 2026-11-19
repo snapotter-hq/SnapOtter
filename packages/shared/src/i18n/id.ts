@@ -961,6 +961,11 @@ export const id: TranslationKeys = {
       name: "Ekstrak Subtitle",
       description: "Keluarkan trek subtitle dari video sebagai file SRT",
     },
+    "convert-subtitles": {
+      name: "Konversi Subtitle",
+      description:
+        "Konversi file subtitle antara SRT, WebVTT, dan ASS. Posisi dan efek ASS akan hilang",
+    },
     "images-to-video": {
       name: "Gambar ke Video",
       description: "Ubah kumpulan gambar menjadi video slideshow",
@@ -3558,6 +3563,17 @@ export const id: TranslationKeys = {
       submit: "Ekstrak Subtitle",
       submitBatch: "Ekstrak Subtitle ({count} file)",
       progressLabel: "Mengekstrak subtitle",
+    },
+    "convert-subtitles": {
+      format: "Format Output",
+      encoding: "Encoding Teks",
+      autoDetect: "Deteksi otomatis",
+      encodingHint: "Pilih encoding file jika huruf beraksen atau karakter non-Latin tampil rusak",
+      stylingHint:
+        "Konversi dari ASS mempertahankan format dasar seperti miring, tetapi menghapus posisi dan efek",
+      submit: "Konversi Subtitle",
+      submitBatch: "Konversi Subtitle ({count} file)",
+      progressLabel: "Mengonversi subtitle",
     },
     "images-to-video": {
       square1080x1080: "Persegi (1080x1080)",

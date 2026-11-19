@@ -142,7 +142,7 @@ pnpm dev
 | Modalitet | Antal | Exempelverktyg |
 |----------|-------|---------------|
 | **Bild** | 112 | Ändra storlek, Beskär, Komprimera, Konvertera, Ta bort bakgrund, Skala upp, OCR, Vattenstämpel, Collage, Färglägg, GIF-verktyg, formatförinställningar |
-| **Video** | 58 | Klipp, Beskär, Komprimera, Konvertera, Slå ihop, Extrahera ljud, Automatiska undertexter, Video till GIF, Ändra storlek, Stabilisera, formatförinställningar |
+| **Video** | 59 | Klipp, Beskär, Komprimera, Konvertera, Slå ihop, Extrahera ljud, Automatiska undertexter, Video till GIF, Ändra storlek, Stabilisera, formatförinställningar |
 | **Ljud** | 27 | Klipp, Slå ihop, Konvertera, Normalisera, Brusreducering, Transkribera, Tonhöjdsförskjutning, Tona, Ringsignalsskapare, formatförinställningar |
 | **PDF / Dokument** | 35 | Slå ihop, Dela, Komprimera, OCR, Vattenstämpel, Maskera, Word till PDF, Excel till PDF, Rotera, Skydda, Reparera |
 | **Filer** | 23 | CSV till JSON, JSON till XML, Slå ihop CSV, Dela CSV, Skapa ZIP, Extrahera ZIP, Diagramskapare, YAML/JSON |

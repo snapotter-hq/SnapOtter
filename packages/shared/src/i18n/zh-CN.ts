@@ -739,6 +739,10 @@ export const zhCN: TranslationKeys = {
       name: "提取字幕",
       description: "从视频中提取字幕轨道为 SRT 文件",
     },
+    "convert-subtitles": {
+      name: "转换字幕",
+      description: "在 SRT、WebVTT 和 ASS 之间转换字幕文件。ASS 的定位和特效会丢失",
+    },
     "images-to-video": {
       name: "图片转视频",
       description: "将一组图片制作成幻灯片视频",
@@ -3286,6 +3290,16 @@ export const zhCN: TranslationKeys = {
       submit: "提取字幕",
       submitBatch: "提取字幕（{count} 个文件）",
       progressLabel: "正在提取字幕",
+    },
+    "convert-subtitles": {
+      format: "输出格式",
+      encoding: "文本编码",
+      autoDetect: "自动检测",
+      encodingHint: "如果中文或其他字符显示为乱码，请选择文件的编码",
+      stylingHint: "从 ASS 转换会保留斜体等基本格式，但会丢失定位和特效",
+      submit: "转换字幕",
+      submitBatch: "转换字幕（{count} 个文件）",
+      progressLabel: "正在转换字幕",
     },
     "images-to-video": {
       square1080x1080: "正方形（1080x1080）",

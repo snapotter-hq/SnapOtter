@@ -139,6 +139,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "burn-subtitles": "media-player",
   "embed-subtitles": "media-player",
   "extract-subtitles": "media-player",
+  "convert-subtitles": "no-comparison",
   "images-to-video": "media-player",
   "video-metadata": "media-player",
 

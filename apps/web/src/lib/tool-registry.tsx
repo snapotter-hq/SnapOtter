@@ -530,6 +530,11 @@ const ExtractSubtitlesSettings = lazy(() =>
     default: m.ExtractSubtitlesSettings,
   })),
 );
+const ConvertSubtitlesSettings = lazy(() =>
+  import("@/components/tools/convert-subtitles-settings").then((m) => ({
+    default: m.ConvertSubtitlesSettings,
+  })),
+);
 const ImagesToVideoSettings = lazy(() =>
   import("@/components/tools/images-to-video-settings").then((m) => ({
     default: m.ImagesToVideoSettings,
@@ -1119,6 +1124,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
     },
   ],
   ["extract-subtitles", { accept: VIDEO_INPUTS.join(","), Settings: ExtractSubtitlesSettings }],
+  ["convert-subtitles", { accept: SUBTITLE_INPUTS.join(","), Settings: ConvertSubtitlesSettings }],
   ["images-to-video", { accept: IMAGE_INPUTS.join(","), Settings: ImagesToVideoSettings }],
   ["video-metadata", { accept: VIDEO_INPUTS.join(","), Settings: VideoMetadataSettings }],
 
