@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 8df34fa0c217
+i18n_output_hash: e4e85ad65d70
 i18n_hash_version: 2
-i18n_source_hash: e1ea853b4dd1
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -268,7 +268,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 |---------|------|-------------|
 | `convert-video` | Konwersja wideo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Kompresja wideo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Przycinanie wideo | `startS`, `endS`, `precise` (bool, cięcie z dokładnością do klatki) |
+| `trim-video` | Przycinanie wideo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, cięcie z dokładnością do klatki) |
 | `mute-video` | Wyciszanie wideo | - |
 | `video-to-gif` | Wideo do GIF | `fps` (1-30), `width`, `startS`, `durationS` (maks. 60 s) |
 | `resize-video` | Zmiana rozmiaru wideo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -301,7 +301,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | ID narzędzia | Nazwa | Kluczowe ustawienia |
 |---------|------|-------------|
 | `convert-audio` | Konwersja dźwięku | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Przycinanie dźwięku | `startS`, `endS` |
+| `trim-audio` | Przycinanie dźwięku | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Regulacja głośności | `gainDb` (-30 do 30) |
 | `normalize-audio` | Normalizacja dźwięku | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Wyciszanie/wzmacnianie dźwięku | `fadeInS` (0-30), `fadeOutS` (0-30) |

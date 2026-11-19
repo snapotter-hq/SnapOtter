@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: c49b939c4c6e
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 0e44b9a141d6
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | 轉換影片 | `format`（mp4/mov/webm/avi/mkv）、`quality`（high/balanced/small） |
 | `compress-video` | 壓縮影片 | `quality`（light/balanced/strong）、`resolution`（original/1080p/720p/480p） |
-| `trim-video` | 修剪影片 | `startS`、`endS`、`precise`（bool，影格精確剪輯） |
+| `trim-video` | 修剪影片 | `mode`（range/ends）、`startS`、`endS`、`cutStartS`、`cutEndS`、`precise`（bool，影格精確剪輯） |
 | `mute-video` | 靜音影片 | - |
 | `video-to-gif` | 影片轉 GIF | `fps`（1-30）、`width`、`startS`、`durationS`（最多 60 秒） |
 | `resize-video` | 調整影片大小 | `width`、`height`、`preset`（custom/2160p/1440p/1080p/720p/480p/360p） |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | 名稱 | 主要設定 |
 |---------|------|-------------|
 | `convert-audio` | 轉換音訊 | `format`（mp3/wav/ogg/flac/m4a）、`bitrateKbps`（32-320） |
-| `trim-audio` | 修剪音訊 | `startS`、`endS` |
+| `trim-audio` | 修剪音訊 | `mode`（range/ends）、`startS`、`endS`、`cutStartS`、`cutEndS` |
 | `volume-adjust` | 音量調整 | `gainDb`（-30 至 30） |
 | `normalize-audio` | 正規化音訊 | - （EBU R128，-16 LUFS） |
 | `fade-audio` | 淡入淡出音訊 | `fadeInS`（0-30）、`fadeOutS`（0-30） |

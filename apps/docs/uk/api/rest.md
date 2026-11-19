@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 55c8dfdd4251
+i18n_output_hash: a814a69ec79c
 i18n_hash_version: 2
-i18n_source_hash: e1ea853b4dd1
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -268,7 +268,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | Конвертація відео | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Стиснення відео | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Обрізання відео | `startS`, `endS`, `precise` (bool, покадрово точний виріз) |
+| `trim-video` | Обрізання відео | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, покадрово точний виріз) |
 | `mute-video` | Вимкнення звуку відео | - |
 | `video-to-gif` | Відео в GIF | `fps` (1-30), `width`, `startS`, `durationS` (макс. 60 с) |
 | `resize-video` | Зміна розміру відео | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -301,7 +301,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ID інструмента | Назва | Ключові налаштування |
 |---------|------|-------------|
 | `convert-audio` | Конвертація аудіо | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Обрізання аудіо | `startS`, `endS` |
+| `trim-audio` | Обрізання аудіо | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Регулювання гучності | `gainDb` (-30 до 30) |
 | `normalize-audio` | Нормалізація звуку | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Затухання аудіо | `fadeInS` (0-30), `fadeOutS` (0-30) |

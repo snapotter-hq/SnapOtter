@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 8025b13e01d6
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 2a6ca0023dba
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 |---------|------|-------------|
 | `convert-video` | Converti video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Comprimi video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Taglia video | `startS`, `endS`, `precise` (bool, taglio preciso al frame) |
+| `trim-video` | Taglia video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, taglio preciso al frame) |
 | `mute-video` | Silenzia video | - |
 | `video-to-gif` | Video in GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Ridimensiona video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | ID strumento | Nome | Impostazioni principali |
 |---------|------|-------------|
 | `convert-audio` | Converti audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Taglia audio | `startS`, `endS` |
+| `trim-audio` | Taglia audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Regola volume | `gainDb` (-30 a 30) |
 | `normalize-audio` | Normalizza audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Dissolvenza audio | `fadeInS` (0-30), `fadeOutS` (0-30) |

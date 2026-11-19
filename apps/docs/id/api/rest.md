@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 9ef22f278d64
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 45d6fc3a6f64
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 |---------|------|-------------|
 | `convert-video` | Convert Video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Compress Video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Trim Video | `startS`, `endS`, `precise` (bool, potongan akurat per frame) |
+| `trim-video` | Trim Video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, potongan akurat per frame) |
 | `mute-video` | Mute Video | - |
 | `video-to-gif` | Video to GIF | `fps` (1-30), `width`, `startS`, `durationS` (maks 60d) |
 | `resize-video` | Resize Video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | ID Tool | Nama | Pengaturan utama |
 |---------|------|-------------|
 | `convert-audio` | Convert Audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Trim Audio | `startS`, `endS` |
+| `trim-audio` | Trim Audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Volume Adjust | `gainDb` (-30 hingga 30) |
 | `normalize-audio` | Normalize Audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fade Audio | `fadeInS` (0-30), `fadeOutS` (0-30) |

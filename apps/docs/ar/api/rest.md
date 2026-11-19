@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 146f4c35be04
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 6a7f9fa7f667
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | تحويل الفيديو | `format` (mp4/mov/webm/avi/mkv)، `quality` (high/balanced/small) |
 | `compress-video` | ضغط الفيديو | `quality` (light/balanced/strong)، `resolution` (original/1080p/720p/480p) |
-| `trim-video` | قص الفيديو | `startS`، `endS`، `precise` (منطقي، قص دقيق بالإطار) |
+| `trim-video` | قص الفيديو | `mode` (range/ends)، `startS`، `endS`، `cutStartS`، `cutEndS`، `precise` (منطقي، قص دقيق بالإطار) |
 | `mute-video` | كتم الفيديو | - |
 | `video-to-gif` | فيديو إلى GIF | `fps` (1-30)، `width`، `startS`، `durationS` (بحد أقصى 60 ثانية) |
 | `resize-video` | تغيير حجم الفيديو | `width`، `height`، `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | معرّف الأداة | الاسم | الإعدادات الرئيسية |
 |---------|------|-------------|
 | `convert-audio` | تحويل الصوت | `format` (mp3/wav/ogg/flac/m4a)، `bitrateKbps` (32-320) |
-| `trim-audio` | قص الصوت | `startS`، `endS` |
+| `trim-audio` | قص الصوت | `mode` (range/ends)، `startS`، `endS`، `cutStartS`، `cutEndS` |
 | `volume-adjust` | ضبط مستوى الصوت | `gainDb` (-30 إلى 30) |
 | `normalize-audio` | تسوية الصوت | - (EBU R128، -16 LUFS) |
 | `fade-audio` | تلاشي الصوت | `fadeInS` (0-30)، `fadeOutS` (0-30) |

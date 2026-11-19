@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 160370d9a3a2
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 907a587b2a94
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | แปลงวิดีโอ | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | บีบอัดวิดีโอ | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | ตัดวิดีโอ | `startS`, `endS`, `precise` (bool, ตัดแบบแม่นยำระดับเฟรม) |
+| `trim-video` | ตัดวิดีโอ | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, ตัดแบบแม่นยำระดับเฟรม) |
 | `mute-video` | ปิดเสียงวิดีโอ | - |
 | `video-to-gif` | วิดีโอเป็น GIF | `fps` (1-30), `width`, `startS`, `durationS` (สูงสุด 60 วินาที) |
 | `resize-video` | ปรับขนาดวิดีโอ | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | การตั้งค่าหลัก |
 |---------|------|-------------|
 | `convert-audio` | แปลงเสียง | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | ตัดเสียง | `startS`, `endS` |
+| `trim-audio` | ตัดเสียง | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | ปรับระดับเสียง | `gainDb` (-30 ถึง 30) |
 | `normalize-audio` | ปรับระดับเสียงให้เท่ากัน | - (EBU R128, -16 LUFS) |
 | `fade-audio` | เฟดเสียง | `fadeInS` (0-30), `fadeOutS` (0-30) |

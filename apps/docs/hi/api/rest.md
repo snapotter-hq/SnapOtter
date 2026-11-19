@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 80cc0a21a8e2
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: eec37ee9258a
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | वीडियो कन्वर्ट करें | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | वीडियो कम्प्रेस करें | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | वीडियो ट्रिम करें | `startS`, `endS`, `precise` (bool, फ़्रेम-सटीक कट) |
+| `trim-video` | वीडियो ट्रिम करें | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, फ़्रेम-सटीक कट) |
 | `mute-video` | वीडियो म्यूट करें | - |
 | `video-to-gif` | वीडियो से GIF | `fps` (1-30), `width`, `startS`, `durationS` (अधिकतम 60s) |
 | `resize-video` | वीडियो रीसाइज़ करें | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | टूल ID | नाम | मुख्य सेटिंग्स |
 |---------|------|-------------|
 | `convert-audio` | ऑडियो कन्वर्ट करें | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | ऑडियो ट्रिम करें | `startS`, `endS` |
+| `trim-audio` | ऑडियो ट्रिम करें | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | वॉल्यूम समायोजित करें | `gainDb` (-30 से 30) |
 | `normalize-audio` | ऑडियो नॉर्मलाइज़ करें | - (EBU R128, -16 LUFS) |
 | `fade-audio` | ऑडियो फ़ेड करें | `fadeInS` (0-30), `fadeOutS` (0-30) |

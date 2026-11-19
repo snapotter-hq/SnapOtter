@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: e06ca7ea7d8a
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 1ecedfc5e98c
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 |---------|------|-------------|
 | `convert-video` | Konvertera video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Komprimera video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Trimma video | `startS`, `endS`, `precise` (bool, bildrutenoggrann klippning) |
+| `trim-video` | Trimma video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, bildrutenoggrann klippning) |
 | `mute-video` | Tysta video | - |
 | `video-to-gif` | Video till GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Ändra storlek på video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | Verktygs-ID | Namn | Nyckelinställningar |
 |---------|------|-------------|
 | `convert-audio` | Konvertera ljud | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Trimma ljud | `startS`, `endS` |
+| `trim-audio` | Trimma ljud | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Justera volym | `gainDb` (-30 till 30) |
 | `normalize-audio` | Normalisera ljud | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Tona ljud | `fadeInS` (0-30), `fadeOutS` (0-30) |
