@@ -393,6 +393,10 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     qpdf \
     libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 \
     fonts-dejavu-core \
+    # Metric clones of Calibri and Cambria (both SIL OFL 1.1). Without them
+    # Office's default fonts fall back to DejaVu, which is wider, so converted
+    # text reflows and slides overflow their bottom edge (#4834).
+    fonts-crosextra-carlito fonts-crosextra-caladea \
     libreoffice-calc libreoffice-impress libreoffice-writer \
     gcc g++ \
     libgl1 libglib2.0-0 libgles2 \
@@ -400,6 +404,8 @@ RUN for i in 1 2 3; do apt-get -o Acquire::Retries=3 update && break || sleep $(
     libxkbcommon-x11-0 libxkbcommon0 libxcursor1 \
     && rm -f /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
     && test ! -e /usr/share/tesseract-ocr/5/tessdata/osd.traineddata \
+    && fc-match Calibri | grep -q Carlito \
+    && fc-match Cambria | grep -q Caladea \
     && if apt-cache show libmagickcore-6.q16-7-extra >/dev/null 2>&1; then \
          timeout -k 30 300 apt-get install -y --no-install-recommends libmagickcore-6.q16-7-extra; \
        elif apt-cache show libmagickcore-6.q16-6-extra >/dev/null 2>&1; then \
