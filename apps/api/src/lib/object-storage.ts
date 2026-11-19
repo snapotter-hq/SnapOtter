@@ -205,7 +205,7 @@ async function assertWorkspaceSizeCap(root: string): Promise<void> {
     // results only leave when the TTL sweep expires them, so "try again
     // shortly" was false for up to FILE_MAX_AGE_HOURS (#1161).
     throw new SafeError(
-      "Workspace storage limit reached: stored results count against MAX_WORKSPACE_SIZE_GB until they expire (FILE_MAX_AGE_HOURS). Send fewer files at a time, or raise the limit",
+      "Workspace storage limit reached: stored uploads and results count against MAX_WORKSPACE_SIZE_GB until they expire (FILE_MAX_AGE_HOURS). Raise MAX_WORKSPACE_SIZE_GB, or set MAX_WORKSPACE_SIZE_GB to 0 to remove the cap",
       {
         kind: "operational",
         code: "workspace-cap",

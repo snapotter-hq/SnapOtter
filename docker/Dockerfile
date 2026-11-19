@@ -748,6 +748,7 @@ ENV PORT=1349 \
     MAX_BATCH_SIZE=0 \
     CONCURRENT_JOBS=0 \
     MAX_MEGAPIXELS=0 \
+    MAX_WORKSPACE_SIZE_GB=0 \
     # Unlike its neighbors, this one is never 0/unlimited: it's the only
     # knob here that guards against an external attacker rather than just
     # limiting the owner's own usage, so the one-liner (no compose file to

@@ -130,6 +130,7 @@ Common environment variables (set on the `snapotter` service). Use `0` for unlim
 | `DEFAULT_PASSWORD` | `admin` | Initial admin password. Change this for any non-local deployment. |
 | `MAX_UPLOAD_SIZE_MB` | `0` | Max upload size in MB. `0` is unlimited. |
 | `MAX_BATCH_SIZE` | `0` | Max files per batch. `0` is unlimited. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` | Cap in GB on stored uploads and results. `0` is unlimited. |
 | `CONCURRENT_JOBS` | `0` | Worker concurrency. `0` auto-detects from CPU. |
 | `PROCESSING_TIMEOUT_S` | `0` | Per-job timeout in seconds. `0` is unlimited. |
 | `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per client. `0` disables the limit. |

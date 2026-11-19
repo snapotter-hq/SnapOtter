@@ -246,6 +246,22 @@ describe("assertLocalCapacity capacity guard", () => {
     });
   });
 
+  it("tells a single-file request how to lift the cap, not to send fewer files (#4416)", async () => {
+    root = await mkdtemp(join(tmpdir(), "snapotter-cap-msg-"));
+    await mkdir(join(root, "outputs", "job1"), { recursive: true });
+    await writeFile(join(root, "outputs", "job1", "big.bin"), Buffer.alloc(2 * 1024 * 1024));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+    vi.spyOn(Date, "now").mockReturnValue(nowBase);
+
+    const err = await assertLocalCapacity().then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(err?.message).not.toMatch(/fewer files/i);
+    expect(err?.message).toMatch(/MAX_WORKSPACE_SIZE_GB to 0/);
+  });
+
   it("reuses the cached workspace total within the cache window", async () => {
     root = await mkdtemp(join(tmpdir(), "snapotter-cap-cache-"));
     await mkdir(join(root, "outputs", "job1"), { recursive: true });
