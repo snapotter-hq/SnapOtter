@@ -172,6 +172,30 @@ describe("split on a multi-page TIFF (#4419)", () => {
   });
 });
 
+describe("split refusals on a multi-page TIFF (#4419)", () => {
+  it("refuses a TIFF whose pages have different sizes rather than tiling page 1", async () => {
+    await expectInputError(
+      run(
+        "split",
+        readFixture(fixtures.image.edge.multipageMixedSizesTiff),
+        { columns: 2, rows: 1 },
+        "mixed.tiff",
+      ),
+      /2 pages of different sizes/,
+    );
+  });
+
+  it("tiles page 1 of a mixed-size TIFF when the tiles go to PNG", async () => {
+    const result = await run(
+      "split",
+      readFixture(fixtures.image.edge.multipageMixedSizesTiff),
+      { columns: 2, rows: 1, outputFormat: "png" },
+      "mixed.tiff",
+    );
+    expect(new AdmZip(result.buffer).getEntries()).toHaveLength(2);
+  });
+});
+
 describe("readTiffPagesFor (#4419)", () => {
   it("reports every page of a multi-page TIFF headed back out as TIFF", async () => {
     const info = await readTiffPagesFor(readFixture(fixtures.image.multipageTiff), "tiff");

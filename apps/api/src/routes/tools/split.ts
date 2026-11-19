@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import type { Sharp, SharpFormat } from "@snapotter/image-engine";
-import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import { hasServerErrorStatus, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -235,12 +235,28 @@ export function registerSplit(app: FastifyInstance) {
       const fullW = metadata.width ?? 0;
       const fullH = metadata.height ?? 0;
 
+      const originalExt = extname(filename) || ".png";
+      const { sharpFormat, ext: outputExt } = resolveOutputFormat(
+        settings.outputFormat,
+        originalExt,
+      );
+      let openTile: () => Sharp;
+      try {
+        openTile = await openTileSource(fileBuffer, sharpFormat, metadata.format);
+      } catch (err) {
+        if (!isToolInputError(err)) throw err;
+        const code = toolInputErrorCode(err);
+        return reply.status(400).send({ error: err.message, ...(code && { code }) });
+      }
+
       // Force a full pixel decode before streaming starts. Metadata alone
       // lets truncated files through, and a decode failure after
-      // reply.hijack() cannot become an error response anymore.
+      // reply.hijack() cannot become an error response anymore. This decodes
+      // the page stack the tiles come from, so a broken later page of a
+      // multi-page TIFF fails here too.
       if (!isSvg) {
         try {
-          await sharp(fileBuffer).stats();
+          await openTile().stats();
         } catch (err) {
           throw await asInputErrorIfUndecodable(fileBuffer, err);
         }
@@ -263,13 +279,7 @@ export function registerSplit(app: FastifyInstance) {
 
       const cellW = Math.floor(fullW / cols);
       const cellH = Math.floor(fullH / rows);
-      const originalExt = extname(filename) || ".png";
       const baseName = filename.replace(/\.[^.]+$/, "");
-      const { sharpFormat, ext: outputExt } = resolveOutputFormat(
-        settings.outputFormat,
-        originalExt,
-      );
-      const openTile = await openTileSource(fileBuffer, sharpFormat, metadata.format);
       const jobId = randomUUID();
 
       reply.hijack();
@@ -332,9 +342,7 @@ export function registerSplit(app: FastifyInstance) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
-        if (isToolInputError(err) || isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
-          throw err;
-        }
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         const tooLarge = imageSizeLimitError(err);
         if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         return reply.status(422).send({
