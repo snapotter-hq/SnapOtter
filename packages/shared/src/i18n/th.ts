@@ -1925,6 +1925,7 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังขยายภาพ",
       progressLabelBatch: "กำลังขยาย {count} ภาพ",
       cpuNote: "การขยายภาพด้วย AI ใช้พลังประมวลผลสูง หากไม่มี GPU รูปภาพขนาดใหญ่อาจใช้เวลาหลายนาที",
+      cpuResizedNote: "เซิร์ฟเวอร์นี้ไม่มี GPU จึงย่อรูปภาพเป็น {width} × {height} ก่อนขยาย",
       qualityFast: "เร็ว",
       qualityBalanced: "สมดุล",
       qualityBest: "ดีที่สุด",

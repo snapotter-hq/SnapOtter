@@ -1970,6 +1970,8 @@ export const de: TranslationKeys = {
       progressLabelBatch: "{count} Bilder werden hochskaliert",
       cpuNote:
         "KI-Hochskalierung ist rechenintensiv. Ohne GPU kann ein großes Bild mehrere Minuten dauern.",
+      cpuResizedNote:
+        "Dieser Server hat keine GPU, deshalb wurde das Bild vor dem Hochskalieren auf {width} × {height} verkleinert.",
       qualityFast: "Schnell",
       qualityBalanced: "Ausgewogen",
       qualityBest: "Beste",

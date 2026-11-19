@@ -159,6 +159,7 @@ async function runUpscale(
       width: result.width,
       height: result.height,
       method: result.method,
+      ...(result.inputResizedTo ? { inputResizedTo: result.inputResizedTo } : {}),
     },
   };
 }

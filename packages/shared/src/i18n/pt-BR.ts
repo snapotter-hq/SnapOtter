@@ -1962,6 +1962,8 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Ampliando {count} imagens",
       cpuNote:
         "A ampliação com IA exige muito processamento. Sem GPU, uma imagem grande pode levar vários minutos.",
+      cpuResizedNote:
+        "Este servidor não tem GPU, então a imagem foi reduzida para {width} × {height} antes da ampliação.",
       qualityFast: "Rápido",
       qualityBalanced: "Equilibrado",
       qualityBest: "Melhor",

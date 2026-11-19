@@ -624,6 +624,28 @@ describe("worker abort signal pass-through", () => {
     );
   });
 
+  it("upscale reports the CPU fit in its result payload only when the input was reduced (#4820)", async () => {
+    registerUpscale(fakeApp);
+
+    const plain = await runAiToolJob(job("upscale", { scale: 2, format: "png" }), PNG, ctx);
+    expect(plain.resultPayload).not.toHaveProperty("inputResizedTo");
+
+    vi.mocked(upscale).mockResolvedValueOnce({
+      buffer: PNG,
+      width: 4618,
+      height: 3464,
+      method: "realesrgan",
+      format: "png",
+      inputResizedTo: { width: 2309, height: 1732 },
+    });
+    const fitted = await runAiToolJob(job("upscale", { scale: 2, format: "png" }), PNG, ctx);
+    expect(fitted.resultPayload).toMatchObject({
+      width: 4618,
+      height: 3464,
+      inputResizedTo: { width: 2309, height: 1732 },
+    });
+  });
+
   it("remove-background pipeline processor forwards ctx.signal", async () => {
     registerRemoveBackground(fakeApp);
 

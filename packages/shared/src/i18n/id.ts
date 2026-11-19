@@ -1955,6 +1955,8 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Memperbesar {count} gambar",
       cpuNote:
         "Upscaling AI membutuhkan banyak komputasi. Tanpa GPU, gambar besar bisa memakan waktu beberapa menit.",
+      cpuResizedNote:
+        "Server ini tidak punya GPU, jadi gambar diperkecil ke {width} × {height} sebelum di-upscale.",
       qualityFast: "Cepat",
       qualityBalanced: "Seimbang",
       qualityBest: "Terbaik",

@@ -1962,6 +1962,8 @@ export const it: TranslationKeys = {
       progressLabelBatch: "Ingrandimento di {count} immagini",
       cpuNote:
         "L'upscaling con IA richiede molte risorse. Senza GPU, un'immagine grande può richiedere diversi minuti.",
+      cpuResizedNote:
+        "Questo server non ha una GPU, quindi l'immagine è stata ridotta a {width} × {height} prima dell'upscaling.",
       qualityFast: "Veloce",
       qualityBalanced: "Bilanciata",
       qualityBest: "Migliore",

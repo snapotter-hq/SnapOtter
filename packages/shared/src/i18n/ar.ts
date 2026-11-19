@@ -1940,6 +1940,8 @@ export const ar: TranslationKeys = {
       progressLabelBatch: "جاري تكبير {count} صورة",
       cpuNote:
         "التكبير بالذكاء الاصطناعي يستهلك موارد حسابية كبيرة. بدون معالج رسومات، قد تستغرق الصورة الكبيرة عدة دقائق.",
+      cpuResizedNote:
+        "لا يحتوي هذا الخادم على معالج رسومات، لذلك صُغّرت الصورة إلى {width} × {height} قبل التكبير.",
       qualityFast: "سريع",
       qualityBalanced: "متوازن",
       qualityBest: "الأفضل",

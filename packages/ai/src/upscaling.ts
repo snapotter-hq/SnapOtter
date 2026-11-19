@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -12,7 +11,8 @@ import {
 import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
 /**
- * Maximum input megapixels accepted for CPU-only upscaling (#2513).
+ * Maximum input megapixels for CPU-only AI upscaling (#2513); a larger input
+ * is reduced to fit first (#4820).
  * RealESRGAN_x4plus always runs at 4x internally (allocating a 4x output buffer
  * plus fp32 tile tensors), so a 4 MP ceiling caps the internal 4x array at
  * 64 MP (~192 MB RGB) on CPU hosts. Configurable via MAX_CPU_UPSCALE_MP (0 = unlimited).
@@ -23,6 +23,7 @@ export const MAX_CPU_UPSCALE_MP = 4;
  * Maximum output megapixels (`width * height * scale^2 / 1e6`) on CPU hosts,
  * equal to a 4 MP input at 4x scale (64 MP). Bounds high scale factors (6x, 8x)
  * on smaller inputs so the final upscaled array cannot OOM a 4 GB container.
+ * Scales with MAX_CPU_UPSCALE_MP.
  */
 export const MAX_CPU_UPSCALE_OUTPUT_MP = 64;
 
@@ -35,10 +36,32 @@ function resolveMaxCpuUpscaleMp(): number {
   return MAX_CPU_UPSCALE_MP;
 }
 
-function formatExceededMp(actual: number, limit: number): string {
-  const oneDec = actual.toFixed(1);
-  if (Number(oneDec) > limit) return oneDec;
-  return Math.max(limit + 0.01, Math.round(actual * 100) / 100).toFixed(2);
+/**
+ * The size a CPU host reduces the input to before upscaling, or null when it
+ * already fits (#4820). Refusing a 12 MP phone photo after the upload left
+ * people with nothing, so the input shrinks to the largest size both ceilings
+ * allow: `maxCpuMp` for the AI models (lanczos is exempt), and the output
+ * ceiling `maxCpuMp * 16` divided by the scale squared. Floors keep the result
+ * at or under the budget; 0 disables both.
+ */
+export function cpuFitDimensions(
+  width: number,
+  height: number,
+  scale: number,
+  model: string | undefined,
+  maxCpuMp: number,
+): { width: number; height: number } | null {
+  if (maxCpuMp <= 0 || width <= 0 || height <= 0) return null;
+  const maxCpuOutputMp = maxCpuMp * (MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP);
+  const outputBudgetMp = scale > 0 ? maxCpuOutputMp / scale ** 2 : Number.POSITIVE_INFINITY;
+  const budgetMp = model === "lanczos" ? outputBudgetMp : Math.min(maxCpuMp, outputBudgetMp);
+  const megapixels = (width * height) / 1_000_000;
+  if (megapixels <= budgetMp) return null;
+  const factor = Math.sqrt(budgetMp / megapixels);
+  return {
+    width: Math.max(1, Math.floor(width * factor)),
+    height: Math.max(1, Math.floor(height * factor)),
+  };
 }
 
 export interface UpscaleOptions {
@@ -57,6 +80,8 @@ export interface UpscaleResult {
   height: number;
   method: string;
   format: string;
+  /** Set when a CPU host reduced the input to this size before upscaling (#4820). */
+  inputResizedTo?: { width: number; height: number };
 }
 
 export async function upscale(
@@ -71,30 +96,23 @@ export async function upscale(
 
   const image = sharp(inputBuffer);
   const meta = await image.metadata();
-  const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
   const scale = pythonOptions.scale ?? 2;
-  const effectiveMp = megapixels * scale ** 2;
-  // The refusal asks whether a GPU could run this (a device node counts until
-  // the dispatcher reports, #4758); the timeout keeps the probed answer, so a
+  // The fit asks whether a GPU could run this (a device node counts until the
+  // dispatcher reports, #4758); the timeout keeps the probed answer, so a
   // pre-probe run gets the generous CPU budget.
-  if (!gpuMayBeAvailable("torch")) {
-    const maxCpuMp = resolveMaxCpuUpscaleMp();
-    if (maxCpuMp > 0) {
-      if (pythonOptions.model !== "lanczos" && megapixels > maxCpuMp) {
-        throw new ToolInputError(
-          `Image is too large for CPU upscaling (${formatExceededMp(megapixels, maxCpuMp)} MP, max ${maxCpuMp} MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.`,
-          { code: "IMAGE_TOO_LARGE" },
-        );
-      }
-      const maxCpuOutputMp = maxCpuMp * (MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP);
-      if (effectiveMp > maxCpuOutputMp) {
-        throw new ToolInputError(
-          `Upscaled output is too large for CPU upscaling (${formatExceededMp(effectiveMp, maxCpuOutputMp)} MP at ${scale}x, max ${maxCpuOutputMp} MP on CPU). Use a smaller image, lower scale factor, or a GPU host.`,
-          { code: "RESULT_TOO_LARGE" },
-        );
-      }
-    }
-  }
+  const fit = gpuMayBeAvailable("torch")
+    ? null
+    : cpuFitDimensions(
+        meta.width ?? 0,
+        meta.height ?? 0,
+        scale,
+        pythonOptions.model,
+        resolveMaxCpuUpscaleMp(),
+      );
+  if (fit) image.resize(fit.width, fit.height, { fit: "fill", kernel: "lanczos3" });
+  const width = fit?.width ?? meta.width ?? 0;
+  const height = fit?.height ?? meta.height ?? 0;
+  const effectiveMp = ((width * height) / 1_000_000) * scale ** 2;
 
   const pngBuffer = await image.png().toBuffer();
   await writeScratchInput("upscale", inputPath, pngBuffer);
@@ -123,5 +141,6 @@ export async function upscale(
     height: result.height,
     method: result.method ?? "unknown",
     format: result.format ?? "png",
+    ...(fit ? { inputResizedTo: fit } : {}),
   };
 }

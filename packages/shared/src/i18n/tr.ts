@@ -1960,6 +1960,8 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntü büyütülüyor",
       cpuNote:
         "Yapay zeka ile büyütme yoğun işlem gerektirir. GPU olmadan büyük bir görüntü birkaç dakika sürebilir.",
+      cpuResizedNote:
+        "Bu sunucuda GPU yok, bu yüzden görüntü büyütmeden önce {width} × {height} boyutuna küçültüldü.",
       qualityFast: "Hızlı",
       qualityBalanced: "Dengeli",
       qualityBest: "En İyi",

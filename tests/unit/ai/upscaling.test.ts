@@ -27,7 +27,6 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   gpuMayBeAvailable: vi.fn().mockReturnValue(false),
 }));
 
-import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -36,6 +35,7 @@ import {
   runPythonWithProgress,
 } from "../../../packages/ai/src/bridge.js";
 import {
+  cpuFitDimensions,
   MAX_CPU_UPSCALE_MP,
   MAX_CPU_UPSCALE_OUTPUT_MP,
   upscale,
@@ -478,117 +478,113 @@ describe("upscale", () => {
     });
   });
 
-  describe("CPU pixel limits (issue #2513)", () => {
+  describe("CPU pixel limits (issues #2513, #4820)", () => {
     afterEach(() => {
       delete process.env.MAX_CPU_UPSCALE_MP;
     });
+
+    /** Mocks sharp for one input size and returns the resize spy. */
+    function mockImage(width: number, height: number) {
+      const resize = vi.fn().mockReturnThis();
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            resize,
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width, height }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      return resize;
+    }
 
     it("exports MAX_CPU_UPSCALE_MP=4 and MAX_CPU_UPSCALE_OUTPUT_MP=64", () => {
       expect(MAX_CPU_UPSCALE_MP).toBe(4);
       expect(MAX_CPU_UPSCALE_OUTPUT_MP).toBe(64);
     });
 
-    it("rejects a 12 MP (4000x3000) input on CPU before writing input_upscale.png or spawning Python", async () => {
-      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer,
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
+    it("reduces a 12 MP (4000x3000) phone photo to fit 4 MP on CPU and upscales it instead of refusing (#4820)", async () => {
+      const resize = mockImage(4000, 3000);
 
-      let caught: unknown;
-      try {
-        await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
-      } catch (err) {
-        caught = err;
-      }
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
 
-      expect(isToolInputError(caught)).toBe(true);
-      expect((caught as Error).message).toMatch(/12\.0 MP.*max 4 MP on CPU/i);
-      expect(toBuffer).not.toHaveBeenCalled();
-      expect(writeFile).not.toHaveBeenCalled();
-      expect(runPythonWithProgress).not.toHaveBeenCalled();
+      expect(resize).toHaveBeenCalledTimes(1);
+      expect(resize).toHaveBeenCalledWith(2309, 1732, expect.objectContaining({ fit: "fill" }));
+      expect(2309 * 1732).toBeLessThanOrEqual(4_000_000);
+      expect(result.inputResizedTo).toEqual({ width: 2309, height: 1732 });
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+      // The timeout follows the reduced input: 3.999 MP at 2x on CPU.
+      const timeout = vi.mocked(runPythonWithProgress).mock.calls[0][2]?.timeout;
+      expect(timeout).toBe(Math.max(600_000, ((2309 * 1732) / 1e6) * 4 * 180_000));
     });
 
-    it("scopes the GPU checks to torch so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
-      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer,
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      // Simulate ONNX-only GPU: unscoped isGpuAvailable() and isGpuAvailable("onnx") return true,
-      // but isGpuAvailable("torch") returns false.
+    it("leaves an input that already fits untouched and reports no resize", async () => {
+      const resize = mockImage(2000, 2000);
+
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+
+      expect(resize).not.toHaveBeenCalled();
+      expect(result.inputResizedTo).toBeUndefined();
+    });
+
+    it("reduces a small input whose output would pass the 64 MP CPU ceiling (3 MP at 8x) instead of refusing", async () => {
+      const resize = mockImage(2000, 1500);
+
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 8 });
+
+      // 64 MP / 8^2 = 1 MP input budget
+      expect(result.inputResizedTo).toEqual({ width: 1154, height: 866 });
+      expect(1154 * 866 * 64).toBeLessThanOrEqual(64_000_000);
+      expect(resize).toHaveBeenCalledWith(1154, 866, expect.objectContaining({ fit: "fill" }));
+    });
+
+    it("exempts model=lanczos from the 4 MP input cap but still fits it to the 64 MP output ceiling", async () => {
+      const resize = mockImage(4000, 3000);
+
+      // 12 MP at 2x = 48 MP output: no resize for lanczos
+      const fast = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2, model: "lanczos" });
+      expect(fast.inputResizedTo).toBeUndefined();
+      expect(resize).not.toHaveBeenCalled();
+
+      // 12 MP at 4x = 192 MP output: reduced to the 4 MP that 64 MP allows
+      const big = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4, model: "lanczos" });
+      expect(big.inputResizedTo).toEqual({ width: 2309, height: 1732 });
+    });
+
+    it("scopes the GPU check to torch so an ONNX-only GPU still gets the CPU fit and timeout (issue #2576)", async () => {
+      mockImage(4000, 3000);
       vi.mocked(isGpuAvailable).mockImplementation((framework?: string) => framework !== "torch");
 
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).rejects.toThrow(
-        /12\.0 MP.*max 4 MP on CPU/i,
-      );
-      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
-      expect(runPythonWithProgress).not.toHaveBeenCalled();
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
 
-      // For a 2 MP input at 2x (8 MP effective), CPU rate (180s/MP -> 1,440,000ms) is used instead of GPU rate (600,000ms floor).
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer,
-            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
-      expect(runPythonWithProgress).toHaveBeenCalledWith(
-        "upscale.py",
-        expect.any(Array),
-        expect.objectContaining({ timeout: 8 * 180_000 }),
-      );
+      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
+      expect(result.inputResizedTo).toEqual({ width: 2309, height: 1732 });
+      const timeout = vi.mocked(runPythonWithProgress).mock.calls[0][2]?.timeout;
+      expect(timeout).toBe(((2309 * 1732) / 1e6) * 16 * 180_000);
     });
 
-    it("allows a 12 MP (4000x3000) input when a GPU is available", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
+    it("keeps a 12 MP input at full size when a GPU is available", async () => {
+      const resize = mockImage(4000, 3000);
       vi.mocked(isGpuAvailable).mockReturnValue(true);
 
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toMatchObject({
-        width: 1600,
-        height: 1200,
-      });
-      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+
+      expect(resize).not.toHaveBeenCalled();
+      expect(result.inputResizedTo).toBeUndefined();
+      expect(result).toMatchObject({ width: 1600, height: 1200 });
     });
 
-    it("does not refuse a GPU host before the dispatcher's GPU probe, and keeps the CPU timeout until it reports (#4758)", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
+    it("does not reduce on a GPU host before the dispatcher's GPU probe, and keeps the CPU timeout until it reports (#4758)", async () => {
+      const resize = mockImage(4000, 3000);
       // Boot, or a shutdown after a bundle install: no probe yet, so the
       // probed answer is still "no GPU" while a device node is visible.
       vi.mocked(isGpuAvailable).mockReturnValue(false);
       vi.mocked(gpuMayBeAvailable).mockReturnValue(true);
 
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toMatchObject({
-        width: 1600,
-      });
-      expect(gpuMayBeAvailable).toHaveBeenCalledWith("torch");
-      // 12 MP at 4x is 192 MP, past the 64 MP CPU output cap too, so neither
-      // refusal ran. The timeout uses the CPU rate, which only errs long.
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+
+      expect(resize).not.toHaveBeenCalled();
+      expect(result.inputResizedTo).toBeUndefined();
       expect(runPythonWithProgress).toHaveBeenCalledWith(
         "upscale.py",
         expect.any(Array),
@@ -596,202 +592,60 @@ describe("upscale", () => {
       );
     });
 
-    it("still refuses a 12 MP input on CPU when no GPU device is visible before the probe", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
-      vi.mocked(gpuMayBeAvailable).mockReturnValue(false);
-
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        /max 4 MP on CPU/i,
-      );
-      expect(runPythonWithProgress).not.toHaveBeenCalled();
-    });
-
-    it("rejects CPU upscale when output megapixels exceed MAX_CPU_UPSCALE_OUTPUT_MP (e.g. 3 MP at 8x = 192 MP)", async () => {
-      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer,
-            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1500 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
-
-      let caught: unknown;
-      try {
-        await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 8 });
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(isToolInputError(caught)).toBe(true);
-      expect((caught as Error).message).toMatch(/192\.0 MP at 8x.*max 64 MP on CPU/i);
-      expect(toBuffer).not.toHaveBeenCalled();
-      expect(writeFile).not.toHaveBeenCalled();
-      expect(runPythonWithProgress).not.toHaveBeenCalled();
-    });
-
-    it("honors MAX_CPU_UPSCALE_MP env override and disables the CPU cap when set to 0", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
+    it("honors the MAX_CPU_UPSCALE_MP override, with 0 disabling the fit and bad values falling back to 4 MP", async () => {
+      const resize = mockImage(4000, 3000);
 
       process.env.MAX_CPU_UPSCALE_MP = "0";
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toBeDefined();
+      const unlimited = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      expect(unlimited.inputResizedTo).toBeUndefined();
+      expect(resize).not.toHaveBeenCalled();
 
       process.env.MAX_CPU_UPSCALE_MP = "2";
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        /12\.0 MP.*max 2 MP on CPU/i,
-      );
+      const two = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      expect(two.inputResizedTo).toEqual({ width: 1632, height: 1224 });
+      expect(1632 * 1224).toBeLessThanOrEqual(2_000_000);
 
-      // Proportional output ceiling when MAX_CPU_UPSCALE_MP=2 -> maxCpuOutputMp = 32 MP
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 1500, height: 1000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 6 })).rejects.toThrow(
-        /54\.0 MP at 6x.*max 32 MP on CPU/i,
-      );
+      // The output ceiling scales with it: 2 MP -> 32 MP, so 6x allows 0.888 MP
+      mockImage(1500, 1000);
+      const six = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 6 });
+      expect(six.inputResizedTo).toEqual({ width: 1154, height: 769 });
+      expect(1154 * 769 * 36).toBeLessThanOrEqual(32_000_000);
 
-      // Invalid/negative env values fall back to default 4 MP ceiling
+      mockImage(4000, 3000);
       process.env.MAX_CPU_UPSCALE_MP = "-2";
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).resolves.toBeDefined();
+      const negative = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      expect(negative.inputResizedTo).toEqual({ width: 2309, height: 1732 });
       process.env.MAX_CPU_UPSCALE_MP = "invalid";
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).resolves.toBeDefined();
+      const invalid = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      expect(invalid.inputResizedTo).toEqual({ width: 2309, height: 1732 });
     });
 
-    it("allows exact 4.0 MP input at 4x (64.0 MP output) on CPU and formats near-boundary exceeded MP with 2 decimals (#3061)", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 2000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
+    it("never refuses on size: an extreme panorama still fits with both sides at least 1 px", async () => {
+      mockImage(200_000, 10);
 
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toBeDefined();
+      const result = await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 8 });
 
-      // 2001x2000 = 4.002 MP: sub-half-centimegapixel excess must clamp up to 4.01 MP
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 2001, height: 2000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        "Image is too large for CPU upscaling (4.01 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
-      );
+      expect(result.inputResizedTo?.width).toBeGreaterThan(0);
+      expect(result.inputResizedTo?.height).toBeGreaterThanOrEqual(1);
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+  });
 
-      // 4005x1000 = 4.005 MP: IEEE-754 (4.005).toFixed(2) === "4.00", must round to 4.01 MP
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4005, height: 1000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        "Image is too large for CPU upscaling (4.01 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
-      );
-
-      // 2010x2000 = 4.02 MP
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 2010, height: 2000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        /4\.02 MP, max 4 MP on CPU/,
-      );
-
-      // 4050x1000 = 4.05 MP ((4.05).toFixed(1) === "4.0" in IEEE-754 -> 4.05 MP) vs 4051x1000 = 4.051 MP -> 4.1 MP (1-decimal)
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4050, height: 1000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        "Image is too large for CPU upscaling (4.05 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
-      );
-
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4051, height: 1000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
-        "Image is too large for CPU upscaling (4.1 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
-      );
-
-      // Output ceiling near-boundary: 4,000,100 px at 4x (model=lanczos) = 64.0016 MP -> 64.01 MP
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 40_001, height: 100 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      await expect(
-        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4, model: "lanczos" }),
-      ).rejects.toThrow(
-        "Upscaled output is too large for CPU upscaling (64.01 MP at 4x, max 64 MP on CPU). Use a smaller image, lower scale factor, or a GPU host.",
-      );
+  describe("cpuFitDimensions", () => {
+    it("returns null when the input is inside both CPU ceilings", () => {
+      expect(cpuFitDimensions(2000, 2000, 4, "auto", 4)).toBeNull();
+      expect(cpuFitDimensions(800, 600, 2, "realesrgan", 4)).toBeNull();
     });
 
-    it("exempts model=lanczos from the 4 MP AI input cap on CPU while still enforcing the 64 MP output cap", async () => {
-      vi.mocked(sharp).mockImplementation(
-        () =>
-          ({
-            png: vi.fn().mockReturnThis(),
-            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
-            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
-          }) as unknown as ReturnType<typeof sharp>,
-      );
-      vi.mocked(isGpuAvailable).mockReturnValue(false);
+    it("keeps the aspect ratio and lands at or under the budget", () => {
+      const fit = cpuFitDimensions(4032, 3024, 2, "auto", 4);
+      expect(fit).not.toBeNull();
+      expect((fit?.width ?? 0) * (fit?.height ?? 0)).toBeLessThanOrEqual(4_000_000);
+      expect((fit?.width ?? 0) / (fit?.height ?? 1)).toBeCloseTo(4032 / 3024, 2);
+    });
 
-      // 12 MP at 2x = 48 MP output (<= 64 MP): allowed for lanczos
-      await expect(
-        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2, model: "lanczos" }),
-      ).resolves.toBeDefined();
-
-      // 12 MP at 4x = 192 MP output (> 64 MP): still rejected on CPU
-      await expect(
-        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4, model: "lanczos" }),
-      ).rejects.toThrow(/192\.0 MP at 4x.*max 64 MP on CPU/i);
+    it("is disabled when the cap is 0", () => {
+      expect(cpuFitDimensions(8000, 6000, 8, "auto", 0)).toBeNull();
     });
   });
 

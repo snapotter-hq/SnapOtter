@@ -1894,6 +1894,8 @@ export const ko: TranslationKeys = {
       progressLabelBatch: "{count}개 이미지 업스케일 중",
       cpuNote:
         "AI 업스케일링은 연산 부담이 큽니다. GPU가 없으면 큰 이미지는 몇 분이 걸릴 수 있습니다.",
+      cpuResizedNote:
+        "이 서버에는 GPU가 없어서 업스케일 전에 이미지를 {width} × {height}(으)로 줄였습니다.",
       qualityFast: "빠름",
       qualityBalanced: "균형",
       qualityBest: "최고",
