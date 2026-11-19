@@ -469,6 +469,9 @@ jobs:
     runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-landing
+      # Site builds need more heap than a memory-capped fleet runner's
+      # default (#4965); 4 GB matches an uncapped hosted runner.
+      NODE_OPTIONS: --max-old-space-size=4096
     # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
     # attempts plus the specs still fit.
     timeout-minutes: 25
@@ -509,6 +512,9 @@ jobs:
     runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-docs
+      # Site builds need more heap than a memory-capped fleet runner's
+      # default (#4965); 4 GB matches an uncapped hosted runner.
+      NODE_OPTIONS: --max-old-space-size=4096
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
     # which the config allows up to 10 minutes for on a loaded machine. The
     # extra 10 is degraded-apt-mirror headroom (#876).
@@ -690,6 +696,10 @@ jobs:
     # so a green Build still can't merge past a red shard.
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
+    env:
+      # Site builds need more heap than a memory-capped fleet runner's
+      # default (#4965); 4 GB matches an uncapped hosted runner.
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
