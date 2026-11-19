@@ -48,6 +48,15 @@ jobs:
       landing: ${{ steps.filter.outputs.landing }}
       docs: ${{ steps.filter.outputs.docs }}
       aipython: ${{ steps.filter.outputs.aipython }}
+      # Whether the routed jobs may use the self-hosted `snapotter-fleet`
+      # runners (#4965). This repo is public: only a push to main or a PR from
+      # a branch of this repo qualifies, never a fork. Dependabot PRs stay
+      # hosted because they install dependency versions nobody has reviewed.
+      # Setting the repo variable FLEET_RUNNERS=off sends every job back to
+      # hosted runners without a PR (the host is down, say). The runners also
+      # refuse any other job in a host-side job-started hook, since a fork PR
+      # can edit this file.
+      fleet: ${{ vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: filter
@@ -117,7 +126,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
@@ -131,7 +140,7 @@ jobs:
 
   typecheck:
     name: Typecheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
     steps:
@@ -144,8 +153,9 @@ jobs:
   test-unit:
     name: Unit (${{ matrix.shard }}/2)
     # Pinned: ubuntu-latest became 26.04, which has no libmagickcore-6 EXR
-    # package. Move to 26.04 with the ImageMagick 7 names (#4768).
-    runs-on: ubuntu-24.04
+    # package. Move to 26.04 with the ImageMagick 7 names (#4768). The fleet
+    # runners (#4965) are Ubuntu 24.04 with these packages preinstalled.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-24.04' }}
     # Headroom for a degraded-apt-mirror day (#876, #2007). The apt-install
     # ladder's worst case is ~34m since #1971 (120s update, two 360s
     # post-swap updates, three 300s installs, a shared 300s dpkg wait), plus
@@ -162,12 +172,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The fleet runner user has no sudo; the host carries these packages and
+      # the EXR coder already (#4965).
       - name: Install system dependencies (HEIC + ExifTool + ImageMagick + exotic format tools)
+        if: runner.environment == 'github-hosted'
         uses: ./.github/actions/apt-install
         with:
           packages: libheif-examples libheif-plugin-x265 libheif-plugin-libde265 libimage-exiftool-perl libraw-bin imagemagick ghostscript libjxl-tools libopenjp2-tools
 
-      - uses: ./.github/actions/imagemagick-exr
+      - if: runner.environment == 'github-hosted'
+        uses: ./.github/actions/imagemagick-exr
 
       - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
@@ -182,6 +196,10 @@ jobs:
             [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
           done
       - run: pnpm vitest run tests/unit/ packages/image-engine/tests packages/media-engine/tests packages/doc-engine/tests --reporter=verbose --shard=${{ matrix.shard }}/2
+        env:
+          # A fleet runner is long-lived and shared, so a cancelled run would
+          # leak its Postgres and Redis containers without the reaper (#4965).
+          TESTCONTAINERS_RYUK_DISABLED: ${{ runner.environment == 'github-hosted' && 'true' || 'false' }}
 
   test-unit-result:
     # Keeps the required "Unit Tests" context stable across shard counts, the
@@ -629,7 +647,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     # Only `changes` is a real dependency (its output gates the `if` below).
     # Gating on the test jobs used to save a runner minute on red PRs, but it
     # put a 55s job behind the slowest integration shard and added that time to
