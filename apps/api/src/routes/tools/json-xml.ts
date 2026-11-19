@@ -23,6 +23,25 @@ function nestingTooDeep(kind: "JSON" | "XML"): InputValidationError {
   );
 }
 
+/**
+ * Shape parsed JSON so the builder emits exactly one root element (#4377).
+ * The builder repeats a key once per array item and turns `@_` keys and
+ * `#text` into attributes and text, so only an object with a single plain key
+ * holding a non-array value already has one root. Anything else goes under
+ * `<root>`, with top-level array items as `<item>` children.
+ */
+export function withSingleRoot(data: object): object {
+  if (Array.isArray(data)) return { root: { item: data } };
+  const keys = Object.keys(data);
+  const [only] = keys;
+  const singleElement =
+    keys.length === 1 &&
+    !only.startsWith("@_") &&
+    only !== "#text" &&
+    !Array.isArray((data as Record<string, unknown>)[only]);
+  return singleElement ? data : { root: data };
+}
+
 const settingsSchema = z.object({
   pretty: z.boolean().default(true),
 });
@@ -72,9 +91,7 @@ export function registerJsonXml(app: FastifyInstance) {
       if (data === null || typeof data !== "object") {
         throw new InputValidationError("JSON must be an object or array to convert to XML");
       }
-      // Wrap in a root element when the top level is an array or has multiple
-      // keys, so the XML is well-formed with a single root.
-      const wrapped = Array.isArray(data) || Object.keys(data).length !== 1 ? { root: data } : data;
+      const wrapped = withSingleRoot(data);
       const builder = new XMLBuilder({
         format: settings.pretty,
         ignoreAttributes: false,

@@ -50,6 +50,12 @@ describe("json-xml (pure JS, no skipIf)", () => {
 
     const xmlText = dl.payload;
     expect(xmlText).toContain("<name>Ada</name>");
+    // A top-level array becomes one <root> holding an <item> per element,
+    // not one <root> per element, which no XML parser accepts (#4377).
+    expect(xmlText.match(/<root>/g)).toHaveLength(1);
+    expect(xmlText.match(/<item>/g)).toHaveLength(2);
+    expect(xmlText.trim().startsWith("<root>")).toBe(true);
+    expect(xmlText.trim().endsWith("</root>")).toBe(true);
   }, 30_000);
 
   it("converts XML to JSON with the people structure", async () => {
