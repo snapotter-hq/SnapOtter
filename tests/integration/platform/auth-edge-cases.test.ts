@@ -30,6 +30,22 @@ async function clearSetting(key: string): Promise<void> {
   await db.delete(schema.settings).where(eq(schema.settings.key, key));
 }
 
+// New installs have no password rules; an install that predates that keeps the
+// old defaults, pinned by migration 0013. This file tests the rules themselves,
+// so it runs under that policy and puts a rule back to it after changing it.
+const EXISTING_INSTALL_POLICY: Readonly<Record<string, string>> = {
+  passwordMinLength: "8",
+  passwordRequireUppercase: "true",
+  passwordRequireLowercase: "true",
+  passwordRequireDigit: "true",
+};
+
+async function restorePasswordPolicy(key: string): Promise<void> {
+  const value = EXISTING_INSTALL_POLICY[key];
+  if (value === undefined) await clearSetting(key);
+  else await setSetting(key, value);
+}
+
 // Faults only the settings-table select for `targetKey`, leaving earlier
 // settings reads (login throttle, MFA policy) and full-row selects intact.
 function breakSettingRead(targetKey: string) {
@@ -65,11 +81,13 @@ beforeAll(async () => {
   // timing equalization test is about. The throttle has its own spec in
   // login-throttle.test.ts.
   await setSetting("loginThrottleMaxFailures", "100000");
+  for (const [key, value] of Object.entries(EXISTING_INSTALL_POLICY)) await setSetting(key, value);
   adminToken = await loginAsAdmin(testApp.app);
 });
 
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");
+  for (const key of Object.keys(EXISTING_INSTALL_POLICY)) await clearSetting(key);
   await testApp.cleanup();
 });
 
@@ -2450,7 +2468,7 @@ describe("Admin user-management guards", () => {
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule });
     } finally {
-      await clearSetting(key);
+      await restorePasswordPolicy(key);
     }
   });
 
@@ -2466,7 +2484,7 @@ describe("Admin user-management guards", () => {
 
       expect(res.statusCode, res.body).toBe(200);
     } finally {
-      await clearSetting(key);
+      await restorePasswordPolicy(key);
     }
   });
 
@@ -2492,24 +2510,19 @@ describe("Admin user-management guards", () => {
       expect(res.statusCode).toBe(400);
       expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 12 });
     } finally {
-      await clearSetting("passwordMinLength");
+      await restorePasswordPolicy("passwordMinLength");
     }
   });
 
-  it("change-password falls back to 8 when stored passwordMinLength is blank or out of range (#1713)", async () => {
-    const user = await loggedInUser();
+  it("change-password falls back to the default of 1 when stored passwordMinLength is blank or out of range (#1713)", async () => {
     try {
       for (const bad of ["", "0", "Infinity", "200"]) {
         await setSetting("passwordMinLength", bad);
-        const res = await sendChangePassword(user, "Aa1");
-        expect(res.statusCode).toBe(400);
-        expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+        const res = await sendChangePassword(await loggedInUser(), "Aa1");
+        expect(res.statusCode, res.body).toBe(200);
       }
-      await setSetting("passwordMinLength", "Infinity");
-      const okRes = await sendChangePassword(user, "Abcdef12");
-      expect(okRes.statusCode, okRes.body).toBe(200);
     } finally {
-      await clearSetting("passwordMinLength");
+      await restorePasswordPolicy("passwordMinLength");
     }
   });
 
@@ -2541,6 +2554,17 @@ describe("Admin user-management guards", () => {
     expect(res.statusCode, res.body).toBe(200);
   });
 
+  it("a new install, with no password rows, accepts a simple password", async () => {
+    for (const key of Object.keys(EXISTING_INSTALL_POLICY)) await clearSetting(key);
+    try {
+      const res = await sendChangePassword(await loggedInUser(), "otter");
+
+      expect(res.statusCode, res.body).toBe(200);
+    } finally {
+      for (const key of Object.keys(EXISTING_INSTALL_POLICY)) await restorePasswordPolicy(key);
+    }
+  });
+
   it("an admin can switch every password rule off and register a one-character password with no letters (#1028)", async () => {
     const policy = {
       passwordMinLength: "1",
@@ -2566,7 +2590,7 @@ describe("Admin user-management guards", () => {
       });
       expect(res.statusCode, res.body).toBe(201);
     } finally {
-      for (const key of Object.keys(policy)) await clearSetting(key);
+      for (const key of Object.keys(policy)) await restorePasswordPolicy(key);
     }
   });
 

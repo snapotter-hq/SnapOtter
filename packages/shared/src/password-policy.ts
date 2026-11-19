@@ -70,16 +70,21 @@ export const DEFAULT_PASSWORD_MIN_LENGTH = 1;
 /**
  * Whether a stored boolean password-rule setting is enabled (#2026, #2036).
  *
- * Every rule defaults off and is enabled only when stored as `"true"`, so a
- * missing row means no rule, matching the Security tab switch. Migration 0013
- * stored `"true"` for uppercase, lowercase and digit on installs that already
- * had users, so those keep enforcing what they always did.
+ * With no row, every rule is off: new installs accept any non-empty password.
+ * A stored uppercase, lowercase or digit rule is off only when it is `"false"`,
+ * so a non-canonical value (`"TRUE"`, `"1"`) still fails closed and matches the
+ * Security tab switch. Migration 0013 stored `"true"` for those three on
+ * installs that already had users, so they keep enforcing what they always
+ * did. The special-character rule is enabled only when stored as `"true"`.
  */
 export function isPasswordRuleEnabled(
-  _key: PasswordRuleSettingKey,
+  key: PasswordRuleSettingKey,
   storedValue: string | null | undefined,
 ): boolean {
-  return storedValue === "true";
+  if (key === "passwordRequireSpecial") {
+    return storedValue === "true";
+  }
+  return storedValue != null && storedValue !== "false";
 }
 
 /**

@@ -277,7 +277,7 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
   if (length < minLength)
     broken.push({
       rule: "minLength",
-      message: `Password must be at least ${minLength} characters`,
+      message: `Password must be at least ${minLength} character${minLength === 1 ? "" : "s"}`,
     });
   if (requireUpper && !/\p{Lu}/u.test(password))
     broken.push({ rule: "uppercase", message: "Password must contain an uppercase letter" });
