@@ -64,8 +64,9 @@ async function settledJobRow(jobId: string) {
 }
 
 /** A one-page PDF whose only content is a rendered image, so it has no text
- *  layer: the shape of a scanned document. */
-function makeImageOnlyPdf(): Buffer {
+ *  layer: the shape of a scanned document. With withTextPage, a second page
+ *  carries real text, the shape of a partly scanned document. */
+function makeImageOnlyPdf(withTextPage = false): Buffer {
   const dir = mkdtempSync(join(tmpdir(), "pdf-word-scan-"));
   const out = join(dir, "scanned.pdf");
   const script = [
@@ -74,6 +75,7 @@ function makeImageOnlyPdf(): Buffer {
     "tmp = fitz.open(); tp = tmp.new_page(); tp.insert_text((50, 50), 'SCANNED PAGE')",
     "pix = tp.get_pixmap(dpi=100); tmp.close()",
     "p.insert_image(p.rect, pixmap=pix)",
+    ...(withTextPage ? ["d.new_page().insert_text((50, 50), 'TYPED PAGE')"] : []),
     "d.save(sys.argv[-1]); d.close()",
   ].join("\n");
   const res = spawnSync(pythonBin as string, ["-c", script, out], { encoding: "utf8" });
@@ -147,6 +149,12 @@ describe.skipIf(!hasPdf2docx)("pdf-to-word (requires pdf2docx)", () => {
     const docx = await downloadCompletedDocx(PDF, "test-3page.pdf");
     // DOCX files are ZIP archives; PK magic bytes.
     expect(docx.subarray(0, 2).toString()).toBe("PK");
+  }, 90_000);
+
+  it("still converts a partly scanned PDF, since one page has text (#4838)", async () => {
+    const docx = await downloadCompletedDocx(makeImageOnlyPdf(true), "mixed.pdf");
+    const documentEntry = new AdmZip(docx).getEntry("word/document.xml");
+    expect(documentEntry?.getData().toString("utf8")).toContain("TYPED PAGE");
   }, 90_000);
 
   it("preserves a multi-line colored block as one table with flexible row height", async () => {
