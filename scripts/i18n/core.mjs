@@ -48,6 +48,25 @@ export function collectPending(units, stored, { refreshStale = false } = {}) {
 }
 
 /**
+ * Count what a translation run would do, without translating or writing.
+ * Backs --dry-run, which must stay read-only: runTranslation checkpoints every
+ * chunk through adapter.write() (snapotter-hq/SnapOtter#916).
+ * @param {{ adapter: { extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, StoredEntry>> }, locales: string[], refreshStale?: boolean }} args
+ * @returns {Promise<Record<string, { pending: number, skipped: number, stale: number }>>}
+ */
+export async function reportPending({ adapter, locales, refreshStale = false }) {
+  const units = await adapter.extract();
+  const summary = {};
+  for (const locale of locales) {
+    if (locale === "en") continue; // English is the source
+    const stored = await adapter.load(locale);
+    const { pending, stats } = collectPending(units, stored, { refreshStale });
+    summary[locale] = { pending: pending.length, ...stats };
+  }
+  return summary;
+}
+
+/**
  * Translate every unit for every locale, gating on source hashes.
  * @param {{
  *   adapter: { name: string, extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, StoredEntry>>, write: (l: string, e: Map<string, StoredEntry>) => Promise<void> },

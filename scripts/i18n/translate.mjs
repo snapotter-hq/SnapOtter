@@ -1,7 +1,7 @@
 // scripts/i18n/translate.mjs
 import { mkdirSync } from "node:fs";
 import { ADAPTERS, resolveSurfaces } from "./adapters/registry.mjs";
-import { collectPending, runTranslation } from "./core.mjs";
+import { collectPending, reportPending, runTranslation } from "./core.mjs";
 import { batchResultTranslator, readDone, writePending } from "./lib/batch.mjs";
 import { localeCodes } from "./lib/shared-i18n.mjs";
 
@@ -64,11 +64,20 @@ async function main() {
     console.log("No adapters registered yet. Nothing to do.");
     return;
   }
-  mkdirSync(args.batchDir, { recursive: true });
+  if (args.mode !== "dry-run") mkdirSync(args.batchDir, { recursive: true });
 
   for (const surface of surfaces) {
     const mod = await ADAPTERS[surface]();
     const adapter = mod.adapter;
+
+    // dry-run reports and never writes: no anchors, no batch files, no locale
+    // files (snapotter-hq/SnapOtter#916). extract() anchors in memory, so the
+    // counts already match what a real run would see.
+    if (args.mode === "dry-run") {
+      const summary = await reportPending({ adapter, locales, refreshStale: args.refreshStale });
+      console.log(`dry-run ${surface}:`, JSON.stringify(summary, null, 2));
+      continue;
+    }
 
     // Normalize the English source anchors here, on the write path where
     // mutating the tree is expected. The read-only parity check (i18n:check)
@@ -107,17 +116,7 @@ async function main() {
         });
         console.log(`import ${surface} ${locale}:`, JSON.stringify(summary[locale]));
       }
-      continue;
     }
-
-    // dry-run: stub translator, no batch files, proves wiring
-    const summary = await runTranslation({
-      adapter,
-      locales,
-      translate: async (units, locale) =>
-        new Map(units.map((u) => [u.id, `${locale}:${u.sourceText}`])),
-    });
-    console.log(`dry-run ${surface}:`, JSON.stringify(summary, null, 2));
   }
 }
 
