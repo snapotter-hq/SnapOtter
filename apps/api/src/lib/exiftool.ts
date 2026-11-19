@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
 import { hasServerErrorStatus } from "@snapotter/shared";
+import { env } from "../config.js";
+import { InputValidationError } from "../modality/contract.js";
 import { stripInternalPaths } from "./errors.js";
 import {
   asDecoderOutOfMemory,
@@ -18,22 +20,21 @@ import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
-/** Maximum character length for any single ExifTool tag value. */
-const MAX_TAG_VALUE_LENGTH = 10_000;
-
 /** Allowed pattern for ExifTool tag names (alphanumeric, colon, underscore, hyphen). */
 const TAG_NAME_PATTERN = /^[a-zA-Z0-9:_-]+$/;
 
 /**
- * Validate and sanitize a tag value: strip null bytes, enforce length limit.
- * Returns the sanitized value or throws if it exceeds the length limit.
+ * Validate and sanitize a tag value: strip null bytes, enforce
+ * MAX_METADATA_TAG_LENGTH (0 = unlimited). An over-limit value is the caller's
+ * fault, so it throws a 400 InputValidationError naming the field and limit.
  */
 export function sanitizeTagValue(value: string, tagName: string): string {
   // Strip null bytes
   const cleaned = value.replace(/\0/g, "");
-  if (cleaned.length > MAX_TAG_VALUE_LENGTH) {
-    throw new Error(
-      `Tag value for "${tagName}" exceeds maximum length of ${MAX_TAG_VALUE_LENGTH} characters`,
+  const limit = env.MAX_METADATA_TAG_LENGTH;
+  if (limit > 0 && cleaned.length > limit) {
+    throw new InputValidationError(
+      `Tag value for "${tagName}" exceeds maximum length of ${limit} characters (MAX_METADATA_TAG_LENGTH)`,
     );
   }
   return cleaned;
