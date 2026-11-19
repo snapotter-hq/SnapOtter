@@ -24,6 +24,9 @@ const state = vi.hoisted(() => ({
   redisStatus: "ready",
   redisDel: vi.fn<(key: string) => Promise<number>>(async () => 0),
   insertConflict: false,
+  realAudit: false,
+  auditInsertFault: null as Error | null,
+  reportedErrors: [] as unknown[],
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => {
@@ -59,6 +62,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
       __table: "settings",
       key: { name: "key" },
       value: { name: "value" },
+    },
+    auditLog: {
+      __table: "auditLog",
+      id: { name: "id" },
     },
   };
 
@@ -101,6 +108,9 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
     }),
     insert: (table: { __table?: string }) => ({
       values: (row: Record<string, unknown>) => {
+        if (table.__table === "auditLog" && state.auditInsertFault) {
+          return Promise.reject(state.auditInsertFault);
+        }
         const applyInsert = () => {
           if (table.__table === "users") {
             if (
@@ -185,11 +195,30 @@ vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   closeRedis: async () => {},
 }));
 
-vi.mock("../../../apps/api/src/lib/audit.js", () => ({
-  auditLog: async (_logger: unknown, event: string, details: Record<string, unknown>) => {
-    state.auditEvents.push({ event, details });
-  },
-}));
+// Records events by default. With state.realAudit set it runs the real auditLog
+// against the CLI's own logger, which is how #4569 slipped through: the shim
+// lacked a method auditLog calls, and a wholesale mock never noticed.
+vi.mock("../../../apps/api/src/lib/audit.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/audit.js")>();
+  return {
+    ...actual,
+    auditLog: async (...args: Parameters<typeof actual.auditLog>) => {
+      const [, event, details = {}] = args;
+      state.auditEvents.push({ event, details });
+      if (state.realAudit) await actual.auditLog(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (err: unknown) => {
+      state.reportedErrors.push(err);
+    },
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) => {
   const actual =
@@ -208,6 +237,7 @@ vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) 
 
 import {
   createAdminUser,
+  disableUserMfa,
   generateRecoveryPassword,
   resetUserPassword,
   runRecoveryCli,
@@ -223,6 +253,9 @@ beforeEach(() => {
   state.deletedSessionsFor = [];
   state.deletedApiKeysFor = [];
   state.insertConflict = false;
+  state.realAudit = false;
+  state.auditInsertFault = null;
+  state.reportedErrors = [];
   state.redisStatus = "ready";
   state.redisDel.mockReset();
   state.redisDel.mockResolvedValue(0);
@@ -424,6 +457,95 @@ describe("runRecoveryCli usage, help, and argument validation (#812)", () => {
       expect(state.users).toHaveLength(0);
     } finally {
       errSpy.mockRestore();
+    }
+  });
+});
+
+describe("a failed audit insert never fails a recovery command (#4569)", () => {
+  const auditFault = new Error("permission denied for table audit_log");
+
+  function seedUser(overrides: Partial<(typeof state.users)[number]> = {}) {
+    state.users.push({
+      id: "u_audit",
+      username: "admin",
+      role: "admin",
+      team: "default-team-00000000",
+      passwordHash: "old:hash",
+      mustChangePassword: false,
+      totpEnabled: false,
+      totpSecret: null,
+      recoveryCodesHash: null,
+      ...overrides,
+    });
+  }
+
+  function captureConsole() {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const text = (spy: typeof log) => spy.mock.calls.map((c) => c.map(String).join(" ")).join("\n");
+    return {
+      stdout: () => text(log),
+      stderr: () => `${text(warn)}\n${text(error)}`,
+      errorCalls: () => error.mock.calls,
+      restore: () => {
+        log.mockRestore();
+        warn.mockRestore();
+        error.mockRestore();
+      },
+    };
+  }
+
+  beforeEach(() => {
+    state.realAudit = true;
+    state.auditInsertFault = auditFault;
+  });
+
+  it("reset-password without a password prints the generated one and exits 0", async () => {
+    seedUser();
+    const out = captureConsole();
+    try {
+      expect(await runRecoveryCli(["reset-password", "admin"])).toBe(0);
+      expect(out.stdout()).toMatch(/Password reset for "admin"\. Temporary password: \S{20,} /);
+      expect(state.users[0].passwordHash).not.toBe("old:hash");
+      expect(out.errorCalls()).toContainEqual([
+        "[audit] Failed to write audit log to DB",
+        expect.objectContaining({ err: auditFault, event: "PASSWORD_RESET" }),
+      ]);
+      expect(state.reportedErrors).toEqual([auditFault]);
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("create-admin without a password prints the generated one and exits 0", async () => {
+    const out = captureConsole();
+    try {
+      expect(await runRecoveryCli(["create-admin", "rescue"])).toBe(0);
+      expect(out.stdout()).toMatch(/Created admin user "rescue"\. Temporary password: \S{20,} /);
+      expect(state.users.map((u) => u.username)).toEqual(["rescue"]);
+      expect(out.stderr()).toContain("[audit] Failed to write audit log to DB");
+    } finally {
+      out.restore();
+    }
+  });
+
+  it("unlock-user, disable-mfa and reset-mfa-policy report success for a write that went through", async () => {
+    seedUser({ role: "disabled:admin", totpEnabled: true, totpSecret: "secret" });
+    const out = captureConsole();
+    try {
+      expect(await unlockUser("admin")).toBe("unlocked");
+      expect(state.users[0].role).toBe("admin");
+      expect(await disableUserMfa("admin")).toBe("cleared");
+      expect(await runRecoveryCli(["reset-mfa-policy"])).toBe(0);
+      expect(state.auditEvents.map((e) => e.event)).toEqual([
+        "USER_UPDATED",
+        "MFA_RESET",
+        "SETTINGS_UPDATED",
+      ]);
+      expect(state.reportedErrors).toHaveLength(3);
+    } finally {
+      out.restore();
     }
   });
 });

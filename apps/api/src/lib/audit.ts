@@ -61,12 +61,19 @@ export function extractTargetId(details: Record<string, unknown>): string | null
 }
 
 /**
+ * The logger methods auditLog calls. Callers without a request (the recovery
+ * CLI) implement exactly this, so a method added here fails tsc at every such
+ * caller instead of throwing in front of an operator (#4569).
+ */
+export type AuditLogger = Pick<FastifyBaseLogger, "info" | "warn" | "error">;
+
+/**
  * Emit a structured audit log entry for security-relevant events.
  *
  * Dual-writes: structured stdout log (for aggregators) + DB row.
  */
 export async function auditLog(
-  logger: FastifyBaseLogger,
+  logger: AuditLogger,
   event: string,
   details: Record<string, unknown> = {},
   ip: string | null = null,
