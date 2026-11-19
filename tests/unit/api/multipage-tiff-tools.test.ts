@@ -105,7 +105,10 @@ async function threePageTiff(): Promise<Buffer> {
 async function run(toolId: string, buffer: Buffer, overrides: Record<string, unknown> = {}) {
   const config = getToolConfig(toolId);
   if (!config) throw new Error(`${toolId} must be registered`);
-  const settings = config.settingsSchema.parse({ ...defaultSettingsFor(toolId), ...overrides });
+  const settings = config.settingsSchema.parse({
+    ...(defaultSettingsFor(toolId) as Record<string, unknown>),
+    ...overrides,
+  });
   return await config.process(buffer, settings, "pages.tiff");
 }
 
