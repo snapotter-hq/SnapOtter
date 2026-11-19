@@ -1,0 +1,190 @@
+import { readFileSync } from "node:fs";
+import sharp from "sharp";
+import { describe, expect, it } from "vitest";
+import { bakeSvgDensity, openSvgAtDensity } from "../../../apps/api/src/lib/svg-density.js";
+import { fixtureDir } from "../../fixtures/index.js";
+
+const svg = (rootAttrs: string, body = "") =>
+  Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" ${rootAttrs}>${body}</svg>`);
+
+async function size(input: Buffer, density: number) {
+  const { width, height } = await openSvgAtDensity(input, density).metadata();
+  return [width, height];
+}
+
+/** Fraction of the top pixel row covered by opaque paint. */
+async function opaqueRowFraction(input: Buffer, density: number): Promise<number> {
+  const { data, info } = await openSvgAtDensity(input, density)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let opaque = 0;
+  for (let x = 0; x < info.width; x++) if (data[x * 4 + 3] > 128) opaque++;
+  return opaque / info.width;
+}
+
+describe("openSvgAtDensity (#4423)", () => {
+  it("renders a pt-sized SVG once-scaled at 300 DPI, not squared", async () => {
+    expect(await size(svg('width="640pt" height="426pt" viewBox="0 0 640 426"'), 300)).toEqual([
+      2667, 1775,
+    ]);
+  });
+
+  it("renders the reported potrace fixture at 2667x1775", async () => {
+    const input = readFileSync(`${fixtureDir.formats}/sample.svg`);
+    expect(await size(input, 300)).toEqual([2667, 1775]);
+  });
+
+  it.each([
+    ["in", "2in", "1in", 600, 300],
+    ["mm", "25.4mm", "50.8mm", 300, 600],
+    ["cm", "2.54cm", "5.08cm", 300, 600],
+    ["pc", "6pc", "3pc", 300, 150],
+    ["px", "144px", "72px", 600, 300],
+    ["unitless", "144", "72", 600, 300],
+  ])("sizes a %s root as physical inches times DPI", async (_unit, w, h, ew, eh) => {
+    expect(await size(svg(`width="${w}" height="${h}"`), 300)).toEqual([ew, eh]);
+  });
+
+  it("matches sharp's own output for px roots at every density", async () => {
+    for (const density of [36, 96, 150, 300, 600]) {
+      for (const [w, h] of [
+        [17, 23],
+        [400, 400],
+        [640, 426],
+      ]) {
+        const input = svg(`width="${w}" height="${h}"`);
+        const direct = await sharp(input, { density }).metadata();
+        expect(await size(input, density)).toEqual([direct.width, direct.height]);
+      }
+    }
+  });
+
+  it("keeps inner physical lengths proportional to the canvas", async () => {
+    const body = '<rect width="0.5in" height="0.5in" fill="red"/>';
+    for (const root of [
+      'width="2in" height="2in"',
+      'width="144" height="144" viewBox="0 0 144 144"',
+    ]) {
+      expect(await opaqueRowFraction(svg(root, body), 72)).toBeCloseTo(0.25, 2);
+      expect(await opaqueRowFraction(svg(root, body), 300)).toBeCloseTo(0.25, 2);
+    }
+  });
+
+  it("tags PNG and TIFF output with the requested DPI, not the 72 it rendered at", async () => {
+    const input = svg('width="1in" height="1in"');
+    for (const format of ["png", "tiff"] as const) {
+      const out = await openSvgAtDensity(input, 300)[format]().toBuffer();
+      expect((await sharp(out).metadata()).density).toBe(300);
+    }
+  });
+});
+
+describe("bakeSvgDensity", () => {
+  it("rewrites the root size, adds a viewBox and drops to density 72", () => {
+    const { buffer, density } = bakeSvgDensity(svg('width="640pt" height="426pt"'), 300);
+    expect(density).toBe(72);
+    const text = buffer.toString("utf-8");
+    expect(text).toContain('viewBox="0 0 640 426"');
+    expect(text).toMatch(/\swidth="2666\.66666667"/);
+    expect(text).toMatch(/\sheight="1775"/);
+  });
+
+  it("keeps an existing viewBox and the attribute quote style", () => {
+    const { buffer } = bakeSvgDensity(svg("width='1in' height='1in' viewBox='0 0 10 10'"), 144);
+    const text = buffer.toString("utf-8");
+    expect(text).toContain("width='144'");
+    expect(text).toContain("height='144'");
+    expect(text).toContain("viewBox='0 0 10 10'");
+    expect(text.match(/viewBox/g)).toHaveLength(1);
+  });
+
+  it("only touches the root element", () => {
+    const input = svg(
+      'width="1in" height="1in"',
+      '<svg width="2in" height="2in"/><rect width="1in" stroke-width="3pt"/>',
+    );
+    const text = bakeSvgDensity(input, 300).buffer.toString("utf-8");
+    expect(text).toContain('<svg width="2in" height="2in"/>');
+    expect(text).toContain('<rect width="1in" stroke-width="3pt"/>');
+  });
+
+  it("finds the root after an XML declaration and comments that mention <svg", () => {
+    const input = Buffer.from(
+      '﻿<?xml version="1.0"?>\n<!-- <svg width="9in"> -->\n<svg xmlns="http://www.w3.org/2000/svg" width="1in" height="2in"/>',
+    );
+    const text = bakeSvgDensity(input, 72).buffer.toString("utf-8");
+    expect(text).toContain('<!-- <svg width="9in"> -->');
+    expect(text).toContain('width="72" height="144"');
+  });
+
+  it.each([
+    ["a percentage width", 'width="100%" height="50pt"'],
+    ["an em height", 'width="10pt" height="2em"'],
+    ["no height", 'width="10pt" viewBox="0 0 10 10"'],
+    ["a zero width", 'width="0" height="10pt"'],
+    ["a non-numeric width", 'width="auto" height="10pt"'],
+  ])("leaves a root with %s to sharp unchanged", (_label, attrs) => {
+    const input = svg(attrs);
+    const result = bakeSvgDensity(input, 300);
+    expect(result.buffer).toBe(input);
+    expect(result.density).toBe(300);
+  });
+
+  it("finds the root after a DOCTYPE with an internal subset", () => {
+    const input = Buffer.from(
+      '<!DOCTYPE svg [<!ENTITY a "<svg width=\'9in\'>">]><svg width="1in" height="1in"/>',
+    );
+    expect(bakeSvgDensity(input, 72).buffer.toString("utf-8")).toContain(
+      '<svg viewBox="0 0 72 72" width="72" height="72"/>',
+    );
+  });
+
+  it("ignores width and height text inside another attribute's value", () => {
+    const input = svg(`data-a=" width='100in' height='100in'" width="1in" height="1in"`);
+    const text = bakeSvgDensity(input, 300).buffer.toString("utf-8");
+    expect(text).toContain(`data-a=" width='100in' height='100in'"`);
+    expect(text).toContain('width="300" height="300"');
+    expect(text).toContain('viewBox="0 0 72 72"');
+  });
+
+  it("leaves a root with an unquoted or unterminated attribute unchanged", () => {
+    for (const attrs of ['width=1in height="1in"', 'data-a="x>y" width="1in" height="1in"']) {
+      const input = svg(attrs);
+      expect(bakeSvgDensity(input, 300)).toEqual({ buffer: input, density: 300 });
+    }
+  });
+
+  it("leaves a root whose scaled size overflows unchanged", () => {
+    const input = svg('width="1e306in" height="1in"');
+    expect(bakeSvgDensity(input, 300)).toEqual({ buffer: input, density: 300 });
+  });
+
+  it("parses hostile lengths and attribute runs in linear time", () => {
+    const started = performance.now();
+    for (const attrs of [
+      `width="${"1".repeat(100_000)}x" height="1in"`,
+      `width="1${" ".repeat(100_000)}x" height="1in"`,
+      `width="1.${"1".repeat(100_000)}e" height="1in"`,
+      `${" ".repeat(100_000)}x`,
+      `width="1in"${" ".repeat(100_000)}height=`,
+      `width="1in" height="${"1".repeat(100_000)}`,
+    ]) {
+      const input = svg(attrs);
+      expect(bakeSvgDensity(input, 300).buffer).toBe(input);
+    }
+    // The backtracking pattern this replaced took about 10 s on the first input alone.
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
+  it("leaves a namespace-prefixed or missing root unchanged", () => {
+    for (const input of [
+      Buffer.from('<svg:svg xmlns:svg="http://www.w3.org/2000/svg" width="1in" height="1in"/>'),
+      Buffer.from("<html></html>"),
+      Buffer.from('<?xml version="1.0"'),
+      Buffer.from('<!DOCTYPE svg [<!ENTITY a "x">'),
+    ]) {
+      expect(bakeSvgDensity(input, 300)).toEqual({ buffer: input, density: 300 });
+    }
+  });
+});

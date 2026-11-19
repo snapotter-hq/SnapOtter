@@ -185,6 +185,54 @@ describe("svg-to-raster", () => {
     expect(res.statusCode).toBe(200);
   });
 
+  describe("pt-sized SVG renders at physical size times DPI (#4423)", () => {
+    // 640pt x 426pt potrace output. libvips scales physical units by
+    // (dpi/72)^2 when handed a density, which made this 11111x7396 at 300.
+    const PT_SVG = readFixture(fixtures.image.formats("svg"));
+
+    async function renderedSize(url: string, settings: Record<string, unknown>) {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.svg", contentType: "image/svg+xml", content: PT_SVG },
+        { name: "settings", content: JSON.stringify(settings) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url,
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(200);
+      const dlRes = await app.inject({
+        method: "GET",
+        url: JSON.parse(res.body).downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(dlRes.statusCode).toBe(200);
+      const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
+      return [meta.width, meta.height];
+    }
+
+    it("renders 2667x1775 at the default 300 DPI", async () => {
+      expect(await renderedSize("/api/v1/tools/image/svg-to-raster", {})).toEqual([2667, 1775]);
+    });
+
+    it("renders 640x426 at 72 DPI", async () => {
+      expect(await renderedSize("/api/v1/tools/image/svg-to-raster", { dpi: 72 })).toEqual([
+        640, 426,
+      ]);
+    });
+
+    it("renders 2667x1775 through the svg-to-png preset", async () => {
+      expect(await renderedSize("/api/v1/tools/image/svg-to-png", {})).toEqual([2667, 1775]);
+    });
+
+    it("renders 2667x1775 through the convert tool's 300 DPI SVG path", async () => {
+      expect(await renderedSize("/api/v1/tools/image/convert", { format: "png" })).toEqual([
+        2667, 1775,
+      ]);
+    });
+  });
+
   it("applies background color", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
