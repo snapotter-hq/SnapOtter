@@ -146,6 +146,12 @@ describe("editor shortcuts with an empty event.code (#4764)", () => {
     // The literal plus key cannot be written with the default "+" delimiter.
     fireEvent.keyDown(document.body, { key: "+", code: "", ctrlKey: true });
     expect(useEditorStore.getState().zoom).toBeCloseTo(1.25);
+
+    // Shifted "+" on US-style layouts also zooms in.
+    fireEvent.keyDown(document.body, { key: "-", code: "", ctrlKey: true });
+    expect(useEditorStore.getState().zoom).toBeCloseTo(1);
+    fireEvent.keyDown(document.body, { key: "+", code: "", ctrlKey: true, shiftKey: true });
+    expect(useEditorStore.getState().zoom).toBeCloseTo(1.25);
   });
 
   it("matches shifted bracket keys with an empty code", () => {

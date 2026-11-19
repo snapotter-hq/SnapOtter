@@ -75,7 +75,7 @@ const hasCode = (event: KeyboardEvent): boolean => event.code !== "";
 // key differs from the hotkey spelling: shifted brackets and the plus key.
 // "|" is the split key because "+" cannot express a literal plus.
 const EMPTY_CODE_KEY_OVERRIDES: Record<string, { keys: string; splitKey: string }> = {
-  "mod+=,mod+plus": { keys: "mod|=,mod|+", splitKey: "|" },
+  "mod+=,mod+plus": { keys: "mod|=,mod|+,mod|shift|+", splitKey: "|" },
   "mod+shift+]": { keys: "mod|shift|],mod|shift|}", splitKey: "|" },
   "mod+shift+[": { keys: "mod|shift|[,mod|shift|{", splitKey: "|" },
 };
