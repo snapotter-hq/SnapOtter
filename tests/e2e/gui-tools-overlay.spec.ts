@@ -222,14 +222,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.locator("#text-overlay-color")).toBeVisible();
     });
 
-    test("shows position dropdown with three options", async ({ loggedInPage: page }) => {
+    test("shows position dropdown with four options", async ({ loggedInPage: page }) => {
       await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       const select = page.locator("#text-overlay-position");
       await expect(select).toBeVisible();
       const options = select.locator("option");
-      await expect(options).toHaveCount(3); // top, center, bottom
+      await expect(options).toHaveCount(4); // top, center, bottom, custom
     });
 
     test("shows drop shadow checkbox", async ({ loggedInPage: page }) => {
