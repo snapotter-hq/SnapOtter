@@ -71,6 +71,31 @@ def compute_crop_box(mask_dil, image_shape, margin_frac, margin_min):
     )
 
 
+def compute_model_window(mask_dil, image_shape, size, margin_min):
+    """A size x size crop of native pixels around the mask, or None if it won't fit.
+
+    LaMa runs at a fixed 512. Resizing a crop to 512 and back cost about a fifth
+    of the fill's sharpness (#4644), so when the dilated mask plus margin_min
+    fits in one model-sized window, crop exactly that window and skip the resize.
+    The window is centred on the mask and shifted (never shrunk) to stay inside
+    the frame. A frame side shorter than size is taken whole, and that crop
+    still gets resized to the model's square input.
+    """
+    h, w = image_shape[:2]
+    x0, y0, x1, y1 = _mask_bbox(mask_dil)
+    if (x1 - x0) + 2 * margin_min > size or (y1 - y0) + 2 * margin_min > size:
+        return None
+
+    def span(lo, hi, extent):
+        side = min(size, extent)
+        start = min(max(0, (lo + hi) // 2 - side // 2), extent - side)
+        return start, start + side
+
+    bx0, bx1 = span(x0, x1, w)
+    by0, by1 = span(y0, y1, h)
+    return bx0, by0, bx1, by1
+
+
 def composite(original, inpainted_crop, mask_dil_native, crop_box, feather, core_native=None):
     """Blend the inpainted crop into a copy of the full-res original.
 
@@ -97,12 +122,15 @@ def composite(original, inpainted_crop, mask_dil_native, crop_box, feather, core
     return result
 
 
-def inpaint_array(img_array, mask_array, run_model, progress=None):
+def inpaint_array(img_array, mask_array, run_model, progress=None, model_window=None):
     """Crop-and-composite inpainting orchestrator (model-agnostic).
 
     img_array: HxWx3 uint8 RGB. mask_array: HxW uint8 (white = erase).
     run_model(crop_img, crop_mask) -> inpainted crop, same HxWx3 size as crop_img.
     progress(percent, stage) optional; called for the SSE progress UI.
+    model_window: the model's fixed input side. When set, a mask that fits gets
+    a native crop of exactly that size (compute_model_window) instead of the
+    margin-scaled crop, so run_model sees it without a resize.
     """
     import numpy as np
 
@@ -123,9 +151,14 @@ def inpaint_array(img_array, mask_array, run_model, progress=None):
     d = int(np.clip(round(DILATE_FRAC * diag), DILATE_MIN, DILATE_MAX))
     mask_dil = dilate_mask(mask_bin, d)
 
-    bx0, by0, bx1, by1 = compute_crop_box(mask_dil, img_array.shape, MARGIN_FRAC, MARGIN_MIN)
-    if (bx1 - bx0) * (by1 - by0) >= WHOLE_FRAME_RATIO * w * h:
-        bx0, by0, bx1, by1 = 0, 0, w, h
+    box = None
+    if model_window:
+        box = compute_model_window(mask_dil, img_array.shape, model_window, MARGIN_MIN)
+    if box is None:
+        box = compute_crop_box(mask_dil, img_array.shape, MARGIN_FRAC, MARGIN_MIN)
+        if (box[2] - box[0]) * (box[3] - box[1]) >= WHOLE_FRAME_RATIO * w * h:
+            box = (0, 0, w, h)
+    bx0, by0, bx1, by1 = box
 
     crop_img = img_array[by0:by1, bx0:bx1]
     crop_mask = mask_dil[by0:by1, bx0:bx1]
@@ -164,7 +197,9 @@ def _make_run_model(session):
     """Build a run_model(crop_img, crop_mask) that runs LaMa at its fixed 512x512.
 
     Small crops are upscaled to 512 (INTER_LINEAR), large crops downscaled
-    (INTER_AREA); the result is resized back to the native crop size. Preserves
+    (INTER_AREA); the result is resized back to the native crop size. A crop
+    that is already 512x512 (compute_model_window) passes through unchanged,
+    since cv2.resize to the same size is an exact copy. Preserves
     the model's I/O contract: image in as float32 [0,1] NCHW, output in [0,255].
     """
     import cv2
@@ -235,7 +270,11 @@ def main():
             )
 
         result = inpaint_array(
-            img_array, mask_array, _make_run_model(session), progress=emit_progress
+            img_array,
+            mask_array,
+            _make_run_model(session),
+            progress=emit_progress,
+            model_window=MODEL_SIZE,
         )
 
         emit_progress(90, "Saving")
