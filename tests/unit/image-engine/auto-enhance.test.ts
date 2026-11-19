@@ -67,8 +67,8 @@ describe("analyzeImage", () => {
 
     const result = await analyzeImage(grayBuffer);
     expect(result.scores.whiteBalance).toBe(50);
-    // Grayscale PNG from .grayscale() retains 3 channels with zero spread,
-    // so saturation formula yields channelSpread * 1.2 + 20 = 20
+    // Grayscale PNG from .grayscale() retains 3 channels with zero chroma,
+    // so the saturation formula yields 20 + chroma * 0.75 = 20
     expect(result.scores.saturation).toBe(20);
   });
 
