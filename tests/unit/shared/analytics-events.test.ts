@@ -2,8 +2,8 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 
 describe("ANALYTICS_EVENTS", () => {
-  it("has exactly 28 event keys", () => {
-    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(28);
+  it("has exactly 29 event keys", () => {
+    expect(Object.keys(ANALYTICS_EVENTS)).toHaveLength(29);
   });
 
   it("contains the expected keys", () => {
@@ -30,6 +30,7 @@ describe("ANALYTICS_EVENTS", () => {
     expect(ANALYTICS_EVENTS).toHaveProperty("PIPELINE_STEP_ADDED");
     expect(ANALYTICS_EVENTS).toHaveProperty("PIPELINE_SAVED");
     expect(ANALYTICS_EVENTS).toHaveProperty("PIPELINE_TEMPLATE_SELECTED");
+    expect(ANALYTICS_EVENTS).toHaveProperty("STARTER_JOB_CLICKED");
     expect(ANALYTICS_EVENTS).toHaveProperty("AUTH_LOGIN");
     expect(ANALYTICS_EVENTS).toHaveProperty("AUTH_LOGIN_FAILED");
     expect(ANALYTICS_EVENTS).toHaveProperty("FEEDBACK_PROMPT_SHOWN");

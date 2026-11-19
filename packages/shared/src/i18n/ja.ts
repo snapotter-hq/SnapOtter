@@ -4271,6 +4271,12 @@ export const ja: TranslationKeys = {
     popular: "人気",
     browseByCategory: "カテゴリで探す",
     gettingStarted: "はじめに",
+    starterHint:
+      "何から始めればよいか迷ったら、よく使われる作業を選んで最初のファイルを処理しましょう。",
+    starterImage: "画像を変換・圧縮",
+    starterPdf: "PDF を結合・圧縮",
+    starterBackground: "背景を削除",
+    starterDismiss: "はじめにを非表示",
     noToolsMatch: "'{query}' に一致するツールはありません",
     clearSearch: "検索をクリア",
     requestToolCta: "「{query}」をリクエスト",

@@ -66,6 +66,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   pipeline_step_added: new Set(["tool_id"]),
   pipeline_saved: new Set(["step_count"]),
   pipeline_template_selected: new Set(["template_id"]),
+  starter_job_clicked: new Set(["tool_id"]),
   feedback_prompt_shown: new Set(["source", "survey_id", "prompt_variant"]),
   feedback_prompt_dismissed: new Set(["source", "survey_id", "prompt_variant", "dismiss_kind"]),
   tool_run_degraded: new Set(["tool_id", "is_batch", "trigger", "had_evidence"]),

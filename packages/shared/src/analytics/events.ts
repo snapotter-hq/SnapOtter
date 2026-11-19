@@ -27,6 +27,8 @@ export const ANALYTICS_EVENTS = {
   PIPELINE_STEP_ADDED: "pipeline_step_added",
   PIPELINE_SAVED: "pipeline_saved",
   PIPELINE_TEMPLATE_SELECTED: "pipeline_template_selected",
+  // A tool link in the home page's first-run starter block was clicked (#4909).
+  STARTER_JOB_CLICKED: "starter_job_clicked",
   AUTH_LOGIN: "auth_login",
   AUTH_LOGIN_FAILED: "auth_login_failed",
   // Feedback prompt lifecycle (client-side). Fired when any feedback surface is

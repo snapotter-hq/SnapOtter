@@ -4328,6 +4328,12 @@ export const it: TranslationKeys = {
     popular: "Popolari",
     browseByCategory: "Esplora per categoria",
     gettingStarted: "Per iniziare",
+    starterHint:
+      "Non sai da dove cominciare? Scegli un’operazione comune per elaborare il tuo primo file.",
+    starterImage: "Converti o comprimi un’immagine",
+    starterPdf: "Unisci o comprimi un PDF",
+    starterBackground: "Rimuovi lo sfondo",
+    starterDismiss: "Nascondi Per iniziare",
     noToolsMatch: "Nessuno strumento corrisponde a '{query}'",
     clearSearch: "Cancella ricerca",
     requestToolCta: "Richiedi '{query}'",

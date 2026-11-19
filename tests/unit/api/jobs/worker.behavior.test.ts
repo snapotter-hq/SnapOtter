@@ -60,6 +60,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     typeof import("../../../../packages/shared/src/image-mime.js")
   >("../../../../packages/shared/src/image-mime.js");
   vi.doMock("@snapotter/shared", () => ({
+    ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
     ...toolErrors,
     IMAGE_EXT_TO_MIME,
     ANALYTICS_EVENTS: {},
@@ -518,6 +519,7 @@ describe("worker result payload behavior", () => {
 
       const { loadToolInputBuffer, loadToolInputs } = await loadWorker("", () => {
         vi.doMock("@snapotter/shared", () => ({
+          ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
           SafeError,
           connectivityClass,
           isClientAbort,
@@ -5522,6 +5524,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
 
     const workerMod = await loadWorker("", () => {
       vi.doMock("@snapotter/shared", () => ({
+        ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
         SafeError,
         isSafeMessageError,
         isToolInputError,
@@ -5567,6 +5570,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
 
     const longCanonicalWorkerMod = await loadWorker("", () => {
       vi.doMock("@snapotter/shared", () => ({
+        ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
         SafeError,
         isSafeMessageError,
         isToolInputError,
@@ -5637,6 +5641,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     try {
       const workerMod = await loadWorker("", () => {
         vi.doMock("@snapotter/shared", () => ({
+          ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
           SafeError,
           isSafeMessageError,
           isToolInputError,
@@ -6421,6 +6426,154 @@ describe("tool_used fires once per job across retries (#4450)", () => {
       "distinct-4450",
     );
   });
+});
+
+describe("first-processed onboarding marker (#4909)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  async function runJobs(analyticsOn: boolean) {
+    const { TOOLS } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/constants.js")
+    >("../../../../packages/shared/src/constants.js");
+    const toolErrors = await vi.importActual<
+      typeof import("../../../../packages/shared/src/tool-errors.js")
+    >("../../../../packages/shared/src/tool-errors.js");
+    const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/image-mime.js")
+    >("../../../../packages/shared/src/image-mime.js");
+
+    const processV2Mock = vi.fn();
+    const trackEventMock = vi.fn();
+    const setSettingIfAbsentMock = vi.fn().mockResolvedValue(undefined);
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/shared", () => ({
+        ...toolErrors,
+        IMAGE_EXT_TO_MIME,
+        ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
+        TOOLS,
+        COMPRESS_PRESETS: [],
+        CAMERA_RAW_INPUTS: [],
+        ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
+        extractErrorCode: vi.fn(() => undefined),
+        getBundleForTool: vi.fn(() => null),
+        getOptionalBundleForTool: vi.fn(() => null),
+      }));
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics.js", () => ({
+        captureException: vi.fn(),
+        trackEvent: trackEventMock,
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics-gate.js", () => ({
+        analyticsEnabled: vi.fn(() => analyticsOn),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "bug"),
+        reportError: vi.fn(),
+        safeFormatTag: vi.fn((name?: string) => name?.split(".").pop()?.toLowerCase()),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
+        setSettingIfAbsent: setSettingIfAbsentMock,
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+    const job = (jobId: string) => ({
+      id: jobId,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId,
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: [`uploads/${jobId}/in.png`],
+        filename: "in.png",
+        settings: {},
+        kind: "tool",
+      },
+    });
+
+    processV2Mock.mockRejectedValueOnce(new Error("encode failed"));
+    await expect(processor(job("job-4909-fail"))).rejects.toThrow("encode failed");
+    const callsAfterFailure = setSettingIfAbsentMock.mock.calls.length;
+
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.png",
+      contentType: "image/png",
+    });
+    await processor(job("job-4909-ok"));
+
+    return { setSettingIfAbsentMock, trackEventMock, callsAfterFailure };
+  }
+
+  it.each([true, false])(
+    "stamps the marker on the first successful job with analytics enabled=%s, and never on a failure",
+    async (analyticsOn) => {
+      const { setSettingIfAbsentMock, trackEventMock, callsAfterFailure } =
+        await runJobs(analyticsOn);
+
+      expect(callsAfterFailure).toBe(0);
+      expect(setSettingIfAbsentMock).toHaveBeenCalledTimes(1);
+      expect(setSettingIfAbsentMock).toHaveBeenCalledWith(
+        "onboarding.firstProcessedAt",
+        expect.any(String),
+      );
+      // The marker is a local write; turning analytics off still sends nothing.
+      if (!analyticsOn) expect(trackEventMock).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {

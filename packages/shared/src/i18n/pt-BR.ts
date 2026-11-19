@@ -4324,6 +4324,12 @@ export const ptBR: TranslationKeys = {
     popular: "Populares",
     browseByCategory: "Navegar por categoria",
     gettingStarted: "Primeiros passos",
+    starterHint:
+      "Não sabe por onde começar? Escolha uma tarefa comum para processar seu primeiro arquivo.",
+    starterImage: "Converter ou comprimir uma imagem",
+    starterPdf: "Mesclar ou comprimir um PDF",
+    starterBackground: "Remover o fundo",
+    starterDismiss: "Ocultar primeiros passos",
     noToolsMatch: "Nenhuma ferramenta corresponde a '{query}'",
     clearSearch: "Limpar busca",
     requestToolCta: "Solicitar '{query}'",

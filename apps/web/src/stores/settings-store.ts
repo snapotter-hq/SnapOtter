@@ -1,3 +1,4 @@
+import { ONBOARDING_FIRST_PROCESSED_KEY } from "@snapotter/shared";
 import { create } from "zustand";
 import { apiGet } from "@/lib/api";
 import { parseStringArray } from "@/lib/settings-payload";
@@ -10,6 +11,9 @@ interface SettingsState {
   experimentalEnabled: boolean;
   defaultToolView: "sidebar" | "fullscreen";
   defaultTheme: Theme;
+  /** The instance has completed a tool run. Only full admins can read the
+   * marker, so for everyone else this stays false. */
+  instanceHasProcessed: boolean;
   loaded: boolean;
   loadError: boolean;
   fetch: () => Promise<void>;
@@ -28,6 +32,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   experimentalEnabled: false,
   defaultToolView: "sidebar",
   defaultTheme: "light",
+  instanceHasProcessed: false,
   loaded: false,
   loadError: false,
 
@@ -51,6 +56,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           defaultToolView:
             data.settings.defaultToolView === "fullscreen" ? "fullscreen" : "sidebar",
           defaultTheme,
+          instanceHasProcessed: Boolean(data.settings[ONBOARDING_FIRST_PROCESSED_KEY]),
           loaded: true,
           loadError: false,
         });

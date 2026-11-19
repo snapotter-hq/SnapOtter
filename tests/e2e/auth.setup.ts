@@ -79,6 +79,12 @@ setup("authenticate", async ({ page }) => {
     );
   }
 
+  // The first-run starter block (#4909) shows or hides depending on whether
+  // some earlier test already ran a tool, so hide it in every saved session to
+  // keep home page selectors and screenshots stable. home-page.spec.ts clears
+  // it to test the block itself.
+  await page.evaluate(() => localStorage.setItem("snapotter-starter-jobs-dismissed", "e2e"));
+
   // Save storage state (includes localStorage with the token)
   await page.context().storageState({ path: authFile });
 });

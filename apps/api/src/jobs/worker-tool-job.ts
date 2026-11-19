@@ -662,14 +662,15 @@ export async function processToolJob(
           },
           data.analyticsDistinctId,
         );
-        // Mark the instance's first successful processing so the onboarding
-        // survey only appears once the admin has produced a real result
-        // (shouldShowUsageSurvey gate in web feedback.ts). First-write-wins, so
-        // the timestamp reflects the genuine first job and later jobs no-op.
-        void setSettingIfAbsent(ONBOARDING_FIRST_PROCESSED_KEY, new Date().toISOString()).catch(
-          () => {},
-        );
       }
+
+      // Mark the instance's first successful processing. The onboarding survey
+      // waits for it and the home page's starter block hides on it, so it is
+      // written whether or not analytics is on: it is a local setting, not
+      // egress. First-write-wins, so later jobs no-op.
+      void setSettingIfAbsent(ONBOARDING_FIRST_PROCESSED_KEY, new Date().toISOString()).catch(
+        (err) => logger.warn({ err }, "worker: could not record the first processed job"),
+      );
 
       // Record queue wait time and completion on the OTel span
       const waitedMs = jobAgeMs(job);
