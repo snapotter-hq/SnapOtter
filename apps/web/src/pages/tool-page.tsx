@@ -57,6 +57,7 @@ import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { showUnsupportedFileType } from "@/lib/intake-notice";
 import { withAnalytics } from "@/lib/lazy-analytics";
+import { openFileInput } from "@/lib/open-file-input";
 import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -767,7 +768,7 @@ function ToolPageContent({
         showUnsupportedFileType(t.dropzone.unsupportedFileType);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [
     addFiles,
     toolAccept,

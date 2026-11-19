@@ -31,6 +31,7 @@ import { captureHandledError } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { withAnalytics } from "@/lib/lazy-analytics";
+import { openFileInput } from "@/lib/open-file-input";
 import {
   checkToolResult,
   jobFailureMessage,
@@ -458,7 +459,7 @@ export function EditorPage() {
       if (!file) return;
       await handleOpenFile(file);
     };
-    input.click();
+    openFileInput(input);
   }, [handleOpenFile]);
 
   useEffect(() => {

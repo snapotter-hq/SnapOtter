@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { format } from "@/lib/format";
+import { openFileInput } from "@/lib/open-file-input";
 import { useEditorStore } from "@/stores/editor-store";
 import { NewDocumentDialog } from "./new-document-dialog";
 
@@ -66,7 +67,7 @@ export function WelcomeScreen({ onOpenFile, onNewDocument }: WelcomeScreenProps 
       const file = input.files?.[0];
       if (file) await handleFile(file);
     };
-    input.click();
+    openFileInput(input);
   };
 
   const handleDrop = useCallback(

@@ -30,6 +30,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { type CollageTemplate, getTemplateById } from "@/lib/collage-templates";
 import { format } from "@/lib/format";
 import { showIntakeIgnored, showUnsupportedFileType } from "@/lib/intake-notice";
+import { openFileInput } from "@/lib/open-file-input";
 import { cn } from "@/lib/utils";
 import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -140,7 +141,7 @@ function UploadArea() {
         showUnsupportedFileType(t.dropzone.unsupportedFileType);
       }
     };
-    input.click();
+    openFileInput(input);
   };
 
   return (
@@ -675,7 +676,7 @@ function ImageStrip() {
         showUnsupportedFileType(t.dropzone.unsupportedFileType);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [store, t]);
 
   return (

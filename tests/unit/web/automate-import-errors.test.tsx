@@ -151,6 +151,8 @@ async function importFile(contents: string): Promise<void> {
   fireEvent.click(await screen.findByText(en.automate.importButton));
   const input = created.at(-1);
   if (!input) throw new Error("import created no file input");
+  // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+  expect(input.isConnected).toBe(true);
   const file = new File([contents], "p.snapotter.json", { type: "application/json" });
   Object.defineProperty(input, "files", { value: [file] });
   input.onchange?.({ target: input } as unknown as Event);
