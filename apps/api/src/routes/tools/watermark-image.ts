@@ -126,8 +126,9 @@ export function registerWatermarkImage(app: FastifyInstance) {
 
       // Scale by width, but cap the height at the base's: sharp refuses to
       // composite an overlay larger than the base, which a tall watermark on a
-      // landscape base would otherwise be (#4399).
-      const wmWidth = Math.round((mainW * settings.scale) / 100);
+      // landscape base would otherwise be (#4399). A narrow base at a low
+      // scale rounds to 0, which sharp's resize rejects (#4856).
+      const wmWidth = Math.max(1, Math.round((mainW * settings.scale) / 100));
       let wmImage = sharp(watermarkBuffer).resize({
         width: wmWidth,
         height: mainH,
