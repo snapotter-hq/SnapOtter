@@ -12,7 +12,8 @@ export type EncoderTarget =
   | "mp3"
   | "vorbis"
   | "theora"
-  | "webp";
+  | "webp"
+  | "av1-alpha";
 
 /**
  * The software encoder for each target. All but aac come from external
@@ -32,6 +33,9 @@ const SOFTWARE: Record<EncoderTarget, string> = {
   vorbis: "libvorbis",
   theora: "libtheora",
   webp: "libwebp_anim",
+  // AV1 that can encode a single-plane stream, which an animated AVIF's alpha
+  // plane travels as. libsvtav1 only encodes 4:2:0 (#4827).
+  "av1-alpha": "libaom-av1",
 };
 
 const NVENC: Partial<Record<EncoderTarget, string>> = {
@@ -70,6 +74,7 @@ const ALL_TARGETS: EncoderTarget[] = [
   "vorbis",
   "theora",
   "webp",
+  "av1-alpha",
 ];
 
 /**

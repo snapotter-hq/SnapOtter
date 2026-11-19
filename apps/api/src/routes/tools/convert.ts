@@ -7,7 +7,8 @@ import { promisify } from "node:util";
 import { convert } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { encodeAnimatedAvif } from "../../lib/animated-avif.js";
+import { openAnimated, readAnimation, readAnimationFor } from "../../lib/animated-image.js";
 import {
   encodeBmp,
   encodeEps,
@@ -107,7 +108,7 @@ export function registerConvert(app: FastifyInstance) {
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image conversion failed",
       (s) => s.format,
-      async (inputBuffer, settings, filename) => {
+      async (inputBuffer, settings, filename, ctx) => {
         // CLI-encoded formats bypass Sharp entirely
         const cliEncoder = CLI_ENCODERS[settings.format];
         if (cliEncoder) {
@@ -125,6 +126,25 @@ export function registerConvert(app: FastifyInstance) {
             filename: `${baseName}.${settings.format}`,
             contentType,
           };
+        }
+
+        // Sharp would flatten an animation headed for AVIF to its first frame
+        // (#4827), so those frames go through ffmpeg instead.
+        if (settings.format === "avif" && !isSvgBuffer(inputBuffer)) {
+          const frames = await readAnimation(inputBuffer);
+          if (frames.animated) {
+            const ext = extname(filename);
+            const baseName = ext ? filename.slice(0, -ext.length) : filename;
+            return {
+              buffer: await encodeAnimatedAvif(inputBuffer, frames, {
+                quality: settings.quality,
+                signal: ctx?.signal,
+                scratchDir: ctx?.scratchDir,
+              }),
+              filename: `${baseName}.avif`,
+              contentType: FORMAT_CONTENT_TYPES.avif,
+            };
+          }
         }
 
         // Preserve animation frames when both input and output are animatable formats

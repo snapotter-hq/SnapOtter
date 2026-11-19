@@ -756,6 +756,10 @@ export const hi: TranslationKeys = {
       name: "वीडियो से WebP",
       description: "वीडियो क्लिप को एनिमेटेड WebP इमेज में कन्वर्ट करें",
     },
+    "video-to-avif": {
+      name: "वीडियो से AVIF",
+      description: "वीडियो क्लिप को एनिमेटेड AVIF इमेज में कन्वर्ट करें",
+    },
     "video-to-frames": {
       name: "वीडियो से फ़्रेम",
       description: "वीडियो से फ़्रेम निकालकर इमेज की ZIP बनाएँ",
@@ -3294,6 +3298,17 @@ export const hi: TranslationKeys = {
     "video-to-webp": {
       fps: "फ़्रेम प्रति सेकंड",
       width: "चौड़ाई (px)",
+      quality: "गुणवत्ता",
+      loop: "एनिमेशन लूप करें",
+      submit: "कन्वर्ट करें",
+      submitBatch: "कन्वर्ट करें ({count} फ़ाइलें)",
+      progressLabel: "कन्वर्ट हो रहा है",
+    },
+    "video-to-avif": {
+      fps: "फ़्रेम प्रति सेकंड",
+      width: "चौड़ाई (px)",
+      start: "शुरुआत (सेकंड)",
+      duration: "अवधि (सेकंड)",
       quality: "गुणवत्ता",
       loop: "एनिमेशन लूप करें",
       submit: "कन्वर्ट करें",

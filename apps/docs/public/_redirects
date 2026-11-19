@@ -288,6 +288,8 @@
 /tools/video-metadata.html /tools/video/video-metadata 301
 /tools/video-speed /tools/video/video-speed 301
 /tools/video-speed.html /tools/video/video-speed 301
+/tools/video-to-avif /tools/video/video-to-avif 301
+/tools/video-to-avif.html /tools/video/video-to-avif 301
 /tools/video-to-frames /tools/video/video-to-frames 301
 /tools/video-to-frames.html /tools/video/video-to-frames 301
 /tools/video-to-gif /tools/video/video-to-gif 301

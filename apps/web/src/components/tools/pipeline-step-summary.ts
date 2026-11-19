@@ -77,7 +77,8 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.fps) return `${settings.fps} fps`;
       return "";
     }
-    case "video-to-webp": {
+    case "video-to-webp":
+    case "video-to-avif": {
       if (settings.quality != null) return `Q${settings.quality}`;
       return "";
     }

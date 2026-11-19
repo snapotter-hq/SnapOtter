@@ -921,6 +921,10 @@ export const th: TranslationKeys = {
       name: "วิดีโอเป็น WebP",
       description: "แปลงคลิปวิดีโอเป็นรูปภาพ WebP แอนิเมชัน",
     },
+    "video-to-avif": {
+      name: "วิดีโอเป็น AVIF",
+      description: "แปลงคลิปวิดีโอเป็นรูปภาพ AVIF แอนิเมชัน",
+    },
     "video-to-frames": {
       name: "วิดีโอเป็นเฟรม",
       description: "แยกเฟรมจากวิดีโอเป็น ZIP ของรูปภาพ",
@@ -3440,6 +3444,17 @@ export const th: TranslationKeys = {
     "video-to-webp": {
       fps: "เฟรมต่อวินาที",
       width: "ความกว้าง (px)",
+      quality: "คุณภาพ",
+      loop: "วนซ้ำแอนิเมชัน",
+      submit: "แปลง",
+      submitBatch: "แปลง ({count} ไฟล์)",
+      progressLabel: "กำลังแปลง",
+    },
+    "video-to-avif": {
+      fps: "เฟรมต่อวินาที",
+      width: "ความกว้าง (px)",
+      start: "เริ่มต้น (วินาที)",
+      duration: "ระยะเวลา (วินาที)",
       quality: "คุณภาพ",
       loop: "วนซ้ำแอนิเมชัน",
       submit: "แปลง",

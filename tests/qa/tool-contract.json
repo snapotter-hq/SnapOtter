@@ -9513,6 +9513,136 @@
     ]
   },
   {
+    "id": "video-to-avif",
+    "name": "Video to AVIF",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [
+      ".mp4",
+      ".mov",
+      ".webm",
+      ".mkv",
+      ".avi",
+      ".m4v",
+      ".mts",
+      ".m2ts",
+      ".3gp",
+      ".flv",
+      ".wmv",
+      ".mpg",
+      ".mpeg",
+      ".ts",
+      ".ogv"
+    ],
+    "executionHint": "long",
+    "outputModality": "image",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "fps",
+        "values": [1, 16, 30, null]
+      },
+      {
+        "key": "width",
+        "values": [64, 672, 1280, null]
+      },
+      {
+        "key": "startS",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "durationS",
+        "values": [1, 30.5, 60, null]
+      },
+      {
+        "key": "quality",
+        "values": [1, 51, 100, null]
+      },
+      {
+        "key": "loop",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "fps",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "fps",
+        "value": 31,
+        "why": "above declared max"
+      },
+      {
+        "key": "fps",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "width",
+        "value": 63,
+        "why": "below declared min"
+      },
+      {
+        "key": "width",
+        "value": 1281,
+        "why": "above declared max"
+      },
+      {
+        "key": "width",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "startS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "startS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "durationS",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "durationS",
+        "value": 61,
+        "why": "above declared max"
+      },
+      {
+        "key": "durationS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "quality",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "quality",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "quality",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "loop",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "video-to-frames",
     "name": "Video to Frames",
     "modality": "video",

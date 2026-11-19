@@ -889,6 +889,10 @@ export const en = {
       name: "Video to WebP",
       description: "Convert a video clip into an animated WebP image",
     },
+    "video-to-avif": {
+      name: "Video to AVIF",
+      description: "Convert a video clip into an animated AVIF image",
+    },
     "video-to-frames": {
       name: "Video to Frames",
       description: "Extract frames from a video as a ZIP of images",
@@ -3432,6 +3436,17 @@ export const en = {
     "video-to-webp": {
       fps: "Frames per second",
       width: "Width (px)",
+      quality: "Quality",
+      loop: "Loop animation",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
+    "video-to-avif": {
+      fps: "Frames per second",
+      width: "Width (px)",
+      start: "Start (seconds)",
+      duration: "Duration (seconds)",
       quality: "Quality",
       loop: "Loop animation",
       submit: "Convert",

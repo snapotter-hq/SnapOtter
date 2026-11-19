@@ -132,6 +132,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "stabilize-video": "media-player",
   "gif-to-video": "media-player",
   "video-to-webp": "media-player",
+  "video-to-avif": "media-player",
   "video-to-frames": "media-player",
   "merge-videos": "media-player",
   "replace-audio": "media-player",

@@ -934,6 +934,10 @@ export const ptBR: TranslationKeys = {
       name: "Vídeo para WebP",
       description: "Converta um trecho de vídeo em uma imagem WebP animada",
     },
+    "video-to-avif": {
+      name: "Vídeo para AVIF",
+      description: "Converta um trecho de vídeo em uma imagem AVIF animada",
+    },
     "video-to-frames": {
       name: "Vídeo para Quadros",
       description: "Extraia quadros de um vídeo como um ZIP de imagens",
@@ -3500,6 +3504,17 @@ export const ptBR: TranslationKeys = {
     "video-to-webp": {
       fps: "Quadros por segundo",
       width: "Largura (px)",
+      quality: "Qualidade",
+      loop: "Repetir animação",
+      submit: "Converter",
+      submitBatch: "Converter ({count} arquivos)",
+      progressLabel: "Convertendo",
+    },
+    "video-to-avif": {
+      fps: "Quadros por segundo",
+      width: "Largura (px)",
+      start: "Início (segundos)",
+      duration: "Duração (segundos)",
       quality: "Qualidade",
       loop: "Repetir animação",
       submit: "Converter",

@@ -920,6 +920,10 @@ export const es: TranslationKeys = {
       name: "Vídeo a WebP",
       description: "Convierte un fragmento de vídeo en una imagen WebP animada",
     },
+    "video-to-avif": {
+      name: "Vídeo a AVIF",
+      description: "Convierte un fragmento de vídeo en una imagen AVIF animada",
+    },
     "video-to-frames": {
       name: "Vídeo a fotogramas",
       description: "Extrae fotogramas de un vídeo como un ZIP de imágenes",
@@ -3488,6 +3492,17 @@ export const es: TranslationKeys = {
     "video-to-webp": {
       fps: "Fotogramas por segundo",
       width: "Ancho (px)",
+      quality: "Calidad",
+      loop: "Repetir animación",
+      submit: "Convertir",
+      submitBatch: "Convertir ({count} archivos)",
+      progressLabel: "Convirtiendo",
+    },
+    "video-to-avif": {
+      fps: "Fotogramas por segundo",
+      width: "Ancho (px)",
+      start: "Inicio (segundos)",
+      duration: "Duración (segundos)",
       quality: "Calidad",
       loop: "Repetir animación",
       submit: "Convertir",

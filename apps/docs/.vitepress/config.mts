@@ -538,6 +538,7 @@ function buildBaseTheme() {
               { text: "Stabilize Video", link: "/tools/video/stabilize-video" },
               { text: "GIF to Video", link: "/tools/video/gif-to-video" },
               { text: "Video to WebP", link: "/tools/video/video-to-webp" },
+              { text: "Video to AVIF", link: "/tools/video/video-to-avif" },
               { text: "Video to Frames", link: "/tools/video/video-to-frames" },
               { text: "Merge Videos", link: "/tools/video/merge-videos" },
               { text: "Replace Audio", link: "/tools/video/replace-audio" },

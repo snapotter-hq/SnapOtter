@@ -153,6 +153,7 @@ import { registerVideoColor } from "./video-color.js";
 import { registerVideoLoudnorm } from "./video-loudnorm.js";
 import { registerVideoMetadata } from "./video-metadata.js";
 import { registerVideoSpeed } from "./video-speed.js";
+import { registerVideoToAvif } from "./video-to-avif.js";
 import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerVideoToWebp } from "./video-to-webp.js";
@@ -317,6 +318,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "video-to-frames", register: registerVideoToFrames },
     { id: "video-to-gif", register: registerVideoToGif },
     { id: "video-to-webp", register: registerVideoToWebp },
+    { id: "video-to-avif", register: registerVideoToAvif },
     { id: "watermark-video", register: registerWatermarkVideo },
 
     // Audio

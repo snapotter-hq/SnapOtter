@@ -935,6 +935,10 @@ export const nl: TranslationKeys = {
       name: "Video naar WebP",
       description: "Converteer een videoclip naar een geanimeerde WebP-afbeelding",
     },
+    "video-to-avif": {
+      name: "Video naar AVIF",
+      description: "Converteer een videoclip naar een geanimeerde AVIF-afbeelding",
+    },
     "video-to-frames": {
       name: "Video naar frames",
       description: "Extraheer frames uit een video als een ZIP met afbeeldingen",
@@ -3509,6 +3513,17 @@ export const nl: TranslationKeys = {
     "video-to-webp": {
       fps: "Frames per seconde",
       width: "Breedte (px)",
+      quality: "Kwaliteit",
+      loop: "Animatie herhalen",
+      submit: "Converteren",
+      submitBatch: "Converteren ({count} bestanden)",
+      progressLabel: "Converteren",
+    },
+    "video-to-avif": {
+      fps: "Frames per seconde",
+      width: "Breedte (px)",
+      start: "Start (seconden)",
+      duration: "Duur (seconden)",
       quality: "Kwaliteit",
       loop: "Animatie herhalen",
       submit: "Converteren",
