@@ -857,6 +857,19 @@ class InstallRuntimeTests(unittest.TestCase):
                 None,
             ),
             (
+                # Without the refusal this reads /sys/fs/cgroup/job/memory.max (#1693).
+                "cgroup membership outside the cgroup namespace",
+                {
+                    "/proc/self/cgroup": "0::/../job\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    "/sys/fs/cgroup/job/memory.max": str(gib),
+                    "/sys/fs/cgroup/cgroup.controllers": "cpu memory\n",
+                },
+                r'^unable to resolve the process cgroup memory capacity: '
+                r'cgroup membership "/../job" is outside the cgroup namespace$',
+                None,
+            ),
+            (
                 "mountinfo unreadable",
                 {"/proc/self/cgroup": "0::/docker/deadbeef\n", "/proc/self/mountinfo": denied},
                 r"^unable to read the process cgroup memory capacity from "
