@@ -9641,7 +9641,7 @@ paths:
                     JSON string with options:
                     - `startS` (number >= 0, default 0) - Start time in seconds
                     - `endS` (number, required) - End time in seconds (must be after startS)
-                    - `precise` (boolean, default false) - Re-encode for frame-accurate cuts instead of keyframe seek
+                    - `precise` (boolean, default false) - Re-encode the whole range for exact start and end frames instead of copying from the next keyframe
             example:
               file: photo.png
               settings: '{}'

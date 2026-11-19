@@ -61,26 +61,17 @@ function abortError(): Error {
   return error;
 }
 
-/** Capped, time-limited ffprobe of a file path (spec 4.7). */
-export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Promise<MediaInfo> {
+/**
+ * Runs ffprobe with `args` under the memory limit and time budget, resolving
+ * with its stdout. Failures carry the same crash, spawn and input-error
+ * shapes as probeMedia.
+ */
+export async function runFfprobe(args: string[], opts: ProbeOptions = {}): Promise<string> {
   if (opts.signal?.aborted) throw abortError();
   const bin = resolveFfprobe();
   if (!bin) throw new Error("ffprobe binary not found (set FFPROBE_PATH or install ffmpeg)");
-  const args = [
-    "-v",
-    "error",
-    "-analyzeduration",
-    "10M",
-    "-probesize",
-    "25M",
-    "-print_format",
-    "json",
-    "-show_format",
-    "-show_streams",
-    filePath,
-  ];
   const timeoutMs = opts.timeoutMs ?? 15_000;
-  const stdout = await new Promise<string>((resolvePromise, reject) => {
+  return new Promise<string>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
     const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
@@ -137,6 +128,26 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
       reject(markIfInputError(probeErr, err));
     });
   });
+}
+
+/** Capped, time-limited ffprobe of a file path (spec 4.7). */
+export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Promise<MediaInfo> {
+  const stdout = await runFfprobe(
+    [
+      "-v",
+      "error",
+      "-analyzeduration",
+      "10M",
+      "-probesize",
+      "25M",
+      "-print_format",
+      "json",
+      "-show_format",
+      "-show_streams",
+      filePath,
+    ],
+    opts,
+  );
   const parsed = JSON.parse(stdout) as {
     format?: {
       format_name?: string;
