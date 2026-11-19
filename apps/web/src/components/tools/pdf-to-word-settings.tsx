@@ -1,4 +1,5 @@
 import { ProgressCard } from "@/components/common/progress-card";
+import { ScannedPdfOcrHandoff } from "@/components/common/scanned-pdf-ocr-handoff";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -28,6 +29,7 @@ export function PdfToWordSettings() {
       <p className="text-[10px] text-muted-foreground">{s.hint}</p>
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      <ScannedPdfOcrHandoff hint={s.scannedHint} label={s.runOcr} testId="pdf-to-word-run-ocr" />
 
       {processing ? (
         <ProgressCard

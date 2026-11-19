@@ -3886,6 +3886,9 @@ export const ko: TranslationKeys = {
       submit: "Word로 변환",
       submitBatch: "Word로 변환 ({count}개 파일)",
       progressLabel: "변환 중",
+      scannedHint:
+        "이 PDF는 스캔본이라 Word 파일로 만들어도 페이지 이미지만 들어갑니다. OCR로 텍스트를 읽을 수 있지만 Word 파일이 아닌 일반 텍스트로 나오고, 시간이 더 걸리며 OCR AI 번들이 설치되어 있어야 합니다.",
+      runOcr: "이 PDF에 OCR 실행",
     },
     "pdf-metadata": {
       title: "제목",

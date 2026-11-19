@@ -3954,6 +3954,9 @@ export const es: TranslationKeys = {
       submit: "Convertir a Word",
       submitBatch: "Convertir a Word ({count} archivos)",
       progressLabel: "Convirtiendo",
+      scannedHint:
+        "Este PDF está escaneado, así que un archivo de Word solo contendría imágenes de las páginas. El OCR puede leer el texto, pero te da texto plano en lugar de un archivo de Word, tarda más y requiere tener instalado el paquete de IA de OCR.",
+      runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-metadata": {
       title: "Título",

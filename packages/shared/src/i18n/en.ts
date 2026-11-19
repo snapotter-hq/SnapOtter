@@ -3895,6 +3895,9 @@ export const en = {
       submit: "Convert to Word",
       submitBatch: "Convert to Word ({count} files)",
       progressLabel: "Converting",
+      scannedHint:
+        "This PDF is scanned, so a Word file would only hold pictures of the pages. OCR can read the text, but it gives you plain text rather than a Word file, takes longer, and needs the OCR AI bundle installed.",
+      runOcr: "Run OCR on this PDF",
     },
     "pdf-metadata": {
       title: "Title",

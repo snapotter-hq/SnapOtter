@@ -3961,6 +3961,9 @@ export const tr: TranslationKeys = {
       submit: "Word'e Dönüştür",
       submitBatch: "Word'e Dönüştür ({count} dosya)",
       progressLabel: "Dönüştürülüyor",
+      scannedHint:
+        "Bu PDF taranmış, bu yüzden Word dosyası yalnızca sayfaların resimlerini içerir. OCR metni okuyabilir, ancak Word dosyası yerine düz metin verir, daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
+      runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-metadata": {
       title: "Başlık",

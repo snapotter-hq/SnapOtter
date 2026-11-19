@@ -3683,6 +3683,9 @@ export const zhTW: TranslationKeys = {
       submit: "轉換為 Word",
       submitBatch: "轉換為 Word（{count} 個檔案）",
       progressLabel: "正在轉換",
+      scannedHint:
+        "此 PDF 是掃描檔，轉換成 Word 檔案也只會包含頁面圖片。OCR 可以辨識其中的文字，但得到的是純文字而不是 Word 檔案，耗時較長，且需要已安裝 OCR AI 功能包。",
+      runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-metadata": {
       title: "標題",

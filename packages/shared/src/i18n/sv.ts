@@ -3955,6 +3955,9 @@ export const sv: TranslationKeys = {
       submit: "Konvertera till Word",
       submitBatch: "Konvertera till Word ({count} filer)",
       progressLabel: "Konverterar",
+      scannedHint:
+        "Den här PDF:en är skannad, så en Word-fil skulle bara innehålla bilder av sidorna. OCR kan läsa texten, men ger dig ren text i stället för en Word-fil, tar längre tid och kräver att OCR-AI-paketet är installerat.",
+      runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-metadata": {
       title: "Titel",

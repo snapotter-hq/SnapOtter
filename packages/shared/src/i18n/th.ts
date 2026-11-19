@@ -3902,6 +3902,9 @@ export const th: TranslationKeys = {
       submit: "แปลงเป็น Word",
       submitBatch: "แปลงเป็น Word ({count} ไฟล์)",
       progressLabel: "กำลังแปลง",
+      scannedHint:
+        "PDF นี้เป็นไฟล์สแกน ไฟล์ Word จึงจะมีแค่ภาพของหน้าต่าง ๆ OCR อ่านข้อความได้ แต่จะได้ข้อความธรรมดาแทนไฟล์ Word ใช้เวลานานกว่า และต้องติดตั้งชุด AI สำหรับ OCR ก่อน",
+      runOcr: "เรียกใช้ OCR กับ PDF นี้",
     },
     "pdf-metadata": {
       title: "ชื่อเรื่อง",

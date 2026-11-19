@@ -3967,6 +3967,9 @@ export const it: TranslationKeys = {
       submit: "Converti in Word",
       submitBatch: "Converti in Word ({count} file)",
       progressLabel: "Conversione",
+      scannedHint:
+        "Questo PDF è una scansione, quindi un file Word conterrebbe solo immagini delle pagine. L'OCR può leggere il testo, ma restituisce testo semplice invece di un file Word, richiede più tempo e il pacchetto IA per l'OCR installato.",
+      runOcr: "Esegui l'OCR su questo PDF",
     },
     "pdf-metadata": {
       title: "Titolo",

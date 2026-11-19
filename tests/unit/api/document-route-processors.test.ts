@@ -487,18 +487,43 @@ describe("document route processors", () => {
       const ctx = createCtx(scratchDir, "contract draft.pdf");
       const result = await config?.processV2?.(ctx);
 
+      expect(pdfTextPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-contract_draft.pdf"),
+        join(scratchDir, "text-probe.txt"),
+        { signal: ctx.signal },
+      );
       expect(pdfToWordPy).toHaveBeenCalledWith(
         join(scratchDir, "in-contract_draft.pdf"),
         join(scratchDir, "contract draft.docx"),
         { signal: ctx.signal },
       );
-      expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
-      expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 5, "Checking for text");
+      expect(ctx.report).toHaveBeenNthCalledWith(2, 10, "Converting");
+      expect(ctx.report).toHaveBeenNthCalledWith(3, 90, "Done");
       expect(result).toEqual({
         scratchPath: join(scratchDir, "contract draft.docx"),
         filename: "contract draft.docx",
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
+    });
+  });
+
+  it("refuses a PDF with no text layer before converting it to Word (#4838)", async () => {
+    // pdf2docx copies a scanned page into the .docx as a picture, which reads
+    // as a successful conversion with no text in it. Refuse it the way
+    // pdf-to-text does so the web app can offer OCR instead.
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({ chars: 0, hasText: false });
+    registerPdfToWord(createMockApp());
+    const config = getToolConfig("pdf-to-word");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/text layer[\s\S]*OCR/i),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+      expect(pdfToWordPy).not.toHaveBeenCalled();
     });
   });
 

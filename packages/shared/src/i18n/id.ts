@@ -3959,6 +3959,9 @@ export const id: TranslationKeys = {
       submit: "Konversi ke Word",
       submitBatch: "Konversi ke Word ({count} file)",
       progressLabel: "Mengonversi",
+      scannedHint:
+        "PDF ini hasil pindaian, jadi file Word hanya akan berisi gambar halaman. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, bukan file Word, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
+      runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-metadata": {
       title: "Judul",
