@@ -184,6 +184,10 @@ export function registerCompose(app: FastifyInstance) {
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      // Checked after normalizing, because a network failure can surface as a
+      // TypeError and should keep its 503. Any other one is a bug in this
+      // route, not a bad upload, so the error handler answers 500.
+      if (err instanceof TypeError || err instanceof ReferenceError) throw err;
       const tooLarge = imageSizeLimitError(err);
       if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log?.warn({ err, toolId: "compose" }, "Image composition failed");

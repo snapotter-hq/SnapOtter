@@ -1064,20 +1064,13 @@ describe("Compose cross-format", () => {
           body: payload,
         });
 
-        // Overlay compositing with opacity < 100 can fail for some formats
-        // (e.g., WebP, AVIF) due to alpha channel handling in Sharp.
-        // Accept 200 (success) or 422 (processing error) for core formats.
-        expect([200, 422]).toContain(res.statusCode);
+        // Core formats decode natively, so a 422 here is a regression, not a
+        // bad upload (#4441).
+        expect(res.statusCode, res.body).toBe(200);
 
-        if (res.statusCode === 200) {
-          const body = JSON.parse(res.body);
-          expect(body.downloadUrl).toBeDefined();
-          expect(body.processedSize).toBeGreaterThan(0);
-        } else {
-          const body = JSON.parse(res.body);
-          expect(body.error).toBeDefined();
-          expect(typeof body.error).toBe("string");
-        }
+        const body = JSON.parse(res.body);
+        expect(body.downloadUrl).toBeDefined();
+        expect(body.processedSize).toBeGreaterThan(0);
       });
     }
   });
