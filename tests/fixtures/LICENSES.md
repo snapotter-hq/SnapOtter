@@ -62,6 +62,7 @@ reliably."
 | `content/speech.m4a` | AAC in M4A container | Audio format variant |
 | `content/speech.aac` | AAC raw ADTS | Audio format variant |
 | `content/speech.opus` | Opus | Audio format variant |
+| `audio/edge/speech-zero-length-packet.ogg` | Ogg Vorbis | `speech.ogg` with one zero-length packet added to its last page (CRC recomputed); ffmpeg plays it, PyAV rejects it (#4980) |
 
 ## Synthetic / Project-Generated Assets (pre-existing, not in content/)
 

@@ -64,7 +64,7 @@ describe("installed AI job cancellation propagation", () => {
     await rm(scratchDir, { recursive: true, force: true });
   });
 
-  it("passes ctx.signal from transcribe-audio to the transcription package", async () => {
+  it("passes ctx.signal through every transcribe-audio subprocess boundary", async () => {
     vi.mocked(transcribeAudio).mockRejectedValue(STOP);
 
     await expect(
@@ -75,8 +75,12 @@ describe("installed AI job cancellation propagation", () => {
       ),
     ).rejects.toBe(STOP);
 
+    expect(runFfmpeg).toHaveBeenCalledWith(
+      expect.arrayContaining(["-i", expect.stringContaining("speech.wav")]),
+      { timeoutMs: 10 * 60_000, signal: controller.signal },
+    );
     expect(transcribeAudio).toHaveBeenCalledWith(
-      expect.stringContaining("speech.wav"),
+      expect.stringContaining("audio-16k.wav"),
       { language: "auto", signal: controller.signal, toolId: "transcribe-audio" },
       expect.any(Function),
     );
