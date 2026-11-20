@@ -5999,6 +5999,8 @@ export const ja: TranslationKeys = {
       TOO_MANY_FRAMES: "このファイルはフレーム数が多すぎて処理できません。",
       FEATURE_INSTALL_BUSY:
         "インストールが AI 環境を更新中のため、今は停止できません。まもなく完了します。",
+      MULTI_FRAME_UNSUPPORTED:
+        "このツールは一度に1枚の画像のみ編集できます。先にページやフレームを個別の画像に分割してください。",
       CANCELED: "操作はキャンセルされました。",
       PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
       INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",

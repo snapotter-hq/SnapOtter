@@ -6070,6 +6070,8 @@ export const nl: TranslationKeys = {
       TOO_MANY_FRAMES: "Dit bestand heeft te veel frames om te verwerken.",
       FEATURE_INSTALL_BUSY:
         "De installatie werkt de AI-omgeving bij en kan nu niet worden gestopt. Ze is zo klaar.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Deze tool bewerkt één afbeelding tegelijk. Splits de pagina's of frames eerst in losse afbeeldingen.",
       CANCELED: "De bewerking is geannuleerd.",
       PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",

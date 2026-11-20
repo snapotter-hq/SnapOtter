@@ -6042,6 +6042,8 @@ export const sv: TranslationKeys = {
       TOO_MANY_FRAMES: "Den här filen har för många bildrutor för att bearbetas.",
       FEATURE_INSTALL_BUSY:
         "Installationen uppdaterar AI-miljön och kan inte stoppas just nu. Den blir klar snart.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Det här verktyget redigerar en bild åt gången. Dela först upp sidorna eller bildrutorna i separata bilder.",
       CANCELED: "Åtgärden avbröts.",
       PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",

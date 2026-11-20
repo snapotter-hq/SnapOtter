@@ -6106,6 +6106,8 @@ export const de: TranslationKeys = {
       TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
       FEATURE_INSTALL_BUSY:
         "Die Installation aktualisiert gerade die AI-Umgebung und kann jetzt nicht gestoppt werden. Sie ist gleich fertig.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Dieses Werkzeug bearbeitet jeweils nur ein Bild. Teilen Sie die Seiten oder Frames zuerst in einzelne Bilder auf.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
       PAGE_OUT_OF_RANGE:
         "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",

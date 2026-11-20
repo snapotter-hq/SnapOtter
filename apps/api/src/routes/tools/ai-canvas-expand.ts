@@ -21,6 +21,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -156,6 +157,11 @@ async function encodeExtended(
   };
 }
 
+/** The format encodeExtended will write, so the model never runs on input it would cut down (#5104). */
+async function extendedFormat(requested: string, input: Buffer, filename: string): Promise<string> {
+  return requested === "auto" ? (await resolveOutputFormat(input, filename)).format : requested;
+}
+
 // ── AI job handler ────────────────────────────────────────────────
 registerAiJobHandler(
   "ai-canvas-expand",
@@ -164,6 +170,10 @@ registerAiJobHandler(
     (s) => s?.format ?? "auto",
     async (input, data, ctx) => {
       const settings = settingsSchema.parse(data.settings);
+      await assertSingleFrameFor(
+        input,
+        await extendedFormat(settings.format, input, data.filename),
+      );
 
       let resultBuffer: Buffer;
       try {
@@ -392,6 +402,10 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
           rasterizeSvg: true,
         });
         const orientedBuffer = prepared.buffer;
+        await assertSingleFrameFor(
+          orientedBuffer,
+          await extendedFormat(s.format ?? "auto", orientedBuffer, filename),
+        );
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });

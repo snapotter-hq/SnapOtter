@@ -6064,6 +6064,8 @@ export const ptBR: TranslationKeys = {
       TOO_MANY_FRAMES: "Este arquivo tem quadros demais para processar.",
       FEATURE_INSTALL_BUSY:
         "A instalação está atualizando o ambiente de IA e não pode ser interrompida agora. Ela terminará em breve.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Esta ferramenta edita uma imagem por vez. Divida primeiro as páginas ou quadros em imagens separadas.",
       CANCELED: "A operação foi cancelada.",
       PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
       INVALID_PAGE_RANGE:

@@ -5677,6 +5677,7 @@ export const zhCN: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "结果无法达到目标大小。",
       TOO_MANY_FRAMES: "此文件的帧数过多，无法处理。",
       FEATURE_INSTALL_BUSY: "安装正在更新 AI 环境，现在无法停止。很快就会完成。",
+      MULTI_FRAME_UNSUPPORTED: "此工具一次只能编辑一张图片。请先将各页或各帧拆分为单独的图片。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "该页码范围包含此 PDF 中不存在的页面。",
       INVALID_PAGE_RANGE: "该页码范围无效。请使用类似 1-3,5 的页码。",
