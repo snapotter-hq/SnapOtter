@@ -18,6 +18,7 @@ import {
   SYSTEM_JOBS,
   scheduleSystemJobs,
 } from "../../../apps/api/src/jobs/system-jobs.js";
+import * as enterpriseFeature from "../../../apps/api/src/lib/enterprise-feature.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import type { ObjectInfo } from "../../../apps/api/src/lib/object-storage.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
@@ -781,6 +782,114 @@ describe("runSystemJob", () => {
       await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
       expect(existsSync(dir)).toBe(false);
     });
+  });
+});
+
+// #4938: a failed computeDeleteAfter at enqueue left delete_after NULL, so the
+// job's files followed the global TTL instead of the team's retention.
+describe("storageTtl team retention deadline backfill (#4938)", () => {
+  const suffix = randomUUID().slice(0, 8);
+  const overrideTeamId = `ret-team-${suffix}`;
+  const plainTeamId = `plain-team-${suffix}`;
+  const overrideUserId = `ret-user-${suffix}`;
+  const plainUserId = `plain-user-${suffix}`;
+  const createdAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const jobIds: string[] = [];
+  const dirs: string[] = [];
+
+  beforeAll(async () => {
+    await db.insert(schema.teams).values([
+      { id: overrideTeamId, name: `Retention ${suffix}`, retentionHours: 1 },
+      { id: plainTeamId, name: `Plain ${suffix}` },
+    ]);
+    await db.insert(schema.users).values([
+      {
+        id: overrideUserId,
+        username: `ret-${suffix}`,
+        passwordHash: "hash",
+        role: "user",
+        team: overrideTeamId,
+        mustChangePassword: false,
+      },
+      {
+        id: plainUserId,
+        username: `plain-${suffix}`,
+        passwordHash: "hash",
+        role: "user",
+        team: plainTeamId,
+        mustChangePassword: false,
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    for (const d of dirs) await rm(d, { recursive: true, force: true }).catch(() => {});
+    if (jobIds.length > 0) await db.delete(schema.jobs).where(inArray(schema.jobs.id, jobIds));
+    await db.delete(schema.users).where(inArray(schema.users.id, [overrideUserId, plainUserId]));
+    await db.delete(schema.teams).where(inArray(schema.teams.id, [overrideTeamId, plainTeamId]));
+  });
+
+  async function insertJob(
+    userId: string,
+    status: "queued" | "completed",
+    deleteAfter: Date | null = null,
+  ): Promise<string> {
+    const id = `bf-${randomUUID()}`;
+    jobIds.push(id);
+    await db
+      .insert(schema.jobs)
+      .values({ id, userId, toolId: "resize", type: "single", status, createdAt, deleteAfter });
+    // A fresh dir, so only the deadline sweep could remove it.
+    const dir = join(env.WORKSPACE_PATH, "uploads", id);
+    dirs.push(dir);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "f.bin"), "x");
+    return id;
+  }
+
+  async function deadlineOf(id: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ deleteAfter: schema.jobs.deleteAfter })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, id));
+    return row.deleteAfter;
+  }
+
+  it("fills the missing deadline from created_at, then deletes the job on the next pass", async () => {
+    vi.spyOn(enterpriseFeature, "isEnterpriseFeatureEnabled").mockImplementation(
+      async (feature) => feature === "team_retention_overrides",
+    );
+    const missing = await insertJob(overrideUserId, "completed");
+    const stillQueued = await insertJob(overrideUserId, "queued");
+    const noOverride = await insertJob(plainUserId, "completed");
+    const ownDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const alreadySet = await insertJob(overrideUserId, "completed", ownDeadline);
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+    expect((await deadlineOf(missing))?.getTime()).toBe(createdAt.getTime() + 60 * 60 * 1000);
+    expect(await deadlineOf(stillQueued)).toBeNull();
+    expect(await deadlineOf(noOverride)).toBeNull();
+    expect((await deadlineOf(alreadySet))?.getTime()).toBe(ownDeadline.getTime());
+    // The backfilled deadline has passed, but the job waits for the next pass.
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", missing))).toBe(true);
+    const backfillLogs = warnSpy.mock.calls.filter(
+      (c) => (c[0] as { jobId?: string })?.jobId === missing,
+    );
+    expect(backfillLogs).toHaveLength(1);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", missing))).toBe(false);
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", stillQueued))).toBe(true);
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", noOverride))).toBe(true);
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", alreadySet))).toBe(true);
+    // Logged once: the second pass found nothing left to fill in.
+    expect(
+      warnSpy.mock.calls.filter((c) => (c[0] as { jobId?: string })?.jobId === missing),
+    ).toHaveLength(1);
   });
 });
 
