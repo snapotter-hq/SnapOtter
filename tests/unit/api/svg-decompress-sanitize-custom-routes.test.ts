@@ -2121,8 +2121,9 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         { type: "file", filename: "padded-too-many.apng", content: commentPaddedOverCapSvg },
         { type: "field", fieldname: "settings", value: "{}" },
       ]);
-      expect(clientFailReply.statusCode).toBe(200);
+      expect(clientFailReply.statusCode).toBe(400);
       expect(clientFailReply.payload).toMatchObject({
+        error: "SVGZ file does not contain valid SVG content after decompression",
         results: [],
         errors: [
           {

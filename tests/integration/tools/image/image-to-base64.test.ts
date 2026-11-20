@@ -182,6 +182,42 @@ describe("image-to-base64", () => {
     expect(json.error).toContain("No image files");
   });
 
+  it("answers 400 when no file succeeds, and 200 when one does (#4409)", async () => {
+    const GARBAGE = readFixture(fixtures.image.hostile.garbage);
+    const post = (parts: Parameters<typeof createMultipartPayload>[0]) => {
+      const { body, contentType } = createMultipartPayload(parts);
+      return app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/image-to-base64",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+    };
+
+    const allFailed = await post([
+      { name: "file", filename: "garbage.jpg", contentType: "image/jpeg", content: GARBAGE },
+      { name: "settings", content: "{}" },
+    ]);
+    expect(allFailed.statusCode).toBe(400);
+    expect(JSON.parse(allFailed.body)).toEqual({
+      error: "Unrecognized image format",
+      results: [],
+      errors: [{ filename: "garbage.jpg", error: "Unrecognized image format" }],
+    });
+
+    const partial = await post([
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "garbage.jpg", contentType: "image/jpeg", content: GARBAGE },
+      { name: "settings", content: "{}" },
+    ]);
+    expect(partial.statusCode).toBe(200);
+    const partialJson = JSON.parse(partial.body);
+    expect(partialJson.results).toHaveLength(1);
+    expect(partialJson.errors).toEqual([
+      { filename: "garbage.jpg", error: "Unrecognized image format" },
+    ]);
+  });
+
   it("rejects invalid quality setting", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
