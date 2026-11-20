@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
+import { en } from "@snapotter/shared";
 import {
   expect,
   getE2eRunRoot,
@@ -477,10 +478,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await page.getByTestId("compose-submit").click();
 
+      // The server's 400 carries no error code, so the card shows the panel's
+      // translated fallback rather than the English "Invalid image" (#4447).
       // Scope to the preview card: the settings panel repeats the copy and the
       // sr-only live region announces "Processing failed" (#4097).
       await expect(
-        page.locator("section[aria-label='Preview area']").getByText(/Invalid image|error/i),
+        page
+          .locator("section[aria-label='Preview area']")
+          .getByText(en.errors.processingFailedWithStatus),
       ).toBeVisible({ timeout: 15_000 });
     });
   });
