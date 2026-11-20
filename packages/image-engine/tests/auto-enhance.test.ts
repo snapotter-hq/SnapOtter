@@ -250,6 +250,73 @@ describe("analyzeImage scores", () => {
 });
 
 // ===========================================================================
+// analyzeImage -> source format (#4983)
+// ===========================================================================
+
+describe("analyzeImage reads every source format as 8-bit sRGB", () => {
+  const warmFill = () =>
+    sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 150, g: 128, b: 106 } },
+    });
+  const greyFill = () =>
+    sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 100, g: 100, b: 100 } },
+    }).toColourspace("b-w");
+
+  it("scores a 16-bit RGB image like its 8-bit original", async () => {
+    const reference = await analyzeImage(await warmFill().png().toBuffer());
+    const deep = await analyzeImage(await warmFill().toColourspace("rgb16").png().toBuffer());
+    // Before #4983 the 0-65535 means clamped exposure to 100 and added "overexposed".
+    expect(deep).toEqual(reference);
+    expect(reference.scores.exposure).toBe(52);
+  });
+
+  it("keeps stdev-based scores on a 16-bit textured image", async () => {
+    const eight = await texturedColor(64, 64);
+    const sixteen = await sharp(eight).toColourspace("rgb16").png().toBuffer();
+    expect(await analyzeImage(sixteen)).toEqual(await analyzeImage(eight));
+  });
+
+  it("scores a 16-bit grey image like its 8-bit original", async () => {
+    const reference = await analyzeImage(await greyFill().png().toBuffer());
+    const deep = await analyzeImage(await greyFill().toColourspace("grey16").png().toBuffer());
+    expect(deep).toEqual(reference);
+    expect(deep.scores.exposure).toBe(39);
+  });
+
+  it("reads a CMYK JPEG as colour, not as R, G and B planes", async () => {
+    const reference = await analyzeImage(await warmFill().png().toBuffer());
+    const cmyk = await analyzeImage(
+      await warmFill().toColourspace("cmyk").jpeg({ quality: 100 }).toBuffer(),
+    );
+    // The CMYK round trip through sharp's profile shifts means by a level or two.
+    for (const key of Object.keys(reference.scores) as (keyof typeof reference.scores)[]) {
+      expect(Math.abs(cmyk.scores[key] - reference.scores[key])).toBeLessThanOrEqual(3);
+    }
+    expect(cmyk.issues).toEqual(reference.issues);
+    expect(cmyk.corrections.temperature).toBe(reference.corrections.temperature);
+  });
+
+  it("treats grey+alpha as grayscale, so Auto doesn't tint it", async () => {
+    const reference = await analyzeImage(await greyFill().png().toBuffer());
+    const withAlpha = await analyzeImage(await greyFill().ensureAlpha(0.5).png().toBuffer());
+    // Before #4983 alpha was read as green and blue: whiteBalance 28, a
+    // "color-cast" issue and a warm temperature of 6.
+    expect(withAlpha).toEqual(reference);
+    expect(withAlpha.scores.whiteBalance).toBe(50);
+    expect(withAlpha.corrections.temperature).toBe(0);
+    expect(withAlpha.issues).not.toContain("color-cast");
+  });
+
+  it("ignores the alpha channel of an RGBA image", async () => {
+    const reference = await analyzeImage(await warmFill().png().toBuffer());
+    expect(await analyzeImage(await warmFill().ensureAlpha(0.5).png().toBuffer())).toEqual(
+      reference,
+    );
+  });
+});
+
+// ===========================================================================
 // analyzeImage -> computeCorrections / deadZoneCorrection
 // ===========================================================================
 

@@ -65,7 +65,7 @@ export async function processImageEnhancement(
     if (rawMeta.depth && rawMeta.depth !== "uchar") {
       analysisSource = await sharp(analysisSource).toColourspace("srgb").png().toBuffer();
     }
-    // analyzeImage() -> .stats() is the first full pixel decode; intake only
+    // analyzeImage() makes the first full pixel decode; intake only
     // parsed headers, so undecodable-but-well-formed files fail here (#897)
     analysis = await analyzeImage(analysisSource);
   } catch (err) {

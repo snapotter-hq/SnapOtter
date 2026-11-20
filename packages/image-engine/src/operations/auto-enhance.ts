@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type Stats } from "sharp";
 import type {
   AnalysisResult,
   AnalysisScores,
@@ -128,12 +128,13 @@ const PRESET_MULTIPLIERS: Record<
  * Uses Sharp's stats() for per-channel histogram statistics.
  */
 export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
-  const image = sharp(buffer);
-  const stats = await image.stats();
-  const meta = await image.metadata();
+  const meta = await sharp(buffer).metadata();
+  const stats = await measureChannels(buffer);
 
   const channels = stats.channels;
-  const isGrayscale = channels.length === 1;
+  // Grey stays grey once converted to sRGB (three equal channels), so the
+  // source decides; an alpha channel doesn't make grey+alpha a colour image.
+  const isGrayscale = (meta.channels ?? 3) - (meta.hasAlpha ? 1 : 0) === 1;
 
   const rCh = channels[0];
   const gCh = channels[Math.min(1, channels.length - 1)];
@@ -166,6 +167,22 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
   const suggestedMode = suggestMode(scores, meta);
 
   return { scores, corrections, issues, suggestedMode };
+}
+
+/**
+ * Channel statistics on 8-bit sRGB pixels without alpha, so a 16-bit, CMYK or
+ * grey+alpha source scores like its 8-bit sRGB equivalent. stats() reads the
+ * decoded input and ignores pipeline operations, hence the raw round trip.
+ */
+async function measureChannels(buffer: Buffer): Promise<Stats> {
+  const { data, info } = await sharp(buffer)
+    .removeAlpha()
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  }).stats();
 }
 
 /**
