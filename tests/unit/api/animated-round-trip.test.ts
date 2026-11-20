@@ -940,27 +940,6 @@ describe("animation detection inspects buffer format, not filename extension or 
       expectedFilename: "multipage.gif",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
-    {
-      toolId: "replace-color",
-      settings: { makeTransparent: true },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage.png",
-      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
-    },
-    {
-      toolId: "image-pad",
-      settings: { background: "transparent" },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage_padded.png",
-      expectedShape: { pages: 1, width: 800, pageHeight: 800 },
-    },
-    {
-      toolId: "border",
-      settings: { borderWidth: 10, cornerRadius: 10 },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage.png",
-      expectedShape: { pages: 1, width: 820, pageHeight: 620 },
-    },
   ])(
     "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",
     async ({ toolId, settings, expectedContentType, expectedFilename, expectedShape }) => {

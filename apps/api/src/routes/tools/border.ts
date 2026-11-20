@@ -2,7 +2,7 @@ import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
+import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -44,10 +44,13 @@ export function registerBorder(app: FastifyInstance) {
         const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
         // Rounded corners and drop shadows need full alpha. PNG is the right
         // landing place for a still, but it cannot hold frames, so an animation
-        // switches to WebP instead of being flattened (#1083, #3067). No quality
+        // switches to WebP instead of being flattened (#1083, #3067), and a
+        // multi-page TIFF stays TIFF, which holds alpha too (#4877). No quality
         // on the forced PNG: Sharp reads it as palette quantisation (#710).
         const useFormat =
-          needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
+          needsAlpha &&
+          !ALPHA_FORMATS.has(outputFormat.format) &&
+          !(await isMultiPageTiff(inputBuffer, outputFormat.format))
             ? (await isAnimated(inputBuffer))
               ? outputFormatFor("webp", outputFormat.quality)
               : outputFormatFor("png")

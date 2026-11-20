@@ -176,6 +176,17 @@ export async function isAnimated(buffer: Buffer): Promise<boolean> {
   return (await readAnimation(buffer)).animated;
 }
 
+/**
+ * Whether the input is a multi-page TIFF that is going back out as TIFF.
+ *
+ * For the same tools as isAnimated: TIFF carries an alpha channel, so a page
+ * stack can keep its container when a setting needs alpha, where switching to
+ * PNG would keep page 1 alone (#4877).
+ */
+export async function isMultiPageTiff(buffer: Buffer, outputFormat: string): Promise<boolean> {
+  return (await readTiffPagesFor(buffer, outputFormat)).animated;
+}
+
 /** Open a pipeline that keeps every frame; stills get the plain handle. */
 export function openAnimated(buffer: Buffer, info: FrameInfo): Sharp {
   return info.animated ? sharp(buffer, { animated: true }) : sharp(buffer);
