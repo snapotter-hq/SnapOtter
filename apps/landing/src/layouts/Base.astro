@@ -155,6 +155,11 @@ const htmlDir = dirFor(locale);
     <slot />
     {mobileCta && <StickyMobileCta locale={locale} />}
 
+    <script>
+      import { installCtaTracking } from "../lib/cta-tracking";
+      installCtaTracking();
+    </script>
+
     <!-- Scroll-triggered reveal observer -->
     <script is:inline>
       (function () {

@@ -43,6 +43,8 @@ const loginHintParts = t(locale, "home.quickstart.loginHint", {
   <button
     type="button"
     id="hero-docker-copy"
+    data-cta="docker-copy"
+    data-cta-location="hero"
     class="so-cmd group relative inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-terminal-bg px-4 py-3.5 text-start font-mono text-[0.8125rem] leading-[1.7] text-terminal-fg"
     data-copy={DOCKER_CMD}
     data-copied-status={t(locale, "home.quickstart.copiedStatus")}
@@ -77,6 +79,8 @@ const loginHintParts = t(locale, "home.quickstart.loginHint", {
   <div class="mt-3.5 flex items-center justify-center">
     <a
       href="https://demo.snapotter.com"
+      data-cta="live-demo"
+      data-cta-location="hero"
       target="_blank"
       rel="noopener noreferrer"
       class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-foreground transition-all hover:-translate-y-px hover:border-primary hover:bg-primary-subtle"

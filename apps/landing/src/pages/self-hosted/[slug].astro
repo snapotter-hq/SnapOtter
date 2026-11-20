@@ -118,7 +118,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
           <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">How SnapOtter does it privately</h2>
           <p class="mt-4 text-sm leading-relaxed text-muted md:text-base">{uc.howSnapotter}</p>
           <div class="mt-8">
-            <QuickstartBlock docker={uc.docker} curl={uc.curl} />
+            <QuickstartBlock docker={uc.docker} curl={uc.curl} ctaLocation="self-hosted" />
           </div>
           <div class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {uc.toolRoutes.map((route, i) => (

@@ -67,9 +67,9 @@ function inlineJson(value: unknown): string {
  * The script body both sites place in `<head>`. Empty when there is no key,
  * so forks and PR previews emit nothing at all (the landing Playwright build
  * passes a placeholder key aimed at an unroutable host, so it can assert the
- * snippet lands in every page). CTA clicks need no code of their own:
- * autocapture records every click with the element's text and href, and a
- * named event is a PostHog Action on top.
+ * snippet lands in every page). Autocapture records every click with the
+ * element's text and href; the landing adds a named event for its primary
+ * CTAs on top (apps/landing/src/lib/cta-tracking.ts).
  */
 export function publicSiteAnalyticsScript(input: { key: string; host: string }): string {
   if (!input.key) return "";

@@ -8,16 +8,20 @@ interface Props {
   curl?: string;
   dockerLabel?: string;
   curlLabel?: string;
+  // Where this block sits, for the docker-copy CTA event (lib/cta-tracking.ts).
+  ctaLocation?: string;
 }
 const {
   docker,
   curl,
   dockerLabel = "Self-host in one command",
   curlLabel = "Process a file over the REST API",
+  ctaLocation = "quickstart-block",
 } = Astro.props;
 
-const blocks = [
-  ...(docker ? [{ label: dockerLabel, code: docker }] : []),
+// Only the Docker command is an install CTA; the curl example is reference.
+const blocks: Array<{ label: string; code: string; cta?: string }> = [
+  ...(docker ? [{ label: dockerLabel, code: docker, cta: "docker-copy" }] : []),
   ...(curl ? [{ label: curlLabel, code: curl }] : []),
 ];
 ---
@@ -32,6 +36,8 @@ const blocks = [
         type="button"
         class="so-copy group relative flex w-full items-start gap-3 rounded-xl border border-white/10 bg-terminal-bg px-4 py-3.5 text-start font-mono text-[0.8125rem] leading-[1.7] text-terminal-fg"
         data-copy={b.code}
+        data-cta={b.cta}
+        data-cta-location={b.cta ? ctaLocation : undefined}
         aria-label="Copy this command to your clipboard"
         title="Click to copy"
       >
