@@ -111,8 +111,7 @@ export function registerReplaceColor(app: FastifyInstance) {
 
         let buffer: Buffer;
         try {
-          buffer =
-            (await runPerFrame(inputBuffer, useFormat.format, core)) ?? (await core(inputBuffer));
+          buffer = (await runPerFrame(inputBuffer, useFormat, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }

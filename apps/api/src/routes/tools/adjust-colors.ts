@@ -150,7 +150,7 @@ async function processColorAdjustments(
   // through PNG at the end, so a multi-page TIFF goes page by page too (#4850).
   if (settings.sharpness > 0 || needsRecombMaterialize || outputFormat.format === "tiff") {
     try {
-      const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
+      const perFrame = await runPerFrame(inputBuffer, outputFormat, async (frame) => {
         const result = await processColorAdjustments(frame, settings, filename);
         return result.buffer;
       });

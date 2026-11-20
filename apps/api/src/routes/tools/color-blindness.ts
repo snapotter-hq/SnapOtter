@@ -52,7 +52,7 @@ export function registerColorBlindness(app: FastifyInstance) {
           // one tall page, so TIFF goes a page at a time (#4850).
           const perPage =
             outputFormat.format === "tiff"
-              ? await runPerFrame(inputBuffer, outputFormat.format, simulate)
+              ? await runPerFrame(inputBuffer, outputFormat, simulate)
               : undefined;
           buffer = perPage ?? (await simulate(inputBuffer));
         } catch (err) {

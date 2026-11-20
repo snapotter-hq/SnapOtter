@@ -127,8 +127,7 @@ export function registerPixelate(app: FastifyInstance) {
         let buffer: Buffer;
         try {
           buffer =
-            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-            (await core(inputBuffer));
+            (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
