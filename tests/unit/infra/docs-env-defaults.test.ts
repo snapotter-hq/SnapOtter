@@ -3,6 +3,10 @@ import { globSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { BINARY_OVERRIDE_VARS } from "../../../apps/api/src/lib/binary-overrides.js";
+import {
+  MAX_CPU_UPSCALE_MP,
+  MAX_CPU_UPSCALE_OUTPUT_MP,
+} from "../../../packages/ai/src/upscaling.js";
 import { HW_ACCEL_FAMILIES } from "../../../packages/media-engine/src/encoders.js";
 
 /**
@@ -260,5 +264,29 @@ describe("job deadlines", () => {
     const row = configRows.find((r) => r.name === "PROCESSING_TIMEOUT_S");
     expect(row?.description).toMatch(/sidecar/i);
     expect(row?.description).not.toMatch(/per request/i);
+  });
+});
+
+/**
+ * packages/ai reads MAX_CPU_UPSCALE_MP straight from process.env, so it has no
+ * schema default for the table checks above to compare against. It went
+ * undocumented even after #4820 turned an oversized CPU upscale from a refusal
+ * into a reduction, so admins had no way to learn the ceiling existed (#5037).
+ */
+describe("CPU upscale ceiling", () => {
+  const row = ROWS.find(
+    (r) => r.doc === "apps/docs/guide/configuration.md" && r.name === "MAX_CPU_UPSCALE_MP",
+  );
+
+  it("configuration.md documents it with the default the code uses", () => {
+    expect(row).toBeDefined();
+    const shown = [...(row?.defaultCell ?? "").matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+    expect(shown).toEqual([String(MAX_CPU_UPSCALE_MP)]);
+  });
+
+  it("states the output multiple the code applies", () => {
+    const multiple = MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP;
+    expect(row?.description).toMatch(new RegExp(`\\b${multiple} times\\b`));
+    expect(row?.description).toContain(`${MAX_CPU_UPSCALE_OUTPUT_MP} MP by default`);
   });
 });
