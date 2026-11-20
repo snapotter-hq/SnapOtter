@@ -15746,6 +15746,79 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags: [Files]
+      summary: Convert Case
+      description: |
+        Change text to another case: UPPER, lower, Sentence, Title, Capitalized,
+        iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case or kebab-case. This
+        tool accepts a JSON body, not multipart, and answers with the converted
+        text instead of a file to download.
+
+        `title` keeps short English words lowercase unless they start or end the
+        line. `camel`, `pascal`, `snake` and `kebab` split on spaces, punctuation
+        and existing case changes, and convert each line on its own.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, mode]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Text to convert
+                mode:
+                  type: string
+                  enum: [upper, lower, sentence, title, capitalized, inverse, alternating, camel, pascal, snake, kebab]
+                  description: Target case
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: BCP 47 language tag for language-specific casing, such as the Turkish dotted and dotless i. Without it, casing is language-independent.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        "200":
+          description: Converted text
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, result]
+                properties:
+                  mode:
+                    type: string
+                    enum: [upper, lower, sentence, title, capitalized, inverse, alternating, camel, pascal, snake, kebab]
+                  result:
+                    type: string
+                    description: The converted text
+              example:
+                mode: title
+                result: The Lord of the Rings
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip

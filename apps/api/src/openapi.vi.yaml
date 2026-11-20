@@ -16011,6 +16011,100 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags:
+        - Files
+      summary: Đổi chữ hoa/thường
+      description: |
+        Đổi văn bản sang kiểu chữ khác: UPPER, lower, Sentence, Title, Capitalized, iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case hoặc kebab-case. Công cụ này nhận body JSON, không phải multipart, và trả về văn bản đã chuyển thay vì tệp để tải xuống.
+
+        `title` giữ các từ tiếng Anh ngắn ở dạng chữ thường trừ khi chúng đứng đầu hoặc cuối dòng. `camel`, `pascal`, `snake` và `kebab` tách theo khoảng trắng, dấu câu và chỗ đổi kiểu chữ có sẵn, rồi chuyển từng dòng riêng.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - mode
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Văn bản cần chuyển
+                mode:
+                  type: string
+                  enum:
+                    - upper
+                    - lower
+                    - sentence
+                    - title
+                    - capitalized
+                    - inverse
+                    - alternating
+                    - camel
+                    - pascal
+                    - snake
+                    - kebab
+                  description: Kiểu chữ đích
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: Thẻ ngôn ngữ BCP 47 cho quy tắc chữ hoa riêng của ngôn ngữ, như chữ i có chấm và không chấm của tiếng Thổ Nhĩ Kỳ. Nếu bỏ trống, kết quả không phụ thuộc ngôn ngữ.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        '200':
+          description: Văn bản đã chuyển
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - result
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - upper
+                      - lower
+                      - sentence
+                      - title
+                      - capitalized
+                      - inverse
+                      - alternating
+                      - camel
+                      - pascal
+                      - snake
+                      - kebab
+                  result:
+                    type: string
+                    description: Văn bản đã chuyển
+              example:
+                mode: title
+                result: The Lord of the Rings
+        '400':
+          description: Dữ liệu đầu vào không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Cần xác thực
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26882,6 +26976,14 @@ x-i18n:
       sourceHash: d6035d52053d
       provenance: machine
       outputHash: a6b39c89b38d
+    paths./api/v1/tools/files/convert-case.post.summary:
+      sourceHash: 01842c30dd46
+      provenance: machine
+      outputHash: c342af4a2085
+    paths./api/v1/tools/files/convert-case.post.description:
+      sourceHash: 01451dcad982
+      provenance: machine
+      outputHash: 8b385e6e93a8
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33510,6 +33612,34 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 1f29415afcea
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: 4d70eb439dc0
+      provenance: machine
+      outputHash: 1cfc41f4fcb7
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 8c1e152c67ff
+      provenance: machine
+      outputHash: dc70ae502c94
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/locale/description:
+      sourceHash: d75377c99d3d
+      provenance: machine
+      outputHash: 1b3d25e723e0
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/description:
+      sourceHash: 637c8f6233f5
+      provenance: machine
+      outputHash: 79321f686917
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: 223109693f29
+      provenance: machine
+      outputHash: 79321f686917
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: f89a84f20100
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 58cd27228f46
     ptr:/paths/~1api~1v1~1tools~1files~1create-zip/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 8edbb1dd0820
       provenance: machine

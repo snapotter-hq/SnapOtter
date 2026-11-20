@@ -16012,6 +16012,100 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags:
+        - Files
+      summary: Змінити регістр
+      description: |
+        Перетворює текст на інший регістр: UPPER, lower, Sentence, Title, Capitalized, iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case або kebab-case. Інструмент приймає тіло JSON, а не multipart, і відповідає перетвореним текстом, а не файлом для завантаження.
+
+        `title` залишає короткі англійські слова малими, якщо вони не стоять на початку чи в кінці рядка. `camel`, `pascal`, `snake` і `kebab` розбивають текст за пробілами, розділовими знаками й наявними змінами регістру та перетворюють кожен рядок окремо.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - mode
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Текст для перетворення
+                mode:
+                  type: string
+                  enum:
+                    - upper
+                    - lower
+                    - sentence
+                    - title
+                    - capitalized
+                    - inverse
+                    - alternating
+                    - camel
+                    - pascal
+                    - snake
+                    - kebab
+                  description: Цільовий регістр
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: Мовний тег BCP 47 для правил регістру конкретної мови, як-от турецької i з крапкою і без. Без нього регістр не залежить від мови.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        '200':
+          description: Перетворений текст
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - result
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - upper
+                      - lower
+                      - sentence
+                      - title
+                      - capitalized
+                      - inverse
+                      - alternating
+                      - camel
+                      - pascal
+                      - snake
+                      - kebab
+                  result:
+                    type: string
+                    description: Перетворений текст
+              example:
+                mode: title
+                result: The Lord of the Rings
+        '400':
+          description: Неприпустимі дані
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Потрібна автентифікація
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26884,6 +26978,14 @@ x-i18n:
       sourceHash: d6035d52053d
       provenance: machine
       outputHash: 6e18961233af
+    paths./api/v1/tools/files/convert-case.post.summary:
+      sourceHash: 01842c30dd46
+      provenance: machine
+      outputHash: 33a2d7fee879
+    paths./api/v1/tools/files/convert-case.post.description:
+      sourceHash: 01451dcad982
+      provenance: machine
+      outputHash: 91eee4d9a242
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33509,6 +33611,34 @@ x-i18n:
       provenance: machine
       outputHash: ebc313008c2e
     ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: ab1752cdfc52
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: 4d70eb439dc0
+      provenance: machine
+      outputHash: e71371c32edc
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 8c1e152c67ff
+      provenance: machine
+      outputHash: aa68c48ccdb7
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/locale/description:
+      sourceHash: d75377c99d3d
+      provenance: machine
+      outputHash: 4b842c364587
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/description:
+      sourceHash: 637c8f6233f5
+      provenance: machine
+      outputHash: 7c0d6b4ca5f2
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: 223109693f29
+      provenance: machine
+      outputHash: 7c0d6b4ca5f2
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 2f8848704aeb
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: ab1752cdfc52

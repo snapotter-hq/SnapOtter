@@ -15955,6 +15955,100 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags:
+        - Files
+      summary: Hoofdletters wijzigen
+      description: |
+        Zet tekst om naar een andere schrijfwijze: UPPER, lower, Sentence, Title, Capitalized, iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case of kebab-case. Deze tool accepteert een JSON-body, geen multipart, en antwoordt met de omgezette tekst in plaats van een bestand om te downloaden.
+
+        `title` houdt korte Engelse woorden klein, behalve aan het begin of einde van de regel. `camel`, `pascal`, `snake` en `kebab` splitsen op spaties, leestekens en bestaande hoofdletterwissels, en zetten elke regel apart om.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - mode
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Om te zetten tekst
+                mode:
+                  type: string
+                  enum:
+                    - upper
+                    - lower
+                    - sentence
+                    - title
+                    - capitalized
+                    - inverse
+                    - alternating
+                    - camel
+                    - pascal
+                    - snake
+                    - kebab
+                  description: Doelschrijfwijze
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: BCP 47-taalcode voor taalafhankelijke hoofdletters, zoals de Turkse i met en zonder punt. Zonder code is het resultaat taalonafhankelijk.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        '200':
+          description: Omgezette tekst
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - result
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - upper
+                      - lower
+                      - sentence
+                      - title
+                      - capitalized
+                      - inverse
+                      - alternating
+                      - camel
+                      - pascal
+                      - snake
+                      - kebab
+                  result:
+                    type: string
+                    description: De omgezette tekst
+              example:
+                mode: title
+                result: The Lord of the Rings
+        '400':
+          description: Ongeldige invoer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authenticatie vereist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26812,6 +26906,14 @@ x-i18n:
       sourceHash: d6035d52053d
       provenance: machine
       outputHash: 3456e22d5c18
+    paths./api/v1/tools/files/convert-case.post.summary:
+      sourceHash: 01842c30dd46
+      provenance: machine
+      outputHash: '529716135569'
+    paths./api/v1/tools/files/convert-case.post.description:
+      sourceHash: 01451dcad982
+      provenance: machine
+      outputHash: bfc871e9e149
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33437,6 +33539,34 @@ x-i18n:
       provenance: machine
       outputHash: 9786d63053b6
     ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 1f8ca1b3be80
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: 4d70eb439dc0
+      provenance: machine
+      outputHash: 72d0bd176f55
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 8c1e152c67ff
+      provenance: machine
+      outputHash: 7dbaac94872d
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/locale/description:
+      sourceHash: d75377c99d3d
+      provenance: machine
+      outputHash: 80f9ae2ec8de
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/description:
+      sourceHash: 637c8f6233f5
+      provenance: machine
+      outputHash: 50197d18b672
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: 223109693f29
+      provenance: machine
+      outputHash: 8de69e6d5aaa
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 9786d63053b6
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 1f8ca1b3be80

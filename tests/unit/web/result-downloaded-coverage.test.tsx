@@ -91,8 +91,11 @@ const WEB_SRC = path.resolve(HERE, "../../../apps/web/src");
 const REGISTRY = path.join(WEB_SRC, "lib/tool-registry.tsx");
 const registrySource = readFileSync(REGISTRY, "utf8");
 
-/** Tools that only read metadata or colors out of the input and produce no downloadable file. */
-const NO_DOWNLOAD_TOOLS = new Set(["info", "color-palette"]);
+/**
+ * Tools that produce no downloadable file: they read metadata or colors out of
+ * the input, or show converted text to copy in place.
+ */
+const NO_DOWNLOAD_TOOLS = new Set(["info", "color-palette", "convert-case"]);
 
 /** Tools where ToolPage suppresses ReviewPanel (panelOwnsResult), so useToolProcessor alone is not enough. */
 const PANEL_OWNS_RESULT_TOOLS = new Set(["sign-pdf", "ocr", "favicon", "image-to-pdf"]);

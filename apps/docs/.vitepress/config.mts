@@ -630,6 +630,7 @@ function buildBaseTheme() {
               { text: "Convert YAML / JSON", link: "/tools/files/yaml-json" },
               { text: "XML to CSV", link: "/tools/files/xml-to-csv" },
               { text: "Convert Font", link: "/tools/files/convert-font" },
+              { text: "Convert Case", link: "/tools/files/convert-case" },
               { text: "Create ZIP", link: "/tools/files/create-zip" },
               { text: "Extract ZIP", link: "/tools/files/extract-zip" },
             ],

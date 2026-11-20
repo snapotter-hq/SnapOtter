@@ -323,6 +323,8 @@
 /tools/xml-to-csv /tools/files/xml-to-csv/ 301
 /tools/convert-font/ /tools/files/convert-font/ 301
 /tools/convert-font /tools/files/convert-font/ 301
+/tools/convert-case/ /tools/files/convert-case/ 301
+/tools/convert-case /tools/files/convert-case/ 301
 /tools/create-zip/ /tools/files/create-zip/ 301
 /tools/create-zip /tools/files/create-zip/ 301
 /tools/extract-zip/ /tools/files/extract-zip/ 301

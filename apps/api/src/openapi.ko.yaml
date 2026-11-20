@@ -16006,6 +16006,100 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags:
+        - Files
+      summary: 대소문자 변환
+      description: |
+        텍스트를 다른 표기 형식으로 바꿉니다: UPPER, lower, Sentence, Title, Capitalized, iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case, kebab-case. 이 도구는 multipart가 아닌 JSON 본문을 받고, 다운로드할 파일 대신 변환된 텍스트를 반환합니다.
+
+        `title`은 줄의 처음이나 끝이 아닌 짧은 영어 단어를 소문자로 둡니다. `camel`, `pascal`, `snake`, `kebab`는 공백, 문장 부호, 기존 대소문자 경계에서 단어를 나누고 각 줄을 따로 변환합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+                - mode
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: 변환할 텍스트
+                mode:
+                  type: string
+                  enum:
+                    - upper
+                    - lower
+                    - sentence
+                    - title
+                    - capitalized
+                    - inverse
+                    - alternating
+                    - camel
+                    - pascal
+                    - snake
+                    - kebab
+                  description: 대상 형식
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: '언어별 대소문자 규칙(예: 터키어의 점 있는 i와 점 없는 i)을 위한 BCP 47 언어 태그. 지정하지 않으면 언어와 무관하게 변환합니다.'
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        '200':
+          description: 변환된 텍스트
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - result
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - upper
+                      - lower
+                      - sentence
+                      - title
+                      - capitalized
+                      - inverse
+                      - alternating
+                      - camel
+                      - pascal
+                      - snake
+                      - kebab
+                  result:
+                    type: string
+                    description: 변환된 텍스트
+              example:
+                mode: title
+                result: The Lord of the Rings
+        '400':
+          description: 잘못된 입력
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증이 필요합니다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26878,6 +26972,14 @@ x-i18n:
       sourceHash: d6035d52053d
       provenance: machine
       outputHash: 08709af646a9
+    paths./api/v1/tools/files/convert-case.post.summary:
+      sourceHash: 01842c30dd46
+      provenance: machine
+      outputHash: 93990de2c76a
+    paths./api/v1/tools/files/convert-case.post.description:
+      sourceHash: 01451dcad982
+      provenance: machine
+      outputHash: bd9e744cfe4c
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33503,6 +33605,34 @@ x-i18n:
       provenance: machine
       outputHash: a65096e342c8
     ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 416974a2b8ff
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: 4d70eb439dc0
+      provenance: machine
+      outputHash: 50393a467e1f
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 8c1e152c67ff
+      provenance: machine
+      outputHash: 61d7ac98d5aa
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/requestBody/content/application~1json/schema/properties/locale/description:
+      sourceHash: d75377c99d3d
+      provenance: machine
+      outputHash: f588cd7ab962
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/description:
+      sourceHash: 637c8f6233f5
+      provenance: machine
+      outputHash: a7b22de1e0c6
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: 223109693f29
+      provenance: machine
+      outputHash: a7b22de1e0c6
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: a65096e342c8
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-case/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 416974a2b8ff

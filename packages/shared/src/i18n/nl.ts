@@ -1248,6 +1248,10 @@ export const nl: TranslationKeys = {
       name: "Lettertype converteren",
       description: "Converteer lettertypen tussen TTF, OTF, WOFF en WOFF2",
     },
+    "convert-case": {
+      name: "Hoofdletters wijzigen",
+      description: "Zet tekst om naar HOOFDLETTERS, kleine letters, titelstijl, zinsstijl en meer",
+    },
     "create-zip": {
       name: "ZIP maken",
       description: "Bundel meerdere bestanden in een enkel ZIP-archief",
@@ -4127,6 +4131,25 @@ export const nl: TranslationKeys = {
       submit: "Converteren",
       submitBatch: "Converteren ({count} bestanden)",
       progressLabel: "Converteren",
+    },
+    "convert-case": {
+      input: "Tekst",
+      placeholder: "Plak of typ tekst",
+      chooseCase: "Omzetten naar",
+      result: "Resultaat",
+      modes: {
+        upper: "HOOFDLETTERS",
+        lower: "kleine letters",
+        sentence: "Zinsstijl",
+        title: "Titelstijl",
+        capitalized: "Elk Woord Met Hoofdletter",
+        inverse: "oMGEKEERDE lETTERS",
+        alternating: "aFwIsSeLeNd",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "ZIP maken",

@@ -1246,6 +1246,10 @@ export const ptBR: TranslationKeys = {
       name: "Converter Fonte",
       description: "Converta fontes entre TTF, OTF, WOFF e WOFF2",
     },
+    "convert-case": {
+      name: "Converter maiúsculas e minúsculas",
+      description: "Mude o texto para MAIÚSCULAS, minúsculas, estilo título, estilo frase e mais",
+    },
     "create-zip": {
       name: "Criar ZIP",
       description: "Agrupe vários arquivos em um único arquivo ZIP",
@@ -4118,6 +4122,25 @@ export const ptBR: TranslationKeys = {
       submit: "Converter",
       submitBatch: "Converter ({count} arquivos)",
       progressLabel: "Convertendo",
+    },
+    "convert-case": {
+      input: "Texto",
+      placeholder: "Cole ou digite o texto",
+      chooseCase: "Converter para",
+      result: "Resultado",
+      modes: {
+        upper: "MAIÚSCULAS",
+        lower: "minúsculas",
+        sentence: "Estilo frase",
+        title: "Estilo Título",
+        capitalized: "Cada Palavra Maiúscula",
+        inverse: "mAIÚSCULAS iNVERTIDAS",
+        alternating: "aLtErNaDo",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "Criar ZIP",

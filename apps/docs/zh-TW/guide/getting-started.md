@@ -145,7 +145,7 @@ pnpm dev
 | **影片** | 59 | 剪輯、裁切、壓縮、轉換、合併、擷取音訊、自動字幕、影片轉 GIF、調整大小、防震、格式預設 |
 | **音訊** | 27 | 剪輯、合併、轉換、正規化、降噪、轉錄、變調、淡入淡出、鈴聲製作、格式預設 |
 | **PDF / 文件** | 35 | 合併、分割、壓縮、OCR、浮水印、塗黑、Word 轉 PDF、Excel 轉 PDF、旋轉、保護、修復 |
-| **檔案** | 23 | CSV 轉 JSON、JSON 轉 XML、合併 CSV、分割 CSV、建立 ZIP、解壓縮 ZIP、圖表製作、YAML/JSON |
+| **檔案** | 25 | CSV 轉 JSON、JSON 轉 XML、合併 CSV、分割 CSV、建立 ZIP、解壓縮 ZIP、圖表製作、YAML/JSON |
 
 ### 管線 {#pipelines}
 

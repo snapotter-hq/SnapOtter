@@ -20,6 +20,7 @@ export const REGISTRY_EXEMPT = new Set([
   "color-palette",
   "compare",
   "compose",
+  "convert-case",
   "erase-object",
   "favicon",
   "find-duplicates",

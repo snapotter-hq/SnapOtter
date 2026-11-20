@@ -145,7 +145,7 @@ pnpm dev
 | **Video** | 59 | Kürzen, Zuschneiden, Komprimieren, Konvertieren, Zusammenführen, Audio extrahieren, Automatische Untertitel, Video zu GIF, Größe ändern, Stabilisieren, Formatvorgaben |
 | **Audio** | 27 | Kürzen, Zusammenführen, Konvertieren, Normalisieren, Rauschreduzierung, Transkribieren, Tonhöhe ändern, Überblenden, Klingelton-Ersteller, Formatvorgaben |
 | **PDF / Dokument** | 35 | Zusammenführen, Teilen, Komprimieren, OCR, Wasserzeichen, Schwärzen, Word zu PDF, Excel zu PDF, Drehen, Schützen, Reparieren |
-| **Dateien** | 23 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP extrahieren, Diagramm-Ersteller, YAML/JSON |
+| **Dateien** | 25 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP extrahieren, Diagramm-Ersteller, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

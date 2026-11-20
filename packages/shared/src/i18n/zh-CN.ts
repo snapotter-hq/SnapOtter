@@ -1016,6 +1016,10 @@ export const zhCN: TranslationKeys = {
       name: "转换字体",
       description: "在 TTF、OTF、WOFF 和 WOFF2 之间转换字体",
     },
+    "convert-case": {
+      name: "大小写转换",
+      description: "将文本转换为大写、小写、标题格式、句子格式等",
+    },
     "create-zip": {
       name: "创建 ZIP",
       description: "将多个文件打包为一个 ZIP 压缩包",
@@ -3831,6 +3835,25 @@ export const zhCN: TranslationKeys = {
       submit: "转换",
       submitBatch: "转换（{count} 个文件）",
       progressLabel: "正在转换",
+    },
+    "convert-case": {
+      input: "文本",
+      placeholder: "粘贴或输入文本",
+      chooseCase: "转换为",
+      result: "结果",
+      modes: {
+        upper: "全部大写 (UPPER)",
+        lower: "全部小写 (lower)",
+        sentence: "句首大写 (Sentence)",
+        title: "标题格式 (Title)",
+        capitalized: "每个单词首字母大写 (Capitalized)",
+        inverse: "大小写反转 (iNVERSE)",
+        alternating: "大小写交替 (aLtErNaTiNg)",
+        camel: "camelCase",
+        pascal: "PascalCase",
+        snake: "snake_case",
+        kebab: "kebab-case",
+      },
     },
     "create-zip": {
       submit: "创建 ZIP",
