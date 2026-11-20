@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 80260f533ee7
+i18n_output_hash: 0bba94619a26
 i18n_hash_version: 2
-i18n_source_hash: a305a62638f0
+i18n_source_hash: 718ef5066980
 i18n_provenance: human
 ---
 
@@ -156,6 +156,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 Каждый пресет фиксирует выходной формат и делегирует базовому инструменту, такому как `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` или `convert-spreadsheet`. Полную таблицу маршрутов и необязательные настройки см. в [Пресеты конвертации](/ru/tools/conversion-presets).
 
+Пресеты сжатия работают так же. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` и `compress-image-to-500kb` запускают `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` и `compress-pdf-to-2mb` запускают `compress-pdf`. Каждый из них фиксирует `mode` в значении `targetSize`, а `targetSizeKb` в размере, указанном в его названии.
+
 ### Основное {#essentials}
 
 | ID инструмента | Название | Ключевые настройки |
@@ -196,6 +198,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ID инструмента | Название | AI-модель | Ключевые настройки |
 |---------|------|---------|-------------|
 | `remove-background` | Удаление фона | rembg (BiRefNet / U2-Net) | Этап 1: `model`, `edgeRefine` (0-3), `decontaminate`. Этап 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` и конвейеры: `backgroundType` (transparent/color/gradient/blur, а также image на `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Удаление фона GIF | rembg, кадр за кадром | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Апскейл изображения | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Ластик объектов | LaMa (ONNX) | Маска отправляется как вторая файловая часть (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Извлечение текста | Tesseract (быстрый); RapidOCR + PP-OCR ONNX (сбалансированный/лучший) | `quality` (быстрый/сбалансированный/лучший), `language`, `enhance` |
@@ -250,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | Рамка и обрамление | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Оформление скриншота | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Круглая обрезка | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Обрезка со скруглением | `shape` (rounded-square/squircle), `cornerRadius` (0-50, процент от меньшей стороны), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Отступы изображения | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Спрайт-лист | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - несколько файлов (2-64 изображения) |
 
@@ -285,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | Стабилизация видео | `smoothing` (5-60, в кадрах) |
 | `gif-to-video` | GIF в видео | `format` (mp4/webm/mov) |
 | `video-to-webp` | Видео в WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Видео в AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (макс. 60 с), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Видео в кадры | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Объединение видео | - (несколько файлов, приведённых к разрешению первого видео) |
 | `replace-audio` | Замена аудио | - (видео + аудиофайл, два файла) |
 | `burn-subtitles` | Вшивание субтитров | `fontSize` (8-72) - видео + файл субтитров |
 | `embed-subtitles` | Встраивание субтитров | `language` (код ISO 639-2/B) - видео + файл субтитров |
 | `extract-subtitles` | Извлечение субтитров | - (выводит SRT) |
+| `convert-subtitles` | Конвертировать субтитры | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Изображения в видео | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - несколько файлов |
 | `video-metadata` | Очистка метаданных видео | - |
 | `auto-subtitles` | Автосубтитры (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -329,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | Извлечение страниц | `range` (синтаксис qpdf, напр. "1-5,8,10-z") |
 | `remove-pages` | Удаление страниц | `pages` (диапазон qpdf для удаления) |
 | `organize-pdf` | Упорядочивание PDF | `order` (порядок страниц qpdf, напр. "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF-мультиинструмент | `items` (план страниц, `[{doc, page, rot}]`, до 1200 страниц), `pageCounts` - несколько файлов (до 20 PDF) |
 | `protect-pdf` | Защита PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Снятие защиты PDF | `password` |
 | `repair-pdf` | Восстановление PDF | - |
@@ -345,6 +352,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | Подписание PDF | Пользовательский multipart-маршрут с PDF `file`, файлами подписи `sig0`, `sig1` и JSON-массивом `placements` |
 | `pdf-to-text` | PDF в текст | - |
 | `pdf-to-word` | PDF в Word | - |
+| `pdf-to-markdown` | PDF в Markdown | - (возвращает файл `.md`) |
 | `pdf-metadata` | Метаданные PDF | `title`, `author`, `subject`, `keywords` |
 | `convert-document` | Конвертация документа | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Конвертация презентации | `format` (pptx/odp) |
@@ -377,6 +385,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `yaml-json` | YAML / JSON | - (двунаправленный) |
 | `xml-to-csv` | XML в CSV | - (автоматически находит повторяющиеся элементы) |
 | `convert-font` | Конвертация шрифтов | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Изменить регистр | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (тег BCP 47). Тело JSON, без загрузки файла; возвращает преобразованный текст. |
+| `proportion-calculator` | Калькулятор пропорций | `a`, `b`, `c`, `mode` (direct/inverse). Тело JSON, без загрузки файла; возвращает недостающее значение. |
 | `excel-to-csv` | Excel в CSV | специальный пресет конвертации на основе `convert-spreadsheet` |
 | `create-zip` | Создание ZIP | - (несколько файлов, 2-50 файлов) |
 | `extract-zip` | Извлечение ZIP | - (защита от zip-бомб) |

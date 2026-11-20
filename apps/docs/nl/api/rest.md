@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: 86b15a2d9b98
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 581c508c7bbf
+i18n_source_hash: 718ef5066980
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ De gedeelde catalogus bevat 83 speciale conversiepreset-endpoints zoals `jpg-to-
 
 Elke preset vergrendelt het uitvoerformaat en delegeert naar een basistool zoals `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` of `convert-spreadsheet`. Zie [Conversiepresets](/nl/tools/conversion-presets) voor de volledige routetabel en optionele instellingen.
 
+Compressiepresets werken op dezelfde manier. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` en `compress-image-to-500kb` draaien `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` en `compress-pdf-to-2mb` draaien `compress-pdf`. Elk vergrendelt `mode` op `targetSize` en `targetSizeKb` op de grootte uit de naam.
+
 ### Essentials {#essentials}
 
 | Tool-ID | Naam | Belangrijkste instellingen |
@@ -195,6 +197,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | Tool-ID | Naam | AI-model | Belangrijkste instellingen |
 |---------|------|---------|-------------|
 | `remove-background` | Achtergrond verwijderen | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` en pipelines: `backgroundType` (transparent/color/gradient/blur, plus image op `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | GIF-achtergrond verwijderen | rembg, frame voor frame | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Afbeelding upscalen | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objectgum | LaMa (ONNX) | Masker verzonden als tweede bestandsdeel (veldnaam `mask`), `format`, `quality` |
 | `ocr` | OCR / Tekstextractie | Tesseract (snel); RapidOCR + PP-OCR ONNX (gebalanceerd/beste) | `quality` (snel/gebalanceerd/beste), `language`, `enhance` |
@@ -249,6 +252,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `border` | Rand & kader | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Screenshot verfraaien | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Cirkelvormig bijsnijden | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Afgerond bijsnijden | `shape` (rounded-square/squircle), `cornerRadius` (0-50, procent van de kortste zijde), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Afbeelding opvullen | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - meerdere bestanden (2-64 afbeeldingen) |
 
@@ -284,12 +288,14 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `stabilize-video` | Video stabiliseren | `smoothing` (5-60, in frames) |
 | `gif-to-video` | GIF naar video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video naar WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video naar AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video naar frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Video's samenvoegen | - (meerdere bestanden, genormaliseerd naar de resolutie van de eerste video) |
 | `replace-audio` | Audio vervangen | - (video- + audiobestand, twee bestanden) |
 | `burn-subtitles` | Ondertitels inbranden | `fontSize` (8-72) - video- + ondertitelbestand |
 | `embed-subtitles` | Ondertitels insluiten | `language` (ISO 639-2/B-code) - video- + ondertitelbestand |
 | `extract-subtitles` | Ondertitels extraheren | - (levert SRT) |
+| `convert-subtitles` | Ondertitels converteren | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Afbeeldingen naar video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - meerdere bestanden |
 | `video-metadata` | Videometadata opschonen | - |
 | `auto-subtitles` | Automatische ondertitels (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `extract-pages` | Pagina's extraheren | `range` (qpdf-syntaxis, bijv. \"1-5,8,10-z\") |
 | `remove-pages` | Pagina's verwijderen | `pages` (te verwijderen qpdf-bereik) |
 | `organize-pdf` | PDF ordenen | `order` (qpdf-paginavolgorde, bijv. \"3,1,2,5-z\") |
+| `multi-tool-pdf` | PDF-multitool | `items` (paginaplan, `[{doc, page, rot}]`, tot 1200 pagina's), `pageCounts` - meerdere bestanden (tot 20 PDF's) |
 | `protect-pdf` | PDF beveiligen | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | PDF ontgrendelen | `password` |
 | `repair-pdf` | PDF repareren | - |
@@ -344,6 +351,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `sign-pdf` | PDF ondertekenen | Aangepaste multipart-route met PDF `file`, handtekeningbestanden `sig0`, `sig1` en `placements` JSON-array |
 | `pdf-to-text` | PDF naar tekst | - |
 | `pdf-to-word` | PDF naar Word | - |
+| `pdf-to-markdown` | PDF naar Markdown | - (levert een `.md`-bestand) |
 | `pdf-metadata` | PDF-metadata | `title`, `author`, `subject`, `keywords` |
 | `convert-document` | Document converteren | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Presentatie converteren | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `yaml-json` | YAML / JSON | - (bidirectioneel) |
 | `xml-to-csv` | XML naar CSV | - (vindt automatisch herhalende elementen) |
 | `convert-font` | Lettertype converteren | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Hoofdletters wijzigen | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47-tag). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
+| `proportion-calculator` | Verhoudingscalculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
 | `excel-to-csv` | Excel naar CSV | speciale conversiepreset ondersteund door `convert-spreadsheet` |
 | `create-zip` | ZIP maken | - (meerdere bestanden, 2-50 bestanden) |
 | `extract-zip` | ZIP uitpakken | - (beschermd tegen zip-bommen) |

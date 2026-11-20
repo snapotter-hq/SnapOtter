@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 06c8988d7297
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 2b81b46448d5
+i18n_source_hash: 718ef5066980
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ Le catalogue partagé inclut 83 points de terminaison de préréglages de conver
 
 Chaque préréglage verrouille le format de sortie et délègue à un outil de base tel que `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, ou `convert-spreadsheet`. Consultez [Préréglages de conversion](/fr/tools/conversion-presets) pour le tableau complet des routes et les paramètres optionnels.
 
+Les préréglages de compression fonctionnent de la même manière. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` et `compress-image-to-500kb` exécutent `compress` ; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` et `compress-pdf-to-2mb` exécutent `compress-pdf`. Chacun verrouille `mode` sur `targetSize` et `targetSizeKb` sur la taille indiquée dans son nom.
+
 ### Essentiels {#essentials}
 
 | ID de l'outil | Nom | Paramètres principaux |
@@ -195,6 +197,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | ID de l'outil | Nom | Modèle d'IA | Paramètres principaux |
 |---------|------|---------|-------------|
 | `remove-background` | Supprimer l'arrière-plan | rembg (BiRefNet / U2-Net) | Phase 1 : `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` et pipelines : `backgroundType` (transparent/color/gradient/blur, plus image sur `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Supprimer l'arrière-plan d'un GIF | rembg, image par image | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Agrandissement d'image | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Gomme d'objets | LaMa (ONNX) | Le masque est envoyé comme deuxième partie de fichier (nom de champ `mask`), `format`, `quality` |
 | `ocr` | OCR / Extraction de texte | Tesseract (rapide) ; RapidOCR + PP-OCR ONNX (équilibré/meilleur) | `quality` (rapide/équilibré/meilleur), `language`, `enhance` |
@@ -249,6 +252,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `border` | Bordure et cadre | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Embellir une capture d'écran | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Rognage circulaire | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Recadrage arrondi | `shape` (rounded-square/squircle), `cornerRadius` (0-50, en pourcentage du plus petit côté), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Marges d'image | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Feuille de sprites | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-fichiers (2-64 images) |
 
@@ -284,12 +288,14 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `stabilize-video` | Stabiliser une vidéo | `smoothing` (5-60, en images) |
 | `gif-to-video` | GIF vers vidéo | `format` (mp4/webm/mov) |
 | `video-to-webp` | Vidéo vers WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Vidéo vers AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60 s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Vidéo vers images | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Fusionner des vidéos | - (multi-fichiers, normalisées à la résolution de la première vidéo) |
 | `replace-audio` | Remplacer l'audio | - (vidéo + fichier audio, deux fichiers) |
 | `burn-subtitles` | Incruster des sous-titres | `fontSize` (8-72) - vidéo + fichier de sous-titres |
 | `embed-subtitles` | Intégrer des sous-titres | `language` (code ISO 639-2/B) - vidéo + fichier de sous-titres |
 | `extract-subtitles` | Extraire des sous-titres | - (produit du SRT) |
+| `convert-subtitles` | Convertir les sous-titres | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Images vers vidéo | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-fichiers |
 | `video-metadata` | Nettoyer les métadonnées vidéo | - |
 | `auto-subtitles` | Sous-titres automatiques (IA) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `extract-pages` | Extraire des pages | `range` (syntaxe qpdf, par exemple \"1-5,8,10-z\") |
 | `remove-pages` | Supprimer des pages | `pages` (plage qpdf à supprimer) |
 | `organize-pdf` | Organiser un PDF | `order` (ordre des pages qpdf, par exemple \"3,1,2,5-z\") |
+| `multi-tool-pdf` | Outil multifonction PDF | `items` (plan des pages, `[{doc, page, rot}]`, jusqu'à 1200 pages), `pageCounts` - multi-fichiers (jusqu'à 20 PDF) |
 | `protect-pdf` | Protéger un PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Déverrouiller un PDF | `password` |
 | `repair-pdf` | Réparer un PDF | - |
@@ -344,6 +351,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `sign-pdf` | Signer un PDF | Route multipart personnalisée avec le PDF `file`, les fichiers de signature `sig0`, `sig1`, et le tableau JSON `placements` |
 | `pdf-to-text` | PDF vers texte | - |
 | `pdf-to-word` | PDF vers Word | - |
+| `pdf-to-markdown` | PDF vers Markdown | - (produit un fichier `.md`) |
 | `pdf-metadata` | Métadonnées du PDF | `title`, `author`, `subject`, `keywords` |
 | `convert-document` | Convertir un document | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Convertir une présentation | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `yaml-json` | YAML / JSON | - (bidirectionnel) |
 | `xml-to-csv` | XML vers CSV | - (trouve automatiquement les éléments répétés) |
 | `convert-font` | Convertir une police | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Changer la casse | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (balise BCP 47). Corps JSON, aucun téléversement de fichier ; renvoie le texte converti. |
+| `proportion-calculator` | Calculateur de proportions | `a`, `b`, `c`, `mode` (direct/inverse). Corps JSON, aucun téléversement de fichier ; renvoie la valeur manquante. |
 | `excel-to-csv` | Excel vers CSV | préréglage de conversion dédié adossé à `convert-spreadsheet` |
 | `create-zip` | Créer un ZIP | - (multi-fichiers, 2-50 fichiers) |
 | `extract-zip` | Extraire un ZIP | - (protégé contre les bombes) |
