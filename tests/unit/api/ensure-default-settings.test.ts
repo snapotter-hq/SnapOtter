@@ -188,7 +188,7 @@ describe("ensureDefaultSettings analytics default", () => {
       "await ensureDefaultSettings();",
       "await initAnalytics();",
       "await primeAnalyticsGate();",
-      "await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED",
+      "await trackInstanceStarted();",
     ].map((step) => source.indexOf(step));
     expect(steps.every((at) => at > -1)).toBe(true);
     expect([...steps].sort((a, b) => a - b)).toEqual(steps);
