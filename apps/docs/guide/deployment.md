@@ -402,7 +402,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 
 - **Content-aware resize** crashes on large images (>5 MP) due to a limitation in the caire binary. Works fine with smaller images.
 - **HEIF decode** takes 13-23 seconds. HEIC (Apple's variant) is much faster at 0.3-0.9 seconds.
-- **Upscale** times out on CPU for anything beyond small images. GPU required for practical use.
+- **Upscale** without a GPU shrinks an input that's over the CPU ceiling (4 MP by default, lower at high scale factors) before upscaling, and it runs much slower than on a GPU. [`MAX_CPU_UPSCALE_MP`](/guide/configuration#processing-limits) raises or removes that ceiling if the host has the RAM for it.
 - **CodeFormer** face enhancement is significantly slower than GFPGAN (53s vs 2s on GPU). GFPGAN is recommended for most use cases.
 
 ### AI bundle installs with several replicas {#ai-bundle-installs-with-several-replicas}
