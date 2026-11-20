@@ -38,14 +38,14 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 }));
 
 vi.mock("@snapotter/doc-engine", () => ({
-  assertCropMarginFits: vi.fn(),
+  assertCropFits: vi.fn(),
   convertDocument: vi.fn(),
   gsCompressPdfTuned: vi.fn(),
   gsGrayscalePdf: vi.fn(),
   gsPdfaConvert: vi.fn(),
   htmlToPdfPy: vi.fn(),
   pdfcpuBooklet: vi.fn(),
-  pdfcpuCropMargin: vi.fn(),
+  pdfcpuCrop: vi.fn(),
   pdfcpuNup: vi.fn(),
   pdfcpuPageSizes: vi.fn(async () => [{ width: 612, height: 792 }]),
   pdfcpuTextStamp: vi.fn(),
@@ -88,14 +88,14 @@ vi.mock("@snapotter/doc-engine", () => ({
 
 import { writeFile } from "node:fs/promises";
 import {
-  assertCropMarginFits,
+  assertCropFits,
   convertDocument,
   gsCompressPdfTuned,
   gsGrayscalePdf,
   gsPdfaConvert,
   htmlToPdfPy,
   pdfcpuBooklet,
-  pdfcpuCropMargin,
+  pdfcpuCrop,
   pdfcpuNup,
   pdfcpuPageSizes,
   pdfcpuTextStamp,
@@ -1485,15 +1485,74 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
 
     await withScratch(async (scratchDir) => {
       const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: { margin: 250 } };
-      vi.mocked(assertCropMarginFits).mockImplementationOnce(() => {
+      vi.mocked(assertCropFits).mockImplementationOnce(() => {
         throw new Error("margin too large");
       });
       await expect(getToolConfig("crop-pdf")?.processV2?.(ctx)).rejects.toThrow("margin too large");
       expect(pdfcpuPageSizes).toHaveBeenCalledWith(join(scratchDir, "in-doc.pdf"), {
         signal: ctx.signal,
       });
-      expect(assertCropMarginFits).toHaveBeenCalledWith(250, [{ width: 612, height: 792 }]);
-      expect(pdfcpuCropMargin).not.toHaveBeenCalled();
+      expect(assertCropFits).toHaveBeenCalledWith({ mode: "uniform", margin: 250 }, [
+        { width: 612, height: 792 },
+      ]);
+      expect(pdfcpuCrop).not.toHaveBeenCalled();
+    });
+  });
+
+  it("crop-pdf crops each page to a region measured from its top-left corner (#4988)", async () => {
+    registerCropPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const settings = { mode: "region", x: 0, y: 0, width: 288, height: 432 };
+      const ctx = { ...createCtx(scratchDir, "label.pdf"), settings };
+      await getToolConfig("crop-pdf")?.processV2?.(ctx);
+      const box = { mode: "region", x: 0, y: 0, width: 288, height: 432 };
+      expect(assertCropFits).toHaveBeenCalledWith(box, [{ width: 612, height: 792 }]);
+      expect(pdfcpuCrop).toHaveBeenCalledWith(
+        join(scratchDir, "in-label.pdf"),
+        box,
+        join(scratchDir, "label_cropped.pdf"),
+        { signal: ctx.signal },
+      );
+    });
+  });
+
+  it("crop-pdf passes per-side margins and ignores the other modes' fields (#4988)", async () => {
+    registerCropPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const settings = {
+        mode: "sides",
+        top: 5,
+        right: 306,
+        bottom: 396,
+        left: 0,
+        margin: 99,
+        x: 7,
+      };
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings };
+      await getToolConfig("crop-pdf")?.processV2?.(ctx);
+      expect(pdfcpuCrop).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        { mode: "sides", top: 5, right: 306, bottom: 396, left: 0 },
+        join(scratchDir, "doc_cropped.pdf"),
+        { signal: ctx.signal },
+      );
+    });
+  });
+
+  it("crop-pdf keeps the uniform 20 pt margin when no settings are sent", async () => {
+    registerCropPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "doc.pdf"), settings: {} };
+      await getToolConfig("crop-pdf")?.processV2?.(ctx);
+      expect(pdfcpuCrop).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        { mode: "uniform", margin: 20 },
+        join(scratchDir, "doc_cropped.pdf"),
+        { signal: ctx.signal },
+      );
     });
   });
 
@@ -1507,9 +1566,9 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
     await withScratch(async (scratchDir) => {
       const cropCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { margin: 18 } };
       await getToolConfig("crop-pdf")?.processV2?.(cropCtx);
-      expect(pdfcpuCropMargin).toHaveBeenCalledWith(
+      expect(pdfcpuCrop).toHaveBeenCalledWith(
         join(scratchDir, "in-doc.pdf"),
-        18,
+        { mode: "uniform", margin: 18 },
         join(scratchDir, "doc_cropped.pdf"),
         { signal: cropCtx.signal },
       );

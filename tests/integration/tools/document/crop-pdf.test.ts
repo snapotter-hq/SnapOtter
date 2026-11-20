@@ -134,11 +134,65 @@ describe.skipIf(!pdfcpuAvailable())("crop-pdf (requires pdfcpu)", () => {
       expect(b[3]).toBeGreaterThan(b[1]);
     }
   }, 60_000);
+
+  async function croppedBoxes(settings: Record<string, unknown>) {
+    const res = await runTool(settings);
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    return pageBoxes(Buffer.from(dl.rawPayload));
+  }
+
+  // The fixture's pages are 419.53 x 595.28 pt with the MediaBox at the origin,
+  // so a region y points from the top has its upper edge at 595.28 - y (#4988).
+  it("crops every page to a region measured from the top-left corner", async () => {
+    const output = await croppedBoxes({ mode: "region", x: 10, y: 20, width: 200, height: 300 });
+    expect(output.crop.length).toBeGreaterThan(0);
+    for (const [x0, y0, x1, y1] of output.crop) {
+      expect(x0).toBeCloseTo(10, 1);
+      expect(x1).toBeCloseTo(210, 1);
+      expect(y1).toBeCloseTo(575.28, 1);
+      expect(y0).toBeCloseTo(275.28, 1);
+    }
+  }, 60_000);
+
+  it("crops each side by its own margin", async () => {
+    const output = await croppedBoxes({ mode: "sides", top: 10, right: 20, bottom: 30, left: 40 });
+    expect(output.crop.length).toBeGreaterThan(0);
+    for (const [x0, y0, x1, y1] of output.crop) {
+      expect(x0).toBeCloseTo(40, 1);
+      expect(y0).toBeCloseTo(30, 1);
+      expect(x1).toBeCloseTo(399.53, 1);
+      expect(y1).toBeCloseTo(585.28, 1);
+    }
+  }, 60_000);
+
+  it("rejects a region that runs off the page with 400", async () => {
+    const res = await runTool({ mode: "region", x: 300, y: 0, width: 288, height: 432 });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("INVALID_SETTINGS");
+    expect(JSON.stringify(body)).toContain("Crop region doesn't fit on every page");
+  }, 60_000);
+
+  it("rejects side margins that leave no width with 400", async () => {
+    const res = await runTool({ mode: "sides", left: 210, right: 210 });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("INVALID_SETTINGS");
+    expect(JSON.stringify(body)).toContain("Crop margins are too large for this PDF");
+  }, 60_000);
 });
 
 describe("crop-pdf validation (ungated)", () => {
   it("rejects margin 9999 with 400", async () => {
     const res = await runTool({ margin: 9999 });
     expect(res.statusCode).toBe(400);
+  }, 30_000);
+
+  it("rejects an unknown mode and a zero-size region with 400", async () => {
+    expect((await runTool({ mode: "box" })).statusCode).toBe(400);
+    expect((await runTool({ mode: "region", width: 0 })).statusCode).toBe(400);
   }, 30_000);
 });

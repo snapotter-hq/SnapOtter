@@ -106,26 +106,75 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
 }
 
 /**
- * Crop all pages using a uniform margin in points.
- *
- * Verified CLI shape (pdfcpu v0.13.0):
- *   pdfcpu crop '<margin>' inFile outFile
- * A single number sets all four margins (top, right, bottom, left) uniformly.
- *
- * Sanctioned simplification: the plan's four-sided margins object is replaced
- * by a single uniform margin in points, matching pdfcpu's native single-number
- * form. The route schema (Task 8) follows this shape.
+ * How to crop every page, in points. `sides` margins are measured inward from
+ * each edge. A `region` is measured from each page's top-left corner, so the
+ * same box lands on the same spot of every page whatever its size (#4988).
  */
+export type PdfCropBox =
+  | { mode: "uniform"; margin: number }
+  | { mode: "sides"; top: number; right: number; bottom: number; left: number }
+  | { mode: "region"; x: number; y: number; width: number; height: number };
+
+/** The largest page side pdfcpu and the PDF spec accept, in points. */
+const MAX_PAGE_SIDE = 14_400;
+
+function isMargin(n: number): boolean {
+  return Number.isFinite(n) && n >= 0 && n <= 2000;
+}
+
+/**
+ * The `pdfcpu crop` description for a crop box. Verified CLI shapes
+ * (pdfcpu v0.13.0), all relative to each page's MediaBox:
+ *   '20'                                 uniform margin
+ *   '10 20 30 40'                        top right bottom left margins
+ *   'pos:tl, off:x -y, dim: w h abs'     region anchored to the top-left corner
+ * The anchor offset is in PDF user space, where y grows upward, hence -y.
+ */
+function cropDescription(box: PdfCropBox): string {
+  switch (box.mode) {
+    case "uniform":
+      if (!isMargin(box.margin)) throw new Error("Crop margin must be 0-2000 points");
+      return String(box.margin);
+    case "sides": {
+      const sides = [box.top, box.right, box.bottom, box.left];
+      if (!sides.every(isMargin)) throw new Error("Crop margins must be 0-2000 points");
+      return sides.join(" ");
+    }
+    case "region": {
+      const { x, y, width, height } = box;
+      const valid =
+        [x, y, width, height].every((n) => Number.isFinite(n) && n <= MAX_PAGE_SIDE) &&
+        x >= 0 &&
+        y >= 0 &&
+        width > 0 &&
+        height > 0;
+      if (!valid) {
+        throw new Error("Crop region must start inside the page and have a positive size");
+      }
+      return `pos:tl, off:${x} ${y === 0 ? 0 : -y}, dim: ${width} ${height} abs`;
+    }
+  }
+}
+
+/** Crop all pages to a crop box. Check it with assertCropFits first. */
+export async function pdfcpuCrop(
+  inputPath: string,
+  box: PdfCropBox,
+  outPath: string,
+  opts?: PdfcpuOptions,
+): Promise<void> {
+  const description = cropDescription(box);
+  await runPdfcpu(["crop", description, inputPath, outPath], opts);
+}
+
+/** Crop all pages using a uniform margin in points. */
 export async function pdfcpuCropMargin(
   inputPath: string,
   marginPoints: number,
   outPath: string,
   opts?: PdfcpuOptions,
 ): Promise<void> {
-  if (!Number.isFinite(marginPoints) || marginPoints < 0 || marginPoints > 2000) {
-    throw new Error("Crop margin must be 0-2000 points");
-  }
-  await runPdfcpu(["crop", String(marginPoints), inputPath, outPath], opts);
+  await pdfcpuCrop(inputPath, { mode: "uniform", margin: marginPoints }, outPath, opts);
 }
 
 export interface PdfPageSize {
@@ -133,35 +182,47 @@ export interface PdfPageSize {
   height: number;
 }
 
+interface Point {
+  x: unknown;
+  y: unknown;
+}
+
+function coord(v: unknown): number {
+  return typeof v === "number" ? v : Number.NaN;
+}
+
 /**
- * The distinct page sizes of a PDF in points, from `pdfcpu info -j`. pdfcpu
- * reports MediaBox sizes, which is also the box `pdfcpu crop` measures its
- * margin from (a page that already has a CropBox is re-cropped from its
- * MediaBox), so these are the sizes a crop margin has to fit inside.
+ * The distinct MediaBox sizes of a PDF's pages in points, from
+ * `pdfcpu info -j -p 1-`. `pdfcpu crop` measures from the MediaBox (a page
+ * that already has a CropBox is re-cropped from its MediaBox), so these are
+ * the sizes a crop has to fit inside. They come from the per-page boundaries
+ * rather than `pageSizes`, which swaps width and height on a rotated page
+ * while crop still works on the unrotated box (#4988).
  */
 export async function pdfcpuPageSizes(
   inputPath: string,
   opts?: PdfcpuOptions,
 ): Promise<PdfPageSize[]> {
-  const out = await runPdfcpu(["info", "-j", inputPath], opts);
-  let sizes: unknown;
+  const out = await runPdfcpu(["info", "-j", "-p", "1-", inputPath], opts);
+  let boundaries: unknown;
   try {
-    sizes = (JSON.parse(out) as { infos?: { pageSizes?: unknown }[] }).infos?.[0]?.pageSizes;
+    boundaries = (JSON.parse(out) as { infos?: { pageBoundaries?: unknown }[] }).infos?.[0]
+      ?.pageBoundaries;
   } catch {
-    sizes = undefined;
+    boundaries = undefined;
   }
-  const valid =
-    Array.isArray(sizes) &&
-    sizes.length > 0 &&
-    sizes.every(
-      (s) =>
-        typeof s?.width === "number" &&
-        typeof s?.height === "number" &&
-        Number.isFinite(s.width) &&
-        Number.isFinite(s.height),
-    );
-  if (!valid) throw new Error("pdfcpu info reported no page sizes");
-  return (sizes as PdfPageSize[]).map(({ width, height }) => ({ width, height }));
+  const sizes = new Map<string, PdfPageSize>();
+  for (const page of Object.values(boundaries ?? {})) {
+    const rect = (page as { mediaBox?: { rect?: { ll?: Point; ur?: Point } } })?.mediaBox?.rect;
+    const width = coord(rect?.ur?.x) - coord(rect?.ll?.x);
+    const height = coord(rect?.ur?.y) - coord(rect?.ll?.y);
+    if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) {
+      throw new Error("pdfcpu info reported no page sizes");
+    }
+    sizes.set(`${width}x${height}`, { width, height });
+  }
+  if (sizes.size === 0) throw new Error("pdfcpu info reported no page sizes");
+  return [...sizes.values()];
 }
 
 /**
@@ -174,6 +235,37 @@ export function assertCropMarginFits(marginPoints: number, sizes: PdfPageSize[])
   const limit = Math.floor((shortestSide / 2) * 100) / 100;
   throw new ToolInputError(
     `Crop margin is too large for this PDF. It must be less than ${limit} points, half the shortest page side.`,
+    { code: "INVALID_SETTINGS" },
+  );
+}
+
+function floorPoints(n: number): number {
+  return Math.floor(n * 100) / 100;
+}
+
+/**
+ * A crop that leaves no area, or a region that runs off a page, makes pdfcpu
+ * write an inverted or oversized CropBox instead of failing, so check the box
+ * against every page size first. The narrowest width and shortest height can
+ * come from different pages; a box fits every page exactly when it fits both.
+ */
+export function assertCropFits(box: PdfCropBox, sizes: PdfPageSize[]): void {
+  if (box.mode === "uniform") {
+    assertCropMarginFits(box.margin, sizes);
+    return;
+  }
+  const minWidth = Math.min(...sizes.map((s) => s.width));
+  const minHeight = Math.min(...sizes.map((s) => s.height));
+  if (box.mode === "sides") {
+    if (box.left + box.right < minWidth && box.top + box.bottom < minHeight) return;
+    throw new ToolInputError(
+      `Crop margins are too large for this PDF. Left plus right must be less than ${floorPoints(minWidth)} points and top plus bottom less than ${floorPoints(minHeight)} points.`,
+      { code: "INVALID_SETTINGS" },
+    );
+  }
+  if (box.x + box.width <= minWidth && box.y + box.height <= minHeight) return;
+  throw new ToolInputError(
+    `Crop region doesn't fit on every page. It must stay within ${floorPoints(minWidth)} x ${floorPoints(minHeight)} points, the smallest page size.`,
     { code: "INVALID_SETTINGS" },
   );
 }

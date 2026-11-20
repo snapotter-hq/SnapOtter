@@ -1155,7 +1155,7 @@ export const nl: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF bijsnijden",
-      description: "Snijd alle pagina's bij met een uniforme marge",
+      description: "Snijd pagina's bij op marges of tot een gebied",
     },
     "nup-pdf": {
       name: "Pagina's per vel (N-up)",
@@ -3952,6 +3952,20 @@ export const nl: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Marge (punten)",
+      mode: "Bijsnijden op",
+      modeUniform: "Dezelfde marge aan elke rand",
+      modeSides: "Marge per rand",
+      modeRegion: "Gebied",
+      top: "Boven (punten)",
+      right: "Rechts (punten)",
+      bottom: "Onder (punten)",
+      left: "Links (punten)",
+      x: "Vanaf links (punten)",
+      y: "Vanaf boven (punten)",
+      width: "Breedte (punten)",
+      height: "Hoogte (punten)",
+      regionHint:
+        "Gemeten vanaf de linkerbovenhoek van elke pagina. Een label van 4x6 inch is 288 x 432 punten.",
       submit: "Bijsnijden",
       submitBatch: "Bijsnijden ({count} bestanden)",
       progressLabel: "Bijsnijden",

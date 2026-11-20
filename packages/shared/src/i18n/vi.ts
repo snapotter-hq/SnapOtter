@@ -1154,7 +1154,7 @@ export const vi: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Cắt PDF",
-      description: "Cắt tất cả các trang với lề đồng nhất",
+      description: "Cắt trang theo lề hoặc theo một vùng",
     },
     "nup-pdf": {
       name: "Số trang mỗi tờ (N-up)",
@@ -3930,6 +3930,20 @@ export const vi: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Lề (điểm)",
+      mode: "Cắt theo",
+      modeUniform: "Cùng một lề cho mọi cạnh",
+      modeSides: "Lề cho từng cạnh",
+      modeRegion: "Vùng",
+      top: "Trên (điểm)",
+      right: "Phải (điểm)",
+      bottom: "Dưới (điểm)",
+      left: "Trái (điểm)",
+      x: "Từ trái (điểm)",
+      y: "Từ trên (điểm)",
+      width: "Chiều rộng (điểm)",
+      height: "Chiều cao (điểm)",
+      regionHint:
+        "Đo từ góc trên bên trái của mỗi trang. Nhãn 4x6 inch có kích thước 288 x 432 điểm.",
       submit: "Cắt",
       submitBatch: "Cắt ({count} tệp)",
       progressLabel: "Đang cắt",

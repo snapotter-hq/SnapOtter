@@ -1150,7 +1150,7 @@ export const sv: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Beskär PDF",
-      description: "Beskär alla sidor med en enhetlig marginal",
+      description: "Beskär sidor med marginaler eller till ett område",
     },
     "nup-pdf": {
       name: "Sidor per ark (N-up)",
@@ -3931,6 +3931,20 @@ export const sv: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Marginal (punkter)",
+      mode: "Beskär efter",
+      modeUniform: "Samma marginal på alla kanter",
+      modeSides: "Marginal per kant",
+      modeRegion: "Område",
+      top: "Överkant (punkter)",
+      right: "Höger (punkter)",
+      bottom: "Nederkant (punkter)",
+      left: "Vänster (punkter)",
+      x: "Från vänster (punkter)",
+      y: "Från toppen (punkter)",
+      width: "Bredd (punkter)",
+      height: "Höjd (punkter)",
+      regionHint:
+        "Mäts från varje sidas övre vänstra hörn. En etikett på 4x6 tum är 288 x 432 punkter.",
       submit: "Beskär",
       submitBatch: "Beskär ({count} filer)",
       progressLabel: "Beskär",
