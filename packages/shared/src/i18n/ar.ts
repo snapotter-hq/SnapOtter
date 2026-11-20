@@ -952,6 +952,10 @@ export const ar: TranslationKeys = {
       name: "استخراج الترجمات",
       description: "استخراج مسار الترجمة من الفيديو كملف SRT",
     },
+    "convert-subtitles": {
+      name: "تحويل الترجمات",
+      description: "تحويل ملفات الترجمة بين SRT وWebVTT وASS. تُفقد مواضع ASS وتأثيراته",
+    },
     "images-to-video": {
       name: "صور إلى فيديو",
       description: "تحويل مجموعة صور إلى فيديو عرض شرائح",
@@ -3532,6 +3536,17 @@ export const ar: TranslationKeys = {
       submit: "استخراج الترجمات",
       submitBatch: "استخراج الترجمات ({count} ملفات)",
       progressLabel: "جارٍ استخراج الترجمات",
+    },
+    "convert-subtitles": {
+      format: "صيغة الإخراج",
+      encoding: "ترميز النص",
+      autoDetect: "اكتشاف تلقائي",
+      encodingHint: "اختر ترميز الملف إذا ظهرت الحروف العربية أو غيرها مشوهة",
+      stylingHint:
+        "التحويل من ASS يحتفظ بالتنسيق الأساسي مثل الخط المائل، لكنه يحذف المواضع والتأثيرات",
+      submit: "تحويل الترجمات",
+      submitBatch: "تحويل الترجمات ({count} ملفات)",
+      progressLabel: "جارٍ تحويل الترجمات",
     },
     "images-to-video": {
       square1080x1080: "مربع (1080x1080)",

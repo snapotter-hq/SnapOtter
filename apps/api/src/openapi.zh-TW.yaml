@@ -11268,6 +11268,70 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/video/convert-subtitles:
+    post:
+      operationId: convertSubtitles
+      tags: [Video]
+      summary: Convert Subtitles
+      description: |
+        Convert a subtitle file between SRT, WebVTT and ASS. Converting from
+        ASS drops its positioning and effects. Input is capped by
+        MAX_SUBTITLE_SIZE_MB (1 MB by default).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Subtitle file (.srt, .vtt or .ass)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
+                    - `encoding` (string, default "auto") - Text encoding of the input. One of: auto, utf-8, windows-1252, windows-1250, windows-1251, windows-1256, iso-8859-2, gb18030, big5, shift_jis, euc-kr. "auto" reads valid UTF-8 as is and otherwise assumes Windows-1252
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: subtitles.ass
+              settings: '{"format":"srt"}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Converted subtitle file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/subtitles.srt
+                originalSize: 2048
+                processedSize: 1536
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
   /api/v1/tools/video/images-to-video:
     post:
       operationId: imagesToVideo

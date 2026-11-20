@@ -917,6 +917,11 @@ export const en = {
       name: "Extract Subtitles",
       description: "Pull the subtitle track out of a video as an SRT file",
     },
+    "convert-subtitles": {
+      name: "Convert Subtitles",
+      description:
+        "Convert subtitle files between SRT, WebVTT and ASS. ASS positioning and effects are dropped",
+    },
     "images-to-video": {
       name: "Images to Video",
       description: "Turn a set of images into a slideshow video",
@@ -3498,6 +3503,17 @@ export const en = {
       submit: "Extract Subtitles",
       submitBatch: "Extract Subtitles ({count} files)",
       progressLabel: "Extracting subtitles",
+    },
+    "convert-subtitles": {
+      format: "Output format",
+      encoding: "Text encoding",
+      autoDetect: "Auto-detect",
+      encodingHint: "Pick the file's encoding if accented or non-Latin characters come out garbled",
+      stylingHint:
+        "Converting from ASS keeps basic formatting like italics but drops positioning and effects",
+      submit: "Convert Subtitles",
+      submitBatch: "Convert Subtitles ({count} files)",
+      progressLabel: "Converting subtitles",
     },
     "images-to-video": {
       square1080x1080: "Square (1080x1080)",

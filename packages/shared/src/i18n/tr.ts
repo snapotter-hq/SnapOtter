@@ -962,6 +962,11 @@ export const tr: TranslationKeys = {
       name: "Altyazı Çıkar",
       description: "Videodan altyazı parçasını SRT dosyası olarak çıkar",
     },
+    "convert-subtitles": {
+      name: "Altyazı Dönüştür",
+      description:
+        "Altyazı dosyalarını SRT, WebVTT ve ASS arasında dönüştür. ASS konumlandırması ve efektleri kaybolur",
+    },
     "images-to-video": {
       name: "Görsellerden Video",
       description: "Bir dizi görselden slayt gösterisi videosu oluştur",
@@ -3562,6 +3567,18 @@ export const tr: TranslationKeys = {
       submit: "Altyazı Çıkar",
       submitBatch: "Altyazı Çıkar ({count} dosya)",
       progressLabel: "Altyazı çıkarılıyor",
+    },
+    "convert-subtitles": {
+      format: "Çıktı Formatı",
+      encoding: "Metin Kodlaması",
+      autoDetect: "Otomatik algılama",
+      encodingHint:
+        "Türkçe veya Latin dışı karakterler bozuk görünüyorsa dosyanın kodlamasını seçin",
+      stylingHint:
+        "ASS'den dönüştürme italik gibi temel biçimlendirmeyi korur, ancak konumlandırma ve efektleri kaldırır",
+      submit: "Altyazı Dönüştür",
+      submitBatch: "Altyazı Dönüştür ({count} dosya)",
+      progressLabel: "Altyazılar dönüştürülüyor",
     },
     "images-to-video": {
       square1080x1080: "Kare (1080x1080)",

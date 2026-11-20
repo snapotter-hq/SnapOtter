@@ -191,6 +191,8 @@
 /tools/embed-subtitles /tools/video/embed-subtitles/ 301
 /tools/extract-subtitles/ /tools/video/extract-subtitles/ 301
 /tools/extract-subtitles /tools/video/extract-subtitles/ 301
+/tools/convert-subtitles/ /tools/video/convert-subtitles/ 301
+/tools/convert-subtitles /tools/video/convert-subtitles/ 301
 /tools/images-to-video/ /tools/video/images-to-video/ 301
 /tools/images-to-video /tools/video/images-to-video/ 301
 /tools/video-metadata/ /tools/video/video-metadata/ 301

@@ -784,6 +784,11 @@ export const hi: TranslationKeys = {
       name: "सबटाइटल निकालें",
       description: "वीडियो से सबटाइटल ट्रैक SRT फ़ाइल के रूप में निकालें",
     },
+    "convert-subtitles": {
+      name: "सबटाइटल कन्वर्ट करें",
+      description:
+        "सबटाइटल फ़ाइलों को SRT, WebVTT और ASS के बीच कन्वर्ट करें। ASS की पोज़िशनिंग और इफ़ेक्ट हट जाते हैं",
+    },
     "images-to-video": {
       name: "इमेज से वीडियो",
       description: "इमेज के सेट से स्लाइडशो वीडियो बनाएँ",
@@ -3360,6 +3365,17 @@ export const hi: TranslationKeys = {
       submit: "सबटाइटल एक्सट्रैक्ट करें",
       submitBatch: "सबटाइटल एक्सट्रैक्ट करें ({count} फ़ाइलें)",
       progressLabel: "सबटाइटल एक्सट्रैक्ट हो रहे हैं",
+    },
+    "convert-subtitles": {
+      format: "आउटपुट फ़ॉर्मेट",
+      encoding: "टेक्स्ट एन्कोडिंग",
+      autoDetect: "स्वतः पहचान",
+      encodingHint: "अगर हिंदी या दूसरे अक्षर बिगड़े हुए दिखें, तो फ़ाइल की एन्कोडिंग चुनें",
+      stylingHint:
+        "ASS से कन्वर्ट करने पर इटैलिक जैसी बुनियादी फ़ॉर्मैटिंग बनी रहती है, लेकिन पोज़िशनिंग और इफ़ेक्ट हट जाते हैं",
+      submit: "सबटाइटल कन्वर्ट करें",
+      submitBatch: "सबटाइटल कन्वर्ट करें ({count} फ़ाइलें)",
+      progressLabel: "सबटाइटल कन्वर्ट हो रहे हैं",
     },
     "images-to-video": {
       square1080x1080: "वर्गाकार (1080x1080)",

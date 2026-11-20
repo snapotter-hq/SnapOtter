@@ -97,6 +97,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "watermark-video": VIDEO_FIX,
   "burn-subtitles": VIDEO_FIX,
   "embed-subtitles": VIDEO_FIX,
+  "convert-subtitles": { buffer: SRT, filename: "test.srt" },
   "images-to-video": IMAGE_FIX,
   // Audio tools
   "convert-audio": AUDIO_FIX,
@@ -783,6 +784,13 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "language eng", settings: { language: "eng" } },
     { label: "language fra", settings: { language: "fra" } },
     { label: "language deu", settings: { language: "deu" } },
+  ],
+
+  "convert-subtitles": [
+    { label: "to srt", settings: { format: "srt" } },
+    { label: "to vtt", settings: { format: "vtt" } },
+    { label: "to ass", settings: { format: "ass" } },
+    { label: "explicit gb18030", settings: { format: "vtt", encoding: "gb18030" } },
   ],
 
   "images-to-video": [

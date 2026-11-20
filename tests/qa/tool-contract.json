@@ -9907,6 +9907,63 @@
     "invalidProbes": []
   },
   {
+    "id": "convert-subtitles",
+    "name": "Convert Subtitles",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt", ".vtt", ".ass"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [
+      {
+        "key": "format",
+        "values": ["srt", "vtt", "ass", null]
+      },
+      {
+        "key": "encoding",
+        "values": [
+          "auto",
+          "utf-8",
+          "windows-1252",
+          "windows-1250",
+          "windows-1251",
+          "windows-1256",
+          "iso-8859-2",
+          "gb18030",
+          "big5",
+          "shift_jis",
+          "euc-kr",
+          null
+        ]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "encoding",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "encoding",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "images-to-video",
     "name": "Images to Video",
     "modality": "video",

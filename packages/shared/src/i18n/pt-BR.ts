@@ -962,6 +962,11 @@ export const ptBR: TranslationKeys = {
       name: "Extrair Legendas",
       description: "Extraia a faixa de legendas de um vídeo como arquivo SRT",
     },
+    "convert-subtitles": {
+      name: "Converter Legendas",
+      description:
+        "Converta arquivos de legenda entre SRT, WebVTT e ASS. Posicionamento e efeitos do ASS são descartados",
+    },
     "images-to-video": {
       name: "Imagens para Vídeo",
       description: "Transforme um conjunto de imagens em um vídeo de apresentação",
@@ -3566,6 +3571,18 @@ export const ptBR: TranslationKeys = {
       submit: "Extrair legendas",
       submitBatch: "Extrair legendas ({count} arquivos)",
       progressLabel: "Extraindo legendas",
+    },
+    "convert-subtitles": {
+      format: "Formato de saída",
+      encoding: "Codificação do texto",
+      autoDetect: "Detecção automática",
+      encodingHint:
+        "Escolha a codificação do arquivo se acentos ou caracteres não latinos aparecerem corrompidos",
+      stylingHint:
+        "Converter de ASS mantém a formatação básica, como itálico, mas descarta posicionamento e efeitos",
+      submit: "Converter legendas",
+      submitBatch: "Converter legendas ({count} arquivos)",
+      progressLabel: "Convertendo legendas",
     },
     "images-to-video": {
       square1080x1080: "Quadrado (1080x1080)",

@@ -4749,6 +4749,15 @@
     "isAI": false
   },
   {
+    "id": "convert-subtitles",
+    "name": "Convert Subtitles",
+    "modality": "video",
+    "route": "/video/convert-subtitles",
+    "acceptedInputs": [".srt", ".vtt", ".ass"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "images-to-video",
     "name": "Images to Video",
     "modality": "video",

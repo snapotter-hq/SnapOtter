@@ -909,6 +909,10 @@ export const ko: TranslationKeys = {
       name: "자막 추출",
       description: "동영상에서 자막 트랙을 SRT 파일로 추출",
     },
+    "convert-subtitles": {
+      name: "자막 변환",
+      description: "SRT, WebVTT, ASS 간 자막 파일 변환. ASS 위치 지정과 효과는 제거됩니다",
+    },
     "images-to-video": {
       name: "이미지를 동영상으로",
       description: "이미지 세트를 슬라이드쇼 동영상으로 만들기",
@@ -3487,6 +3491,17 @@ export const ko: TranslationKeys = {
       submit: "자막 추출",
       submitBatch: "자막 추출 ({count}개 파일)",
       progressLabel: "자막 추출 중",
+    },
+    "convert-subtitles": {
+      format: "출력 형식",
+      encoding: "텍스트 인코딩",
+      autoDetect: "자동 감지",
+      encodingHint: "한글이나 특수 문자가 깨져 보이면 파일의 인코딩을 선택하세요",
+      stylingHint:
+        "ASS에서 변환하면 기울임꼴 같은 기본 서식은 유지되지만 위치 지정과 효과는 제거됩니다",
+      submit: "자막 변환",
+      submitBatch: "자막 변환 ({count}개 파일)",
+      progressLabel: "자막 변환 중",
     },
     "images-to-video": {
       square1080x1080: "정사각형 (1080x1080)",

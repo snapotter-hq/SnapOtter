@@ -949,6 +949,10 @@ export const th: TranslationKeys = {
       name: "แยกคำบรรยาย",
       description: "แยกแทร็กคำบรรยายจากวิดีโอเป็นไฟล์ SRT",
     },
+    "convert-subtitles": {
+      name: "แปลงคำบรรยาย",
+      description: "แปลงไฟล์คำบรรยายระหว่าง SRT, WebVTT และ ASS ตำแหน่งและเอฟเฟกต์ของ ASS จะหายไป",
+    },
     "images-to-video": {
       name: "รูปภาพเป็นวิดีโอ",
       description: "เปลี่ยนชุดรูปภาพเป็นวิดีโอสไลด์โชว์",
@@ -3505,6 +3509,16 @@ export const th: TranslationKeys = {
       submit: "แยกคำบรรยาย",
       submitBatch: "แยกคำบรรยาย ({count} ไฟล์)",
       progressLabel: "กำลังแยกคำบรรยาย",
+    },
+    "convert-subtitles": {
+      format: "รูปแบบผลลัพธ์",
+      encoding: "การเข้ารหัสข้อความ",
+      autoDetect: "ตรวจจับอัตโนมัติ",
+      encodingHint: "เลือกการเข้ารหัสของไฟล์หากตัวอักษรไทยหรืออักขระอื่นแสดงผลผิดเพี้ยน",
+      stylingHint: "การแปลงจาก ASS จะคงรูปแบบพื้นฐานอย่างตัวเอียงไว้ แต่จะตัดตำแหน่งและเอฟเฟกต์ออก",
+      submit: "แปลงคำบรรยาย",
+      submitBatch: "แปลงคำบรรยาย ({count} ไฟล์)",
+      progressLabel: "กำลังแปลงคำบรรยาย",
     },
     "images-to-video": {
       square1080x1080: "สี่เหลี่ยมจัตุรัส (1080x1080)",
