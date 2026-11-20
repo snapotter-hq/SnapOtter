@@ -3,6 +3,7 @@ import {
   getBundleForTool,
   getOptionalBundleForTool,
   TOOLS,
+  type ToolUsedStep,
 } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
 import { trackEvent } from "./analytics.js";
@@ -69,12 +70,14 @@ function errorKindForStatus(statusCode: number): "input" | "operational" | "bug"
  * (missing AI bundle, bad input). The worker emits for every enqueued job, so
  * the two never count the same request. Without this the inline routes report
  * opens and starts but never an outcome. Sends at most one event per request.
+ * A `step` marks a request that is one stage of a run rather than a run.
  */
 export function emitInlineToolUsed(
   request: FastifyRequest,
   ctx: ToolRequestAuditContext,
   statusCode: number,
   payload: unknown,
+  step?: ToolUsedStep,
 ): void {
   if (ctx.telemetrySent) return;
   const completed = statusCode >= 200 && statusCode < 300;
@@ -97,5 +100,9 @@ export function emitInlineToolUsed(
         error_code: errorCodeFromPayload(payload, statusCode),
         error_kind: errorKindForStatus(statusCode),
       };
-  void trackEvent(ANALYTICS_EVENTS.TOOL_USED, { ...base, ...outcome }, distinctId);
+  void trackEvent(
+    ANALYTICS_EVENTS.TOOL_USED,
+    { ...base, ...outcome, ...(step && { step }) },
+    distinctId,
+  );
 }

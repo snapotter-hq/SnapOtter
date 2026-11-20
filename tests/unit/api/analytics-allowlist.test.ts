@@ -108,6 +108,20 @@ describe("auth_login_failed reason (#4216)", () => {
   });
 });
 
+describe("tool_used step (#4886)", () => {
+  it("keeps a step from the closed set", () => {
+    expect(
+      sanitizeEventProperties("tool_used", { tool_id: "passport-photo", step: "analyze" }),
+    ).toEqual({ tool_id: "passport-photo", step: "analyze" });
+  });
+
+  it("drops a step outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("tool_used", { tool_id: "passport-photo", step: "Jane Doe.heic" }),
+    ).toEqual({ tool_id: "passport-photo" });
+  });
+});
+
 describe("ai_bundle_action install failure (#4821)", () => {
   it.each(AI_INSTALL_ERROR_KINDS)("keeps the closed-set error_kind %s", (kind) => {
     expect(

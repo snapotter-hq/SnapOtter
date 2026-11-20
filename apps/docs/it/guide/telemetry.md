@@ -1,8 +1,8 @@
 ---
 description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati e come disattivare le analisi di prodotto a livello di istanza."
-i18n_source_hash: f8bbfe8db02f
+i18n_source_hash: b82b4638cd21
 i18n_provenance: machine
-i18n_output_hash: e019a38f66be
+i18n_output_hash: 41f39c7f278a
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Le analisi di prodotto anonime sono attive per impostazione predefinita e vengon
 
 ## Eventi che inviamo (quando abilitati) {#events-we-send-when-enabled}
 
-- tool_used: id dello strumento, stato, durata, categoria, se è uno strumento AI, un codice di errore in caso di fallimento.
+- tool_used: id dello strumento, stato, durata, categoria, se è uno strumento AI, un codice di errore in caso di fallimento e il nome del passaggio per uno strumento che segnala una fase a sé (il passaggio di analisi di Passport Photo).
 - pipeline_executed: numero di passaggi, id degli strumenti, flag batch, numero di file, durata, stato.
 - ai_bundle_action: id del bundle, azione (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), durata e, se l'installazione non riesce, una categoria di errore da un elenco fisso (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). L'output del programma di installazione, i percorsi e i messaggi di errore non vengono mai inviati.
 - Utilizzo del frontend: quali pagine degli strumenti vengono aperte, file aggiunti (solo conteggi), strumento avviato, download, salvataggi, ricerca (solo numero di risultati), elaborazione batch.

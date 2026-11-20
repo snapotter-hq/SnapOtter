@@ -1,8 +1,8 @@
 ---
 description: "Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées et comment désactiver les analyses produit à l'échelle de l'instance."
-i18n_source_hash: f8bbfe8db02f
+i18n_source_hash: b82b4638cd21
 i18n_provenance: machine
-i18n_output_hash: 163edbf5ebd8
+i18n_output_hash: 330ee24cdd04
 i18n_hash_version: 2
 ---
 
@@ -12,7 +12,7 @@ Les analyses produit anonymes sont activées par défaut et définies pour l'ens
 
 ## Événements que nous envoyons (lorsqu'ils sont activés) {#events-we-send-when-enabled}
 
-- tool_used : identifiant de l'outil, statut, durée, catégorie, s'il s'agit d'un outil IA, un code d'erreur en cas d'échec.
+- tool_used : identifiant de l'outil, statut, durée, catégorie, s'il s'agit d'un outil IA, un code d'erreur en cas d'échec, et le nom de l'étape pour un outil qui signale une étape à part (l'étape d'analyse de Passport Photo).
 - pipeline_executed : nombre d'étapes, identifiants des outils, indicateur de lot, nombre de fichiers, durée, statut.
 - ai_bundle_action : identifiant du bundle, action (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), durée et, en cas d'échec de l'installation, une catégorie d'échec issue d'une liste fixe (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). La sortie de l'installateur, les chemins et les messages d'erreur ne sont jamais envoyés.
 - Utilisation du frontend : quelles pages d'outils sont ouvertes, fichiers ajoutés (nombres uniquement), outil démarré, téléchargements, enregistrements, recherche (nombre de résultats uniquement), lot traité.
