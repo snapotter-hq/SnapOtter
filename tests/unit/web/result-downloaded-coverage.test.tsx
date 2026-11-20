@@ -95,7 +95,12 @@ const registrySource = readFileSync(REGISTRY, "utf8");
  * Tools that produce no downloadable file: they read metadata or colors out of
  * the input, show converted text to copy in place, or answer with numbers.
  */
-const NO_DOWNLOAD_TOOLS = new Set(["info", "color-palette", "convert-case", "aspect-ratio-calculator"]);
+const NO_DOWNLOAD_TOOLS = new Set([
+  "info",
+  "color-palette",
+  "convert-case",
+  "aspect-ratio-calculator",
+]);
 
 /** Tools where ToolPage suppresses ReviewPanel (panelOwnsResult), so useToolProcessor alone is not enough. */
 const PANEL_OWNS_RESULT_TOOLS = new Set(["sign-pdf", "ocr", "favicon", "image-to-pdf"]);
