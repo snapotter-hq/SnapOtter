@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,6 +14,10 @@ import {
   isSvgzClientError,
   sanitizeSvg,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
+
+// fast-xml-parser is an apps/api dependency, so resolve it from there.
+const require = createRequire(path.resolve(__dirname, "../../../apps/api/package.json"));
+const { XMLValidator } = require("fast-xml-parser") as typeof import("fast-xml-parser");
 
 describe("sanitizeSvg", () => {
   it("removes DOCTYPE declarations", () => {
@@ -365,8 +371,18 @@ describe("sanitizeSvg: bounded work on unterminated markup", () => {
     expect(ms).toBeLessThan(1000);
   });
 
-  it("counts entity-encoded openings toward the element cap", () => {
-    const { run } = timed(`${SVG_OPEN}${"&#60;set".repeat(6000)}</svg>`);
+  it("leaves entity-encoded openings as text instead of counting them (#5102)", () => {
+    // `&#60;` stays encoded, so it never becomes an opening for the scanners
+    // to chase and has no reason to count toward the element cap.
+    const { ms, run } = timed(`${SVG_OPEN}${"&#60;set".repeat(6000)}</svg>`);
+    const out = run();
+    expect(out).not.toMatch(/<set/i);
+    expect(out).toContain("&#60;set");
+    expect(ms).toBeLessThan(1000);
+  });
+
+  it("still counts raw openings toward the element cap", () => {
+    const { run } = timed(`${SVG_OPEN}${"<set".repeat(6000)}</svg>`);
     expect(run).toThrow("maximum element count of 5000");
   });
 
@@ -391,6 +407,97 @@ describe("sanitizeSvg: bounded work on unterminated markup", () => {
     expect(run).toThrow(
       expect.objectContaining({ statusCode: 400, message: "SVG nesting is too deep to sanitize" }),
     );
+  });
+});
+
+describe("sanitizeSvg: character references that encode XML syntax (#5102)", () => {
+  const clean = (svg: string) => sanitizeSvg(Buffer.from(svg)).toString("utf-8");
+
+  it.each([
+    ["&#34; in a double-quoted attribute", '<svg><rect fill="url(&#34;#grad&#34;)"/></svg>'],
+    ["&#x22; in a double-quoted attribute", '<svg><rect fill="url(&#x22;#grad&#x22;)"/></svg>'],
+    [
+      "&#39; in a single-quoted attribute",
+      "<svg><text font-family='&#39;Open Sans&#39;'>a</text></svg>",
+    ],
+    [
+      "&#x27; in a single-quoted attribute",
+      "<svg><text font-family='&#x27;Open Sans&#x27;'>a</text></svg>",
+    ],
+    ["&#60; in text", "<svg><text>a &#60; b</text></svg>"],
+    ["&#x3C; in text", "<svg><text>a &#x3C; b</text></svg>"],
+    ["&#38; in text", "<svg><text>R&#38;D</text></svg>"],
+    ["&#x26; in text", "<svg><text>R&#x26;D</text></svg>"],
+    ["&#60; in an attribute", '<svg><rect data-x="a &#60; b"/></svg>'],
+    ["&#62; in text", "<svg><text>]]&#62;</text></svg>"],
+  ])("keeps %s well-formed", (_label, input) => {
+    expect(XMLValidator.validate(input)).toBe(true);
+    const out = clean(input);
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toBe(input);
+  });
+
+  it("does not turn an encoded quote into a new attribute", () => {
+    const out = clean('<svg><rect fill="x&#34; stroke=&#34;red"/></svg>');
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toContain('fill="x&#34; stroke=&#34;red"');
+    expect(out).not.toContain('stroke="red"');
+  });
+
+  it("does not turn encoded markup into an element", () => {
+    const out = clean("<svg><text>&#60;script>alert(1)&#60;/script></text></svg>");
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).not.toMatch(/<script/i);
+  });
+
+  it("does not decode an encoded ampersand a second time", () => {
+    // XML reads `&#38;#106;` as the literal text `&#106;`, not as `j`.
+    const out = clean('<svg><a href="&#38;#106;avascript:x"><text>c</text></a></svg>');
+    expect(out).toContain('href="&#38;#106;avascript:x"');
+  });
+
+  it("decodes a code point above U+FFFF whole instead of truncating it", () => {
+    // String.fromCharCode wrapped these to 16 bits: &#65570; came out as `"`.
+    const out = clean('<svg><rect data-x="&#65570;"/><text>&#x1F600;</text></svg>');
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toBe(
+      `<svg><rect data-x="${String.fromCodePoint(65570)}"/><text>${String.fromCodePoint(0x1f600)}</text></svg>`,
+    );
+  });
+
+  it("leaves a reference past U+10FFFF untouched", () => {
+    const out = clean("<svg><text>&#x110000;&#99999999;</text></svg>");
+    expect(out).toContain("&#x110000;&#99999999;");
+  });
+
+  it.each([
+    ["a decoded digit", '<svg><a href="&#&#49;06;avascript:alert(1)"><text>c</text></a></svg>'],
+    ["a decoded #", '<svg><a href="&&#35;x6A;avascript:alert(1)"><text>c</text></a></svg>'],
+    ["an uppercase X", '<svg><a href="&#X6A;avascript:alert(1)"><text>c</text></a></svg>'],
+  ])("catches a scheme hidden behind %s", (_label, input) => {
+    const out = clean(input);
+    expect(out).not.toMatch(/javascript:/i);
+    expect(out).not.toMatch(/&#[xX]?[0-9a-fA-F]+;avascript/);
+  });
+
+  it("rejects references nested deeper than the decode pass cap", () => {
+    // Each level encodes the first digit, so it needs one more pass to decode.
+    let ref = "&#106;";
+    for (let level = 0; level < 6; level++) {
+      const i = ref.search(/\d/);
+      ref = `${ref.slice(0, i)}&#${ref.charCodeAt(i)};${ref.slice(i + 1)}`;
+    }
+    expect(() => clean(`<svg><text>${ref}</text></svg>`)).toThrow(
+      expect.objectContaining({ statusCode: 400 }),
+    );
+  });
+
+  it("still decodes letters so an encoded scheme is caught", () => {
+    const out = clean(
+      '<svg><rect fill="&#34;"/><a href="&#106;avascript:alert(1)"><text>c</text></a></svg>',
+    );
+    expect(out).toContain('fill="&#34;"');
+    expect(out).not.toMatch(/javascript:/i);
   });
 });
 
