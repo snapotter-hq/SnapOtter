@@ -4,6 +4,7 @@ import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -190,10 +191,18 @@ export function registerWatermarkImage(app: FastifyInstance) {
       }
 
       const outputFormat = await resolveOutputFormat(mainBuffer, filename);
-      const result = await sharp(mainBuffer)
-        .composite([{ input: wmBuffer, top, left }])
-        .toFormat(outputFormat.format, outputFormat.encoderOptions)
-        .toBuffer();
+      const placeWatermark = (page: Buffer) =>
+        sharp(page).composite([{ input: wmBuffer, top, left }]);
+      // A composite on a page stack lands on page 1 alone, so a multi-page TIFF
+      // or an animated GIF goes page by page. Every page shares page 1's size,
+      // so the watermark sized above fits each one (#5104).
+      const result =
+        (await runPerFrame(mainBuffer, outputFormat, (page) =>
+          placeWatermark(page).png().toBuffer(),
+        )) ??
+        (await placeWatermark(mainBuffer)
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer());
 
       const jobId = randomUUID();
       const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_watermarked.${outputFormat.extension}`;

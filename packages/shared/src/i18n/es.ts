@@ -5919,6 +5919,8 @@ export const es: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Se superó la cuota de almacenamiento.",
       TARGET_SIZE_EXCEEDED: "El resultado no puede alcanzar el tamaño objetivo.",
       TOO_MANY_FRAMES: "Este archivo tiene demasiados fotogramas para procesarlo.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Esta herramienta edita una imagen cada vez. Divide primero las páginas o fotogramas en imágenes separadas.",
       CANCELED: "Se canceló la operación.",
       PAGE_OUT_OF_RANGE: "Ese rango incluye una página que este PDF no tiene.",
       INVALID_PAGE_RANGE: "Ese rango de páginas no es válido. Usa números de página como 1-3,5.",

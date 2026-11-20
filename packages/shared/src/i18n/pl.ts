@@ -5921,6 +5921,8 @@ export const pl: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Przekroczono limit miejsca.",
       TARGET_SIZE_EXCEEDED: "Wynik nie może osiągnąć docelowego rozmiaru.",
       TOO_MANY_FRAMES: "Ten plik ma zbyt wiele klatek, aby go przetworzyć.",
+      MULTI_FRAME_UNSUPPORTED:
+        "To narzędzie edytuje jeden obraz naraz. Najpierw podziel strony lub klatki na osobne obrazy.",
       CANCELED: "Operację anulowano.",
       PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",

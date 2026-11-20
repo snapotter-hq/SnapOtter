@@ -5908,6 +5908,8 @@ export const tr: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Depolama kotası aşıldı.",
       TARGET_SIZE_EXCEEDED: "Sonuç hedef boyuta ulaşamıyor.",
       TOO_MANY_FRAMES: "Bu dosyada işlenemeyecek kadar çok kare var.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Bu araç aynı anda tek bir görseli düzenler. Önce sayfaları veya kareleri ayrı görsellere bölün.",
       CANCELED: "İşlem iptal edildi.",
       PAGE_OUT_OF_RANGE: "Bu sayfa aralığı, bu PDF'de olmayan bir sayfa içeriyor.",
       INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",

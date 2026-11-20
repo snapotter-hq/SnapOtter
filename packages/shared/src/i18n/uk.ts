@@ -5909,6 +5909,8 @@ export const uk: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Перевищено квоту сховища.",
       TARGET_SIZE_EXCEEDED: "Результат не може досягти цільового розміру.",
       TOO_MANY_FRAMES: "У цьому файлі забагато кадрів для обробки.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Цей інструмент редагує лише одне зображення за раз. Спершу розділіть сторінки або кадри на окремі зображення.",
       CANCELED: "Операцію скасовано.",
       PAGE_OUT_OF_RANGE: "У цьому діапазоні є сторінка, якої немає в цьому PDF.",
       INVALID_PAGE_RANGE:
