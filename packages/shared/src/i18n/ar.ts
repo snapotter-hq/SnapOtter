@@ -1234,6 +1234,10 @@ export const ar: TranslationKeys = {
       name: "دمج ملفات CSV",
       description: "دمج ملفات CSV أو TSV متعددة ذات أعمدة متطابقة في ملف واحد",
     },
+    "merge-text": {
+      name: "دمج الملفات النصية",
+      description: "دمج عدة ملفات نصية أو Markdown في ملف واحد بالترتيب الذي تختاره",
+    },
     "yaml-json": {
       name: "تحويل YAML / JSON",
       description: "التحويل بين YAML وJSON في الاتجاهين",
@@ -4099,6 +4103,14 @@ export const ar: TranslationKeys = {
     "merge-csvs": {
       submit: "دمج",
       submitBatch: "دمج ({count} ملفات)",
+      progressLabel: "جارٍ الدمج",
+    },
+    "merge-text": {
+      separator: "بين الملفات",
+      separatorBlankLine: "سطر فارغ",
+      separatorRule: "خط أفقي (---)",
+      separatorFilenameHeading: "اسم الملف كعنوان",
+      submit: "دمج",
       progressLabel: "جارٍ الدمج",
     },
     "yaml-json": {

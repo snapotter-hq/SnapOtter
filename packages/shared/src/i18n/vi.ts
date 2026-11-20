@@ -1247,6 +1247,10 @@ export const vi: TranslationKeys = {
       name: "Ghép CSV",
       description: "Gộp nhiều tệp CSV hoặc TSV có cùng cột thành một",
     },
+    "merge-text": {
+      name: "Ghép tệp văn bản",
+      description: "Gộp nhiều tệp văn bản hoặc Markdown thành một theo thứ tự bạn chọn",
+    },
     "yaml-json": {
       name: "Chuyển đổi YAML / JSON",
       description: "Chuyển đổi hai chiều giữa YAML và JSON",
@@ -4122,6 +4126,14 @@ export const vi: TranslationKeys = {
     "merge-csvs": {
       submit: "Ghép",
       submitBatch: "Ghép ({count} tệp)",
+      progressLabel: "Đang ghép",
+    },
+    "merge-text": {
+      separator: "Giữa các tệp",
+      separatorBlankLine: "Dòng trống",
+      separatorRule: "Đường kẻ ngang (---)",
+      separatorFilenameHeading: "Tên tệp làm tiêu đề",
+      submit: "Ghép",
       progressLabel: "Đang ghép",
     },
     "yaml-json": {

@@ -1021,6 +1021,10 @@ export const zhTW: TranslationKeys = {
       name: "合併 CSV",
       description: "將多個欄位相符的 CSV 或 TSV 檔案合併為一個",
     },
+    "merge-text": {
+      name: "合併文字檔案",
+      description: "依你選擇的順序，將多個文字或 Markdown 檔案合併為一個",
+    },
     "yaml-json": {
       name: "轉換 YAML / JSON",
       description: "在 YAML 與 JSON 之間雙向轉換",
@@ -3852,6 +3856,14 @@ export const zhTW: TranslationKeys = {
     "merge-csvs": {
       submit: "合併",
       submitBatch: "合併（{count} 個檔案）",
+      progressLabel: "正在合併",
+    },
+    "merge-text": {
+      separator: "檔案之間",
+      separatorBlankLine: "空行",
+      separatorRule: "水平線 (---)",
+      separatorFilenameHeading: "以檔名作為標題",
+      submit: "合併",
       progressLabel: "正在合併",
     },
     "yaml-json": {

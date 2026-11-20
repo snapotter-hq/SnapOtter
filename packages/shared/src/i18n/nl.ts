@@ -1250,6 +1250,11 @@ export const nl: TranslationKeys = {
       description:
         "Combineer meerdere CSV- of TSV-bestanden met overeenkomende kolommen tot een bestand",
     },
+    "merge-text": {
+      name: "Tekstbestanden samenvoegen",
+      description:
+        "Combineer meerdere tekst- of Markdown-bestanden tot een bestand, in de volgorde die je kiest",
+    },
     "yaml-json": {
       name: "YAML / JSON converteren",
       description: "Converteer tussen YAML en JSON, beide richtingen",
@@ -4145,6 +4150,14 @@ export const nl: TranslationKeys = {
     "merge-csvs": {
       submit: "Samenvoegen",
       submitBatch: "Samenvoegen ({count} bestanden)",
+      progressLabel: "Samenvoegen",
+    },
+    "merge-text": {
+      separator: "Tussen bestanden",
+      separatorBlankLine: "Lege regel",
+      separatorRule: "Horizontale lijn (---)",
+      separatorFilenameHeading: "Bestandsnaam als kop",
+      submit: "Samenvoegen",
       progressLabel: "Samenvoegen",
     },
     "yaml-json": {

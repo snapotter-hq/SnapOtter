@@ -1020,6 +1020,10 @@ export const zhCN: TranslationKeys = {
       name: "合并 CSV",
       description: "将多个列匹配的 CSV 或 TSV 文件合并为一个",
     },
+    "merge-text": {
+      name: "合并文本文件",
+      description: "按你选择的顺序，将多个文本或 Markdown 文件合并为一个",
+    },
     "yaml-json": {
       name: "转换 YAML / JSON",
       description: "在 YAML 和 JSON 之间双向转换",
@@ -3851,6 +3855,14 @@ export const zhCN: TranslationKeys = {
     "merge-csvs": {
       submit: "合并",
       submitBatch: "合并（{count} 个文件）",
+      progressLabel: "正在合并",
+    },
+    "merge-text": {
+      separator: "文件之间",
+      separatorBlankLine: "空行",
+      separatorRule: "水平线 (---)",
+      separatorFilenameHeading: "以文件名作为标题",
+      submit: "合并",
       progressLabel: "正在合并",
     },
     "yaml-json": {

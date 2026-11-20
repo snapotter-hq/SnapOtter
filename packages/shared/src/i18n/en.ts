@@ -1199,6 +1199,10 @@ export const en = {
       name: "Merge CSVs",
       description: "Combine multiple CSV or TSV files with matching columns into one",
     },
+    "merge-text": {
+      name: "Merge Text Files",
+      description: "Combine multiple text or Markdown files into one, in the order you choose",
+    },
     "yaml-json": {
       name: "Convert YAML / JSON",
       description: "Convert between YAML and JSON, both directions",
@@ -4063,6 +4067,14 @@ export const en = {
     "merge-csvs": {
       submit: "Merge",
       submitBatch: "Merge ({count} files)",
+      progressLabel: "Merging",
+    },
+    "merge-text": {
+      separator: "Between files",
+      separatorBlankLine: "Blank line",
+      separatorRule: "Horizontal rule (---)",
+      separatorFilenameHeading: "Filename as a heading",
+      submit: "Merge",
       progressLabel: "Merging",
     },
     "yaml-json": {

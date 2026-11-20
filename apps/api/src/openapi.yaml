@@ -15770,6 +15770,67 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/merge-text:
+    post:
+      operationId: mergeText
+      tags: [Files]
+      summary: Merge Text Files
+      description: Combine multiple text or Markdown files into one, in the order they are uploaded. Each file must be UTF-8 text. The output keeps the shared extension when every input has the same one, otherwise it is plain text. CSV inputs always come back as .txt, because each file brings its own header row.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more .txt, .md, .markdown, .csv or .log files to merge (2-50 files)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `separator` (blank-line | rule | filename-heading, default blank-line) - What goes between files: a blank line, a `---` rule, or each file's name as a heading
+            example:
+              file:
+                - notes-1.md
+                - notes-2.md
+              settings: '{"separator":"filename-heading"}'
+      responses:
+        "200":
+          description: Merged text file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/merged.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson

@@ -858,6 +858,11 @@ const MergeCsvsSettings = lazy(() =>
     default: m.MergeCsvsSettings,
   })),
 );
+const MergeTextSettings = lazy(() =>
+  import("@/components/tools/merge-text-settings").then((m) => ({
+    default: m.MergeTextSettings,
+  })),
+);
 const YamlJsonSettings = lazy(() =>
   import("@/components/tools/yaml-json-settings").then((m) => ({
     default: m.YamlJsonSettings,
@@ -1231,6 +1236,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],
   ["split-csv", { accept: ".csv,.tsv", Settings: SplitCsvSettings }],
   ["merge-csvs", { accept: ".csv,.tsv", Settings: MergeCsvsSettings }],
+  ["merge-text", { accept: ".txt,.md,.markdown,.csv,.log", Settings: MergeTextSettings }],
   ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
   ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],

@@ -319,6 +319,8 @@
 /tools/split-csv /tools/files/split-csv/ 301
 /tools/merge-csvs/ /tools/files/merge-csvs/ 301
 /tools/merge-csvs /tools/files/merge-csvs/ 301
+/tools/merge-text/ /tools/files/merge-text/ 301
+/tools/merge-text /tools/files/merge-text/ 301
 /tools/yaml-json/ /tools/files/yaml-json/ 301
 /tools/yaml-json /tools/files/yaml-json/ 301
 /tools/xml-to-csv/ /tools/files/xml-to-csv/ 301
