@@ -8046,6 +8046,42 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "merge-text": {
+    searchTitle: "Merge Text and Markdown Files Into One",
+    longDescription:
+      "Join 2 to 50 text, Markdown, CSV or log files into a single file, in the order you arrange them. Put a blank line, a horizontal rule, or each file's name as a heading between them. When every file is Markdown the result is Markdown too, and a file that isn't UTF-8 text is rejected by name instead of turning into garbled characters. Runs on your own SnapOtter instance, so your notes and logs never reach a third party.",
+    useCases: [
+      "Stitching chapter or section drafts written as separate Markdown files into one manuscript",
+      "Combining a folder of meeting notes into a single document to search or share",
+      "Combining several .log files into one before searching through them",
+      "Assembling README fragments or changelog entries into one page",
+    ],
+    features: [
+      "Joins files in the order shown, with drag-to-reorder before you merge",
+      "Choice of separator: blank line, horizontal rule, or a filename heading for each file",
+      "Keeps the shared extension, so Markdown inputs come back as merged.md",
+      "Rejects binary and non-UTF-8 files with the offending filename in the error",
+      "Matches Windows line endings when every input uses them",
+    ],
+    faqs: [
+      {
+        q: "Can I control the order of the files?",
+        a: "Yes. Files are joined top to bottom in the order they appear in the file list, and you can drag them into a different order before merging.",
+      },
+      {
+        q: "What does the filename heading separator look like?",
+        a: 'When every file is Markdown, each section starts with a level one heading such as "# notes.md". Otherwise each section gets a "==> notes.txt <==" marker line instead, the same style tail uses for multiple files.',
+      },
+      {
+        q: "Can I merge CSV files with it?",
+        a: "You can, but the result comes back as plain text because each file's header row is repeated. To combine CSV tables into one valid table, use Merge CSVs instead.",
+      },
+      {
+        q: "Does it support email files?",
+        a: "Not yet. .eml files aren't accepted, because flattening MIME email into readable text needs its own handling. Supported inputs are .txt, .md, .markdown, .csv and .log.",
+      },
+    ],
+  },
   "yaml-json": {
     searchTitle: "Convert YAML to JSON and Back",
     longDescription:
