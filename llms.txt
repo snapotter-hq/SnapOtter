@@ -1,6 +1,6 @@
 # SnapOtter
 
-SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 258 tool routes across the five modalities, plus a layer-based image editor.
+SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 259 tool routes across the five modalities, plus a layer-based image editor.
 
 All processing happens locally. Files never leave your infrastructure.
 
@@ -40,7 +40,7 @@ Then run docker compose up -d, open http://localhost:1349, and log in with admin
 
 ## Tools
 
-258 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
+259 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
 ### Image
 
