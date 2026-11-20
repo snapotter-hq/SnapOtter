@@ -370,6 +370,8 @@ export const processPassportGenerate: ToolProcessV2 = async ({
       );
 
       if (printBuffer) {
+        if (!jobId)
+          throw new Error("passport-photo generate needs its job id to link the print sheet");
         const printFilename = `${stem}_passport_print_${printLayout}.jpg`;
         extraOutputs = [{ name: printFilename, buffer: printBuffer, contentType: "image/jpeg" }];
         resultPayload.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;

@@ -70,8 +70,11 @@ export interface ToolProcessInputV2 {
 }
 
 export interface ToolProcessCtxV2 {
-  /** The job's own id: its outputs are served from /api/v1/download/<jobId>/. */
-  jobId: string;
+  /**
+   * The job's own id: its outputs are served from /api/v1/download/<jobId>/.
+   * The worker always sets it; only direct calls (tests) leave it out.
+   */
+  jobId?: string;
   inputs: ToolProcessInputV2[];
   settings: unknown;
   scratchDir: string;
