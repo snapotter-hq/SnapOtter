@@ -179,6 +179,12 @@ export const sv: TranslationKeys = {
     discoverySourceLabel: "Hur hörde du talas om oss?",
     optionalHint: "(valfritt)",
     continueLabel: "Fortsätt",
+    analyticsConsentTitle: "Skicka anonym användningsstatistik och kraschrapporter?",
+    analyticsConsentBody: "Dina filer skickas aldrig. Du kan ändra detta senare i Inställningar.",
+    analyticsConsentLearnMore: "Se vad som skickas",
+    analyticsConsentYes: "Skicka",
+    analyticsConsentNo: "Skicka inte",
+    analyticsConsentSaveFailed: "Det gick inte att spara ditt val. Försök igen.",
   },
   categories: {
     essentials: "Grundläggande",
@@ -5021,7 +5027,7 @@ export const sv: TranslationKeys = {
     privacy: {
       title: "Integritet",
       description:
-        "Anonym produktanalys hjälper till att förbättra SnapOtter. Den är på som standard och ställs in för hela instansen av en administratör.",
+        "Anonym produktanalys hjälper till att förbättra SnapOtter. En administratör ställer in den för hela instansen.",
       analyticsLabel: "Anonym produktanalys",
       analyticsDescription:
         "Dela anonyma användningsdata (vilka verktyg som körs, tidsåtgång, felkoder) och kraschrapporter. Ingen IP-adress, ingen kontoidentitet. Vi samlar aldrig in dina filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Stäng av det här för att stoppa allt.",

@@ -179,6 +179,13 @@ export const ptBR: TranslationKeys = {
     discoverySourceLabel: "Como você ficou sabendo da gente?",
     optionalHint: "(opcional)",
     continueLabel: "Continuar",
+    analyticsConsentTitle: "Enviar estatísticas de uso anônimas e relatórios de falhas?",
+    analyticsConsentBody:
+      "Seus arquivos nunca são enviados. Você pode mudar isso depois em Configurações.",
+    analyticsConsentLearnMore: "Ver o que é enviado",
+    analyticsConsentYes: "Enviar",
+    analyticsConsentNo: "Não enviar",
+    analyticsConsentSaveFailed: "Não foi possível salvar sua escolha. Tente novamente.",
   },
   categories: {
     essentials: "Essenciais",
@@ -5033,7 +5040,7 @@ export const ptBR: TranslationKeys = {
     privacy: {
       title: "Privacidade",
       description:
-        "As análises de produto anônimas ajudam a melhorar o SnapOtter. Elas ficam ativadas por padrão e são configuradas para toda a instância por um administrador.",
+        "As análises de produto anônimas ajudam a melhorar o SnapOtter. Um administrador as configura para toda a instância.",
       analyticsLabel: "Análises de produto anônimas",
       analyticsDescription:
         "Compartilhe dados de uso anônimos (quais ferramentas são executadas, durações, códigos de erro) e relatórios de falha. Sem endereço IP, sem identidade de conta. Nunca coletamos os nomes dos seus arquivos, o conteúdo dos arquivos, a saída de OCR, os metadados de imagem ou o texto de documentos. Desative isso para interromper tudo.",

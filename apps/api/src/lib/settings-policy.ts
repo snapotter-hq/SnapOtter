@@ -167,6 +167,7 @@ export const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
 
   cookie_secret: readonly({ encrypted: true, redacted: true }),
   instance_id: readonly(),
+  analyticsConsentOrigin: readonly(),
   sqlite_import: readonly(),
   "onboarding.firstProcessedAt": readonly(),
   scim_token_hash: readonly({ encrypted: true, redacted: true }),

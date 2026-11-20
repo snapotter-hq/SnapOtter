@@ -825,7 +825,7 @@ describe("loadEnv HOST", () => {
 describe("loadEnv instance and analytics seeds", () => {
   const SEED_ID = "3f2c1a9e-8b7d-4c6e-9a5f-1e2d3c4b5a69";
 
-  it("accepts a lowercase v4 instance id and defaults analytics to on", () => {
+  it("accepts a lowercase v4 instance id and leaves the analytics default unset (#4910)", () => {
     restoreEnv();
     const parsed = loadEnv({
       ...process.env,
@@ -833,7 +833,7 @@ describe("loadEnv instance and analytics seeds", () => {
       SNAPOTTER_ANALYTICS_DEFAULT: undefined,
     });
     expect(parsed.SNAPOTTER_INSTANCE_ID).toBe(SEED_ID);
-    expect(parsed.SNAPOTTER_ANALYTICS_DEFAULT).toBe("on");
+    expect(parsed.SNAPOTTER_ANALYTICS_DEFAULT).toBeUndefined();
   });
 
   it("defaults the instance id to empty, which tells ensureInstanceId to generate one", () => {

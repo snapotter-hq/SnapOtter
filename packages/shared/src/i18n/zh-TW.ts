@@ -174,6 +174,12 @@ export const zhTW: TranslationKeys = {
     discoverySourceLabel: "您是如何得知我們的?",
     optionalHint: "(選填)",
     continueLabel: "繼續",
+    analyticsConsentTitle: "要傳送匿名使用統計和當機報告嗎?",
+    analyticsConsentBody: "您的檔案永遠不會被傳送。您之後可以在設定中變更此選項。",
+    analyticsConsentLearnMore: "查看傳送哪些內容",
+    analyticsConsentYes: "傳送",
+    analyticsConsentNo: "不傳送",
+    analyticsConsentSaveFailed: "無法儲存您的選擇，請再試一次。",
   },
   categories: {
     essentials: "基本工具",
@@ -4737,8 +4743,7 @@ export const zhTW: TranslationKeys = {
     },
     privacy: {
       title: "隱私",
-      description:
-        "匿名產品分析有助於改進 SnapOtter。此功能預設開啟，並由管理員為整個實例統一設定。",
+      description: "匿名產品分析有助於改進 SnapOtter。此功能由管理員為整個實例統一設定。",
       analyticsLabel: "匿名產品分析",
       analyticsDescription:
         "分享匿名使用資料（執行了哪些工具、時長、錯誤代碼）與當機報告。不含 IP 位址，不含帳戶身分。我們絕不收集您的檔案名稱、檔案內容、OCR 輸出、影像中繼資料或文件文字。關閉此項即可停止上述所有收集。",

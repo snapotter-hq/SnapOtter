@@ -178,6 +178,13 @@ export const id: TranslationKeys = {
     discoverySourceLabel: "Dari mana Anda mengetahui kami?",
     optionalHint: "(opsional)",
     continueLabel: "Lanjutkan",
+    analyticsConsentTitle: "Kirim statistik penggunaan anonim dan laporan crash?",
+    analyticsConsentBody:
+      "File Anda tidak pernah dikirim. Anda dapat mengubahnya nanti di Pengaturan.",
+    analyticsConsentLearnMore: "Lihat apa yang dikirim",
+    analyticsConsentYes: "Kirim",
+    analyticsConsentNo: "Jangan kirim",
+    analyticsConsentSaveFailed: "Pilihan Anda tidak dapat disimpan. Silakan coba lagi.",
   },
   categories: {
     essentials: "Dasar",
@@ -5022,7 +5029,7 @@ export const id: TranslationKeys = {
     privacy: {
       title: "Privasi",
       description:
-        "Analitik Produk Anonim membantu meningkatkan SnapOtter. Fitur ini aktif secara default dan diatur untuk seluruh instance oleh administrator.",
+        "Analitik Produk Anonim membantu meningkatkan SnapOtter. Administrator mengaturnya untuk seluruh instance.",
       analyticsLabel: "Analitik Produk Anonim",
       analyticsDescription:
         "Bagikan data penggunaan anonim (alat mana yang dijalankan, durasi, kode kesalahan) dan laporan kerusakan. Tanpa alamat IP, tanpa identitas akun. Kami tidak pernah mengumpulkan nama file, isi file, keluaran OCR, metadata gambar, atau teks dokumen Anda. Matikan ini untuk menghentikan semuanya.",

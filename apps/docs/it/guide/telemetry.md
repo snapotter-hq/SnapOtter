@@ -1,16 +1,16 @@
 ---
-description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati e come disattivare le analisi di prodotto a livello di istanza."
-i18n_source_hash: b82b4638cd21
+description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati, come funziona la scelta al primo avvio e come disattivare le analisi di prodotto per l'intera istanza."
+i18n_source_hash: 784b2a0c06eb
 i18n_provenance: machine
-i18n_output_hash: 41f39c7f278a
+i18n_output_hash: 0d690cb2220e
 i18n_hash_version: 2
 ---
 
 # Cosa raccoglie SnapOtter {#what-snapotter-collects}
 
-Le analisi di prodotto anonime sono attive per impostazione predefinita e vengono impostate per l'intera istanza da un amministratore. Disattivale in Impostazioni > Sistema > Privacy.
+Anonymous Product Analytics viene impostato per l'intera istanza da un amministratore. Una nuova istanza lo chiede al primo avvio e non invia nulla finché qualcuno non risponde. Puoi modificarlo in qualsiasi momento in Settings > System > Privacy.
 
-## Eventi che inviamo (quando abilitati) {#events-we-send-when-enabled}
+Quando le analisi sono attive, SnapOtter invia a PostHog quali strumenti e pipeline vengono eseguiti, quanto durano, se vanno a buon fine, i codici di errore e il numero di file, insieme all'ID anonimo dell'istanza, alla sua versione, all'architettura della CPU, al sistema operativo, al tipo di installazione e alla presenza o meno di una GPU. Le segnalazioni di arresto anomalo vanno a Sentry senza nomi di file, percorsi, indirizzi e-mail e valori tra virgolette. Non invia mai i tuoi file, i loro nomi o percorsi, il loro contenuto, l'output dell'OCR o il testo estratto, i metadati delle immagini o l'identità del tuo account. PostHog e Sentry sono gli unici due destinatari, e con le analisi disattivate non viene inviato nulla a nessuno dei due.
 
 - tool_used: id dello strumento, stato, durata, categoria, se è uno strumento AI, un codice di errore in caso di fallimento e il nome del passaggio per uno strumento che segnala una fase a sé (il passaggio di analisi di Passport Photo).
 - pipeline_executed: numero di passaggi, id degli strumenti, flag batch, numero di file, durata, stato.
@@ -21,20 +21,20 @@ Le analisi di prodotto anonime sono attive per impostazione predefinita e vengon
 ## Cosa non raccogliamo mai {#what-we-never-collect}
 
 - Nomi o percorsi dei file
-- Contenuti dei file
-- Testo dell'output OCR
+- Contenuto dei file
+- Testo prodotto dall'OCR
 - Metadati delle immagini (EXIF)
 - Testo estratto dai documenti
-- La tua identità di account
+- L'identità del tuo account
 
-Come qualsiasi server, PostHog vede l'indirizzo IP da cui arriva ogni richiesta. Il nostro progetto PostHog lo scarta invece di memorizzarlo, e gli eventi inviati dal server di SnapOtter stesso trasmettono un valore segnaposto al suo posto.
+PostHog vede l'indirizzo IP da cui proviene ogni richiesta, come qualsiasi server. Il nostro progetto PostHog lo scarta invece di memorizzarlo, e gli eventi del server di SnapOtter inviano un segnaposto al suo posto.
 
 ## Avvisi di aggiornamento {#update-notices}
 
-Finché l'analisi è attiva, il server chiede a PostHog ogni qualche ora qual è la versione più recente di SnapOtter, usando l'ID anonimo dell'istanza e la sua versione. Quando esiste una versione più recente, gli amministratori vedono un avviso con un link alle note di rilascio. Se lo chiudi, resta nascosto fino alla versione successiva. Non viene installato né scaricato nulla al posto tuo e, con l'analisi disattivata, il server non lo chiede mai.
+Finché le analisi sono attive, il server chiede a PostHog ogni poche ore qual è la versione più recente di SnapOtter, usando l'ID anonimo dell'istanza e la sua versione. Quando esiste una versione più recente, gli amministratori vedono un avviso con un link alle note di rilascio. Se lo chiudi, resta nascosto fino alla versione successiva. Non viene installato né scaricato nulla al tuo posto e, con le analisi disattivate, il server non chiede mai nulla.
 
-## Come disattivarle {#turning-it-off}
+## Come disattivarlo {#turning-it-off}
 
-Admin: Impostazioni > Sistema > Privacy, disattiva "Analisi di prodotto anonime". Si interrompe immediatamente, a livello di istanza. Per compilare un'immagine che non può mai emettere dati, imposta il build arg `SNAPOTTER_ANALYTICS=off`.
+Amministratori: Settings > System > Privacy, disattiva "Anonymous Product Analytics". L'invio si interrompe subito, per l'intera istanza. Per creare un'immagine che non possa mai inviare dati, imposta l'argomento di build `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` nell'ambiente del server ha lo stesso effetto in fase di esecuzione e prevale su qualsiasi risposta salvata nell'app.
 
-Per avviare una nuova istanza con l'analisi già disattivata, aggiungi `SNAPOTTER_ANALYTICS_DEFAULT=off` all'ambiente del server prima del suo primo avvio. Con Docker Compose, inseriscilo sotto `environment:` del servizio dell'app, perché impostarlo solo in `.env` non lo fa arrivare al container.
+Per rispondere in anticipo alla domanda del primo avvio, aggiungi `SNAPOTTER_ANALYTICS_DEFAULT=off` (oppure `on`) all'ambiente del server prima del primo avvio, e non verrà chiesto a nessuno. Con Docker Compose, inseriscilo sotto `environment:` del servizio dell'app, perché impostarlo solo in `.env` non raggiunge il container.

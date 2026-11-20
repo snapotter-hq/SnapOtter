@@ -178,6 +178,12 @@ export const ko: TranslationKeys = {
     discoverySourceLabel: "SnapOtter를 어떻게 알게 되셨나요?",
     optionalHint: "(선택 사항)",
     continueLabel: "계속",
+    analyticsConsentTitle: "익명 사용 통계와 오류 보고서를 보낼까요?",
+    analyticsConsentBody: "파일은 절대 전송되지 않습니다. 나중에 설정에서 변경할 수 있습니다.",
+    analyticsConsentLearnMore: "전송되는 정보 보기",
+    analyticsConsentYes: "보내기",
+    analyticsConsentNo: "보내지 않기",
+    analyticsConsentSaveFailed: "선택을 저장하지 못했습니다. 다시 시도해 주세요.",
   },
   categories: {
     essentials: "기본 도구",
@@ -4950,7 +4956,7 @@ export const ko: TranslationKeys = {
     privacy: {
       title: "개인정보",
       description:
-        "익명 제품 분석은 SnapOtter 개선에 도움이 됩니다. 기본적으로 켜져 있으며 관리자가 전체 인스턴스에 대해 설정합니다.",
+        "익명 제품 분석은 SnapOtter 개선에 도움이 됩니다. 관리자가 전체 인스턴스에 대해 설정합니다.",
       analyticsLabel: "익명 제품 분석",
       analyticsDescription:
         "익명 사용 데이터(실행된 도구, 소요 시간, 오류 코드)와 충돌 보고서를 공유합니다. IP 주소나 계정 정보는 포함되지 않습니다. 파일 이름, 파일 내용, OCR 결과, 이미지 메타데이터, 문서 텍스트는 절대 수집하지 않습니다. 모두 중단하려면 이 옵션을 끄세요.",

@@ -1,28 +1,46 @@
 import { ANALYTICS_BAKED } from "@snapotter/shared";
 import type Redis from "ioredis";
+import { ANALYTICS_CONSENT_ORIGIN_KEY } from "./analytics-consent.js";
 
 const TTL_MS = 30_000;
 const SETTING_KEY = "analyticsEnabled";
 
-// `undefined` from a reader means the key is absent (default ON).
+// The reader answers the admin's effective decision: true or false, or
+// `undefined` while nobody has decided (#4910). Undecided sends nothing.
 type GateReader = () => Promise<boolean | undefined>;
 
-let cachedEnabled = true; // last known toggle value (default ON)
+let cachedEnabled = true; // last known toggle value; only Sentry reads it before priming, and Sentry waits for gatePrimed()
+let cachedDecided = true; // false while a fresh install waits for the admin's answer
 let knownDisabled = false; // have we positively read "disabled"? fail-closed anchor
 let primed = false; // has a successful read happened yet? gates Sentry at cold start
 let fetchedAt = 0; // Date.now() of the last read attempt
 let reader: GateReader = defaultReader;
 
+/**
+ * A stored analyticsEnabled row is the decision. Without one, an instance that
+ * predates the consent prompt keeps the old default (on), and everything else,
+ * a fresh install or one not yet classified, counts as undecided.
+ */
+export function resolveAnalyticsDecision(
+  stored: string | undefined,
+  origin: string | undefined,
+): boolean | undefined {
+  if (stored !== undefined) return stored !== "false";
+  if (origin === "upgrade") return true;
+  return undefined;
+}
+
 async function defaultReader(): Promise<boolean | undefined> {
   const { db, schema } = await import("../db/index.js");
-  const { eq } = await import("drizzle-orm");
+  const { inArray } = await import("drizzle-orm");
   const rows = await db
-    .select({ value: schema.settings.value })
+    .select({ key: schema.settings.key, value: schema.settings.value })
     .from(schema.settings)
-    .where(eq(schema.settings.key, SETTING_KEY))
-    .limit(1);
-  if (rows.length === 0) return undefined;
-  return rows[0].value !== "false";
+    .where(inArray(schema.settings.key, [SETTING_KEY, ANALYTICS_CONSENT_ORIGIN_KEY]))
+    .limit(2);
+  const stored = rows.find((row) => row.key === SETTING_KEY)?.value;
+  const origin = rows.find((row) => row.key === ANALYTICS_CONSENT_ORIGIN_KEY)?.value;
+  return resolveAnalyticsDecision(stored, origin);
 }
 
 /**
@@ -64,6 +82,16 @@ export function analyticsEnabled(): boolean {
   return cachedEnabled;
 }
 
+/**
+ * True while a fresh install waits for the admin to answer the first-run
+ * prompt. Nothing is sent in that state. False when analytics can never come
+ * on (bake off or an env kill switch), since there is nothing to ask.
+ */
+export function analyticsConsentPending(): boolean {
+  if (!bakedEnabled()) return false;
+  return !cachedDecided;
+}
+
 const disabledListeners = new Set<() => void>();
 
 /**
@@ -84,9 +112,10 @@ export function onAnalyticsDisabled(listener: () => void): () => void {
 async function readIntoCache(): Promise<{ error: unknown } | null> {
   try {
     const v = await reader();
-    const on = v === undefined ? true : v;
+    const on = v === true;
     const becameDisabled = !on && !knownDisabled;
     cachedEnabled = on;
+    cachedDecided = v !== undefined;
     knownDisabled = !on;
     primed = true;
     fetchedAt = Date.now();
@@ -148,6 +177,7 @@ export function __setReaderForTests(r: GateReader | null): void {
 }
 export function __resetGateForTests(): void {
   cachedEnabled = true;
+  cachedDecided = true;
   knownDisabled = false;
   primed = false;
   fetchedAt = 0;

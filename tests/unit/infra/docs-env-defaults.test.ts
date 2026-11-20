@@ -183,12 +183,20 @@ describe("guide env-var tables", () => {
   it.each(ROWS.filter((r) => SCHEMA.get(r.name)?.enum))(
     "$doc $name only offers values its enum accepts",
     ({ name, defaultCell, description }) => {
-      const members = SCHEMA.get(name)?.enum ?? [];
+      const declared = SCHEMA.get(name);
+      const members = declared?.enum ?? [];
       const shown = [...defaultCell.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
-      // A strict enum has exactly one default and it has to be spelled out;
-      // "-" or prose in this cell is how the SKIP_MUST_CHANGE_PASSWORD bug read.
-      expect(shown).toHaveLength(1);
-      expect(members).toContain(shown[0]);
+      if (declared?.default === undefined && declared?.unresolvedDefault === undefined) {
+        // An optional enum (no .default) has no default to show, and its cell
+        // must say so rather than name a member (SNAPOTTER_ANALYTICS_DEFAULT, #4910).
+        expect(shown).toEqual([]);
+        expect(defaultCell.trim()).toBe("(unset)");
+      } else {
+        // A strict enum has exactly one default and it has to be spelled out;
+        // "-" or prose in this cell is how the SKIP_MUST_CHANGE_PASSWORD bug read.
+        expect(shown).toHaveLength(1);
+        expect(members).toContain(shown[0]);
+      }
       expect(valueTokens(description).filter((t) => !members.includes(t))).toEqual([]);
     },
   );

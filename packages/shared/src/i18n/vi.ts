@@ -180,6 +180,13 @@ export const vi: TranslationKeys = {
     discoverySourceLabel: "Bạn biết đến chúng tôi bằng cách nào?",
     optionalHint: "(tùy chọn)",
     continueLabel: "Tiếp tục",
+    analyticsConsentTitle: "Gửi thống kê sử dụng ẩn danh và báo cáo sự cố?",
+    analyticsConsentBody:
+      "Tệp của bạn không bao giờ được gửi đi. Bạn có thể thay đổi lựa chọn này sau trong Cài đặt.",
+    analyticsConsentLearnMore: "Xem những gì được gửi",
+    analyticsConsentYes: "Gửi",
+    analyticsConsentNo: "Không gửi",
+    analyticsConsentSaveFailed: "Không thể lưu lựa chọn của bạn. Vui lòng thử lại.",
   },
   categories: {
     essentials: "Cơ bản",
@@ -5015,7 +5022,7 @@ export const vi: TranslationKeys = {
     privacy: {
       title: "Quyền riêng tư",
       description:
-        "Phân tích sản phẩm ẩn danh giúp cải thiện SnapOtter. Tính năng này được bật theo mặc định và do quản trị viên thiết lập cho toàn bộ phiên bản.",
+        "Phân tích sản phẩm ẩn danh giúp cải thiện SnapOtter. Quản trị viên thiết lập tính năng này cho toàn bộ phiên bản.",
       analyticsLabel: "Phân tích sản phẩm ẩn danh",
       analyticsDescription:
         "Chia sẻ dữ liệu sử dụng ẩn danh (công cụ nào chạy, thời lượng, mã lỗi) và báo cáo sự cố. Không có địa chỉ IP, không có danh tính tài khoản. Chúng tôi không bao giờ thu thập tên tệp, nội dung tệp, kết quả OCR, siêu dữ liệu hình ảnh hay văn bản tài liệu của bạn. Tắt tùy chọn này để dừng tất cả.",

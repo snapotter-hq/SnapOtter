@@ -669,6 +669,13 @@ export function SystemSection() {
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  // With no stored value the instance is either an upgrade (on) or a fresh
+  // install waiting for the first-run answer (off). Only the loaded config can
+  // tell them apart, so read off until it says nothing is pending (#4910).
+  const analyticsOn =
+    settings.analyticsEnabled !== undefined
+      ? settings.analyticsEnabled !== "false"
+      : analyticsConfigLoaded && analyticsConfig?.consentPending === false;
   // Snapshot of the last server state, so a save sends only the fields this tab
   // changed (never a stale value that could clobber another admin's concurrent edit).
   const originalSettingsRef = useRef<Record<string, string>>({});
@@ -964,23 +971,18 @@ export function SystemSection() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.analyticsEnabled !== "false"}
+          aria-checked={analyticsOn}
           aria-label={t.settings.privacy.analyticsLabel}
-          onClick={() =>
-            updateSetting(
-              "analyticsEnabled",
-              settings.analyticsEnabled === "false" ? "true" : "false",
-            )
-          }
+          onClick={() => updateSetting("analyticsEnabled", analyticsOn ? "false" : "true")}
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.analyticsEnabled !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            analyticsOn ? "bg-primary" : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.analyticsEnabled !== "false" ? "translate-x-6" : "translate-x-1",
+              analyticsOn ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>

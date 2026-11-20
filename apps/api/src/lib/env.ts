@@ -97,10 +97,10 @@ const envSchema = z
       .refine((value) => value === "" || UUID_V4.test(value), {
         message: "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
       }),
-    // "off" starts a new instance with analytics switched off, for any
-    // deployment that wants opt-in. It only seeds a missing setting, so an
-    // admin's later choice always stands.
-    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).default("on"),
+    // Unset, a new instance asks its admin on first run and sends nothing
+    // until answered (#4910). "on" or "off" answers that prompt in advance. It
+    // only seeds a missing setting, so an admin's later choice always stands.
+    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).optional(),
     BASE_PATH: z
       .string()
       .default("")
