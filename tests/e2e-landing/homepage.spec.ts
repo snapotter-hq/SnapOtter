@@ -173,11 +173,11 @@ test.describe("Landing Homepage", () => {
   test("tool command center shows multiple starting points for a selected modality", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: /Video 58/ }).click();
+    await page.getByRole("button", { name: /Video 59/ }).click();
 
     const results = page.locator("#tool-command-results");
     await expect(page.getByText("Video starting points")).toBeVisible();
-    await expect(page.getByText(/12 of 58 tools/)).toBeVisible();
+    await expect(page.getByText(/12 of 59 tools/)).toBeVisible();
     await expect(results.getByRole("link", { name: /Convert Video/ })).toBeVisible();
     await expect(results.getByRole("link", { name: /Compress Video/ })).toBeVisible();
     await expect(results.getByRole("link", { name: /Trim Video/ })).toBeVisible();
