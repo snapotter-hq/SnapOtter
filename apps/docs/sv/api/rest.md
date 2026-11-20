@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 2ee3af880243
-i18n_source_hash: 21592dbca884
+i18n_output_hash: 74b1a9692185
+i18n_source_hash: 477830ee7b9e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ Den delade katalogen innehåller 83 dedikerade slutpunkter för konverteringsfö
 
 Varje förinställning låser utdataformatet och delegerar till ett basverktyg såsom `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` eller `convert-spreadsheet`. Se [Konverteringsförinställningar](/sv/tools/conversion-presets) för den fullständiga rutttabellen och valfria inställningar.
 
+Komprimeringsförinställningar fungerar på samma sätt. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` och `compress-image-to-500kb` kör `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` och `compress-pdf-to-2mb` kör `compress-pdf`. Varje förinställning låser `mode` till `targetSize` och `targetSizeKb` till storleken i namnet.
+
 ### Grundläggande {#essentials}
 
 | Verktygs-ID | Namn | Nyckelinställningar |
@@ -195,6 +197,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | Verktygs-ID | Namn | AI-modell | Nyckelinställningar |
 |---------|------|---------|-------------|
 | `remove-background` | Ta bort bakgrund | rembg (BiRefNet / U2-Net) | Fas 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fas 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` och pipelines: `backgroundType` (transparent/color/gradient/blur, samt image på `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Ta bort GIF-bakgrund | rembg, bild för bild | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Bilduppskalning | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objektsudd | LaMa (ONNX) | Mask skickas som andra fildel (fältnamn `mask`), `format`, `quality` |
 | `ocr` | OCR / Textextraktion | Tesseract (snabb); RapidOCR + PP-OCR ONNX (balanserad/bäst) | `quality` (snabb/balanserad/bäst), `language`, `enhance` |
@@ -249,6 +252,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `border` | Ram och kant | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Försköna skärmbild | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Cirkelbeskärning | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Rundad beskärning | `shape` (rounded-square/squircle), `cornerRadius` (0-50, procent av den kortare sidan), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Bildutfyllnad | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite-ark | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - flerfil (2-64 bilder) |
 
@@ -284,12 +288,14 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `stabilize-video` | Stabilisera video | `smoothing` (5-60, i bildrutor) |
 | `gif-to-video` | GIF till video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video till WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video till AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60 s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video till bildrutor | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Slå ihop videor | - (flerfil, normaliserad till första videons upplösning) |
 | `replace-audio` | Ersätt ljud | - (video + ljudfil, två filer) |
 | `burn-subtitles` | Bränn in undertexter | `fontSize` (8-72) - video + undertextfil |
 | `embed-subtitles` | Bädda in undertexter | `language` (ISO 639-2/B-kod) - video + undertextfil |
 | `extract-subtitles` | Extrahera undertexter | - (ger SRT) |
+| `convert-subtitles` | Konvertera undertexter | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Bilder till video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - flerfil |
 | `video-metadata` | Rensa videometadata | - |
 | `auto-subtitles` | Automatiska undertexter (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `extract-pages` | Extrahera sidor | `range` (qpdf-syntax, t.ex. "1-5,8,10-z") |
 | `remove-pages` | Ta bort sidor | `pages` (qpdf-intervall att ta bort) |
 | `organize-pdf` | Ordna PDF | `order` (qpdf-sidordning, t.ex. "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF-multiverktyg | `items` (sidplan, `[{doc, page, rot}]`, upp till 1200 sidor), `pageCounts` - flerfil (upp till 20 PDF:er) |
 | `protect-pdf` | Skydda PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Lås upp PDF | `password` |
 | `repair-pdf` | Reparera PDF | - |
@@ -344,6 +351,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `sign-pdf` | Signera PDF | Anpassad multipart-rutt med PDF `file`, signaturfiler `sig0`, `sig1` och `placements` JSON-array |
 | `pdf-to-text` | PDF till text | - |
 | `pdf-to-word` | PDF till Word | - |
+| `pdf-to-markdown` | PDF till Markdown | - (ger en `.md`-fil) |
 | `pdf-metadata` | PDF-metadata | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Konvertera dokument | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Konvertera presentation | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `yaml-json` | YAML / JSON | - (dubbelriktad) |
 | `xml-to-csv` | XML till CSV | - (hittar automatiskt upprepade element) |
 | `convert-font` | Konvertera typsnitt | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Ändra skiftläge | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47-tagg). JSON-kropp, ingen filuppladdning; ger den konverterade texten. |
+| `proportion-calculator` | Proportionsräknare | `a`, `b`, `c`, `mode` (direct/inverse). JSON-kropp, ingen filuppladdning; ger det saknade värdet. |
 | `excel-to-csv` | Excel till CSV | dedikerad konverteringsförinställning som backas upp av `convert-spreadsheet` |
 | `create-zip` | Skapa ZIP | - (flerfil, 2-50 filer) |
 | `extract-zip` | Extrahera ZIP | - (bombskyddad) |

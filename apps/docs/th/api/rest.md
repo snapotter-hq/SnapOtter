@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 916ea03b9099
-i18n_source_hash: 21592dbca884
+i18n_output_hash: b695afe5ec80
+i18n_source_hash: 477830ee7b9e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 แต่ละพรีเซ็ตล็อกรูปแบบเอาต์พุตและมอบหมายให้เครื่องมือฐาน เช่น `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` หรือ `convert-spreadsheet` ดู [พรีเซ็ตการแปลง](/th/tools/conversion-presets) สำหรับตารางเส้นทางฉบับสมบูรณ์และการตั้งค่าที่ไม่บังคับ
 
+พรีเซ็ตการบีบอัดทำงานในแบบเดียวกัน `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` และ `compress-image-to-500kb` รัน `compress` ส่วน `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` และ `compress-pdf-to-2mb` รัน `compress-pdf` แต่ละพรีเซ็ตล็อก `mode` เป็น `targetSize` และล็อก `targetSizeKb` เป็นขนาดที่ระบุในชื่อ
+
 ### พื้นฐาน {#essentials}
 
 | Tool ID | ชื่อ | การตั้งค่าหลัก |
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | โมเดล AI | การตั้งค่าหลัก |
 |---------|------|---------|-------------|
 | `remove-background` | ลบพื้นหลัง | rembg (BiRefNet / U2-Net) | ระยะที่ 1: `model`, `edgeRefine` (0-3), `decontaminate` ระยะที่ 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` และไปป์ไลน์: `backgroundType` (transparent/color/gradient/blur รวมถึง image บน `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | ลบพื้นหลัง GIF | rembg ทีละเฟรม | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | ขยายภาพ | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ลบวัตถุ | LaMa (ONNX) | ส่ง Mask เป็นส่วนไฟล์ที่สอง (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / การแยกข้อความ | Tesseract (เร็ว); RapidOCR + PP-OCR ONNX (สมดุล/ดีที่สุด) | `quality` (เร็ว/สมดุล/ดีที่สุด), `language`, `enhance` |
@@ -249,6 +252,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | ขอบและกรอบ | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | ตกแต่งภาพหน้าจอ | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | ครอปวงกลม | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | ครอปมุมมน | `shape` (rounded-square/squircle), `cornerRadius` (0-50, เปอร์เซ็นต์ของด้านที่สั้นกว่า), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | เติมขอบรูปภาพ | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - หลายไฟล์ (2-64 รูป) |
 
@@ -284,12 +288,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | ทำวิดีโอให้นิ่ง | `smoothing` (5-60, เป็นเฟรม) |
 | `gif-to-video` | GIF เป็นวิดีโอ | `format` (mp4/webm/mov) |
 | `video-to-webp` | วิดีโอเป็น WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | วิดีโอเป็น AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (สูงสุด 60 วินาที), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | วิดีโอเป็นเฟรม | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | รวมวิดีโอ | - (หลายไฟล์ ปรับเป็นความละเอียดของวิดีโอแรก) |
 | `replace-audio` | แทนที่เสียง | - (วิดีโอ + ไฟล์เสียง สองไฟล์) |
 | `burn-subtitles` | ฝังคำบรรยาย (Burn) | `fontSize` (8-72) - วิดีโอ + ไฟล์คำบรรยาย |
 | `embed-subtitles` | ฝังคำบรรยาย (Embed) | `language` (รหัส ISO 639-2/B) - วิดีโอ + ไฟล์คำบรรยาย |
 | `extract-subtitles` | สกัดคำบรรยาย | - (ส่งออก SRT) |
+| `convert-subtitles` | แปลงคำบรรยาย | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | รูปภาพเป็นวิดีโอ | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - หลายไฟล์ |
 | `video-metadata` | ล้างเมทาดาทาวิดีโอ | - |
 | `auto-subtitles` | คำบรรยายอัตโนมัติ (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | สกัดหน้า | `range` (ไวยากรณ์ qpdf เช่น "1-5,8,10-z") |
 | `remove-pages` | ลบหน้า | `pages` (ช่วง qpdf ที่จะลบ) |
 | `organize-pdf` | จัดระเบียบ PDF | `order` (ลำดับหน้า qpdf เช่น "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF มัลติเครื่องมือ | `items` (แผนหน้า, `[{doc, page, rot}]`, สูงสุด 1200 หน้า), `pageCounts` - หลายไฟล์ (สูงสุด 20 PDF) |
 | `protect-pdf` | ป้องกัน PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | ปลดล็อก PDF | `password` |
 | `repair-pdf` | ซ่อมแซม PDF | - |
@@ -344,6 +351,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | ลงนาม PDF | เส้นทาง multipart กำหนดเองพร้อม PDF `file`, ไฟล์ลายเซ็น `sig0`, `sig1` และอาร์เรย์ JSON `placements` |
 | `pdf-to-text` | PDF เป็นข้อความ | - |
 | `pdf-to-word` | PDF เป็น Word | - |
+| `pdf-to-markdown` | PDF เป็น Markdown | - (ส่งคืนไฟล์ `.md`) |
 | `pdf-metadata` | เมทาดาทา PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | แปลงเอกสาร | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | แปลงงานนำเสนอ | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `yaml-json` | YAML / JSON | - (แบบสองทิศทาง) |
 | `xml-to-csv` | XML เป็น CSV | - (ค้นหาองค์ประกอบที่ซ้ำโดยอัตโนมัติ) |
 | `convert-font` | แปลงฟอนต์ | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | แปลงตัวพิมพ์ | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (แท็ก BCP 47) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
+| `proportion-calculator` | เครื่องคิดเลขสัดส่วน | `a`, `b`, `c`, `mode` (direct/inverse) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
 | `excel-to-csv` | Excel เป็น CSV | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-spreadsheet` |
 | `create-zip` | สร้าง ZIP | - (หลายไฟล์ 2-50 ไฟล์) |
 | `extract-zip` | แตก ZIP | - (ป้องกัน bomb) |

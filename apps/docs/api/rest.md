@@ -152,6 +152,8 @@ The shared catalog includes 83 dedicated conversion preset endpoints such as `jp
 
 Each preset locks the output format and delegates to a base tool such as `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, or `convert-spreadsheet`. See [Conversion Presets](/tools/conversion-presets) for the complete route table and optional settings.
 
+Compression presets work the same way. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` and `compress-image-to-500kb` run `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` and `compress-pdf-to-2mb` run `compress-pdf`. Each one locks `mode` to `targetSize` and `targetSizeKb` to the size in its name.
+
 ### Essentials {#essentials}
 
 | Tool ID | Name | Key settings |
@@ -192,6 +194,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | Tool ID | Name | AI Model | Key settings |
 |---------|------|---------|-------------|
 | `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Phase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, and pipelines: `backgroundType` (transparent/color/gradient/blur, plus image on `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Remove GIF Background | rembg, frame by frame | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask sent as second file part (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Text Extraction | Tesseract (fast); RapidOCR + PP-OCR ONNX (balanced/best) | `quality` (fast/balanced/best), `language`, `enhance` |
@@ -246,6 +249,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `border` | Border & Frame | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Beautify Screenshot | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Circle Crop | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Rounded Crop | `shape` (rounded-square/squircle), `cornerRadius` (0-50, percent of the shorter side), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Image Pad | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 images) |
 
@@ -281,12 +285,14 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `stabilize-video` | Stabilize Video | `smoothing` (5-60, in frames) |
 | `gif-to-video` | GIF to Video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video to WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video to AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video to Frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Merge Videos | - (multi-file, normalized to first video's resolution) |
 | `replace-audio` | Replace Audio | - (video + audio file, two files) |
 | `burn-subtitles` | Burn Subtitles | `fontSize` (8-72) - video + subtitle file |
 | `embed-subtitles` | Embed Subtitles | `language` (ISO 639-2/B code) - video + subtitle file |
 | `extract-subtitles` | Extract Subtitles | - (outputs SRT) |
+| `convert-subtitles` | Convert Subtitles | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Images to Video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-file |
 | `video-metadata` | Clean Video Metadata | - |
 | `auto-subtitles` | Auto Subtitles (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -325,6 +331,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `extract-pages` | Extract Pages | `range` (qpdf syntax, e.g. "1-5,8,10-z") |
 | `remove-pages` | Remove Pages | `pages` (qpdf range to remove) |
 | `organize-pdf` | Organize PDF | `order` (qpdf page order, e.g. "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF Multi-Tool | `items` (page plan, `[{doc, page, rot}]`, up to 1200 pages), `pageCounts` - multi-file (up to 20 PDFs) |
 | `protect-pdf` | Protect PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Unlock PDF | `password` |
 | `repair-pdf` | Repair PDF | - |
@@ -341,6 +348,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `sign-pdf` | Sign PDF | Custom multipart route with PDF `file`, signature files `sig0`, `sig1`, and `placements` JSON array |
 | `pdf-to-text` | PDF to Text | - |
 | `pdf-to-word` | PDF to Word | - |
+| `pdf-to-markdown` | PDF to Markdown | - (returns a `.md` file) |
 | `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Convert Document | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Convert Presentation | `format` (pptx/odp) |
@@ -373,6 +381,8 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `yaml-json` | YAML / JSON | - (bidirectional) |
 | `xml-to-csv` | XML to CSV | - (auto-finds repeating elements) |
 | `convert-font` | Convert Font | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Convert Case | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 tag). JSON body, no file upload; returns the converted text. |
+| `proportion-calculator` | Proportion Calculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON body, no file upload; returns the missing value. |
 | `excel-to-csv` | Excel to CSV | dedicated conversion preset backed by `convert-spreadsheet` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
 | `extract-zip` | Extract ZIP | - (bomb-protected) |

@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: cf2343b31fd8
-i18n_source_hash: 21592dbca884
+i18n_output_hash: e45d5ade80ed
+i18n_source_hash: 477830ee7b9e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ O catálogo compartilhado inclui 83 endpoints dedicados a presets de conversão,
 
 Cada preset trava o formato de saída e delega a uma ferramenta base como `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` ou `convert-spreadsheet`. Consulte [Presets de conversão](/pt-BR/tools/conversion-presets) para a tabela completa de rotas e as configurações opcionais.
 
+Os presets de compressão funcionam da mesma forma. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` e `compress-image-to-500kb` executam `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` e `compress-pdf-to-2mb` executam `compress-pdf`. Cada um trava `mode` em `targetSize` e `targetSizeKb` no tamanho indicado no nome.
+
 ### Essenciais {#essentials}
 
 | ID da ferramenta | Nome | Principais configurações |
@@ -195,6 +197,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | ID da ferramenta | Nome | Modelo de IA | Principais configurações |
 |---------|------|---------|-------------|
 | `remove-background` | Remover Fundo | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` e pipelines: `backgroundType` (transparent/color/gradient/blur, além de image em `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Remover Fundo de GIF | rembg, quadro a quadro | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Ampliação de Imagem | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Apagador de Objetos | LaMa (ONNX) | Máscara enviada como segunda parte de arquivo (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Extração de texto | Tesseract (rápido); RapidOCR + PP-OCR ONNX (equilibrado/melhor) | `quality` (rápido/equilibrado/melhor), `language`, `enhance` |
@@ -249,6 +252,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `border` | Borda e Moldura | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Embelezar Captura de Tela | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Recorte Circular | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Recorte Arredondado | `shape` (rounded-square/squircle), `cornerRadius` (0-50, porcentagem do lado menor), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Preencher Imagem | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - múltiplos arquivos (2-64 imagens) |
 
@@ -284,12 +288,14 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `stabilize-video` | Estabilizar Vídeo | `smoothing` (5-60, em quadros) |
 | `gif-to-video` | GIF para Vídeo | `format` (mp4/webm/mov) |
 | `video-to-webp` | Vídeo para WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Vídeo para AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (máx. 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Vídeo para Quadros | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Mesclar Vídeos | - (múltiplos arquivos, normalizados para a resolução do primeiro vídeo) |
 | `replace-audio` | Substituir Áudio | - (vídeo + arquivo de áudio, dois arquivos) |
 | `burn-subtitles` | Gravar Legendas | `fontSize` (8-72) - vídeo + arquivo de legenda |
 | `embed-subtitles` | Incorporar Legendas | `language` (código ISO 639-2/B) - vídeo + arquivo de legenda |
 | `extract-subtitles` | Extrair Legendas | - (gera SRT) |
+| `convert-subtitles` | Converter Legendas | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Imagens para Vídeo | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - múltiplos arquivos |
 | `video-metadata` | Limpar Metadados de Vídeo | - |
 | `auto-subtitles` | Legendas Automáticas (IA) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `extract-pages` | Extrair Páginas | `range` (sintaxe qpdf, ex. "1-5,8,10-z") |
 | `remove-pages` | Remover Páginas | `pages` (intervalo qpdf a remover) |
 | `organize-pdf` | Organizar PDF | `order` (ordem de páginas qpdf, ex. "3,1,2,5-z") |
+| `multi-tool-pdf` | Ferramenta multifuncional de PDF | `items` (plano de páginas, `[{doc, page, rot}]`, até 1200 páginas), `pageCounts` - múltiplos arquivos (até 20 PDFs) |
 | `protect-pdf` | Proteger PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Desbloquear PDF | `password` |
 | `repair-pdf` | Reparar PDF | - |
@@ -344,6 +351,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `sign-pdf` | Assinar PDF | Rota multipart personalizada com o PDF `file`, arquivos de assinatura `sig0`, `sig1` e o array JSON `placements` |
 | `pdf-to-text` | PDF para Texto | - |
 | `pdf-to-word` | PDF para Word | - |
+| `pdf-to-markdown` | PDF para Markdown | - (gera um arquivo `.md`) |
 | `pdf-metadata` | Metadados de PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Converter Documento | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Converter Apresentação | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `yaml-json` | YAML / JSON | - (bidirecional) |
 | `xml-to-csv` | XML para CSV | - (encontra automaticamente elementos repetidos) |
 | `convert-font` | Converter Fonte | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Converter maiúsculas e minúsculas | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Corpo JSON, sem upload de arquivo; retorna o texto convertido. |
+| `proportion-calculator` | Calculadora de proporção | `a`, `b`, `c`, `mode` (direct/inverse). Corpo JSON, sem upload de arquivo; retorna o valor que falta. |
 | `excel-to-csv` | Excel para CSV | preset de conversão dedicado, baseado em `convert-spreadsheet` |
 | `create-zip` | Criar ZIP | - (múltiplos arquivos, 2-50 arquivos) |
 | `extract-zip` | Extrair ZIP | - (protegido contra bomb) |

@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: a6fce017a806
-i18n_source_hash: 21592dbca884
+i18n_output_hash: e71e5173c534
+i18n_source_hash: 477830ee7b9e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ Danh mục dùng chung bao gồm 83 endpoint cấu hình chuyển đổi chuyên
 
 Mỗi cấu hình sẵn khóa định dạng đầu ra và ủy thác cho một công cụ nền tảng như `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, hoặc `convert-spreadsheet`. Xem [Cấu hình chuyển đổi sẵn](/vi/tools/conversion-presets) để biết bảng route đầy đủ và các cài đặt tùy chọn.
 
+Các preset nén hoạt động theo cách tương tự. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` và `compress-image-to-500kb` chạy `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` và `compress-pdf-to-2mb` chạy `compress-pdf`. Mỗi preset cố định `mode` là `targetSize` và `targetSizeKb` là dung lượng ghi trong tên của nó.
+
 ### Cơ bản {#essentials}
 
 | ID công cụ | Tên | Cài đặt chính |
@@ -195,6 +197,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | ID công cụ | Tên | Mô hình AI | Cài đặt chính |
 |---------|------|---------|-------------|
 | `remove-background` | Xóa nền | rembg (BiRefNet / U2-Net) | Giai đoạn 1: `model`, `edgeRefine` (0-3), `decontaminate`. Giai đoạn 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` và pipeline: `backgroundType` (transparent/color/gradient/blur, cùng image trên `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Xóa nền GIF | rembg, từng khung hình | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Phóng to ảnh | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Xóa vật thể | LaMa (ONNX) | Mặt nạ được gửi làm phần tệp thứ hai (tên trường `mask`), `format`, `quality` |
 | `ocr` | OCR / Trích xuất văn bản | Tesseract (nhanh); RapidOCR + PP-OCR ONNX (cân bằng/tốt nhất) | `quality` (nhanh/cân bằng/tốt nhất), `language`, `enhance` |
@@ -249,6 +252,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `border` | Viền & Khung | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Làm đẹp ảnh chụp màn hình | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Cắt tròn | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Cắt bo tròn | `shape` (rounded-square/squircle), `cornerRadius` (0-50, phần trăm của cạnh ngắn hơn), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Đệm ảnh | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - đa tệp (2-64 ảnh) |
 
@@ -284,12 +288,14 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `stabilize-video` | Ổn định Video | `smoothing` (5-60, theo khung hình) |
 | `gif-to-video` | GIF sang Video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video sang WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video sang AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (tối đa 60 giây), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video sang khung hình | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Ghép Video | - (đa tệp, chuẩn hóa theo độ phân giải của video đầu tiên) |
 | `replace-audio` | Thay âm thanh | - (tệp video + âm thanh, hai tệp) |
 | `burn-subtitles` | Gắn phụ đề cứng | `fontSize` (8-72) - tệp video + phụ đề |
 | `embed-subtitles` | Nhúng phụ đề | `language` (mã ISO 639-2/B) - tệp video + phụ đề |
 | `extract-subtitles` | Trích xuất phụ đề | - (xuất SRT) |
+| `convert-subtitles` | Chuyển đổi phụ đề | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Ảnh sang Video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - đa tệp |
 | `video-metadata` | Dọn Metadata Video | - |
 | `auto-subtitles` | Phụ đề tự động (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `extract-pages` | Trích xuất trang | `range` (cú pháp qpdf, ví dụ "1-5,8,10-z") |
 | `remove-pages` | Xóa trang | `pages` (khoảng qpdf cần xóa) |
 | `organize-pdf` | Sắp xếp PDF | `order` (thứ tự trang qpdf, ví dụ "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF Đa công cụ | `items` (kế hoạch trang, `[{doc, page, rot}]`, tối đa 1200 trang), `pageCounts` - đa tệp (tối đa 20 PDF) |
 | `protect-pdf` | Bảo vệ PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Mở khóa PDF | `password` |
 | `repair-pdf` | Sửa chữa PDF | - |
@@ -344,6 +351,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `sign-pdf` | Ký PDF | Route multipart tùy chỉnh với PDF `file`, tệp chữ ký `sig0`, `sig1`, và mảng JSON `placements` |
 | `pdf-to-text` | PDF sang Text | - |
 | `pdf-to-word` | PDF sang Word | - |
+| `pdf-to-markdown` | PDF sang Markdown | - (trả về tệp `.md`) |
 | `pdf-metadata` | Metadata PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Chuyển đổi tài liệu | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Chuyển đổi bản trình bày | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `yaml-json` | YAML / JSON | - (hai chiều) |
 | `xml-to-csv` | XML sang CSV | - (tự động tìm các phần tử lặp) |
 | `convert-font` | Chuyển đổi phông chữ | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Đổi chữ hoa/thường | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (thẻ BCP 47). Thân JSON, không tải tệp lên; trả về văn bản đã chuyển đổi. |
+| `proportion-calculator` | Máy tính tỉ lệ | `a`, `b`, `c`, `mode` (direct/inverse). Thân JSON, không tải tệp lên; trả về giá trị còn thiếu. |
 | `excel-to-csv` | Excel sang CSV | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-spreadsheet` |
 | `create-zip` | Tạo ZIP | - (đa tệp, 2-50 tệp) |
 | `extract-zip` | Giải nén ZIP | - (chống bom nén) |

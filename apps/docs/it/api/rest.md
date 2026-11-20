@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 2fef0a82b24f
-i18n_source_hash: 21592dbca884
+i18n_output_hash: ce650caabaf9
+i18n_source_hash: 477830ee7b9e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ Il catalogo condiviso include 83 endpoint dedicati ai preset di conversione, com
 
 Ogni preset blocca il formato di output e delega a uno strumento di base come `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` o `convert-spreadsheet`. Vedi [Preset di conversione](/it/tools/conversion-presets) per la tabella completa delle route e le impostazioni facoltative.
 
+I preset di compressione funzionano allo stesso modo. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` e `compress-image-to-500kb` eseguono `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` e `compress-pdf-to-2mb` eseguono `compress-pdf`. Ognuno blocca `mode` su `targetSize` e `targetSizeKb` sulla dimensione indicata nel nome.
+
 ### Elementi essenziali {#essentials}
 
 | ID strumento | Nome | Impostazioni principali |
@@ -195,6 +197,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | ID strumento | Nome | Modello AI | Impostazioni principali |
 |---------|------|---------|-------------|
 | `remove-background` | Rimuovi sfondo | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` e pipeline: `backgroundType` (transparent/color/gradient/blur, più image su `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Rimuovi sfondo GIF | rembg, fotogramma per fotogramma | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Upscaling immagini | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Gomma per oggetti | LaMa (ONNX) | Maschera inviata come secondo file part (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Estrazione testo | Tesseract (veloce); RapidOCR + PP-OCR ONNX (bilanciato/migliore) | `quality` (veloce/bilanciato/migliore), `language`, `enhance` |
@@ -249,6 +252,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `border` | Bordo e cornice | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Abbellisci screenshot | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Ritaglio circolare | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Ritaglio Arrotondato | `shape` (rounded-square/squircle), `cornerRadius` (0-50, percentuale del lato più corto), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Spaziatura immagine | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Foglio sprite | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 immagini) |
 
@@ -284,12 +288,14 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `stabilize-video` | Stabilizza video | `smoothing` (5-60, in frame) |
 | `gif-to-video` | GIF in video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video in WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video in AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video in frame | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Unisci video | - (multi-file, normalizzato alla risoluzione del primo video) |
 | `replace-audio` | Sostituisci audio | - (file video + audio, due file) |
 | `burn-subtitles` | Incorpora sottotitoli | `fontSize` (8-72) - file video + sottotitoli |
 | `embed-subtitles` | Integra sottotitoli | `language` (codice ISO 639-2/B) - file video + sottotitoli |
 | `extract-subtitles` | Estrai sottotitoli | - (produce SRT) |
+| `convert-subtitles` | Converti Sottotitoli | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Immagini in video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-file |
 | `video-metadata` | Pulisci metadati video | - |
 | `auto-subtitles` | Sottotitoli automatici (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +334,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `extract-pages` | Estrai pagine | `range` (sintassi qpdf, es. "1-5,8,10-z") |
 | `remove-pages` | Rimuovi pagine | `pages` (intervallo qpdf da rimuovere) |
 | `organize-pdf` | Organizza PDF | `order` (ordine delle pagine qpdf, es. "3,1,2,5-z") |
+| `multi-tool-pdf` | Strumento multifunzione PDF | `items` (piano delle pagine, `[{doc, page, rot}]`, fino a 1200 pagine), `pageCounts` - multi-file (fino a 20 PDF) |
 | `protect-pdf` | Proteggi PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Sblocca PDF | `password` |
 | `repair-pdf` | Ripara PDF | - |
@@ -344,6 +351,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `sign-pdf` | Firma PDF | Route multipart personalizzata con PDF `file`, file di firma `sig0`, `sig1` e array JSON `placements` |
 | `pdf-to-text` | PDF in testo | - |
 | `pdf-to-word` | PDF in Word | - |
+| `pdf-to-markdown` | PDF in Markdown | - (produce un file `.md`) |
 | `pdf-metadata` | Metadati PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Converti documento | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Converti presentazione | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `yaml-json` | YAML / JSON | - (bidirezionale) |
 | `xml-to-csv` | XML in CSV | - (individua automaticamente gli elementi ripetuti) |
 | `convert-font` | Converti Font | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Cambia maiuscole/minuscole | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Corpo JSON, nessun caricamento di file; restituisce il testo convertito. |
+| `proportion-calculator` | Calcolatore di proporzioni | `a`, `b`, `c`, `mode` (direct/inverse). Corpo JSON, nessun caricamento di file; restituisce il valore mancante. |
 | `excel-to-csv` | Excel in CSV | preset di conversione dedicato supportato da `convert-spreadsheet` |
 | `create-zip` | Crea ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Estrai ZIP | - (protetto da zip bomb) |
