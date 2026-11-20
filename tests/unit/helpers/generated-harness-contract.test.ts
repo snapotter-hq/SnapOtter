@@ -35,6 +35,19 @@ describe("generated QA harness contract", () => {
     expect(text).toContain("featureUnavailableDisposition");
   });
 
+  // #4443: under REQUIRE_AI_FEATURES=1 a bundle missing from DATA_DIR must
+  // fail the tool by name, not skip it or hide behind per-request 501s.
+  it.each([
+    "format-matrix-generated.shared.ts",
+    "format-matrix-multimodal.test.ts",
+    "settings-matrix.test.ts",
+  ])("%s gates AI tools on installed bundles through requiredAiGate", (filename) => {
+    const text = source(filename);
+    expect(text).toContain("requiredAiGate(toolId");
+    expect(text).toContain("firstMissingBundle: getFirstMissingBundleForTool");
+    expect(text).not.toMatch(/&& !REQUIRE_AI_FEATURES\)/);
+  });
+
   it("multimodal matrix consumes the shared image-inclusive fixture index", () => {
     const text = source("format-matrix-multimodal.test.ts");
     expect(text).toContain("generatedFixtureDirectories");
@@ -122,9 +135,10 @@ describe("generated QA harness contract", () => {
 
   it("the nightly extended lane does not require AI features it never installs", () => {
     // Strict required-AI mode (absence of a bundle is a failure) is only valid
-    // on a host with bundles installed, which is the release-QA fleet. The
+    // on a host with bundles installed: the ubuntu_gpu AI matrix step in the
+    // release preflight (.claude/scripts/fix-issue/ai-matrix.sh, #4443). The
     // extended-matrix lane has no bundle-install step, so requiring them there
-    // 501s every installed-contract case on a bundle-less runner.
+    // fails every AI tool on a bundle-less runner.
     const workflow = readFileSync(join(process.cwd(), ".github/workflows/nightly.yml"), "utf8");
     const extendedLane = workflow.slice(
       workflow.indexOf("  extended-matrix:"),

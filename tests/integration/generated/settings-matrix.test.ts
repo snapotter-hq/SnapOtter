@@ -1,5 +1,6 @@
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
@@ -7,6 +8,7 @@ import {
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
   isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
@@ -1201,8 +1203,20 @@ describe("settings variation matrix", () => {
     const missingPython = allPythonVariationsUnavailable
       ? findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings)
       : undefined;
-    const skipTool =
-      (AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES) || allPythonVariationsUnavailable;
+    const aiGate = AI_GATED_TOOLS.has(toolId)
+      ? requiredAiGate(toolId, {
+          requireAiFeatures: REQUIRE_AI_FEATURES,
+          firstMissingBundle: getFirstMissingBundleForTool,
+          dataDir: process.env.DATA_DIR,
+        })
+      : undefined;
+    if (aiGate?.kind === "fail") {
+      it(`${toolId} -- required AI bundle installed`, () => {
+        throw new Error(aiGate.reason);
+      });
+      continue;
+    }
+    const skipTool = aiGate?.kind === "skip" || allPythonVariationsUnavailable;
 
     describe.skipIf(skipTool)(missingPython ? `${toolId} -- ${missingPython}` : toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {

@@ -54,6 +54,18 @@ If `RELEASE_TOKEN` is missing, the workflow falls back to the default token, the
    This has to be run by a maintainer, not by the workflow: listing self-hosted runners requires Administration:read, which is not an available `GITHUB_TOKEN` permission. If it reports no runner, start the service on the GPU box (`systemctl --user start github-runner`) and re-check. The workflow's own `preflight-gpu-runner` job claims the same labels before anything expensive runs, so a missed check shows up as a run parked on the first job instead of a late, unexplained stall.
 
 1. Make sure `main` is green and everything you want in the release is merged.
+
+   Then run the strict AI matrices against the release commit. No CI lane installs AI bundles, so CI skips every AI tool in the generated matrices; this run is the only one that covers them. On an amd64 Linux box with a persistent `DATA_DIR` whose `ai/venv` holds the image's base Python packages:
+
+   ```bash
+   export REQUIRE_AI_FEATURES=1 DATA_DIR=/path/to/ai-data PYTHON_VENV_PATH=/path/to/ai-data/ai/venv
+   AI_PROVISION=1 pnpm vitest run tests/integration/generated/ai-provision.test.ts
+   pnpm vitest run tests/integration/generated/settings-matrix.test.ts \
+     tests/integration/generated/format-matrix-generated-{1,2,3}.test.ts \
+     tests/integration/generated/format-matrix-multimodal.test.ts
+   ```
+
+   The first command installs any missing feature bundle through the admin install route (several GB on the first run). The optional Accurate OCR runtime installs only when the API is told it's the official container and trusts the release key, so also export `SNAPOTTER_OFFICIAL_CONTAINER=1` and the repo variables `OCR_RUNTIME_INDEX_KEY_ID` and `OCR_RUNTIME_INDEX_PUBLIC_KEY_PEM_B64` (a public key). In the second, a tool whose bundle is missing fails by name instead of skipping. Maintainers run both on the GPU box through the fleet tooling.
 2. Optional: to override the auto-generated release notes, add a `.release-notes.md` on `main`. If present, it replaces the GitHub release body and seeds the docs changelog.
 3. Dispatch the workflow:
    ```bash
