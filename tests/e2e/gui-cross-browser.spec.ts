@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import AdmZip from "adm-zip";
-import { getTestImagePath, test, waitForProcessing } from "./helpers";
+import { compressToSlider, getTestImagePath, test, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Cross-browser smoke tests -- critical flows validated across browsers.
@@ -97,40 +97,19 @@ test.describe("Cross-browser smoke tests", () => {
   }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/image/compress");
-    await page.waitForLoadState("networkidle");
+    const slider = await compressToSlider(page);
+    const box = await slider.boundingBox();
+    if (!box) throw new Error("the slider has no bounding box");
 
-    // Upload and wait for processing to produce the before-after view
-    await uploadImage(page);
-    await waitForProcessing(page);
-    await page.waitForTimeout(1000);
-
-    // Locate the before-after slider container for drag interaction
-    const sliderContainer = page.locator("[class*='before-after'], [class*='BeforeAfter']").first();
-
-    // Even if the exact slider handle class differs, verify the container rendered
-    const containerVisible = await sliderContainer.isVisible({ timeout: 10000 }).catch(() => false);
-
-    if (containerVisible) {
-      // Drag the slider from center to the left quarter
-      const box = await sliderContainer.boundingBox();
-      if (box) {
-        const startX = box.x + box.width / 2;
-        const startY = box.y + box.height / 2;
-        const endX = box.x + box.width * 0.25;
-
-        await page.mouse.move(startX, startY);
-        await page.mouse.down();
-        await page.mouse.move(endX, startY, { steps: 10 });
-        await page.mouse.up();
-        await page.waitForTimeout(300);
-      }
-    }
-
-    // Verify no CSS layout breakage -- the container should still be visible
-    if (containerVisible) {
-      await expect(sliderContainer).toBeVisible();
-    }
+    // Drag the divider from the center to the left quarter.
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.25, y, { steps: 10 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
+      .toBeLessThan(35);
 
     expect(errors).toHaveLength(0);
   });
