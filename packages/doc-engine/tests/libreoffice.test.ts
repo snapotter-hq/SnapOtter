@@ -165,8 +165,8 @@ describe("convertDocument success path", () => {
 });
 
 // Sentry NODE-35: a truncated or unreadable document makes LibreOffice say
-// "source file could not be loaded" on stderr and exit 0 with no output. That
-// is the user's file, not our bug (#4380).
+// "source file could not be loaded" on stderr and write no output. That is the
+// user's file, not our bug (#4380). Older builds exit 0; 26.x exits 1 (#5039).
 describe("convertDocument with a document LibreOffice can't load", () => {
   async function convertNoOutput(stderr: string): Promise<unknown> {
     nextClose({ stderr, code: 0 });
@@ -213,16 +213,49 @@ describe("convertDocument with a document LibreOffice can't load", () => {
     expect(isToolInputError(err)).toBe(false);
     expect(err).toMatchObject({ code: "ENOSPC", syscall: "write" });
   });
+
+  async function convertExit1(stderr: string): Promise<unknown> {
+    nextClose({ stderr, code: 1 });
+    return import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/in-truncated.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+  }
+
+  it("rejects a load failure that exits 1 as the same user-input error", async () => {
+    const err = await convertExit1(
+      "Fontconfig warning: no <cachedir> elements found.\nError: source file could not be loaded\n",
+    );
+    expect(isToolInputError(err)).toBe(true);
+    expect(toolInputErrorCode(err)).toBe("DOCUMENT_UNREADABLE");
+    expect((err as Error).message).toBe(
+      "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.",
+    );
+    expect(((err as Error).cause as Error).message).toMatch(
+      /^LibreOffice exited 1: .*source file could not be loaded/s,
+    );
+  });
+
+  it("answers a full disk as storage-full when a load failure exits 1", async () => {
+    statfs.mockResolvedValueOnce({ bavail: 0, bsize: 4096 });
+    const err = await convertExit1(
+      "Error Area:Io Class:Access Code:5\nError: source file could not be loaded\n",
+    );
+    expect(isToolInputError(err)).toBe(false);
+    expect(err).toMatchObject({ code: "ENOSPC", syscall: "write" });
+  });
 });
 
 describe("convertDocument failure paths", () => {
   it("rejects on non-zero exit with the stderr tail", async () => {
-    nextClose({ stderr: "source file could not be loaded", code: 1 });
+    nextClose({ stderr: "Error: Please verify input parameters", code: 1 });
     const err = await import("../src/libreoffice.js")
       .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
-    expect((err as Error).message).toBe("LibreOffice exited 1: source file could not be loaded");
+    expect(isToolInputError(err)).toBe(false);
+    expect((err as Error).message).toBe(
+      "LibreOffice exited 1: Error: Please verify input parameters",
+    );
     expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
