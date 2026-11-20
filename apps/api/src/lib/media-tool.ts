@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   isVaapiEncoder,
+  type MediaStreamInfo,
   probeMedia,
   resolveEncoder,
   runFfmpeg,
@@ -161,6 +162,25 @@ export interface AudioOutput {
   encodeArgs: string[];
 }
 
+/** Narrowest first, so the index doubles as a rank when sources are mixed. */
+const WAV_PCM_CODECS = ["pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le"] as const;
+
+function wavPcmRank(stream: MediaStreamInfo | undefined): number {
+  const bits = stream?.bitsPerSample;
+  // Lossy codecs probe with no depth: more than 16 bits buys nothing there.
+  if (!bits || bits <= 16) return 0;
+  if (/^(flt|dbl)/.test(stream?.sampleFmt ?? "")) return 3;
+  return bits > 24 ? 2 : 1;
+}
+
+/**
+ * WAV PCM codec that keeps the resolution of the widest source, so a 24-bit
+ * FLAC or AIFF doesn't come back truncated to 16 bits (#4969).
+ */
+export function wavPcmCodec(streams: Array<MediaStreamInfo | undefined>): string {
+  return WAV_PCM_CODECS[Math.max(0, ...streams.map(wavPcmRank))];
+}
+
 /**
  * `encodeArgs` is a function so the encoder is resolved when a job builds its
  * command line, not when this module loads: resolving probes the ffmpeg
@@ -262,7 +282,12 @@ export async function runMediaTool(
   argsFor: (
     inPath: string,
     outPath: string,
-    info: { durationS: number | null; audioSampleRate: number | null; hasAudio: boolean },
+    info: {
+      durationS: number | null;
+      audioSampleRate: number | null;
+      hasAudio: boolean;
+      audio: MediaStreamInfo | undefined;
+    },
   ) => string[],
   opts: { timeoutMs?: number } = {},
 ): Promise<MediaRunResult> {
@@ -279,6 +304,7 @@ export async function runMediaTool(
       durationS: info.durationS,
       audioSampleRate: audio?.sampleRate ?? null,
       hasAudio: audio !== undefined,
+      audio,
     }),
     info.durationS,
     opts,

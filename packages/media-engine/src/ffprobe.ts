@@ -10,6 +10,10 @@ export interface MediaStreamInfo {
   height?: number;
   sampleRate?: number;
   channels?: number;
+  /** ffmpeg sample format, e.g. "s16", "s32", "flt", "fltp". */
+  sampleFmt?: string;
+  /** Source bit depth. Unset for lossy codecs, which have none. */
+  bitsPerSample?: number;
 }
 
 export interface MediaInfo {
@@ -162,6 +166,9 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
       height?: number;
       sample_rate?: string;
       channels?: number;
+      sample_fmt?: string;
+      bits_per_sample?: number;
+      bits_per_raw_sample?: string;
     }>;
   };
   const duration = parsed.format?.duration ? Number(parsed.format.duration) : null;
@@ -177,6 +184,10 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
     bitrateKbps: Number.isFinite(bitRate as number) ? Math.round((bitRate as number) / 1000) : null,
     streams: (parsed.streams ?? []).map((s) => {
       const sr = s.sample_rate ? Number(s.sample_rate) : undefined;
+      // FLAC and ALAC carry their depth in bits_per_raw_sample and report 0 in
+      // bits_per_sample; PCM codecs fill bits_per_sample and may leave the raw one "N/A".
+      const raw = Number(s.bits_per_raw_sample);
+      const bits = raw > 0 ? raw : (s.bits_per_sample ?? 0);
       return {
         type: s.codec_type === "video" ? "video" : s.codec_type === "audio" ? "audio" : "other",
         codec: s.codec_name ?? "unknown",
@@ -184,6 +195,8 @@ export async function probeMedia(filePath: string, opts: ProbeOptions = {}): Pro
         height: s.height,
         sampleRate: Number.isFinite(sr) && (sr as number) > 0 ? sr : undefined,
         channels: typeof s.channels === "number" && s.channels > 0 ? s.channels : undefined,
+        sampleFmt: s.sample_fmt,
+        bitsPerSample: bits > 0 ? bits : undefined,
       } as MediaStreamInfo;
     }),
     tags: Object.keys(tags).length > 0 ? tags : undefined,
