@@ -2272,6 +2272,7 @@ export const hi: TranslationKeys = {
       submit: "ट्रांसक्राइब करें",
       submitBatch: "ट्रांसक्राइब करें ({count} फ़ाइलें)",
       progressLabel: "ऑडियो ट्रांसक्राइब हो रहा है",
+      noSpeechDetected: "इस फ़ाइल में कोई बोली गई आवाज़ नहीं मिली।",
     },
     "auto-subtitles": {
       language: "भाषा",
@@ -2280,6 +2281,7 @@ export const hi: TranslationKeys = {
       submit: "उपशीर्षक बनाएं",
       submitBatch: "उपशीर्षक बनाएं ({count} फ़ाइलें)",
       progressLabel: "उपशीर्षक बन रहे हैं",
+      noSpeechDetected: "इस फ़ाइल में कोई बोली गई आवाज़ नहीं मिली।",
     },
     "transparency-fixer": {
       webp: "WebP",

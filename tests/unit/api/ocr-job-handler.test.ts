@@ -78,6 +78,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   type ToolJobData,
 } from "../../../apps/api/src/jobs/types.js";
+import { NO_TEXT_DETECTED_WARNING } from "../../../apps/api/src/lib/empty-result-warnings.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerOcr } from "../../../apps/api/src/routes/tools/ocr.js";
 import "../../../apps/api/src/routes/tools/ocr-pdf.js";
@@ -1360,6 +1361,39 @@ describe("OCR AI job handler resource controls", () => {
     expect(vi.mocked(ctx.report).mock.calls.map(([percent]) => percent)).toEqual([
       2, 10, 10, 55, 100,
     ]);
+  });
+
+  // An image with no text is valid input: the job succeeds and the warning
+  // explains the empty artifact, as blur-faces does for no faces (#4923).
+  it.each(["", " \n\t"])("succeeds with a no-text warning when OCR finds %j", async (text) => {
+    mocks.extractText.mockResolvedValueOnce({
+      text,
+      engine: "tesseract",
+      requestedQuality: "fast",
+      actualQuality: "fast",
+      device: "cpu",
+      provider: "tesseract",
+      degraded: false,
+      warnings: [],
+    });
+
+    const result = await runAiToolJob(job(), INPUT, {
+      scratchDir: "/tmp/ocr-job",
+      signal: new AbortController().signal,
+      report: vi.fn(),
+    });
+
+    expect(result.resultPayload).toMatchObject({ warning: NO_TEXT_DETECTED_WARNING });
+  });
+
+  it("carries no warning when OCR finds text", async () => {
+    const result = await runAiToolJob(job(), INPUT, {
+      scratchDir: "/tmp/ocr-job",
+      signal: new AbortController().signal,
+      report: vi.fn(),
+    });
+
+    expect(result.resultPayload).not.toHaveProperty("warning");
   });
 
   it("does not start image preparation for an already-canceled job", async () => {

@@ -2418,6 +2418,7 @@ export const th: TranslationKeys = {
       submit: "ถอดเสียง",
       submitBatch: "ถอดเสียง ({count} ไฟล์)",
       progressLabel: "กำลังถอดเสียง",
+      noSpeechDetected: "ไม่พบเสียงพูดในไฟล์นี้",
     },
     "auto-subtitles": {
       language: "ภาษา",
@@ -2426,6 +2427,7 @@ export const th: TranslationKeys = {
       submit: "สร้างคำบรรยาย",
       submitBatch: "สร้างคำบรรยาย ({count} ไฟล์)",
       progressLabel: "กำลังสร้างคำบรรยาย",
+      noSpeechDetected: "ไม่พบเสียงพูดในไฟล์นี้",
     },
     "transparency-fixer": {
       webp: "WebP",

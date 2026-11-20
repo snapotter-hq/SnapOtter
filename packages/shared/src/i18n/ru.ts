@@ -2472,6 +2472,7 @@ export const ru: TranslationKeys = {
       submit: "Транскрибировать",
       submitBatch: "Транскрибировать ({count} файлов)",
       progressLabel: "Транскрипция аудио",
+      noSpeechDetected: "Речь в этом файле не обнаружена.",
     },
     "auto-subtitles": {
       language: "Язык",
@@ -2480,6 +2481,7 @@ export const ru: TranslationKeys = {
       submit: "Создать субтитры",
       submitBatch: "Создать субтитры ({count} файлов)",
       progressLabel: "Создание субтитров",
+      noSpeechDetected: "Речь в этом файле не обнаружена.",
     },
     "transparency-fixer": {
       webp: "WebP",

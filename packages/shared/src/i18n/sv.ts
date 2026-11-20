@@ -2463,6 +2463,7 @@ export const sv: TranslationKeys = {
       submit: "Transkribera",
       submitBatch: "Transkribera ({count} filer)",
       progressLabel: "Transkriberar ljud",
+      noSpeechDetected: "Inget tal upptäcktes i den här filen.",
     },
     "auto-subtitles": {
       language: "Språk",
@@ -2471,6 +2472,7 @@ export const sv: TranslationKeys = {
       submit: "Generera undertexter",
       submitBatch: "Generera undertexter ({count} filer)",
       progressLabel: "Genererar undertexter",
+      noSpeechDetected: "Inget tal upptäcktes i den här filen.",
     },
     "transparency-fixer": {
       webp: "WebP",

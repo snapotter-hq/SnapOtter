@@ -2200,6 +2200,7 @@ export const zhTW: TranslationKeys = {
       submit: "轉錄",
       submitBatch: "轉錄 ({count} 個檔案)",
       progressLabel: "正在轉錄音訊",
+      noSpeechDetected: "此檔案中未偵測到語音。",
     },
     "auto-subtitles": {
       language: "語言",
@@ -2208,6 +2209,7 @@ export const zhTW: TranslationKeys = {
       submit: "產生字幕",
       submitBatch: "產生字幕 ({count} 個檔案)",
       progressLabel: "正在產生字幕",
+      noSpeechDetected: "此檔案中未偵測到語音。",
     },
     "transparency-fixer": {
       webp: "WebP",

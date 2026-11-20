@@ -2459,6 +2459,7 @@ export const es: TranslationKeys = {
       submit: "Transcribir",
       submitBatch: "Transcribir ({count} archivos)",
       progressLabel: "Transcribiendo audio",
+      noSpeechDetected: "No se detectó voz en este archivo.",
     },
     "auto-subtitles": {
       language: "Idioma",
@@ -2467,6 +2468,7 @@ export const es: TranslationKeys = {
       submit: "Generar subtítulos",
       submitBatch: "Generar subtítulos ({count} archivos)",
       progressLabel: "Generando subtítulos",
+      noSpeechDetected: "No se detectó voz en este archivo.",
     },
     "transparency-fixer": {
       webp: "WebP",
