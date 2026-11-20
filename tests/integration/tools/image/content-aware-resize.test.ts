@@ -622,6 +622,10 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 400, protectFaces: false }) },
     ]);
 
+    // Carving the stress fixture is CPU-bound and outlasts settle()'s 25 s
+    // default on a busy runner (#5099). The vitest timeout covers the 30 s
+    // sync window, this wait, and the cancel settle() runs on a stuck job, so
+    // a hung carve is canceled rather than leaked into later tests.
     const res = await settle(
       await app.inject({
         method: "POST",
@@ -632,13 +636,14 @@ describe("Content-Aware Resize", () => {
         },
         body,
       }),
+      90_000,
     );
 
     expect([200, 503]).toContain(res.statusCode);
     if (res.statusCode === 503) {
       expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
-  }, 120_000);
+  }, 180_000);
 
   it("processes WebP input", async () => {
     const { readFileSync } = await import("node:fs");
