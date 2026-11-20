@@ -218,7 +218,9 @@ jobs:
     # Keeps the required "Unit Tests" context stable across shard counts, the
     # same way test-integration-result does for Integration.
     name: Unit Tests
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, test-unit]
     if: always()
@@ -323,7 +325,9 @@ jobs:
     # unexpanded name "Integration (${{ matrix.shard }}/6)") never leaves
     # required shard contexts stuck as expected.
     name: Integration
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, test-integration]
     if: always()
@@ -675,7 +679,9 @@ jobs:
     # Keep always(), not !cancelled(): a job skipped by its own if: reports as
     # success, so a cancelled run would pass this check.
     name: AI Sidecar (rembg)
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, ai-sidecar-rembg]
     if: always()

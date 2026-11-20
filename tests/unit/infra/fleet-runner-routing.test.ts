@@ -11,6 +11,10 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(import.meta.dirname, "../../..");
 const workflowsDir = path.join(root, ".github/workflows");
 const FLEET_LABEL = "snapotter-fleet";
+// A small runner of its own for the needs-only gate jobs, so they never queue
+// behind heavy jobs on the fleet runners.
+const GATE_LABEL = "snapotter-gate";
+const GATE_JOBS = ["ai-sidecar-rembg-result", "test-integration-result", "test-unit-result"];
 
 interface Step {
   name?: string;
@@ -261,9 +265,10 @@ const ci = readWorkflow("ci.yml");
 const fleetOutput = ci.jobs.changes.outputs?.fleet ?? "";
 
 function routedJobs(workflow: Workflow): [string, Job][] {
-  return Object.entries(workflow.jobs).filter(([, job]) =>
-    JSON.stringify(job["runs-on"] ?? "").includes(FLEET_LABEL),
-  );
+  return Object.entries(workflow.jobs).filter(([, job]) => {
+    const runsOn = JSON.stringify(job["runs-on"] ?? "");
+    return runsOn.includes(FLEET_LABEL) || runsOn.includes(GATE_LABEL);
+  });
 }
 
 // Every routed job but `changes` reads the decision from its output; `changes`
@@ -343,9 +348,10 @@ describe("self-hosted fleet runner routing (#4965)", () => {
   );
 
   it.each(jobsReadingFleetOutput)(
-    "%s resolves to exactly the fleet labels when allowed",
-    (_id, job) => {
-      expect(resolveRunsOn(job, true)).toEqual(["self-hosted", FLEET_LABEL]);
+    "%s resolves to exactly its self-hosted labels when allowed",
+    (id, job) => {
+      const label = GATE_JOBS.includes(id) ? GATE_LABEL : FLEET_LABEL;
+      expect(resolveRunsOn(job, true)).toEqual(["self-hosted", label]);
     },
   );
 
@@ -366,12 +372,22 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     }
   });
 
+  it.each(GATE_JOBS)("%s is a needs-only gate that fits the small gate runner", (id) => {
+    const job = ci.jobs[id];
+    expect([job.needs ?? []].flat().length).toBeGreaterThan(1);
+    // No checkout, no actions: only a shell check of the needs results.
+    expect((job.steps ?? []).every((step) => step.run && !step.uses)).toBe(true);
+  });
+
   it("only ci.yml routes jobs to the fleet", () => {
     // Release, publish and bundle workflows run with secrets and must never
     // land on a shared self-hosted host through this label.
     const others = readdirSync(workflowsDir)
       .filter((file) => /\.ya?ml$/.test(file) && file !== "ci.yml")
-      .filter((file) => readFileSync(path.join(workflowsDir, file), "utf8").includes(FLEET_LABEL));
+      .filter((file) => {
+        const text = readFileSync(path.join(workflowsDir, file), "utf8");
+        return text.includes(FLEET_LABEL) || text.includes(GATE_LABEL);
+      });
     expect(others).toEqual([]);
   });
 });
