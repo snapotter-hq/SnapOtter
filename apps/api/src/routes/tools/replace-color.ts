@@ -2,7 +2,7 @@ import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
+import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -56,9 +56,12 @@ export function registerReplaceColor(app: FastifyInstance) {
         // GIF carries one bit of alpha, so knocking a colour out has to change
         // container. PNG is the right landing place for a still, but it cannot
         // hold frames, and falling back to it discards the animation (#1083).
-        // WebP has both full alpha and frames.
+        // WebP has both full alpha and frames. A multi-page TIFF stays TIFF,
+        // which holds alpha and pages alike (#4877).
         const useFormat =
-          needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
+          needsAlpha &&
+          !ALPHA_FORMATS.has(outputFormat.format) &&
+          !(await isMultiPageTiff(inputBuffer, outputFormat.format))
             ? (await isAnimated(inputBuffer))
               ? outputFormatFor("webp", outputFormat.quality)
               : // No quality on the forced PNG: even 100 turns on Sharp's palette

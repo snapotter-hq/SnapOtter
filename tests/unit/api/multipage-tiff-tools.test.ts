@@ -168,3 +168,112 @@ describe("multi-page TIFF through the TIFF-out image tools (#4850)", () => {
     });
   });
 });
+
+/**
+ * Issue #4877: rounded corners, shadows and transparency need full alpha, and
+ * these tools used to leave TIFF for PNG to get it, which kept page 1 of a
+ * multi-page TIFF and dropped the rest. TIFF holds alpha, so a page stack now
+ * stays a TIFF with an alpha channel on every page.
+ */
+const ALPHA_TOOLS: Array<{ toolId: string; settings: Record<string, unknown>; filename: string }> =
+  [
+    { toolId: "border", settings: { cornerRadius: 10 }, filename: "pages.tiff" },
+    { toolId: "border", settings: { shadow: true }, filename: "pages.tiff" },
+    { toolId: "replace-color", settings: { makeTransparent: true }, filename: "pages.tiff" },
+    { toolId: "image-pad", settings: { background: "transparent" }, filename: "pages_padded.tiff" },
+  ];
+
+describe("multi-page TIFF through the tools that need alpha (#4877)", () => {
+  it.each(ALPHA_TOOLS)(
+    "$toolId $settings keeps every page as a TIFF with alpha",
+    async ({ toolId, settings, filename }) => {
+      const source = await threePageTiff();
+      const firstPage = await sharp(source, { page: 0, pages: 1 })
+        .tiff({ compression: "lzw" })
+        .toBuffer();
+
+      const multi = await run(toolId, source, settings);
+      const one = await pageShape((await run(toolId, firstPage, settings)).buffer);
+
+      expect(multi.contentType).toBe("image/tiff");
+      expect(multi.filename).toBe(filename);
+      expect(await pageShape(multi.buffer)).toEqual({ ...one, format: "tiff", pages: 3 });
+      for (let page = 0; page < 3; page++) {
+        expect((await sharp(multi.buffer, { page }).metadata()).hasAlpha).toBe(true);
+      }
+    },
+  );
+
+  it("knocks the colour out on the page that holds it", async () => {
+    const result = await run("replace-color", await threePageTiff(), {
+      makeTransparent: true,
+      sourceColor: "#828282",
+      tolerance: 5,
+    });
+    const alphaAt = async (page: number) =>
+      (await sharp(result.buffer, { page }).extractChannel(3).raw().toBuffer())[0];
+    expect(await alphaAt(0)).toBe(255);
+    expect(await alphaAt(1)).toBe(0);
+    expect(await alphaAt(2)).toBe(255);
+  });
+
+  // These three took page 1 of multipage.tiff to PNG under #2549.
+  it.each([
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      filename: "multipage.tiff",
+      pageHeight: 600,
+      width: 800,
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      filename: "multipage_padded.tiff",
+      pageHeight: 800,
+      width: 800,
+    },
+    {
+      toolId: "border",
+      settings: { borderWidth: 10, cornerRadius: 10 },
+      filename: "multipage.tiff",
+      pageHeight: 620,
+      width: 820,
+    },
+  ])(
+    "$toolId keeps all 10 pages of multipage.tiff",
+    async ({ toolId, settings, filename, pageHeight, width }) => {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
+      const result = await config.process(
+        readFixture(fixtures.image.multipageTiff),
+        config.settingsSchema.parse(settings),
+        "multipage.tiff",
+      );
+      expect(result.contentType).toBe("image/tiff");
+      expect(result.filename).toBe(filename);
+      expect(await pageShape(result.buffer)).toEqual({
+        format: "tiff",
+        pages: 10,
+        width,
+        pageHeight,
+      });
+    },
+  );
+
+  it("refuses a TIFF whose pages differ in size rather than keeping page 1 as PNG", async () => {
+    const source = readFixture(fixtures.image.edge.multipageMixedSizesTiff);
+    await expect(run("border", source, { cornerRadius: 10 })).rejects.toThrow(
+      /2 pages of different sizes/,
+    );
+  });
+
+  it("still sends a one-page TIFF to PNG", async () => {
+    const firstPage = await sharp(await threePageTiff(), { page: 0, pages: 1 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    const result = await run("border", firstPage, { cornerRadius: 10 });
+    expect(result.contentType).toBe("image/png");
+    expect(result.filename).toBe("pages.png");
+  });
+});
