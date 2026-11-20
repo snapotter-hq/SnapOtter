@@ -690,32 +690,34 @@ describe("computeDeleteAfter (via enqueueToolJob fire-and-forget)", () => {
     expect(updateWhere).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to FILE_MAX_AGE_HOURS when the team retentionHours is null", async () => {
-    const start = Date.now();
-    const { mod } = await loadEnqueueModule({
+  // A team without an override leaves delete_after NULL so the global sweep
+  // applies the live tempFileMaxAgeHours setting. Writing an env-derived
+  // deadline here ignored that setting and turned FILE_MAX_AGE_HOURS=0
+  // ("never expire") into instant deletion (#5100).
+  it("leaves delete_after unset when the team retentionHours is null (#5100)", async () => {
+    const { mod, updateWhere } = await loadEnqueueModule({
       teamRetentionEnabled: true,
       userRow: [{ team: "team-1" }],
       teamRow: [{ retentionHours: null }],
     });
     await enqueueWithUser(mod);
 
-    const arg = updateSetMock.mock.calls[0][0] as { deleteAfter: Date };
-    const expected = start + 24 * 60 * 60 * 1000; // FILE_MAX_AGE_HOURS mocked to 24
-    expect(Math.abs(arg.deleteAfter.getTime() - expected)).toBeLessThan(5000);
+    expect(selectMock).toHaveBeenCalledTimes(2);
+    expect(updateSetMock).not.toHaveBeenCalled();
+    expect(updateWhere).not.toHaveBeenCalled();
   });
 
-  it("falls back to FILE_MAX_AGE_HOURS when the teams lookup returns no row", async () => {
-    const start = Date.now();
-    const { mod } = await loadEnqueueModule({
+  it("leaves delete_after unset when the teams lookup returns no row (#5100)", async () => {
+    const { mod, updateWhere } = await loadEnqueueModule({
       teamRetentionEnabled: true,
       userRow: [{ team: "team-1" }],
       teamRow: [],
     });
     await enqueueWithUser(mod);
 
-    const arg = updateSetMock.mock.calls[0][0] as { deleteAfter: Date };
-    const expected = start + 24 * 60 * 60 * 1000;
-    expect(Math.abs(arg.deleteAfter.getTime() - expected)).toBeLessThan(5000);
+    expect(selectMock).toHaveBeenCalledTimes(2);
+    expect(updateSetMock).not.toHaveBeenCalled();
+    expect(updateWhere).not.toHaveBeenCalled();
   });
 
   it("logs and reports a computeDeleteAfter failure without rejecting enqueueToolJob (#1522)", async () => {
