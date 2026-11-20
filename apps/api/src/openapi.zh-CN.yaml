@@ -3108,9 +3108,15 @@ paths:
                     - `pathMode`（字符串，默认 "spline"）- 可选值：none、polygon、spline
                     - `cornerThreshold`（数字 0-180，默认 60）- 角点检测角度
                     - `invert`（布尔值，默认 false）- 追踪前反转颜色
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: 客户端提供的任务 ID，用于 SSE 进度跟踪
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
         '200':
           description: 处理后的图片（downloadUrl 指向 .svg 文件）
@@ -3125,6 +3131,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: 已接受异步处理。可通过 SSE 在 /api/v1/jobs/{jobId}/progress 跟踪进度。
+          headers:
+            Location:
+              description: 任务的状态 URL（与 statusUrl 的值相同）。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: 输入无效
           content:
@@ -3139,6 +3173,12 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 处理失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster
