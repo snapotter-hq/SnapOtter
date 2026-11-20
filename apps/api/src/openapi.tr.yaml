@@ -6917,6 +6917,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags:
+        - Files
+      summary: Kaydedilen birden çok dosyayı tek bir ZIP olarak indir
+      description: İstenen tüm dosyaları içeren tek bir ZIP akışı gönderir. Girdiler istek sırasını korur, yinelenen kimlikler atılır ve çakışan adlara _1, _2 sonekleri eklenir. files:all olmadan her kimlik size ait bir dosyaya ait olmalıdır. Herhangi bir kimlik yoksa veya size ait değilse, bir dosyası eksik arşiv döndürmek yerine isteğin tamamı 404 ile başarısız olur. İlk girdi gönderildikten sonra bir dosya depolamadan kaybolursa akış kesilir; böylece istemci hiçbir zaman bir dosyası sessizce eksik olan bir ZIP almaz.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: Eklenecek kaydedilen dosyaların kimlikleri, arşiv sırasıyla
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: İstenen dosyaların ZIP arşivi
+          headers:
+            Content-Disposition:
+              description: Arşivin adı her zaman files.zip olur.
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        '400':
+          description: ids listesi eksik, boş veya dize olmayan bir değer içeriyor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Çağıranın ne files:own ne de files:all izni var
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Bir kimlik yok veya başka bir kullanıcıya ait ("File not found") ya da ilk dosyanın verisi depolamada yok ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Hız sınırı aşıldı (dakikada 60 istek)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary
@@ -26098,6 +26170,14 @@ x-i18n:
       sourceHash: 1bfaa5c376bb
       provenance: machine
       outputHash: 7496ea981da8
+    paths./api/v1/files/download.post.summary:
+      sourceHash: 50f86842447d
+      provenance: machine
+      outputHash: f2fba7ee9e9e
+    paths./api/v1/files/download.post.description:
+      sourceHash: 6872f1dc70e3
+      provenance: machine
+      outputHash: d5aaf1429112
     paths./api/v1/files/upload.post.summary:
       sourceHash: b94c597782ee
       provenance: machine
@@ -30902,6 +30982,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 71487691d646
+    ptr:/paths/~1api~1v1~1files~1download/post/requestBody/content/application~1json/schema/properties/ids/description:
+      sourceHash: 2011132f33ca
+      provenance: machine
+      outputHash: fb44d3d7b559
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/description:
+      sourceHash: 71abee16c6a1
+      provenance: machine
+      outputHash: e3813e9b34ed
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/headers/Content-Disposition/description:
+      sourceHash: 93c05fd533fa
+      provenance: machine
+      outputHash: 57755bb3f448
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/400/description:
+      sourceHash: 857460ea8d43
+      provenance: machine
+      outputHash: 2c39a92e4dd4
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 71487691d646
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/403/description:
+      sourceHash: 0e302e76c2d7
+      provenance: machine
+      outputHash: cc218e79de62
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/404/description:
+      sourceHash: 072ccfb204cb
+      provenance: machine
+      outputHash: 18971dc7fc42
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/429/description:
+      sourceHash: eb2a9882cf3d
+      provenance: machine
+      outputHash: 6b1840ac2149
     ptr:/paths/~1api~1v1~1files~1upload/post/responses/201/description:
       sourceHash: 3a40b0031dc5
       provenance: machine

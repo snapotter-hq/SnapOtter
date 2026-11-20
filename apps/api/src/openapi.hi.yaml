@@ -6915,6 +6915,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags:
+        - Files
+      summary: कई सहेजी गई फ़ाइलें एक ZIP के रूप में download करें
+      description: अनुरोध की गई हर फ़ाइल वाली एक ZIP stream करता है। entries अनुरोध के क्रम में रहती हैं, दोहराए गए ID हटा दिए जाते हैं, और टकराने वाले नामों को _1, _2 suffix मिलते हैं। files:all के बिना हर ID आपकी अपनी फ़ाइल का होना चाहिए। अगर कोई ID मौजूद नहीं है या आपका नहीं है, तो पूरा अनुरोध 404 के साथ विफल होता है, ताकि किसी फ़ाइल के बिना archive न लौटे। अगर पहली entry भेजे जाने के बाद कोई फ़ाइल storage से गायब हो जाती है, तो stream कट जाती है, ताकि client को कभी ऐसी ZIP न मिले जिसमें कोई फ़ाइल चुपचाप छूट गई हो।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: शामिल की जाने वाली सहेजी गई फ़ाइलों के ID, archive के क्रम में
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: अनुरोध की गई फ़ाइलों का ZIP archive
+          headers:
+            Content-Disposition:
+              description: archive का नाम हमेशा files.zip रखता है।
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        '400':
+          description: ids सूची मौजूद नहीं है, खाली है, या उसमें ऐसा मान है जो string नहीं है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: कॉल करने वाले के पास न files:own है, न files:all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: कोई ID मौजूद नहीं है या किसी दूसरे user का है ("File not found"), या पहली फ़ाइल का डेटा storage से गायब है ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: रेट सीमा पार हो गई (प्रति मिनट 60 अनुरोध)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary
@@ -26094,6 +26166,14 @@ x-i18n:
       sourceHash: 1bfaa5c376bb
       provenance: machine
       outputHash: db8e5f290798
+    paths./api/v1/files/download.post.summary:
+      sourceHash: 50f86842447d
+      provenance: machine
+      outputHash: faf4da87e2a8
+    paths./api/v1/files/download.post.description:
+      sourceHash: 6872f1dc70e3
+      provenance: machine
+      outputHash: 43d97f281953
     paths./api/v1/files/upload.post.summary:
       sourceHash: b94c597782ee
       provenance: machine
@@ -30898,6 +30978,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1files~1download/post/requestBody/content/application~1json/schema/properties/ids/description:
+      sourceHash: 2011132f33ca
+      provenance: machine
+      outputHash: a15cfa7b8789
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/description:
+      sourceHash: 71abee16c6a1
+      provenance: machine
+      outputHash: ae97bd7149a1
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/headers/Content-Disposition/description:
+      sourceHash: 93c05fd533fa
+      provenance: machine
+      outputHash: 9d6b43e0417e
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/400/description:
+      sourceHash: 857460ea8d43
+      provenance: machine
+      outputHash: 886936e2f0d9
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/403/description:
+      sourceHash: 0e302e76c2d7
+      provenance: machine
+      outputHash: 861d3058f3e2
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/404/description:
+      sourceHash: 072ccfb204cb
+      provenance: machine
+      outputHash: 201a59786335
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/429/description:
+      sourceHash: eb2a9882cf3d
+      provenance: machine
+      outputHash: 38b1c71270bf
     ptr:/paths/~1api~1v1~1files~1upload/post/responses/201/description:
       sourceHash: 3a40b0031dc5
       provenance: machine

@@ -6917,6 +6917,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags:
+        - Files
+      summary: Pobierz kilka zapisanych plików jako jeden ZIP
+      description: Przesyła strumieniowo jeden plik ZIP ze wszystkimi żądanymi plikami. Wpisy zachowują kolejność z żądania, zduplikowane identyfikatory są pomijane, a kolidujące nazwy dostają przyrostki _1, _2. Bez files:all każdy identyfikator musi wskazywać jeden z Twoich plików. Jeśli któregoś identyfikatora brakuje lub nie należy do Ciebie, całe żądanie kończy się błędem 404 zamiast zwrócić archiwum bez jednego pliku. Jeśli plik zniknie z magazynu po wysłaniu pierwszego wpisu, strumień zostaje przerwany, więc klient nigdy nie dostanie pliku ZIP, w którym po cichu brakuje pliku.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: Identyfikatory zapisanych plików do dołączenia, w kolejności archiwum
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: Archiwum ZIP z żądanymi plikami
+          headers:
+            Content-Disposition:
+              description: Archiwum zawsze nosi nazwę files.zip.
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        '400':
+          description: Brak listy ids, lista jest pusta lub zawiera wartość, która nie jest ciągiem znaków
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Wymagane uwierzytelnienie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Wywołujący nie ma ani files:own, ani files:all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Brakuje identyfikatora lub należy on do innego użytkownika ("File not found") albo danych pierwszego pliku nie ma już w magazynie ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Przekroczono limit żądań (60 żądań na minutę)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary
@@ -26099,6 +26171,14 @@ x-i18n:
       sourceHash: 1bfaa5c376bb
       provenance: machine
       outputHash: 8c9e0c48b6b3
+    paths./api/v1/files/download.post.summary:
+      sourceHash: 50f86842447d
+      provenance: machine
+      outputHash: 71ad447098b9
+    paths./api/v1/files/download.post.description:
+      sourceHash: 6872f1dc70e3
+      provenance: machine
+      outputHash: 83c185e71052
     paths./api/v1/files/upload.post.summary:
       sourceHash: b94c597782ee
       provenance: machine
@@ -30903,6 +30983,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 11561c48ce8b
+    ptr:/paths/~1api~1v1~1files~1download/post/requestBody/content/application~1json/schema/properties/ids/description:
+      sourceHash: 2011132f33ca
+      provenance: machine
+      outputHash: cd08591cd3f0
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/description:
+      sourceHash: 71abee16c6a1
+      provenance: machine
+      outputHash: 795c391911c5
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/headers/Content-Disposition/description:
+      sourceHash: 93c05fd533fa
+      provenance: machine
+      outputHash: 14c1010b7100
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/400/description:
+      sourceHash: 857460ea8d43
+      provenance: machine
+      outputHash: 2033312660b8
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 11561c48ce8b
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/403/description:
+      sourceHash: 0e302e76c2d7
+      provenance: machine
+      outputHash: e3de543bfc7a
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/404/description:
+      sourceHash: 072ccfb204cb
+      provenance: machine
+      outputHash: 88c53e12ba54
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/429/description:
+      sourceHash: eb2a9882cf3d
+      provenance: machine
+      outputHash: e40aa20917cd
     ptr:/paths/~1api~1v1~1files~1upload/post/responses/201/description:
       sourceHash: 3a40b0031dc5
       provenance: machine

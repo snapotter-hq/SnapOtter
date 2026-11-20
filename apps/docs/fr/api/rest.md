@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: dab54f75f5da
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 06c8988d7297
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Stockage de fichiers persistant avec historique des versions.
 | `GET` | `/api/v1/files/:id/download` | Télécharge un fichier |
 | `GET` | `/api/v1/files/:id/thumbnail` | Récupère une miniature JPEG de 300 px |
 | `DELETE` | `/api/v1/files` | Supprime en masse des fichiers et leurs chaînes de versions (corps : `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Télécharge plusieurs fichiers dans un seul ZIP (corps : `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Récupère des URL distantes dans l'espace de travail pour les imports basés sur URL |
 | `POST` | `/api/v1/preview` | Génère un aperçu WebP compatible avec le navigateur (pour les formats HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Diffuse un aperçu mis en cache ou généré, compatible avec le navigateur, pour un PDF, un document bureautique, une vidéo ou un fichier audio enregistré |

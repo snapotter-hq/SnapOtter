@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 41009d0458c8
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: c7df8dada0ae
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | تنزيل الملف |
 | `GET` | `/api/v1/files/:id/thumbnail` | الحصول على صورة مصغرة JPEG بحجم 300 بكسل |
 | `DELETE` | `/api/v1/files` | حذف جماعي للملفات وسلاسل إصداراتها (النص: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | تنزيل عدة ملفات في ملف ZIP واحد (النص: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | جلب عناوين URL بعيدة إلى مساحة العمل للاستيراد المستند إلى URL |
 | `POST` | `/api/v1/preview` | إنشاء معاينة WebP متوافقة مع المتصفح (لصيغ HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | بث معاينة مخزَّنة مؤقتًا أو مُنشأة ومتوافقة مع المتصفح لملف PDF أو مستند Office أو فيديو أو صوت محفوظ |

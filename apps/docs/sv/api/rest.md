@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 68bb37f4a6bf
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 00c88b9373dd
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Persistent fillagring med versionshistorik.
 | `GET` | `/api/v1/files/:id/download` | Ladda ner fil |
 | `GET` | `/api/v1/files/:id/thumbnail` | Hämta 300px JPEG-miniatyr |
 | `DELETE` | `/api/v1/files` | Massradera filer och deras versionskedjor (kropp: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Ladda ner flera filer som en ZIP (kropp: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Hämta fjärr-URL:er till arbetsytan för URL-baserade importer |
 | `POST` | `/api/v1/preview` | Generera en webbläsarkompatibel WebP-förhandsvisning (för HEIC/HEIF/RAW-format) |
 | `GET` | `/api/v1/files/:id/preview` | Strömma en cachad eller genererad webbläsarkompatibel förhandsvisning för en sparad PDF, ett Office-dokument, en video- eller ljudfil |

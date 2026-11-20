@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 0699e9c77ed6
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: aacc5b40fdaf
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Almacenamiento persistente de archivos con historial de versiones.
 | `GET` | `/api/v1/files/:id/download` | Descargar archivo |
 | `GET` | `/api/v1/files/:id/thumbnail` | Obtener una miniatura JPEG de 300px |
 | `DELETE` | `/api/v1/files` | Eliminar en bloque archivos y sus cadenas de versiones (cuerpo: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Descargar varios archivos en un solo ZIP (cuerpo: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Obtener URL remotas en el espacio de trabajo para importaciones basadas en URL |
 | `POST` | `/api/v1/preview` | Generar una vista previa WebP compatible con el navegador (para formatos HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Transmitir una vista previa en caché o generada compatible con el navegador para un PDF, documento de oficina, vídeo o archivo de audio guardado |

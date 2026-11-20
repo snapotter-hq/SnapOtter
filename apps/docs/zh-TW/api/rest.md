@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: a772baa24dd9
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 6fb46cccd8fa
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | 下載檔案 |
 | `GET` | `/api/v1/files/:id/thumbnail` | 取得 300px JPEG 縮圖 |
 | `DELETE` | `/api/v1/files` | 批次刪除檔案及其版本鏈（主體：`{ ids: [...] }`） |
+| `POST` | `/api/v1/files/download` | 將多個檔案下載為一個 ZIP（主體：`{ ids: [...] }`） |
 | `POST` | `/api/v1/fetch-urls` | 將遠端 URL 抓取進工作區，用於以 URL 為基礎的匯入 |
 | `POST` | `/api/v1/preview` | 產生瀏覽器相容的 WebP 預覽（適用於 HEIC/HEIF/RAW 格式） |
 | `GET` | `/api/v1/files/:id/preview` | 為已儲存的 PDF、Office 文件、影片或音訊檔串流已快取或已產生的瀏覽器相容預覽 |

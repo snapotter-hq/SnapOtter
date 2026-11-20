@@ -539,6 +539,7 @@ Persistent file storage with version history.
 | `GET` | `/api/v1/files/:id/download` | Download file |
 | `GET` | `/api/v1/files/:id/thumbnail` | Get 300px JPEG thumbnail |
 | `DELETE` | `/api/v1/files` | Bulk delete files and their version chains (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Download several files as one ZIP (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Fetch remote URLs into the workspace for URL-based imports |
 | `POST` | `/api/v1/preview` | Generate a browser-compatible WebP preview (for HEIC/HEIF/RAW formats) |
 | `GET` | `/api/v1/files/:id/preview` | Stream a cached or generated browser-compatible preview for a saved PDF, office document, video, or audio file |

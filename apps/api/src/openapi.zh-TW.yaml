@@ -6883,6 +6883,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags:
+        - Files
+      summary: 將多個已儲存的檔案下載為一個 ZIP
+      description: 以串流方式傳回一個包含所有要求檔案的 ZIP。項目保持要求中的順序，重複的 ID 會被移除，名稱衝突的檔案會加上 _1、_2 後綴。沒有 files:all 時，每個 ID 都必須是你自己的檔案。只要有一個 ID 不存在或不屬於你，整個要求就會以 404 失敗，而不是傳回缺少檔案的壓縮檔。如果第一個項目送出後某個檔案從儲存空間消失，串流會被中斷，因此用戶端絕不會收到悄悄缺少檔案的 ZIP。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: 要包含的已儲存檔案 ID，依壓縮檔中的順序排列
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 包含所要求檔案的 ZIP 壓縮檔
+          headers:
+            Content-Disposition:
+              description: 壓縮檔一律命名為 files.zip。
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        '400':
+          description: ids 清單缺少、為空或包含非字串值
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: 呼叫端既沒有 files:own 也沒有 files:all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: 某個 ID 不存在或屬於其他使用者（"File not found"），或第一個檔案的資料已不在儲存空間中（"File not found in storage"）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 已超過速率限制（每分鐘 60 次要求）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary
@@ -26009,6 +26081,14 @@ x-i18n:
       sourceHash: 1bfaa5c376bb
       provenance: machine
       outputHash: 2e7ae404a246
+    paths./api/v1/files/download.post.summary:
+      sourceHash: 50f86842447d
+      provenance: machine
+      outputHash: bd7ef823d6ea
+    paths./api/v1/files/download.post.description:
+      sourceHash: 6872f1dc70e3
+      provenance: machine
+      outputHash: e8fc2bf4c6d8
     paths./api/v1/files/upload.post.summary:
       sourceHash: b94c597782ee
       provenance: machine
@@ -30813,6 +30893,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 6a06a757cbea
+    ptr:/paths/~1api~1v1~1files~1download/post/requestBody/content/application~1json/schema/properties/ids/description:
+      sourceHash: 2011132f33ca
+      provenance: machine
+      outputHash: 9b12a59e26a5
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/description:
+      sourceHash: 71abee16c6a1
+      provenance: machine
+      outputHash: 720d5b23da8d
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/headers/Content-Disposition/description:
+      sourceHash: 93c05fd533fa
+      provenance: machine
+      outputHash: 4da932d2b4a4
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/400/description:
+      sourceHash: 857460ea8d43
+      provenance: machine
+      outputHash: 832c02944c5d
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 6a06a757cbea
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/403/description:
+      sourceHash: 0e302e76c2d7
+      provenance: machine
+      outputHash: a9898db65e8c
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/404/description:
+      sourceHash: 072ccfb204cb
+      provenance: machine
+      outputHash: 8ead653bd76d
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/429/description:
+      sourceHash: eb2a9882cf3d
+      provenance: machine
+      outputHash: 45aeaa5a3f1a
     ptr:/paths/~1api~1v1~1files~1upload/post/responses/201/description:
       sourceHash: 3a40b0031dc5
       provenance: machine

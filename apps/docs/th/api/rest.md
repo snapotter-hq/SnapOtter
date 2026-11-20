@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: d1f9ad4f3209
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 3f70b805dc00
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | ดาวน์โหลดไฟล์ |
 | `GET` | `/api/v1/files/:id/thumbnail` | รับภาพขนาดย่อ JPEG 300px |
 | `DELETE` | `/api/v1/files` | ลบไฟล์และสายเวอร์ชันของไฟล์แบบกลุ่ม (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | ดาวน์โหลดหลายไฟล์เป็น ZIP เดียว (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | ดึง URL ระยะไกลเข้าสู่ workspace สำหรับการนำเข้าแบบอิง URL |
 | `POST` | `/api/v1/preview` | สร้างตัวอย่าง WebP ที่เข้ากันได้กับเบราว์เซอร์ (สำหรับรูปแบบ HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | สตรีมตัวอย่างที่แคชไว้หรือสร้างขึ้นที่เข้ากันได้กับเบราว์เซอร์สำหรับ PDF, เอกสาร office, วิดีโอ หรือไฟล์เสียงที่บันทึกไว้ |

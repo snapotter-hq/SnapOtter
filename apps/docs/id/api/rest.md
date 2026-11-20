@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: f5bfb0980a54
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: a75dbf88cd5b
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Penyimpanan file persisten dengan riwayat versi.
 | `GET` | `/api/v1/files/:id/download` | Unduh file |
 | `GET` | `/api/v1/files/:id/thumbnail` | Dapatkan thumbnail JPEG 300px |
 | `DELETE` | `/api/v1/files` | Hapus massal file dan rantai versinya (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Unduh beberapa file sebagai satu ZIP (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Ambil URL jarak jauh ke dalam ruang kerja untuk impor berbasis URL |
 | `POST` | `/api/v1/preview` | Hasilkan pratinjau WebP yang kompatibel dengan peramban (untuk format HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Alirkan pratinjau yang di-cache atau dihasilkan yang kompatibel dengan peramban untuk file PDF, dokumen office, video, atau audio tersimpan |

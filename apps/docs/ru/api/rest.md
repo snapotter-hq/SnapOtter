@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: ddec6063b8cb
+i18n_output_hash: 80260f533ee7
 i18n_hash_version: 2
-i18n_source_hash: fa6e4037f02c
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -543,6 +543,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | Загрузка файла |
 | `GET` | `/api/v1/files/:id/thumbnail` | Получение JPEG-миниатюры 300px |
 | `DELETE` | `/api/v1/files` | Массовое удаление файлов и их цепочек версий (тело: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Скачивание нескольких файлов одним ZIP (тело: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Загрузка удалённых URL в рабочую область для импорта по URL |
 | `POST` | `/api/v1/preview` | Генерация совместимого с браузером WebP-превью (для форматов HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Потоковая передача кешированного или сгенерированного совместимого с браузером превью для сохранённого PDF, офисного документа, видео- или аудиофайла |

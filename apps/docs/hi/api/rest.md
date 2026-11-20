@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: b551e54b0e3b
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 0bdbc635d1f9
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | फ़ाइल डाउनलोड करें |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG थंबनेल प्राप्त करें |
 | `DELETE` | `/api/v1/files` | फ़ाइलें और उनकी संस्करण श्रृंखलाएँ बल्क में हटाएँ (बॉडी: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | कई फ़ाइलें एक ZIP के रूप में download करें (बॉडी: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | URL-आधारित आयात के लिए रिमोट URL को वर्कस्पेस में लाएँ |
 | `POST` | `/api/v1/preview` | एक ब्राउज़र-संगत WebP प्रीव्यू जेनरेट करें (HEIC/HEIF/RAW फ़ॉर्मेट के लिए) |
 | `GET` | `/api/v1/files/:id/preview` | किसी सहेजी गई PDF, ऑफ़िस डॉक्यूमेंट, वीडियो, या ऑडियो फ़ाइल के लिए कैश किया गया या जेनरेट किया गया ब्राउज़र-संगत प्रीव्यू स्ट्रीम करें |

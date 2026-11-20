@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 6374967f6a94
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: de4ad12d7df6
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Dauerhafte Dateispeicherung mit Versionsverlauf.
 | `GET` | `/api/v1/files/:id/download` | Datei herunterladen |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px-JPEG-Thumbnail abrufen |
 | `DELETE` | `/api/v1/files` | Dateien und ihre Versionsketten massenhaft löschen (Body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Mehrere Dateien als eine ZIP-Datei herunterladen (Body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Remote-URLs in den Arbeitsbereich abrufen für URL-basierte Importe |
 | `POST` | `/api/v1/preview` | Eine browserkompatible WebP-Vorschau erzeugen (für HEIC/HEIF/RAW-Formate) |
 | `GET` | `/api/v1/files/:id/preview` | Eine zwischengespeicherte oder erzeugte browserkompatible Vorschau für eine gespeicherte PDF-, Office-Dokument-, Video- oder Audiodatei streamen |

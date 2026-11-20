@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 508d44b1d816
+i18n_output_hash: 9feab63e5bf3
 i18n_hash_version: 2
-i18n_source_hash: fa6e4037f02c
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -543,6 +543,7 @@ Trwałe przechowywanie plików z historią wersji.
 | `GET` | `/api/v1/files/:id/download` | Pobierz plik |
 | `GET` | `/api/v1/files/:id/thumbnail` | Pobierz miniaturę JPEG 300px |
 | `DELETE` | `/api/v1/files` | Zbiorczo usuń pliki i ich łańcuchy wersji (treść: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Pobierz kilka plików jako jeden ZIP (treść: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Pobierz zdalne adresy URL do obszaru roboczego dla importów opartych na URL |
 | `POST` | `/api/v1/preview` | Wygeneruj podgląd WebP zgodny z przeglądarką (dla formatów HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Przesyłaj strumieniowo podgląd zgodny z przeglądarką z pamięci podręcznej lub wygenerowany dla zapisanego pliku PDF, dokumentu biurowego, wideo lub audio |
