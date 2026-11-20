@@ -1,7 +1,7 @@
 import { extname } from "node:path";
 import { createGunzip } from "node:zlib";
 import { extToMime, formatToMime } from "@snapotter/image-engine";
-import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
+import { CAMERA_RAW_INPUTS, MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
@@ -332,7 +332,12 @@ export async function validateImageBuffer(
   }
 
   try {
-    const sharpOpts = detectedFormat === "svg" ? { density: 72 } : undefined;
+    // metadata() reads the header only, so lifting the pixel limit here costs
+    // nothing and lets the checks below name the limit an image breaks.
+    const sharpOpts =
+      detectedFormat === "svg"
+        ? { density: 72, limitInputPixels: false as const }
+        : { limitInputPixels: false as const };
     const metadata = await sharp(buffer, sharpOpts).metadata();
     if (metadata.format === "svg") {
       detectedFormat = "svg";
@@ -357,12 +362,30 @@ export async function validateImageBuffer(
       };
     }
 
+    const pixelLimit = sharpDefaultPixelLimit();
+    if (width * height > pixelLimit) {
+      return {
+        valid: false,
+        reason: `Image exceeds the decoder's ${pixelLimit.toLocaleString("en-US")} pixel limit (${width}x${height}, ${((width * height) / 1_000_000).toFixed(1)}MP)`,
+      };
+    }
+
     return { valid: true, format: detectedFormat, width, height };
   } catch (err) {
     const outOfMemory = asDecoderOutOfMemory(err);
     if (outOfMemory instanceof DecoderOutOfMemoryError) throw outOfMemory;
     return { valid: false, reason: "Failed to read image metadata", cause: err };
   }
+}
+
+/**
+ * sharp's default limitInputPixels. Every decode in the image engine runs
+ * with it, so it stays the ceiling even when MAX_MEGAPIXELS is 0 or higher.
+ * Read at call time: many unit tests mock @snapotter/shared without this
+ * export, and a module-level read would fail every importer of this file.
+ */
+function sharpDefaultPixelLimit(): number {
+  return MAX_RESIZE_OUTPUT_DIMENSION ** 2;
 }
 
 function formatExceededMp(actual: number, limit: number): string {

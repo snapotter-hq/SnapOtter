@@ -1,3 +1,4 @@
+import { crc32, deflateSync } from "node:zlib";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
@@ -782,5 +783,76 @@ describe("validateImageBuffer - megapixel limit boundary", () => {
       .toBuffer();
     env.MAX_MEGAPIXELS = 0;
     expectValid(await validateImageBuffer(png), "png", 1000, 1000);
+  });
+});
+
+/**
+ * A grayscale PNG whose IHDR claims w x h with a single tiny IDAT. Only the
+ * header is read by validation, so this stands in for a 17000x17000 upload
+ * without allocating hundreds of megabytes.
+ */
+function headerOnlyPng(width: number, height: number): Buffer {
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const typed = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(typed) >>> 0);
+    return Buffer.concat([len, typed, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(Buffer.alloc(width + 1))),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+// sharp refuses to decode more than 16383 x 16383 pixels by default, whatever
+// MAX_MEGAPIXELS says, so validation names that ceiling instead of reporting a
+// generic metadata failure (#4435).
+describe("validateImageBuffer - decoder pixel ceiling", () => {
+  const original = env.MAX_MEGAPIXELS;
+
+  afterEach(() => {
+    env.MAX_MEGAPIXELS = original;
+  });
+
+  it("names the decoder limit and the dimensions for a 289 MP image under MAX_MEGAPIXELS=0", async () => {
+    env.MAX_MEGAPIXELS = 0;
+    expectRejected(
+      await validateImageBuffer(headerOnlyPng(17000, 17000), "big.png"),
+      "Image exceeds the decoder's 268,402,689 pixel limit (17000x17000, 289.0MP)",
+    );
+  });
+
+  it("keeps the decoder limit when MAX_MEGAPIXELS is set above it", async () => {
+    env.MAX_MEGAPIXELS = 1000;
+    expectRejected(
+      await validateImageBuffer(headerOnlyPng(20000, 20000), "big.png"),
+      "Image exceeds the decoder's 268,402,689 pixel limit (20000x20000, 400.0MP)",
+    );
+  });
+
+  it("reports MAX_MEGAPIXELS first when it is the lower limit", async () => {
+    env.MAX_MEGAPIXELS = 100;
+    expectRejected(
+      await validateImageBuffer(headerOnlyPng(17000, 17000), "big.png"),
+      "Image exceeds maximum size: 289.0MP (limit: 100MP)",
+    );
+  });
+
+  it("accepts an image exactly at the decoder limit", async () => {
+    env.MAX_MEGAPIXELS = 0;
+    expectValid(
+      await validateImageBuffer(headerOnlyPng(16383, 16383), "edge.png"),
+      "png",
+      16383,
+      16383,
+    );
   });
 });

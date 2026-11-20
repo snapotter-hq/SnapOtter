@@ -6,6 +6,7 @@
  * reading metadata with sharp.
  */
 
+import { crc32, deflateSync } from "node:zlib";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
@@ -339,5 +340,45 @@ describe("Resize", () => {
     expect(meta.pages).toBe(10);
     expect(meta.width).toBe(400);
     expect(meta.height).toBe(300);
+  });
+
+  it("names the configured megapixel limit for a 289 MP upload (#4435)", async () => {
+    // Only the IHDR is read before the refusal, so a header claiming
+    // 17000x17000 stands in for the real 289 MP file. vitest.config.ts sets
+    // MAX_MEGAPIXELS=100, which sharp's own 268 MP ceiling used to mask.
+    const chunk = (type: string, data: Buffer): Buffer => {
+      const len = Buffer.alloc(4);
+      len.writeUInt32BE(data.length);
+      const typed = Buffer.concat([Buffer.from(type, "ascii"), data]);
+      const crc = Buffer.alloc(4);
+      crc.writeUInt32BE(crc32(typed) >>> 0);
+      return Buffer.concat([len, typed, crc]);
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(17000, 0);
+    ihdr.writeUInt32BE(17000, 4);
+    ihdr[8] = 8;
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk("IHDR", ihdr),
+      chunk("IDAT", deflateSync(Buffer.alloc(17001))),
+      chunk("IEND", Buffer.alloc(0)),
+    ]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "huge.png", contentType: "image/png", content: png },
+      { name: "settings", content: JSON.stringify({ percentage: 50 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(
+      "Invalid image: Image exceeds maximum size: 289.0MP (limit: 100MP)",
+    );
   });
 });
