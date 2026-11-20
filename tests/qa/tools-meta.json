@@ -4646,6 +4646,31 @@
     "isAI": false
   },
   {
+    "id": "video-to-avif",
+    "name": "Video to AVIF",
+    "modality": "video",
+    "route": "/video/video-to-avif",
+    "acceptedInputs": [
+      ".mp4",
+      ".mov",
+      ".webm",
+      ".mkv",
+      ".avi",
+      ".m4v",
+      ".mts",
+      ".m2ts",
+      ".3gp",
+      ".flv",
+      ".wmv",
+      ".mpg",
+      ".mpeg",
+      ".ts",
+      ".ogv"
+    ],
+    "executionHint": "long",
+    "isAI": false
+  },
+  {
     "id": "video-to-frames",
     "name": "Video to Frames",
     "modality": "video",
@@ -5682,6 +5707,24 @@
     "modality": "file",
     "route": "/files/xml-to-csv",
     "acceptedInputs": [".xml"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "convert-font",
+    "name": "Convert Font",
+    "modality": "file",
+    "route": "/files/convert-font",
+    "acceptedInputs": [".ttf", ".otf", ".woff", ".woff2"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "convert-case",
+    "name": "Convert Case",
+    "modality": "file",
+    "route": "/files/convert-case",
+    "acceptedInputs": [],
     "executionHint": "fast",
     "isAI": false
   },
