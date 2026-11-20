@@ -147,6 +147,9 @@ export const fixtures = {
     gap: p("audio/formats/tone-gap.wav"),
     tiny: (ext: string) => p(`audio/formats/tiny.${ext}`),
     hostileEmpty: { zeroByte: p("audio/hostile/zero-byte.wav") },
+    // speech.ogg plus a zero-length Vorbis packet on its last page: ffmpeg
+    // plays it, PyAV refuses it (#4980).
+    zeroLengthPacketOgg: p("audio/edge/speech-zero-length-packet.ogg"),
   },
   document: {
     pdfMulti: p("document/valid/multipage-6.pdf"),

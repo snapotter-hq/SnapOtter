@@ -25,6 +25,7 @@ import {
 
 const MP3 = readFileSync(fixtures.audio.tiny("mp3"));
 const SPEECH_WAV = readFileSync(fixtures.audio.speech.wav);
+const ZERO_LENGTH_PACKET_OGG = readFileSync(fixtures.audio.zeroLengthPacketOgg);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const AI_CAPABILITY = installedAiCapabilityGate(
   "transcribe-audio",
@@ -223,6 +224,44 @@ describe("transcribe-audio", () => {
         const subtitles = artifact.buffer.toString("utf8");
         expectSrtArtifact(subtitles);
         expectKnownTranscript(subtitles);
+      }, 300_000);
+
+      // PyAV refuses this file even though ffmpeg plays it (#4980).
+      it("transcribes an Ogg that only the ffmpeg CLI can decode", async () => {
+        const { body, contentType } = createMultipartPayload([
+          {
+            name: "file",
+            filename: "speech-zero-length-packet.ogg",
+            contentType: "audio/ogg",
+            content: ZERO_LENGTH_PACKET_OGG,
+          },
+          {
+            name: "settings",
+            content: JSON.stringify({ outputFormat: "txt" }),
+          },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/audio/transcribe-audio",
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            "content-type": contentType,
+          },
+          body,
+        });
+
+        expect(res.statusCode).toBe(202);
+        const json = JSON.parse(res.body);
+        const artifact = await waitForDownloadedJobArtifact(
+          app,
+          adminToken,
+          "transcribe-audio",
+          json.jobId as string,
+          240_000,
+        );
+        expect(artifact.filename).toBe("speech-zero-length-packet.txt");
+        expectKnownTranscript(artifact.buffer.toString("utf8"));
       }, 300_000);
     },
   );
