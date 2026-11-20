@@ -1,3 +1,4 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -11,10 +12,20 @@ import { buildTestApp, loginAsAdmin, loginAsUser, type TestApp } from "../test-s
 // stubbed to prove the config carries `hasFeedbackSink()` and not a copy of the
 // baked key (#2252).
 const feedbackSink = vi.hoisted(() => ({ present: false }));
+// Events that got past the gate. The test app has no PostHog client, so the
+// real trackEvent would drop everything before anyone could see it (#5014).
+const sentEvents = vi.hoisted(() => [] as string[]);
 
 vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, hasFeedbackSink: () => feedbackSink.present };
+  const { analyticsEnabled } = await import("../../../apps/api/src/lib/analytics-gate.js");
+  return {
+    ...actual,
+    hasFeedbackSink: () => feedbackSink.present,
+    trackEvent: async (event: string) => {
+      if (analyticsEnabled()) sentEvents.push(event);
+    },
+  };
 });
 
 let testApp: TestApp;
@@ -47,6 +58,7 @@ afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
   delete process.env.ANALYTICS_BAKED_OVERRIDE;
   feedbackSink.present = false;
+  sentEvents.length = 0;
   __resetGateForTests();
 });
 
@@ -266,6 +278,51 @@ describe("first-run consent (#4910)", () => {
       .where(eq(schema.settings.key, "analyticsConsentOrigin"));
     expect(row?.value).toBe("upgrade");
     await expect(classifyAnalyticsConsentOrigin()).resolves.toBe("known");
+  });
+
+  describe("instance_started on the first answer (#5014)", () => {
+    async function putAnalytics(value: "true" | "false") {
+      const token = await loginAsAdmin(testApp.app);
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { analyticsEnabled: value },
+      });
+      expect(res.statusCode).toBe(200);
+    }
+
+    async function setOrigin(origin: "fresh" | "upgrade") {
+      process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+      await db
+        .insert(schema.settings)
+        .values({ key: "analyticsConsentOrigin", value: origin })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: origin } });
+      await refreshAnalyticsGate();
+    }
+
+    const censusCount = () =>
+      sentEvents.filter((e) => e === ANALYTICS_EVENTS.INSTANCE_STARTED).length;
+
+    it("sends it once when a fresh install says yes, and not on a later yes", async () => {
+      await setOrigin("fresh");
+      await putAnalytics("true");
+      expect(censusCount()).toBe(1);
+      await putAnalytics("true");
+      expect(censusCount()).toBe(1);
+    });
+
+    it("sends nothing when a fresh install says no", async () => {
+      await setOrigin("fresh");
+      await putAnalytics("false");
+      expect(censusCount()).toBe(0);
+    });
+
+    it("sends nothing for an upgraded instance, which was already counted at boot", async () => {
+      await setOrigin("upgrade");
+      await putAnalytics("true");
+      expect(censusCount()).toBe(0);
+    });
   });
 
   it("the origin marker can't be written through the settings API", async () => {

@@ -366,6 +366,11 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         });
       }
 
+      const importsAnalytics = preparedSettings.some((s) => s.key === "analyticsEnabled");
+      // Read before the write: once it lands the prompt no longer reads as pending.
+      const consentWasPending =
+        importsAnalytics && (await import("../../lib/analytics-gate.js")).analyticsConsentPending();
+
       // Apply changes
       const now = new Date();
 
@@ -453,7 +458,7 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         changes,
       });
 
-      if (preparedSettings.some((s) => s.key === "analyticsEnabled")) {
+      if (importsAnalytics) {
         // The setting is already persisted. A Redis hiccup here must not turn a
         // successful import into a 500; the TTL refresh converges replicas anyway.
         try {
@@ -464,6 +469,11 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
           await publishAnalyticsGateInvalidation();
         } catch (err) {
           request.log.warn({ err }, "analytics gate invalidation failed (import still applied)");
+        }
+        // Same first-answer census as PUT /api/v1/settings (#5014).
+        if (consentWasPending) {
+          const { trackInstanceStarted } = await import("../../lib/instance-started.js");
+          await trackInstanceStarted();
         }
       }
 
