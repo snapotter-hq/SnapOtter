@@ -1,9 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { type MediaStreamInfo, probeMedia, resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
+import { runFfmpegWithProgress, stageMediaInputs, wavPcmCodec } from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -19,9 +19,9 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 /** Functions, so the encoder is resolved per job rather than at module load (#1270). */
-const ENCODERS: Record<string, () => string[]> = {
+const ENCODERS: Record<string, (sources: Array<MediaStreamInfo | undefined>) => string[]> = {
   mp3: () => ["-c:a", resolveEncoder("mp3"), "-b:a", "192k"],
-  wav: () => ["-c:a", "pcm_s16le"],
+  wav: (sources) => ["-c:a", wavPcmCodec(sources)],
   flac: () => ["-c:a", "flac"],
   m4a: () => ["-c:a", "aac", "-b:a", "192k"],
 };
@@ -43,11 +43,13 @@ export function registerMergeAudio(app: FastifyInstance) {
       const settings = settingsSchema.parse(ctx.settings);
       const paths = await stageMediaInputs(ctx);
 
-      // Probe each for total duration (progress mapping)
+      // Probe each for total duration (progress mapping) and WAV bit depth
       let totalS = 0;
+      const sources: Array<MediaStreamInfo | undefined> = [];
       for (const p of paths) {
         const info = await probeMedia(p);
         totalS += info.durationS ?? 0;
+        sources.push(info.streams.find((s) => s.type === "audio"));
       }
 
       // Build per-input normalize chains + audio-only concat
@@ -71,7 +73,7 @@ export function registerMergeAudio(app: FastifyInstance) {
         filter,
         "-map",
         "[a]",
-        ...ENCODERS[settings.format](),
+        ...ENCODERS[settings.format](sources),
         outPath,
       ];
 
