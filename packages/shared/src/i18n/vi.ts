@@ -934,6 +934,10 @@ export const vi: TranslationKeys = {
       name: "Video sang WebP",
       description: "Chuyển đổi đoạn video thành ảnh WebP động",
     },
+    "video-to-avif": {
+      name: "Video sang AVIF",
+      description: "Chuyển đổi đoạn video thành ảnh AVIF động",
+    },
     "video-to-frames": {
       name: "Video sang khung hình",
       description: "Trích xuất khung hình từ video thành tệp ZIP chứa ảnh",
@@ -3490,6 +3494,17 @@ export const vi: TranslationKeys = {
     "video-to-webp": {
       fps: "Số khung hình/giây",
       width: "Chiều rộng (px)",
+      quality: "Chất lượng",
+      loop: "Lặp hoạt ảnh",
+      submit: "Chuyển đổi",
+      submitBatch: "Chuyển đổi ({count} tệp)",
+      progressLabel: "Đang chuyển đổi",
+    },
+    "video-to-avif": {
+      fps: "Số khung hình/giây",
+      width: "Chiều rộng (px)",
+      start: "Bắt đầu (giây)",
+      duration: "Thời lượng (giây)",
       quality: "Chất lượng",
       loop: "Lặp hoạt ảnh",
       submit: "Chuyển đổi",

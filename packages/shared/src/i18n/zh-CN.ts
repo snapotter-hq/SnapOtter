@@ -711,6 +711,10 @@ export const zhCN: TranslationKeys = {
       name: "视频转 WebP",
       description: "将视频片段转换为 WebP 动图",
     },
+    "video-to-avif": {
+      name: "视频转 AVIF",
+      description: "将视频片段转换为 AVIF 动图",
+    },
     "video-to-frames": {
       name: "视频提取帧",
       description: "从视频中提取帧并打包为 ZIP 图片集",
@@ -3222,6 +3226,17 @@ export const zhCN: TranslationKeys = {
     "video-to-webp": {
       fps: "每秒帧数",
       width: "宽度 (px)",
+      quality: "质量",
+      loop: "循环动画",
+      submit: "转换",
+      submitBatch: "转换（{count} 个文件）",
+      progressLabel: "正在转换",
+    },
+    "video-to-avif": {
+      fps: "每秒帧数",
+      width: "宽度 (px)",
+      start: "开始（秒）",
+      duration: "时长（秒）",
       quality: "质量",
       loop: "循环动画",
       submit: "转换",

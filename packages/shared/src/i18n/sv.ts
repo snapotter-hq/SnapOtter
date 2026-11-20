@@ -931,6 +931,10 @@ export const sv: TranslationKeys = {
       name: "Video till WebP",
       description: "Konvertera ett videoklipp till en animerad WebP-bild",
     },
+    "video-to-avif": {
+      name: "Video till AVIF",
+      description: "Konvertera ett videoklipp till en animerad AVIF-bild",
+    },
     "video-to-frames": {
       name: "Video till bildrutor",
       description: "Extrahera bildrutor från en video som en ZIP med bilder",
@@ -3490,6 +3494,17 @@ export const sv: TranslationKeys = {
     "video-to-webp": {
       fps: "Bildrutor per sekund",
       width: "Bredd (px)",
+      quality: "Kvalitet",
+      loop: "Loopa animation",
+      submit: "Konvertera",
+      submitBatch: "Konvertera ({count} filer)",
+      progressLabel: "Konverterar",
+    },
+    "video-to-avif": {
+      fps: "Bildrutor per sekund",
+      width: "Bredd (px)",
+      start: "Start (sekunder)",
+      duration: "Längd (sekunder)",
       quality: "Kvalitet",
       loop: "Loopa animation",
       submit: "Konvertera",

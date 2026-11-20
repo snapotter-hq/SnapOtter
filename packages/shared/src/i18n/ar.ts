@@ -924,6 +924,10 @@ export const ar: TranslationKeys = {
       name: "فيديو إلى WebP",
       description: "تحويل مقطع فيديو إلى صورة WebP متحركة",
     },
+    "video-to-avif": {
+      name: "فيديو إلى AVIF",
+      description: "تحويل مقطع فيديو إلى صورة AVIF متحركة",
+    },
     "video-to-frames": {
       name: "فيديو إلى إطارات",
       description: "استخراج إطارات من الفيديو كملف ZIP من الصور",
@@ -3468,6 +3472,17 @@ export const ar: TranslationKeys = {
     "video-to-webp": {
       fps: "إطارات في الثانية",
       width: "العرض (px)",
+      quality: "الجودة",
+      loop: "تكرار الرسوم المتحركة",
+      submit: "تحويل",
+      submitBatch: "تحويل ({count} ملفات)",
+      progressLabel: "جارٍ التحويل",
+    },
+    "video-to-avif": {
+      fps: "إطارات في الثانية",
+      width: "العرض (px)",
+      start: "البداية (ثوانٍ)",
+      duration: "المدة (ثوانٍ)",
       quality: "الجودة",
       loop: "تكرار الرسوم المتحركة",
       submit: "تحويل",

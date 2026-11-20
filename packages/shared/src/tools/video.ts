@@ -222,6 +222,18 @@ export const VIDEO_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "video-to-avif",
+    name: "Video to AVIF",
+    description: "Convert a video clip into an animated AVIF image",
+    category: "video-convert",
+    icon: "Image",
+    route: "/video-to-avif",
+    modality: "video",
+    acceptedInputs: VIDEO_INPUTS,
+    outputModality: "image",
+    executionHint: "long",
+  },
+  {
     id: "video-to-frames",
     name: "Video to Frames",
     description: "Extract frames from a video as a ZIP of images",

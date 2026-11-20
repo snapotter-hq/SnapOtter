@@ -31,6 +31,7 @@ const ALL_ENCODERS = new Set([
   "libvorbis",
   "libtheora",
   "libwebp_anim",
+  "libaom-av1",
 ]);
 
 beforeEach(() => {
@@ -53,6 +54,7 @@ const ALL_TARGETS: EncoderTarget[] = [
   "vorbis",
   "theora",
   "webp",
+  "av1-alpha",
 ];
 
 describe("resolveEncoder: software (no accel set)", () => {
@@ -67,6 +69,7 @@ describe("resolveEncoder: software (no accel set)", () => {
     vorbis: "libvorbis",
     theora: "libtheora",
     webp: "libwebp_anim",
+    "av1-alpha": "libaom-av1",
   };
   for (const target of ALL_TARGETS) {
     it(`${target} -> ${expected[target]}`, () => {

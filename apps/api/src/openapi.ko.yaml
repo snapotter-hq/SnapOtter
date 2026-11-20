@@ -8589,7 +8589,10 @@ paths:
                     type: string
                   deployMode:
                     type: string
-                    enum: [embedded, external, native]
+                    enum:
+                      - embedded
+                      - external
+                      - native
               example:
                 enabled: true
                 posthogApiKey: example
@@ -10829,6 +10832,96 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/video/video-to-avif:
+    post:
+      operationId: videoToAvif
+      tags:
+        - Video
+      summary: 비디오를 AVIF로
+      description: 비디오 클립을 애니메이션 AVIF 이미지로 변환합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 처리할 비디오 파일
+                settings:
+                  type: string
+                  description: |
+                    옵션이 담긴 JSON 문자열:
+                    - `fps` (정수 1-30, 기본값 12) - 출력 프레임 레이트
+                    - `width` (정수 64-1280, 기본값 480) - 출력 너비(픽셀)
+                    - `startS` (숫자 >= 0, 기본값 0) - 시작 시간(초)
+                    - `durationS` (숫자 0-60, 기본값 5) - 길이(초)
+                    - `quality` (정수 1-100, 기본값 50) - AVIF 압축 품질
+                    - `loop` (불리언, 기본값 true) - 애니메이션 반복 재생
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '202':
+          description: 비동기 처리를 위해 접수되었습니다. /api/v1/jobs/{jobId}/progress의 SSE로 진행 상황을 확인하세요.
+          headers:
+            Location:
+              description: 작업의 상태 URL입니다(statusUrl과 같은 값).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
+        '400':
+          description: 잘못된 입력
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
@@ -26031,6 +26124,14 @@ x-i18n:
       sourceHash: 48fa0306cbe8
       provenance: machine
       outputHash: adbb95723750
+    paths./api/v1/tools/video/video-to-avif.post.summary:
+      sourceHash: 7ca70806ae90
+      provenance: machine
+      outputHash: bfea16d420d7
+    paths./api/v1/tools/video/video-to-avif.post.description:
+      sourceHash: 5127f29a1e4f
+      provenance: machine
+      outputHash: 9053ea583cbe
     paths./api/v1/tools/video/video-to-frames.post.summary:
       sourceHash: 8941a5926866
       provenance: machine
@@ -31563,6 +31664,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4fddf38ba7ed
+      provenance: machine
+      outputHash: 17fd224bba8f
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: a542a7181a18
+      provenance: machine
+      outputHash: 81d7dde17e9c
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: 9d141b18482d
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 518ec26a4f6d
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: a65096e342c8
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-frames/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 4fddf38ba7ed
       provenance: machine

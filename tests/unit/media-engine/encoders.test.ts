@@ -49,6 +49,7 @@ const QSV_ONLY = new Set([
   "libvorbis",
   "libtheora",
   "libwebp_anim",
+  "libaom-av1",
   "h264_qsv",
   "hevc_qsv",
 ]);
@@ -65,6 +66,7 @@ const TARGETS = [
   "vorbis",
   "theora",
   "webp",
+  "av1-alpha",
 ] as const;
 
 const WITH_NVENC = new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc", "av1_nvenc"]);
@@ -265,10 +267,11 @@ describe("softwareEncoderStatus", () => {
       "libvorbis",
       "libtheora",
       "libwebp_anim",
+      "libaom-av1",
     ]);
   });
 
-  it("lists all ten when the build has no software encoders at all", () => {
+  it("lists all eleven when the build has no software encoders at all", () => {
     setEncoderInventoryForTests(new Set(["h264_qsv"]));
     expect(softwareEncoderStatus().missing).toEqual([
       "libx264",
@@ -281,6 +284,7 @@ describe("softwareEncoderStatus", () => {
       "libvorbis",
       "libtheora",
       "libwebp_anim",
+      "libaom-av1",
     ]);
   });
 
@@ -306,6 +310,7 @@ describe("softwareEncoderStatus", () => {
       "libvorbis",
       "libtheora",
       "libwebp_anim",
+      "libaom-av1",
     ]);
   });
 
@@ -414,6 +419,7 @@ describe("hwAccelStatus", () => {
       "vorbis",
       "theora",
       "webp",
+      "av1-alpha",
     ]);
   });
 
@@ -763,7 +769,7 @@ describe("logHwAccel (#1089)", () => {
       unusable: ["hevc_nvenc"],
     });
     expect(warn.mock.calls[0]?.[1]).toBe(
-      'SNAPOTTER_HW_ACCEL="nvenc" is partly available; av1_nvenc, hevc_nvenc fall back to software; vp9, aac, opus, mp3, vorbis, theora, webp always use software',
+      'SNAPOTTER_HW_ACCEL="nvenc" is partly available; av1_nvenc, hevc_nvenc fall back to software; vp9, aac, opus, mp3, vorbis, theora, webp, av1-alpha always use software',
     );
   });
 
@@ -780,10 +786,10 @@ describe("logHwAccel (#1089)", () => {
     expect(info.mock.calls[0]?.[0]).toEqual({
       requested: "nvenc",
       active: ["h264_nvenc", "hevc_nvenc", "av1_nvenc"],
-      unmapped: ["vp9", "aac", "opus", "mp3", "vorbis", "theora", "webp"],
+      unmapped: ["vp9", "aac", "opus", "mp3", "vorbis", "theora", "webp", "av1-alpha"],
     });
     expect(info.mock.calls[0]?.[1]).toBe(
-      "Hardware encoders enabled: h264_nvenc, hevc_nvenc, av1_nvenc; vp9, aac, opus, mp3, vorbis, theora, webp always use software",
+      "Hardware encoders enabled: h264_nvenc, hevc_nvenc, av1_nvenc; vp9, aac, opus, mp3, vorbis, theora, webp, av1-alpha always use software",
     );
   });
 });

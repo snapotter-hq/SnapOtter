@@ -177,6 +177,8 @@
 /tools/gif-to-video /tools/video/gif-to-video/ 301
 /tools/video-to-webp/ /tools/video/video-to-webp/ 301
 /tools/video-to-webp /tools/video/video-to-webp/ 301
+/tools/video-to-avif/ /tools/video/video-to-avif/ 301
+/tools/video-to-avif /tools/video/video-to-avif/ 301
 /tools/video-to-frames/ /tools/video/video-to-frames/ 301
 /tools/video-to-frames /tools/video/video-to-frames/ 301
 /tools/merge-videos/ /tools/video/merge-videos/ 301

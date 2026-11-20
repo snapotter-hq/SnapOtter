@@ -8589,7 +8589,10 @@ paths:
                     type: string
                   deployMode:
                     type: string
-                    enum: [embedded, external, native]
+                    enum:
+                      - embedded
+                      - external
+                      - native
               example:
                 enabled: true
                 posthogApiKey: example
@@ -10833,6 +10836,96 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/video/video-to-avif:
+    post:
+      operationId: videoToAvif
+      tags:
+        - Video
+      summary: वीडियो से AVIF
+      description: एक video क्लिप को एक एनिमेटेड AVIF image में बदलें।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: प्रोसेस करने के लिए वीडियो फ़ाइल
+                settings:
+                  type: string
+                  description: |
+                    विकल्पों वाली JSON स्ट्रिंग:
+                    - `fps` (integer 1-30, default 12) - आउटपुट फ़्रेम दर
+                    - `width` (integer 64-1280, default 480) - पिक्सल में आउटपुट चौड़ाई
+                    - `startS` (number >= 0, default 0) - सेकंड में शुरुआती समय
+                    - `durationS` (number 0-60, default 5) - सेकंड में अवधि
+                    - `quality` (integer 1-100, default 50) - AVIF कंप्रेशन गुणवत्ता
+                    - `loop` (boolean, default true) - एनिमेशन लूप करें
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE प्रोग्रेस ट्रैकिंग के लिए क्लाइंट द्वारा दिया गया जॉब ID
+            example:
+              file: photo.png
+              settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '202':
+          description: एसिंक प्रोसेसिंग के लिए स्वीकृत। /api/v1/jobs/{jobId}/progress पर SSE से प्रगति देखें।
+          headers:
+            Location:
+              description: इस job के लिए status URL (statusUrl के समान मान)।
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
+        '400':
+          description: अमान्य इनपुट
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: प्रोसेसिंग विफल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
@@ -26032,6 +26125,14 @@ x-i18n:
       sourceHash: 48fa0306cbe8
       provenance: machine
       outputHash: 4152e2cc5aca
+    paths./api/v1/tools/video/video-to-avif.post.summary:
+      sourceHash: 7ca70806ae90
+      provenance: machine
+      outputHash: cf20654d6c9a
+    paths./api/v1/tools/video/video-to-avif.post.description:
+      sourceHash: 5127f29a1e4f
+      provenance: machine
+      outputHash: cc8d71f4d6dd
     paths./api/v1/tools/video/video-to-frames.post.summary:
       sourceHash: 8941a5926866
       provenance: machine
@@ -31564,6 +31665,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4fddf38ba7ed
+      provenance: machine
+      outputHash: 395e10e409db
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: a542a7181a18
+      provenance: machine
+      outputHash: fd84bad18b06
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 1e2c73f9659e
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: 6c6c1e8a1e72
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 0e3e8d2efb12
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 793a6b875fe9
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: c00ddf368708
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-frames/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 4fddf38ba7ed
       provenance: machine

@@ -8593,7 +8593,10 @@ paths:
                     type: string
                   deployMode:
                     type: string
-                    enum: [embedded, external, native]
+                    enum:
+                      - embedded
+                      - external
+                      - native
               example:
                 enabled: true
                 posthogApiKey: example
@@ -10837,6 +10840,96 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/video/video-to-avif:
+    post:
+      operationId: videoToAvif
+      tags:
+        - Video
+      summary: Видео в AVIF
+      description: Конвертация видеоклипа в анимированное изображение AVIF.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Видеофайл для обработки
+                settings:
+                  type: string
+                  description: |
+                    Строка JSON с параметрами:
+                    - `fps` (целое число 1-30, по умолчанию 12) - Частота кадров на выходе
+                    - `width` (целое число 64-1280, по умолчанию 480) - Ширина на выходе в пикселях
+                    - `startS` (число >= 0, по умолчанию 0) - Время начала в секундах
+                    - `durationS` (число 0-60, по умолчанию 5) - Длительность в секундах
+                    - `quality` (целое число 1-100, по умолчанию 50) - Качество сжатия AVIF
+                    - `loop` (логическое значение, по умолчанию true) - Зациклить анимацию
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Необязательный ID задачи, передаваемый клиентом, для отслеживания прогресса через SSE
+            example:
+              file: photo.png
+              settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '202':
+          description: Принято в асинхронную обработку. Отслеживайте прогресс через SSE по адресу /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL статуса задачи (то же значение, что и statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
+        '400':
+          description: Недопустимые данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
@@ -25829,7 +25922,7 @@ x-i18n:
       outputHash: 0255181c7bcb
     paths./api/v1/admin/features/{bundleId}/install.post.description:
       sourceHash: 6051af19be7e
-      provenance: machine
+      provenance: human
       outputHash: 7e1711dc5628
     paths./api/v1/admin/features/{bundleId}/uninstall.post.summary:
       sourceHash: 160eaf179d4f
@@ -26039,6 +26132,14 @@ x-i18n:
       sourceHash: 48fa0306cbe8
       provenance: machine
       outputHash: cd5155221ddb
+    paths./api/v1/tools/video/video-to-avif.post.summary:
+      sourceHash: 7ca70806ae90
+      provenance: machine
+      outputHash: 4cfd50b6c018
+    paths./api/v1/tools/video/video-to-avif.post.description:
+      sourceHash: 5127f29a1e4f
+      provenance: machine
+      outputHash: 2bc52e9a69d2
     paths./api/v1/tools/video/video-to-frames.post.summary:
       sourceHash: 8941a5926866
       provenance: machine
@@ -26285,7 +26386,7 @@ x-i18n:
       outputHash: 598c2fe1c9bc
     paths./api/v1/tools/pdf/compress-pdf-to-100kb.post.description:
       sourceHash: 5a13ae7c6e69
-      provenance: machine
+      provenance: human
       outputHash: 386c07e9c590
     paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.summary:
       sourceHash: 221c729e6ddd
@@ -26293,7 +26394,7 @@ x-i18n:
       outputHash: 6ac7b7dede50
     paths./api/v1/tools/pdf/compress-pdf-to-200kb.post.description:
       sourceHash: 48e46409e13a
-      provenance: machine
+      provenance: human
       outputHash: df1dce7b81b9
     paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.summary:
       sourceHash: 9196060d0d71
@@ -26301,7 +26402,7 @@ x-i18n:
       outputHash: b77f5f7234df
     paths./api/v1/tools/pdf/compress-pdf-to-500kb.post.description:
       sourceHash: 24c751490f0b
-      provenance: machine
+      provenance: human
       outputHash: bab5289dada6
     paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.summary:
       sourceHash: affd9a8d906f
@@ -26309,7 +26410,7 @@ x-i18n:
       outputHash: d5a9628d0122
     paths./api/v1/tools/pdf/compress-pdf-to-1mb.post.description:
       sourceHash: 16ef1ad29f01
-      provenance: machine
+      provenance: human
       outputHash: 750d8957261d
     paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.summary:
       sourceHash: c78524582a37
@@ -26317,7 +26418,7 @@ x-i18n:
       outputHash: 1a365c59ee42
     paths./api/v1/tools/pdf/compress-pdf-to-2mb.post.description:
       sourceHash: 9408c6fdc894
-      provenance: machine
+      provenance: human
       outputHash: 844fbfcb7cd6
     paths./api/v1/tools/pdf/rotate-pdf.post.summary:
       sourceHash: 1eccabbce838
@@ -26357,7 +26458,7 @@ x-i18n:
       outputHash: 6d97845087b7
     paths./api/v1/tools/pdf/multi-tool-pdf.post.description:
       sourceHash: b3cd42a4b0b1
-      provenance: machine
+      provenance: human
       outputHash: 1da23e38a6ad
     paths./api/v1/tools/pdf/protect-pdf.post.summary:
       sourceHash: dae6c607e963
@@ -31571,6 +31672,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 5541b9519f82
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4fddf38ba7ed
+      provenance: machine
+      outputHash: 43ecce2c2daf
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: a542a7181a18
+      provenance: machine
+      outputHash: 4cae3403541e
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b811afebb36f
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: f7bd62bff809
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: c1d050e79827
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: eb22ded67683
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 5541b9519f82
+    ptr:/paths/~1api~1v1~1tools~1video~1video-to-avif/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: dea70993e963
     ptr:/paths/~1api~1v1~1tools~1video~1video-to-frames/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 4fddf38ba7ed
       provenance: machine

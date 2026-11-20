@@ -711,6 +711,10 @@ export const zhTW: TranslationKeys = {
       name: "影片轉 WebP",
       description: "將影片片段轉換為動態 WebP 圖片",
     },
+    "video-to-avif": {
+      name: "影片轉 AVIF",
+      description: "將影片片段轉換為動態 AVIF 圖片",
+    },
     "video-to-frames": {
       name: "影片轉影格",
       description: "從影片擷取影格並匯出為 ZIP 圖片檔",
@@ -3222,6 +3226,17 @@ export const zhTW: TranslationKeys = {
     "video-to-webp": {
       fps: "每秒影格數",
       width: "寬度 (px)",
+      quality: "品質",
+      loop: "循環播放動畫",
+      submit: "轉換",
+      submitBatch: "轉換（{count} 個檔案）",
+      progressLabel: "正在轉換",
+    },
+    "video-to-avif": {
+      fps: "每秒影格數",
+      width: "寬度 (px)",
+      start: "開始（秒）",
+      duration: "持續時間（秒）",
       quality: "品質",
       loop: "循環播放動畫",
       submit: "轉換",

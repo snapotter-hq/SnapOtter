@@ -896,6 +896,10 @@ export const ja: TranslationKeys = {
       name: "動画を WebP に変換",
       description: "動画クリップをアニメーション WebP 画像に変換",
     },
+    "video-to-avif": {
+      name: "動画を AVIF に変換",
+      description: "動画クリップをアニメーション AVIF 画像に変換",
+    },
     "video-to-frames": {
       name: "動画をフレームに変換",
       description: "動画からフレームを画像の ZIP として抽出",
@@ -3448,6 +3452,17 @@ export const ja: TranslationKeys = {
     "video-to-webp": {
       fps: "フレームレート",
       width: "幅 (px)",
+      quality: "品質",
+      loop: "アニメーションをループ",
+      submit: "変換",
+      submitBatch: "変換 ({count} ファイル)",
+      progressLabel: "変換中",
+    },
+    "video-to-avif": {
+      fps: "フレームレート",
+      width: "幅 (px)",
+      start: "開始 (秒)",
+      duration: "長さ (秒)",
       quality: "品質",
       loop: "アニメーションをループ",
       submit: "変換",

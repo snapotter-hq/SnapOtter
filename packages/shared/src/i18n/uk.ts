@@ -934,6 +934,10 @@ export const uk: TranslationKeys = {
       name: "Відео у WebP",
       description: "Конвертувати відеокліп в анімоване зображення WebP",
     },
+    "video-to-avif": {
+      name: "Відео у AVIF",
+      description: "Конвертувати відеокліп в анімоване зображення AVIF",
+    },
     "video-to-frames": {
       name: "Відео у кадри",
       description: "Витягти кадри з відео як ZIP-архів зображень",
@@ -3503,6 +3507,17 @@ export const uk: TranslationKeys = {
     "video-to-webp": {
       fps: "Кадрів на секунду",
       width: "Ширина (px)",
+      quality: "Якість",
+      loop: "Зациклити анімацію",
+      submit: "Конвертувати",
+      submitBatch: "Конвертувати ({count} файлів)",
+      progressLabel: "Конвертація",
+    },
+    "video-to-avif": {
+      fps: "Кадрів на секунду",
+      width: "Ширина (px)",
+      start: "Початок (секунди)",
+      duration: "Тривалість (секунди)",
       quality: "Якість",
       loop: "Зациклити анімацію",
       submit: "Конвертувати",

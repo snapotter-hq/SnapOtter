@@ -881,6 +881,10 @@ export const ko: TranslationKeys = {
       name: "동영상을 WebP로",
       description: "동영상 클립을 애니메이션 WebP 이미지로 변환",
     },
+    "video-to-avif": {
+      name: "동영상을 AVIF로",
+      description: "동영상 클립을 애니메이션 AVIF 이미지로 변환",
+    },
     "video-to-frames": {
       name: "동영상을 프레임으로",
       description: "동영상에서 프레임을 추출하여 이미지 ZIP으로 저장",
@@ -3423,6 +3427,17 @@ export const ko: TranslationKeys = {
     "video-to-webp": {
       fps: "초당 프레임 수",
       width: "너비 (px)",
+      quality: "품질",
+      loop: "애니메이션 반복",
+      submit: "변환",
+      submitBatch: "변환 ({count}개 파일)",
+      progressLabel: "변환 중",
+    },
+    "video-to-avif": {
+      fps: "초당 프레임 수",
+      width: "너비 (px)",
+      start: "시작 (초)",
+      duration: "재생 시간 (초)",
       quality: "품질",
       loop: "애니메이션 반복",
       submit: "변환",

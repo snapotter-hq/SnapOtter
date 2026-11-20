@@ -495,6 +495,11 @@ const VideoToWebpSettings = lazy(() =>
     default: m.VideoToWebpSettings,
   })),
 );
+const VideoToAvifSettings = lazy(() =>
+  import("@/components/tools/video-to-avif-settings").then((m) => ({
+    default: m.VideoToAvifSettings,
+  })),
+);
 const VideoToFramesSettings = lazy(() =>
   import("@/components/tools/video-to-frames-settings").then((m) => ({
     default: m.VideoToFramesSettings,
@@ -1089,6 +1094,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["stabilize-video", { accept: VIDEO_INPUTS.join(","), Settings: StabilizeVideoSettings }],
   ["gif-to-video", { accept: ".gif", Settings: GifToVideoSettings }],
   ["video-to-webp", { accept: VIDEO_INPUTS.join(","), Settings: VideoToWebpSettings }],
+  ["video-to-avif", { accept: VIDEO_INPUTS.join(","), Settings: VideoToAvifSettings }],
   ["video-to-frames", { accept: VIDEO_INPUTS.join(","), Settings: VideoToFramesSettings }],
   ["merge-videos", { accept: VIDEO_INPUTS.join(","), Settings: MergeVideosSettings }],
   [

@@ -54,7 +54,7 @@ const STILL: FrameInfo = { animated: false, pages: 1, pageHeight: 0, width: 0 };
  * Multi-frame input is pushed through the same `assertGifWorkload` cap the GIF
  * tools use, rather than introducing a second limit.
  */
-async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
+export async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
   let meta: Metadata;
   try {
     meta = await sharp(buffer).metadata();
@@ -100,6 +100,8 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
  * taller than the original, so a 100x100 GIF converted to JPEG comes out as a
  * 100x300 contact sheet. Reporting the input as a still keeps those conversions
  * on the single-frame path, which is the correct result for them anyway.
+ * (convert is the one exception for AVIF: it sends an animation to ffmpeg
+ * through animated-avif.ts instead.)
  */
 export async function readAnimationFor(buffer: Buffer, outputFormat: string): Promise<FrameInfo> {
   const container = animatedContainerFor(outputFormat);

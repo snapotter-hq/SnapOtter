@@ -90,6 +90,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "stabilize-video": VIDEO_FIX,
   "gif-to-video": { buffer: GIF, filename: "test.gif" },
   "video-to-webp": VIDEO_FIX,
+  "video-to-avif": VIDEO_FIX,
   "video-to-frames": VIDEO_FIX,
   "aspect-pad": VIDEO_FIX,
   "blur-pad": VIDEO_FIX,
@@ -717,6 +718,15 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "quality max", settings: { quality: 100 } },
     { label: "loop true", settings: { loop: true } },
     { label: "loop false", settings: { loop: false } },
+  ],
+
+  "video-to-avif": [
+    { label: "fps min", settings: { fps: 1, width: 64, durationS: 1 } },
+    { label: "fps max", settings: { fps: 30, width: 64, durationS: 1 } },
+    { label: "width max", settings: { width: 1280, durationS: 1 } },
+    { label: "quality min", settings: { quality: 1, width: 64, durationS: 1 } },
+    { label: "quality max", settings: { quality: 100, width: 64, durationS: 1 } },
+    { label: "loop false", settings: { loop: false, width: 64, durationS: 1 } },
   ],
 
   "video-to-frames": [

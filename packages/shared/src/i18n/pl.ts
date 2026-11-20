@@ -933,6 +933,10 @@ export const pl: TranslationKeys = {
       name: "Wideo na WebP",
       description: "Konwertuj klip wideo na animowany obraz WebP",
     },
+    "video-to-avif": {
+      name: "Wideo na AVIF",
+      description: "Konwertuj klip wideo na animowany obraz AVIF",
+    },
     "video-to-frames": {
       name: "Wideo na klatki",
       description: "Wyodrębnij klatki z wideo jako ZIP z obrazami",
@@ -3502,6 +3506,17 @@ export const pl: TranslationKeys = {
     "video-to-webp": {
       fps: "Klatki na sekundę",
       width: "Szerokość (px)",
+      quality: "Jakość",
+      loop: "Zapętl animację",
+      submit: "Konwertuj",
+      submitBatch: "Konwertuj ({count} plików)",
+      progressLabel: "Konwertowanie",
+    },
+    "video-to-avif": {
+      fps: "Klatki na sekundę",
+      width: "Szerokość (px)",
+      start: "Początek (sekundy)",
+      duration: "Czas trwania (sekundy)",
       quality: "Jakość",
       loop: "Zapętl animację",
       submit: "Konwertuj",

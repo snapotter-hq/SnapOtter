@@ -933,6 +933,10 @@ export const id: TranslationKeys = {
       name: "Video ke WebP",
       description: "Konversi klip video menjadi gambar WebP animasi",
     },
+    "video-to-avif": {
+      name: "Video ke AVIF",
+      description: "Konversi klip video menjadi gambar AVIF animasi",
+    },
     "video-to-frames": {
       name: "Video ke Frame",
       description: "Ekstrak frame dari video sebagai ZIP berisi gambar",
@@ -3494,6 +3498,17 @@ export const id: TranslationKeys = {
     "video-to-webp": {
       fps: "Frame per detik",
       width: "Lebar (px)",
+      quality: "Kualitas",
+      loop: "Ulangi animasi",
+      submit: "Konversi",
+      submitBatch: "Konversi ({count} file)",
+      progressLabel: "Mengonversi",
+    },
+    "video-to-avif": {
+      fps: "Frame per detik",
+      width: "Lebar (px)",
+      start: "Mulai (detik)",
+      duration: "Durasi (detik)",
       quality: "Kualitas",
       loop: "Ulangi animasi",
       submit: "Konversi",

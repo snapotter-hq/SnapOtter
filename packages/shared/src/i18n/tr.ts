@@ -934,6 +934,10 @@ export const tr: TranslationKeys = {
       name: "Videodan WebP",
       description: "Video klibi animasyonlu WebP görseline dönüştür",
     },
+    "video-to-avif": {
+      name: "Videodan AVIF",
+      description: "Video klibi animasyonlu AVIF görseline dönüştür",
+    },
     "video-to-frames": {
       name: "Videodan Kareler",
       description: "Videodan kareleri ZIP içinde görsel olarak çıkar",
@@ -3498,6 +3502,17 @@ export const tr: TranslationKeys = {
     "video-to-webp": {
       fps: "Saniyedeki kare sayısı",
       width: "Genişlik (px)",
+      quality: "Kalite",
+      loop: "Animasyonu döngüle",
+      submit: "Dönüştür",
+      submitBatch: "Dönüştür ({count} dosya)",
+      progressLabel: "Dönüştürülüyor",
+    },
+    "video-to-avif": {
+      fps: "Saniyedeki kare sayısı",
+      width: "Genişlik (px)",
+      start: "Başlangıç (saniye)",
+      duration: "Süre (saniye)",
       quality: "Kalite",
       loop: "Animasyonu döngüle",
       submit: "Dönüştür",
