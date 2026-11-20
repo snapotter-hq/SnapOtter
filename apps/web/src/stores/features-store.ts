@@ -22,6 +22,11 @@ interface BundleProgress {
   stage: string;
 }
 
+interface FeaturesResponse {
+  bundles: FeatureBundleState[];
+  upscaleCpuMaxMp?: number | null;
+}
+
 interface ToolBundleInstallResult {
   bundleId: string;
   jobId?: string;
@@ -35,6 +40,11 @@ interface FeaturesState {
   loadError: boolean;
   /** A background refresh has failed repeatedly, so `bundles` may not match the server. */
   bundlesStale: boolean;
+  /**
+   * The CPU upscale ceiling in megapixels (0 = no cap), or null when a GPU may
+   * run upscales uncapped or the server is too old to say (#5036).
+   */
+  upscaleCpuMaxMp: number | null;
   installing: Record<string, BundleProgress>;
   errors: Record<string, string>;
   queued: string[];
@@ -84,10 +94,15 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   const refreshBundles = async (): Promise<boolean> => {
     const seq = ++refreshSeq;
     try {
-      const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
+      const data = await apiGet<FeaturesResponse>("/v1/features");
       if (seq !== refreshSeq) return false;
       refreshFailureStreak = 0;
-      set({ bundles: data.bundles, loaded: true, bundlesStale: false });
+      set({
+        bundles: data.bundles,
+        upscaleCpuMaxMp: data.upscaleCpuMaxMp ?? null,
+        loaded: true,
+        bundlesStale: false,
+      });
       return true;
     } catch {
       if (seq === refreshSeq) {
@@ -344,6 +359,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     loaded: false,
     loadError: false,
     bundlesStale: false,
+    upscaleCpuMaxMp: null,
     installing: {},
     errors: {},
     queued: [],
@@ -364,10 +380,16 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       const epoch = resetSeq;
       const seq = ++refreshSeq;
       try {
-        const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
+        const data = await apiGet<FeaturesResponse>("/v1/features");
         if (epoch !== resetSeq || seq !== refreshSeq) return;
         refreshFailureStreak = 0;
-        set({ bundles: data.bundles, loaded: true, loadError: false, bundlesStale: false });
+        set({
+          bundles: data.bundles,
+          upscaleCpuMaxMp: data.upscaleCpuMaxMp ?? null,
+          loaded: true,
+          loadError: false,
+          bundlesStale: false,
+        });
         recoverActiveInstalls();
       } catch {
         if (epoch !== resetSeq || seq !== refreshSeq) return;

@@ -2008,6 +2008,8 @@ export const it: TranslationKeys = {
         "L'upscaling con IA richiede molte risorse. Senza GPU, un'immagine grande può richiedere diversi minuti.",
       cpuResizedNote:
         "Questo server non ha una GPU, quindi l'immagine è stata ridotta a {width} × {height} prima dell'upscaling.",
+      cpuFitHint:
+        "Questo server non ha una GPU, quindi l'immagine verrà ridotta a {width} × {height} prima dell'upscaling.",
       qualityFast: "Veloce",
       qualityBalanced: "Bilanciata",
       qualityBest: "Migliore",

@@ -2001,6 +2001,8 @@ export const id: TranslationKeys = {
         "Upscaling AI membutuhkan banyak komputasi. Tanpa GPU, gambar besar bisa memakan waktu beberapa menit.",
       cpuResizedNote:
         "Server ini tidak punya GPU, jadi gambar diperkecil ke {width} × {height} sebelum di-upscale.",
+      cpuFitHint:
+        "Server ini tidak punya GPU, jadi gambar ini akan diperkecil ke {width} × {height} sebelum di-upscale.",
       qualityFast: "Cepat",
       qualityBalanced: "Seimbang",
       qualityBest: "Terbaik",
