@@ -4770,7 +4770,23 @@
       },
       {
         "key": "position",
-        "values": ["top", "center", "bottom", null]
+        "values": ["top", "center", "bottom", "custom", null]
+      },
+      {
+        "key": "x",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "y",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "wrap",
+        "values": [true, false, null]
+      },
+      {
+        "key": "maxWidth",
+        "values": [10, 55, 100, null]
       },
       {
         "key": "backgroundBox",
@@ -4805,6 +4821,56 @@
       {
         "key": "position",
         "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "x",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "x",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "x",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "y",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "y",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "y",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "wrap",
+        "value": "yes-please",
+        "why": "wrong type"
+      },
+      {
+        "key": "maxWidth",
+        "value": 9,
+        "why": "below declared min"
+      },
+      {
+        "key": "maxWidth",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "maxWidth",
+        "value": "not-a-number",
         "why": "wrong type"
       },
       {
@@ -8507,7 +8573,7 @@
       },
       {
         "key": "endS",
-        "values": [1e-6, 50.000001, 100.000001, null]
+        "values": [0.000001, 50.000001, 100.000001, null]
       },
       {
         "key": "cutStartS",
@@ -10271,7 +10337,7 @@
       },
       {
         "key": "endS",
-        "values": [1e-6, 50.000001, 100.000001, null]
+        "values": [0.000001, 50.000001, 100.000001, null]
       },
       {
         "key": "cutStartS",
