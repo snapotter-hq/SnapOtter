@@ -1256,6 +1256,10 @@ export const de: TranslationKeys = {
       name: "Groß-/Kleinschreibung ändern",
       description: "Text in GROSS-, klein-, Titel-, Satzschreibung und mehr umwandeln",
     },
+    "proportion-calculator": {
+      name: "Dreisatzrechner",
+      description: "Dreisatz lösen: X aus drei bekannten Werten berechnen",
+    },
     "create-zip": {
       name: "ZIP erstellen",
       description: "Mehrere Dateien in ein einzelnes ZIP-Archiv bündeln",
@@ -4178,6 +4182,18 @@ export const de: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Art",
+      direct: "Proportional",
+      inverse: "Antiproportional",
+      directHint: "A verhält sich zu B wie C zu X, also X = B × C ÷ A",
+      inverseHint: "A × B = C × X, also X = A × B ÷ C",
+      calculate: "Berechnen",
+      result: "Ergebnis",
+      invalidNumber: "Zahl eingeben",
+      zeroDivisorDirect: "A darf beim proportionalen Dreisatz nicht 0 sein",
+      zeroDivisorInverse: "C darf beim antiproportionalen Dreisatz nicht 0 sein",
     },
     "create-zip": {
       submit: "ZIP erstellen",

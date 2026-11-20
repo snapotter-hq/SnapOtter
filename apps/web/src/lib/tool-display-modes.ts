@@ -213,6 +213,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "xml-to-csv": "no-comparison",
   "convert-font": "no-comparison",
   "convert-case": "no-dropzone",
+  "proportion-calculator": "no-dropzone",
   "create-zip": "no-comparison",
   "extract-zip": "no-comparison",
 };

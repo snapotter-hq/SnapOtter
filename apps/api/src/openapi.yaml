@@ -15872,6 +15872,79 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/proportion-calculator:
+    post:
+      operationId: proportionCalculator
+      tags: [Files]
+      summary: Proportion Calculator
+      description: |
+        Solve the rule of three: given three values, find the fourth. Takes a
+        JSON body, not multipart, and answers with a number instead of a file.
+
+        `direct`: A is to B as C is to X, so X = B * C / A. `inverse`: A * B =
+        C * X, so X = A * B / C. The answer is rounded to 15 significant digits.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [a, b, c]
+              properties:
+                a:
+                  type: number
+                  description: First known value. Must not be 0 in direct mode.
+                b:
+                  type: number
+                  description: The value that goes with a
+                c:
+                  type: number
+                  description: Third known value. Must not be 0 in inverse mode.
+                mode:
+                  type: string
+                  enum: [direct, inverse]
+                  default: direct
+                  description: Direct or inverse proportion
+            example:
+              a: 3
+              b: 6
+              c: 10
+              mode: direct
+      responses:
+        "200":
+          description: The missing value
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, x]
+                properties:
+                  mode:
+                    type: string
+                    enum: [direct, inverse]
+                  x:
+                    type: number
+                    description: The value that goes with c
+              example:
+                mode: direct
+                x: 20
+        "400":
+          description: Invalid input, a zero divisor, or an answer out of range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/convert-font:
     post:
       operationId: convertFont

@@ -1260,6 +1260,10 @@ export const fr: TranslationKeys = {
       name: "Changer la casse",
       description: "Passer le texte en MAJUSCULES, minuscules, casse de titre, de phrase et plus",
     },
+    "proportion-calculator": {
+      name: "Calculateur de proportions",
+      description: "Résolvez la règle de trois : trouvez X à partir de trois valeurs connues",
+    },
     "create-zip": {
       name: "Créer un ZIP",
       description: "Regroupez plusieurs fichiers dans une seule archive ZIP",
@@ -4171,6 +4175,18 @@ export const fr: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Type",
+      direct: "Directe",
+      inverse: "Inverse",
+      directHint: "A est à B ce que C est à X, donc X = B × C ÷ A",
+      inverseHint: "A × B = C × X, donc X = A × B ÷ C",
+      calculate: "Calculer",
+      result: "Résultat",
+      invalidNumber: "Saisissez un nombre",
+      zeroDivisorDirect: "A ne peut pas valoir 0 dans une proportion directe",
+      zeroDivisorInverse: "C ne peut pas valoir 0 dans une proportion inverse",
     },
     "create-zip": {
       submit: "Créer un ZIP",

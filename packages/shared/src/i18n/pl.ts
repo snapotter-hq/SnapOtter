@@ -1253,6 +1253,10 @@ export const pl: TranslationKeys = {
       name: "Zmień wielkość liter",
       description: "Zamień tekst na WIELKIE, małe litery, styl tytułu, styl zdania i inne",
     },
+    "proportion-calculator": {
+      name: "Kalkulator proporcji",
+      description: "Rozwiąż regułę trzech: oblicz X z trzech znanych wartości",
+    },
     "create-zip": {
       name: "Utwórz ZIP",
       description: "Spakuj wiele plików do jednego archiwum ZIP",
@@ -4160,6 +4164,18 @@ export const pl: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Rodzaj",
+      direct: "Prosta",
+      inverse: "Odwrotna",
+      directHint: "A ma się do B jak C do X, więc X = B × C ÷ A",
+      inverseHint: "A × B = C × X, więc X = A × B ÷ C",
+      calculate: "Oblicz",
+      result: "Wynik",
+      invalidNumber: "Wpisz liczbę",
+      zeroDivisorDirect: "A nie może wynosić 0 w proporcji prostej",
+      zeroDivisorInverse: "C nie może wynosić 0 w proporcji odwrotnej",
     },
     "create-zip": {
       submit: "Utwórz ZIP",

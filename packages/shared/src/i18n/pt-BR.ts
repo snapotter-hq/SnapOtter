@@ -1254,6 +1254,10 @@ export const ptBR: TranslationKeys = {
       name: "Converter maiúsculas e minúsculas",
       description: "Mude o texto para MAIÚSCULAS, minúsculas, estilo título, estilo frase e mais",
     },
+    "proportion-calculator": {
+      name: "Calculadora de proporção",
+      description: "Resolva a regra de três: encontre X a partir de três valores conhecidos",
+    },
     "create-zip": {
       name: "Criar ZIP",
       description: "Agrupe vários arquivos em um único arquivo ZIP",
@@ -4159,6 +4163,18 @@ export const ptBR: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Tipo",
+      direct: "Direta",
+      inverse: "Inversa",
+      directHint: "A está para B assim como C está para X, então X = B × C ÷ A",
+      inverseHint: "A × B = C × X, então X = A × B ÷ C",
+      calculate: "Calcular",
+      result: "Resultado",
+      invalidNumber: "Insira um número",
+      zeroDivisorDirect: "A não pode ser 0 em uma proporção direta",
+      zeroDivisorInverse: "C não pode ser 0 em uma proporção inversa",
     },
     "create-zip": {
       submit: "Criar ZIP",

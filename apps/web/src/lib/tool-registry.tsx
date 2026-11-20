@@ -878,6 +878,11 @@ const ConvertCaseSettings = lazy(() =>
     default: m.ConvertCaseSettings,
   })),
 );
+const ProportionCalculatorSettings = lazy(() =>
+  import("@/components/tools/proportion-calculator-settings").then((m) => ({
+    default: m.ProportionCalculatorSettings,
+  })),
+);
 const CreateZipSettings = lazy(() =>
   import("@/components/tools/create-zip-settings").then((m) => ({
     default: m.CreateZipSettings,
@@ -1230,6 +1235,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
   ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],
   ["convert-case", { Settings: ConvertCaseSettings }],
+  ["proportion-calculator", { Settings: ProportionCalculatorSettings }],
   ["create-zip", { Settings: CreateZipSettings }],
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];

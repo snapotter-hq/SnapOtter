@@ -1254,6 +1254,10 @@ export const uk: TranslationKeys = {
       description:
         "Перетворіть текст на ВЕРХНІЙ, нижній регістр, регістр заголовка, речення та інші",
     },
+    "proportion-calculator": {
+      name: "Калькулятор пропорцій",
+      description: "Розв'яжіть пропорцію: знайдіть X за трьома відомими значеннями",
+    },
     "create-zip": {
       name: "Створення ZIP",
       description: "Запакувати кілька файлів в один архів ZIP",
@@ -4159,6 +4163,18 @@ export const uk: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Тип",
+      direct: "Пряма",
+      inverse: "Обернена",
+      directHint: "A відноситься до B, як C до X, тому X = B × C ÷ A",
+      inverseHint: "A × B = C × X, тому X = A × B ÷ C",
+      calculate: "Обчислити",
+      result: "Результат",
+      invalidNumber: "Введіть число",
+      zeroDivisorDirect: "У прямій пропорції A не може дорівнювати 0",
+      zeroDivisorInverse: "В оберненій пропорції C не може дорівнювати 0",
     },
     "create-zip": {
       submit: "Створити ZIP",

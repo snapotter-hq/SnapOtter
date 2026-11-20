@@ -51,6 +51,7 @@ const CUSTOM_ROUTE_TOOLS = new Set([
   "barcode-generate",
   "chart-maker",
   "convert-case",
+  "proportion-calculator",
   "qr-generate",
   "passport-photo",
   "html-to-image",

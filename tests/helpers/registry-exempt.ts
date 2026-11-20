@@ -29,6 +29,7 @@ export const REGISTRY_EXEMPT = new Set([
   "image-to-pdf",
   "info",
   "pdf-to-image",
+  "proportion-calculator",
   "qr-generate",
   "sign-pdf",
   "stitch",

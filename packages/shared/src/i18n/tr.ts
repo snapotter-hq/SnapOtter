@@ -1254,6 +1254,10 @@ export const tr: TranslationKeys = {
       description:
         "Metni BÜYÜK, küçük harfe, başlık düzenine, cümle düzenine ve daha fazlasına çevirin",
     },
+    "proportion-calculator": {
+      name: "Orantı Hesaplayıcı",
+      description: "Üçlü kuralını çözün: bilinen üç değerden X'i bulun",
+    },
     "create-zip": {
       name: "ZIP Oluştur",
       description: "Birden fazla dosyayı tek bir ZIP arşivinde paketle",
@@ -4155,6 +4159,18 @@ export const tr: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Tür",
+      direct: "Doğru orantı",
+      inverse: "Ters orantı",
+      directHint: "A'nın B'ye oranı C'nin X'e oranına eşittir, yani X = B × C ÷ A",
+      inverseHint: "A × B = C × X, yani X = A × B ÷ C",
+      calculate: "Hesapla",
+      result: "Sonuç",
+      invalidNumber: "Bir sayı girin",
+      zeroDivisorDirect: "Doğru orantıda A 0 olamaz",
+      zeroDivisorInverse: "Ters orantıda C 0 olamaz",
     },
     "create-zip": {
       submit: "ZIP Oluştur",

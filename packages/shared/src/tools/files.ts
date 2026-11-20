@@ -125,6 +125,25 @@ export const FILE_TOOLS: Tool[] = [
     acceptedInputs: [],
     executionHint: "fast",
   },
+  {
+    id: "proportion-calculator",
+    name: "Proportion Calculator",
+    description: "Solve the rule of three: find X from three known values",
+    keywords: [
+      "rule of three",
+      "cross multiplication",
+      "ratio",
+      "proportion",
+      "calculator",
+      "math",
+    ],
+    category: "data",
+    icon: "Calculator",
+    route: "/proportion-calculator",
+    modality: "file",
+    acceptedInputs: [],
+    executionHint: "fast",
+  },
   // Archives
   {
     id: "create-zip",

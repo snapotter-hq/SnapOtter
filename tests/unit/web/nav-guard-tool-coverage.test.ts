@@ -57,6 +57,8 @@ const EXEMPT: Record<string, string> = {
     "produces no file: it reads colors out of the input, and re-reads them on demand",
   "convert-case":
     "produces no file: it turns pasted text into text that is shown and copied in place",
+  "proportion-calculator":
+    "produces no file: it turns three typed numbers into one that is shown and copied in place",
   ocr: "writes the extracted text onto the file-store entry (updateEntryById), which the guard already reads, and claims it when copied, downloaded, or auto-saved (#1111)",
   favicon:
     "writes the generated zip onto the file-store entry (updateEntryById), which the guard already reads (#1111)",

@@ -1214,6 +1214,10 @@ export const ja: TranslationKeys = {
       name: "大文字・小文字変換",
       description: "テキストを大文字、小文字、タイトルケース、文頭大文字などに変換",
     },
+    "proportion-calculator": {
+      name: "比例計算機",
+      description: "比例の計算: 既知の3つの値からXを求めます",
+    },
     "create-zip": {
       name: "ZIP 作成",
       description: "複数のファイルを1つの ZIP アーカイブにまとめる",
@@ -4102,6 +4106,18 @@ export const ja: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "種類",
+      direct: "正比例",
+      inverse: "反比例",
+      directHint: "A:B = C:X なので X = B × C ÷ A",
+      inverseHint: "A × B = C × X なので X = A × B ÷ C",
+      calculate: "計算",
+      result: "結果",
+      invalidNumber: "数値を入力してください",
+      zeroDivisorDirect: "正比例ではAに0は使えません",
+      zeroDivisorInverse: "反比例ではCに0は使えません",
     },
     "create-zip": {
       submit: "ZIPを作成",

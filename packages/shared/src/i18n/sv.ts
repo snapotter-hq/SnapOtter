@@ -1250,6 +1250,10 @@ export const sv: TranslationKeys = {
       name: "Ändra skiftläge",
       description: "Gör om text till VERSALER, gemener, rubrikstil, meningsstil med mera",
     },
+    "proportion-calculator": {
+      name: "Proportionsräknare",
+      description: "Lös regula de tri: räkna ut X från tre kända värden",
+    },
     "create-zip": {
       name: "Skapa ZIP",
       description: "Paketera flera filer i ett enda ZIP-arkiv",
@@ -4147,6 +4151,18 @@ export const sv: TranslationKeys = {
         snake: "snake_case",
         kebab: "kebab-case",
       },
+    },
+    "proportion-calculator": {
+      modeLabel: "Typ",
+      direct: "Direkt",
+      inverse: "Omvänd",
+      directHint: "A förhåller sig till B som C till X, så X = B × C ÷ A",
+      inverseHint: "A × B = C × X, så X = A × B ÷ C",
+      calculate: "Beräkna",
+      result: "Resultat",
+      invalidNumber: "Ange ett tal",
+      zeroDivisorDirect: "A kan inte vara 0 i en direkt proportion",
+      zeroDivisorInverse: "C kan inte vara 0 i en omvänd proportion",
     },
     "create-zip": {
       submit: "Skapa ZIP",
