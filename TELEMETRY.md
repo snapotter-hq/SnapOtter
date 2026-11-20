@@ -74,6 +74,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `pipeline_step_added` | A step is added to a pipeline | `tool_id` |
 | `pipeline_saved` | A pipeline is saved | `step_count` |
 | `pipeline_template_selected` | A pipeline template is picked | `template_id` |
+| `starter_job_clicked` | A tool in the first-run "Getting Started" block on the home page is opened | `tool_id` |
 | `sponsor_clicked` | The sponsor link is clicked | none |
 | `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
 | `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |

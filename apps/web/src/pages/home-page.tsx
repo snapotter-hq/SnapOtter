@@ -14,6 +14,7 @@ import { SearchShortcutHint } from "@/components/common/search-shortcut-hint.js"
 import { ToolCard } from "@/components/common/tool-card.js";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.js";
 import { AppLayout } from "@/components/layout/app-layout.js";
+import { StarterJobs } from "@/components/onboarding/starter-jobs.js";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
@@ -193,6 +194,8 @@ export function HomePage() {
               count: visibleTools.length,
             })}
           />
+
+          {!search && <StarterJobs visibleTools={visibleTools} />}
 
           <ModalityTabs
             tabs={tabs}

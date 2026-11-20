@@ -4335,6 +4335,12 @@ export const nl: TranslationKeys = {
     popular: "Populair",
     browseByCategory: "Bladeren op categorie",
     gettingStarted: "Aan de slag",
+    starterHint:
+      "Weet je niet waar je moet beginnen? Kies een veelgebruikte taak voor je eerste bestand.",
+    starterImage: "Afbeelding converteren of comprimeren",
+    starterPdf: "PDF samenvoegen of comprimeren",
+    starterBackground: "Achtergrond verwijderen",
+    starterDismiss: "Aan de slag verbergen",
     noToolsMatch: "Geen tools gevonden voor '{query}'",
     clearSearch: "Zoekopdracht wissen",
     requestToolCta: "'{query}' aanvragen",

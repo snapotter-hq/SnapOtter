@@ -4314,6 +4314,12 @@ export const es: TranslationKeys = {
     popular: "Popular",
     browseByCategory: "Explorar por categoría",
     gettingStarted: "Primeros pasos",
+    starterHint:
+      "¿No sabes por dónde empezar? Elige una tarea habitual para procesar tu primer archivo.",
+    starterImage: "Convertir o comprimir una imagen",
+    starterPdf: "Combinar o comprimir un PDF",
+    starterBackground: "Quitar el fondo",
+    starterDismiss: "Ocultar primeros pasos",
     noToolsMatch: "Ninguna herramienta coincide con '{query}'",
     clearSearch: "Borrar búsqueda",
     requestToolCta: "Solicitar '{query}'",

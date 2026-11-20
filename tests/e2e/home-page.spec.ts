@@ -205,6 +205,39 @@ test.describe("Home Page", () => {
     await expect(page.getByText("Essentials").first()).toBeVisible();
   });
 
+  test("first-run starter block links to a tool and can be dismissed (#4909)", async ({ page }) => {
+    // Earlier tests may already have run a tool, so strip the processed marker
+    // and the saved dismissal to get a fresh instance's view.
+    await page.route("**/api/v1/settings", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      const body = (await response.json()) as { settings: Record<string, string> };
+      delete body.settings["onboarding.firstProcessedAt"];
+      await route.fulfill({ response, json: body });
+    });
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem("starter-e2e-cleared")) return;
+      sessionStorage.setItem("starter-e2e-cleared", "1");
+      localStorage.removeItem("snapotter-starter-jobs-dismissed");
+      localStorage.removeItem("snapotter-recent-tools");
+    });
+    await page.goto("/");
+
+    const block = page.getByTestId("starter-jobs");
+    await expect(block).toBeVisible();
+    await expect(block.getByRole("heading", { name: "Getting Started" })).toBeVisible();
+    await expect(page.getByTestId("starter-job-merge-pdf")).toHaveAttribute(
+      "href",
+      "/pdf/merge-pdf",
+    );
+
+    await page.getByTestId("starter-jobs-dismiss").click();
+    await expect(block).toBeHidden();
+    await page.reload();
+    await expect(page.locator("[data-search-input]")).toHaveAttribute("placeholder", /[1-9]/);
+    await expect(block).toBeHidden();
+  });
+
   test("top nav has theme toggle", async ({ loggedInPage: page }) => {
     // Theme toggle moved to the top-nav header in 2.0
     await expect(page.getByTitle("Toggle theme")).toBeVisible();
