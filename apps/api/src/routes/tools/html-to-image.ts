@@ -59,6 +59,7 @@ const settingsSchema = captureSettingsSchema
 export type CaptureSettings = z.infer<typeof captureSettingsSchema>;
 
 const CONTENT_TYPES = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
+const BROWSER_CRASHED = "BROWSER_CRASHED";
 
 /**
  * Render the queued source. A URL capture reads `settings.url`; an HTML capture
@@ -105,7 +106,7 @@ export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw,
         "Screenshot service is temporarily unavailable",
         503,
         undefined,
-        "BROWSER_CRASHED",
+        BROWSER_CRASHED,
       );
     }
     throw new InputValidationError("Screenshot capture failed", 422, stripInternalPaths(message));
