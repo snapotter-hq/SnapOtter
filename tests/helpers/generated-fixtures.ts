@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
-import { extname } from "node:path";
+import { extname, join } from "node:path";
 import { fixtureDir } from "../fixtures/index.js";
 
 export interface GeneratedFixture {
@@ -14,6 +14,16 @@ const POSITIVE_CONTROL_FIXTURE: Readonly<Record<string, string>> = {
   "chart-maker": "tiny.csv",
   "extract-subtitles": "tiny-subs.mkv",
 };
+
+// The format matrix's fixtures are all still images. A tool listed here
+// refuses a still image, so it gets one extra input it accepts (#4930).
+const FORMAT_MATRIX_POSITIVE_CONTROL: Readonly<Record<string, string>> = {
+  "remove-gif-background": join(fixtureDir.image.valid, "animated.gif"),
+};
+
+export function formatMatrixPositiveControl(toolId: string): string | undefined {
+  return FORMAT_MATRIX_POSITIVE_CONTROL[toolId];
+}
 
 export function generatedFixtureDirectories(): string[] {
   return [
