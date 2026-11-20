@@ -1,7 +1,11 @@
+import { existsSync } from "node:fs";
+import { extname } from "node:path";
 import { TOOLS } from "@snapotter/shared";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   buildGeneratedFixtureIndex,
+  formatMatrixPositiveControl,
   type GeneratedFixture,
   generatedFixtureDirectories,
   selectFixturesForTool,
@@ -64,5 +68,22 @@ describe("generated fixture discovery", () => {
         acceptedInputs: [".mp4", ".mkv"],
       })[0].filename,
     ).toBe("tiny-subs.mkv");
+  });
+
+  // Every fixture in the format matrix's directory is a still image, which
+  // remove-gif-background refuses, so it needs an animated positive control (#4930).
+  it("gives remove-gif-background an animated format-matrix positive control", async () => {
+    const tool = TOOLS.find((candidate) => candidate.id === "remove-gif-background");
+    const control = formatMatrixPositiveControl("remove-gif-background");
+
+    expect(control).toBeDefined();
+    if (!control) throw new Error("missing positive control");
+    expect(existsSync(control)).toBe(true);
+    expect(tool?.acceptedInputs).toContain(extname(control).toLowerCase());
+    expect((await sharp(control, { animated: true }).metadata()).pages).toBeGreaterThan(1);
+  });
+
+  it("adds no format-matrix positive control for tools that take still images", () => {
+    expect(formatMatrixPositiveControl("resize")).toBeUndefined();
   });
 });

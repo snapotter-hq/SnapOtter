@@ -70,6 +70,7 @@ export function buildGeneratedMultipartFields({
   }
   if (toolId === "watermark-image") fields.push(fileField(companions.image, "watermark"));
   if (toolId === "compose") fields.push(fileField(companions.image, "overlay"));
+  if (toolId === "erase-object") fields.push(fileField(companions.image, "mask"));
 
   const effectiveSettings =
     toolId === "collage" && typeof settings === "object" && settings !== null
