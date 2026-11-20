@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 6d1ae2f49714
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: f778ef8496f2
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Lưu trữ tệp bền vững kèm lịch sử phiên bản.
 | `GET` | `/api/v1/files/:id/download` | Tải tệp xuống |
 | `GET` | `/api/v1/files/:id/thumbnail` | Lấy hình thu nhỏ JPEG 300px |
 | `DELETE` | `/api/v1/files` | Xóa hàng loạt tệp và chuỗi phiên bản của chúng (thân: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Tải xuống nhiều tệp dưới dạng một tệp ZIP (thân: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Tải URL từ xa vào không gian làm việc cho các lần nhập dựa trên URL |
 | `POST` | `/api/v1/preview` | Tạo bản xem trước WebP tương thích trình duyệt (cho định dạng HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Stream bản xem trước tương thích trình duyệt được cache hoặc tạo mới cho một tệp PDF, tài liệu văn phòng, video hoặc âm thanh đã lưu |

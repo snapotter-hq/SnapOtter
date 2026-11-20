@@ -6813,6 +6813,77 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
 
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags: [Files]
+      summary: Download several saved files as one ZIP
+      description: Streams one ZIP holding every requested file. Entries keep request order, duplicate IDs are dropped, and colliding names get _1, _2 suffixes. Without files:all, every ID must be one of your own files. If any ID is missing or not yours, the whole request fails with 404 rather than returning an archive with a file left out. A blob that disappears from storage after the first entry has been sent cuts the stream, so a client never receives a ZIP with a file quietly missing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: Saved file IDs to include, in archive order
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: ZIP archive of the requested files
+          headers:
+            Content-Disposition:
+              description: Always names the archive files.zip.
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        "400":
+          description: The ids list is missing, empty, or holds a non-string value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: The caller has neither files:own nor files:all
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: An ID is missing or belongs to another user ("File not found"), or the first file's blob is gone from storage ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded (60 requests a minute)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary

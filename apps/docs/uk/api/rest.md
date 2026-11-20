@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 60220c953b87
+i18n_output_hash: 673c38ed3595
 i18n_hash_version: 2
-i18n_source_hash: fa6e4037f02c
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -543,6 +543,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | Завантажити файл |
 | `GET` | `/api/v1/files/:id/thumbnail` | Отримати мініатюру JPEG 300px |
 | `DELETE` | `/api/v1/files` | Масове видалення файлів та їхніх ланцюжків версій (тіло: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Завантажити кілька файлів одним ZIP (тіло: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Отримати віддалені URL у робочу область для імпорту на основі URL |
 | `POST` | `/api/v1/preview` | Згенерувати сумісний з браузером попередній перегляд WebP (для форматів HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Передати кешований або згенерований сумісний з браузером попередній перегляд для збереженого PDF, офісного документа, відео чи аудіофайлу |

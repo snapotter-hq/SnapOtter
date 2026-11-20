@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: cffd28f0a968
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 0f8b143dd862
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Sürüm geçmişiyle kalıcı dosya depolama.
 | `GET` | `/api/v1/files/:id/download` | Dosyayı indir |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG küçük resmini al |
 | `DELETE` | `/api/v1/files` | Dosyaları ve sürüm zincirlerini toplu olarak sil (gövde: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Birden çok dosyayı tek bir ZIP olarak indir (gövde: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | URL tabanlı içe aktarmalar için uzak URL'leri çalışma alanına getir |
 | `POST` | `/api/v1/preview` | Tarayıcı uyumlu bir WebP önizlemesi oluştur (HEIC/HEIF/RAW biçimleri için) |
 | `GET` | `/api/v1/files/:id/preview` | Kayıtlı bir PDF, office belgesi, video veya ses dosyası için önbelleğe alınmış ya da oluşturulmuş tarayıcı uyumlu önizlemeyi akışa al |

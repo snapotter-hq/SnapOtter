@@ -6916,6 +6916,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags:
+        - Files
+      summary: تنزيل عدة ملفات محفوظة في ملف ZIP واحد
+      description: يبث ملف ZIP واحدًا يضم كل الملفات المطلوبة. تحافظ الإدخالات على ترتيب الطلب، وتُحذف المعرّفات المكررة، وتحصل الأسماء المتعارضة على اللاحقتين _1 و_2. من دون files:all، يجب أن يكون كل معرّف لملف من ملفاتك. إذا كان أي معرّف مفقودًا أو لا يخصك، يفشل الطلب كله بالرمز 404 بدلًا من إرجاع أرشيف ينقصه ملف. إذا اختفى ملف من التخزين بعد إرسال الإدخال الأول، ينقطع البث، فلا يتلقى العميل أبدًا ملف ZIP ينقصه ملف دون أن يعلم.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: معرّفات الملفات المحفوظة المراد تضمينها، بترتيب الأرشيف
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: أرشيف ZIP للملفات المطلوبة
+          headers:
+            Content-Disposition:
+              description: يسمّي الأرشيف دائمًا files.zip.
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        '400':
+          description: قائمة ids مفقودة أو فارغة أو تحتوي على قيمة ليست نصًا
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: المصادقة مطلوبة
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: لا يملك المستدعي files:own ولا files:all
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: معرّف مفقود أو يخص مستخدمًا آخر ("File not found")، أو أن ملف أول عنصر لم يعد موجودًا في التخزين ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: تجاوز حد معدل الطلبات (60 طلبًا في الدقيقة)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/files/upload:
     post:
       operationId: saveFileToLibrary
@@ -26101,6 +26173,14 @@ x-i18n:
       sourceHash: 1bfaa5c376bb
       provenance: machine
       outputHash: 17add3ee7e3c
+    paths./api/v1/files/download.post.summary:
+      sourceHash: 50f86842447d
+      provenance: machine
+      outputHash: 7564df607ffe
+    paths./api/v1/files/download.post.description:
+      sourceHash: 6872f1dc70e3
+      provenance: machine
+      outputHash: 05bbc65c34b0
     paths./api/v1/files/upload.post.summary:
       sourceHash: b94c597782ee
       provenance: machine
@@ -30905,6 +30985,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1files~1download/post/requestBody/content/application~1json/schema/properties/ids/description:
+      sourceHash: 2011132f33ca
+      provenance: machine
+      outputHash: 3494ef81063a
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/description:
+      sourceHash: 71abee16c6a1
+      provenance: machine
+      outputHash: 8474dc317325
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/200/headers/Content-Disposition/description:
+      sourceHash: 93c05fd533fa
+      provenance: machine
+      outputHash: b7cdbbd204db
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/400/description:
+      sourceHash: 857460ea8d43
+      provenance: machine
+      outputHash: 5196be6c5393
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/403/description:
+      sourceHash: 0e302e76c2d7
+      provenance: machine
+      outputHash: 53eced0ecdee
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/404/description:
+      sourceHash: 072ccfb204cb
+      provenance: machine
+      outputHash: afffcd5e49ec
+    ptr:/paths/~1api~1v1~1files~1download/post/responses/429/description:
+      sourceHash: eb2a9882cf3d
+      provenance: machine
+      outputHash: a268661f0f10
     ptr:/paths/~1api~1v1~1files~1upload/post/responses/201/description:
       sourceHash: 3a40b0031dc5
       provenance: machine

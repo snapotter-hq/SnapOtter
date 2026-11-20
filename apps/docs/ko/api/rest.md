@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: bd7a862db6cd
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 885b1561d41b
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | 파일 다운로드 |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG 썸네일 획득 |
 | `DELETE` | `/api/v1/files` | 파일 및 버전 체인 일괄 삭제(본문: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | 여러 파일을 ZIP 하나로 다운로드(본문: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | URL 기반 가져오기를 위해 원격 URL을 워크스페이스로 페치 |
 | `POST` | `/api/v1/preview` | 브라우저 호환 WebP 미리보기 생성(HEIC/HEIF/RAW 형식용) |
 | `GET` | `/api/v1/files/:id/preview` | 저장된 PDF, 오피스 문서, 비디오 또는 오디오 파일에 대해 캐시되었거나 생성된 브라우저 호환 미리보기 스트리밍 |

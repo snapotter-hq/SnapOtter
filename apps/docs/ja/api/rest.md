@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 2f59c21dbec3
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 8bce34a2f166
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | ファイルをダウンロード |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px の JPEG サムネイルを取得 |
 | `DELETE` | `/api/v1/files` | ファイルとそのバージョンチェーンを一括削除（ボディ: `{ ids: [...] }`） |
+| `POST` | `/api/v1/files/download` | 複数のファイルを 1 つの ZIP でダウンロード（ボディ: `{ ids: [...] }`） |
 | `POST` | `/api/v1/fetch-urls` | URL ベースのインポートのためにリモート URL をワークスペースに取得 |
 | `POST` | `/api/v1/preview` | ブラウザ互換の WebP プレビューを生成（HEIC/HEIF/RAW 形式向け） |
 | `GET` | `/api/v1/files/:id/preview` | 保存済みの PDF、Office ドキュメント、動画、音声ファイルについて、キャッシュされたまたは生成されたブラウザ互換プレビューをストリーミング |

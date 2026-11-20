@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: a5094b783dea
-i18n_source_hash: fa6e4037f02c
+i18n_output_hash: 86b15a2d9b98
+i18n_source_hash: a305a62638f0
 i18n_provenance: human
 ---
 
@@ -542,6 +542,7 @@ Persistente bestandsopslag met versiegeschiedenis.
 | `GET` | `/api/v1/files/:id/download` | Bestand downloaden |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG-thumbnail ophalen |
 | `DELETE` | `/api/v1/files` | Bestanden en hun versieketens in bulk verwijderen (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Meerdere bestanden als één ZIP downloaden (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Externe URL's ophalen in de werkruimte voor URL-gebaseerde imports |
 | `POST` | `/api/v1/preview` | Een browsercompatibele WebP-preview genereren (voor HEIC/HEIF/RAW-formaten) |
 | `GET` | `/api/v1/files/:id/preview` | Een gecachte of gegenereerde browsercompatibele preview streamen voor een opgeslagen PDF, Office-document, video of audiobestand |
