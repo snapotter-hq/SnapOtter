@@ -1,5 +1,5 @@
 /**
- * Migration 0013 relaxes the password policy for new installs only. The rules
+ * Migration 0014 relaxes the password policy for new installs only. The rules
  * now default off and the minimum to 1, so an install that already has users
  * gets the old defaults (8 characters, uppercase, lowercase, digit) written as
  * rows wherever none exists, and keeps enforcing what it always did. A fresh
@@ -105,7 +105,7 @@ afterAll(async () => {
   if (preRelaxedFolder) rmSync(preRelaxedFolder, { recursive: true, force: true });
 });
 
-describe("migration 0013: relaxed password policy for new installs only", () => {
+describe("migration 0014: relaxed password policy for new installs only", () => {
   it("pins the old defaults on an install that already has users", async () => {
     const pool = await preRelaxedDatabase({ users: 1, settings: [["defaultTheme", "dark"]] });
 

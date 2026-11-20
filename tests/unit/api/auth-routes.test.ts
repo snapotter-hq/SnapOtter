@@ -335,7 +335,7 @@ describe("validatePasswordStrength, default policy (new installs)", () => {
   });
 });
 
-// Migration 0013 pinned these on installs that already had users, so they keep
+// Migration 0014 pinned these on installs that already had users, so they keep
 // enforcing exactly what the default used to be.
 describe("validatePasswordStrength, the policy existing installs keep", () => {
   beforeEach(() => {

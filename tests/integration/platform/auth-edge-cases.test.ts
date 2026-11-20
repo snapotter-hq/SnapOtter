@@ -31,7 +31,7 @@ async function clearSetting(key: string): Promise<void> {
 }
 
 // New installs have no password rules; an install that predates that keeps the
-// old defaults, pinned by migration 0013. This file tests the rules themselves,
+// old defaults, pinned by migration 0014. This file tests the rules themselves,
 // so it runs under that policy and puts a rule back to it after changing it.
 const EXISTING_INSTALL_POLICY: Readonly<Record<string, string>> = {
   passwordMinLength: "8",
