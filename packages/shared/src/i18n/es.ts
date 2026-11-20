@@ -1299,7 +1299,7 @@ export const es: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Recortar PDF",
-      description: "Recorta todas las páginas con un margen uniforme",
+      description: "Recorta las páginas por márgenes o a una región",
     },
     "resize-pdf-pages": {
       name: "Cambiar tamaño de páginas PDF",
@@ -4153,6 +4153,20 @@ export const es: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Margen (puntos)",
+      mode: "Recortar por",
+      modeUniform: "El mismo margen en cada borde",
+      modeSides: "Margen por borde",
+      modeRegion: "Región",
+      top: "Arriba (puntos)",
+      right: "Derecha (puntos)",
+      bottom: "Abajo (puntos)",
+      left: "Izquierda (puntos)",
+      x: "Desde la izquierda (puntos)",
+      y: "Desde arriba (puntos)",
+      width: "Ancho (puntos)",
+      height: "Alto (puntos)",
+      regionHint:
+        "Se mide desde la esquina superior izquierda de cada página. Una etiqueta de 4x6 in mide 288 x 432 puntos.",
       submit: "Recortar",
       submitBatch: "Recortar ({count} archivos)",
       progressLabel: "Recortando",

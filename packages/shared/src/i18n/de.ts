@@ -1318,7 +1318,7 @@ export const de: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF zuschneiden",
-      description: "Alle Seiten mit einheitlichem Rand zuschneiden",
+      description: "Seiten über Ränder oder auf einen Bereich zuschneiden",
     },
     "resize-pdf-pages": {
       name: "PDF-Seitengröße ändern",
@@ -4185,6 +4185,20 @@ export const de: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Rand (Punkte)",
+      mode: "Zuschneiden nach",
+      modeUniform: "Gleicher Rand an allen Kanten",
+      modeSides: "Rand je Kante",
+      modeRegion: "Bereich",
+      top: "Oben (Punkte)",
+      right: "Rechts (Punkte)",
+      bottom: "Unten (Punkte)",
+      left: "Links (Punkte)",
+      x: "Von links (Punkte)",
+      y: "Von oben (Punkte)",
+      width: "Breite (Punkte)",
+      height: "Höhe (Punkte)",
+      regionHint:
+        "Gemessen von der oberen linken Ecke jeder Seite. Ein 4x6-Zoll-Etikett ist 288 x 432 Punkte groß.",
       submit: "Zuschneiden",
       submitBatch: "Zuschneiden ({count} Dateien)",
       progressLabel: "Wird zugeschnitten",

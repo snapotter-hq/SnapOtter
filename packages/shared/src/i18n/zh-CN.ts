@@ -1039,7 +1039,7 @@ export const zhCN: TranslationKeys = {
     },
     "crop-pdf": {
       name: "裁剪 PDF",
-      description: "按统一边距裁剪所有页面",
+      description: "按边距或区域裁剪页面",
     },
     "resize-pdf-pages": {
       name: "调整 PDF 页面尺寸",
@@ -3828,6 +3828,19 @@ export const zhCN: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "边距（点）",
+      mode: "裁剪方式",
+      modeUniform: "四边相同边距",
+      modeSides: "每边单独边距",
+      modeRegion: "区域",
+      top: "上（点）",
+      right: "右（点）",
+      bottom: "下（点）",
+      left: "左（点）",
+      x: "距左侧（点）",
+      y: "距顶部（点）",
+      width: "宽度（点）",
+      height: "高度（点）",
+      regionHint: "从每页左上角开始测量。4x6 英寸标签为 288 x 432 点。",
       submit: "裁剪",
       submitBatch: "裁剪（{count} 个文件）",
       progressLabel: "正在裁剪",

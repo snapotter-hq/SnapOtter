@@ -1319,7 +1319,7 @@ export const fr: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Recadrer un PDF",
-      description: "Recadrez toutes les pages avec une marge uniforme",
+      description: "Recadrez les pages par marges ou sur une zone",
     },
     "resize-pdf-pages": {
       name: "Redimensionner les pages PDF",
@@ -4179,6 +4179,20 @@ export const fr: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Marge (points)",
+      mode: "Recadrer par",
+      modeUniform: "Même marge sur chaque bord",
+      modeSides: "Marge par bord",
+      modeRegion: "Zone",
+      top: "Haut (points)",
+      right: "Droite (points)",
+      bottom: "Bas (points)",
+      left: "Gauche (points)",
+      x: "Depuis la gauche (points)",
+      y: "Depuis le haut (points)",
+      width: "Largeur (points)",
+      height: "Hauteur (points)",
+      regionHint:
+        "Mesuré depuis le coin supérieur gauche de chaque page. Une étiquette de 4x6 po mesure 288 x 432 points.",
       submit: "Recadrer",
       submitBatch: "Recadrer ({count} fichiers)",
       progressLabel: "Recadrage",

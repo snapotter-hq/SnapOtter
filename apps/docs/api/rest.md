@@ -340,7 +340,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `linearize-pdf` | Web-Optimize PDF | - (linearize for fast web viewing) |
 | `grayscale-pdf` | Grayscale PDF | - |
 | `pdfa-convert` | PDF/A Convert | - (archival PDF/A-2) |
-| `crop-pdf` | Crop PDF | `margin` (0-2000 points) |
+| `crop-pdf` | Crop PDF | `mode` (uniform/sides/region), `margin` (0-2000 points), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | Resize PDF Pages | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |

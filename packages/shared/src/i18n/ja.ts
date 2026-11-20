@@ -1277,7 +1277,7 @@ export const ja: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF クロップ",
-      description: "全ページを均一な余白でクロップ",
+      description: "余白または領域でページをクロップ",
     },
     "resize-pdf-pages": {
       name: "PDF ページサイズ変更",
@@ -4111,6 +4111,19 @@ export const ja: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "余白（ポイント）",
+      mode: "クロップ方法",
+      modeUniform: "全辺に同じ余白",
+      modeSides: "辺ごとの余白",
+      modeRegion: "領域",
+      top: "上（ポイント）",
+      right: "右（ポイント）",
+      bottom: "下（ポイント）",
+      left: "左（ポイント）",
+      x: "左から（ポイント）",
+      y: "上から（ポイント）",
+      width: "幅（ポイント）",
+      height: "高さ（ポイント）",
+      regionHint: "各ページの左上隅から測ります。4x6 インチのラベルは 288 x 432 ポイントです。",
       submit: "切り抜き",
       submitBatch: "切り抜き ({count}ファイル)",
       progressLabel: "切り抜き中",

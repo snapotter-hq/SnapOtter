@@ -1315,7 +1315,7 @@ export const tr: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF Kırp",
-      description: "Tüm sayfaları tek tip kenar boşluğuyla kırp",
+      description: "Sayfaları kenar boşluklarına göre veya bir alana kırp",
     },
     "resize-pdf-pages": {
       name: "PDF Sayfalarını Yeniden Boyutlandır",
@@ -4164,6 +4164,19 @@ export const tr: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Kenar boşluğu (punto)",
+      mode: "Kırpma yöntemi",
+      modeUniform: "Her kenarda aynı boşluk",
+      modeSides: "Kenar başına boşluk",
+      modeRegion: "Alan",
+      top: "Üst (punto)",
+      right: "Sağ (punto)",
+      bottom: "Alt (punto)",
+      left: "Sol (punto)",
+      x: "Soldan (punto)",
+      y: "Üstten (punto)",
+      width: "Genişlik (punto)",
+      height: "Yükseklik (punto)",
+      regionHint: "Her sayfanın sol üst köşesinden ölçülür. 4x6 inç bir etiket 288 x 432 puntodur.",
       submit: "Kırp",
       submitBatch: "Kırp ({count} dosya)",
       progressLabel: "Kırpılıyor",

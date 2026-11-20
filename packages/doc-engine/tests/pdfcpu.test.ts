@@ -283,39 +283,187 @@ describe("pdfcpuCropMargin", () => {
   });
 });
 
-describe("pdfcpuPageSizes", () => {
-  const info = (pageSizes: unknown) =>
-    JSON.stringify({ header: {}, infos: [{ pageCount: 3, pageSizes, unit: "points" }] });
+describe("pdfcpuCrop (#4988)", () => {
+  it("passes a uniform margin as a single number", async () => {
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop("/in.pdf", { mode: "uniform", margin: 20 }, "/out.pdf");
+    expect(h.lastArgs()).toEqual(["-c", "disable", "crop", "20", "/in.pdf", "/out.pdf"]);
+  });
 
-  it("runs info -j on the input and returns the distinct page sizes", async () => {
+  it("passes per-side margins in pdfcpu's top right bottom left order", async () => {
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop(
+      "/in.pdf",
+      { mode: "sides", top: 10, right: 20, bottom: 30, left: 40 },
+      "/out.pdf",
+    );
+    expect(h.lastArgs()).toEqual(["-c", "disable", "crop", "10 20 30 40", "/in.pdf", "/out.pdf"]);
+  });
+
+  // pdfcpu's top-left anchor offset is in PDF user space, where y grows
+  // upward, so moving the region down the page needs a negative y offset.
+  it("anchors a region to each page's top-left corner", async () => {
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop(
+      "/in.pdf",
+      { mode: "region", x: 10, y: 20, width: 288, height: 432 },
+      "/out.pdf",
+    );
+    expect(h.lastArgs()).toEqual([
+      "-c",
+      "disable",
+      "crop",
+      "pos:tl, off:10 -20, dim: 288 432 abs",
+      "/in.pdf",
+      "/out.pdf",
+    ]);
+  });
+
+  it("writes a zero offset without a minus sign", async () => {
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop("/in.pdf", { mode: "region", x: 0, y: 0, width: 306, height: 396 }, "/o");
+    expect(h.lastArgs()[3]).toBe("pos:tl, off:0 0, dim: 306 396 abs");
+  });
+
+  it("rejects out-of-range values before spawning", async () => {
+    const m = await import("../src/pdfcpu.js");
+    await expect(
+      m.pdfcpuCrop("/in.pdf", { mode: "sides", top: -1, right: 0, bottom: 0, left: 0 }, "/o"),
+    ).rejects.toThrow("Crop margins must be 0-2000 points");
+    await expect(
+      m.pdfcpuCrop(
+        "/in.pdf",
+        { mode: "sides", top: 0, right: Number.NaN, bottom: 0, left: 0 },
+        "/o",
+      ),
+    ).rejects.toThrow("Crop margins must be 0-2000 points");
+    await expect(
+      m.pdfcpuCrop("/in.pdf", { mode: "region", x: -1, y: 0, width: 10, height: 10 }, "/o"),
+    ).rejects.toThrow("Crop region must start inside the page and have a positive size");
+    await expect(
+      m.pdfcpuCrop("/in.pdf", { mode: "region", x: 0, y: 0, width: 0, height: 10 }, "/o"),
+    ).rejects.toThrow("Crop region must start inside the page and have a positive size");
+    await expect(m.pdfcpuCrop("/in.pdf", { mode: "uniform", margin: 2001 }, "/o")).rejects.toThrow(
+      "Crop margin must be 0-2000 points",
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("assertCropFits (#4988)", () => {
+  const letter = { width: 612, height: 792 };
+  const a4 = { width: 595.28, height: 841.89 };
+
+  async function inputError(fn: () => void): Promise<Error> {
+    let err: unknown;
+    try {
+      fn();
+    } catch (e) {
+      err = e;
+    }
+    expect(isToolInputError(err)).toBe(true);
+    expect(err).toMatchObject({ statusCode: 400, code: "INVALID_SETTINGS" });
+    return err as Error;
+  }
+
+  it("checks a uniform margin the same way as assertCropMarginFits", async () => {
+    const m = await import("../src/pdfcpu.js");
+    expect(() => m.assertCropFits({ mode: "uniform", margin: 305 }, [letter])).not.toThrow();
+    const err = await inputError(() =>
+      m.assertCropFits({ mode: "uniform", margin: 306 }, [letter]),
+    );
+    expect(err.message).toContain("Crop margin is too large for this PDF");
+  });
+
+  it("accepts side margins that leave some area on every page", async () => {
+    const m = await import("../src/pdfcpu.js");
+    const sides = { mode: "sides", top: 0, right: 300, bottom: 390, left: 0 } as const;
+    expect(() => m.assertCropFits(sides, [letter, a4])).not.toThrow();
+  });
+
+  it("rejects side margins that meet across the narrowest or shortest page", async () => {
+    const m = await import("../src/pdfcpu.js");
+    const wide = { mode: "sides", top: 0, right: 300, bottom: 0, left: 295.28 } as const;
+    const err = await inputError(() => m.assertCropFits(wide, [letter, a4]));
+    expect(err.message).toBe(
+      "Crop margins are too large for this PDF. Left plus right must be less than 595.28 points and top plus bottom less than 792 points.",
+    );
+    const tall = { mode: "sides", top: 400, right: 0, bottom: 392, left: 0 } as const;
+    await inputError(() => m.assertCropFits(tall, [letter, a4]));
+  });
+
+  it("accepts a region that fits inside every page, edge to edge", async () => {
+    const m = await import("../src/pdfcpu.js");
+    const quarter = { mode: "region", x: 0, y: 0, width: 306, height: 396 } as const;
+    expect(() => m.assertCropFits(quarter, [letter])).not.toThrow();
+    const full = { mode: "region", x: 0, y: 0, width: 612, height: 792 } as const;
+    expect(() => m.assertCropFits(full, [letter])).not.toThrow();
+  });
+
+  // pdfcpu writes a CropBox that runs past the MediaBox instead of failing.
+  it("rejects a region that runs off the smallest page", async () => {
+    const m = await import("../src/pdfcpu.js");
+    const label = { mode: "region", x: 400, y: 0, width: 288, height: 432 } as const;
+    const err = await inputError(() => m.assertCropFits(label, [letter, a4]));
+    expect(err.message).toBe(
+      "Crop region doesn't fit on every page. It must stay within 595.28 x 792 points, the smallest page size.",
+    );
+    const low = { mode: "region", x: 0, y: 500, width: 288, height: 432 } as const;
+    await inputError(() => m.assertCropFits(low, [letter]));
+  });
+});
+
+describe("pdfcpuPageSizes", () => {
+  const box = (llx: number, lly: number, urx: number, ury: number, rot = 0) => ({
+    mediaBox: { rect: { ll: { x: llx, y: lly }, ur: { x: urx, y: ury } } },
+    rot,
+  });
+  const info = (pageBoundaries: unknown) =>
+    JSON.stringify({ header: {}, infos: [{ pageCount: 3, pageBoundaries }] });
+
+  it("runs info -j over every page and returns the distinct MediaBox sizes", async () => {
     h.nextClose({
-      stdout: info([
-        { width: 419.53, height: 595.28 },
-        { width: 612, height: 792 },
-      ]),
+      stdout: info({
+        "1": box(0, 0, 419.53, 595.28),
+        "2": box(0, 0, 612, 792),
+        "3": box(0, 0, 419.53, 595.28),
+      }),
       code: 0,
     });
     const sizes = await import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf"));
-    expect(h.lastArgs()).toEqual(["-c", "disable", "info", "-j", "/in.pdf"]);
+    expect(h.lastArgs()).toEqual(["-c", "disable", "info", "-j", "-p", "1-", "/in.pdf"]);
     expect(sizes).toEqual([
       { width: 419.53, height: 595.28 },
       { width: 612, height: 792 },
     ]);
   });
 
+  // pdfcpu's pageSizes swap width and height for a /Rotate 90 page, but crop
+  // works on the unrotated MediaBox, so a fit check must see 612 x 792 (#4988).
+  it("reports a rotated page's unrotated MediaBox size, offset from the origin", async () => {
+    h.nextClose({ stdout: info({ "1": box(100, 200, 712, 992, 90) }), code: 0 });
+    const sizes = await import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf"));
+    expect(sizes).toEqual([{ width: 612, height: 792 }]);
+  });
+
   it("rejects output with no usable page sizes", async () => {
-    h.nextClose({ stdout: info([]), code: 0 });
-    await expect(
-      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
-    ).rejects.toThrow("pdfcpu info reported no page sizes");
-    h.nextClose({ stdout: info([{ width: "wide", height: 10 }]), code: 0 });
-    await expect(
-      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
-    ).rejects.toThrow("pdfcpu info reported no page sizes");
-    h.nextClose({ stdout: "not json", code: 0 });
-    await expect(
-      import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
-    ).rejects.toThrow("pdfcpu info reported no page sizes");
+    const m = await import("../src/pdfcpu.js");
+    for (const stdout of [
+      info({}),
+      info({ "1": { rot: 0 } }),
+      info({ "1": { mediaBox: { rect: { ll: { x: 0, y: 0 }, ur: { x: "wide", y: 10 } } } } }),
+      info({ "1": box(0, 0, 612, 792), "2": box(10, 10, 10, 500) }),
+      "not json",
+    ]) {
+      h.nextClose({ stdout, code: 0 });
+      await expect(m.pdfcpuPageSizes("/in.pdf")).rejects.toThrow(
+        "pdfcpu info reported no page sizes",
+      );
+    }
   });
 
   it("propagates a pdfcpu failure", async () => {

@@ -1311,7 +1311,7 @@ export const pl: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Kadruj PDF",
-      description: "Przytnij wszystkie strony z jednolitym marginesem",
+      description: "Przytnij strony marginesami lub do obszaru",
     },
     "resize-pdf-pages": {
       name: "Zmień rozmiar stron PDF",
@@ -4164,6 +4164,20 @@ export const pl: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Margines (punkty)",
+      mode: "Przycinanie według",
+      modeUniform: "Ten sam margines na każdej krawędzi",
+      modeSides: "Margines dla każdej krawędzi",
+      modeRegion: "Obszar",
+      top: "Góra (punkty)",
+      right: "Prawo (punkty)",
+      bottom: "Dół (punkty)",
+      left: "Lewo (punkty)",
+      x: "Od lewej (punkty)",
+      y: "Od góry (punkty)",
+      width: "Szerokość (punkty)",
+      height: "Wysokość (punkty)",
+      regionHint:
+        "Mierzone od lewego górnego rogu każdej strony. Etykieta 4x6 cala ma 288 x 432 punkty.",
       submit: "Przytnij",
       submitBatch: "Przytnij ({count} plików)",
       progressLabel: "Przycinanie",
