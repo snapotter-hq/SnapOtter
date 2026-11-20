@@ -348,18 +348,19 @@ export async function processToolJob(
         extraOutputs = aiResult.extraOutputs;
       } else {
         const config = getToolConfig(data.toolId);
-        // A custom route's direct-only process fn never runs for a pipeline
-        // step or batch child, whose input is not what it was written for.
-        const processV2 = config
-          ? config.processV2
-          : data.kind === "tool"
-            ? getDirectJobProcessFn(data.toolId)
-            : undefined;
+        // A custom route's direct-only process fn runs for that route's own
+        // jobs, ahead of the tool's pipeline config: passport-photo's generate
+        // queues a cutout the pipeline fn would analyze all over again. It
+        // never runs for a pipeline step or batch child, whose input is not
+        // what it was written for.
+        const directProcess = data.kind === "tool" ? getDirectJobProcessFn(data.toolId) : undefined;
+        const processV2 = directProcess ?? config?.processV2;
         if (!config && !processV2) throw new Error(`No tool config for ${data.toolId}`);
 
         // Use the resolved v2 process function (adapter or native)
         if (!processV2) throw new Error(`No processV2 for ${data.toolId}`);
         const result = await processV2({
+          jobId,
           inputs,
           settings: data.settings,
           scratchDir,

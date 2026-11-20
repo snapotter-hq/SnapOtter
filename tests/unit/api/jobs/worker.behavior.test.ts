@@ -166,6 +166,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   }));
 
   vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+    getDirectJobProcessFn: vi.fn(),
     getToolConfig: vi.fn(),
   }));
 
@@ -1722,6 +1723,95 @@ describe("worker result payload behavior", () => {
     });
   });
 
+  it("runs a route's direct-only process fn ahead of the tool's pipeline config, with the job id (#4337)", async () => {
+    const configProcess = vi.fn();
+    const directProcess = vi.fn(async () => ({
+      buffer: Buffer.from("cropped"),
+      filename: "face_passport.jpg",
+      contentType: "image/jpeg",
+    }));
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn((toolId: string) =>
+          toolId === "passport-photo" ? directProcess : undefined,
+        ),
+        getToolConfig: vi.fn(() => ({ processV2: configProcess })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("cutout-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    await processor({
+      id: "job-passport",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId: "job-passport",
+        toolId: "passport-photo",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/job-passport/face_nobg.png"],
+        filename: "face_nobg.png",
+        settings: { countryCode: "US" },
+        kind: "tool",
+      },
+    });
+
+    expect(configProcess).not.toHaveBeenCalled();
+    expect(directProcess).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "job-passport", settings: { countryCode: "US" } }),
+    );
+    expect(objectStorageMocks.putObject).toHaveBeenCalledWith(
+      "outputs/job-passport/face_passport.jpg",
+      Buffer.from("cropped"),
+    );
+  });
+
   it("writes outputs/<jobId>/.result-payload.json before the primary output only when resultPayload is non-empty (#1389)", async () => {
     const processV2Mock = vi.fn();
     const dbSetMock = vi.fn(() => ({
@@ -1743,6 +1833,7 @@ describe("worker result payload behavior", () => {
         schema: { jobs: { id: "jobs.id" } },
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -2264,6 +2355,7 @@ describe("worker result payload behavior", () => {
           schema: { jobs: { id: "jobs.id" } },
         }));
         vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getDirectJobProcessFn: vi.fn(),
           getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
         }));
         vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -5673,6 +5765,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           schema: { jobs: { id: "jobs.id" } },
         }));
         vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getDirectJobProcessFn: vi.fn(),
           getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
         }));
         vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -5821,6 +5914,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         schema: { jobs: { id: "jobs.id" } },
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -6109,6 +6203,7 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
           setSettingIfAbsent: vi.fn().mockResolvedValue(undefined),
         }));
         vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getDirectJobProcessFn: vi.fn(),
           getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
         }));
         vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -6306,6 +6401,7 @@ describe("tool_used fires once per job across retries (#4450)", () => {
         setSettingIfAbsent: vi.fn().mockResolvedValue(undefined),
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -6626,6 +6722,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
         updateSingleFileProgressAtomically: updateSingleFileProgressAtomicallyMock,
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -7014,6 +7111,7 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
         },
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
@@ -7893,6 +7991,7 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
         },
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({
           processV2: vi.fn().mockResolvedValue({
             buffer: Buffer.from("out-bytes"),
@@ -8187,6 +8286,7 @@ describe("per-attempt job scratch dir (#4217)", () => {
         schema: { jobs: { id: "jobs.id" } },
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({

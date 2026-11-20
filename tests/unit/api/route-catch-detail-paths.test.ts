@@ -100,7 +100,6 @@ import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
-import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
@@ -391,17 +390,11 @@ describe("route catches strip internal paths from details and log raw errors (#1
     }
   });
 
-  it("qr-generate and passport-photo generate mask server paths in 422 details and log the error", async () => {
-    const bgRemoved = await sharp({
-      create: { width: 200, height: 200, channels: 4, background: "#fff" },
-    })
-      .png()
-      .toBuffer();
-    getObjectBuffer.mockResolvedValue(bgRemoved);
-
+  // passport-photo generate now runs as a queued job: its 422 path masking is
+  // pinned in passport-photo-generate-queue.test.ts (#4337).
+  it("qr-generate masks server paths in 422 details and logs the error", async () => {
     const { app, logLines } = await buildLoggedApp((instance) => {
       registerQrGenerate(instance);
-      registerPassportPhoto(instance);
     });
     try {
       putObject.mockRejectedValueOnce(new Error(`qr write failed at ${sampleTempPath}`));
@@ -418,37 +411,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
         requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("qr write failed"))).toBe(true);
-
-      putObject.mockRejectedValueOnce(new Error(`passport write failed at ${sampleTempPath}`));
-      const passRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/passport-photo/generate",
-        payload: {
-          jobId: "job",
-          filename: "face.png",
-          countryCode: "US",
-          landmarks: {
-            leftEye: { x: 0.42, y: 0.45 },
-            rightEye: { x: 0.58, y: 0.45 },
-            eyeCenter: { x: 0.5, y: 0.45 },
-            chin: { x: 0.5, y: 0.7 },
-            forehead: { x: 0.5, y: 0.32 },
-            crown: { x: 0.5, y: 0.25 },
-            nose: { x: 0.5, y: 0.55 },
-            faceCenterX: 0.5,
-          },
-          imageWidth: 200,
-          imageHeight: 200,
-        },
-      });
-      expect(passRes.statusCode, passRes.body).toBe(422);
-      expect(passRes.json()).toEqual({
-        error: "Passport photo generation failed",
-        details: "passport write failed at [internal]",
-        code: "UNPROCESSABLE_ENTITY",
-        requestId: expect.any(String),
-      });
-      expect(logLines.some((l) => l.includes("passport write failed"))).toBe(true);
     } finally {
       await app.close();
     }

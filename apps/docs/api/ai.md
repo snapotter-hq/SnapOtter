@@ -322,6 +322,9 @@ Accepts a JSON body with the Phase 1 results plus generation settings:
 | `landmarks` | object | (required) | Landmarks from Phase 1 |
 | `imageWidth` | number | (required) | Image width from Phase 1 |
 | `imageHeight` | number | (required) | Image height from Phase 1 |
+| `clientJobId` | string | (generated) | Your own job id for the progress stream |
+
+Generate runs as a queued job: `200` with the result inside the synchronous wait window, `202` with a job id after it. See [Passport Photo](/tools/image/passport-photo#phase-2-generate) for the details.
 
 ## Object Erasing (Inpainting) {#object-erasing-inpainting}
 
