@@ -1,8 +1,8 @@
 ---
 description: "Esquema do banco de dados PostgreSQL, tabelas, migrações e procedimentos de backup do SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 1d3841c34087
+i18n_output_hash: b959b70a3e99
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ No RDS, Supabase, Cloud SQL ou qualquer cluster que você mesmo opere, a divisã
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Depois, como superusuário ou como o papel que executou esse `CREATE ROLE`, permita que o papel proprietário o administre:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+No Postgres 16 e posteriores, `CREATEROLE` só permite que um papel altere papéis que ele mesmo criou ou sobre os quais tem `ADMIN OPTION`. O SnapOtter só muda a senha do papel de execução quando ela não corresponde mais a `DATABASE_URL` (depois de uma rotação, por exemplo), e sem essa concessão essa inicialização falha. `INHERIT FALSE, SET FALSE` repassa a administração e nada mais. Um `WITH ADMIN OPTION` simples também daria a `snapotter` os privilégios do papel de execução. O Postgres 15 e anteriores não precisam da concessão e rejeitam essa sintaxe, então pule-a nesses casos.
+
+Quando o SnapOtter define a senha, ele grava um verificador SCRAM-SHA-256, mesmo que o `password_encryption` do cluster seja `md5`. O Postgres aceita isso por uma linha `md5` no `pg_hba.conf`, mas um pooler de conexões que verifica hashes md5 por conta própria não consegue entrar como o papel de execução.
 
 Depois, forneça ao SnapOtter as duas strings de conexão, apontando para o mesmo host, porta e banco de dados:
 

@@ -1,8 +1,8 @@
 ---
 description: "Databasschema, tabeller, migreringar och säkerhetskopieringsrutiner för PostgreSQL i SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 8e7e7f768cdd
+i18n_output_hash: 1af4247d2a36
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ På RDS, Supabase, Cloud SQL eller något kluster du kör själv är uppdelninge
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Låt sedan, som superuser eller som rollen som körde den `CREATE ROLE`, ägarrollen administrera den:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Från och med Postgres 16 får en roll med `CREATEROLE` bara ändra roller den själv har skapat eller har `ADMIN OPTION` på. SnapOtter ändrar körningsrollens lösenord bara när det inte längre stämmer med `DATABASE_URL` (till exempel efter en rotation), och utan den här behörigheten misslyckas den starten. `INHERIT FALSE, SET FALSE` lämnar över administrationen och inget annat. Ett vanligt `WITH ADMIN OPTION` skulle också ge `snapotter` körningsrollens rättigheter. Postgres 15 och äldre behöver inte behörigheten och avvisar den syntaxen, så hoppa över den där.
+
+När SnapOtter sätter lösenordet sparar det en SCRAM-SHA-256-verifierare, även om klustrets `password_encryption` är `md5`. Postgres godtar det via en `md5`-rad i `pg_hba.conf`, men en anslutningspool som själv kontrollerar md5-hashar kan inte logga in som körningsrollen.
 
 Ge sedan SnapOtter båda anslutningssträngarna, riktade mot samma värd, port och databas:
 

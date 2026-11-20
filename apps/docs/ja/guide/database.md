@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: d8beb300d26b
+i18n_output_hash: 089fd7c91c3d
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ Op RDS, Supabase, Cloud SQL of een cluster dat u zelf beheert, is de scheiding o
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+次に、スーパーユーザー、またはその `CREATE ROLE` を実行したロールとして、所有者ロールがこのロールを管理できるようにします:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Postgres 16 以降、`CREATEROLE` で変更できるのは、そのロール自身が作成したロールか、`ADMIN OPTION` を持っているロールだけです。SnapOtter がランタイムロールのパスワードを変更するのは、それが `DATABASE_URL` と一致しなくなったとき(ローテーション後など)だけで、この権限がないとその起動は失敗します。`INHERIT FALSE, SET FALSE` は管理権限だけを渡します。単なる `WITH ADMIN OPTION` では、`snapotter` にランタイムロールの権限まで与えてしまいます。Postgres 15 以前ではこの権限は不要で、この構文も受け付けないため、その場合は省略してください。
+
+SnapOtter がパスワードを設定するときは、クラスタの `password_encryption` が `md5` であっても SCRAM-SHA-256 の検証子を保存します。Postgres は `pg_hba.conf` の `md5` 行経由でこれを受け付けますが、md5 ハッシュを自前で検証するコネクションプーラーはランタイムロールとしてログインできません。
 
 Geef SnapOtter vervolgens beide verbindingsreeksen, gericht op dezelfde host, poort en database:
 

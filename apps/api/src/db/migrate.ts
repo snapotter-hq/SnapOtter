@@ -91,6 +91,35 @@ export async function readLastAppliedMigrationAt(): Promise<number | null> {
   }
 }
 
+const INSUFFICIENT_PRIVILEGE = "42501";
+
+/**
+ * ensureRuntimeRole(), with a refusal translated for the operator.
+ *
+ * A 42501 here is not the ownership problem the catch in runMigrations()
+ * describes. CREATE ROLE needs CREATEROLE, and on Postgres 16 and later the
+ * ALTER ROLE that realigns a stale password also needs ADMIN OPTION on the
+ * runtime role. A role the migration role created has that already; one an
+ * operator created by hand, as the database guide says to, does not.
+ *
+ * The SafeError's own code is not 42501, so the outer catch passes it through.
+ */
+async function ensureRuntimeRoleOrExplain(
+  client: pg.Client,
+  role: string,
+  password: string,
+): Promise<boolean> {
+  try {
+    return await ensureRuntimeRole(client, role, password);
+  } catch (err) {
+    if (errorCode(err) !== INSUFFICIENT_PRIVILEGE) throw err;
+    throw new SafeError(
+      "The role in DATABASE_MIGRATION_URL was refused while creating the runtime role in DATABASE_URL, or while updating its password to match DATABASE_URL. It needs CREATEROLE, and on Postgres 16 and later it also needs ADMIN OPTION on a runtime role it did not create itself, such as one created by hand. As a superuser or a role with ADMIN OPTION on the runtime role, run: GRANT <runtime role> TO <migration role> WITH ADMIN OPTION, INHERIT FALSE, SET FALSE. Alternatively, set the runtime role's password to the one in DATABASE_URL so there is nothing to update.",
+      { kind: "operational", code: "migration-role-cannot-manage-runtime-role", cause: err },
+    );
+  }
+}
+
 export async function runMigrations(): Promise<void> {
   const migrationsFolder = MIGRATIONS_FOLDER;
   const split = resolveRoleSplit(env.DATABASE_URL, env.DATABASE_MIGRATION_URL);
@@ -139,7 +168,11 @@ export async function runMigrations(): Promise<void> {
     const clientDb = drizzle(client);
     await clientDb.execute(sql`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
     try {
-      const created = await ensureRuntimeRole(client, split.runtimeRole, split.runtimePassword);
+      const created = await ensureRuntimeRoleOrExplain(
+        client,
+        split.runtimeRole,
+        split.runtimePassword,
+      );
       if (created) {
         logger.info(`Created least-privilege runtime role "${split.runtimeRole}".`);
       }
@@ -157,10 +190,11 @@ export async function runMigrations(): Promise<void> {
   } catch (err) {
     // One catch for the whole privileged sequence: which statement an
     // underprivileged role trips on varies, so per-function catches would miss
-    // whichever fires first. The message below names every requirement.
-    if (errorCode(err) === "42501") {
+    // whichever fires first. The message below names every requirement except
+    // the runtime role's, which ensureRuntimeRoleOrExplain() already explained.
+    if (errorCode(err) === INSUFFICIENT_PRIVILEGE) {
       throw new SafeError(
-        "The role in DATABASE_MIGRATION_URL lacks privileges this database needs at boot. It has to own the SnapOtter tables (only an owner can grant on them), be allowed to create the drizzle schema, and hold CREATEROLE so it can create or alter the runtime role. Point DATABASE_MIGRATION_URL at the role that owns the tables (on an existing install, the role you have been running SnapOtter as), or transfer ownership with REASSIGN OWNED BY.",
+        "The role in DATABASE_MIGRATION_URL lacks privileges this database needs at boot. It has to own the SnapOtter tables (only an owner can grant on them) and be allowed to create the drizzle schema. Point DATABASE_MIGRATION_URL at the role that owns the tables (on an existing install, the role you have been running SnapOtter as), or transfer ownership with REASSIGN OWNED BY.",
         { kind: "operational", code: "migration-role-not-owner", cause: err },
       );
     }

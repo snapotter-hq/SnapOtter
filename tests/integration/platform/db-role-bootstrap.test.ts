@@ -55,6 +55,9 @@ const leakRole = `${role}_leak`;
 // Only ever given a password by plain DDL, as the reference the verifier specs
 // recompute.
 const verifierRole = `${role}_verifier`;
+// Created by the fork's superuser, not the stranger, standing in for the
+// runtime role an operator creates by hand as the database guide says to.
+const handmadeRole = `${role}_handmade`;
 
 // Mirrors MIGRATION_LOCK_KEY in apps/api/src/db/migrate.ts, which does not
 // export it.
@@ -228,6 +231,7 @@ afterAll(async () => {
     raceRole,
     leakRole,
     verifierRole,
+    handmadeRole,
   ]) {
     // DROP OWNED BY also strips the default-privilege entries and the database
     // GRANT, which DROP ROLE would otherwise refuse over. It only reaches the
@@ -653,6 +657,67 @@ describe("migration role that does not own the tables", () => {
     // the same reason the listener itself keys on the SQLSTATE.
     expect(warned.some((line) => line.startsWith("Postgres: "))).toBe(true);
   }, 30_000);
+});
+
+describe("runtime role the migration role did not create", () => {
+  // Postgres 16 dropped the rule that CREATEROLE could alter any non-superuser
+  // role. Now it also takes ADMIN OPTION on that role, which a role gets
+  // automatically only for roles it created itself (#4907).
+  beforeAll(async () => {
+    await execAsOwner("DROP ROLE IF EXISTS %I", handmadeRole);
+    const { rows } = await owner.query<{ stmt: string }>(
+      "SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', $1::text, $2::text) AS stmt",
+      [handmadeRole, password],
+    );
+    await owner.query(rows[0].stmt);
+  });
+
+  it("explains ADMIN OPTION when a stale password cannot be realigned", async () => {
+    const failure = await withSplitEnv(
+      urlAs(handmadeRole, rotatedPassword),
+      urlAs(strangerRole, password),
+      () =>
+        runMigrations().then(
+          () => null,
+          (err: Error & { code?: string; cause?: unknown }) => err,
+        ),
+    );
+    expect(failure?.code).toBe("migration-role-cannot-manage-runtime-role");
+    expect(failure?.message).toMatch(/ADMIN OPTION/);
+    expect(sqlStatesOf(failure?.cause)).toContain("42501");
+    // The refused ALTER changed nothing.
+    await expect(
+      asRole(handmadeRole, password, (client) => client.query("SELECT 1")),
+    ).resolves.toBeDefined();
+  }, 30_000);
+
+  // The GRANT the error message and the database guide give, run verbatim.
+  it("realigns the password once the migration role holds ADMIN OPTION on it", async () => {
+    const { rows } = await owner.query<{ stmt: string }>(
+      "SELECT format('GRANT %I TO %I WITH ADMIN OPTION, INHERIT FALSE, SET FALSE', $1::text, $2::text) AS stmt",
+      [handmadeRole, strangerRole],
+    );
+    await owner.query(rows[0].stmt);
+
+    await expect(
+      asRole(strangerRole, password, (stranger) =>
+        ensureRuntimeRole(stranger, handmadeRole, rotatedPassword),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      asRole(handmadeRole, rotatedPassword, (client) => client.query("SELECT 1")),
+    ).resolves.toBeDefined();
+
+    // INHERIT FALSE, SET FALSE: the grant hands over administration only, not
+    // the runtime role's privileges.
+    const { rows: membership } = await owner.query<{ inherits: boolean; sets: boolean }>(
+      `SELECT inherit_option AS inherits, set_option AS sets FROM pg_auth_members
+       WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname = $1)
+         AND member = (SELECT oid FROM pg_roles WHERE rolname = $2)`,
+      [handmadeRole, strangerRole],
+    );
+    expect(membership).toEqual([{ inherits: false, sets: false }]);
+  });
 });
 
 describe("split configuration rejected before the boot retry loop", () => {

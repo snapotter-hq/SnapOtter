@@ -1,8 +1,8 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur backup untuk SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: e83d91b3ba10
+i18n_output_hash: 86e7fc6126ed
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ Di RDS, Supabase, Cloud SQL, atau cluster apa pun yang Anda jalankan sendiri, pe
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+फिर, सुपरयूज़र के रूप में या उस रोल के रूप में जिसने वह `CREATE ROLE` चलाया था, owner रोल को इसे प्रबंधित करने की अनुमति दें:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Postgres 16 और उसके बाद, `CREATEROLE` किसी रोल को केवल वही रोल बदलने देता है जो उसने खुद बनाए हों या जिन पर उसके पास `ADMIN OPTION` हो। SnapOtter रनटाइम रोल का पासवर्ड तभी बदलता है जब वह `DATABASE_URL` से मेल नहीं खाता (जैसे रोटेशन के बाद), और इस अनुमति के बिना वह बूट विफल हो जाता है। `INHERIT FALSE, SET FALSE` केवल प्रबंधन सौंपता है, और कुछ नहीं। सादा `WITH ADMIN OPTION` `snapotter` को रनटाइम रोल के विशेषाधिकार भी दे देगा। Postgres 15 और उससे पहले के संस्करणों को इस अनुमति की ज़रूरत नहीं है और वे यह सिंटैक्स अस्वीकार करते हैं, इसलिए वहाँ इसे छोड़ दें।
+
+जब SnapOtter पासवर्ड सेट करता है, तो वह SCRAM-SHA-256 verifier संग्रहीत करता है, भले ही क्लस्टर का `password_encryption` `md5` हो। Postgres इसे `pg_hba.conf` की `md5` पंक्ति के ज़रिए स्वीकार करता है, लेकिन जो कनेक्शन पूलर md5 हैश खुद जाँचता है, वह रनटाइम रोल के रूप में लॉग इन नहीं कर सकता।
 
 Lalu berikan kedua connection string kepada SnapOtter, menunjuk ke host, port, dan database yang sama:
 

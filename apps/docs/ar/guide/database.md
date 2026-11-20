@@ -1,8 +1,8 @@
 ---
 description: "مخطط قاعدة بيانات PostgreSQL والجداول وعمليات الترحيل وإجراءات النسخ الاحتياطي في SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 72c455796c92
+i18n_output_hash: 3a386a968052
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ npx drizzle-kit migrate    # apply pending migrations
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+بعد ذلك، وبصفتك مستخدمًا فائقًا أو الدور الذي نفّذ أمر `CREATE ROLE` ذاك، اسمح لدور المالك بإدارته:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+في Postgres 16 وما بعده، لا يسمح `CREATEROLE` للدور إلا بتعديل الأدوار التي أنشأها بنفسه أو التي يملك عليها `ADMIN OPTION`. لا يغيّر SnapOtter كلمة مرور دور التشغيل إلا عندما لا تعود مطابقة لـ `DATABASE_URL` (بعد تدويرها مثلًا)، ومن دون هذه الصلاحية يفشل ذلك الإقلاع. تنقل `INHERIT FALSE, SET FALSE` الإدارة وحدها ولا شيء غيرها. أما `WITH ADMIN OPTION` وحدها فستمنح `snapotter` أيضًا صلاحيات دور التشغيل. لا يحتاج Postgres 15 وما قبله إلى هذه الصلاحية ويرفض تلك الصياغة، فتجاوزها هناك.
+
+عندما يضبط SnapOtter كلمة المرور، فإنه يخزّن مُحقِّق SCRAM-SHA-256 حتى لو كانت قيمة `password_encryption` في العنقود `md5`. يقبل Postgres ذلك عبر سطر `md5` في `pg_hba.conf`، لكن مُجمِّع الاتصالات الذي يتحقق من تجزئات md5 بنفسه لا يستطيع تسجيل الدخول بدور التشغيل.
 
 ثم زوّد SnapOtter بسلسلتي الاتصال معًا، تشيران إلى المضيف والمنفذ وقاعدة البيانات نفسها:
 
