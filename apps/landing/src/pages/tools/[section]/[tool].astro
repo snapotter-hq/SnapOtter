@@ -6,6 +6,7 @@ import * as lucideIcons from "lucide";
 import Footer from "@/components/Footer.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
+import { formatBytes, sizeChange, TOOL_CONTENT } from "@/data/tool-content";
 import { TOOL_SEO } from "@/data/tool-seo";
 import Base from "@/layouts/Base.astro";
 
@@ -25,6 +26,7 @@ const sectionName = sectionInfo?.name ?? section;
 const categoryMap = new Map(CATEGORIES.map((c) => [c.id, c]));
 const category = categoryMap.get(tool.category);
 const seo = TOOL_SEO[tool.id];
+const content = TOOL_CONTENT[tool.id];
 const related = TOOLS.filter((t) => t.category === tool.category && t.id !== tool.id).slice(0, 4);
 const catColor = category?.color ?? "#737373";
 const isAiTool = (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(tool.id);
@@ -214,6 +216,83 @@ const allJsonLd = [breadcrumbJsonLd, softwareJsonLd];
         </div>
       </div>
     </section>
+
+    <!-- First-hand results (#4911): only tools with measured content get this section -->
+    {content && (
+      <section class="border-t border-border py-16" data-testid="tool-first-hand" aria-labelledby="first-hand-heading">
+        <div class="mx-auto max-w-4xl px-6">
+          <div class="reveal">
+            <h2 id="first-hand-heading" class="font-display text-2xl font-bold tracking-tight md:text-3xl">
+              What you actually get
+            </h2>
+            <p class="mt-3 text-sm leading-relaxed text-muted">
+              We ran {tool.name} on real files and wrote down what came out. {content.testedWith}
+            </p>
+
+            <ul class="mt-8 space-y-4">
+              {content.runs.map((run) => (
+                <li class="rounded-xl border border-border bg-surface p-5">
+                  <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+                    <dt class="font-semibold">Input</dt>
+                    <dd class="leading-relaxed text-muted">{run.input}</dd>
+                    <dt class="font-semibold">Settings</dt>
+                    <dd class="leading-relaxed text-muted">{run.settings}</dd>
+                    <dt class="font-semibold">Output</dt>
+                    <dd class="leading-relaxed text-muted">{run.output}</dd>
+                    <dt class="font-semibold">Size</dt>
+                    <dd class="leading-relaxed">
+                      {formatBytes(run.inputBytes)} to {formatBytes(run.outputBytes)}
+                      <span class="text-muted"> ({sizeChange(run.inputBytes, run.outputBytes)})</span>
+                    </dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            <h3 class="mt-12 font-display text-xl font-bold">How to do it</h3>
+            <ol class="mt-4 list-decimal space-y-2 ps-5 text-sm leading-relaxed">
+              {content.steps.map((step) => <li>{step}</li>)}
+            </ol>
+
+            <h3 class="mt-12 font-display text-xl font-bold">Limits</h3>
+            <ul class="mt-4 list-disc space-y-2 ps-5 text-sm leading-relaxed">
+              {content.limits.map((limit) => <li>{limit}</li>)}
+            </ul>
+
+            {content.alternatives && (
+              <>
+                <h3 class="mt-12 font-display text-xl font-bold">Compared with a hosted tool</h3>
+                <p class="mt-4 text-sm leading-relaxed">{content.alternatives.text}</p>
+                <p class="mt-2 text-xs text-muted">
+                  Source:{" "}
+                  <a
+                    href={content.alternatives.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    class="text-primary-ink underline hover:text-primary-ink-strong"
+                  >{content.alternatives.sourceName}</a>, read on {content.alternatives.checked}. Plans change, so check the current page.
+                </p>
+              </>
+            )}
+
+            <p class="mt-12 text-xs leading-relaxed text-muted">
+              Sample files:{" "}
+              {content.sources.map((source, i) => (
+                <>
+                  {i > 0 && "; "}
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary-ink underline hover:text-primary-ink-strong"
+                  >{source.name}</a>{" "}({source.license})
+                </>
+              ))}.
+            </p>
+          </div>
+        </div>
+      </section>
+    )}
 
     <!-- Features -->
     {seo?.features && seo.features.length > 0 && (
