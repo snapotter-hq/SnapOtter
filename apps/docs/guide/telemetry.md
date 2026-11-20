@@ -10,7 +10,7 @@ Anonymous Product Analytics is on by default and set for the whole instance by a
 
 - tool_used: tool id, status, duration, category, whether it is an AI tool, an error code on failure.
 - pipeline_executed: step count, tool ids, batch flag, file count, duration, status.
-- ai_bundle_action: bundle id, action, duration.
+- ai_bundle_action: bundle id, action (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, or `imported`), duration, and on a failed install a failure category from a fixed list (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, or `other`). Installer output, paths, and error messages are never sent.
 - Frontend usage: which tool pages open, files added (counts only), tool started, downloads, saves, search (result count only), batch processed.
 - Crash reports: error type, a redacted error message (file names, paths, emails, and quoted values removed), a source stack with file basenames, and for AI tools a Python traceback with file basenames only.
 

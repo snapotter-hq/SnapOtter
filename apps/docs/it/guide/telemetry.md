@@ -1,8 +1,8 @@
 ---
 description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati e come disattivare le analisi di prodotto a livello di istanza."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: d46b0e9f5f56
+i18n_output_hash: e019a38f66be
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Le analisi di prodotto anonime sono attive per impostazione predefinita e vengon
 
 - tool_used: id dello strumento, stato, durata, categoria, se è uno strumento AI, un codice di errore in caso di fallimento.
 - pipeline_executed: numero di passaggi, id degli strumenti, flag batch, numero di file, durata, stato.
-- ai_bundle_action: id del bundle, azione, durata.
+- ai_bundle_action: id del bundle, azione (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), durata e, se l'installazione non riesce, una categoria di errore da un elenco fisso (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). L'output del programma di installazione, i percorsi e i messaggi di errore non vengono mai inviati.
 - Utilizzo del frontend: quali pagine degli strumenti vengono aperte, file aggiunti (solo conteggi), strumento avviato, download, salvataggi, ricerca (solo numero di risultati), elaborazione batch.
 - Report sui crash: tipo di errore, un messaggio di errore oscurato (senza nomi di file, percorsi, email e valori tra virgolette), uno stack sorgente con i nomi base dei file e, per gli strumenti AI, un traceback Python con solo i nomi base dei file.
 

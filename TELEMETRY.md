@@ -39,7 +39,7 @@ Emitted from `apps/api` through `trackEvent()`; properties are filtered by `anal
 | `auth_login_failed` | A login attempt fails | `method` (`password` or `oidc`) |
 | `tool_used` | A tool job finishes (once per job: an attempt that will be retried sends nothing) | `tool_id`, `status`, `duration_ms`, `category`, `is_ai_tool`, `is_batch`, `input_format`, `output_format`, `bytes_in`, `bytes_out`, `execution_hint`, `error_code`, `error_kind` |
 | `pipeline_executed` | A pipeline run finishes | `step_count`, `tool_ids`, `is_batch`, `file_count`, `duration_ms`, `status` |
-| `ai_bundle_action` | An AI bundle is installed, uninstalled, reset, or imported | `bundle_id`, `action`, `duration_ms` |
+| `ai_bundle_action` | An AI bundle install starts, succeeds, or fails, or a bundle is uninstalled, reset, or imported | `bundle_id`, `action` (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), `duration_ms` (0 for `install_started`), `error_kind` (only on `install_failed`, from the closed `AI_INSTALL_ERROR_KINDS` list: `oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`; the raw installer message never leaves the server) |
 
 ### Feedback events
 

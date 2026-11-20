@@ -1,8 +1,8 @@
 ---
 description: "Data penggunaan anonim apa yang dikumpulkan SnapOtter, kapan dikirim, dan cara mematikan analitik produk untuk seluruh instance."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: fb05a16291d8
+i18n_output_hash: e0c060d26b33
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Analitik Produk Anonim aktif secara default dan diatur untuk seluruh instance ol
 
 - tool_used: id alat, status, durasi, kategori, apakah ini alat AI, kode error saat gagal.
 - pipeline_executed: jumlah langkah, id alat, flag batch, jumlah file, durasi, status.
-- ai_bundle_action: id bundle, aksi, durasi.
+- ai_bundle_action: id bundle, aksi (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), durasi, dan saat instalasi gagal, kategori kegagalan dari daftar tetap (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Output penginstal, path, dan pesan galat tidak pernah dikirim.
 - Penggunaan frontend: halaman alat mana yang dibuka, file ditambahkan (hanya jumlah), alat dimulai, unduhan, penyimpanan, pencarian (hanya jumlah hasil), batch diproses.
 - Laporan crash: tipe error, pesan error yang sudah disamarkan (nama file, path, email, dan nilai dalam tanda kutip dihapus), source stack dengan basename file, dan untuk alat AI, traceback Python dengan hanya basename file.
 

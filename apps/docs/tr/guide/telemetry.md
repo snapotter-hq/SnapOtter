@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, ne zaman gönderildiği ve örnek genelindeki ürün analitiğinin nasıl kapatılacağı."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: f4aa2109f42c
+i18n_output_hash: 1f6dabdfbb82
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ Anonim Ürün Analitiği varsayılan olarak açıktır ve bir yönetici tarafın
 
 - tool_used: araç kimliği, durum, süre, kategori, AI aracı olup olmadığı, başarısızlıkta bir hata kodu.
 - pipeline_executed: adım sayısı, araç kimlikleri, toplu işlem bayrağı, dosya sayısı, süre, durum.
-- ai_bundle_action: paket kimliği, eylem, süre.
+- ai_bundle_action: paket kimliği, eylem (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), süre ve başarısız bir kurulumda sabit bir listeden hata kategorisi (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Yükleyici çıktısı, yollar ve hata mesajları asla gönderilmez.
 - Frontend kullanımı: hangi araç sayfalarının açıldığı, eklenen dosyalar (yalnızca sayılar), başlatılan araç, indirmeler, kaydetmeler, arama (yalnızca sonuç sayısı), işlenen toplu işlem.
 - Çökme raporları: hata türü, temizlenmiş bir hata mesajı (dosya adları, yollar, e-postalar ve tırnak içindeki değerler çıkarılmış), dosya temel adlarını içeren bir kaynak yığını ve AI araçları için yalnızca dosya temel adlarını içeren bir Python traceback'i.
 

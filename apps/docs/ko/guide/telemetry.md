@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter가 수집하는 익명 사용 데이터, 전송 시점, 인스턴스 전체 제품 분석을 끄는 방법."
-i18n_source_hash: 1a68d9371570
+i18n_source_hash: f8bbfe8db02f
 i18n_provenance: machine
-i18n_output_hash: 6979791c40b8
+i18n_output_hash: 8201d0a7cca5
 i18n_hash_version: 2
 ---
 
@@ -14,7 +14,7 @@ i18n_hash_version: 2
 
 - tool_used: 도구 id, 상태, 소요 시간, 카테고리, AI 도구 여부, 실패 시 오류 코드.
 - pipeline_executed: 단계 수, 도구 id, 배치 플래그, 파일 수, 소요 시간, 상태.
-- ai_bundle_action: 번들 id, 작업, 소요 시간.
+- ai_bundle_action: 번들 id, 작업 (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), 소요 시간, 설치에 실패한 경우 고정 목록의 실패 범주 (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). 설치 프로그램 출력, 경로, 오류 메시지는 전송되지 않습니다.
 - 프런트엔드 사용: 어떤 도구 페이지가 열리는지, 추가된 파일(개수만), 도구 시작, 다운로드, 저장, 검색(결과 수만), 배치 처리.
 - 크래시 리포트: 오류 유형, 민감 정보가 제거된 오류 메시지(파일 이름, 경로, 이메일, 따옴표로 묶인 값 제거), 파일 기본 이름이 포함된 소스 스택, 그리고 AI 도구의 경우 파일 기본 이름만 포함된 Python 트레이스백.
 
