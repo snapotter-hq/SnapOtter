@@ -2408,6 +2408,7 @@ export const ja: TranslationKeys = {
       submit: "文字起こし",
       submitBatch: "文字起こし ({count}ファイル)",
       progressLabel: "音声を文字起こし中",
+      noSpeechDetected: "このファイルでは音声が検出されませんでした。",
     },
     "auto-subtitles": {
       language: "言語",
@@ -2416,6 +2417,7 @@ export const ja: TranslationKeys = {
       submit: "字幕を生成",
       submitBatch: "字幕を生成 ({count}ファイル)",
       progressLabel: "字幕を生成中",
+      noSpeechDetected: "このファイルでは音声が検出されませんでした。",
     },
     "transparency-fixer": {
       webp: "WebP",

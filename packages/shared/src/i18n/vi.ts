@@ -2448,6 +2448,7 @@ export const vi: TranslationKeys = {
       submit: "Phiên âm",
       submitBatch: "Phiên âm ({count} tệp)",
       progressLabel: "Đang phiên âm",
+      noSpeechDetected: "Không phát hiện giọng nói trong tệp này.",
     },
     "auto-subtitles": {
       language: "Ngôn ngữ",
@@ -2456,6 +2457,7 @@ export const vi: TranslationKeys = {
       submit: "Tạo phụ đề",
       submitBatch: "Tạo phụ đề ({count} tệp)",
       progressLabel: "Đang tạo phụ đề",
+      noSpeechDetected: "Không phát hiện giọng nói trong tệp này.",
     },
     "transparency-fixer": {
       webp: "WebP",

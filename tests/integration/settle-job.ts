@@ -7,6 +7,7 @@ import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
 import { waitForJob } from "../../apps/api/src/jobs/enqueue.js";
 import { getQueue } from "../../apps/api/src/jobs/queues.js";
 import type { Pool, ToolJobResult } from "../../apps/api/src/jobs/types.js";
+import { EMPTY_RESULT_WARNINGS } from "../../apps/api/src/lib/empty-result-warnings.js";
 import { resolveToolPool } from "../../apps/api/src/lib/pool.js";
 import type { SettledJobOutcome } from "../helpers/generated-case-accounting.js";
 
@@ -226,10 +227,17 @@ async function downloadCompletedJobArtifact(
       `${toolId}: completed job ${jobId} artifact download returned ${download.statusCode}`,
     );
   }
-  if (download.rawPayload.length === 0) {
+  // An empty transcript or OCR result is correct for input with no speech or
+  // text, but only when the result says so (#4923).
+  const warning = result.resultPayload?.warning;
+  const explainedEmpty = typeof warning === "string" && EMPTY_RESULT_WARNINGS.has(warning);
+  if (download.rawPayload.length === 0 && !explainedEmpty) {
     throw new Error(`${toolId}: completed job ${jobId} produced an empty artifact`);
   }
-  if (result.processedSize <= 0 || download.rawPayload.length !== result.processedSize) {
+  if (
+    (result.processedSize <= 0 && !explainedEmpty) ||
+    download.rawPayload.length !== result.processedSize
+  ) {
     throw new Error(
       `${toolId}: completed job ${jobId} artifact size mismatch ` +
         `(worker=${result.processedSize}, downloaded=${download.rawPayload.length})`,

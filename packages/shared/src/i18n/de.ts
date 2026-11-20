@@ -2470,6 +2470,7 @@ export const de: TranslationKeys = {
       submit: "Transkribieren",
       submitBatch: "Transkribieren ({count} Dateien)",
       progressLabel: "Audio wird transkribiert",
+      noSpeechDetected: "In dieser Datei wurde keine Sprache erkannt.",
     },
     "auto-subtitles": {
       language: "Sprache",
@@ -2478,6 +2479,7 @@ export const de: TranslationKeys = {
       submit: "Untertitel generieren",
       submitBatch: "Untertitel generieren ({count} Dateien)",
       progressLabel: "Untertitel werden generiert",
+      noSpeechDetected: "In dieser Datei wurde keine Sprache erkannt.",
     },
     "transparency-fixer": {
       webp: "WebP",

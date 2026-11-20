@@ -19,6 +19,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { NO_TEXT_DETECTED_WARNING } from "../../lib/empty-result-warnings.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
@@ -115,7 +116,10 @@ async function processOcrJob(
     buffer: Buffer.from(result.text, "utf-8"),
     filename: `${base}_ocr.txt`,
     contentType: "text/plain",
-    resultPayload: { ...result },
+    resultPayload: {
+      ...result,
+      ...(result.text.trim() === "" && { warning: NO_TEXT_DETECTED_WARNING }),
+    },
   };
 }
 
