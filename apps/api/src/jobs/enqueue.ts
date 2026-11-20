@@ -347,8 +347,8 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   }
 
   // Fire-and-forget: compute deleteAfter from team retention override. A
-  // failure leaves delete_after NULL, so the job's files follow the global
-  // FILE_MAX_AGE_HOURS TTL instead of the team's retention (#1522).
+  // failure leaves delete_after NULL until the storage TTL sweep backfills it
+  // for a team with a retention override (#1522, #4938).
   if (data.userId) {
     void computeDeleteAfter(data.jobId, data.userId).catch((err: unknown) => {
       logger.warn(

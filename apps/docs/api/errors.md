@@ -215,6 +215,7 @@ These codes exist in the server source for logs, telemetry, or Fastify's own err
 | `SIEM_DECRYPTION_FAILED` | Reported to error tracking by SIEM forwarding. The SIEM auth header cannot be decrypted. |
 | `WEBHOOK_DECRYPTION_FAILED` | Reported to error tracking. The request that hit the same failure answers with `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Reported to error tracking when a staged upload cannot be removed. |
+| `RETENTION_DEADLINE_BACKFILLED` | Reported to error tracking by the storage TTL sweep when it fills in a finished job's missing team retention deadline. The job's files then follow the team's retention. |
 | `USERNAME_RACE_EXHAUSTED` | Raised when SSO auto-create loses the username race on every retry. The login page shows an error instead. |
 | `ERR_OUT_OF_RANGE` | Thrown by the object storage reader for an invalid byte range. |
 | `ETIMEDOUT` | Set on the timeout error for a GDPR export. The export fails, and it can be requested again. |
