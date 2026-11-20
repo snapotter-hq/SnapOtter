@@ -197,9 +197,7 @@ export async function processImageEnhancement(
   // and a reason the client can show.
   let finalBuffer: Buffer;
   try {
-    const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) =>
-      core(frame, false),
-    );
+    const perFrame = await runPerFrame(rawBuffer, outputFormat, (frame) => core(frame, false));
     if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
     finalBuffer = perFrame ?? (await core(rawBuffer, true));
   } catch (err) {

@@ -8,6 +8,7 @@ import {
 } from "../../../apps/api/src/lib/animated-image.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
+import { outputFormatFor } from "../../../apps/api/src/lib/output-format.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
@@ -977,7 +978,7 @@ describe("readAnimation rethrows DecoderOutOfMemoryError on metadata() OOM (#383
             () => readAnimationFor(source, "gif"),
             () => readAnimationFor(source, "webp"),
             () => isAnimated(source),
-            () => runPerFrame(source, "gif", async (frame) => frame),
+            () => runPerFrame(source, outputFormatFor("gif"), async (frame) => frame),
           ]) {
             const oomErr = buildErr();
             metaSpy.mockRejectedValueOnce(oomErr);

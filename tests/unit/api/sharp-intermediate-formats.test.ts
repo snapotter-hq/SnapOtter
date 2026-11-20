@@ -375,7 +375,6 @@ describe("the API names the format of every intermediate it writes (#1190)", () 
     // These are listed because "no new colours or no palette upstream" is a
     // fact about the caller, which the text of the line cannot show.
     expect(byFile).toEqual({
-      "lib/animated-image.ts": 1,
       "routes/tools/ai-canvas-expand.ts": 1,
       "routes/tools/erase-object.ts": 1,
       "routes/tools/gif-tools.ts": 6,

@@ -3,6 +3,7 @@ import sharp, { type Metadata, type Sharp } from "sharp";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload, MAX_GIF_FRAMES } from "./gif-limits.js";
 import { logger } from "./logger.js";
+import type { EncoderOptions, OutputFormat } from "./output-format.js";
 
 /**
  * Animation-aware plumbing for the Sharp-backed image tools (issue #1083).
@@ -231,11 +232,14 @@ function assertOutputWorkload(width: number, height: number, pages: number): voi
  * Frames travel as PNG in both directions so nothing is lost on the way in or
  * out; every caller resolves its output format from the original buffer before
  * splitting, so no tool needs the frame to arrive in a particular container.
+ * The join is the encode the user downloads, so it takes the route's encoder
+ * options; without them WebP fell back to Sharp's quality 80 (#5103).
  */
 async function mapFrames(
   buffer: Buffer,
   info: FrameInfo,
   container: AnimatedContainer,
+  encoderOptions: EncoderOptions,
   transform: (frame: Buffer, index: number) => Promise<Buffer>,
 ): Promise<Buffer> {
   const rebuilt: Buffer[] = [];
@@ -257,8 +261,8 @@ async function mapFrames(
   // which would cost every page a lossy generation.
   if (container === "tiff") return await joined.tiff({ compression: "lzw" }).toBuffer();
   return container === "gif"
-    ? await joined.gif({ delay: info.delay, loop: info.loop }).toBuffer()
-    : await joined.webp({ delay: info.delay, loop: info.loop }).toBuffer();
+    ? await joined.gif({ ...encoderOptions, delay: info.delay, loop: info.loop }).toBuffer()
+    : await joined.webp({ ...encoderOptions, delay: info.delay, loop: info.loop }).toBuffer();
 }
 
 /**
@@ -270,23 +274,27 @@ async function mapFrames(
  * JPEG really does produce a still, so that case is not a failure.
  *
  * `still` is the tool's own logic, unchanged, receiving one frame at a time.
+ * `outputFormat` is the whole resolved format rather than its name so the
+ * route's encoder options reach the final join (#5103).
  */
 export async function runPerFrame(
   inputBuffer: Buffer,
-  outputFormat: string,
+  outputFormat: Pick<OutputFormat, "format" | "encoderOptions">,
   still: (frame: Buffer) => Promise<Buffer>,
 ): Promise<Buffer | undefined> {
   // Container first: reading the animation applies the frame cap, and an input
   // headed for a still format should not be rejected over a frame count that is
   // about to be discarded anyway. readAnimationFor gates in the same order.
-  const container = animatedContainerFor(outputFormat);
+  const container = animatedContainerFor(outputFormat.format);
   if (!container) return undefined;
 
   const info =
     container === "tiff"
-      ? await readTiffPagesFor(inputBuffer, outputFormat)
+      ? await readTiffPagesFor(inputBuffer, outputFormat.format)
       : await readAnimation(inputBuffer);
   if (!info.animated) return undefined;
 
-  return await mapFrames(inputBuffer, info, container, (frame) => still(frame));
+  return await mapFrames(inputBuffer, info, container, outputFormat.encoderOptions, (frame) =>
+    still(frame),
+  );
 }

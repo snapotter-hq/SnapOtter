@@ -67,8 +67,7 @@ export function registerRotate(app: FastifyInstance) {
               .toBuffer();
           } else {
             buffer =
-              (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-              (await core(inputBuffer));
+              (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
           }
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
