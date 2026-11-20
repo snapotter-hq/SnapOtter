@@ -1,0 +1,40 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro template consumes frontmatter values.
+// biome-ignore-all lint/correctness/noUnusedImports: Astro template consumes frontmatter imports.
+// The three questions homepage visitors were scrolling (and clicking Pricing)
+// to answer, placed right after the hero (#5011). The answers are the /faq
+// page's own strings, so the two pages can't disagree.
+import { t } from "@/i18n";
+import { localizeHref } from "@/lib/i18n-page";
+
+interface Props {
+  locale?: string;
+}
+const { locale = "en" } = Astro.props;
+
+const questions = ["q2", "q6", "q9"].map((k) => ({
+  q: t(locale, `faq.${k}.q`),
+  a: t(locale, `faq.${k}.a`),
+}));
+---
+
+<section id="quick-answers" class="px-6 py-14 md:py-20">
+  <div class="mx-auto max-w-5xl">
+    <h2 class="reveal text-center font-display text-2xl font-bold tracking-tight sm:text-3xl">
+      {t(locale, "home.faq.title")}
+    </h2>
+    <dl class="mt-10 grid gap-6 md:grid-cols-3">
+      {questions.map(({ q, a }) => (
+        <div class="reveal rounded-2xl border border-border bg-surface p-6">
+          <dt class="font-display text-base font-bold">{q}</dt>
+          <dd class="mt-2 text-sm leading-relaxed text-muted">{a}</dd>
+        </div>
+      ))}
+    </dl>
+    <p class="mt-8 text-center text-sm">
+      <a href={localizeHref(locale, "/faq")} class="font-semibold text-primary-ink underline-offset-4 hover:underline">
+        {t(locale, "home.faq.more")}
+      </a>
+    </p>
+  </div>
+</section>
