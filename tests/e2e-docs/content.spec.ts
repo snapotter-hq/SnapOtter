@@ -95,4 +95,24 @@ test.describe("Docs Footer", () => {
     expect(hasLlms).toBe(true);
     expect(hasLlmsFull).toBe(true);
   });
+
+  // #5009: llms.txt was every page in 21 locales (768 KB) with `{#id}` heading
+  // ids in its link titles, and llms-full.txt was 18 MB.
+  test("llms.txt is a short English index and neither file leaks heading ids", async ({
+    request,
+  }) => {
+    const index = await (await request.get("/llms.txt")).text();
+    expect(index.length).toBeLessThan(32 * 1024);
+    expect(index).toContain(
+      "[Getting Started](https://docs.snapotter.com/guide/getting-started.md)",
+    );
+    expect(index).toContain("https://docs.snapotter.com/api/rest.md");
+    expect(index).not.toContain("{#");
+    expect(index).not.toMatch(/docs\.snapotter\.com\/(de|ja|zh-CN)[/.]/);
+
+    const full = await (await request.get("/llms-full.txt")).text();
+    expect(full).toContain("url: https://docs.snapotter.com/tools/image/resize.md");
+    expect(full).not.toContain("{#");
+    expect(full).not.toMatch(/docs\.snapotter\.com\/(de|ja|zh-CN)[/.]/);
+  });
 });

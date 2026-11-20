@@ -6,7 +6,11 @@ import { publicSiteAnalyticsScript } from "../../../packages/shared/src/analytic
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
 import { buildJsonLd } from "./jsonld.mts";
-import { pageOnlySidebar } from "./llms-sidebar.mjs";
+import {
+  llmsIgnorePatterns,
+  llmsSidebar,
+  stripHeadingIdsFromLlmsOutputs,
+} from "./llms-sidebar.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
@@ -129,6 +133,9 @@ function localizeSidebar(items: any[], locale: string): any[] {
 }
 
 export default defineConfig({
+  async buildEnd(siteConfig) {
+    await stripHeadingIdsFromLlmsOutputs(siteConfig.outDir);
+  },
   title: "SnapOtter",
   description:
     "Documentation for SnapOtter, the open-source file toolkit. 200+ tools for image, video, audio, PDF, and file processing. Local AI, pipelines, REST API.",
@@ -293,7 +300,8 @@ export default defineConfig({
       }),
       llmstxt({
         domain: "https://docs.snapotter.com",
-        sidebar: pageOnlySidebar,
+        sidebar: llmsSidebar,
+        ignoreFilesPerOutput: llmsIgnorePatterns(NON_EN.map((l) => l.code)),
         customLLMsTxtTemplate: `# {title}
 
 {description}
@@ -303,6 +311,10 @@ export default defineConfig({
 ## Docs
 
 {toc}
+
+## Tools
+
+Every tool has its own page at \`https://docs.snapotter.com/tools/<section>/<toolId>.md\`, for example [Resize Image](https://docs.snapotter.com/tools/image/resize.md), [Trim Video](https://docs.snapotter.com/tools/video/trim-video.md) or [Merge PDFs](https://docs.snapotter.com/tools/pdf/merge-pdf.md). Sections are \`image\`, \`video\`, \`audio\`, \`pdf\` and \`files\`. [Conversion Presets](https://docs.snapotter.com/tools/conversion-presets.md) lists the format converters, and [llms-full.txt](https://docs.snapotter.com/llms-full.txt) has every tool page in full.
 
 ## API Quick Reference
 
