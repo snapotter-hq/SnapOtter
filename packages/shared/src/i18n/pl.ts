@@ -2457,6 +2457,7 @@ export const pl: TranslationKeys = {
       submit: "Transkrybuj",
       submitBatch: "Transkrybuj ({count} plików)",
       progressLabel: "Transkrypcja audio",
+      noSpeechDetected: "Nie wykryto mowy w tym pliku.",
     },
     "auto-subtitles": {
       language: "Język",
@@ -2465,6 +2466,7 @@ export const pl: TranslationKeys = {
       submit: "Generuj napisy",
       submitBatch: "Generuj napisy ({count} plików)",
       progressLabel: "Generowanie napisów",
+      noSpeechDetected: "Nie wykryto mowy w tym pliku.",
     },
     "transparency-fixer": {
       webp: "WebP",

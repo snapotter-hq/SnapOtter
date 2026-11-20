@@ -2449,6 +2449,7 @@ export const id: TranslationKeys = {
       submit: "Transkripsi",
       submitBatch: "Transkripsi ({count} file)",
       progressLabel: "Mentranskripsi audio",
+      noSpeechDetected: "Tidak ada ucapan yang terdeteksi di file ini.",
     },
     "auto-subtitles": {
       language: "Bahasa",
@@ -2457,6 +2458,7 @@ export const id: TranslationKeys = {
       submit: "Buat Subtitle",
       submitBatch: "Buat Subtitle ({count} file)",
       progressLabel: "Membuat subtitle",
+      noSpeechDetected: "Tidak ada ucapan yang terdeteksi di file ini.",
     },
     "transparency-fixer": {
       webp: "WebP",

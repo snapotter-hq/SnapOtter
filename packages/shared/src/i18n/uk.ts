@@ -2458,6 +2458,7 @@ export const uk: TranslationKeys = {
       submit: "Транскрибувати",
       submitBatch: "Транскрибувати ({count} файлiв)",
       progressLabel: "Транскрипцiя аудiо",
+      noSpeechDetected: "Мовлення в цьому файлі не виявлено.",
     },
     "auto-subtitles": {
       language: "Мова",
@@ -2466,6 +2467,7 @@ export const uk: TranslationKeys = {
       submit: "Створити субтитри",
       submitBatch: "Створити субтитри ({count} файлiв)",
       progressLabel: "Створення субтитрiв",
+      noSpeechDetected: "Мовлення в цьому файлі не виявлено.",
     },
     "transparency-fixer": {
       webp: "WebP",

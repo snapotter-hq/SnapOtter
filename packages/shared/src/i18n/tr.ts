@@ -2455,6 +2455,7 @@ export const tr: TranslationKeys = {
       submit: "Transkribe Et",
       submitBatch: "Transkribe Et ({count} dosya)",
       progressLabel: "Ses transkripsiyonu yapılıyor",
+      noSpeechDetected: "Bu dosyada konuşma algılanamadı.",
     },
     "auto-subtitles": {
       language: "Dil",
@@ -2463,6 +2464,7 @@ export const tr: TranslationKeys = {
       submit: "Altyazı Oluştur",
       submitBatch: "Altyazı Oluştur ({count} dosya)",
       progressLabel: "Altyazı oluşturuluyor",
+      noSpeechDetected: "Bu dosyada konuşma algılanamadı.",
     },
     "transparency-fixer": {
       webp: "WebP",

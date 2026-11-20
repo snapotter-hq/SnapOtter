@@ -2456,6 +2456,7 @@ export const ptBR: TranslationKeys = {
       submit: "Transcrever",
       submitBatch: "Transcrever ({count} arquivos)",
       progressLabel: "Transcrevendo áudio",
+      noSpeechDetected: "Nenhuma fala detectada neste arquivo.",
     },
     "auto-subtitles": {
       language: "Idioma",
@@ -2464,6 +2465,7 @@ export const ptBR: TranslationKeys = {
       submit: "Gerar legendas",
       submitBatch: "Gerar legendas ({count} arquivos)",
       progressLabel: "Gerando legendas",
+      noSpeechDetected: "Nenhuma fala detectada neste arquivo.",
     },
     "transparency-fixer": {
       webp: "WebP",

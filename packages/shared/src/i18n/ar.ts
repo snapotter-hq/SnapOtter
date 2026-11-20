@@ -2428,6 +2428,7 @@ export const ar: TranslationKeys = {
       submit: "تحويل إلى نص",
       submitBatch: "تحويل إلى نص ({count} ملف)",
       progressLabel: "جاري تحويل الصوت إلى نص",
+      noSpeechDetected: "لم يتم اكتشاف أي كلام في هذا الملف.",
     },
     "auto-subtitles": {
       language: "اللغة",
@@ -2436,6 +2437,7 @@ export const ar: TranslationKeys = {
       submit: "إنشاء ترجمة",
       submitBatch: "إنشاء ترجمة ({count} ملف)",
       progressLabel: "جاري إنشاء الترجمة",
+      noSpeechDetected: "لم يتم اكتشاف أي كلام في هذا الملف.",
     },
     "transparency-fixer": {
       webp: "WebP",

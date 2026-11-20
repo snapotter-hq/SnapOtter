@@ -2383,6 +2383,7 @@ export const ko: TranslationKeys = {
       submit: "전사",
       submitBatch: "전사 ({count}개 파일)",
       progressLabel: "오디오 전사 중",
+      noSpeechDetected: "이 파일에서 음성이 감지되지 않았습니다.",
     },
     "auto-subtitles": {
       language: "언어",
@@ -2391,6 +2392,7 @@ export const ko: TranslationKeys = {
       submit: "자막 생성",
       submitBatch: "자막 생성 ({count}개 파일)",
       progressLabel: "자막 생성 중",
+      noSpeechDetected: "이 파일에서 음성이 감지되지 않았습니다.",
     },
     "transparency-fixer": {
       webp: "WebP",

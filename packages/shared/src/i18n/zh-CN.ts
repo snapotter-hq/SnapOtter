@@ -2186,6 +2186,7 @@ export const zhCN: TranslationKeys = {
       submit: "转录",
       submitBatch: "转录 ({count} 个文件)",
       progressLabel: "正在转录音频",
+      noSpeechDetected: "此文件中未检测到语音。",
     },
     "auto-subtitles": {
       language: "语言",
@@ -2194,6 +2195,7 @@ export const zhCN: TranslationKeys = {
       submit: "生成字幕",
       submitBatch: "生成字幕 ({count} 个文件)",
       progressLabel: "正在生成字幕",
+      noSpeechDetected: "此文件中未检测到语音。",
     },
     "transparency-fixer": {
       webp: "WebP",

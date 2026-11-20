@@ -2392,6 +2392,7 @@ export const en = {
       submit: "Transcribe",
       submitBatch: "Transcribe ({count} files)",
       progressLabel: "Transcribing audio",
+      noSpeechDetected: "No speech was detected in this file.",
     },
     "auto-subtitles": {
       language: "Language",
@@ -2400,6 +2401,7 @@ export const en = {
       submit: "Generate Subtitles",
       submitBatch: "Generate Subtitles ({count} files)",
       progressLabel: "Generating subtitles",
+      noSpeechDetected: "No speech was detected in this file.",
     },
     "transparency-fixer": {
       progressLabelBatch: "Fixing transparency ({count} files)",
