@@ -201,6 +201,8 @@ async function openFileViaMenu(file: File) {
   fireEvent.click(screen.getByTestId("menu-item-open"));
   const input = createdInputs[createdInputs.length - 1];
   expect(input).toBeDefined();
+  // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+  expect(input.isConnected).toBe(true);
   Object.defineProperty(input, "files", {
     value: [file],
     configurable: true,
@@ -214,6 +216,8 @@ async function openFileViaWelcomeButton(file: File) {
   fireEvent.click(screen.getByRole("button", { name: en.editor.welcome.openImageButton }));
   const input = createdInputs[createdInputs.length - 1];
   expect(input).toBeDefined();
+  // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+  expect(input.isConnected).toBe(true);
   Object.defineProperty(input, "files", {
     value: [file],
     configurable: true,

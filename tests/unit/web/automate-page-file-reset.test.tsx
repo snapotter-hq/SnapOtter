@@ -796,6 +796,8 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     fireEvent.click(screen.getByText(en.automate.addButton));
     const emptyInput = createdInputs.at(-1);
     if (!emptyInput) throw new Error("handleAddMore created no file input");
+    // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+    expect(emptyInput.isConnected).toBe(true);
     Object.defineProperty(emptyInput, "files", { value: [] });
     act(() => {
       emptyInput.onchange?.({ target: emptyInput } as unknown as Event);
@@ -1061,6 +1063,8 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     fireEvent.click(screen.getByText(en.automate.addButton));
     const emptyInput = createdInputs.at(-1);
     if (!emptyInput) throw new Error("handleAddMore created no file input");
+    // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+    expect(emptyInput.isConnected).toBe(true);
     Object.defineProperty(emptyInput, "files", { value: [] });
     act(() => {
       emptyInput.onchange?.({ target: emptyInput } as unknown as Event);

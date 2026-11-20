@@ -48,6 +48,7 @@ import { useTimeouts } from "@/hooks/use-timeouts";
 import { captureHandledError, track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { format, formatDateTime } from "@/lib/format";
+import { openFileInput } from "@/lib/open-file-input";
 import {
   checkToolResult,
   frameFailure,
@@ -1014,7 +1015,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         failLoad(err);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [onClose, t, handleUnexpectedError]);
 
   // Close on Escape
