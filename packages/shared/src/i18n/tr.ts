@@ -5212,7 +5212,8 @@ export const tr: TranslationKeys = {
       editCancelButton: "İptal",
       updateSuccess: "Rol güncellendi",
       updateFailed: "Rol güncellenemedi",
-      deleteConfirm: '"{name}" rolü silinsin mi? {count} kullanıcının yeniden atanması gerekecek.',
+      deleteConfirm:
+        '"{name}" rolü silinsin mi? Bu roldeki {count} kullanıcı yerleşik "user" rolüne taşınacak.',
       deleteConfirmSimple: '"{name}" rolü silinsin mi?',
       deleteSuccess: '"{name}" rolü silindi',
       deleteFailed: "Rol silinemedi",

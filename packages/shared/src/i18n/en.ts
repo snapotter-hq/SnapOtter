@@ -5135,7 +5135,8 @@ export const en = {
       editCancelButton: "Cancel",
       updateSuccess: "Role updated",
       updateFailed: "Failed to update role",
-      deleteConfirm: 'Delete role "{name}"? {count} user(s) will need to be reassigned.',
+      deleteConfirm:
+        'Delete role "{name}"? Its {count} user(s) will be moved to the built-in "user" role.',
       deleteConfirmSimple: 'Delete role "{name}"?',
       deleteSuccess: 'Role "{name}" deleted',
       deleteFailed: "Failed to delete role",

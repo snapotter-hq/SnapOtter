@@ -5220,7 +5220,7 @@ export const pl: TranslationKeys = {
       updateSuccess: "Rola zaktualizowana",
       updateFailed: "Nie udało się zaktualizować roli",
       deleteConfirm:
-        'Usunąć rolę "{name}"? {count} użytkownik(ów) będzie wymagać ponownego przypisania.',
+        'Usunąć rolę "{name}"? Jej {count} użytkownik(ów) zostanie przeniesionych do wbudowanej roli "user".',
       deleteConfirmSimple: 'Usunąć rolę "{name}"?',
       deleteSuccess: 'Rola "{name}" usunięta',
       deleteFailed: "Nie udało się usunąć roli",

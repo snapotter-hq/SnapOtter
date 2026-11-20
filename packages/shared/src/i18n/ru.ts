@@ -5213,7 +5213,8 @@ export const ru: TranslationKeys = {
       editCancelButton: "Отмена",
       updateSuccess: "Роль обновлена",
       updateFailed: "Не удалось обновить роль",
-      deleteConfirm: 'Удалить роль "{name}"? {count} пользователю(ям) потребуется переназначение.',
+      deleteConfirm:
+        'Удалить роль "{name}"? Её {count} пользователь(ей) будут перемещены во встроенную роль "user".',
       deleteConfirmSimple: 'Удалить роль "{name}"?',
       deleteSuccess: 'Роль "{name}" удалена',
       deleteFailed: "Не удалось удалить роль",

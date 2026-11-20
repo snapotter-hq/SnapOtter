@@ -5242,7 +5242,8 @@ export const de: TranslationKeys = {
       editCancelButton: "Abbrechen",
       updateSuccess: "Rolle aktualisiert",
       updateFailed: "Rolle konnte nicht aktualisiert werden",
-      deleteConfirm: 'Rolle "{name}" löschen? {count} Benutzer müssen neu zugewiesen werden.',
+      deleteConfirm:
+        'Rolle "{name}" löschen? Die {count} Benutzer dieser Rolle werden in die integrierte Rolle "user" verschoben.',
       deleteConfirmSimple: 'Rolle "{name}" löschen?',
       deleteSuccess: 'Rolle "{name}" gelöscht',
       deleteFailed: "Rolle konnte nicht gelöscht werden",

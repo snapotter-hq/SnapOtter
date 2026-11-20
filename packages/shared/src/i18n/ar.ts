@@ -5161,7 +5161,8 @@ export const ar: TranslationKeys = {
       editCancelButton: "إلغاء",
       updateSuccess: "تم تحديث الدور",
       updateFailed: "فشل تحديث الدور",
-      deleteConfirm: 'حذف الدور "{name}"؟ يحتاج {count} مستخدم(ين) إلى إعادة تعيين.',
+      deleteConfirm:
+        'حذف الدور "{name}"؟ سيُنقل {count} مستخدم(ين) من هذا الدور إلى الدور المدمج "user".',
       deleteConfirmSimple: 'حذف الدور "{name}"؟',
       deleteSuccess: 'تم حذف الدور "{name}"',
       deleteFailed: "فشل حذف الدور",

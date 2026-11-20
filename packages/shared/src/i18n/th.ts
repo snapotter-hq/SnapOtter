@@ -5125,7 +5125,7 @@ export const th: TranslationKeys = {
       editCancelButton: "ยกเลิก",
       updateSuccess: "อัปเดตบทบาทแล้ว",
       updateFailed: "อัปเดตบทบาทล้มเหลว",
-      deleteConfirm: 'ลบบทบาท "{name}"? ผู้ใช้ {count} คนจะต้องมอบหมายใหม่',
+      deleteConfirm: 'ลบบทบาท "{name}"? ผู้ใช้ {count} คนในบทบาทนี้จะถูกย้ายไปยังบทบาท "user" ในตัว',
       deleteConfirmSimple: 'ลบบทบาท "{name}"?',
       deleteSuccess: 'ลบบทบาท "{name}" แล้ว',
       deleteFailed: "ลบบทบาทล้มเหลว",

@@ -4903,7 +4903,7 @@ export const zhTW: TranslationKeys = {
       editCancelButton: "取消",
       updateSuccess: "角色已更新",
       updateFailed: "更新角色失敗",
-      deleteConfirm: "刪除角色「{name}」？{count}位使用者需要重新指派。",
+      deleteConfirm: "刪除角色「{name}」？此角色的{count}位使用者將移至內建的「user」角色。",
       deleteConfirmSimple: "刪除角色「{name}」？",
       deleteSuccess: "角色「{name}」已刪除",
       deleteFailed: "刪除角色失敗",

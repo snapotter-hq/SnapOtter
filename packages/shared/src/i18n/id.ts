@@ -5203,7 +5203,8 @@ export const id: TranslationKeys = {
       editCancelButton: "Batal",
       updateSuccess: "Peran diperbarui",
       updateFailed: "Gagal memperbarui peran",
-      deleteConfirm: 'Hapus peran "{name}"? {count} pengguna perlu ditetapkan ulang.',
+      deleteConfirm:
+        'Hapus peran "{name}"? {count} pengguna dengan peran ini akan dipindahkan ke peran bawaan "user".',
       deleteConfirmSimple: 'Hapus peran "{name}"?',
       deleteSuccess: 'Peran "{name}" dihapus',
       deleteFailed: "Gagal menghapus peran",

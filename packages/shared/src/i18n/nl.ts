@@ -5224,7 +5224,7 @@ export const nl: TranslationKeys = {
       updateSuccess: "Rol bijgewerkt",
       updateFailed: "Rol bijwerken mislukt",
       deleteConfirm:
-        'Rol "{name}" verwijderen? {count} gebruiker(s) moeten opnieuw worden toegewezen.',
+        'Rol "{name}" verwijderen? De {count} gebruiker(s) met deze rol worden verplaatst naar de ingebouwde rol "user".',
       deleteConfirmSimple: 'Rol "{name}" verwijderen?',
       deleteSuccess: 'Rol "{name}" verwijderd',
       deleteFailed: "Rol verwijderen mislukt",

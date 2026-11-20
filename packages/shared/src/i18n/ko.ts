@@ -5122,7 +5122,7 @@ export const ko: TranslationKeys = {
       updateSuccess: "역할이 업데이트되었습니다",
       updateFailed: "역할 업데이트에 실패했습니다",
       deleteConfirm:
-        '역할 "{name}"을(를) 삭제하시겠습니까? {count}명의 사용자를 재배정해야 합니다.',
+        '역할 "{name}"을(를) 삭제하시겠습니까? 이 역할의 사용자 {count}명은 기본 제공 "user" 역할로 이동됩니다.',
       deleteConfirmSimple: '역할 "{name}"을(를) 삭제하시겠습니까?',
       deleteSuccess: '역할 "{name}"이(가) 삭제되었습니다',
       deleteFailed: "역할 삭제에 실패했습니다",

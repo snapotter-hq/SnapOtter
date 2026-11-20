@@ -5153,7 +5153,8 @@ export const ja: TranslationKeys = {
       editCancelButton: "キャンセル",
       updateSuccess: "ロールを更新しました",
       updateFailed: "ロールの更新に失敗しました",
-      deleteConfirm: "ロール「{name}」を削除しますか？{count}人のユーザーの再割り当てが必要です。",
+      deleteConfirm:
+        "ロール「{name}」を削除しますか？このロールの{count}人のユーザーは組み込みの「user」ロールに移動されます。",
       deleteConfirmSimple: "ロール「{name}」を削除しますか？",
       deleteSuccess: "ロール「{name}」を削除しました",
       deleteFailed: "ロールの削除に失敗しました",
