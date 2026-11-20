@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 158ed4245ae6
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 1b1ec27e9a4a
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 |---------|------|-------------|
 | `convert-video` | Convertir une vidéo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Compresser une vidéo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Découper une vidéo | `startS`, `endS`, `precise` (bool, coupe précise à l'image près) |
+| `trim-video` | Découper une vidéo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, coupe précise à l'image près) |
 | `mute-video` | Couper le son d'une vidéo | - |
 | `video-to-gif` | Vidéo vers GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60 s) |
 | `resize-video` | Redimensionner une vidéo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | ID de l'outil | Nom | Paramètres principaux |
 |---------|------|-------------|
 | `convert-audio` | Convertir l'audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Découper l'audio | `startS`, `endS` |
+| `trim-audio` | Découper l'audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Ajuster le volume | `gainDb` (-30 à 30) |
 | `normalize-audio` | Normaliser l'audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fondu audio | `fadeInS` (0-30), `fadeOutS` (0-30) |

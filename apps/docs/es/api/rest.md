@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: ba33fa699e8f
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 3d8af3cc6a5d
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 |---------|------|-------------|
 | `convert-video` | Convertir vídeo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Comprimir vídeo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Recortar vídeo | `startS`, `endS`, `precise` (bool, corte con precisión de fotograma) |
+| `trim-video` | Recortar vídeo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, corte con precisión de fotograma) |
 | `mute-video` | Silenciar vídeo | - |
 | `video-to-gif` | Vídeo a GIF | `fps` (1-30), `width`, `startS`, `durationS` (máx. 60 s) |
 | `resize-video` | Redimensionar vídeo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | ID de herramienta | Nombre | Ajustes clave |
 |---------|------|-------------|
 | `convert-audio` | Convertir audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Recortar audio | `startS`, `endS` |
+| `trim-audio` | Recortar audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Ajustar volumen | `gainDb` (-30 a 30) |
 | `normalize-audio` | Normalizar audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fundido de audio | `fadeInS` (0-30), `fadeOutS` (0-30) |

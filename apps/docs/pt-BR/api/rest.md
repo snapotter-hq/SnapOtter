@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: 955525a9893e
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 628ef2b5ac42
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 |---------|------|-------------|
 | `convert-video` | Converter Vídeo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Comprimir Vídeo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Cortar Vídeo | `startS`, `endS`, `precise` (bool, corte com precisão de quadro) |
+| `trim-video` | Cortar Vídeo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, corte com precisão de quadro) |
 | `mute-video` | Silenciar Vídeo | - |
 | `video-to-gif` | Vídeo para GIF | `fps` (1-30), `width`, `startS`, `durationS` (máx. 60s) |
 | `resize-video` | Redimensionar Vídeo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | ID da ferramenta | Nome | Principais configurações |
 |---------|------|-------------|
 | `convert-audio` | Converter Áudio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Cortar Áudio | `startS`, `endS` |
+| `trim-audio` | Cortar Áudio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Ajustar Volume | `gainDb` (-30 a 30) |
 | `normalize-audio` | Normalizar Áudio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fade de Áudio | `fadeInS` (0-30), `fadeOutS` (0-30) |

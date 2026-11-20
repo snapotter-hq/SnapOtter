@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 4baf9d79932f
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 1842790d29ca
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | 비디오 변환 | `format`(mp4/mov/webm/avi/mkv), `quality`(high/balanced/small) |
 | `compress-video` | 비디오 압축 | `quality`(light/balanced/strong), `resolution`(original/1080p/720p/480p) |
-| `trim-video` | 비디오 자르기 | `startS`, `endS`, `precise`(bool, 프레임 단위 정밀 컷) |
+| `trim-video` | 비디오 자르기 | `mode`(range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise`(bool, 프레임 단위 정밀 컷) |
 | `mute-video` | 비디오 음소거 | - |
 | `video-to-gif` | 비디오를 GIF로 | `fps`(1-30), `width`, `startS`, `durationS`(최대 60초) |
 | `resize-video` | 비디오 크기 조정 | `width`, `height`, `preset`(custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 도구 ID | 이름 | 주요 설정 |
 |---------|------|-------------|
 | `convert-audio` | 오디오 변환 | `format`(mp3/wav/ogg/flac/m4a), `bitrateKbps`(32-320) |
-| `trim-audio` | 오디오 자르기 | `startS`, `endS` |
+| `trim-audio` | 오디오 자르기 | `mode`(range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | 볼륨 조정 | `gainDb`(-30 ~ 30) |
 | `normalize-audio` | 오디오 정규화 | - (EBU R128, -16 LUFS) |
 | `fade-audio` | 오디오 페이드 | `fadeInS`(0-30), `fadeOutS`(0-30) |

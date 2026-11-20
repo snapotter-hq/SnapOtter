@@ -24,6 +24,15 @@ describe("getSettingsSummary", () => {
     );
   });
 
+  it.each(["trim-video", "trim-audio"])("summarises %s range and ends cuts (#728)", (toolId) => {
+    expect(getSettingsSummary(toolId, { startS: 2, endS: 9 })).toBe("2-9s");
+    expect(getSettingsSummary(toolId, { mode: "range", startS: 2, endS: 9 })).toBe("2-9s");
+    expect(getSettingsSummary(toolId, { mode: "ends", cutStartS: 3, cutEndS: 1.5 })).toBe(
+      "-3s / -1.5s",
+    );
+    expect(getSettingsSummary(toolId, {})).toBe("");
+  });
+
   it("returns format for convert", () => {
     expect(getSettingsSummary("convert", { format: "webp" })).toBe("WEBP");
   });

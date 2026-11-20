@@ -19,17 +19,17 @@ import {
   runSmartCut,
   smartCutContainerSupported,
 } from "../../lib/smart-cut.js";
+import { checkTrimMode, resolveTrimWindow, trimModeFields } from "../../lib/trim-window.js";
 import { InputValidationError } from "../../modality/contract.js";
 import type { ToolProcessCtxV2 } from "../tool-factory.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z
   .object({
-    startS: z.number().finite().min(0).default(0),
-    endS: z.number().finite().min(0.000001),
+    ...trimModeFields,
     precise: z.boolean().default(false),
   })
-  .refine((s) => s.endS > s.startS, { message: "End must be after start" });
+  .superRefine((s, ctx) => checkTrimMode(s, ctx));
 
 interface Cut {
   inPath: string;
@@ -81,15 +81,13 @@ export function registerTrimVideo(app: FastifyInstance) {
       if (info.durationS === null) {
         throw new InputValidationError("Could not determine video duration");
       }
-      if (settings.startS >= info.durationS) {
-        throw new InputValidationError("Start is beyond the end of the video");
-      }
+      const { startS, endS } = resolveTrimWindow(settings, info.durationS, "video");
       const cut: Cut = {
         inPath,
         outPath: join(ctx.scratchDir, "media", outName),
         ext: origExt,
-        startS: settings.startS,
-        endS: Math.min(settings.endS, info.durationS),
+        startS,
+        endS,
       };
 
       if (settings.precise || !(await trySmartCut(ctx, cut))) {

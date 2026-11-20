@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 75bf1a2260d1
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 1b4c50f7fe2d
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 |---------|------|-------------|
 | `convert-video` | Video konvertieren | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Video komprimieren | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Video zuschneiden | `startS`, `endS`, `precise` (bool, bildgenauer Schnitt) |
+| `trim-video` | Video zuschneiden | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, bildgenauer Schnitt) |
 | `mute-video` | Video stummschalten | - |
 | `video-to-gif` | Video zu GIF | `fps` (1-30), `width`, `startS`, `durationS` (max. 60s) |
 | `resize-video` | Video-Größe ändern | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | Tool-ID | Name | Wichtige Einstellungen |
 |---------|------|-------------|
 | `convert-audio` | Audio konvertieren | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Audio zuschneiden | `startS`, `endS` |
+| `trim-audio` | Audio zuschneiden | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Lautstärke anpassen | `gainDb` (-30 bis 30) |
 | `normalize-audio` | Audio normalisieren | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Audio ein-/ausblenden | `fadeInS` (0-30), `fadeOutS` (0-30) |

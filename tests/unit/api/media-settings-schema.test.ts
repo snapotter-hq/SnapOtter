@@ -49,6 +49,43 @@ describe("media time settings schemas", () => {
     expect(parses("trim-audio", { startS: 0, endS: 0.5 })).toBe(true);
   });
 
+  it.each(["trim-audio", "trim-video"])("%s still accepts a bare start/end range", (toolId) => {
+    expect(parses(toolId, { startS: 1, endS: 4 })).toBe(true);
+    expect(parses(toolId, { mode: "range", startS: 1, endS: 4 })).toBe(true);
+  });
+
+  it.each(["trim-audio", "trim-video"])("%s requires an end in range mode", (toolId) => {
+    expect(parses(toolId, { startS: 1 })).toBe(false);
+    expect(parses(toolId, { mode: "range", cutStartS: 1 })).toBe(false);
+  });
+
+  it.each(["trim-audio", "trim-video"])("%s cuts from the ends without an end time", (toolId) => {
+    expect(parses(toolId, { mode: "ends", cutStartS: 2, cutEndS: 3 })).toBe(true);
+    expect(parses(toolId, { mode: "ends", cutStartS: 2 })).toBe(true);
+    expect(parses(toolId, { mode: "ends", cutEndS: 3 })).toBe(true);
+  });
+
+  it.each(["trim-audio", "trim-video"])("%s rejects an ends cut of nothing", (toolId) => {
+    expect(parses(toolId, { mode: "ends" })).toBe(false);
+    expect(parses(toolId, { mode: "ends", cutStartS: 0, cutEndS: 0 })).toBe(false);
+  });
+
+  it.each(["trim-audio", "trim-video"])("%s refuses fields from the other mode", (toolId) => {
+    expect(parses(toolId, { mode: "ends", cutStartS: 1, endS: 5 })).toBe(false);
+    expect(parses(toolId, { mode: "ends", cutStartS: 1, startS: 2 })).toBe(false);
+    expect(parses(toolId, { startS: 1, endS: 4, cutEndS: 2 })).toBe(false);
+    expect(parses(toolId, { mode: "range", startS: 1, endS: 4, cutStartS: 0, cutEndS: 0 })).toBe(
+      true,
+    );
+  });
+
+  it.each(["trim-audio", "trim-video"])("%s rejects negative or non-finite cuts", (toolId) => {
+    expect(parses(toolId, { mode: "ends", cutStartS: -1, cutEndS: 3 })).toBe(false);
+    expect(parses(toolId, { mode: "ends", cutStartS: 1, cutEndS: Number.POSITIVE_INFINITY })).toBe(
+      false,
+    );
+  });
+
   it("requires at least one representable fade duration", () => {
     expect(parses("fade-audio", { fadeInS: Number.MIN_VALUE, fadeOutS: 0 })).toBe(false);
     expect(parses("fade-audio", { fadeInS: 0, fadeOutS: 0.000001 })).toBe(true);

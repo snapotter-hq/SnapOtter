@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 8c5d97092eb1
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: bba661af0e13
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | 動画の変換 | `format`（mp4/mov/webm/avi/mkv）, `quality`（high/balanced/small） |
 | `compress-video` | 動画の圧縮 | `quality`（light/balanced/strong）, `resolution`（original/1080p/720p/480p） |
-| `trim-video` | 動画のトリミング | `startS`, `endS`, `precise`（bool、フレーム精度のカット） |
+| `trim-video` | 動画のトリミング | `mode`（range/ends）, `startS`, `endS`, `cutStartS`, `cutEndS`, `precise`（bool、フレーム精度のカット） |
 | `mute-video` | 動画のミュート | - |
 | `video-to-gif` | 動画から GIF | `fps`（1-30）, `width`, `startS`, `durationS`（最大 60 秒） |
 | `resize-video` | 動画のリサイズ | `width`, `height`, `preset`（custom/2160p/1440p/1080p/720p/480p/360p） |
@@ -300,7 +300,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ツール ID | 名前 | 主な設定 |
 |---------|------|-------------|
 | `convert-audio` | 音声の変換 | `format`（mp3/wav/ogg/flac/m4a）, `bitrateKbps`（32-320） |
-| `trim-audio` | 音声のトリミング | `startS`, `endS` |
+| `trim-audio` | 音声のトリミング | `mode`（range/ends）, `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | 音量調整 | `gainDb`（-30 から 30） |
 | `normalize-audio` | 音声のノーマライズ | -（EBU R128、-16 LUFS） |
 | `fade-audio` | 音声のフェード | `fadeInS`（0-30）, `fadeOutS`（0-30） |

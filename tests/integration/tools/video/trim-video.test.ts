@@ -155,4 +155,25 @@ describe.skipIf(!ffmpegAvailable())("trim-video (requires ffmpeg)", () => {
     const res = await runTool({ startS: 0.5, endS: 0.2 });
     expect(res.statusCode).toBe(400);
   });
+
+  it("cuts time off both ends without an end time (#728)", async () => {
+    // tiny.mp4 is 1s; precise re-encode so the result tracks the cut instead
+    // of snapping to a keyframe.
+    const res = await runTool({ mode: "ends", cutStartS: 0.2, cutEndS: 0.3, precise: true });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    const tmpDir = mkdtempSync(join(tmpdir(), "trim-ends-test-"));
+    const probeFile = join(tmpDir, "trimmed.mp4");
+    writeFileSync(probeFile, dl.rawPayload);
+    const info = await probeMedia(probeFile);
+    expect(info.durationS as number).toBeGreaterThan(0.3);
+    expect(info.durationS as number).toBeLessThan(0.75);
+  }, 60_000);
+
+  it("rejects an ends cut that leaves nothing (#728)", async () => {
+    const res = await runTool({ mode: "ends", cutStartS: 0.6, cutEndS: 0.6 });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/nothing of the video is left/);
+  });
 });

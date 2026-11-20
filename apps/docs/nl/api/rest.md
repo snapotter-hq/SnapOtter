@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: ed9a62f2b460
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 8053b0a7d1a1
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 |---------|------|-------------|
 | `convert-video` | Video converteren | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Video comprimeren | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Video inkorten | `startS`, `endS`, `precise` (bool, frame-nauwkeurige knip) |
+| `trim-video` | Video inkorten | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, frame-nauwkeurige knip) |
 | `mute-video` | Video dempen | - |
 | `video-to-gif` | Video naar GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Videoformaat wijzigen | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | Tool-ID | Naam | Belangrijkste instellingen |
 |---------|------|-------------|
 | `convert-audio` | Audio converteren | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Audio inkorten | `startS`, `endS` |
+| `trim-audio` | Audio inkorten | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Volume aanpassen | `gainDb` (-30 tot 30) |
 | `normalize-audio` | Audio normaliseren | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Audio faden | `fadeInS` (0-30), `fadeOutS` (0-30) |

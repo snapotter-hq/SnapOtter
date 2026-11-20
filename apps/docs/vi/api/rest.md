@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: cb5150884e2c
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 659a68820781
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 |---------|------|-------------|
 | `convert-video` | Chuyển đổi Video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Nén Video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Cắt Video | `startS`, `endS`, `precise` (bool, cắt chính xác từng khung hình) |
+| `trim-video` | Cắt Video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, cắt chính xác từng khung hình) |
 | `mute-video` | Tắt tiếng Video | - |
 | `video-to-gif` | Video sang GIF | `fps` (1-30), `width`, `startS`, `durationS` (tối đa 60 giây) |
 | `resize-video` | Đổi kích thước Video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | ID công cụ | Tên | Cài đặt chính |
 |---------|------|-------------|
 | `convert-audio` | Chuyển đổi âm thanh | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Cắt âm thanh | `startS`, `endS` |
+| `trim-audio` | Cắt âm thanh | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Điều chỉnh âm lượng | `gainDb` (-30 đến 30) |
 | `normalize-audio` | Chuẩn hóa âm thanh | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Làm mờ dần âm thanh | `fadeInS` (0-30), `fadeOutS` (0-30) |

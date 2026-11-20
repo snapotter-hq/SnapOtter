@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 70e53ad992e8
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 63a6c4e1b1db
+i18n_source_hash: b6b526b4f2b2
 i18n_provenance: human
 ---
 
@@ -267,7 +267,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 |---------|------|-------------|
 | `convert-video` | Video Dönüştür | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Video Sıkıştır | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Video Kırp | `startS`, `endS`, `precise` (bool, kare tam kesim) |
+| `trim-video` | Video Kırp | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, kare tam kesim) |
 | `mute-video` | Videoyu Sustur | - |
 | `video-to-gif` | Videodan GIF'e | `fps` (1-30), `width`, `startS`, `durationS` (maks. 60sn) |
 | `resize-video` | Videoyu Yeniden Boyutlandır | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -300,7 +300,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | Araç Kimliği | Ad | Anahtar ayarlar |
 |---------|------|-------------|
 | `convert-audio` | Ses Dönüştür | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Sesi Kırp | `startS`, `endS` |
+| `trim-audio` | Sesi Kırp | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Ses Düzeyini Ayarla | `gainDb` (-30 ile 30 arası) |
 | `normalize-audio` | Sesi Normalleştir | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Sesi Soldur | `fadeInS` (0-30), `fadeOutS` (0-30) |

@@ -69,10 +69,8 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.quality) return String(settings.quality);
       return "";
     }
-    case "trim-video": {
-      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
-      return "";
-    }
+    case "trim-video":
+      return trimSummary(settings);
     case "video-to-gif": {
       if (settings.fps) return `${settings.fps} fps`;
       return "";
@@ -123,10 +121,8 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       }
       return "";
     }
-    case "trim-audio": {
-      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
-      return "";
-    }
+    case "trim-audio":
+      return trimSummary(settings);
     case "volume-adjust": {
       if (settings.gainDb != null) return `${settings.gainDb} dB`;
       return "";
@@ -205,4 +201,10 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
     default:
       return "";
   }
+}
+
+function trimSummary(settings: Record<string, unknown>): string {
+  if (settings.mode === "ends") return `-${settings.cutStartS ?? 0}s / -${settings.cutEndS ?? 0}s`;
+  if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
+  return "";
 }
