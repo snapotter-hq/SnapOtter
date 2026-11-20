@@ -75,6 +75,37 @@ export function isEngineUnavailableFailure(error: unknown): boolean {
   return /spawn\s+\S*(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\S*\s+ENOENT/i.test(message);
 }
 
+/** The parts of a settled job row that say how it ended. */
+export interface SettledJobOutcome {
+  status: string;
+  error: unknown;
+}
+
+/**
+ * True when an accepted job failed because the worker refused its input.
+ *
+ * A long tool answers 202, so a file it correctly refuses never comes back as
+ * a 4xx response: the job fails, and the worker records the status the sync
+ * route would have sent on the failed row (`failureStatus` in
+ * apps/api/src/jobs/worker-shared.ts). pdf-to-word refusing a scanned PDF is
+ * the case that made this matter (#5038). Read the recorded status, never the
+ * message, since the copy gets reworded. Only a 4xx the matrix already allows
+ * counts; a server fault or a failure with no recorded status stays a failure.
+ */
+export function isRecordedRejection(
+  row: SettledJobOutcome | undefined,
+  allowedStatuses: ReadonlySet<number>,
+): boolean {
+  if (row?.status !== "failed") return false;
+  const httpStatus = (row.error as { httpStatus?: unknown } | null)?.httpStatus;
+  return (
+    typeof httpStatus === "number" &&
+    httpStatus >= 400 &&
+    httpStatus < 500 &&
+    allowedStatuses.has(httpStatus)
+  );
+}
+
 export type GeneratedSkipCategory = (typeof GENERATED_SKIP_CATEGORIES)[number];
 
 export interface GeneratedSkipSummary {

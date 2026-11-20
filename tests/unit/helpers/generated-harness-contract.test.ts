@@ -54,6 +54,18 @@ describe("generated QA harness contract", () => {
     );
   });
 
+  // A long tool's refusal of a bad file arrives as a failed job, not a 4xx
+  // response. Each 202 branch has to read the recorded status off the job row,
+  // or the refusal reads as a crash and accounting stops balancing (#5038).
+  it.each([
+    "format-matrix-generated.shared.ts",
+    "format-matrix-multimodal.test.ts",
+    "settings-matrix.test.ts",
+  ])("%s counts a recorded client-fault job failure as a rejection", (filename) => {
+    const text = source(filename);
+    expect(text).toContain("isRecordedRejection(await settledJobRow(");
+  });
+
   it("fuzz executes the exact requested run count instead of interrupting successfully", () => {
     const text = source("fuzz-settings.test.ts");
     expect(text).not.toContain("interruptAfterTimeLimit");

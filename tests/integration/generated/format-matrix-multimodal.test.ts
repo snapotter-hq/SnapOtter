@@ -7,6 +7,7 @@ import {
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
+  isRecordedRejection,
 } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -17,7 +18,7 @@ import {
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -328,8 +329,20 @@ describe("multi-modality tool x format matrix", () => {
               );
               accounting.accept();
             } catch (error) {
-              if (!isEngineUnavailableFailure(error)) throw error;
-              accounting.skip("missing-host-binary", `engine unavailable for ${fixture.filename}`);
+              if (isEngineUnavailableFailure(error)) {
+                accounting.skip(
+                  "missing-host-binary",
+                  `engine unavailable for ${fixture.filename}`,
+                );
+                return;
+              }
+              // A long tool refuses a bad file by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(payload.jobId as string), ALLOWED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
             }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();
