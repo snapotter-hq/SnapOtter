@@ -260,6 +260,23 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
 }
 
 /**
+ * Process fns the worker runs only for a custom route's own jobs (kind
+ * "tool"). For a tool whose job input is not a file a pipeline step or batch
+ * child could hand it: html-to-image queues the HTML or URL it was sent, not
+ * an image. These stay out of the pipeline/batch registry above, so
+ * getRegisteredToolIds and REGISTRY_EXEMPT are unaffected.
+ */
+const directJobRegistry = new Map<string, ToolProcessV2>();
+
+export function registerDirectJobProcessFn(toolId: string, process: ToolProcessV2): void {
+  directJobRegistry.set(toolId, process);
+}
+
+export function getDirectJobProcessFn(toolId: string): ToolProcessV2 | undefined {
+  return directJobRegistry.get(toolId);
+}
+
+/**
  * Factory that registers a POST /api/v1/tools/:section/:toolId route.
  *
  * The route accepts multipart with:
@@ -629,206 +646,36 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           });
         }
 
-        // Check per-user concurrent job limit before enqueuing. Type
-        // "single" rows are SSE alias bookkeeping, not work (#808: they now
-        // carry the owner so cancels can be authorized); counting them
-        // would double-charge every tool-route run against the limit.
-        const userId = authUser.id;
-        const maxConcurrent = parseNumericSettingValue(
-          "maxConcurrentJobsPerUser",
-          await getSettingStrict("maxConcurrentJobsPerUser"),
-          0,
-        );
-        if (maxConcurrent > 0 && userId) {
-          const activeJobs = await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(schema.jobs)
-            .where(
-              and(
-                sql`${schema.jobs.userId} = ${userId}`,
-                inArray(schema.jobs.status, ["queued", "processing"]),
-                ne(schema.jobs.type, "single"),
-              ),
-            );
-
-          if (activeJobs[0].count >= maxConcurrent) {
-            return reply.status(429).send({
-              error: "Too many concurrent jobs. Please wait for existing jobs to complete.",
-              activeJobs: activeJobs[0].count,
-              limit: maxConcurrent,
-            });
-          }
-        }
-
-        const startTime = Date.now();
-
-        // Enqueue for the BullMQ worker
-        const dbSettings = config.redactSettingsForAudit
-          ? config.redactSettingsForAudit(settings)
-          : undefined;
-        // Once enqueueToolJob has written the jobs row, that row owns
-        // uploads/<jobId>/ (a failed queue add is retried from it), so the
-        // finally below must leave the upload alone. If it threw before the
-        // row landed, nothing else will ever remove the upload.
-        enqueued = true;
-        const jobData: ToolJobData = {
-          jobId,
-          toolId: config.toolId,
-          userId,
-          username: authUser.username,
-          requestIp: request.ip,
-          requestId: request.id,
-          pool,
-          inputRefs,
-          filename,
-          settings,
-          dbSettings,
-          fileId: fileId ?? undefined,
-          saveMode,
-          clientJobId: clientJobId ?? undefined,
-          kind: "tool",
-          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-        };
+        const enqueueState = { enqueued: false };
         try {
-          await enqueueToolJob(jobData);
-          clientJobId = jobData.clientJobId ?? null;
-        } catch (err) {
-          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
-          throw err;
-        }
-
-        // Long tools never block the HTTP request (spec 4.5): straight to SSE.
-        if (shouldSkipSyncWindow(toolMeta?.executionHint)) {
-          return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
-        }
-
-        try {
-          const result = await waitForJob(pool, jobId);
-          if (result) {
-            if (!result.audited) {
-              // Fire-and-forget: audit log must never block the response
-              import("../lib/audit.js")
-                .then(({ isToolAuditEnabled, auditFromRequest }) =>
-                  isToolAuditEnabled().then((enabled) => {
-                    if (!enabled) return;
-                    return auditFromRequest(request)("TOOL_EXECUTED", {
-                      userId: authUser.id,
-                      username: authUser.username,
-                      toolId: config.toolId,
-                      inputFileCount: received.length,
-                      totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
-                      outputFormat:
-                        ((settings as Record<string, unknown>)?.format as string | undefined) ??
-                        ((settings as Record<string, unknown>)?.outputFormat as
-                          | string
-                          | undefined) ??
-                        null,
-                      status: "success",
-                      durationMs: Date.now() - startTime,
-                    });
-                  }),
-                )
-                .catch((err) => {
-                  request.log.warn(
-                    { err, toolId: config.toolId },
-                    "Failed to emit TOOL_EXECUTED audit log",
-                  );
-                });
-            }
-
-            return reply.send({
+          return await enqueueAndAwaitToolJob(request, reply, {
+            jobData: {
               jobId,
-              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
-              previewUrl: result.previewRef
-                ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+              toolId: config.toolId,
+              userId: authUser.id,
+              username: authUser.username,
+              requestIp: request.ip,
+              requestId: request.id,
+              pool,
+              inputRefs,
+              filename,
+              settings,
+              dbSettings: config.redactSettingsForAudit
+                ? config.redactSettingsForAudit(settings)
                 : undefined,
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-              savedFileId: result.savedFileId,
-              autoSaveError: result.autoSaveError,
-              ...result.resultPayload,
-            });
-          }
-          return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
-        } catch (err) {
-          // A cancel that lands inside the sync window surfaces here as the
-          // worker's UnrecoverableError("Canceled") (#808). Answer the
-          // structural canceled shape the web client maps to its localized
-          // canceled state, mirroring pipeline and batch. The message alone
-          // is forgeable (a tool can fail with exactly this string), so the
-          // row the worker committed before throwing is the authority; a
-          // mismatch falls through to the logged generic path.
-          if (err instanceof Error && err.message === "Canceled") {
-            const wasCanceled = await db
-              .select({ status: schema.jobs.status })
-              .from(schema.jobs)
-              .where(eq(schema.jobs.id, jobId))
-              .then((rows) => rows[0]?.status === "canceled")
-              .catch((readErr) => {
-                request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
-                void reportError(markUpstreamError(readErr), {
-                  source: "http",
-                  route: request.routeOptions?.url,
-                  method: request.method,
-                  toolId: config.toolId,
-                  jobId,
-                });
-                return false;
-              });
-            if (wasCanceled) {
-              return reply.status(422).send({ error: "Canceled", canceled: true });
-            }
-          }
-          // Bad input the worker rejected answers with the status it would
-          // have got from preValidate (#1742). The class doesn't survive the
-          // queue, so the row the worker wrote is the authority.
-          const row = await db
-            .select({ status: schema.jobs.status, error: schema.jobs.error })
-            .from(schema.jobs)
-            .where(eq(schema.jobs.id, jobId))
-            .then((rows) => rows[0] ?? null)
-            .catch((readErr) => {
-              request.log.warn({ err: readErr, jobId }, "failed job row read failed");
-              void reportError(markUpstreamError(readErr), {
-                source: "http",
-                route: request.routeOptions?.url,
-                method: request.method,
-                toolId: config.toolId,
-                jobId,
-              });
-              return null;
-            });
-          if (row?.status === "canceled") {
-            return reply.status(422).send({ error: "Canceled", canceled: true });
-          }
-          const failure = row?.error ?? null;
-          if (typeof failure?.httpStatus === "number") {
-            if (failure.httpStatus >= 500) {
-              request.log.error({ err, toolId: config.toolId }, "tool processing failed");
-            } else {
-              request.log.info({ err, toolId: config.toolId }, "tool rejected input");
-            }
-            const body: Record<string, unknown> = { error: failure.message };
-            if (failure.details !== undefined) body.details = failure.details;
-            if (failure.code) body.code = failure.code;
-            return reply.status(failure.httpStatus).send(body);
-          }
-          if (failure === null) {
-            throw markQueueEventsJobFailure(err);
-          }
-          // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
-          // but return only a user-safe detail to the client.
-          request.log.error({ err, toolId: config.toolId }, "tool processing failed");
-          const rawDetail =
-            typeof failure?.message === "string" && failure.message.length > 0
-              ? failure.message
-              : err instanceof Error
-                ? err.message
-                : String(err);
-          return reply.status(422).send({
-            error: "Processing failed",
-            details: friendlyError(rawDetail),
+              fileId: fileId ?? undefined,
+              saveMode,
+              clientJobId: clientJobId ?? undefined,
+              kind: "tool",
+              analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+            },
+            executionHint: toolMeta?.executionHint,
+            inputFileCount: received.length,
+            totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
+            state: enqueueState,
           });
+        } finally {
+          enqueued = enqueueState.enqueued;
         }
       } finally {
         if (!enqueued) {
@@ -841,4 +688,208 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       }
     },
   );
+}
+
+export interface EnqueueAndAwaitOptions {
+  jobData: ToolJobData;
+  executionHint?: "fast" | "long";
+  /** Counts for the TOOL_EXECUTED audit event. */
+  inputFileCount: number;
+  totalInputSize: number;
+  /**
+   * Set to true once the jobs row may exist. From then on the row owns
+   * uploads/<jobId>/, so the caller must not discard the upload.
+   */
+  state: { enqueued: boolean };
+}
+
+/**
+ * The second half of a tool request, shared by createToolRoute and the custom
+ * routes that queue their work (html-to-image): the per-user concurrency
+ * check, the enqueue, the sync wait, and the answer. A finished job answers
+ * 200 with the result, a long tool or an expired sync window answers 202 with
+ * the job id, and a failed job answers the status its row carries.
+ */
+export async function enqueueAndAwaitToolJob(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  opts: EnqueueAndAwaitOptions,
+): Promise<FastifyReply> {
+  const { jobData, state } = opts;
+  const { jobId, toolId, pool, userId, settings } = jobData;
+
+  // Check per-user concurrent job limit before enqueuing. Type
+  // "single" rows are SSE alias bookkeeping, not work (#808: they now
+  // carry the owner so cancels can be authorized); counting them
+  // would double-charge every tool-route run against the limit.
+  const maxConcurrent = parseNumericSettingValue(
+    "maxConcurrentJobsPerUser",
+    await getSettingStrict("maxConcurrentJobsPerUser"),
+    0,
+  );
+  if (maxConcurrent > 0 && userId) {
+    const activeJobs = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.jobs)
+      .where(
+        and(
+          sql`${schema.jobs.userId} = ${userId}`,
+          inArray(schema.jobs.status, ["queued", "processing"]),
+          ne(schema.jobs.type, "single"),
+        ),
+      );
+
+    if (activeJobs[0].count >= maxConcurrent) {
+      return reply.status(429).send({
+        error: "Too many concurrent jobs. Please wait for existing jobs to complete.",
+        activeJobs: activeJobs[0].count,
+        limit: maxConcurrent,
+      });
+    }
+  }
+
+  const startTime = Date.now();
+
+  // Once enqueueToolJob has written the jobs row, that row owns
+  // uploads/<jobId>/ (a failed queue add is retried from it), so the
+  // caller must leave the upload alone. If it threw before the row
+  // landed, nothing else will ever remove the upload.
+  state.enqueued = true;
+  let clientJobId: string | null;
+  try {
+    await enqueueToolJob(jobData);
+    clientJobId = jobData.clientJobId ?? null;
+  } catch (err) {
+    if (!(await hasPersistedJobRow(jobId, request.log))) state.enqueued = false;
+    throw err;
+  }
+
+  // Long tools never block the HTTP request (spec 4.5): straight to SSE.
+  if (shouldSkipSyncWindow(opts.executionHint)) {
+    return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+  }
+
+  try {
+    const result = await waitForJob(pool, jobId);
+    if (result) {
+      if (!result.audited) {
+        // Fire-and-forget: audit log must never block the response
+        import("../lib/audit.js")
+          .then(({ isToolAuditEnabled, auditFromRequest }) =>
+            isToolAuditEnabled().then((enabled) => {
+              if (!enabled) return;
+              return auditFromRequest(request)("TOOL_EXECUTED", {
+                userId,
+                username: jobData.username,
+                toolId,
+                inputFileCount: opts.inputFileCount,
+                totalInputSize: opts.totalInputSize,
+                outputFormat:
+                  ((settings as Record<string, unknown>)?.format as string | undefined) ??
+                  ((settings as Record<string, unknown>)?.outputFormat as string | undefined) ??
+                  null,
+                status: "success",
+                durationMs: Date.now() - startTime,
+              });
+            }),
+          )
+          .catch((err) => {
+            request.log.warn({ err, toolId }, "Failed to emit TOOL_EXECUTED audit log");
+          });
+      }
+
+      return reply.send({
+        jobId,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+        previewUrl: result.previewRef
+          ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+          : undefined,
+        originalSize: result.originalSize,
+        processedSize: result.processedSize,
+        savedFileId: result.savedFileId,
+        autoSaveError: result.autoSaveError,
+        ...result.resultPayload,
+      });
+    }
+    return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+  } catch (err) {
+    // A cancel that lands inside the sync window surfaces here as the
+    // worker's UnrecoverableError("Canceled") (#808). Answer the
+    // structural canceled shape the web client maps to its localized
+    // canceled state, mirroring pipeline and batch. The message alone
+    // is forgeable (a tool can fail with exactly this string), so the
+    // row the worker committed before throwing is the authority; a
+    // mismatch falls through to the logged generic path.
+    if (err instanceof Error && err.message === "Canceled") {
+      const wasCanceled = await db
+        .select({ status: schema.jobs.status })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId))
+        .then((rows) => rows[0]?.status === "canceled")
+        .catch((readErr) => {
+          request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+          void reportError(markUpstreamError(readErr), {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            toolId,
+            jobId,
+          });
+          return false;
+        });
+      if (wasCanceled) {
+        return reply.status(422).send({ error: "Canceled", canceled: true });
+      }
+    }
+    // Bad input the worker rejected answers with the status it would
+    // have got from preValidate (#1742). The class doesn't survive the
+    // queue, so the row the worker wrote is the authority.
+    const row = await db
+      .select({ status: schema.jobs.status, error: schema.jobs.error })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, jobId))
+      .then((rows) => rows[0] ?? null)
+      .catch((readErr) => {
+        request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+        void reportError(markUpstreamError(readErr), {
+          source: "http",
+          route: request.routeOptions?.url,
+          method: request.method,
+          toolId,
+          jobId,
+        });
+        return null;
+      });
+    if (row?.status === "canceled") {
+      return reply.status(422).send({ error: "Canceled", canceled: true });
+    }
+    const failure = row?.error ?? null;
+    if (typeof failure?.httpStatus === "number") {
+      if (failure.httpStatus >= 500) {
+        request.log.error({ err, toolId }, "tool processing failed");
+      } else {
+        request.log.info({ err, toolId }, "tool rejected input");
+      }
+      const body: Record<string, unknown> = { error: failure.message };
+      if (failure.details !== undefined) body.details = failure.details;
+      if (failure.code) body.code = failure.code;
+      return reply.status(failure.httpStatus).send(body);
+    }
+    if (failure === null) {
+      throw markQueueEventsJobFailure(err);
+    }
+    // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
+    // but return only a user-safe detail to the client.
+    request.log.error({ err, toolId }, "tool processing failed");
+    const rawDetail =
+      typeof failure?.message === "string" && failure.message.length > 0
+        ? failure.message
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    return reply.status(422).send({
+      error: "Processing failed",
+      details: friendlyError(rawDetail),
+    });
+  }
 }

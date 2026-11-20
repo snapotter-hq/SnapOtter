@@ -761,7 +761,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
 
   it("html-to-image, webhooks, and siem mask server paths in 400 URL validation details", async () => {
     validateFetchUrlMock.mockRejectedValue(new Error(`DNS lookup failed via ${sampleTempPath}`));
-    const { app, logLines } = await buildLoggedApp(async (instance) => {
+    const { app } = await buildLoggedApp(async (instance) => {
       registerHtmlToImage(instance);
       await registerWebhookRoutes(instance);
       await registerSiemRoutes(instance);
@@ -812,21 +812,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
         code: "BAD_REQUEST",
         requestId: expect.any(String),
       });
-
-      putObject.mockRejectedValueOnce(new Error(`capture write failed at ${sampleTempPath}`));
-      const htmlCaptureRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/html-to-image",
-        payload: { html: "<p>hi</p>" },
-      });
-      expect(htmlCaptureRes.statusCode, htmlCaptureRes.body).toBe(422);
-      expect(htmlCaptureRes.json()).toEqual({
-        error: "Screenshot capture failed",
-        details: "capture write failed at [internal]",
-        code: "UNPROCESSABLE_ENTITY",
-        requestId: expect.any(String),
-      });
-      expect(logLines.some((l) => l.includes("capture write failed"))).toBe(true);
     } finally {
       await app.close();
     }

@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 22724c82c565
+i18n_output_hash: 508d44b1d816
 i18n_hash_version: 2
-i18n_source_hash: 0c461ea0d64a
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -398,6 +398,7 @@ Przechwyć stronę internetową jako obraz. W przeciwieństwie do innych narzęd
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Niestandardowa szerokość okna widoku 320-3840 |
 | `viewportHeight` | number | `720` | Niestandardowa wysokość okna widoku 320-2160 |
+| `clientJobId` | string | (generowany) | Własny identyfikator zadania, aby otworzyć strumień postępu, zanim nadejdzie odpowiedź |
 
 **Przykład:**
 
@@ -418,6 +419,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Przechwytywanie działa jako zadanie w kolejce. Jeśli zakończy się w oknie oczekiwania synchronicznego, otrzymasz powyższy wynik z kodem `200`. Wolniejsze przechwytywanie odpowiada `202` z `{"jobId":"...","async":true}`; śledź je zgodnie z opisem w sekcji [Śledzenie postępu](#progress-tracking). Do wersji 2.3.0 ten endpoint zawsze czekał i odpowiadał `200`, więc skrypty obsługujące tylko `200` powinny obsługiwać też `202`.
 
 ### Podtrasy narzędzi {#tool-sub-routes}
 

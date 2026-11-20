@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 05d2515f3c24
-i18n_source_hash: 0c461ea0d64a
+i18n_output_hash: 0699e9c77ed6
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -397,6 +397,7 @@ Captura una página web como imagen. A diferencia de otras herramientas, este en
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Ancho personalizado del viewport 320-3840 |
 | `viewportHeight` | number | `720` | Alto personalizado del viewport 320-2160 |
+| `clientJobId` | string | (generado) | Tu propio ID de trabajo, para abrir el flujo de progreso antes de que llegue la respuesta |
 
 **Ejemplo:**
 
@@ -417,6 +418,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+La captura se ejecuta como un trabajo en cola. Si termina dentro de la ventana de espera síncrona, recibes el resultado anterior con `200`. Una captura más lenta responde `202` con `{"jobId":"...","async":true}`; síguela como se describe en [Seguimiento del progreso](#progress-tracking). Hasta la versión 2.3.0 este endpoint siempre esperaba y respondía `200`, así que los scripts que solo manejan `200` también deberían manejar `202`.
 
 ### Subrutas de herramientas {#tool-sub-routes}
 

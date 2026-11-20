@@ -1907,6 +1907,44 @@ describe("worker result payload behavior", () => {
       }),
     );
 
+    // 4c. html-to-image's page-load timeout (504 PAGE_LOAD_TIMEOUT) fails on
+    // attempt 1, while its 503 browser crash still retries once (#4337).
+    dbSetMock.mockClear();
+    const { InputValidationError } = await import("../../../../apps/api/src/modality/contract.js");
+    const pageTimeout = new InputValidationError(
+      "Page took too long to load",
+      504,
+      "Timeout 30000ms exceeded",
+      "PAGE_LOAD_TIMEOUT",
+    );
+    processV2Mock.mockRejectedValueOnce(pageTimeout);
+    const rejectedTimeout = await processor({
+      ...makeJob("job-page-timeout"),
+      opts: { attempts: 2 },
+    }).catch((e: unknown) => e);
+    expect(rejectedTimeout).toBeInstanceOf(UnrecoverableError);
+    expect((rejectedTimeout as { cause?: unknown }).cause).toBe(pageTimeout);
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: expect.objectContaining({ code: "PAGE_LOAD_TIMEOUT", httpStatus: 504 }),
+      }),
+    );
+
+    const browserCrash = new InputValidationError(
+      "Screenshot service is temporarily unavailable",
+      503,
+      undefined,
+      "BROWSER_CRASHED",
+    );
+    processV2Mock.mockRejectedValueOnce(browserCrash);
+    const rejectedCrash = await processor({
+      ...makeJob("job-browser-crash"),
+      opts: { attempts: 2 },
+    }).catch((e: unknown) => e);
+    expect(rejectedCrash).toBe(browserCrash);
+    expect(rejectedCrash).not.toBeInstanceOf(UnrecoverableError);
+
     // Non-spawn ENOENT (e.g. syscall: "open" inside a tool) is NOT converted
     // to ENGINE_UNAVAILABLE or UnrecoverableError, so attempt 1 of 2 retries.
     dbSetMock.mockClear();

@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 049c53123332
-i18n_source_hash: 0c461ea0d64a
+i18n_output_hash: 68bb37f4a6bf
+i18n_source_hash: fa6e4037f02c
 i18n_provenance: human
 ---
 
@@ -397,6 +397,7 @@ Fånga en webbsida som en bild. Till skillnad från andra verktyg accepterar den
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Anpassad visningsområdesbredd 320-3840 |
 | `viewportHeight` | number | `720` | Anpassad visningsområdeshöjd 320-2160 |
+| `clientJobId` | string | (genereras) | Ditt eget jobb-ID, så att du kan öppna förloppsströmmen innan svaret kommer |
 
 **Exempel:**
 
@@ -417,6 +418,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Fångsten körs som ett jobb i kön. Blir den klar inom det synkrona väntefönstret får du resultatet ovan med `200`. En långsammare fångst svarar `202` med `{"jobId":"...","async":true}`; följ den enligt [Förloppsspårning](#progress-tracking). Till och med 2.3.0 väntade den här slutpunkten alltid och svarade `200`, så skript som bara hanterar `200` bör även hantera `202`.
 
 ### Verktygsunderrutter {#tool-sub-routes}
 
