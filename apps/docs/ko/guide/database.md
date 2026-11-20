@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 PostgreSQL 데이터베이스 스키마, 테이블, 마이그레이션, 백업 절차를 설명합니다."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 6949c0326de2
+i18n_output_hash: a2af004ba962
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ RDS, Supabase, Cloud SQL, 또는 직접 운영하는 모든 클러스터에서�
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+그런 다음 슈퍼유저 또는 해당 `CREATE ROLE`을 실행한 역할로서 소유자 역할이 이 역할을 관리할 수 있게 합니다:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Postgres 16부터 `CREATEROLE`은 역할이 직접 만들었거나 `ADMIN OPTION`을 가진 역할만 변경할 수 있게 합니다. SnapOtter는 런타임 역할의 비밀번호가 더 이상 `DATABASE_URL`과 일치하지 않을 때(예: 교체 후)만 비밀번호를 변경하며, 이 권한이 없으면 해당 부팅이 실패합니다. `INHERIT FALSE, SET FALSE`는 관리 권한만 넘깁니다. 일반 `WITH ADMIN OPTION`은 `snapotter`에 런타임 역할의 권한까지 줍니다. Postgres 15 이하에서는 이 권한이 필요 없고 해당 구문도 거부하므로 건너뛰세요.
+
+SnapOtter가 비밀번호를 설정할 때는 클러스터의 `password_encryption`이 `md5`여도 SCRAM-SHA-256 검증자를 저장합니다. Postgres는 `pg_hba.conf`의 `md5` 줄을 통해 이를 허용하지만, md5 해시를 직접 확인하는 커넥션 풀러는 런타임 역할로 로그인할 수 없습니다.
 
 그런 다음 같은 호스트, 포트, 데이터베이스를 가리키는 두 연결 문자열을 SnapOtter에 모두 전달합니다.
 

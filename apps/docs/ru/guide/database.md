@@ -1,8 +1,8 @@
 ---
 description: "Схема базы данных PostgreSQL, таблицы, миграции и процедуры резервного копирования SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: a89db62c1295
+i18n_output_hash: da84a41e367d
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ npx drizzle-kit migrate    # apply pending migrations
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Затем от имени суперпользователя или роли, выполнившей этот `CREATE ROLE`, разрешите роли-владельцу управлять ею:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Начиная с Postgres 16, `CREATEROLE` позволяет роли изменять только те роли, которые она создала сама или на которые у неё есть `ADMIN OPTION`. SnapOtter меняет пароль рабочей роли, только когда он перестаёт совпадать с `DATABASE_URL` (например, после ротации), и без этого права такой запуск завершается ошибкой. `INHERIT FALSE, SET FALSE` передаёт только управление. Простой `WITH ADMIN OPTION` дал бы `snapotter` ещё и привилегии рабочей роли. Postgres 15 и более ранним версиям это право не нужно, и такой синтаксис они отвергают, так что там пропустите этот шаг.
+
+Когда SnapOtter задаёт пароль, он сохраняет верификатор SCRAM-SHA-256, даже если в кластере `password_encryption` равен `md5`. Postgres принимает его через строку `md5` в `pg_hba.conf`, но пулер соединений, который сам проверяет хеши md5, не сможет войти под рабочей ролью.
 
 Затем передайте SnapOtter обе строки подключения, указывающие на один и тот же хост, порт и базу данных:
 

@@ -1,8 +1,8 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur backup untuk SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: e90059ee2f35
+i18n_output_hash: a21af5cfb358
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ Di RDS, Supabase, Cloud SQL, atau cluster apa pun yang Anda jalankan sendiri, pe
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Ensuite, en tant que superutilisateur ou que rôle ayant exécuté ce `CREATE ROLE`, autorisez le rôle propriétaire à l'administrer :
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+À partir de Postgres 16, `CREATEROLE` ne permet à un rôle de modifier que les rôles qu'il a créés lui-même ou sur lesquels il détient `ADMIN OPTION`. SnapOtter ne change le mot de passe du rôle d'exécution que lorsqu'il ne correspond plus à `DATABASE_URL` (après une rotation, par exemple), et sans cette autorisation ce démarrage échoue. `INHERIT FALSE, SET FALSE` transmet l'administration et rien d'autre. Un simple `WITH ADMIN OPTION` donnerait aussi à `snapotter` les privilèges du rôle d'exécution. Postgres 15 et antérieur n'ont pas besoin de cette autorisation et refusent cette syntaxe, ignorez-la donc dans ce cas.
+
+Quand SnapOtter définit le mot de passe, il enregistre un vérificateur SCRAM-SHA-256, même si le `password_encryption` du cluster vaut `md5`. Postgres l'accepte via une ligne `md5` dans `pg_hba.conf`, mais un pooler de connexions qui vérifie lui-même les hachages md5 ne peut pas se connecter avec le rôle d'exécution.
 
 Lalu berikan kedua connection string kepada SnapOtter, menunjuk ke host, port, dan database yang sama:
 

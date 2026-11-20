@@ -1,8 +1,8 @@
 ---
 description: "Lược đồ cơ sở dữ liệu PostgreSQL, các bảng, migration và quy trình sao lưu của SnapOtter."
-i18n_source_hash: 83a63d444827
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: c5036acac00a
+i18n_output_hash: 4ec75ea8f791
 i18n_hash_version: 2
 ---
 
@@ -189,6 +189,16 @@ Trên RDS, Supabase, Cloud SQL, hoặc bất kỳ cụm nào bạn tự chạy, 
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Sau đó, với tư cách superuser hoặc vai trò đã chạy lệnh `CREATE ROLE` đó, cho phép vai trò sở hữu quản trị nó:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Từ Postgres 16 trở đi, `CREATEROLE` chỉ cho phép một vai trò thay đổi những vai trò do chính nó tạo ra hoặc những vai trò nó có `ADMIN OPTION`. SnapOtter chỉ đổi mật khẩu của vai trò runtime khi mật khẩu đó không còn khớp với `DATABASE_URL` (chẳng hạn sau khi xoay vòng), và nếu thiếu quyền này thì lần khởi động đó thất bại. `INHERIT FALSE, SET FALSE` chỉ giao quyền quản trị, không gì khác. Một `WITH ADMIN OPTION` đơn thuần cũng sẽ trao cho `snapotter` các đặc quyền của vai trò runtime. Postgres 15 trở về trước không cần quyền này và từ chối cú pháp đó, vì vậy hãy bỏ qua ở đó.
+
+Khi SnapOtter đặt mật khẩu, nó lưu một verifier SCRAM-SHA-256, ngay cả khi `password_encryption` của cụm là `md5`. Postgres chấp nhận điều đó qua một dòng `md5` trong `pg_hba.conf`, nhưng một connection pooler tự kiểm tra hash md5 sẽ không thể đăng nhập bằng vai trò runtime.
 
 Sau đó đưa cho SnapOtter cả hai chuỗi kết nối, trỏ đến cùng một máy chủ, cổng và cơ sở dữ liệu:
 
