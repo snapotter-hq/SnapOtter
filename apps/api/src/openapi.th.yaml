@@ -3108,9 +3108,15 @@ paths:
                     - `pathMode` (สตริง, ค่าเริ่มต้น "spline") - หนึ่งใน: none, polygon, spline
                     - `cornerThreshold` (ตัวเลข 0-180, ค่าเริ่มต้น 60) - มุมในการตรวจจับมุม
                     - `invert` (boolean, ค่าเริ่มต้น false) - กลับสีก่อนการ trace
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: รหัสงานที่ไคลเอนต์กำหนดเองสำหรับติดตามความคืบหน้า SSE
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
         '200':
           description: ภาพที่ประมวลผลแล้ว (downloadUrl ชี้ไปยังไฟล์ .svg)
@@ -3125,6 +3131,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: รับงานเพื่อประมวลผลแบบ async ติดตามความคืบหน้าผ่าน SSE ที่ /api/v1/jobs/{jobId}/progress
+          headers:
+            Location:
+              description: URL สถานะของงาน (ค่าเดียวกับ statusUrl)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: อินพุตไม่ถูกต้อง
           content:
@@ -3139,6 +3173,12 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: ประมวลผลไม่สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster

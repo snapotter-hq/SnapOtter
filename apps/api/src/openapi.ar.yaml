@@ -3133,9 +3133,15 @@ paths:
                     - `pathMode` (نص، الافتراضي "spline") - واحد من: none، polygon، spline
                     - `cornerThreshold` (رقم من 0 إلى 180، الافتراضي 60) - زاوية اكتشاف الزوايا
                     - `invert` (منطقي، الافتراضي false) - عكس الألوان قبل التتبع
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: معرّف المهمة الذي يحدده العميل لتتبع تقدم SSE
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
         '200':
           description: الصورة المعالجة (يشير downloadUrl إلى ملف .svg)
@@ -3150,6 +3156,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: قُبل الطلب للمعالجة غير المتزامنة. تابع التقدم عبر SSE على المسار /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: رابط حالة المهمة (القيمة نفسها في statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: إدخال غير صالح
           content:
@@ -3164,6 +3198,12 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: فشلت المعالجة
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster

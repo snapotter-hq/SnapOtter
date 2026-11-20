@@ -3134,9 +3134,15 @@ paths:
                     - `pathMode` (chaîne, par défaut "spline") - Une valeur parmi : none, polygon, spline
                     - `cornerThreshold` (nombre de 0 à 180, par défaut 60) - Angle de détection des coins
                     - `invert` (booléen, par défaut false) - Inverser les couleurs avant le tracé
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Identifiant de tâche fourni par le client pour le suivi de progression SSE
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
         '200':
           description: Image traitée (downloadUrl pointe vers un fichier .svg)
@@ -3151,6 +3157,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '202':
+          description: Acceptée pour un traitement asynchrone. Suivez la progression via SSE à /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: URL de statut de la tâche (même valeur que statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         '400':
           description: Entrée invalide
           content:
@@ -3165,6 +3199,12 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Échec du traitement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/image/svg-to-raster:
     post:
       operationId: svgToRaster
