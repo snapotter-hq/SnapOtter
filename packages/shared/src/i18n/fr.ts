@@ -1179,6 +1179,10 @@ export const fr: TranslationKeys = {
       name: "PDF vers texte",
       description: "Extrayez le texte brut d’un PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF vers Markdown",
+      description: "Conserve les titres, listes et tableaux quand le PDF en contient",
+    },
     "pdf-to-word": {
       name: "PDF vers Word",
       description: "Idéal pour les PDF textuels ; les pages numérisées nécessitent l’OCR",
@@ -4039,6 +4043,14 @@ export const fr: TranslationKeys = {
       progressLabel: "Extraction",
       scannedHint:
         "Ce PDF est numérisé, il n'y a donc pas de texte à extraire. L'OCR peut le lire, mais c'est plus long et cela demande que le pack d'IA OCR soit installé.",
+      runOcr: "Lancer l'OCR sur ce PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Convertir en Markdown",
+      submitBatch: "Convertir en Markdown ({count} fichiers)",
+      progressLabel: "Conversion",
+      scannedHint:
+        "Ce PDF est numérisé, il n'y a donc aucun texte à convertir en Markdown. L'OCR peut lire le texte, mais il produit du texte brut, c'est plus long et cela demande que le pack d'IA OCR soit installé.",
       runOcr: "Lancer l'OCR sur ce PDF",
     },
     "pdf-to-word": {

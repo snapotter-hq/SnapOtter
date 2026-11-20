@@ -1135,6 +1135,10 @@ export const ja: TranslationKeys = {
       name: "PDF からテキスト",
       description: "PDF からプレーンテキストを抽出",
     },
+    "pdf-to-markdown": {
+      name: "PDF から Markdown",
+      description: "PDF にある見出し、リスト、表を保持します",
+    },
     "pdf-to-word": {
       name: "PDF を Word に変換",
       description: "テキストベースの PDF に最適。スキャンページには OCR が必要です。",
@@ -3970,6 +3974,14 @@ export const ja: TranslationKeys = {
       progressLabel: "抽出中",
       scannedHint:
         "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+      runOcr: "このPDFでOCRを実行",
+    },
+    "pdf-to-markdown": {
+      submit: "Markdownに変換",
+      submitBatch: "Markdownに変換 ({count}ファイル)",
+      progressLabel: "変換中",
+      scannedHint:
+        "このPDFはスキャンされた画像のため、Markdownに変換できるテキストがありません。OCRならテキストを読み取れますが、結果はプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
       runOcr: "このPDFでOCRを実行",
     },
     "pdf-to-word": {

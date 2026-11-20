@@ -287,6 +287,8 @@
 /tools/sign-pdf /tools/pdf/sign-pdf/ 301
 /tools/pdf-to-text/ /tools/pdf/pdf-to-text/ 301
 /tools/pdf-to-text /tools/pdf/pdf-to-text/ 301
+/tools/pdf-to-markdown/ /tools/pdf/pdf-to-markdown/ 301
+/tools/pdf-to-markdown /tools/pdf/pdf-to-markdown/ 301
 /tools/pdf-to-word/ /tools/pdf/pdf-to-word/ 301
 /tools/pdf-to-word /tools/pdf/pdf-to-word/ 301
 /tools/pdf-metadata/ /tools/pdf/pdf-metadata/ 301

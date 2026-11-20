@@ -948,6 +948,10 @@ export const zhTW: TranslationKeys = {
       name: "PDF 轉文字",
       description: "從 PDF 提取純文字",
     },
+    "pdf-to-markdown": {
+      name: "PDF 轉 Markdown",
+      description: "保留 PDF 中原有的標題、清單和表格",
+    },
     "pdf-to-word": {
       name: "PDF 轉 Word",
       description: "適用於文字型 PDF；掃描頁面需使用 OCR",
@@ -3740,6 +3744,14 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在擷取",
       scannedHint:
         "此 PDF 是掃描檔，沒有可擷取的文字。OCR 可以辨識它，但耗時較長，且需要已安裝 OCR AI 功能包。",
+      runOcr: "對此 PDF 執行 OCR",
+    },
+    "pdf-to-markdown": {
+      submit: "轉換為 Markdown",
+      submitBatch: "轉換為 Markdown（{count} 個檔案）",
+      progressLabel: "正在轉換",
+      scannedHint:
+        "此 PDF 是掃描檔，沒有可轉換為 Markdown 的文字。OCR 可以辨識其中的文字，但得到的是純文字，耗時較長，且需要已安裝 OCR AI 功能包。",
       runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-to-word": {

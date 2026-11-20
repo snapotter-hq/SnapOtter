@@ -1176,6 +1176,10 @@ export const de: TranslationKeys = {
       name: "PDF zu Text",
       description: "Nur-Text aus einem PDF extrahieren",
     },
+    "pdf-to-markdown": {
+      name: "PDF zu Markdown",
+      description: "Behält Überschriften, Listen und Tabellen bei, wo das PDF sie hat",
+    },
     "pdf-to-word": {
       name: "PDF zu Word",
       description: "Ideal für textbasierte PDFs; gescannte Seiten benötigen OCR",
@@ -4046,6 +4050,14 @@ export const de: TranslationKeys = {
       progressLabel: "Wird extrahiert",
       scannedHint:
         "Dieses PDF ist gescannt, es gibt also keinen Text zu extrahieren. OCR kann es lesen, braucht aber länger und setzt das installierte OCR-KI-Paket voraus.",
+      runOcr: "OCR auf dieses PDF anwenden",
+    },
+    "pdf-to-markdown": {
+      submit: "In Markdown konvertieren",
+      submitBatch: "In Markdown konvertieren ({count} Dateien)",
+      progressLabel: "Wird konvertiert",
+      scannedHint:
+        "Dieses PDF ist gescannt, es gibt also keinen Text, der zu Markdown werden kann. OCR kann den Text lesen, liefert aber reinen Text, braucht länger und setzt das installierte OCR-KI-Paket voraus.",
       runOcr: "OCR auf dieses PDF anwenden",
     },
     "pdf-to-word": {

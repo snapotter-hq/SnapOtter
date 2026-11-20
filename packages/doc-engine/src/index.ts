@@ -59,6 +59,7 @@ export {
   pdfScrubProducerPy,
   pdfSignPy,
   pdfTextPy,
+  pdfToMarkdownPy,
   pdfToWordPy,
 } from "./python-docs.js";
 export {

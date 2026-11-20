@@ -226,6 +226,27 @@ export async function pdfTextPy(
   return { chars: parsed.chars, hasText };
 }
 
+/** PDF to Markdown with inferred headings, lists and tables (PyMuPDF). Long-running: 5 min timeout. */
+export async function pdfToMarkdownPy(
+  inPath: string,
+  outMdPath: string,
+  opts?: DocsScriptOptions,
+): Promise<{ chars: number }> {
+  const stdout = await runDocsScript(
+    "doc_markdown",
+    { path: inPath, out: outMdPath },
+    buildDocsRunOpts(opts, 300_000),
+  ).catch(withDamageClassification);
+  const parsed = parseDocsJson<{ chars?: number; error?: string }>("doc_markdown", stdout);
+  if ("error" in parsed) {
+    throw new Error(`doc_markdown failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
+  if (typeof parsed.chars !== "number") {
+    throw new Error(`doc_markdown failed: ${stdout.slice(0, 200)}`);
+  }
+  return { chars: parsed.chars };
+}
+
 /** PDF to DOCX conversion (pdf2docx). Long-running: 5 min timeout. */
 export async function pdfToWordPy(
   inPath: string,

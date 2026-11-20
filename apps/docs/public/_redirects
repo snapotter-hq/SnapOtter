@@ -192,6 +192,8 @@
 /tools/pdf-to-image.html /tools/pdf/pdf-to-image 301
 /tools/pdf-to-text /tools/pdf/pdf-to-text 301
 /tools/pdf-to-text.html /tools/pdf/pdf-to-text 301
+/tools/pdf-to-markdown /tools/pdf/pdf-to-markdown 301
+/tools/pdf-to-markdown.html /tools/pdf/pdf-to-markdown 301
 /tools/pdf-to-word /tools/pdf/pdf-to-word 301
 /tools/pdf-to-word.html /tools/pdf/pdf-to-word 301
 /tools/pdfa-convert /tools/pdf/pdfa-convert 301

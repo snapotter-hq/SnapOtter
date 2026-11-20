@@ -1127,6 +1127,10 @@ export const en = {
       name: "PDF to Text",
       description: "Extract plain text from a PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF to Markdown",
+      description: "Keeps headings, lists and tables where the PDF has them",
+    },
     "pdf-to-word": {
       name: "PDF to Word",
       description: "Best for text-based PDFs; scanned pages need OCR",
@@ -3955,6 +3959,14 @@ export const en = {
       progressLabel: "Extracting",
       scannedHint:
         "This PDF is scanned, so there's no text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
+      runOcr: "Run OCR on this PDF",
+    },
+    "pdf-to-markdown": {
+      submit: "Convert to Markdown",
+      submitBatch: "Convert to Markdown ({count} files)",
+      progressLabel: "Converting",
+      scannedHint:
+        "This PDF is scanned, so there's no text to turn into Markdown. OCR can read the text, but it gives you plain text, takes longer, and needs the OCR AI bundle installed.",
       runOcr: "Run OCR on this PDF",
     },
     "pdf-to-word": {

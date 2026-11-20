@@ -191,6 +191,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "redact-pdf": "document",
   "sign-pdf": "interactive-sign",
   "pdf-to-text": "no-comparison",
+  "pdf-to-markdown": "no-comparison",
   "pdf-to-word": "no-comparison",
   "pdf-metadata": "no-comparison",
   "powerpoint-to-pdf": "document",

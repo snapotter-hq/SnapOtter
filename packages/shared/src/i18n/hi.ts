@@ -994,6 +994,10 @@ export const hi: TranslationKeys = {
       name: "PDF से टेक्स्ट",
       description: "PDF से प्लेन टेक्स्ट निकालें",
     },
+    "pdf-to-markdown": {
+      name: "PDF से Markdown",
+      description: "PDF में मौजूद हेडिंग, सूचियाँ और टेबल बनाए रखता है",
+    },
     "pdf-to-word": {
       name: "PDF से Word",
       description: "टेक्स्ट-आधारित PDF के लिए सर्वोत्तम; स्कैन किए पेज के लिए OCR ज़रूरी है",
@@ -3816,6 +3820,14 @@ export const hi: TranslationKeys = {
       progressLabel: "निकाला जा रहा है",
       scannedHint:
         "यह PDF स्कैन किया हुआ है, इसलिए निकालने के लिए कोई टेक्स्ट नहीं है। OCR इसे पढ़ सकता है, लेकिन इसमें ज़्यादा समय लगता है और OCR AI बंडल इंस्टॉल होना चाहिए।",
+      runOcr: "इस PDF पर OCR चलाएँ",
+    },
+    "pdf-to-markdown": {
+      submit: "Markdown में रूपांतरित करें",
+      submitBatch: "Markdown में रूपांतरित करें ({count} फ़ाइलें)",
+      progressLabel: "रूपांतरित हो रहा है",
+      scannedHint:
+        "यह PDF स्कैन किया हुआ है, इसलिए Markdown में बदलने के लिए कोई टेक्स्ट नहीं है। OCR टेक्स्ट पढ़ सकता है, लेकिन इससे सादा टेक्स्ट मिलता है, ज़्यादा समय लगता है और OCR AI बंडल इंस्टॉल होना चाहिए।",
       runOcr: "इस PDF पर OCR चलाएँ",
     },
     "pdf-to-word": {

@@ -1173,6 +1173,10 @@ export const pl: TranslationKeys = {
       name: "PDF na tekst",
       description: "Wyodrębnij tekst z pliku PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF na Markdown",
+      description: "Zachowuje nagłówki, listy i tabele, jeśli PDF je zawiera",
+    },
     "pdf-to-word": {
       name: "PDF na Word",
       description: "Najlepszy dla tekstowych PDF; zeskanowane strony wymagają OCR",
@@ -4028,6 +4032,14 @@ export const pl: TranslationKeys = {
       progressLabel: "Wyodrębnianie",
       scannedHint:
         "Ten PDF jest skanem, więc nie ma tekstu do wyodrębnienia. OCR może go odczytać, ale trwa to dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+      runOcr: "Uruchom OCR dla tego PDF-a",
+    },
+    "pdf-to-markdown": {
+      submit: "Konwertuj do Markdown",
+      submitBatch: "Konwertuj do Markdown ({count} plików)",
+      progressLabel: "Konwersja",
+      scannedHint:
+        "Ten PDF jest skanem, więc nie ma w nim tekstu do zamiany na Markdown. OCR może odczytać tekst, ale daje zwykły tekst, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
       runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-to-word": {

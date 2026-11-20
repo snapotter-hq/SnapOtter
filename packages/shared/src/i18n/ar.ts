@@ -1161,6 +1161,10 @@ export const ar: TranslationKeys = {
       name: "PDF إلى نص",
       description: "استخراج النص العادي من ملف PDF",
     },
+    "pdf-to-markdown": {
+      name: "PDF إلى Markdown",
+      description: "يحافظ على العناوين والقوائم والجداول حين يحتويها ملف PDF",
+    },
     "pdf-to-word": {
       name: "PDF إلى Word",
       description: "الأفضل لملفات PDF النصية؛ الصفحات الممسوحة تحتاج OCR",
@@ -3989,6 +3993,14 @@ export const ar: TranslationKeys = {
       progressLabel: "جارٍ الاستخراج",
       scannedHint:
         "هذا الملف ممسوح ضوئيًا، فلا يوجد نص لاستخراجه. يمكن للتعرّف الضوئي على الحروف قراءته، لكنه يستغرق وقتًا أطول ويتطلب تثبيت حزمة الذكاء الاصطناعي الخاصة به.",
+      runOcr: "تشغيل OCR على هذا الملف",
+    },
+    "pdf-to-markdown": {
+      submit: "تحويل إلى Markdown",
+      submitBatch: "تحويل إلى Markdown ({count} ملفات)",
+      progressLabel: "جارٍ التحويل",
+      scannedHint:
+        "هذا الملف ممسوح ضوئيًا، لذا لا يوجد نص لتحويله إلى Markdown. يمكن للتعرّف الضوئي على الحروف قراءة النص، لكنه يعطيك نصًا عاديًا، ويستغرق وقتًا أطول ويتطلب تثبيت حزمة الذكاء الاصطناعي الخاصة به.",
       runOcr: "تشغيل OCR على هذا الملف",
     },
     "pdf-to-word": {

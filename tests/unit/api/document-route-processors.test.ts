@@ -56,6 +56,7 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfScrubProducerPy: vi.fn(),
   pdfSignPy: vi.fn(async () => ({ placed: 1 })),
   pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
+  pdfToMarkdownPy: vi.fn(async () => ({ chars: 42 })),
   pdfToWordPy: vi.fn(),
   qpdfAssemblePages: vi.fn(),
   qpdfAvailable: vi.fn(() => false),
@@ -99,6 +100,7 @@ import {
   pdfScrubProducerPy,
   pdfSignPy,
   pdfTextPy,
+  pdfToMarkdownPy,
   pdfToWordPy,
   qpdfAssemblePages,
   qpdfDecrypt,
@@ -142,6 +144,7 @@ import { registerNupPdf } from "../../../apps/api/src/routes/tools/nup-pdf.js";
 import { registerOrganizePdf } from "../../../apps/api/src/routes/tools/organize-pdf.js";
 import { registerPdfMetadata } from "../../../apps/api/src/routes/tools/pdf-metadata.js";
 import { registerPdfPageNumbers } from "../../../apps/api/src/routes/tools/pdf-page-numbers.js";
+import { registerPdfToMarkdown } from "../../../apps/api/src/routes/tools/pdf-to-markdown.js";
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
 import { registerPdfToWord } from "../../../apps/api/src/routes/tools/pdf-to-word.js";
 import { registerPdfaConvert } from "../../../apps/api/src/routes/tools/pdfa-convert.js";
@@ -524,6 +527,54 @@ describe("document route processors", () => {
         code: "NO_TEXT_LAYER",
       });
       expect(pdfToWordPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("converts PDFs to Markdown through pdfToMarkdownPy with ctx.signal (#1096)", async () => {
+    registerPdfToMarkdown(createMockApp());
+    const config = getToolConfig("pdf-to-markdown");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "annual report.pdf");
+      const result = await config?.processV2?.(ctx);
+
+      expect(pdfTextPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-annual_report.pdf"),
+        join(scratchDir, "text-probe.txt"),
+        { signal: ctx.signal },
+      );
+      expect(pdfToMarkdownPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-annual_report.pdf"),
+        join(scratchDir, "annual report.md"),
+        { signal: ctx.signal },
+      );
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 5, "Checking for text");
+      expect(ctx.report).toHaveBeenNthCalledWith(2, 15, "Converting to Markdown");
+      expect(ctx.report).toHaveBeenNthCalledWith(3, 90, "Done");
+      expect(result).toEqual({
+        scratchPath: join(scratchDir, "annual report.md"),
+        filename: "annual report.md",
+        contentType: "text/markdown",
+        resultPayload: { chars: 42 },
+      });
+    });
+  });
+
+  it("refuses a PDF with no text layer before converting it to Markdown (#1096)", async () => {
+    // A scanned PDF would come back as an empty .md. Refuse it with
+    // pdf-to-text's code so the web app can offer OCR instead.
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({ chars: 0, hasText: false });
+    registerPdfToMarkdown(createMockApp());
+    const config = getToolConfig("pdf-to-markdown");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/text layer[\s\S]*OCR/i),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+      expect(pdfToMarkdownPy).not.toHaveBeenCalled();
     });
   });
 
