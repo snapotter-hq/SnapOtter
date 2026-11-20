@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import {
   engineCrashError,
   engineCrashSignal,
+  isToolInputError,
   ToolInputError,
   wrapWithMemoryLimit,
 } from "@snapotter/shared";
@@ -46,7 +47,8 @@ const OUT_OF_SPACE = /Error Area:Io Class:Space\b/;
 const ACCESS_DENIED = /Error Area:Io Class:Access\b/;
 // LibreOffice's own word for an input it couldn't open: a truncated or
 // corrupt file, a password-protected one, or one whose contents don't match
-// its extension. It still exits 0, just without writing anything (#4380).
+// its extension. It writes nothing; older builds still exit 0 (#4380), while
+// 26.x exits 1 (#5039).
 const SOURCE_NOT_LOADED = /source file could not be loaded/i;
 const UNREADABLE_DOCUMENT_MESSAGE =
   "This document couldn't be opened. It may be damaged, password-protected, or not the format its extension says.";
@@ -91,6 +93,21 @@ async function failure(message: string, stderr: string, outDir: string): Promise
   }
   const refusal = await outputDirWriteRefusal(outDir);
   return refusal ? Object.assign(err, { code: refusal, syscall: "open", path: outDir }) : err;
+}
+
+/**
+ * failure(), plus the user's-file verdict when LibreOffice said it couldn't
+ * load the input. A storage fault still wins, so a full disk that also broke
+ * the load answers as the server's problem.
+ */
+async function conversionFailure(message: string, stderr: string, outDir: string): Promise<Error> {
+  const err = await failure(message, stderr, outDir);
+  if ((err as NodeJS.ErrnoException).code !== undefined) return err;
+  if (!SOURCE_NOT_LOADED.test(stderr)) return err;
+  return new ToolInputError(UNREADABLE_DOCUMENT_MESSAGE, {
+    cause: err,
+    code: "DOCUMENT_UNREADABLE",
+  });
 }
 
 /**
@@ -192,24 +209,22 @@ export async function convertDocument(
           reject(libreofficeSpawnFailure(bin, code, signal, err));
           return;
         }
-        void failure(`LibreOffice exited ${code}: ${err.slice(-1000)}`, err, outDir).then(reject);
+        void conversionFailure(`LibreOffice exited ${code}: ${err.slice(-1000)}`, err, outDir).then(
+          reject,
+        );
       });
       opts.signal?.addEventListener("abort", onAbort, { once: true });
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);
     if (!produced) {
-      const noOutput = await failure(
+      const noOutput = await conversionFailure(
         `LibreOffice produced no ${ext} output for ${basename(inputPath)}`,
         err,
         outDir,
       );
-      if ((noOutput as NodeJS.ErrnoException).code !== undefined) throw noOutput;
-      if (SOURCE_NOT_LOADED.test(err)) {
-        throw new ToolInputError(UNREADABLE_DOCUMENT_MESSAGE, {
-          cause: noOutput,
-          code: "DOCUMENT_UNREADABLE",
-        });
+      if ((noOutput as NodeJS.ErrnoException).code !== undefined || isToolInputError(noOutput)) {
+        throw noOutput;
       }
       // Anything else is unexplained, so keep LibreOffice's own words with it
       // for triage (NODE-35 events carried no stderr at all).
