@@ -444,21 +444,21 @@ describe("sanitizeSvg mutation kills: url() CSS schemes", () => {
   it("neutralizes an https url() reference", () => {
     const out = clean(`<svg><rect style="fill:url('https://evil.com/t')" id="keep"/></svg>`);
     expect(out).not.toContain("https://evil.com");
-    expect(out).toContain('url("data:,');
+    expect(out).toContain("url('data:,");
     expect(out).toContain('id="keep"');
   });
 
   it("neutralizes a file: url() reference", () => {
     const out = clean(`<svg><rect style="fill:url(file:///etc/passwd)" id="keep"/></svg>`);
     expect(out).not.toContain("file:///etc/passwd");
-    expect(out).toContain('url("data:,');
+    expect(out).toContain("url(data:,");
     expect(out).toContain('id="keep"');
   });
 
   it("neutralizes a data: url() reference", () => {
     const out = clean(`<svg><rect style="fill:url(data:image/png;base64,AAA)" id="keep"/></svg>`);
-    expect(out).not.toContain("url(data:");
-    expect(out).toContain('url("data:,');
+    expect(out).not.toContain("data:image/png");
+    expect(out).toContain("url(data:,");
     expect(out).toContain('id="keep"');
   });
 

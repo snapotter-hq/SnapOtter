@@ -228,18 +228,28 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // One pass covers javascript:, data:, file:, and http(s): on both `href` and
   // `xlink:href`, tolerating unquoted values and leading whitespace before the
   // scheme (browsers trim it) which the older per-scheme patterns missed. The
-  // capture preserves the `xlink:` prefix so the neutralized attribute stays
-  // well-formed. Durable follow-up: replace this regex sanitizer with an XML
-  // parse + allowlist, which is the real fix for regex whack-a-mole.
+  // captures preserve the `xlink:` prefix and the opening quote the input used,
+  // so the neutralized attribute stays well-formed: writing a fixed `"` here
+  // left `href='...` unbalanced (#5056). Durable follow-up: replace this regex
+  // sanitizer with an XML parse + allowlist, which is the real fix for regex
+  // whack-a-mole.
   svg = svg.replace(
-    /((?:xlink:)?href)\s*=\s*(?:["']\s*)?(?:javascript|data|file|https?):/gi,
-    '$1="data:,',
+    /((?:xlink:)?href)\s*=\s*(?:(["'])\s*)?(?:javascript|data|file|https?):/gi,
+    "$1=$2data:,",
   );
 
   // ── Block dangerous schemes in url() values ──
-  svg = svg.replace(/url\s*\(\s*["']?https?:\/\//gi, 'url("data:,');
-  svg = svg.replace(/url\s*\(\s*["']?file:/gi, 'url("data:,');
-  svg = svg.replace(/url\s*\(\s*["']?data:/gi, 'url("data:,');
+  // Keep the url()'s own quote, if any. Inserting one broke the enclosing
+  // attribute: `fill="url(data:...)"` became `fill="url("data:,...)"` (#5056).
+  // In both patterns the whitespace after the quote sits inside the optional
+  // group, so two `\s*` runs are never adjacent and a long run of spaces
+  // cannot be split two ways (that backtracking is quadratic). Named entities
+  // are not decoded above, and an XML parser turns `url(&quot;https://...` back
+  // into a quoted URL, so `&quot;` and `&apos;` count as quotes here too.
+  svg = svg.replace(
+    /url\s*\(\s*(?:(["']|&quot;|&apos;)\s*)?(?:https?:\/\/|file:|data:)/gi,
+    "url($1data:,",
+  );
 
   return Buffer.from(svg, "utf-8");
 }
