@@ -1,7 +1,7 @@
 import { createWriteStream } from "node:fs";
-import { mkdir, readdir } from "node:fs/promises";
-import { extname, join } from "node:path";
-import { probeMedia, runFfmpeg } from "@snapotter/media-engine";
+import { mkdir, readdir, rename } from "node:fs/promises";
+import { dirname, extname, join } from "node:path";
+import { probeMedia, type RunFfmpegOptions, runFfmpeg } from "@snapotter/media-engine";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -43,6 +43,74 @@ export function timeModeSegmentLength(durationS: number, segmentS: number): numb
   return (durationS + MIN_TAIL_S) / fullParts;
 }
 
+// Stream copy keeps the source's codec headers. FLAC's STREAMINFO holds the
+// total sample count, so a copied FLAC part claims the whole input's length
+// (#4885). Re-encoding FLAC to FLAC is lossless and writes a fresh header.
+function isFlac(ext: string): boolean {
+  return ext.toLowerCase() === ".flac";
+}
+
+/**
+ * Cuts inPath into segLen-second parts named by outPattern (an ffmpeg
+ * `%03d` pattern), each reporting its own duration.
+ */
+export async function splitEvery(
+  inPath: string,
+  segLen: number,
+  outPattern: string,
+  opts: RunFfmpegOptions,
+): Promise<void> {
+  // -reset_timestamps restarts each part at zero; without it Opus parts keep
+  // the source's running granule positions and probe as the source's length.
+  await runFfmpeg(
+    [
+      "-i",
+      inPath,
+      "-f",
+      "segment",
+      "-segment_time",
+      String(segLen),
+      "-reset_timestamps",
+      "1",
+      "-c",
+      "copy",
+      outPattern,
+    ],
+    opts,
+  );
+  if (!isFlac(extname(outPattern))) {
+    return;
+  }
+  // The segment muxer can't fix this by encoding FLAC itself: only the last
+  // part gets a finished STREAMINFO. Re-encode each copied part on its own.
+  const dir = dirname(outPattern);
+  for (const part of await readdir(dir)) {
+    if (!isFlac(extname(part))) continue;
+    const partPath = join(dir, part);
+    const fixedPath = `${partPath}.tmp`;
+    await runFfmpeg(
+      ["-i", partPath, "-map", "0", "-c", "copy", "-c:a", "flac", "-f", "flac", fixedPath],
+      opts,
+    );
+    await rename(fixedPath, partPath);
+  }
+}
+
+/** Extracts [from, to] seconds of inPath to partPath. */
+export async function extractPart(
+  inPath: string,
+  from: number,
+  to: number,
+  partPath: string,
+  opts: RunFfmpegOptions,
+): Promise<void> {
+  const codecArgs = isFlac(extname(partPath)) ? ["-c", "copy", "-c:a", "flac"] : ["-c", "copy"];
+  await runFfmpeg(
+    ["-ss", String(from), "-to", String(to), "-i", inPath, ...codecArgs, partPath],
+    opts,
+  );
+}
+
 export function registerSplitAudio(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "split-audio",
@@ -80,20 +148,10 @@ export function registerSplitAudio(app: FastifyInstance) {
         }
 
         ctx.report(5, "Splitting audio");
-        await runFfmpeg(
-          [
-            "-i",
-            inPath,
-            "-f",
-            "segment",
-            "-segment_time",
-            String(segLen),
-            "-c",
-            "copy",
-            join(framesDir, `part-%03d${srcExt}`),
-          ],
-          { signal: ctx.signal, timeoutMs: 10 * 60_000 },
-        );
+        await splitEvery(inPath, segLen, join(framesDir, `part-%03d${srcExt}`), {
+          signal: ctx.signal,
+          timeoutMs: 10 * 60_000,
+        });
       } else {
         // silence mode: pass 1 - detect silence regions
         ctx.report(5, "Detecting silence");
@@ -135,13 +193,10 @@ export function registerSplitAudio(app: FastifyInstance) {
             Math.min(90, 10 + Math.round(((seg + 1) / total) * 80)),
             `Extracting segment ${seg + 1}/${total}`,
           );
-          await runFfmpeg(
-            ["-ss", String(from), "-to", String(to), "-i", inPath, "-c", "copy", partPath],
-            {
-              signal: ctx.signal,
-              timeoutMs: 60_000,
-            },
-          );
+          await extractPart(inPath, from, to, partPath, {
+            signal: ctx.signal,
+            timeoutMs: 60_000,
+          });
         }
       }
 

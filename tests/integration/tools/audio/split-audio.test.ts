@@ -180,6 +180,101 @@ describe.skipIf(!ffmpegAvailable())("split-audio (requires ffmpeg)", () => {
     }
   }, 60_000);
 
+  // Probed duration of every part in the ZIP the tool returns for `input`.
+  async function splitAndProbe(
+    tmpDir: string,
+    input: string,
+    settings: Record<string, unknown>,
+  ): Promise<Record<string, number>> {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: basename(input),
+        contentType: "application/octet-stream",
+        content: readFileSync(input),
+      },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/audio/split-audio",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+
+    const durations: Record<string, number> = {};
+    for (const entry of new AdmZip(dl.rawPayload).getEntries()) {
+      const partPath = join(tmpDir, `out-${basename(entry.entryName)}`);
+      writeFileSync(partPath, entry.getData());
+      durations[entry.entryName] = (await probeMedia(partPath)).durationS ?? 0;
+    }
+    return durations;
+  }
+
+  it.each(["flac", "opus"])(
+    "time-mode %s parts report their own duration, not the source's (#4885)",
+    async (ext) => {
+      // FLAC parts kept the source's STREAMINFO total and the second Opus part
+      // kept running granule positions, so both probed as 20 s.
+      const tmpDir = mkdtempSync(join(tmpdir(), "split-audio-dur-"));
+      try {
+        const input = join(tmpDir, `twenty.${ext}`);
+        execFileSync("ffmpeg", [
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "sine=f=440:d=20:sample_rate=48000",
+          "-ac",
+          "2",
+          input,
+        ]);
+        const durations = await splitAndProbe(tmpDir, input, { mode: "time", segmentS: 10 });
+
+        expect(Object.keys(durations).sort()).toEqual([`part-000.${ext}`, `part-001.${ext}`]);
+        for (const durationS of Object.values(durations)) {
+          expect(durationS).toBeGreaterThan(9);
+          expect(durationS).toBeLessThan(11);
+        }
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    },
+    60_000,
+  );
+
+  it("silence-mode FLAC parts report their own duration (#4885)", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "split-audio-dur-"));
+    try {
+      const wav = join(tmpDir, "tone-gap.wav");
+      writeFileSync(wav, TONE_GAP);
+      const input = join(tmpDir, "tone-gap.flac");
+      execFileSync("ffmpeg", ["-v", "error", "-i", wav, input]);
+      // tone-gap.wav is 1.2 s with a silence from 0.4 s to 0.8 s, so the cut
+      // lands at 0.6 s and each part is about 0.6 s long.
+      const durations = await splitAndProbe(tmpDir, input, {
+        mode: "silence",
+        thresholdDb: -40,
+        minSilenceS: 0.2,
+      });
+
+      expect(Object.keys(durations).sort()).toEqual(["part-000.flac", "part-001.flac"]);
+      for (const durationS of Object.values(durations)) {
+        expect(durationS).toBeGreaterThan(0.4);
+        expect(durationS).toBeLessThan(0.8);
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it("rejects time mode when the whole input fits in one part", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.mp3", contentType: "audio/mpeg", content: MP3 },
