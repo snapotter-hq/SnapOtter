@@ -6,10 +6,11 @@ import {
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
+  isRecordedRejection,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -1297,8 +1298,17 @@ describe("settings variation matrix", () => {
             } catch (error) {
               // Tools whose input needs no probing are admitted normally and
               // only meet the missing engine when ffmpeg is spawned.
-              if (!isEngineUnavailableFailure(error)) throw error;
-              accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+              if (isEngineUnavailableFailure(error)) {
+                accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+                return;
+              }
+              // A long tool refuses a bad input by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(json.jobId as string), ACCEPTED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
             }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();

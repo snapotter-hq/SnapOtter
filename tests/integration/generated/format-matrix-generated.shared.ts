@@ -8,6 +8,7 @@ import { fixtureDir } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isRecordedRejection,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
@@ -17,7 +18,7 @@ import {
   pairwiseSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -278,12 +279,23 @@ export function registerToolFormatMatrix(part: number): void {
           if (res.statusCode === 202) {
             const payload = JSON.parse(res.body) as { jobId?: string };
             expect(payload.jobId).toBeDefined();
-            await waitForGeneratedJobArtifact(
-              testApp.app,
-              adminToken,
-              toolId,
-              payload.jobId as string,
-            );
+            try {
+              await waitForGeneratedJobArtifact(
+                testApp.app,
+                adminToken,
+                toolId,
+                payload.jobId as string,
+              );
+            } catch (error) {
+              // A long tool refuses a bad file by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(payload.jobId as string), ALLOWED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
+              continue;
+            }
             accounting.accept();
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();

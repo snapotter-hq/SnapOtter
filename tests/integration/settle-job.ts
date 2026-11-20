@@ -8,6 +8,7 @@ import { waitForJob } from "../../apps/api/src/jobs/enqueue.js";
 import { getQueue } from "../../apps/api/src/jobs/queues.js";
 import type { Pool, ToolJobResult } from "../../apps/api/src/jobs/types.js";
 import { resolveToolPool } from "../../apps/api/src/lib/pool.js";
+import type { SettledJobOutcome } from "../helpers/generated-case-accounting.js";
 
 const LIVE_DATABASE_STATUSES = new Set(["queued", "processing"]);
 const TERMINAL_QUEUE_STATES = new Set(["completed", "failed"]);
@@ -303,4 +304,17 @@ export async function waitForGeneratedJobArtifact(
     throw new Error(`${toolId}: completed job ${jobId} returned a failure payload${suffix}`);
   }
   return result;
+}
+
+/**
+ * Read how a job ended from its durable row. The worker commits the failed row
+ * before BullMQ reports the failure, so by the time `waitForGeneratedJobArtifact`
+ * rethrows, the recorded status is already there for `isRecordedRejection`.
+ */
+export async function settledJobRow(jobId: string): Promise<SettledJobOutcome | undefined> {
+  const [row] = await db
+    .select({ status: schema.jobs.status, error: schema.jobs.error })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, jobId));
+  return row;
 }

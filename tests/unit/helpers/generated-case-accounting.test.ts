@@ -3,6 +3,7 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
+  isRecordedRejection,
 } from "../../helpers/generated-case-accounting.js";
 
 describe("isEngineUnavailableFailure", () => {
@@ -170,5 +171,44 @@ describe("featureUnavailableDisposition", () => {
         requireAiFeatures: false,
       }),
     ).toBe("continue");
+  });
+});
+
+describe("isRecordedRejection", () => {
+  const ALLOWED = new Set([200, 202, 400, 413, 415, 422]);
+
+  // A long tool answers 202, so its refusal of a bad file only shows up on the
+  // failed job row. pdf-to-word refusing a scanned PDF is the case that turned
+  // the format matrix red (#5038).
+  it("counts a failed job the worker recorded as a 422 as a rejection", () => {
+    expect(
+      isRecordedRejection(
+        {
+          status: "failed",
+          error: { message: "no text layer", httpStatus: 422, code: "NO_TEXT_LAYER" },
+        },
+        ALLOWED,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([400, 413, 415])("counts a recorded %i as a rejection", (httpStatus) => {
+    expect(isRecordedRejection({ status: "failed", error: { httpStatus } }, ALLOWED)).toBe(true);
+  });
+
+  it.each([
+    ["a server fault", { status: "failed", error: { httpStatus: 500 } }],
+    ["a 4xx the matrix does not allow", { status: "failed", error: { httpStatus: 409 } }],
+    [
+      "an allowed status that is not a client fault",
+      { status: "failed", error: { httpStatus: 200 } },
+    ],
+    ["a failure with no recorded status", { status: "failed", error: { message: "boom" } }],
+    ["a failure with no error at all", { status: "failed", error: null }],
+    ["a job that did not fail", { status: "completed", error: { httpStatus: 422 } }],
+    ["a canceled job", { status: "canceled", error: { httpStatus: 422 } }],
+    ["a missing row", undefined],
+  ])("does not count %s as a rejection", (_label, row) => {
+    expect(isRecordedRejection(row, ALLOWED)).toBe(false);
   });
 });
