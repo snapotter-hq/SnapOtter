@@ -1227,6 +1227,10 @@ export const ar: TranslationKeys = {
       name: "XML إلى CSV",
       description: "استخراج العناصر المتكررة من XML إلى جدول CSV",
     },
+    "convert-font": {
+      name: "تحويل خط",
+      description: "حوّل الخطوط بين TTF وOTF وWOFF وWOFF2",
+    },
     "create-zip": {
       name: "إنشاء ZIP",
       description: "تجميع ملفات متعددة في أرشيف ZIP واحد",
@@ -4070,6 +4074,13 @@ export const ar: TranslationKeys = {
       submitBatch: "تحويل ({count} ملفات)",
       progressLabel: "جارٍ التحويل",
     },
+    "convert-font": {
+      format: "صيغة الإخراج",
+      hint: "التحويل من OTF إلى TTF يعيد رسم المنحنيات بدقة وحدة خط واحدة. يحافظ WOFF وWOFF2 على المخططات دون تغيير.",
+      submit: "تحويل",
+      submitBatch: "تحويل ({count} ملفات)",
+      progressLabel: "جارٍ التحويل",
+    },
     "create-zip": {
       submit: "إنشاء ZIP",
       submitBatch: "إنشاء ZIP ({count} ملفات)",
@@ -5740,6 +5751,8 @@ export const ar: TranslationKeys = {
         "تحتوي هذه الصورة المتحركة على عدد كبير جدًا من البكسلات عبر إطاراتها. استخدم إطارات أقل أو حجمًا أصغر.",
       MEDIA_UNDECODABLE:
         "تعذّرت قراءة هذا الملف. قد يكون تالفًا، أو لا يحتوي على مسار صوت أو فيديو، أو يستخدم تنسيقًا لا تدعمه هذه الأداة.",
+      FONT_UNSUPPORTED:
+        "تعذّر تحويل هذا الخط. قد يكون تالفًا أو كبيرًا جدًا أو مجموعة خطوط (.ttc) أو خطًا متغيرًا لا يدعمه هذا التنسيق.",
     },
     generic: "حدث خطأ",
     offline: "أنت غير متصل بالإنترنت",

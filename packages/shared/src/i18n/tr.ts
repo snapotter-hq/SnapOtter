@@ -1241,6 +1241,10 @@ export const tr: TranslationKeys = {
       name: "XML'den CSV'ye",
       description: "XML'deki tekrarlayan öğeleri CSV tablosuna çıkar",
     },
+    "convert-font": {
+      name: "Yazı Tipi Dönüştür",
+      description: "Yazı tiplerini TTF, OTF, WOFF ve WOFF2 arasında dönüştürün",
+    },
     "create-zip": {
       name: "ZIP Oluştur",
       description: "Birden fazla dosyayı tek bir ZIP arşivinde paketle",
@@ -4103,6 +4107,13 @@ export const tr: TranslationKeys = {
       submitBatch: "Dönüştür ({count} dosya)",
       progressLabel: "Dönüştürülüyor",
     },
+    "convert-font": {
+      format: "Çıkış formatı",
+      hint: "OTF'den TTF'ye dönüştürmede eğriler en fazla 1 yazı tipi birimi sapmayla yeniden çizilir. WOFF ve WOFF2 dış hatları değiştirmez.",
+      submit: "Dönüştür",
+      submitBatch: "Dönüştür ({count} dosya)",
+      progressLabel: "Dönüştürülüyor",
+    },
     "create-zip": {
       submit: "ZIP Oluştur",
       submitBatch: "ZIP Oluştur ({count} dosya)",
@@ -5802,6 +5813,8 @@ export const tr: TranslationKeys = {
         "Bu animasyonun tüm karelerindeki toplam piksel sayısı çok fazla. Daha az kare veya daha küçük bir boyut kullanın.",
       MEDIA_UNDECODABLE:
         "Bu dosya okunamıyor. Dosya bozuk olabilir, ses veya video akışı içermiyor olabilir ya da bu aracın desteklemediği bir biçimde olabilir.",
+      FONT_UNSUPPORTED:
+        "Bu yazı tipi dönüştürülemiyor. Hasarlı, çok büyük, bir yazı tipi koleksiyonu (.ttc) ya da bu biçimin desteklemediği bir değişken yazı tipi olabilir.",
     },
     generic: "Bir hata oluştu",
     offline: "Çevrimdışısınız",

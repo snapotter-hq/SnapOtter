@@ -56,6 +56,7 @@ export const hasPikepdf = hasPython && pythonWith("pikepdf");
 
 export interface GeneratedPythonCapabilities {
   fitz: boolean;
+  fontTools: boolean;
   markdown: boolean;
   pdf2docx: boolean;
   pikepdf: boolean;
@@ -64,6 +65,7 @@ export interface GeneratedPythonCapabilities {
 
 const GENERATED_PYTHON_CAPABILITIES: GeneratedPythonCapabilities = {
   fitz: hasFitz,
+  fontTools: hasPython && pythonWith("fontTools.ttLib") && pythonWith("brotli"),
   markdown: hasPython && pythonWith("markdown"),
   pdf2docx: hasPython && pythonWith("pdf2docx"),
   pikepdf: hasPikepdf,
@@ -73,6 +75,7 @@ const GENERATED_PYTHON_CAPABILITIES: GeneratedPythonCapabilities = {
 const GENERATED_TOOL_MODULES: Readonly<
   Record<string, readonly (keyof GeneratedPythonCapabilities)[]>
 > = {
+  "convert-font": ["fontTools"],
   "flatten-pdf": ["fitz"],
   "html-to-pdf": ["weasyprint"],
   "markdown-to-pdf": ["weasyprint", "markdown"],

@@ -1185,6 +1185,10 @@ export const ko: TranslationKeys = {
       name: "XML을 CSV로",
       description: "XML에서 반복 요소를 CSV 테이블로 추출",
     },
+    "convert-font": {
+      name: "글꼴 변환",
+      description: "글꼴을 TTF, OTF, WOFF, WOFF2 사이에서 변환",
+    },
     "create-zip": {
       name: "ZIP 만들기",
       description: "여러 파일을 하나의 ZIP 아카이브로 묶기",
@@ -4026,6 +4030,13 @@ export const ko: TranslationKeys = {
       submitBatch: "변환 ({count}개 파일)",
       progressLabel: "변환 중",
     },
+    "convert-font": {
+      format: "출력 형식",
+      hint: "OTF에서 TTF로 변환하면 곡선을 1 글꼴 단위 이내 오차로 다시 그립니다. WOFF와 WOFF2는 윤곽선을 그대로 유지합니다.",
+      submit: "변환",
+      submitBatch: "변환 ({count}개 파일)",
+      progressLabel: "변환 중",
+    },
     "create-zip": {
       submit: "ZIP 생성",
       submitBatch: "ZIP 생성 ({count}개 파일)",
@@ -5703,6 +5714,8 @@ export const ko: TranslationKeys = {
         "이 애니메이션은 전체 프레임의 픽셀 수가 너무 많습니다. 프레임 수를 줄이거나 크기를 작게 하세요.",
       MEDIA_UNDECODABLE:
         "이 파일을 읽을 수 없습니다. 파일이 손상되었거나, 오디오나 비디오 스트림이 없거나, 이 도구가 지원하지 않는 형식일 수 있습니다.",
+      FONT_UNSUPPORTED:
+        "이 글꼴은 변환할 수 없습니다. 손상되었거나, 너무 크거나, 글꼴 컬렉션(.ttc)이거나, 이 형식이 지원하지 않는 가변 글꼴일 수 있습니다.",
     },
     generic: "오류가 발생했습니다",
     offline: "오프라인 상태입니다",

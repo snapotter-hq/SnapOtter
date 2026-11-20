@@ -1012,6 +1012,10 @@ export const zhTW: TranslationKeys = {
       name: "XML 轉 CSV",
       description: "從 XML 中提取重複元素為 CSV 表格",
     },
+    "convert-font": {
+      name: "轉換字型",
+      description: "在 TTF、OTF、WOFF 與 WOFF2 之間轉換字型",
+    },
     "create-zip": {
       name: "建立 ZIP",
       description: "將多個檔案打包為單一 ZIP 壓縮檔",
@@ -3821,6 +3825,13 @@ export const zhTW: TranslationKeys = {
       submitBatch: "轉換（{count} 個檔案）",
       progressLabel: "正在轉換",
     },
+    "convert-font": {
+      format: "輸出格式",
+      hint: "OTF 轉 TTF 會以 1 個字型單位以內的誤差重繪曲線。WOFF 與 WOFF2 不改變字形輪廓。",
+      submit: "轉換",
+      submitBatch: "轉換（{count} 個檔案）",
+      progressLabel: "正在轉換",
+    },
     "create-zip": {
       submit: "建立 ZIP",
       submitBatch: "建立 ZIP（{count} 個檔案）",
@@ -5464,6 +5475,8 @@ export const zhTW: TranslationKeys = {
       TOO_MANY_PIXELS: "此動畫所有影格的像素總數過多。請使用較少的影格或較小的尺寸。",
       MEDIA_UNDECODABLE:
         "無法讀取此檔案。檔案可能已損壞、沒有音訊或視訊串流，或使用了此工具不支援的格式。",
+      FONT_UNSUPPORTED:
+        "無法轉換此字型。它可能已損毀、過大、是字型集合（.ttc），或是此格式不支援的可變字型。",
     },
     generic: "發生錯誤",
     offline: "您已離線",

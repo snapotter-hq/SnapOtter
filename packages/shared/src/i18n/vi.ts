@@ -1241,6 +1241,10 @@ export const vi: TranslationKeys = {
       name: "XML sang CSV",
       description: "Trích xuất các phần tử lặp lại từ XML thành bảng CSV",
     },
+    "convert-font": {
+      name: "Chuyển đổi phông chữ",
+      description: "Chuyển đổi phông chữ giữa TTF, OTF, WOFF và WOFF2",
+    },
     "create-zip": {
       name: "Tạo ZIP",
       description: "Gộp nhiều tệp thành một kho lưu trữ ZIP",
@@ -4094,6 +4098,13 @@ export const vi: TranslationKeys = {
       submitBatch: "Chuyển đổi ({count} tệp)",
       progressLabel: "Đang chuyển đổi",
     },
+    "convert-font": {
+      format: "Định dạng đầu ra",
+      hint: "Chuyển OTF sang TTF sẽ vẽ lại đường cong với sai số tối đa 1 đơn vị phông. WOFF và WOFF2 giữ nguyên đường viền.",
+      submit: "Chuyển đổi",
+      submitBatch: "Chuyển đổi ({count} tệp)",
+      progressLabel: "Đang chuyển đổi",
+    },
     "create-zip": {
       submit: "Tạo ZIP",
       submitBatch: "Tạo ZIP ({count} tệp)",
@@ -5779,6 +5790,8 @@ export const vi: TranslationKeys = {
         "Ảnh động này có quá nhiều điểm ảnh trên tất cả các khung hình. Hãy dùng ít khung hình hơn hoặc kích thước nhỏ hơn.",
       MEDIA_UNDECODABLE:
         "Không thể đọc tệp này. Tệp có thể bị hỏng, không có luồng âm thanh hoặc video, hoặc dùng định dạng mà công cụ này không hỗ trợ.",
+      FONT_UNSUPPORTED:
+        "Không thể chuyển đổi phông chữ này. Phông chữ có thể bị hỏng, quá lớn, là bộ sưu tập phông chữ (.ttc) hoặc phông chữ biến thiên mà định dạng này không hỗ trợ.",
     },
     generic: "Đã xảy ra lỗi",
     offline: "Bạn đang ngoại tuyến",

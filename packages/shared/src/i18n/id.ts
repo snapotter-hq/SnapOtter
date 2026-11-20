@@ -1239,6 +1239,10 @@ export const id: TranslationKeys = {
       name: "XML ke CSV",
       description: "Ekstrak elemen berulang dari XML ke tabel CSV",
     },
+    "convert-font": {
+      name: "Konversi Font",
+      description: "Konversi font antara TTF, OTF, WOFF, dan WOFF2",
+    },
     "create-zip": {
       name: "Buat ZIP",
       description: "Gabungkan beberapa file menjadi satu arsip ZIP",
@@ -4100,6 +4104,13 @@ export const id: TranslationKeys = {
       submitBatch: "Konversi ({count} file)",
       progressLabel: "Mengonversi",
     },
+    "convert-font": {
+      format: "Format keluaran",
+      hint: "OTF ke TTF menggambar ulang kurva dengan selisih maksimal 1 unit font. WOFF dan WOFF2 tidak mengubah outline.",
+      submit: "Konversi",
+      submitBatch: "Konversi ({count} file)",
+      progressLabel: "Mengonversi",
+    },
     "create-zip": {
       submit: "Buat ZIP",
       submitBatch: "Buat ZIP ({count} file)",
@@ -5798,6 +5809,8 @@ export const id: TranslationKeys = {
         "Animasi ini memiliki terlalu banyak piksel di seluruh frame-nya. Gunakan lebih sedikit frame atau ukuran yang lebih kecil.",
       MEDIA_UNDECODABLE:
         "File ini tidak dapat dibaca. File mungkin rusak, tidak memiliki aliran audio atau video, atau memakai format yang tidak didukung alat ini.",
+      FONT_UNSUPPORTED:
+        "Font ini tidak dapat dikonversi. Font mungkin rusak, terlalu besar, berupa koleksi font (.ttc), atau font variabel yang tidak didukung format ini.",
     },
     generic: "Terjadi kesalahan",
     offline: "Anda sedang offline",

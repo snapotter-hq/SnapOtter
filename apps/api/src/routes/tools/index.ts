@@ -38,6 +38,7 @@ import { registerConversionPresets } from "./conversion-presets.js";
 import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
 import { registerConvertDocument } from "./convert-document.js";
+import { registerConvertFont } from "./convert-font.js";
 import { registerConvertPresentation } from "./convert-presentation.js";
 import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
 import { registerConvertSubtitles } from "./convert-subtitles.js";
@@ -382,6 +383,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
 
     // Data Files
     { id: "chart-maker", register: registerChartMaker },
+    { id: "convert-font", register: registerConvertFont },
     { id: "create-zip", register: registerCreateZip },
     { id: "csv-excel", register: registerCsvExcel },
     { id: "csv-json", register: registerCsvJson },

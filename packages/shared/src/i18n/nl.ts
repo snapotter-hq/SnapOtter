@@ -1244,6 +1244,10 @@ export const nl: TranslationKeys = {
       name: "XML naar CSV",
       description: "Extraheer herhalende elementen uit XML naar een CSV-tabel",
     },
+    "convert-font": {
+      name: "Lettertype converteren",
+      description: "Converteer lettertypen tussen TTF, OTF, WOFF en WOFF2",
+    },
     "create-zip": {
       name: "ZIP maken",
       description: "Bundel meerdere bestanden in een enkel ZIP-archief",
@@ -4117,6 +4121,13 @@ export const nl: TranslationKeys = {
       submitBatch: "Converteren ({count} bestanden)",
       progressLabel: "Converteren",
     },
+    "convert-font": {
+      format: "Uitvoerformaat",
+      hint: "Van OTF naar TTF worden curven opnieuw getekend tot op 1 lettertype-eenheid. WOFF en WOFF2 laten de contouren ongewijzigd.",
+      submit: "Converteren",
+      submitBatch: "Converteren ({count} bestanden)",
+      progressLabel: "Converteren",
+    },
     "create-zip": {
       submit: "ZIP maken",
       submitBatch: "ZIP maken ({count} bestanden)",
@@ -5826,6 +5837,8 @@ export const nl: TranslationKeys = {
         "Deze animatie heeft over al haar frames te veel pixels. Gebruik minder frames of een kleiner formaat.",
       MEDIA_UNDECODABLE:
         "Dit bestand kan niet worden gelezen. Het is mogelijk beschadigd, heeft geen audio- of videostream of gebruikt een formaat dat deze tool niet ondersteunt.",
+      FONT_UNSUPPORTED:
+        "Dit lettertype kan niet worden geconverteerd. Het is mogelijk beschadigd, te groot, een lettertypeverzameling (.ttc) of een variabel lettertype dat dit formaat niet ondersteunt.",
     },
     generic: "Er is een fout opgetreden",
     offline: "Je bent offline",

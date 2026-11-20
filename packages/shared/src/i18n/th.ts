@@ -1221,6 +1221,10 @@ export const th: TranslationKeys = {
       name: "XML เป็น CSV",
       description: "แยกองค์ประกอบที่ซ้ำจาก XML เป็นตาราง CSV",
     },
+    "convert-font": {
+      name: "แปลงฟอนต์",
+      description: "แปลงฟอนต์ระหว่าง TTF, OTF, WOFF และ WOFF2",
+    },
     "create-zip": {
       name: "สร้าง ZIP",
       description: "รวมหลายไฟล์เป็นไฟล์ ZIP เดียว",
@@ -4040,6 +4044,13 @@ export const th: TranslationKeys = {
       submitBatch: "แปลง ({count} ไฟล์)",
       progressLabel: "กำลังแปลง",
     },
+    "convert-font": {
+      format: "รูปแบบไฟล์ออก",
+      hint: "การแปลง OTF เป็น TTF จะวาดเส้นโค้งใหม่โดยคลาดเคลื่อนไม่เกิน 1 หน่วยฟอนต์ ส่วน WOFF และ WOFF2 จะคงเส้นขอบไว้ตามเดิม",
+      submit: "แปลง",
+      submitBatch: "แปลง ({count} ไฟล์)",
+      progressLabel: "กำลังแปลง",
+    },
     "create-zip": {
       submit: "สร้าง ZIP",
       submitBatch: "สร้าง ZIP ({count} ไฟล์)",
@@ -5686,6 +5697,8 @@ export const th: TranslationKeys = {
         "ไฟล์นี้โหลดรูปภาพหรือสไตล์จากอินเทอร์เน็ต ซึ่งเซิร์ฟเวอร์นี้ไม่อนุญาต ฝังสิ่งเหล่านั้นไว้ในไฟล์แล้วลองอีกครั้ง",
       TOO_MANY_PIXELS: "ภาพเคลื่อนไหวนี้มีพิกเซลรวมทุกเฟรมมากเกินไป ใช้เฟรมให้น้อยลงหรือขนาดที่เล็กลง",
       MEDIA_UNDECODABLE: "อ่านไฟล์นี้ไม่ได้ ไฟล์อาจเสียหาย ไม่มีสตรีมเสียงหรือวิดีโอ หรือใช้รูปแบบที่เครื่องมือนี้ไม่รองรับ",
+      FONT_UNSUPPORTED:
+        "แปลงฟอนต์นี้ไม่ได้ ฟอนต์อาจเสียหาย ใหญ่เกินไป เป็นคอลเลกชันฟอนต์ (.ttc) หรือเป็นฟอนต์แบบแปรผันที่รูปแบบนี้ไม่รองรับ",
     },
     generic: "เกิดข้อผิดพลาด",
     offline: "คุณออฟไลน์อยู่",

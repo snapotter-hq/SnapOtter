@@ -48,6 +48,7 @@ export {
   type TextStampOptions,
 } from "./pdfcpu.js";
 export {
+  convertFontPy,
   type DocsScriptOptions,
   htmlToPdfPy,
   pdfFlattenPy,

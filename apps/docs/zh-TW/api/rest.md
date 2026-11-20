@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 0e44b9a141d6
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 2e597675c4aa
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `merge-csvs` | 合併 CSV | - （多檔案，欄位需相符） |
 | `yaml-json` | YAML / JSON | - （雙向） |
 | `xml-to-csv` | XML 轉 CSV | - （自動尋找重複元素） |
+| `convert-font` | 轉換字型 | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel 轉 CSV | 由 `convert-spreadsheet` 支援的專屬轉換預設 |
 | `create-zip` | 建立 ZIP | - （多檔案，2-50 個檔案） |
 | `extract-zip` | 解壓 ZIP | - （防炸彈保護） |

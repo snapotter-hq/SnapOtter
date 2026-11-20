@@ -172,6 +172,11 @@ export const fixtures = {
     yaml: p("data/valid/tiny.yaml"),
     tsv: p("data/valid/tiny.tsv"),
     zip: p("data/valid/tiny.zip"),
+    // Self-made 3-glyph fonts (.notdef, space, O), fsType 8.
+    ttf: p("data/valid/tiny.ttf"),
+    otf: p("data/valid/tiny.otf"),
+    woff: p("data/valid/tiny.woff"),
+    woff2: p("data/valid/tiny.woff2"),
   },
   security: {
     svgXxeFile: p("security/svg-xxe-file-read.svg"),

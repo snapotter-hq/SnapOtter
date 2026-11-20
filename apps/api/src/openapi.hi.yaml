@@ -15952,6 +15952,64 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags:
+        - Files
+      summary: फ़ॉन्ट कन्वर्ट
+      description: फ़ॉन्ट को TTF, OTF, WOFF और WOFF2 के बीच रूपांतरित करें। WOFF और WOFF2 आउटलाइन को नहीं बदलते। OTF से TTF में क्यूबिक कर्व 1 फ़ॉन्ट यूनिट की सटीकता से क्वाड्रैटिक कर्व के रूप में दोबारा बनते हैं; TTF से OTF आकृतियाँ बनाए रखता है और कंट्रोल पॉइंट को पूरी फ़ॉन्ट यूनिट तक राउंड करता है। एम्बेडिंग अनुमतियाँ (OS/2 fsType) बनी रहती हैं। फ़ॉन्ट कलेक्शन (.ttc) अस्वीकार किए जाते हैं।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: रूपांतरित करने के लिए TTF, OTF, WOFF या WOFF2 फ़ॉन्ट
+                settings:
+                  type: string
+                  description: |
+                    विकल्पों वाली JSON स्ट्रिंग:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - आउटपुट फ़ॉर्मैट
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        '200':
+          description: रूपांतरित फ़ॉन्ट
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: अमान्य इनपुट
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26813,6 +26871,14 @@ x-i18n:
       sourceHash: 156ea77c8a62
       provenance: machine
       outputHash: 4ba5623dc465
+    paths./api/v1/tools/files/convert-font.post.summary:
+      sourceHash: d07a89cf190e
+      provenance: machine
+      outputHash: 596fbb765110
+    paths./api/v1/tools/files/convert-font.post.description:
+      sourceHash: d6035d52053d
+      provenance: machine
+      outputHash: 085c08d7f4bc
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33418,6 +33484,26 @@ x-i18n:
       provenance: machine
       outputHash: 793a6b875fe9
     ptr:/paths/~1api~1v1~1tools~1files~1xml-to-csv/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: b7c599f9918f
+      provenance: machine
+      outputHash: d01a6810a94f
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: fba6a123a3a2
+      provenance: machine
+      outputHash: af521a2eee83
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/200/description:
+      sourceHash: c01e1339be2e
+      provenance: machine
+      outputHash: 19963de19c32
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 793a6b875fe9
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: c2cc14123e88

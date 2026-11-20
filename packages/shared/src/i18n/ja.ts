@@ -1202,6 +1202,10 @@ export const ja: TranslationKeys = {
       name: "XML を CSV に変換",
       description: "XML から繰り返し要素を CSV テーブルに抽出",
     },
+    "convert-font": {
+      name: "フォント変換",
+      description: "フォントを TTF、OTF、WOFF、WOFF2 の間で変換",
+    },
     "create-zip": {
       name: "ZIP 作成",
       description: "複数のファイルを1つの ZIP アーカイブにまとめる",
@@ -4051,6 +4055,13 @@ export const ja: TranslationKeys = {
       submitBatch: "変換 ({count}ファイル)",
       progressLabel: "変換中",
     },
+    "convert-font": {
+      format: "出力形式",
+      hint: "OTF から TTF への変換では、曲線を 1 フォント単位以内の誤差で描き直します。WOFF と WOFF2 はアウトラインを変更しません。",
+      submit: "変換",
+      submitBatch: "変換 ({count}ファイル)",
+      progressLabel: "変換中",
+    },
     "create-zip": {
       submit: "ZIPを作成",
       submitBatch: "ZIPを作成 ({count}ファイル)",
@@ -5754,6 +5765,8 @@ export const ja: TranslationKeys = {
         "このアニメーションは全フレームのピクセル数が多すぎます。フレーム数を減らすか、サイズを小さくしてください。",
       MEDIA_UNDECODABLE:
         "このファイルを読み込めません。破損しているか、音声や映像のストリームがないか、このツールが対応していない形式の可能性があります。",
+      FONT_UNSUPPORTED:
+        "このフォントは変換できません。破損している、大きすぎる、フォントコレクション（.ttc）である、またはこの形式が対応していないバリアブルフォントである可能性があります。",
     },
     generic: "エラーが発生しました",
     offline: "オフラインです",

@@ -15898,6 +15898,64 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags:
+        - Files
+      summary: フォント変換
+      description: フォントを TTF、OTF、WOFF、WOFF2 の間で変換します。WOFF と WOFF2 はアウトラインを変更しません。OTF から TTF への変換では、3 次曲線を 1 フォント単位以内の誤差で 2 次曲線に描き直します。TTF から OTF への変換では形状を保ち、制御点を整数のフォント単位に丸めます。埋め込み権限 (OS/2 fsType) は保持されます。フォントコレクション (.ttc) は受け付けません。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 変換する TTF、OTF、WOFF、または WOFF2 フォント
+                settings:
+                  type: string
+                  description: |
+                    オプションを含む JSON 文字列:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - 出力形式
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        '200':
+          description: 変換されたフォント
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 無効な入力
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 認証が必要です
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26747,6 +26805,14 @@ x-i18n:
       sourceHash: 156ea77c8a62
       provenance: machine
       outputHash: f44225a11260
+    paths./api/v1/tools/files/convert-font.post.summary:
+      sourceHash: d07a89cf190e
+      provenance: machine
+      outputHash: cd38501ecfd6
+    paths./api/v1/tools/files/convert-font.post.description:
+      sourceHash: d6035d52053d
+      provenance: machine
+      outputHash: 1ab0d881f73e
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33352,6 +33418,26 @@ x-i18n:
       provenance: machine
       outputHash: 80d946358d20
     ptr:/paths/~1api~1v1~1tools~1files~1xml-to-csv/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 687cdf386c50
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: b7c599f9918f
+      provenance: machine
+      outputHash: e80a9af2b307
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: fba6a123a3a2
+      provenance: machine
+      outputHash: 48f9d795a536
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/200/description:
+      sourceHash: c01e1339be2e
+      provenance: machine
+      outputHash: b97ea60acf51
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: b8c7ae7c1701
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 687cdf386c50

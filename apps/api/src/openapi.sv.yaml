@@ -15950,6 +15950,64 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags:
+        - Files
+      summary: Konvertera typsnitt
+      description: Konverterar ett typsnitt mellan TTF, OTF, WOFF och WOFF2. WOFF och WOFF2 lämnar konturerna oförändrade. OTF till TTF ritar om kubiska kurvor som kvadratiska med högst 1 typsnittsenhets avvikelse; TTF till OTF behåller formerna och avrundar kontrollpunkter till hela typsnittsenheter. Inbäddningsbehörigheter (OS/2 fsType) behålls. Typsnittssamlingar (.ttc) avvisas.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: TTF-, OTF-, WOFF- eller WOFF2-typsnitt att konvertera
+                settings:
+                  type: string
+                  description: |
+                    JSON-sträng med alternativ:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - Utdataformat
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        '200':
+          description: Konverterat typsnitt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Ogiltig indata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autentisering krävs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26813,6 +26871,14 @@ x-i18n:
       sourceHash: 156ea77c8a62
       provenance: machine
       outputHash: 318a996183b6
+    paths./api/v1/tools/files/convert-font.post.summary:
+      sourceHash: d07a89cf190e
+      provenance: machine
+      outputHash: ab3d1297b735
+    paths./api/v1/tools/files/convert-font.post.description:
+      sourceHash: d6035d52053d
+      provenance: machine
+      outputHash: 1426ad60c9f6
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33418,6 +33484,26 @@ x-i18n:
       provenance: machine
       outputHash: e570ee6409c0
     ptr:/paths/~1api~1v1~1tools~1files~1xml-to-csv/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3fba9baf5f68
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: b7c599f9918f
+      provenance: machine
+      outputHash: 3dd10c992747
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: fba6a123a3a2
+      provenance: machine
+      outputHash: 20749765e1b7
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/200/description:
+      sourceHash: c01e1339be2e
+      provenance: machine
+      outputHash: 544f42d75379
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: e570ee6409c0
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 3fba9baf5f68

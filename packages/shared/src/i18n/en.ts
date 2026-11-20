@@ -1194,6 +1194,10 @@ export const en = {
       name: "XML to CSV",
       description: "Extract repeating elements from XML into a CSV table",
     },
+    "convert-font": {
+      name: "Convert Font",
+      description: "Convert fonts between TTF, OTF, WOFF, and WOFF2",
+    },
     "create-zip": {
       name: "Create ZIP",
       description: "Bundle multiple files into a single ZIP archive",
@@ -4036,6 +4040,13 @@ export const en = {
       submitBatch: "Convert ({count} files)",
       progressLabel: "Converting",
     },
+    "convert-font": {
+      format: "Output format",
+      hint: "OTF to TTF redraws curves to within 1 font unit. WOFF and WOFF2 keep the outlines unchanged.",
+      submit: "Convert",
+      submitBatch: "Convert ({count} files)",
+      progressLabel: "Converting",
+    },
     "create-zip": {
       submit: "Create ZIP",
       submitBatch: "Create ZIP ({count} files)",
@@ -5716,6 +5727,8 @@ export const en = {
         "This animation has too many pixels across its frames. Use fewer frames or a smaller size.",
       MEDIA_UNDECODABLE:
         "This file can't be read. It may be damaged, have no audio or video stream, or use a format this tool doesn't support.",
+      FONT_UNSUPPORTED:
+        "This font can't be converted. It may be damaged, too large, a font collection (.ttc), or a variable font this format can't hold.",
     },
     generic: "An error occurred",
     offline: "You're offline",

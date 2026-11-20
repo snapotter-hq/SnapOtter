@@ -1238,6 +1238,10 @@ export const sv: TranslationKeys = {
       name: "XML till CSV",
       description: "Extrahera upprepade element från XML till en CSV-tabell",
     },
+    "convert-font": {
+      name: "Konvertera typsnitt",
+      description: "Konvertera typsnitt mellan TTF, OTF, WOFF och WOFF2",
+    },
     "create-zip": {
       name: "Skapa ZIP",
       description: "Paketera flera filer i ett enda ZIP-arkiv",
@@ -4096,6 +4100,13 @@ export const sv: TranslationKeys = {
       submitBatch: "Konvertera ({count} filer)",
       progressLabel: "Konverterar",
     },
+    "convert-font": {
+      format: "Utdataformat",
+      hint: "OTF till TTF ritar om kurvorna med högst 1 typsnittsenhets avvikelse. WOFF och WOFF2 lämnar konturerna oförändrade.",
+      submit: "Konvertera",
+      submitBatch: "Konvertera ({count} filer)",
+      progressLabel: "Konverterar",
+    },
     "create-zip": {
       submit: "Skapa ZIP",
       submitBatch: "Skapa ZIP ({count} filer)",
@@ -5798,6 +5809,8 @@ export const sv: TranslationKeys = {
         "Animeringen har för många pixlar sammanlagt över sina bildrutor. Använd färre bildrutor eller en mindre storlek.",
       MEDIA_UNDECODABLE:
         "Filen kan inte läsas. Den kan vara skadad, sakna ljud- eller videoström eller använda ett format som det här verktyget inte stöder.",
+      FONT_UNSUPPORTED:
+        "Det här typsnittet kan inte konverteras. Det kan vara skadat, för stort, en typsnittssamling (.ttc) eller ett variabelt typsnitt som det här formatet inte stöder.",
     },
     generic: "Ett fel uppstod",
     offline: "Du är offline",

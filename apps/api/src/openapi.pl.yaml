@@ -15954,6 +15954,64 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags:
+        - Files
+      summary: Konwertuj czcionkę
+      description: Konwertuje czcionkę między TTF, OTF, WOFF i WOFF2. WOFF i WOFF2 nie zmieniają konturów. Przy konwersji OTF na TTF krzywe sześcienne są rysowane od nowa jako kwadratowe z dokładnością do 1 jednostki czcionki; konwersja TTF na OTF zachowuje kształty i zaokrągla punkty kontrolne do pełnych jednostek czcionki. Uprawnienia osadzania (OS/2 fsType) są zachowywane. Kolekcje czcionek (.ttc) są odrzucane.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Czcionka TTF, OTF, WOFF lub WOFF2 do konwersji
+                settings:
+                  type: string
+                  description: |
+                    Ciąg JSON z opcjami:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - Format wyjściowy
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        '200':
+          description: Przekonwertowana czcionka
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Nieprawidłowe dane wejściowe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Wymagane uwierzytelnienie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -26818,6 +26876,14 @@ x-i18n:
       sourceHash: 156ea77c8a62
       provenance: machine
       outputHash: b13ec4214b11
+    paths./api/v1/tools/files/convert-font.post.summary:
+      sourceHash: d07a89cf190e
+      provenance: machine
+      outputHash: fc5e34705011
+    paths./api/v1/tools/files/convert-font.post.description:
+      sourceHash: d6035d52053d
+      provenance: machine
+      outputHash: a0206d05b9ae
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -33423,6 +33489,26 @@ x-i18n:
       provenance: machine
       outputHash: 97d99b5cfe7f
     ptr:/paths/~1api~1v1~1tools~1files~1xml-to-csv/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 11561c48ce8b
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: b7c599f9918f
+      provenance: machine
+      outputHash: bd30def5c2a8
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: fba6a123a3a2
+      provenance: machine
+      outputHash: 86e25ff8710f
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/200/description:
+      sourceHash: c01e1339be2e
+      provenance: machine
+      outputHash: ecde70806d1a
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 97d99b5cfe7f
+    ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 11561c48ce8b

@@ -65,6 +65,8 @@
 /tools/convert-audio.html /tools/audio/convert-audio 301
 /tools/convert-document /tools/files/convert-document 301
 /tools/convert-document.html /tools/files/convert-document 301
+/tools/convert-font /tools/files/convert-font 301
+/tools/convert-font.html /tools/files/convert-font 301
 /tools/convert-presentation /tools/files/convert-presentation 301
 /tools/convert-presentation.html /tools/files/convert-presentation 301
 /tools/convert-spreadsheet /tools/files/convert-spreadsheet 301

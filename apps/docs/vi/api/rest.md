@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 659a68820781
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: b044d2ecd804
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `merge-csvs` | Ghép CSV | - (đa tệp, cột khớp nhau) |
 | `yaml-json` | YAML / JSON | - (hai chiều) |
 | `xml-to-csv` | XML sang CSV | - (tự động tìm các phần tử lặp) |
+| `convert-font` | Chuyển đổi phông chữ | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel sang CSV | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-spreadsheet` |
 | `create-zip` | Tạo ZIP | - (đa tệp, 2-50 tệp) |
 | `extract-zip` | Giải nén ZIP | - (chống bom nén) |

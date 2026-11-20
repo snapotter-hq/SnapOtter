@@ -100,6 +100,7 @@ DOCS_SCRIPTS = {
     "doc_html_pdf",
     "doc_sign",
     "doc_scrub_meta",
+    "font_convert",
 }
 
 if DISPATCHER_PROFILE == "docs":

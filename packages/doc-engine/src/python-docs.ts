@@ -1,5 +1,6 @@
 import { runDocsScript } from "@snapotter/ai";
 import {
+  type FontFormat,
   isSafeMessageError,
   SafeError,
   type SignPlacement,
@@ -343,4 +344,33 @@ export async function pdfSignPy(
     throw new Error(`doc_sign failed: ${stdout.slice(0, 200)}`);
   }
   return { placed: parsed.placed };
+}
+
+/**
+ * Convert a font between TTF, OTF, WOFF and WOFF2 (fontTools). A file that is
+ * not a font this can read comes back as `inputError`, the user's fault rather
+ * than a script failure.
+ */
+export async function convertFontPy(
+  inPath: string,
+  outPath: string,
+  format: FontFormat,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "font_convert",
+    { path: inPath, out: outPath, format },
+    ...(runOpts ? [runOpts] : []),
+  );
+  const parsed = parseDocsJson<{ ok?: boolean; inputError?: string; error?: string }>(
+    "font_convert",
+    stdout,
+  );
+  if (typeof parsed.inputError === "string") {
+    throw new ToolInputError(parsed.inputError, { code: "FONT_UNSUPPORTED" });
+  }
+  if ("error" in parsed || parsed.ok !== true) {
+    throw new Error(`font_convert failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
 }

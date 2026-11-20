@@ -1227,6 +1227,10 @@ export const es: TranslationKeys = {
       name: "XML a CSV",
       description: "Extrae elementos repetitivos de XML a una tabla CSV",
     },
+    "convert-font": {
+      name: "Convertir fuente",
+      description: "Convierte fuentes entre TTF, OTF, WOFF y WOFF2",
+    },
     "create-zip": {
       name: "Crear ZIP",
       description: "Agrupa varios archivos en un solo archivo ZIP",
@@ -4096,6 +4100,13 @@ export const es: TranslationKeys = {
       submitBatch: "Convertir ({count} archivos)",
       progressLabel: "Convirtiendo",
     },
+    "convert-font": {
+      format: "Formato de salida",
+      hint: "De OTF a TTF las curvas se redibujan con un margen de 1 unidad de fuente. WOFF y WOFF2 conservan los contornos intactos.",
+      submit: "Convertir",
+      submitBatch: "Convertir ({count} archivos)",
+      progressLabel: "Convirtiendo",
+    },
     "create-zip": {
       submit: "Crear ZIP",
       submitBatch: "Crear ZIP ({count} archivos)",
@@ -5820,6 +5831,8 @@ export const es: TranslationKeys = {
         "Esta animación tiene demasiados píxeles entre todos sus fotogramas. Usa menos fotogramas o un tamaño menor.",
       MEDIA_UNDECODABLE:
         "No se puede leer este archivo. Puede que esté dañado, no tenga pista de audio ni de vídeo o use un formato que esta herramienta no admite.",
+      FONT_UNSUPPORTED:
+        "Esta fuente no se puede convertir. Puede estar dañada, ser demasiado grande, ser una colección de fuentes (.ttc) o una fuente variable que este formato no admite.",
     },
     generic: "Ocurrió un error",
     offline: "Estás sin conexión",

@@ -372,6 +372,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `merge-csvs` | Merge CSVs | - (multi-file, matching columns) |
 | `yaml-json` | YAML / JSON | - (bidirectional) |
 | `xml-to-csv` | XML to CSV | - (auto-finds repeating elements) |
+| `convert-font` | Convert Font | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel to CSV | dedicated conversion preset backed by `convert-spreadsheet` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
 | `extract-zip` | Extract ZIP | - (bomb-protected) |

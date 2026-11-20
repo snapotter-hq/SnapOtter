@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 2a6ca0023dba
-i18n_source_hash: b6b526b4f2b2
+i18n_output_hash: 2711259dfd53
+i18n_source_hash: 0c461ea0d64a
 i18n_provenance: human
 ---
 
@@ -375,6 +375,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `merge-csvs` | Unisci CSV | - (multi-file, colonne corrispondenti) |
 | `yaml-json` | YAML / JSON | - (bidirezionale) |
 | `xml-to-csv` | XML in CSV | - (individua automaticamente gli elementi ripetuti) |
+| `convert-font` | Converti Font | `format` (ttf, otf, woff, woff2) |
 | `excel-to-csv` | Excel in CSV | preset di conversione dedicato supportato da `convert-spreadsheet` |
 | `create-zip` | Crea ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Estrai ZIP | - (protetto da zip bomb) |
