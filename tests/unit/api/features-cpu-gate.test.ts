@@ -27,6 +27,7 @@ const hoisted = vi.hoisted(() => {
   return {
     dataDir,
     hostLacksAvx: vi.fn(() => false),
+    gpuMayBeAvailable: vi.fn(() => false),
     reserveFeatureInstallStream: vi.fn(async () => {}),
   };
 });
@@ -63,6 +64,7 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
     ...actual,
     selectOcrRuntimeTarget: () => "linux-amd64-cpu-py312" as const,
     getOcrRuntimeEffectiveMemoryBytes: () => 8 * 1024 ** 3,
+    gpuMayBeAvailable: hoisted.gpuMayBeAvailable,
   };
 });
 
@@ -151,6 +153,38 @@ describe("feature routes on a CPU without AVX (#4680)", () => {
       (b) => b.id === "face-detection",
     );
     expect(face?.compatibility).toBeUndefined();
+  });
+
+  describe("upscaleCpuMaxMp, for the pre-run upscale hint (#5036)", () => {
+    afterEach(() => {
+      hoisted.gpuMayBeAvailable.mockReset();
+      hoisted.gpuMayBeAvailable.mockReturnValue(false);
+      vi.unstubAllEnvs();
+    });
+
+    it("reports the default CPU ceiling on a host without a GPU", async () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "");
+      const res = await app.inject({ method: "GET", url: "/api/v1/features" });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().upscaleCpuMaxMp).toBe(4);
+      expect(hoisted.gpuMayBeAvailable).toHaveBeenCalledWith("torch");
+    });
+
+    it("reports MAX_CPU_UPSCALE_MP when set, 0 meaning no cap", async () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "8");
+      let res = await app.inject({ method: "GET", url: "/api/v1/features" });
+      expect(res.json().upscaleCpuMaxMp).toBe(8);
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "0");
+      res = await app.inject({ method: "GET", url: "/api/v1/features" });
+      expect(res.json().upscaleCpuMaxMp).toBe(0);
+    });
+
+    it("reports null when a GPU may run the upscale", async () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "8");
+      hoisted.gpuMayBeAvailable.mockReturnValue(true);
+      const res = await app.inject({ method: "GET", url: "/api/v1/features" });
+      expect(res.json()).toHaveProperty("upscaleCpuMaxMp", null);
+    });
   });
 
   it("refuses the bundle install with FEATURE_CPU_UNSUPPORTED before reserving anything", async () => {

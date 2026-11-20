@@ -1954,6 +1954,8 @@ export const ja: TranslationKeys = {
         "AIアップスケーリングは処理負荷が高い処理です。GPUがない場合、大きな画像には数分かかることがあります。",
       cpuResizedNote:
         "このサーバーにはGPUがないため、アップスケールの前に画像を{width} × {height}に縮小しました。",
+      cpuFitHint:
+        "このサーバーにはGPUがないため、アップスケールの前にこの画像を{width} × {height}に縮小します。",
       qualityFast: "高速",
       qualityBalanced: "バランス",
       qualityBest: "最高",

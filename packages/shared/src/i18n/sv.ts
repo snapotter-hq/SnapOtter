@@ -1992,6 +1992,8 @@ export const sv: TranslationKeys = {
       cpuNote: "AI-uppskalning är beräkningsintensiv. Utan GPU kan en stor bild ta flera minuter.",
       cpuResizedNote:
         "Den här servern har ingen GPU, så bilden minskades till {width} × {height} före uppskalningen.",
+      cpuFitHint:
+        "Den här servern har ingen GPU, så bilden minskas till {width} × {height} före uppskalningen.",
       qualityFast: "Snabb",
       qualityBalanced: "Balanserad",
       qualityBest: "Bäst",

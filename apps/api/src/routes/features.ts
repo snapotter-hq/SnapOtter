@@ -29,9 +29,11 @@ import {
   buildInstallerEnv,
   drainOcrDispatcher,
   getOcrRuntimeEffectiveMemoryBytes,
+  gpuMayBeAvailable,
   handoffOcrDispatcher,
   probeOcrDispatcher,
   resolveAiVenvPath,
+  resolveMaxCpuUpscaleMp,
   rotateOcrDispatcher,
   selectOcrRuntimeTarget,
   shutdownDispatcher,
@@ -1133,7 +1135,11 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       const user = requireAuth(request, reply);
       if (!user) return reply;
 
-      return reply.send({ bundles: getFeatureStates() });
+      // The upscale panel warns before the run that a large photo will be
+      // reduced on a CPU host (#5036). Null means a GPU may run it uncapped;
+      // the server stays the source of truth at run time.
+      const upscaleCpuMaxMp = gpuMayBeAvailable("torch") ? null : resolveMaxCpuUpscaleMp();
+      return reply.send({ bundles: getFeatureStates(), upscaleCpuMaxMp });
     },
   );
 

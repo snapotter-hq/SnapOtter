@@ -2001,6 +2001,8 @@ export const nl: TranslationKeys = {
         "AI-opschaling is rekenintensief. Zonder GPU kan een grote afbeelding enkele minuten duren.",
       cpuResizedNote:
         "Deze server heeft geen GPU, dus de afbeelding is vóór het opschalen verkleind tot {width} × {height}.",
+      cpuFitHint:
+        "Deze server heeft geen GPU, dus deze afbeelding wordt vóór het opschalen verkleind tot {width} × {height}.",
       qualityFast: "Snel",
       qualityBalanced: "Gebalanceerd",
       qualityBest: "Beste",

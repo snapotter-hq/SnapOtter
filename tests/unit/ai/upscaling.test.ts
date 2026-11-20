@@ -27,7 +27,7 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   gpuMayBeAvailable: vi.fn().mockReturnValue(false),
 }));
 
-import { isToolInputError } from "@snapotter/shared";
+import { cpuFitRefuses, isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -39,6 +39,7 @@ import {
   cpuFitDimensions,
   MAX_CPU_UPSCALE_MP,
   MAX_CPU_UPSCALE_OUTPUT_MP,
+  resolveMaxCpuUpscaleMp,
   upscale,
 } from "../../../packages/ai/src/upscaling.js";
 
@@ -669,6 +670,47 @@ describe("upscale", () => {
 
     it("is disabled when the cap is 0", () => {
       expect(cpuFitDimensions(8000, 6000, 8, "auto", 0)).toBeNull();
+    });
+  });
+
+  // The web panel calls the same helpers before the run (#5036), so the
+  // refusal predicate and the resolved ceiling are pinned on their own.
+  describe("cpuFitRefuses", () => {
+    it("refuses when the fitted result is no bigger than the original", () => {
+      const fit = cpuFitDimensions(8000, 6000, 2, "auto", 4);
+      expect(fit).not.toBeNull();
+      expect(cpuFitRefuses(8000, 6000, 2, fit ?? { width: 0, height: 0 })).toBe(true);
+    });
+
+    it("allows a reduction that still grows the image", () => {
+      const fit = cpuFitDimensions(4032, 3024, 2, "auto", 4);
+      expect(fit).not.toBeNull();
+      expect(cpuFitRefuses(4032, 3024, 2, fit ?? { width: 0, height: 0 })).toBe(false);
+    });
+  });
+
+  describe("resolveMaxCpuUpscaleMp", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("defaults to MAX_CPU_UPSCALE_MP", () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "");
+      expect(resolveMaxCpuUpscaleMp()).toBe(MAX_CPU_UPSCALE_MP);
+    });
+
+    it("honours a valid env value, 0 included", () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", " 8 ");
+      expect(resolveMaxCpuUpscaleMp()).toBe(8);
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "0");
+      expect(resolveMaxCpuUpscaleMp()).toBe(0);
+    });
+
+    it("ignores a negative or non-numeric value", () => {
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "-1");
+      expect(resolveMaxCpuUpscaleMp()).toBe(MAX_CPU_UPSCALE_MP);
+      vi.stubEnv("MAX_CPU_UPSCALE_MP", "lots");
+      expect(resolveMaxCpuUpscaleMp()).toBe(MAX_CPU_UPSCALE_MP);
     });
   });
 

@@ -1997,6 +1997,8 @@ export const ptBR: TranslationKeys = {
         "A ampliação com IA exige muito processamento. Sem GPU, uma imagem grande pode levar vários minutos.",
       cpuResizedNote:
         "Este servidor não tem GPU, então a imagem foi reduzida para {width} × {height} antes da ampliação.",
+      cpuFitHint:
+        "Este servidor não tem GPU, então esta imagem será reduzida para {width} × {height} antes da ampliação.",
       qualityFast: "Rápido",
       qualityBalanced: "Equilibrado",
       qualityBest: "Melhor",

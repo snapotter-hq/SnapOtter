@@ -1,5 +1,10 @@
 import { join } from "node:path";
-import { ToolInputError } from "@snapotter/shared";
+import {
+  cpuFitDimensions,
+  cpuFitRefuses,
+  MAX_CPU_UPSCALE_MP,
+  ToolInputError,
+} from "@snapotter/shared";
 import sharp from "sharp";
 import {
   gpuMayBeAvailable,
@@ -11,58 +16,16 @@ import {
 } from "./bridge.js";
 import { readScratchOutput, writeScratchInput } from "./scratch-io.js";
 
-/**
- * Maximum input megapixels for CPU-only AI upscaling (#2513); a larger input
- * is reduced to fit first (#4820).
- * RealESRGAN_x4plus always runs at 4x internally (allocating a 4x output buffer
- * plus fp32 tile tensors), so a 4 MP ceiling caps the internal 4x array at
- * 64 MP (~192 MB RGB) on CPU hosts. Configurable via MAX_CPU_UPSCALE_MP (0 = unlimited).
- */
-export const MAX_CPU_UPSCALE_MP = 4;
+export { cpuFitDimensions, MAX_CPU_UPSCALE_MP, MAX_CPU_UPSCALE_OUTPUT_MP } from "@snapotter/shared";
 
-/**
- * Maximum output megapixels (`width * height * scale^2 / 1e6`) on CPU hosts,
- * equal to a 4 MP input at 4x scale (64 MP). Bounds high scale factors (6x, 8x)
- * on smaller inputs so the final upscaled array cannot OOM a 4 GB container.
- * Scales with MAX_CPU_UPSCALE_MP.
- */
-export const MAX_CPU_UPSCALE_OUTPUT_MP = 64;
-
-function resolveMaxCpuUpscaleMp(): number {
+/** The CPU ceiling in effect: MAX_CPU_UPSCALE_MP from the env, else the default. */
+export function resolveMaxCpuUpscaleMp(): number {
   const raw = process.env.MAX_CPU_UPSCALE_MP?.trim();
   if (raw !== undefined && raw !== "") {
     const parsed = Number(raw);
     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
   }
   return MAX_CPU_UPSCALE_MP;
-}
-
-/**
- * The size a CPU host reduces the input to before upscaling, or null when it
- * already fits (#4820). Refusing a 12 MP phone photo after the upload left
- * people with nothing, so the input shrinks to the largest size both ceilings
- * allow: `maxCpuMp` for the AI models (lanczos is exempt), and the output
- * ceiling `maxCpuMp * 16` divided by the scale squared. Floors keep the result
- * within the budget (bar the 1 px minimum side); 0 disables both.
- */
-export function cpuFitDimensions(
-  width: number,
-  height: number,
-  scale: number,
-  model: string | undefined,
-  maxCpuMp: number,
-): { width: number; height: number } | null {
-  if (maxCpuMp <= 0 || width <= 0 || height <= 0) return null;
-  const maxCpuOutputMp = maxCpuMp * (MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP);
-  const outputBudgetMp = scale > 0 ? maxCpuOutputMp / scale ** 2 : Number.POSITIVE_INFINITY;
-  const budgetMp = model === "lanczos" ? outputBudgetMp : Math.min(maxCpuMp, outputBudgetMp);
-  const megapixels = (width * height) / 1_000_000;
-  if (megapixels <= budgetMp) return null;
-  const factor = Math.sqrt(budgetMp / megapixels);
-  return {
-    width: Math.max(1, Math.floor(width * factor)),
-    height: Math.max(1, Math.floor(height * factor)),
-  };
 }
 
 export interface UpscaleOptions {
@@ -111,12 +74,8 @@ export async function upscale(
         resolveMaxCpuUpscaleMp(),
       );
   if (fit) {
-    // Past the point where the fitted result would be no bigger than the
-    // original (a 48 MP photo at 2x lands at 16 MP), an "upscaled" file is a
-    // downgrade, so that case still refuses rather than hand it back.
-    const fittedOutputPx = fit.width * fit.height * scale ** 2;
-    if (fittedOutputPx <= (meta.width ?? 0) * (meta.height ?? 0)) {
-      const maxOutputMp = (fittedOutputPx / 1_000_000).toFixed(1);
+    if (cpuFitRefuses(meta.width ?? 0, meta.height ?? 0, scale, fit)) {
+      const maxOutputMp = ((fit.width * fit.height * scale ** 2) / 1_000_000).toFixed(1);
       throw new ToolInputError(
         `Image is too large to upscale ${scale}x without a GPU: the result would be smaller than the original (about ${maxOutputMp} MP at most on CPU). Use a higher scale factor, a smaller image, or a GPU host.`,
         { code: "RESULT_TOO_LARGE" },
