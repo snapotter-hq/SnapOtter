@@ -176,8 +176,8 @@ describe("smart crop on a still keeps sharp's own window (#4878)", () => {
   // planSubject replays the attention or entropy window instead of letting
   // sharp crop, so a still has to come out exactly as sharp's cover crop did.
   it.each([
-    { strategy: "attention", width: 60, height: 100, padding: 0 },
-    { strategy: "entropy", width: 140, height: 50, padding: 25 },
+    { strategy: "attention" as const, width: 60, height: 100, padding: 0 },
+    { strategy: "entropy" as const, width: 140, height: 50, padding: 25 },
   ])("$strategy $width x $height at $padding% padding", async (settings) => {
     // Page 2 has its block off-centre, so the window sits away from 0, 0.
     const page = (await pages())[1];
