@@ -897,6 +897,199 @@ describe("transparency survives the container it arrived in (#1187)", () => {
   });
 });
 
+describe("resize keeps contain padding transparent", () => {
+  const FIXTURE_WIDTH = 64;
+  const FIXTURE_HEIGHT = 48;
+  const ANIMATED_FRAMES = 3;
+
+  /**
+   * Stacked RGBA frames: a transparent surround with an opaque centered block.
+   * The non-square canvas leaves top and bottom padding under `fit: "contain"`.
+   */
+  function transparentPixels(frames: number): Buffer {
+    const channels = 4;
+    const data = Buffer.alloc(FIXTURE_WIDTH * FIXTURE_HEIGHT * frames * channels);
+    for (let frame = 0; frame < frames; frame++) {
+      for (let y = 12; y < 36; y++) {
+        for (let x = 16; x < 48; x++) {
+          const i = ((frame * FIXTURE_HEIGHT + y) * FIXTURE_WIDTH + x) * channels;
+          data[i + frame] = 255;
+          data[i + 3] = 255;
+        }
+      }
+    }
+    return data;
+  }
+
+  function render(frames: number) {
+    return sharp(transparentPixels(frames), {
+      raw: {
+        width: FIXTURE_WIDTH,
+        height: FIXTURE_HEIGHT * frames,
+        channels: 4,
+        ...(frames > 1 ? { pageHeight: FIXTURE_HEIGHT } : {}),
+      },
+    });
+  }
+
+  async function transparentPng(): Promise<Buffer> {
+    return render(1).png().toBuffer();
+  }
+
+  async function transparentWebp(): Promise<Buffer> {
+    return render(1).webp().toBuffer();
+  }
+
+  async function transparentTiff(): Promise<Buffer> {
+    return render(1).tiff({ compression: "lzw" }).toBuffer();
+  }
+
+  async function transparentAnimation(format: "gif" | "webp"): Promise<Buffer> {
+    const image = render(ANIMATED_FRAMES);
+    return format === "gif" ? image.gif().toBuffer() : image.webp().toBuffer();
+  }
+
+  type DecodedFrame = {
+    width: number;
+    height: number;
+    topLeftAlpha: number;
+    topMiddleAlpha: number;
+    bottomMiddleAlpha: number;
+    centerAlpha: number;
+  };
+
+  /** Decode every frame independently, so frame > 0 cannot ride on frame 0. */
+  async function decodeFrames(buffer: Buffer): Promise<DecodedFrame[]> {
+    const meta = await sharp(buffer, { animated: true }).metadata();
+    const pages = meta.pages ?? 1;
+    const frames: DecodedFrame[] = [];
+
+    for (let page = 0; page < pages; page++) {
+      const { data, info } = await sharp(buffer, { page })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const alphaAt = (x: number, y: number) => data[(y * info.width + x) * 4 + 3];
+
+      frames.push({
+        width: info.width,
+        height: info.height,
+        topLeftAlpha: alphaAt(0, 0),
+        topMiddleAlpha: alphaAt(Math.floor(info.width / 2), 0),
+        bottomMiddleAlpha: alphaAt(Math.floor(info.width / 2), info.height - 1),
+        centerAlpha: alphaAt(Math.floor(info.width / 2), Math.floor(info.height / 2)),
+      });
+    }
+
+    return frames;
+  }
+
+  async function runResize(
+    buffer: Buffer,
+    filename: string,
+    settings: Record<string, unknown> = { width: 32, height: 32 },
+  ) {
+    const config = getToolConfig("resize");
+    if (!config) throw new Error("resize must be registered");
+    return config.process(buffer, config.settingsSchema.parse(settings), filename);
+  }
+
+  it("keeps PNG padding transparent", async () => {
+    const { buffer, contentType } = await runResize(await transparentPng(), "transparent.png");
+
+    expect(contentType).toBe("image/png");
+    const meta = await sharp(buffer).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+    expect(meta.hasAlpha).toBe(true);
+
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    expect([...data.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
+
+    const center = (16 * info.width + 16) * info.channels;
+    expect([...data.subarray(center, center + 4)]).toEqual([255, 0, 0, 255]);
+  });
+
+  it("keeps WebP padding transparent", async () => {
+    const { buffer, contentType } = await runResize(await transparentWebp(), "transparent.webp");
+
+    expect(contentType).toBe("image/webp");
+    const meta = await sharp(buffer).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+    expect(meta.hasAlpha).toBe(true);
+
+    // WebP is lossy, so RGB under a transparent pixel is not stable; alpha is.
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    expect(data[3]).toBe(0);
+
+    const center = (16 * info.width + 16) * info.channels;
+    expect(data[center + 3]).toBe(255);
+  });
+
+  it("keeps TIFF padding transparent", async () => {
+    const { buffer, contentType } = await runResize(await transparentTiff(), "transparent.tiff");
+
+    expect(contentType).toBe("image/tiff");
+    const meta = await sharp(buffer).metadata();
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+    expect(meta.hasAlpha).toBe(true);
+
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    expect(data[3]).toBe(0);
+
+    const center = (16 * info.width + 16) * info.channels;
+    expect(data[center + 3]).toBe(255);
+  });
+
+  it("keeps JPEG output opaque", async () => {
+    const opaqueJpeg = await sharp({
+      create: {
+        width: 64,
+        height: 48,
+        channels: 3,
+        background: { r: 200, g: 30, b: 40 },
+      },
+    })
+      .jpeg()
+      .toBuffer();
+
+    const { buffer, contentType } = await runResize(opaqueJpeg, "opaque.jpg");
+
+    expect(contentType).toBe("image/jpeg");
+    const meta = await sharp(buffer).metadata();
+    expect(meta.format).toBe("jpeg");
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+    expect(meta.channels).toBe(3);
+    expect(meta.hasAlpha).toBeFalsy();
+  });
+
+  describe.each([
+    { label: "animated GIF", format: "gif" as const, filename: "transparent.gif" },
+    { label: "animated WebP", format: "webp" as const, filename: "transparent.webp" },
+  ])("$label", ({ format, filename }) => {
+    it("keeps the padding transparent on every frame", async () => {
+      const { buffer } = await runResize(await transparentAnimation(format), filename);
+      const frames = await decodeFrames(buffer);
+
+      expect(frames).toHaveLength(ANIMATED_FRAMES);
+      for (const [page, frame] of frames.entries()) {
+        expect(frame.width).toBe(32);
+        expect(frame.height).toBe(32);
+        expect(frame.topLeftAlpha, `frame ${page} top-left`).toBe(0);
+        expect(frame.topMiddleAlpha, `frame ${page} top-middle`).toBe(0);
+        expect(frame.bottomMiddleAlpha, `frame ${page} bottom-middle`).toBe(0);
+        expect(frame.centerAlpha, `frame ${page} center`).toBe(255);
+      }
+    });
+  });
+});
+
 describe("the container guard covers the image catalogue (#1190)", () => {
   const candidates = TOOLS.filter(
     (tool) =>

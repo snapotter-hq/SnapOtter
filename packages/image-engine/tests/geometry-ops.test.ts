@@ -24,6 +24,26 @@ function solid(width: number, height: number, color: Rgb): Sharp {
 }
 
 /**
+ * 64x48 RGBA source: transparent surround with an opaque red centered block.
+ * The non-square aspect makes `fit: "contain"` pad top and bottom, so the
+ * padded corner's alpha is observable independently of the image content.
+ */
+function transparent64x48(): Sharp {
+  const width = 64;
+  const height = 48;
+  const channels = 4;
+  const data = Buffer.alloc(width * height * channels);
+  for (let y = 12; y < 36; y++) {
+    for (let x = 16; x < 48; x++) {
+      const i = (y * width + x) * channels;
+      data[i] = 255;
+      data[i + 3] = 255;
+    }
+  }
+  return sharp(data, { raw: { width, height, channels } });
+}
+
+/**
  * 4x4 image with four distinct quadrant colors so left/top offsets are
  * observable from a single sampled pixel:
  *   top-left = red, top-right = green, bottom-left = blue, bottom-right = white.
@@ -166,6 +186,29 @@ describe("resize (mutation-killing)", () => {
       20,
     );
     expect(center.rgb).toEqual([255, 0, 0]);
+  });
+
+  it("fit=contain pads a transparent RGBA source with a transparent background", async () => {
+    // 64x48 into 32x32: content becomes 32x24, leaving 4px bars top and bottom,
+    // which Sharp's default would paint opaque black.
+    const { data, info } = await (
+      await resize(transparent64x48(), {
+        width: 32,
+        height: 32,
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+    )
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    expect(info.channels).toBe(4);
+    expect(info.width).toBe(32);
+    expect(info.height).toBe(32);
+    expect([...data.slice(0, 4)]).toEqual([0, 0, 0, 0]);
+
+    const center = (16 * info.width + 16) * info.channels;
+    expect([...data.slice(center, center + info.channels)]).toEqual([255, 0, 0, 255]);
   });
 
   it("fit=fill stretches to the exact target with no padding", async () => {
