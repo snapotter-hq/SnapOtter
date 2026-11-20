@@ -51,6 +51,7 @@ const ALL_FIXTURES = [...FIXTURES_BY_EXT.values()].flat();
 
 /** Tools that do NOT use the standard factory POST endpoint. */
 const CUSTOM_ROUTE_TOOLS = new Set([
+  "base64",
   "barcode-generate",
   "chart-maker",
   "convert-case",
