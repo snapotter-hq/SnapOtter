@@ -362,10 +362,11 @@ export async function validateImageBuffer(
       };
     }
 
-    if (width * height > SHARP_DEFAULT_PIXEL_LIMIT) {
+    const pixelLimit = sharpDefaultPixelLimit();
+    if (width * height > pixelLimit) {
       return {
         valid: false,
-        reason: `Image exceeds the decoder's ${SHARP_DEFAULT_PIXEL_LIMIT.toLocaleString("en-US")} pixel limit (${width}x${height}, ${((width * height) / 1_000_000).toFixed(1)}MP)`,
+        reason: `Image exceeds the decoder's ${pixelLimit.toLocaleString("en-US")} pixel limit (${width}x${height}, ${((width * height) / 1_000_000).toFixed(1)}MP)`,
       };
     }
 
@@ -380,8 +381,12 @@ export async function validateImageBuffer(
 /**
  * sharp's default limitInputPixels. Every decode in the image engine runs
  * with it, so it stays the ceiling even when MAX_MEGAPIXELS is 0 or higher.
+ * Read at call time: many unit tests mock @snapotter/shared without this
+ * export, and a module-level read would fail every importer of this file.
  */
-const SHARP_DEFAULT_PIXEL_LIMIT = MAX_RESIZE_OUTPUT_DIMENSION ** 2;
+function sharpDefaultPixelLimit(): number {
+  return MAX_RESIZE_OUTPUT_DIMENSION ** 2;
+}
 
 function formatExceededMp(actual: number, limit: number): string {
   const oneDec = actual.toFixed(1);
