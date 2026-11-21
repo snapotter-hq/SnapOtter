@@ -3982,6 +3982,8 @@ export const th: TranslationKeys = {
       runOcr: "เรียกใช้ OCR กับ PDF นี้",
       unreadablePages:
         "{count} จาก {total} หน้าไม่มีเลเยอร์ข้อความที่อ่านได้ ส่วนของหน้าเหล่านั้นในไฟล์ .txt จึงอาจอ่านไม่ออก OCR อ่านหน้าเหล่านั้นได้",
+      partlyUnreadablePages:
+        "ใน {count} จาก {total} หน้า ข้อความบางส่วนใช้ฟอนต์ที่จับคู่กับอักขระที่อ่านได้ไม่ได้ บรรทัดเหล่านั้นในไฟล์ .txt จึงอาจอ่านไม่ออก OCR อ่านบรรทัดเหล่านั้นได้",
     },
     "pdf-to-markdown": {
       submit: "แปลงเป็น Markdown",

@@ -4034,6 +4034,8 @@ export const vi: TranslationKeys = {
       runOcr: "Chạy OCR cho PDF này",
       unreadablePages:
         "{count} trên {total} trang không có lớp văn bản đọc được, nên phần đó trong tệp .txt có thể bị lỗi ký tự. OCR có thể đọc các trang đó.",
+      partlyUnreadablePages:
+        "Trên {count} trong {total} trang, một phần văn bản dùng phông chữ không khớp với ký tự đọc được, nên các dòng đó trong tệp .txt có thể bị lỗi ký tự. OCR có thể đọc được chúng.",
     },
     "pdf-to-markdown": {
       submit: "Chuyển sang Markdown",

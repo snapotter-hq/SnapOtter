@@ -3764,6 +3764,8 @@ export const zhTW: TranslationKeys = {
       runOcr: "對此 PDF 執行 OCR",
       unreadablePages:
         "{total} 頁中有 {count} 頁沒有可讀的文字層，因此 .txt 中對應的部分可能是亂碼。OCR 可以辨識這些頁面。",
+      partlyUnreadablePages:
+        "{total} 頁中有 {count} 頁的部分文字使用了無法對應到可讀字元的字型，因此 .txt 中的這些行可能是亂碼。OCR 可以辨識它們。",
     },
     "pdf-to-markdown": {
       submit: "轉換為 Markdown",

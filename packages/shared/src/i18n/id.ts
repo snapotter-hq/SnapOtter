@@ -4040,6 +4040,8 @@ export const id: TranslationKeys = {
       runOcr: "Jalankan OCR pada PDF ini",
       unreadablePages:
         "{count} dari {total} halaman tidak punya lapisan teks yang bisa dibaca, jadi bagiannya di file .txt mungkin kacau. OCR bisa membaca halaman-halaman itu.",
+      partlyUnreadablePages:
+        "Di {count} dari {total} halaman, sebagian teks memakai font yang tidak cocok dengan karakter yang bisa dibaca, jadi baris-baris itu mungkin kacau di file .txt. OCR bisa membacanya.",
     },
     "pdf-to-markdown": {
       submit: "Konversi ke Markdown",

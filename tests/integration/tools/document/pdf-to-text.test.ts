@@ -68,6 +68,7 @@ type FontPdfKind =
   | "type0-inline-no-tounicode"
   | "type0-identity-name"
   | "type0-identity-name-mixed"
+  | "type0-no-tounicode-mixed"
   | "type0-identity-name-plus-cid-is-unicode"
   | "type0-identity-name-plus-no-tounicode"
   | "type0-identity-stream"
@@ -93,6 +94,8 @@ type FontPdfKind =
  *    as if they were Unicode, with no U+FFFD to catch (#1566 case 2).
  *  - "type0-identity-name-mixed": the same, plus a second line in Helvetica
  *    that reads fine.
+ *  - "type0-no-tounicode-mixed": the "type0-no-tounicode" line plus the same
+ *    readable Helvetica line (#4947).
  *  - "type0-identity-name-plus-cid-is-unicode": the same, plus a second line
  *    in Montserrat in the "type0-cid-is-unicode" shape, which only reads right
  *    through MuPDF's CID fallback. Set smaller because Montserrat Black at 12pt
@@ -126,7 +129,7 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    p.insert_text((72, 72), text, fontname='helv', fontsize=12)",
     "else:",
     "    p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
-    "if kind == 'type0-identity-name-mixed':",
+    "if kind in ('type0-identity-name-mixed', 'type0-no-tounicode-mixed'):",
     "    p.insert_text((72, 120), text, fontname='helv', fontsize=12)",
     "IDENTITY_CMAP = b'1 begincodespacerange\\n<0000> <FFFF>\\nendcodespacerange\\n1 beginbfrange\\n<0000> <FFFF> <0000>\\nendbfrange\\n'",
     "def add_type3(codes):",
@@ -175,7 +178,7 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    drawn = d.xref_stream(content).decode('latin1')",
     "    d.update_stream(content, re.sub(r'<[0-9a-fA-F]+>', cids, drawn, count=1).encode('latin1'))",
     "for xref, _ext, ftype, *_ in p.get_fonts():",
-    "    if kind in ('type0-no-tounicode', 'type0-cid-is-unicode', 'type0-inline-no-tounicode') and ftype == 'Type0':",
+    "    if kind in ('type0-no-tounicode', 'type0-no-tounicode-mixed', 'type0-cid-is-unicode', 'type0-inline-no-tounicode') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', 'null')",
     "    if kind in ('type0-identity-name', 'type0-identity-name-mixed') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
@@ -368,6 +371,7 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool();
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).unreadablePages).toBeUndefined();
+    expect(JSON.parse(res.body).partlyUnreadablePages).toBeUndefined();
   }, 60_000);
 
   it("still extracts a page whose other text reads fine next to an /Identity-H line", async () => {
@@ -375,6 +379,33 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     expect(res.statusCode).toBe(200);
     expect(await downloadText(res)).toContain(FONT_TEXT);
   }, 60_000);
+
+  it("says a page was partly unreadable when an /Identity-H line shares it with readable text (#4947)", async () => {
+    const res = await runTool(makeFontPdf("type0-identity-name-mixed"), "identity-mixed.pdf");
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.partlyUnreadablePages).toEqual({ count: 1, total: 1 });
+    // The page has usable text, so it isn't counted as unreadable.
+    expect(body.unreadablePages).toBeUndefined();
+  }, 60_000);
+
+  it("says a page was partly unreadable when a no-ToUnicode line shares it with readable text (#4947)", async () => {
+    const res = await runTool(makeFontPdf("type0-no-tounicode-mixed"), "no-tounicode-mixed.pdf");
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.partlyUnreadablePages).toEqual({ count: 1, total: 1 });
+    expect(body.unreadablePages).toBeUndefined();
+    // The junk stays in the .txt next to the good line; only the note is new.
+    expect(await downloadText(res)).toContain(FONT_TEXT);
+  }, 60_000);
+
+  it("adds no partly unreadable note to readable composite and simple fonts (#4947)", async () => {
+    for (const kind of ["type0", "type0-cid-is-unicode", "simple-unmapped-names"] as const) {
+      const res = await runTool(makeFontPdf(kind), `${kind}.pdf`);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).partlyUnreadablePages, kind).toBeUndefined();
+    }
+  }, 90_000);
 
   it("still extracts CID = Unicode text next to an /Identity-H line", async () => {
     // Pins why the verdict reads the rest of the page with MuPDF's CID

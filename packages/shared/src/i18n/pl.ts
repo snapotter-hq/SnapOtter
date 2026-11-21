@@ -4047,6 +4047,8 @@ export const pl: TranslationKeys = {
       runOcr: "Uruchom OCR dla tego PDF-a",
       unreadablePages:
         "{count} z {total} stron nie ma czytelnej warstwy tekstu, więc ich część pliku .txt może być nieczytelna. OCR może odczytać te strony.",
+      partlyUnreadablePages:
+        "Na {count} z {total} stron część tekstu jest zapisana czcionką, której nie da się przełożyć na czytelne znaki, więc te wiersze mogą być nieczytelne w pliku .txt. OCR może je odczytać.",
     },
     "pdf-to-markdown": {
       submit: "Konwertuj do Markdown",

@@ -3839,6 +3839,8 @@ export const hi: TranslationKeys = {
       runOcr: "इस PDF पर OCR चलाएँ",
       unreadablePages:
         "{total} में से {count} पेजों में पढ़ने लायक टेक्स्ट लेयर नहीं है, इसलिए .txt में उनका हिस्सा बिगड़ा हुआ दिख सकता है। OCR उन पेजों को पढ़ सकता है।",
+      partlyUnreadablePages:
+        "{total} में से {count} पेजों पर कुछ टेक्स्ट ऐसे फ़ॉन्ट में है जो पढ़ने लायक अक्षरों से मेल नहीं खाता, इसलिए .txt में वे लाइनें बिगड़ी हुई दिख सकती हैं। OCR उन्हें पढ़ सकता है।",
     },
     "pdf-to-markdown": {
       submit: "Markdown में रूपांतरित करें",

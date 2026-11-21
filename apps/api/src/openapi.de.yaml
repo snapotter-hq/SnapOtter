@@ -15383,6 +15383,16 @@ paths:
                           total:
                             type: integer
                             description: Seiten im PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Nur vorhanden, wenn einige Seiten als Text lesbar waren, aber auch Text in einer Schrift ohne brauchbare ToUnicode-Zuordnung enthielten. Diese Zeilen bleiben so in der .txt, wie sie extrahiert wurden.
+                        properties:
+                          count:
+                            type: integer
+                            description: Seiten, die als Text lesbar waren, aber auch unlesbaren Text enthielten
+                          total:
+                            type: integer
+                            description: Seiten im PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33738,6 +33748,18 @@ x-i18n:
       provenance: machine
       outputHash: 13d9a3379d25
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: c387aa018272
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: a0c6462c9c44
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 2ec4a7ebd858
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: c387aa018272

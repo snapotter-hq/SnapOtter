@@ -15389,6 +15389,16 @@ paths:
                           total:
                             type: integer
                             description: Páginas del PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Solo aparece cuando algunas páginas se leían como texto pero también tenían texto en una fuente sin un mapa ToUnicode utilizable. Esas líneas se mantienen en el .txt tal como se extrajeron.
+                        properties:
+                          count:
+                            type: integer
+                            description: Páginas que se leían como texto pero también tenían texto ilegible
+                          total:
+                            type: integer
+                            description: Páginas del PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33744,6 +33754,18 @@ x-i18n:
       provenance: machine
       outputHash: 64a93fd5dafc
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 5f155187c90f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 246fb21a18f3
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: ab623f06a19f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 5f155187c90f

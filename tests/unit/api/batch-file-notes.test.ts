@@ -67,6 +67,18 @@ describe("pickBatchFileNotes: unreadable PDF pages (#954)", () => {
   });
 });
 
+describe("pickBatchFileNotes: partly unreadable PDF pages (#4947)", () => {
+  it("keeps pdf-to-text's partly unreadable page count", () => {
+    expect(
+      pickBatchFileNotes({ chars: 52, partlyUnreadablePages: { count: 1, total: 3 } }),
+    ).toEqual({ partlyUnreadablePages: { count: 1, total: 3 } });
+  });
+
+  it("drops a malformed one", () => {
+    expect(pickBatchFileNotes({ partlyUnreadablePages: { total: 3 } })).toBeUndefined();
+  });
+});
+
 describe("compactFileNotes", () => {
   const skip = { deepEnhanceSkipped: "unavailable" as const };
   const results = { "0": "a.png", "1": "b.png", "2": "c.png" };

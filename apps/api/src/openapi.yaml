@@ -15137,6 +15137,16 @@ paths:
                           total:
                             type: integer
                             description: Pages in the PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Present only when some pages read as text but also held text in a font with no usable ToUnicode map. Those lines stay in the .txt as extracted.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pages that read as text but also held unreadable text
+                          total:
+                            type: integer
+                            description: Pages in the PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png

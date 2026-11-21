@@ -3993,6 +3993,8 @@ export const ja: TranslationKeys = {
       runOcr: "このPDFでOCRを実行",
       unreadablePages:
         "{total}ページ中{count}ページに読み取れるテキストレイヤーがないため、.txtのその部分は文字化けしている可能性があります。OCRならそれらのページを読み取れます。",
+      partlyUnreadablePages:
+        "{total}ページ中{count}ページで、一部のテキストが読み取れる文字に対応しないフォントで書かれているため、.txtのその行は文字化けしている可能性があります。OCRなら読み取れます。",
     },
     "pdf-to-markdown": {
       submit: "Markdownに変換",
