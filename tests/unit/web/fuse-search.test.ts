@@ -177,3 +177,14 @@ describe("a query with no real match reaches the empty state (#4818)", () => {
     expect(search(q).slice(0, 3)).toContain(id);
   });
 });
+
+describe("joining stills into an animation finds images-to-video (#4826)", () => {
+  // These used to land on png-to-gif and jpg-to-gif, which turn one still
+  // into one still GIF.
+  it.each(["images to gif", "multiple png to gif", "animated gif", "animated webp", "gif maker"])(
+    "%s finds images-to-video",
+    (q) => {
+      expect(search(q).slice(0, 5)).toContain("images-to-video");
+    },
+  );
+});

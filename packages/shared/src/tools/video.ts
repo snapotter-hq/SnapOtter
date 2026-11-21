@@ -318,6 +318,13 @@ export const VIDEO_TOOLS: Tool[] = [
     id: "images-to-video",
     name: "Images to Video",
     description: "Turn a set of images into a slideshow video",
+    keywords: [
+      "images to gif",
+      "multiple png to gif",
+      "animated gif",
+      "animated webp",
+      "gif maker",
+    ],
     category: "video-effects",
     icon: "GalleryThumbnails",
     route: "/images-to-video",
