@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 2be8da680cb8
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 473a0d035690
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF 签名 | 自定义 multipart 路由，带 PDF `file`、签名文件 `sig0`、`sig1` 和 `placements` JSON 数组 |
 | `pdf-to-text` | PDF 转文本 | - |
 | `pdf-to-word` | PDF 转 Word | - |
-| `pdf-metadata` | PDF 元数据 | `title`、`author`、`subject`、`keywords` |
+| `pdf-metadata` | PDF 元数据 | `title`、`author`、`subject`、`keywords`、`stripAll` |
 | `convert-document` | 转换文档 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | 转换演示文稿 | `format`（pptx/odp） |
 | `convert-spreadsheet` | 转换电子表格 | `format`（xlsx/ods/csv） |

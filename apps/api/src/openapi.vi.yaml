@@ -15602,6 +15602,7 @@ paths:
                     - `author` (chuỗi, tùy chọn, tối đa 500) - Tác giả tài liệu
                     - `subject` (chuỗi, tùy chọn, tối đa 500) - Chủ đề tài liệu
                     - `keywords` (chuỗi, tùy chọn, tối đa 500) - Từ khóa tài liệu
+                    - `stripAll` (boolean, tùy chọn) - Xóa toàn bộ từ điển Info (ngày tháng, Creator, Producer, khóa tùy chỉnh) và luồng XMP trước khi ghi các trường ở trên. Xóa XMP làm tệp không còn tuân thủ PDF/A.
             example:
               file: photo.png
               settings: '{}'
@@ -15618,6 +15619,22 @@ paths:
                       metadata:
                         type: object
                         description: Các trường siêu dữ liệu PDF thu được
+                      stripped:
+                        type: object
+                        description: Có khi đặt `stripAll`. Những gì đã bị xóa.
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: Các khóa từ điển Info đã có
+                          xmpRemoved:
+                            type: boolean
+                            description: Có xóa luồng siêu dữ liệu XMP hay không
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: Mức PDF/A mà tệp đầu vào khai báo (ví dụ 2B), null nếu không có
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33972,9 +33989,9 @@ x-i18n:
       provenance: machine
       outputHash: aa7a4781780d
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 268cad6002d3
+      sourceHash: 69e35e648fd4
       provenance: machine
-      outputHash: efa0570be383
+      outputHash: 512960baccba
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/description:
       sourceHash: a19925f5e3bb
       provenance: machine
@@ -33983,6 +34000,22 @@ x-i18n:
       sourceHash: 33fe6b2474bb
       provenance: machine
       outputHash: 8c1941e93349
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/description:
+      sourceHash: 0635dbe78956
+      provenance: machine
+      outputHash: a73a4b2e8423
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/removed/description:
+      sourceHash: e5d9ea51f978
+      provenance: machine
+      outputHash: 6ab128b5065f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/xmpRemoved/description:
+      sourceHash: 5e04b469fa79
+      provenance: machine
+      outputHash: 59ba67e01a55
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/200/content/application~1json/schema/allOf/1/properties/stripped/properties/pdfa/description:
+      sourceHash: 34f912bbf4bf
+      provenance: machine
+      outputHash: 95ec5593b992
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-metadata/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

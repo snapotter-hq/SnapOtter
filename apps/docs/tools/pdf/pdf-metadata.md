@@ -4,7 +4,7 @@ description: Read and write PDF document metadata.
 
 # PDF Metadata {#pdf-metadata}
 
-Read and update PDF document metadata fields such as title, author, subject, and keywords. When no settings are provided, the existing metadata is returned without modification.
+Read and update PDF document metadata fields such as title, author, subject, and keywords, or remove the document's metadata altogether. When no settings are provided, the existing metadata is returned without modification.
 
 ## API Endpoint {#api-endpoint}
 
@@ -20,8 +20,9 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 | author | string | No | - | Document author (max 500 characters) |
 | subject | string | No | - | Document subject (max 500 characters) |
 | keywords | string | No | - | Document keywords (max 500 characters) |
+| stripAll | boolean | No | false | Remove the whole Info dictionary (dates, Creator, Producer, custom keys) and the XMP stream, then write any fields given above |
 
-All parameters are optional. Omitted fields are left unchanged.
+All parameters are optional. Omitted fields are left unchanged unless `stripAll` is set.
 
 ## Example Request {#example-request}
 
@@ -56,3 +57,5 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - The `metadata` field in the response contains the resulting metadata after any updates.
 - To read metadata without modifying it, omit the `settings` field or send an empty object.
 - Each metadata field is limited to 500 characters.
+- With `stripAll`, the response also carries `stripped`: the Info keys that were removed (`removed`), whether an XMP stream was removed (`xmpRemoved`), and the PDF/A level the input declared (`pdfa`, or `null`). Removing XMP breaks PDF/A conformance.
+- `stripAll` doesn't touch per-page metadata streams or embedded file attachments.

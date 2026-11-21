@@ -4090,6 +4090,9 @@ export const id: TranslationKeys = {
       runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-metadata": {
+      stripAll: "Hapus metadata dokumen",
+      stripAllHint:
+        "Menghapus tanggal, Creator, Producer, kolom khusus, dan XMP sebelum menulis kolom di bawah. File PDF/A kehilangan kesesuaiannya.",
       title: "Judul",
       author: "Penulis",
       subject: "Subjek",

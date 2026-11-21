@@ -52,6 +52,7 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfFlattenPy: vi.fn(),
   pdfMetadataGetPy: vi.fn(async () => ({ Title: "Updated" })),
   pdfMetadataSetPy: vi.fn(),
+  pdfMetadataStripPy: vi.fn(async () => ({ removed: ["Author"], xmpRemoved: true, pdfa: null })),
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfScrubProducerPy: vi.fn(),
   pdfSignPy: vi.fn(async () => ({ placed: 1 })),
@@ -102,6 +103,7 @@ import {
   pdfFlattenPy,
   pdfMetadataGetPy,
   pdfMetadataSetPy,
+  pdfMetadataStripPy,
   pdfRedactPy,
   pdfScrubProducerPy,
   pdfSignPy,
@@ -691,6 +693,44 @@ describe("document route processors", () => {
         contentType: "application/pdf",
         resultPayload: { metadata: { Title: "Updated" } },
       });
+      expect(pdfMetadataStripPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("strips all metadata through pdfMetadataStripPy when stripAll is set and reports what went", async () => {
+    registerPdfMetadata(createMockApp());
+    const config = getToolConfig("pdf-metadata");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = {
+        ...createCtx(scratchDir, "whitepaper.pdf"),
+        settings: { stripAll: true, title: "Updated" },
+      };
+      const result = await config?.processV2?.(ctx);
+
+      expect(pdfMetadataStripPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-whitepaper.pdf"),
+        join(scratchDir, "whitepaper_metadata.pdf"),
+        { Title: "Updated" },
+        { signal: ctx.signal },
+      );
+      expect(pdfMetadataSetPy).not.toHaveBeenCalled();
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Removing metadata");
+      expect(result?.resultPayload).toEqual({
+        metadata: { Title: "Updated" },
+        stripped: { removed: ["Author"], xmpRemoved: true, pdfa: null },
+      });
+    });
+  });
+
+  it("rejects a non-boolean stripAll", async () => {
+    registerPdfMetadata(createMockApp());
+    const config = getToolConfig("pdf-metadata");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "whitepaper.pdf"), settings: { stripAll: "yes" } };
+      await expect(config?.processV2?.(ctx)).rejects.toThrow();
+      expect(pdfMetadataStripPy).not.toHaveBeenCalled();
     });
   });
 });

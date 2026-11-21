@@ -1,6 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pdfMetadataGetPy, pdfMetadataSetPy } from "@snapotter/doc-engine";
+import {
+  type PdfMetadataStripResult,
+  pdfMetadataGetPy,
+  pdfMetadataSetPy,
+  pdfMetadataStripPy,
+} from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
@@ -10,6 +15,8 @@ const settingsSchema = z.object({
   author: z.string().max(500).optional(),
   subject: z.string().max(500).optional(),
   keywords: z.string().max(500).optional(),
+  // Clear the whole Info dictionary and the XMP stream before writing the fields above.
+  stripAll: z.boolean().optional(),
 });
 
 export function registerPdfMetadata(app: FastifyInstance) {
@@ -27,7 +34,6 @@ export function registerPdfMetadata(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
 
       const outPath = join(ctx.scratchDir, `${base}_metadata.pdf`);
-      ctx.report(10, "Setting metadata");
 
       // Build metadata record from DEFINED keys only (empty string = clear).
       const meta: Record<string, string> = {};
@@ -36,7 +42,14 @@ export function registerPdfMetadata(app: FastifyInstance) {
       if (settings.subject !== undefined) meta.Subject = settings.subject;
       if (settings.keywords !== undefined) meta.Keywords = settings.keywords;
 
-      await pdfMetadataSetPy(inPath, outPath, meta, { signal: ctx.signal });
+      let stripped: PdfMetadataStripResult | undefined;
+      if (settings.stripAll) {
+        ctx.report(10, "Removing metadata");
+        stripped = await pdfMetadataStripPy(inPath, outPath, meta, { signal: ctx.signal });
+      } else {
+        ctx.report(10, "Setting metadata");
+        await pdfMetadataSetPy(inPath, outPath, meta, { signal: ctx.signal });
+      }
       const metadata = await pdfMetadataGetPy(outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
@@ -44,7 +57,7 @@ export function registerPdfMetadata(app: FastifyInstance) {
         scratchPath: outPath,
         filename: `${base}_metadata.pdf`,
         contentType: "application/pdf",
-        resultPayload: { metadata },
+        resultPayload: stripped ? { metadata, stripped } : { metadata },
       };
     },
   });

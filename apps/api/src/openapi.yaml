@@ -15355,6 +15355,7 @@ paths:
                     - `author` (string, optional, max 500) - Document author
                     - `subject` (string, optional, max 500) - Document subject
                     - `keywords` (string, optional, max 500) - Document keywords
+                    - `stripAll` (boolean, optional) - Remove the whole Info dictionary (dates, Creator, Producer, custom keys) and the XMP stream before writing the fields above. Stripping XMP breaks PDF/A conformance.
             example:
               file: photo.png
               settings: '{}'
@@ -15371,6 +15372,22 @@ paths:
                       metadata:
                         type: object
                         description: The resulting PDF metadata fields
+                      stripped:
+                        type: object
+                        description: Present when `stripAll` was set. What the strip removed.
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: Info dictionary keys that were present
+                          xmpRemoved:
+                            type: boolean
+                            description: Whether an XMP metadata stream was removed
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: PDF/A level the input declared (for example 2B), null when none
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png

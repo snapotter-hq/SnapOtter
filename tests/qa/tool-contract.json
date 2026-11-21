@@ -11930,8 +11930,19 @@
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
-    "axes": [],
-    "invalidProbes": []
+    "axes": [
+      {
+        "key": "stripAll",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "stripAll",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
   },
   {
     "id": "powerpoint-to-pdf",

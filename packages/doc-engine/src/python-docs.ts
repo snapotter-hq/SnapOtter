@@ -338,6 +338,49 @@ export async function pdfMetadataSetPy(
   }
 }
 
+export interface PdfMetadataStripResult {
+  /** Info dictionary keys that were present, without the leading slash. */
+  removed: string[];
+  xmpRemoved: boolean;
+  /** PDF/A level the input declared in XMP (e.g. "2B"), null when none. */
+  pdfa: string | null;
+}
+
+/**
+ * Drop the whole Info dictionary and the catalog XMP stream, then write
+ * `metadata` onto the clean document (pikepdf).
+ */
+export async function pdfMetadataStripPy(
+  inPath: string,
+  outPath: string,
+  metadata: Record<string, string>,
+  opts?: DocsScriptOptions,
+): Promise<PdfMetadataStripResult> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    { path: inPath, out: outPath, mode: "strip", metadata },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
+  const parsed = parseDocsJson<{
+    removed?: unknown;
+    xmpRemoved?: unknown;
+    pdfa?: unknown;
+    error?: string;
+  }>("doc_metadata", stdout);
+  if ("error" in parsed) {
+    throw new Error(`doc_metadata strip failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
+  if (!Array.isArray(parsed.removed)) {
+    throw new Error(`doc_metadata strip failed: ${stdout.slice(0, 200)}`);
+  }
+  return {
+    removed: parsed.removed.map(String),
+    xmpRemoved: parsed.xmpRemoved === true,
+    pdfa: typeof parsed.pdfa === "string" && parsed.pdfa ? parsed.pdfa : null,
+  };
+}
+
 /** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min default timeout. */
 export async function htmlToPdfPy(
   inPath: string,

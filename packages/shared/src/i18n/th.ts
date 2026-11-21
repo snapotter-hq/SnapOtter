@@ -4031,6 +4031,9 @@ export const th: TranslationKeys = {
       runOcr: "เรียกใช้ OCR กับ PDF นี้",
     },
     "pdf-metadata": {
+      stripAll: "ลบข้อมูลเมตาของเอกสาร",
+      stripAllHint:
+        "ล้างวันที่ Creator Producer ฟิลด์ที่กำหนดเอง และ XMP ก่อนเขียนฟิลด์ด้านล่าง ไฟล์ PDF/A จะไม่เป็นไปตามมาตรฐานอีกต่อไป",
       title: "ชื่อเรื่อง",
       author: "ผู้เขียน",
       subject: "หัวข้อ",

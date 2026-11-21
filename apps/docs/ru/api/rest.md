@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 80260f533ee7
+i18n_output_hash: 5a82bd995da0
 i18n_hash_version: 2
-i18n_source_hash: a305a62638f0
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -345,7 +345,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | Подписание PDF | Пользовательский multipart-маршрут с PDF `file`, файлами подписи `sig0`, `sig1` и JSON-массивом `placements` |
 | `pdf-to-text` | PDF в текст | - |
 | `pdf-to-word` | PDF в Word | - |
-| `pdf-metadata` | Метаданные PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | Метаданные PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Конвертация документа | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Конвертация презентации | `format` (pptx/odp) |
 | `convert-spreadsheet` | Конвертация таблицы | `format` (xlsx/ods/csv) |

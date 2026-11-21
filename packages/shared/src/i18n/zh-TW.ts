@@ -3813,6 +3813,9 @@ export const zhTW: TranslationKeys = {
       runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-metadata": {
+      stripAll: "移除文件中繼資料",
+      stripAllHint:
+        "在寫入下方欄位之前，清除日期、Creator、Producer、自訂欄位和 XMP。PDF/A 檔案將不再符合規範。",
       title: "標題",
       author: "作者",
       subject: "主旨",

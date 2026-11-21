@@ -4025,6 +4025,9 @@ export const en = {
       runOcr: "Run OCR on this PDF",
     },
     "pdf-metadata": {
+      stripAll: "Remove document metadata",
+      stripAllHint:
+        "Clears dates, Creator, Producer, custom fields and XMP before writing the fields below. PDF/A files lose conformance.",
       title: "Title",
       author: "Author",
       subject: "Subject",

@@ -3888,6 +3888,9 @@ export const hi: TranslationKeys = {
       runOcr: "इस PDF पर OCR चलाएँ",
     },
     "pdf-metadata": {
+      stripAll: "दस्तावेज़ का मेटाडेटा हटाएँ",
+      stripAllHint:
+        "नीचे के फ़ील्ड लिखने से पहले तारीखें, Creator, Producer, कस्टम फ़ील्ड और XMP हटा देता है। PDF/A फ़ाइलों की अनुरूपता खत्म हो जाती है।",
       title: "शीर्षक",
       author: "लेखक",
       subject: "विषय",

@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 0bdbc635d1f9
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 67fd1a2797ec
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF साइन करें | PDF `file`, सिग्नेचर फ़ाइलें `sig0`, `sig1`, और `placements` JSON ऐरे के साथ कस्टम मल्टीपार्ट रूट |
 | `pdf-to-text` | PDF से टेक्स्ट | - |
 | `pdf-to-word` | PDF से Word | - |
-| `pdf-metadata` | PDF मेटाडेटा | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | PDF मेटाडेटा | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | डॉक्यूमेंट कन्वर्ट करें | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | प्रेज़ेंटेशन कन्वर्ट करें | `format` (pptx/odp) |
 | `convert-spreadsheet` | स्प्रेडशीट कन्वर्ट करें | `format` (xlsx/ods/csv) |

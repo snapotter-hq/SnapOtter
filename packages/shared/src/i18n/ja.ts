@@ -4042,6 +4042,9 @@ export const ja: TranslationKeys = {
       runOcr: "このPDFでOCRを実行",
     },
     "pdf-metadata": {
+      stripAll: "文書のメタデータを削除",
+      stripAllHint:
+        "下の項目を書き込む前に、日付、Creator、Producer、カスタム項目、XMP を削除します。PDF/A ファイルは準拠性を失います。",
       title: "タイトル",
       author: "著者",
       subject: "件名",

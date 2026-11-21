@@ -4094,6 +4094,9 @@ export const tr: TranslationKeys = {
       runOcr: "Bu PDF'de OCR çalıştır",
     },
     "pdf-metadata": {
+      stripAll: "Belge meta verilerini kaldır",
+      stripAllHint:
+        "Aşağıdaki alanları yazmadan önce tarihleri, Creator, Producer, özel alanları ve XMP'yi temizler. PDF/A dosyaları uyumluluğunu kaybeder.",
       title: "Başlık",
       author: "Yazar",
       subject: "Konu",

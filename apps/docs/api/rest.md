@@ -341,7 +341,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `sign-pdf` | Sign PDF | Custom multipart route with PDF `file`, signature files `sig0`, `sig1`, and `placements` JSON array |
 | `pdf-to-text` | PDF to Text | - |
 | `pdf-to-word` | PDF to Word | - |
-| `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Convert Document | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Convert Presentation | `format` (pptx/odp) |
 | `convert-spreadsheet` | Convert Spreadsheet | `format` (xlsx/ods/csv) |

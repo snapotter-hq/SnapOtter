@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 8bce34a2f166
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 720f8261a033
+i18n_source_hash: 21592dbca884
 i18n_provenance: human
 ---
 
@@ -344,7 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF の署名 | PDF `file`、署名ファイル `sig0`、`sig1`、`placements` JSON 配列を含むカスタムマルチパートルート |
 | `pdf-to-text` | PDF からテキスト | - |
 | `pdf-to-word` | PDF から Word | - |
-| `pdf-metadata` | PDF メタデータ | `title`, `author`, `subject`, `keywords` |
+| `pdf-metadata` | PDF メタデータ | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | ドキュメントの変換 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | プレゼンテーションの変換 | `format`（pptx/odp） |
 | `convert-spreadsheet` | スプレッドシートの変換 | `format`（xlsx/ods/csv） |
