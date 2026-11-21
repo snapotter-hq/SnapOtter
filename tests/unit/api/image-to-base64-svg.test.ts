@@ -189,7 +189,7 @@ describe("image-to-base64 SVG and SVGZ sanitization in original mode (#2594)", (
       { outputFormat: "original", maxWidth: 0, maxHeight: 0 },
     );
 
-    expect(statusCode).toBe(200);
+    expect(statusCode).toBe(400);
     expect(json.results).toEqual([]);
     expect(json.errors).toEqual([
       { filename: "long-comment.svg", error: "Unrecognized image format" },
@@ -321,7 +321,7 @@ describe("image-to-base64 SVG and SVGZ sanitization in original mode (#2594)", (
       { outputFormat: "original" },
     );
 
-    expect(statusCode).toBe(200);
+    expect(statusCode).toBe(400);
     expect(json.results).toEqual([]);
     expect(json.errors).toHaveLength(3);
     expect(json.errors.map((e) => e.filename)).toEqual([
