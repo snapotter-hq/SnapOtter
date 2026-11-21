@@ -110,4 +110,23 @@ describe("xml-to-csv (pure JS, no skipIf)", () => {
     expect(lines[2]).toBe(",1");
     expect(text).not.toContain("native code");
   }, 30_000);
+
+  // #4379: fast-xml-parser is lenient, so an unclosed root used to tabulate
+  // whatever it had read so far and answer 200.
+  it("rejects XML with an unclosed root instead of returning partial CSV", async () => {
+    const res = await runTool(
+      "malformed.xml",
+      Buffer.from("<people><person><name>Ada</name></person>"),
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(
+      "XML parse failed: Unclosed tag 'people'. (line 1, column 1)",
+    );
+  }, 30_000);
+
+  it("rejects mismatched closing tags", async () => {
+    const res = await runTool("mismatch.xml", Buffer.from("<rows><row><a>1</row></rows>"));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^XML parse failed: Expected closing tag 'a'/);
+  }, 30_000);
 });
