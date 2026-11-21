@@ -4036,6 +4036,8 @@ export const sv: TranslationKeys = {
       runOcr: "Kör OCR på den här PDF:en",
       unreadablePages:
         "{count} av {total} sidor saknar ett läsbart textlager, så deras del av .txt-filen kan bli oläslig. OCR kan läsa de sidorna.",
+      partlyUnreadablePages:
+        "På {count} av {total} sidor står en del av texten i ett typsnitt som inte motsvarar läsbara tecken, så de raderna kan bli oläsliga i .txt-filen. OCR kan läsa dem.",
     },
     "pdf-to-markdown": {
       submit: "Konvertera till Markdown",

@@ -4057,6 +4057,8 @@ export const nl: TranslationKeys = {
       runOcr: "OCR uitvoeren op deze pdf",
       unreadablePages:
         "{count} van de {total} pagina's hebben geen leesbare tekstlaag, dus hun deel van de .txt kan onleesbaar zijn. OCR kan die pagina's lezen.",
+      partlyUnreadablePages:
+        "Op {count} van de {total} pagina's staat een deel van de tekst in een lettertype dat niet naar leesbare tekens verwijst, dus die regels kunnen onleesbaar zijn in de .txt. OCR kan ze lezen.",
     },
     "pdf-to-markdown": {
       submit: "Converteren naar Markdown",

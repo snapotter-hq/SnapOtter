@@ -55,10 +55,26 @@ describe("PDF to Text says when some pages had no readable text (#954)", () => {
     );
   });
 
+  it("names how many readable pages also held unreadable text (#4947)", () => {
+    act(() =>
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        resultNotes: { partlyUnreadablePages: { count: 1, total: 3 } },
+      }),
+    );
+    renderPanel();
+
+    expect(screen.getByTestId("pdf-to-text-partly-unreadable-pages")).toHaveTextContent(
+      "On 1 of 3 pages, some text is in a font",
+    );
+    expect(screen.queryByTestId("pdf-to-text-unreadable-pages")).not.toBeInTheDocument();
+  });
+
   it("says nothing when every page read fine", () => {
     act(() => useFileStore.getState().updateEntry(0, { status: "completed", resultNotes: null }));
     renderPanel();
 
     expect(screen.queryByTestId("pdf-to-text-unreadable-pages")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pdf-to-text-partly-unreadable-pages")).not.toBeInTheDocument();
   });
 });

@@ -817,7 +817,7 @@ with tempfile.TemporaryDirectory() as scratch:
     text_closed.clear()
     fitz.open = lambda _p: TextDoc()
     code, stdout, _ = run_main(text_mod, "doc_text.py", {"path": in_pdf, "out": out_pdf})
-    check("doc_text.py", code == 0 and json.loads(stdout) == {"chars": 11, "hasText": True, "pages": 1, "emptyPages": 0, "unreadablePages": 0} and text_closed == [True], f"normal text: {code} {stdout} {text_closed}")
+    check("doc_text.py", code == 0 and json.loads(stdout) == {"chars": 11, "hasText": True, "pages": 1, "emptyPages": 0, "unreadablePages": 0, "partlyUnreadablePages": 0} and text_closed == [True], f"normal text: {code} {stdout} {text_closed}")
 
 print(json.dumps(failures))
 `;

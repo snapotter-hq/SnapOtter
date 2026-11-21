@@ -323,6 +323,31 @@ describe("pdfTextPy", () => {
     ).resolves.toEqual({ chars: 52, hasText: true, pages: 3, emptyPages: 1, unreadablePages: 1 });
   });
 
+  it("passes the partly unreadable page count through (#4947)", async () => {
+    runDocsScript.mockResolvedValueOnce(
+      '{"chars": 52, "hasText": true, "pages": 3, "emptyPages": 0, "unreadablePages": 0, "partlyUnreadablePages": 2}',
+    );
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).resolves.toEqual({
+      chars: 52,
+      hasText: true,
+      pages: 3,
+      emptyPages: 0,
+      unreadablePages: 0,
+      partlyUnreadablePages: 2,
+    });
+  });
+
+  it("keeps the page counts when a #954-era sidecar sends no partly unreadable count", async () => {
+    runDocsScript.mockResolvedValueOnce(
+      '{"chars": 52, "hasText": true, "pages": 3, "emptyPages": 0, "unreadablePages": 1, "partlyUnreadablePages": "2"}',
+    );
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).resolves.toEqual({ chars: 52, hasText: true, pages: 3, emptyPages: 0, unreadablePages: 1 });
+  });
+
   it("leaves the per-page counts off when an older sidecar omits or garbles them", async () => {
     runDocsScript.mockResolvedValueOnce('{"chars": 9, "hasText": true, "pages": "3"}');
     await expect(

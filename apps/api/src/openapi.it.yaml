@@ -15387,6 +15387,16 @@ paths:
                           total:
                             type: integer
                             description: Pagine nel PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Presente solo quando alcune pagine erano leggibili come testo ma contenevano anche testo in un font senza una mappa ToUnicode utilizzabile. Quelle righe restano nel .txt così come sono state estratte.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pagine leggibili come testo che contenevano anche testo illeggibile
+                          total:
+                            type: integer
+                            description: Pagine nel PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33742,6 +33752,18 @@ x-i18n:
       provenance: machine
       outputHash: 532595ace65c
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 4460881f9753
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 03dacdd786d4
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: c64797ba25db
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 4460881f9753

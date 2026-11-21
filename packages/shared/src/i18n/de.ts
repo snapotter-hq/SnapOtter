@@ -4068,6 +4068,8 @@ export const de: TranslationKeys = {
       runOcr: "OCR auf dieses PDF anwenden",
       unreadablePages:
         "{count} von {total} Seiten haben keine lesbare Textebene, daher kann ihr Teil der .txt-Datei unleserlich sein. OCR kann diese Seiten lesen.",
+      partlyUnreadablePages:
+        "Auf {count} von {total} Seiten steht ein Teil des Textes in einer Schrift, die sich keinen lesbaren Zeichen zuordnen lässt, daher können diese Zeilen in der .txt-Datei unleserlich sein. OCR kann sie lesen.",
     },
     "pdf-to-markdown": {
       submit: "In Markdown konvertieren",
