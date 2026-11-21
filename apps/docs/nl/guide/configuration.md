@@ -2,7 +2,7 @@
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 1fa494781b1c
+i18n_output_hash: eb4d6f6dfb7b
 i18n_hash_version: 2
 ---
 
@@ -23,7 +23,7 @@ Alle configuratie verloopt via omgevingsvariabelen. Elke variabele heeft een zin
 | `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
 | `LOG_LEVEL` | `info` | Uitgebreidheid van de logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. De standaardinstelling vertrouwt alleen een peer in een privénetwerk, zodat een reverse proxy op een Docker-netwerk of LAN wordt vertrouwd en een vervalste header van een publieke client niet. Stel `true` alleen in als er een proxy onder uw beheer op een openbaar adres voor staat. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Stel in op `off` om een nieuwe instantie te starten met "Anonymous Product Analytics" uitgeschakeld, zodat die vanaf de eerste start niets verstuurt. Het vult de instelling alleen in zolang niemand er een waarde voor heeft gekozen. Zodra de instelling is opgeslagen, door een beheerder of door deze variabele, heeft het wijzigen van de variabele geen effect; een beheerder kan analytics nog steeds inschakelen onder Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (niet ingesteld) | Beantwoordt de analytics-vraag bij de eerste start vooraf, zodat niemand die krijgt. Niet ingesteld vraagt een nieuwe instantie het aan de beheerder en verstuurt die niets tot er een antwoord is. `off` start die met "Anonymous Product Analytics" uitgeschakeld; `on` start die ingeschakeld. Het vult de instelling alleen in zolang niemand er een waarde voor heeft gekozen. Zodra de instelling is opgeslagen, door een beheerder of door deze variabele, heeft het wijzigen van de variabele geen effect; een beheerder kan die nog steeds wijzigen onder Settings > System > Privacy. |
 
 ### Authenticatie {#authentication}
 
@@ -86,7 +86,7 @@ Start u de image zonder `DATABASE_URL` en zonder `REDIS_URL`, dan start hij binn
 
 Upgraden vanaf 1.x: plaats uw oude `snapotter.db` op `/data/snapotter.db` in het volume en de embedded-modus importeert het bij de eerste start in de embedded PostgreSQL. De import wordt één keer uitgevoerd; latere starts slaan hem over.
 
-Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image wordt geleverd met analytics ingeschakeld; bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, stel `SNAPOTTER_ANALYTICS_DEFAULT=off` in vóór de eerste start, of gebruik de opt-out voor beheerders in de app, om dit uit te schakelen.
+Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de image, net als elke andere configuratie. De gepubliceerde image kan analytics versturen, maar een nieuwe instantie vraagt het eerst aan de beheerder en verstuurt niets tot er een antwoord is. Om dit uit te schakelen, antwoord nee, bouw met `--build-arg SNAPOTTER_ANALYTICS=off`, stel `SNAPOTTER_ANALYTICS_DEFAULT=off` in vóór de eerste start, of gebruik de opt-out voor beheerders in de app.
 
 ### Verwerkingslimieten {#processing-limits}
 

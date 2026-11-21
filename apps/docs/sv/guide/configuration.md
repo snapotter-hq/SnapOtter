@@ -2,7 +2,7 @@
 description: "Alla miljövariabler i SnapOtter med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: a89c850dbf0e
+i18n_output_hash: 7cc4e9e29d3b
 i18n_hash_version: 2
 ---
 
@@ -23,7 +23,7 @@ All konfiguration görs med miljövariabler. Varje variabel har ett rimligt stan
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung för CORS, eller tom för endast samma ursprung. |
 | `LOG_LEVEL` | `info` | Loggningsnivå. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Standardvärdet litar bara på en peer i ett privat nätverk, så en omvänd proxy i ett Docker-nätverk eller ett LAN är betrodd medan en falsk rubrik från en publik klient inte är det. Ange `true` endast när en proxy som du kontrollerar står framför på en publik adress. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Ange `off` för att starta en ny instans med ”Anonymous Product Analytics” avstängt, så att den inte skickar något från första uppstarten. Den fyller bara i inställningen så länge ingen har valt ett värde. När inställningen väl har sparats, av en administratör eller av denna variabel, gör en ändring av variabeln ingenting; en administratör kan fortfarande slå på analys under Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (inte satt) | Besvarar analysfrågan vid första starten i förväg, så att ingen tillfrågas. Om den inte är satt frågar en ny instans sin administratör och skickar ingenting förrän den fått svar. `off` startar den med ”Anonymous Product Analytics” avstängt; `on` startar den påslagen. Den fyller bara i inställningen så länge ingen har valt ett värde. När inställningen väl har sparats, av en administratör eller av denna variabel, gör en ändring av variabeln ingenting; en administratör kan fortfarande ändra den under Settings > System > Privacy. |
 
 ### Autentisering {#authentication}
 
@@ -86,7 +86,7 @@ Kör avbilden utan `DATABASE_URL` och utan `REDIS_URL` så startar den sin egen 
 
 Uppgradering från 1.x: lägg din gamla `snapotter.db` på `/data/snapotter.db` i volymen så importerar inbäddat läge den till den inbäddade PostgreSQL vid första uppstarten. Importen körs en gång; senare uppstarter hoppar över den.
 
-Notering om telemetri: inbäddat läge ärver avbildens standardinställning för analys som all annan konfiguration. Den publicerade avbilden levereras med analys påslagen; bygg med `--build-arg SNAPOTTER_ANALYTICS=off`, ange `SNAPOTTER_ANALYTICS_DEFAULT=off` före första uppstarten, eller använd administratörens avanmälan i appen, för att inaktivera den.
+Notering om telemetri: inbäddat läge ärver avbildens standardinställning för analys som all annan konfiguration. Den publicerade avbilden kan skicka analysdata, men en ny instans frågar först sin administratör och skickar ingenting förrän den fått svar. För att inaktivera den, svara nej, bygg med `--build-arg SNAPOTTER_ANALYTICS=off`, ange `SNAPOTTER_ANALYTICS_DEFAULT=off` före första uppstarten, eller använd administratörens avanmälan i appen.
 
 ### Bearbetningsgränser {#processing-limits}
 

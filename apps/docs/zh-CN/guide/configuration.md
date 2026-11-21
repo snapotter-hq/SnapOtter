@@ -2,7 +2,7 @@
 description: "SnapOtter 的所有环境变量及其默认值。可配置认证、存储、AI 模型、分析等。"
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 71dee2df3bd2
+i18n_output_hash: f9ff4bcd36de
 i18n_hash_version: 2
 ---
 
@@ -23,7 +23,7 @@ i18n_hash_version: 2
 | `CORS_ORIGIN` | （空） | 以逗号分隔的 CORS 允许来源，留空则仅允许同源。 |
 | `LOG_LEVEL` | `info` | 日志详细程度。可选值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认值只信任私有网络中的对端，因此 Docker 网络或局域网上的反向代理会被信任，而公网客户端伪造的请求头不会。仅当你控制的代理位于公网地址之前时，才设置 `true`。 |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | 设为 `off` 可让新实例在启动时关闭“匿名产品分析”，从而从首次启动起就不发送任何数据。它只在尚无人做出选择时填入该设置。一旦该设置已被保存（无论是由管理员还是由此变量保存），更改此变量都不再起作用；管理员仍可在 设置 > 系统 > 隐私 中开启分析。 |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | （未设置） | 预先回答首次运行时的分析问题，因此不会询问任何人。未设置时，新实例会询问其管理员，在得到答复前不发送任何数据。`off` 让它在关闭“匿名产品分析”的状态下启动；`on` 则在开启状态下启动。它只在尚无人做出选择时填入该设置。一旦该设置已被保存（无论是由管理员还是由此变量保存），更改此变量都不再起作用；管理员仍可在 设置 > 系统 > 隐私 中更改。 |
 
 ### 认证 {#authentication}
 
@@ -86,7 +86,7 @@ i18n_hash_version: 2
 
 从 1.x 升级：将旧的 `snapotter.db` 放在卷中的 `/data/snapotter.db` 位置，内置模式会在首次启动时把它导入内置 PostgreSQL。导入只运行一次；之后的启动会跳过它。
 
-遥测说明：内置模式与其他配置一样继承镜像的分析默认值。发布的镜像默认开启分析；使用 `--build-arg SNAPOTTER_ANALYTICS=off` 构建、在首次启动前设置 `SNAPOTTER_ANALYTICS_DEFAULT=off`，或使用应用内的管理员退出选项，即可将其禁用。
+遥测说明：内置模式与其他配置一样继承镜像的分析默认值。发布的镜像可以发送分析数据，但新实例会先询问其管理员，在得到答复前不发送任何数据。要将其禁用，可以回答“否”、使用 `--build-arg SNAPOTTER_ANALYTICS=off` 构建、在首次启动前设置 `SNAPOTTER_ANALYTICS_DEFAULT=off`，或使用应用内的管理员退出选项。
 
 ### 处理限制 {#processing-limits}
 

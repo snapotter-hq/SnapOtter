@@ -2,7 +2,7 @@
 description: "Toutes les variables d'environnement de SnapOtter avec leurs valeurs par défaut. Configurez l'authentification, le stockage, les modèles d'IA, l'analytique et plus encore."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: human
-i18n_output_hash: 9f86c0d38f70
+i18n_output_hash: f356063d08a1
 i18n_hash_version: 2
 ---
 
@@ -23,7 +23,7 @@ Toute la configuration se fait via des variables d'environnement. Chaque variabl
 | `CORS_ORIGIN` | (vide) | Origines autorisées pour le CORS, séparées par des virgules, ou vide pour la même origine uniquement. |
 | `LOG_LEVEL` | `info` | Verbosité des journaux. L'une des valeurs : `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quels pairs peuvent définir l'IP du client via `X-Forwarded-For`. La valeur par défaut ne croit qu'un pair d'un réseau privé : un reverse proxy sur un réseau Docker ou sur un LAN est donc digne de confiance, alors que l'en-tête falsifié d'un client public ne l'est pas. Ne mettez `true` que lorsqu'un proxy que vous contrôlez se trouve devant, sur une adresse publique. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (non définie) | Répond à l'avance à la question sur l'analytique posée au premier démarrage, si bien que personne n'est interrogé. Si elle n'est pas définie, une nouvelle instance interroge son administrateur et n'envoie rien tant qu'il n'a pas répondu. `off` la démarre avec « Analyses de produit anonymes » désactivé ; `on` la démarre avec ce paramètre activé. La variable ne renseigne le paramètre que tant que personne n'en a choisi un. Une fois le paramètre enregistré, par un administrateur ou par cette variable, modifier la variable n'a plus aucun effet ; un administrateur peut toujours le modifier dans Paramètres > Système > Confidentialité. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (non définie) | Répond à l'avance à la question sur l'analytique posée au premier démarrage, si bien que personne n'est interrogé. Si elle n'est pas définie, une nouvelle instance interroge son administrateur et n'envoie rien tant qu'il n'a pas répondu. `off` la démarre avec le paramètre « Analyses de produit anonymes » désactivé ; `on` la démarre avec ce paramètre activé. La variable ne renseigne le paramètre que tant que personne n'en a choisi un. Une fois le paramètre enregistré, par un administrateur ou par cette variable, modifier la variable n'a plus aucun effet ; un administrateur peut toujours le modifier dans Paramètres > Système > Confidentialité. |
 
 ### Authentification {#authentication}
 
