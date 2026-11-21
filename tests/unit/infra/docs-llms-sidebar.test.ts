@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -50,7 +51,94 @@ describe("VitePress LLM sidebar", () => {
     expect(config).toContain(
       '{ text: "Hardware requirements", link: "/guide/deployment#hardware-requirements" }',
     );
-    expect(config).toContain('import { pageOnlySidebar } from "./llms-sidebar.mjs";');
-    expect(config).toMatch(/llmstxt\(\{[\s\S]*?sidebar:\s*pageOnlySidebar,/);
+    expect(config).toMatch(/llmstxt\(\{[\s\S]*?sidebar:\s*llmsSidebar,/);
+  });
+});
+
+// #5009: llms.txt was 768 KB (every page in 21 locales) with 3,843 `{#id}`
+// leaks in its link titles; llms-full.txt was 18 MB.
+describe("llms.txt and llms-full.txt contents", () => {
+  it("drops tool links from the llms.txt table of contents but keeps guides", async () => {
+    const helper = await loadHelper();
+    const sidebar = {
+      "/": [
+        { text: "Guide", items: [{ text: "Deployment", link: "/guide/deployment" }] },
+        {
+          text: "Image",
+          items: [
+            { text: "Resize", link: "/tools/image/resize" },
+            { text: "Deep", items: [{ text: "Crop", link: "/tools/image/crop" }] },
+          ],
+        },
+      ],
+    };
+    expect(helper.llmsSidebar(sidebar)).toEqual({
+      "/": [
+        { text: "Guide", items: [{ text: "Deployment", link: "/guide/deployment" }] },
+        { text: "Image", items: [{ text: "Deep", items: [] }] },
+      ],
+    });
+    expect(sidebar["/"][1].items).toHaveLength(2);
+  });
+
+  it("keeps translations out of both files and tool pages out of the index", async () => {
+    const helper = await loadHelper();
+    const { llmsTxt, llmsFullTxt } = helper.llmsIgnorePatterns(["de", "zh-CN"]);
+    for (const patterns of [llmsTxt, llmsFullTxt]) {
+      expect(patterns).toEqual(expect.arrayContaining(["de/**", "de.md", "zh-CN/**", "zh-CN.md"]));
+    }
+    expect(llmsTxt).toContain("tools/**");
+    expect(llmsFullTxt).not.toContain("tools/**");
+    expect(config).toMatch(
+      /ignoreFilesPerOutput:\s*llmsIgnorePatterns\(NON_EN\.map\(\(l\) => l\.code\)\)/,
+    );
+  });
+
+  it("strips explicit heading ids from titles and headings only", async () => {
+    const helper = await loadHelper();
+    const input = [
+      "- [Getting Started {#getting-started}](https://docs.snapotter.com/guide/getting-started.md): Install",
+      "## Quick Start {#quick-start}",
+      '### 401 "Bearer token required" {#\\_401-bearer-token-required}',
+      "See [the stack](#docker-compose) and `{#not-a-heading}` inline.",
+      "```md\n## Kept {#kept} trailing\n```",
+    ].join("\n");
+    expect(helper.stripHeadingIds(input)).toBe(
+      [
+        "- [Getting Started](https://docs.snapotter.com/guide/getting-started.md): Install",
+        "## Quick Start",
+        '### 401 "Bearer token required"',
+        "See [the stack](#docker-compose) and `{#not-a-heading}` inline.",
+        "```md\n## Kept {#kept} trailing\n```",
+      ].join("\n"),
+    );
+  });
+
+  it("rewrites the plugin's .md and llms*.txt outputs and nothing else", async () => {
+    const helper = await loadHelper();
+    const dir = mkdtempSync(join(tmpdir(), "llms-out-"));
+    try {
+      mkdirSync(join(dir, "guide"));
+      const leak = "# Title {#title}\n";
+      writeFileSync(join(dir, "llms.txt"), "- [A {#a}](x.md)\n");
+      writeFileSync(join(dir, "llms-full.txt"), leak);
+      writeFileSync(join(dir, "guide", "page.md"), leak);
+      writeFileSync(join(dir, "robots.txt"), leak);
+      writeFileSync(join(dir, "page.html"), leak);
+      await helper.stripHeadingIdsFromLlmsOutputs(dir);
+      expect(readFileSync(join(dir, "llms.txt"), "utf8")).toBe("- [A](x.md)\n");
+      expect(readFileSync(join(dir, "llms-full.txt"), "utf8")).toBe("# Title\n");
+      expect(readFileSync(join(dir, "guide", "page.md"), "utf8")).toBe("# Title\n");
+      expect(readFileSync(join(dir, "robots.txt"), "utf8")).toBe(leak);
+      expect(readFileSync(join(dir, "page.html"), "utf8")).toBe(leak);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs that cleanup after every docs build", () => {
+    expect(config).toMatch(
+      /async buildEnd\(siteConfig\) \{\s*await stripHeadingIdsFromLlmsOutputs\(siteConfig\.outDir\);/,
+    );
   });
 });
