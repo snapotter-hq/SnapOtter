@@ -261,10 +261,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // In both patterns the whitespace after the quote sits inside the optional
   // group, so two `\s*` runs are never adjacent and a long run of spaces
   // cannot be split two ways (that backtracking is quadratic). Named entities
-  // are not decoded above, and an XML parser turns `url(&quot;https://...` back
-  // into a quoted URL, so `&quot;` and `&apos;` count as quotes here too.
+  // and references to quotes are not decoded above, and an XML parser turns
+  // `url(&quot;https://...` or `url(&#34;https://...` back into a quoted URL,
+  // so those count as quotes here too.
   svg = svg.replace(
-    /url\s*\(\s*(?:(["']|&quot;|&apos;)\s*)?(?:https?:\/\/|file:|data:)/gi,
+    /url\s*\(\s*(?:(["']|&quot;|&apos;|&#0*(?:34|39);|&#[xX]0*2[27];)\s*)?(?:https?:\/\/|file:|data:)/gi,
     "url($1data:,",
   );
 

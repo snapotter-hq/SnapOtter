@@ -492,6 +492,19 @@ describe("sanitizeSvg: character references that encode XML syntax (#5102)", () 
     );
   });
 
+  it.each([
+    ["&#34;", '<svg><rect fill="url(&#34;https://evil.test/x&#34;)"/></svg>', "&#34;"],
+    ["&#x22;", '<svg><rect fill="url(&#x22;file:///etc/passwd&#x22;)"/></svg>', "&#x22;"],
+    ["&#39;", "<svg><rect style='fill:url(&#39;data:text/html,x&#39;)'/></svg>", "&#39;"],
+    ["&#X27;", "<svg><rect style='fill:url(&#X27;https://evil.test/x&#X27;)'/></svg>", "&#X27;"],
+  ])("blocks an external url() quoted with %s", (_label, input, quote) => {
+    // A renderer reads the reference as a quote, so this is a quoted external URL.
+    const out = clean(input);
+    expect(out).toContain(`url(${quote}data:,`);
+    expect(out).not.toMatch(/https:\/\/|file:\/\/|data:text/);
+    expect(XMLValidator.validate(out)).toBe(true);
+  });
+
   it("still decodes letters so an encoded scheme is caught", () => {
     const out = clean(
       '<svg><rect fill="&#34;"/><a href="&#106;avascript:alert(1)"><text>c</text></a></svg>',
