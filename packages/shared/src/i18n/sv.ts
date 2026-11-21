@@ -5898,6 +5898,8 @@ export const sv: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Lagringskvoten har överskridits.",
       TARGET_SIZE_EXCEEDED: "Resultatet kan inte nå målstorleken.",
       TOO_MANY_FRAMES: "Den här filen har för många bildrutor för att bearbetas.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Det här verktyget redigerar en bild åt gången. Dela först upp sidorna eller bildrutorna i separata bilder.",
       CANCELED: "Åtgärden avbröts.",
       PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",

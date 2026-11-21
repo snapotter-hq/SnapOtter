@@ -5796,6 +5796,7 @@ export const th: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "เกินโควตาพื้นที่จัดเก็บ",
       TARGET_SIZE_EXCEEDED: "ผลลัพธ์ไม่สามารถถึงขนาดเป้าหมายได้",
       TOO_MANY_FRAMES: "ไฟล์นี้มีเฟรมมากเกินไปที่จะประมวลผล",
+      MULTI_FRAME_UNSUPPORTED: "เครื่องมือนี้แก้ไขได้ครั้งละหนึ่งภาพ แยกหน้าหรือเฟรมออกเป็นภาพแยกกันก่อน",
       CANCELED: "ยกเลิกการดำเนินการแล้ว",
       PAGE_OUT_OF_RANGE: "ช่วงหน้านี้มีหน้าที่ไม่มีอยู่ใน PDF นี้",
       INVALID_PAGE_RANGE: "ช่วงหน้านี้ไม่ถูกต้อง ใช้หมายเลขหน้าเช่น 1-3,5",

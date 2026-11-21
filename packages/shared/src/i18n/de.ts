@@ -5961,6 +5961,8 @@ export const de: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Speicherkontingent überschritten.",
       TARGET_SIZE_EXCEEDED: "Das Ergebnis kann die Zielgröße nicht erreichen.",
       TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Dieses Werkzeug bearbeitet jeweils nur ein Bild. Teilen Sie die Seiten oder Frames zuerst in einzelne Bilder auf.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
       PAGE_OUT_OF_RANGE:
         "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",

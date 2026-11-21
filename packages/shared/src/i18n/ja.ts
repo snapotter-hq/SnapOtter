@@ -5855,6 +5855,8 @@ export const ja: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "ストレージの容量を超えました。",
       TARGET_SIZE_EXCEEDED: "結果を目標サイズに収めることができません。",
       TOO_MANY_FRAMES: "このファイルはフレーム数が多すぎて処理できません。",
+      MULTI_FRAME_UNSUPPORTED:
+        "このツールは一度に1枚の画像のみ編集できます。先にページやフレームを個別の画像に分割してください。",
       CANCELED: "操作はキャンセルされました。",
       PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
       INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",

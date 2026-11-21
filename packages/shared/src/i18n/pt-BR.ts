@@ -5919,6 +5919,8 @@ export const ptBR: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Cota de armazenamento excedida.",
       TARGET_SIZE_EXCEEDED: "O resultado não consegue atingir o tamanho desejado.",
       TOO_MANY_FRAMES: "Este arquivo tem quadros demais para processar.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Esta ferramenta edita uma imagem por vez. Divida primeiro as páginas ou quadros em imagens separadas.",
       CANCELED: "A operação foi cancelada.",
       PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
       INVALID_PAGE_RANGE:

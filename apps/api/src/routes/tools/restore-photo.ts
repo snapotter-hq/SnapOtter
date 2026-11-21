@@ -21,6 +21,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -70,6 +71,8 @@ registerAiJobHandler(
     () => "restore-photo",
     async (input, data, ctx) => {
       const settings = settingsSchema.parse(data.settings);
+      const outputFormat = await resolveOutputFormat(input, data.filename);
+      await assertSingleFrameFor(input, outputFormat.format);
 
       let result: Awaited<ReturnType<typeof restorePhoto>>;
       try {
@@ -92,7 +95,6 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(input, err);
       }
 
-      const outputFormat = await resolveOutputFormat(input, data.filename);
       let outputBuffer = result.buffer;
       if (outputFormat.format !== "png") {
         outputBuffer = await sharp(result.buffer)
@@ -332,6 +334,8 @@ export function registerRestorePhoto(app: FastifyInstance) {
       async (inputBuffer, settings, filename, ctx) => {
         const s = settings as z.infer<typeof settingsSchema>;
         const orientedBuffer = await autoOrient(inputBuffer);
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        await assertSingleFrameFor(orientedBuffer, outputFormat.format);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
@@ -356,7 +360,6 @@ export function registerRestorePhoto(app: FastifyInstance) {
           } catch (err) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
-          const outputFormat = await resolveOutputFormat(inputBuffer, filename);
           let outputBuffer = result.buffer;
           if (outputFormat.format !== "png") {
             outputBuffer = await sharp(result.buffer)

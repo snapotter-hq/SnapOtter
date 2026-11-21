@@ -5925,6 +5925,8 @@ export const nl: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Opslagquotum overschreden.",
       TARGET_SIZE_EXCEEDED: "Het resultaat kan de doelgrootte niet halen.",
       TOO_MANY_FRAMES: "Dit bestand heeft te veel frames om te verwerken.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Deze tool bewerkt één afbeelding tegelijk. Splits de pagina's of frames eerst in losse afbeeldingen.",
       CANCELED: "De bewerking is geannuleerd.",
       PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",

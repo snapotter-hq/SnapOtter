@@ -5881,6 +5881,8 @@ export const vi: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Đã vượt quá hạn mức lưu trữ.",
       TARGET_SIZE_EXCEEDED: "Kết quả không thể đạt kích thước mục tiêu.",
       TOO_MANY_FRAMES: "Tệp này có quá nhiều khung hình để xử lý.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Công cụ này chỉ chỉnh sửa từng ảnh một. Hãy tách các trang hoặc khung hình thành các ảnh riêng trước.",
       CANCELED: "Thao tác đã bị hủy.",
       PAGE_OUT_OF_RANGE: "Phạm vi trang đó có một trang mà PDF này không có.",
       INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",

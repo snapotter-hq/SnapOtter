@@ -5819,6 +5819,8 @@ export const en = {
       STORAGE_QUOTA_EXCEEDED: "Storage quota exceeded.",
       TARGET_SIZE_EXCEEDED: "The result can't reach the target size.",
       TOO_MANY_FRAMES: "This file has too many frames to process.",
+      MULTI_FRAME_UNSUPPORTED:
+        "This tool edits one image at a time. Split the pages or frames into separate images first.",
       CANCELED: "The operation was canceled.",
       PAGE_OUT_OF_RANGE: "That page range includes a page this PDF doesn't have.",
       INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",

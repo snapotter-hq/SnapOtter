@@ -5945,6 +5945,8 @@ export const fr: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Quota de stockage dépassé.",
       TARGET_SIZE_EXCEEDED: "Le résultat ne peut pas atteindre la taille cible.",
       TOO_MANY_FRAMES: "Ce fichier contient trop d'images pour être traité.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Cet outil modifie une seule image à la fois. Séparez d'abord les pages ou les images en fichiers distincts.",
       CANCELED: "L'opération a été annulée.",
       PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
       INVALID_PAGE_RANGE:
