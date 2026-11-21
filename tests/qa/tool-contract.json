@@ -14743,6 +14743,54 @@
     "invalidProbes": []
   },
   {
+    "id": "otf-to-ttf",
+    "name": "OTF to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".otf"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "woff-to-ttf",
+    "name": "WOFF to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".woff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "woff2-to-ttf",
+    "name": "WOFF2 to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".woff2"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ttf-to-woff2",
+    "name": "TTF to WOFF2",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".ttf", ".otf"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "compress-image-to-20kb",
     "name": "Compress Image to 20 KB",
     "modality": "image",

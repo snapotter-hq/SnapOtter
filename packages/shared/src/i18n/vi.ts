@@ -697,6 +697,22 @@ export const vi: TranslationKeys = {
       name: "Excel sang CSV",
       description: "Chuyển đổi Excel sang CSV trực tuyến. Nhanh, miễn phí và riêng tư.",
     },
+    "otf-to-ttf": {
+      name: "OTF sang TTF",
+      description: "Chuyển đổi OTF sang TTF trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF sang TTF",
+      description: "Chuyển đổi WOFF sang TTF trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 sang TTF",
+      description: "Chuyển đổi WOFF2 sang TTF trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF sang WOFF2",
+      description: "Chuyển đổi TTF sang WOFF2 trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
     // END conversion-presets
     resize: {
       name: "Thay đổi kích thước ảnh",

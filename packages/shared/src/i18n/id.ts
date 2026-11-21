@@ -695,6 +695,22 @@ export const id: TranslationKeys = {
       name: "Excel ke CSV",
       description: "Konversi Excel ke CSV online. Cepat, gratis, dan privat.",
     },
+    "otf-to-ttf": {
+      name: "OTF ke TTF",
+      description: "Konversi OTF ke TTF online. Cepat, gratis, dan privat.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF ke TTF",
+      description: "Konversi WOFF ke TTF online. Cepat, gratis, dan privat.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 ke TTF",
+      description: "Konversi WOFF2 ke TTF online. Cepat, gratis, dan privat.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF ke WOFF2",
+      description: "Konversi TTF ke WOFF2 online. Cepat, gratis, dan privat.",
+    },
     // END conversion-presets
     resize: {
       name: "Ubah Ukuran Gambar",

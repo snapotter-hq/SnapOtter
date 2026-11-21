@@ -476,6 +476,19 @@ export const zhCN: TranslationKeys = {
       name: "Excel 转 CSV",
       description: "在线将 Excel 转换为 CSV。快速、免费、私密。",
     },
+    "otf-to-ttf": { name: "OTF 转 TTF", description: "在线将 OTF 转换为 TTF。快速、免费、私密。" },
+    "woff-to-ttf": {
+      name: "WOFF 转 TTF",
+      description: "在线将 WOFF 转换为 TTF。快速、免费、私密。",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 转 TTF",
+      description: "在线将 WOFF2 转换为 TTF。快速、免费、私密。",
+    },
+    "ttf-to-woff2": {
+      name: "TTF 转 WOFF2",
+      description: "在线将 TTF 转换为 WOFF2。快速、免费、私密。",
+    },
     // END conversion-presets
     resize: {
       name: "调整图片尺寸",

@@ -392,6 +392,10 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `proportion-calculator` | Kalkulator proporcji | `a`, `b`, `c`, `mode` (direct/inverse). Treść JSON, bez przesyłania pliku; zwraca brakującą wartość. |
 | `base64` | Kodowanie / dekodowanie Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Treść JSON, bez przesyłania pliku; zwraca przekonwertowany tekst. |
 | `excel-to-csv` | Excel do CSV | dedykowane ustawienie wstępne konwersji oparte na `convert-spreadsheet` |
+| `otf-to-ttf` | OTF do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `woff-to-ttf` | WOFF do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `woff2-to-ttf` | WOFF2 do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `ttf-to-woff2` | TTF do WOFF2 | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
 | `create-zip` | Utwórz ZIP | - (wieloplikowe, 2-50 plików) |
 | `extract-zip` | Wypakuj ZIP | - (ochrona przed bombą) |
 

@@ -391,6 +391,10 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `proportion-calculator` | Kalkulator Perbandingan | `a`, `b`, `c`, `mode` (direct/inverse). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
 | `base64` | Encode / Decode Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
 | `excel-to-csv` | Excel to CSV | preset konversi khusus yang didukung oleh `convert-spreadsheet` |
+| `otf-to-ttf` | OTF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff-to-ttf` | WOFF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff2-to-ttf` | WOFF2 to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `ttf-to-woff2` | TTF to WOFF2 | preset konversi khusus yang didukung oleh `convert-font` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Extract ZIP | - (terlindungi dari bomb) |
 

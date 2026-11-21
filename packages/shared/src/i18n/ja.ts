@@ -697,6 +697,22 @@ export const ja: TranslationKeys = {
       name: "ExcelをCSVに変換",
       description: "ExcelをCSVにオンラインで変換。高速、無料、プライベート。",
     },
+    "otf-to-ttf": {
+      name: "OTFをTTFに変換",
+      description: "OTFをTTFにオンラインで変換。高速、無料、プライベート。",
+    },
+    "woff-to-ttf": {
+      name: "WOFFをTTFに変換",
+      description: "WOFFをTTFにオンラインで変換。高速、無料、プライベート。",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2をTTFに変換",
+      description: "WOFF2をTTFにオンラインで変換。高速、無料、プライベート。",
+    },
+    "ttf-to-woff2": {
+      name: "TTFをWOFF2に変換",
+      description: "TTFをWOFF2にオンラインで変換。高速、無料、プライベート。",
+    },
     // END conversion-presets
     resize: {
       name: "画像リサイズ",

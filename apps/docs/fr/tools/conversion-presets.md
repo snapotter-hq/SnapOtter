@@ -157,6 +157,10 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | ID du préréglage | Convertit | Route | Outil de base | Entrées acceptées | Réglages facultatifs |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel vers CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF vers TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF vers TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 vers TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF vers WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Remarques {#notes}
 

@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | เครื่องคิดเลขสัดส่วน | `a`, `b`, `c`, `mode` (direct/inverse) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
 | `base64` | เข้ารหัส / ถอดรหัส Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
 | `excel-to-csv` | Excel เป็น CSV | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-spreadsheet` |
+| `otf-to-ttf` | OTF เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `woff-to-ttf` | WOFF เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `woff2-to-ttf` | WOFF2 เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `ttf-to-woff2` | TTF เป็น WOFF2 | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
 | `create-zip` | สร้าง ZIP | - (หลายไฟล์ 2-50 ไฟล์) |
 | `extract-zip` | แตก ZIP | - (ป้องกัน bomb) |
 

@@ -692,6 +692,22 @@ export const ar: TranslationKeys = {
       name: "Excel إلى CSV",
       description: "حوّل Excel إلى CSV عبر الإنترنت. سريع ومجاني وخاص.",
     },
+    "otf-to-ttf": {
+      name: "OTF إلى TTF",
+      description: "حوّل OTF إلى TTF عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF إلى TTF",
+      description: "حوّل WOFF إلى TTF عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 إلى TTF",
+      description: "حوّل WOFF2 إلى TTF عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF إلى WOFF2",
+      description: "حوّل TTF إلى WOFF2 عبر الإنترنت. سريع ومجاني وخاص.",
+    },
     // END conversion-presets
     resize: {
       name: "تغيير حجم الصورة",

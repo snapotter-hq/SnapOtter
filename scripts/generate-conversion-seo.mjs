@@ -869,6 +869,65 @@ function subtitleEntry(p) {
   };
 }
 
+const FONT = {
+  TTF: "TrueType, the desktop format every operating system and design app installs",
+  OTF: "OpenType with CFF outlines, the cubic-curve flavour most type foundries ship",
+  WOFF: "a compressed web wrapper around a TTF or OTF",
+  WOFF2:
+    "the Brotli-compressed web wrapper every current browser loads, and the smallest of the four",
+};
+
+function fontEntry(p) {
+  const { from, to } = p;
+  const web = to === "WOFF2";
+  const outlines = web
+    ? "WOFF2 only wraps the font, so the outlines, kerning, and OpenType features come through untouched. TrueType and OpenType sources both work."
+    : from === "OTF"
+      ? "OTF stores cubic curves and TTF stores quadratic ones, so every glyph is redrawn. Each curve stays within one font unit of the original, which is invisible at any size you would set text."
+      : `Unwrapping ${from} gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original.`;
+  return {
+    searchTitle: `${from} to ${to} Converter Online Free`,
+    longDescription: `Convert ${from} fonts to ${to}. ${from} is ${FONT[from]}. ${to} is ${FONT[to]}. ${outlines} ${PRIVACY}`,
+    useCases: web
+      ? [
+          "Self-host a webfont with an @font-face rule instead of loading it from a font CDN",
+          "Cut a site's font payload by serving WOFF2 in place of a raw TTF",
+          "Ship a brand font with a web app without bloating the first page load",
+        ]
+      : [
+          `Install a font that only came as ${from} on a desktop or in a design app`,
+          "Get a font into software that only accepts TrueType",
+          "Inspect or edit a webfont in a desktop font editor",
+        ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      priv(from),
+    ],
+    faqs: [
+      {
+        q: `Will ${from} to ${to} change how the font looks?`,
+        a: web
+          ? "No. WOFF2 is a compressed container, so the glyphs inside are the same ones you uploaded."
+          : from === "OTF"
+            ? "Not visibly. The curves are approximated within one font unit, which is a fraction of a pixel at normal text sizes. Hinting is not carried over, so very small sizes on older Windows rendering may look slightly softer."
+            : "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: web
+          ? "Yes. A variable font keeps its axes when it is wrapped as WOFF2."
+          : "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  };
+}
+
 const BY_BASE = {
   convert: rasterEntry,
   vectorize: vectorizeEntry,
@@ -882,6 +941,7 @@ const BY_BASE = {
   "convert-audio": audioEntry,
   "convert-spreadsheet": spreadsheetEntry,
   "convert-subtitles": subtitleEntry,
+  "convert-font": fontEntry,
 };
 
 function serialize(id, seo) {

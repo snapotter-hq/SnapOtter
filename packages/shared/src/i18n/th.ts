@@ -691,6 +691,22 @@ export const th: TranslationKeys = {
       name: "Excel เป็น CSV",
       description: "แปลง Excel เป็น CSV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
     },
+    "otf-to-ttf": {
+      name: "OTF เป็น TTF",
+      description: "แปลง OTF เป็น TTF ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "woff-to-ttf": {
+      name: "WOFF เป็น TTF",
+      description: "แปลง WOFF เป็น TTF ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 เป็น TTF",
+      description: "แปลง WOFF2 เป็น TTF ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "ttf-to-woff2": {
+      name: "TTF เป็น WOFF2",
+      description: "แปลง TTF เป็น WOFF2 ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
     // END conversion-presets
     resize: {
       name: "ปรับขนาดภาพ",

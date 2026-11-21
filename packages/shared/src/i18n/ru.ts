@@ -695,6 +695,22 @@ export const ru: TranslationKeys = {
       name: "Excel в CSV",
       description: "Конвертируйте Excel в CSV онлайн. Быстро, бесплатно и приватно.",
     },
+    "otf-to-ttf": {
+      name: "OTF в TTF",
+      description: "Конвертируйте OTF в TTF онлайн. Быстро, бесплатно и приватно.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF в TTF",
+      description: "Конвертируйте WOFF в TTF онлайн. Быстро, бесплатно и приватно.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 в TTF",
+      description: "Конвертируйте WOFF2 в TTF онлайн. Быстро, бесплатно и приватно.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF в WOFF2",
+      description: "Конвертируйте TTF в WOFF2 онлайн. Быстро, бесплатно и приватно.",
+    },
     // END conversion-presets
     resize: {
       name: "Изменение размера изображения",

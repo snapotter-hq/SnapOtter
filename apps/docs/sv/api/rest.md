@@ -391,6 +391,10 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `proportion-calculator` | Proportionsräknare | `a`, `b`, `c`, `mode` (direct/inverse). JSON-kropp, ingen filuppladdning; ger det saknade värdet. |
 | `base64` | Base64-koda / avkoda | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-kropp, ingen filuppladdning; ger den konverterade texten. |
 | `excel-to-csv` | Excel till CSV | dedikerad konverteringsförinställning som backas upp av `convert-spreadsheet` |
+| `otf-to-ttf` | OTF till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `woff-to-ttf` | WOFF till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `woff2-to-ttf` | WOFF2 till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `ttf-to-woff2` | TTF till WOFF2 | dedikerad konverteringsförinställning som backas upp av `convert-font` |
 | `create-zip` | Skapa ZIP | - (flerfil, 2-50 filer) |
 | `extract-zip` | Extrahera ZIP | - (bombskyddad) |
 

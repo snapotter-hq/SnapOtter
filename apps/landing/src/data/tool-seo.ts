@@ -3805,6 +3805,126 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "otf-to-ttf": {
+    searchTitle: "OTF to TTF Converter Online Free",
+    longDescription:
+      "Convert OTF fonts to TTF. OTF is OpenType with CFF outlines, the cubic-curve flavour most type foundries ship. TTF is TrueType, the desktop format every operating system and design app installs. OTF stores cubic curves and TTF stores quadratic ones, so every glyph is redrawn. Each curve stays within one font unit of the original, which is invisible at any size you would set text. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as OTF on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your OTF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will OTF to TTF change how the font looks?",
+        a: "Not visibly. The curves are approximated within one font unit, which is a fraction of a pixel at normal text sizes. Hinting is not carried over, so very small sizes on older Windows rendering may look slightly softer.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "woff-to-ttf": {
+    searchTitle: "WOFF to TTF Converter Online Free",
+    longDescription:
+      "Convert WOFF fonts to TTF. WOFF is a compressed web wrapper around a TTF or OTF. TTF is TrueType, the desktop format every operating system and design app installs. Unwrapping WOFF gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as WOFF on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your WOFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WOFF to TTF change how the font looks?",
+        a: "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "woff2-to-ttf": {
+    searchTitle: "WOFF2 to TTF Converter Online Free",
+    longDescription:
+      "Convert WOFF2 fonts to TTF. WOFF2 is the Brotli-compressed web wrapper every current browser loads, and the smallest of the four. TTF is TrueType, the desktop format every operating system and design app installs. Unwrapping WOFF2 gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as WOFF2 on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your WOFF2 files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WOFF2 to TTF change how the font looks?",
+        a: "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "ttf-to-woff2": {
+    searchTitle: "TTF to WOFF2 Converter Online Free",
+    longDescription:
+      "Convert TTF fonts to WOFF2. TTF is TrueType, the desktop format every operating system and design app installs. WOFF2 is the Brotli-compressed web wrapper every current browser loads, and the smallest of the four. WOFF2 only wraps the font, so the outlines, kerning, and OpenType features come through untouched. TrueType and OpenType sources both work. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Self-host a webfont with an @font-face rule instead of loading it from a font CDN",
+      "Cut a site's font payload by serving WOFF2 in place of a raw TTF",
+      "Ship a brand font with a web app without bloating the first page load",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your TTF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will TTF to WOFF2 change how the font looks?",
+        a: "No. WOFF2 is a compressed container, so the glyphs inside are the same ones you uploaded.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Yes. A variable font keeps its axes when it is wrapped as WOFF2.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
   // END conversion-presets
   resize: {
     searchTitle: "Resize Images Online Free",

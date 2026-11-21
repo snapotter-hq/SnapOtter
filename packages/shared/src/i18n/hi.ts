@@ -479,6 +479,19 @@ export const hi: TranslationKeys = {
       name: "Excel से CSV",
       description: "Excel को CSV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
     },
+    "otf-to-ttf": { name: "OTF से TTF", description: "OTF को TTF में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "woff-to-ttf": {
+      name: "WOFF से TTF",
+      description: "WOFF को TTF में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 से TTF",
+      description: "WOFF2 को TTF में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "ttf-to-woff2": {
+      name: "TTF से WOFF2",
+      description: "TTF को WOFF2 में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
     // END conversion-presets
     resize: {
       name: "इमेज रीसाइज़",

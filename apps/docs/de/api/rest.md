@@ -391,6 +391,10 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `proportion-calculator` | Dreisatzrechner | `a`, `b`, `c`, `mode` (direct/inverse). JSON-Body, kein Datei-Upload; gibt den fehlenden Wert zurück. |
 | `base64` | Base64 kodieren / dekodieren | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-Body, kein Datei-Upload; gibt den umgewandelten Text zurück. |
 | `excel-to-csv` | Excel zu CSV | dediziertes Konvertierungs-Preset, gestützt auf `convert-spreadsheet` |
+| `otf-to-ttf` | OTF zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `woff-to-ttf` | WOFF zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `woff2-to-ttf` | WOFF2 zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `ttf-to-woff2` | TTF zu WOFF2 | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
 | `create-zip` | ZIP erstellen | - (Mehrfachdatei, 2-50 Dateien) |
 | `extract-zip` | ZIP extrahieren | - (Bomben-geschützt) |
 

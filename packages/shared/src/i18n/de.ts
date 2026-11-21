@@ -698,6 +698,22 @@ export const de: TranslationKeys = {
       name: "Excel in CSV umwandeln",
       description: "Excel online in CSV umwandeln. Schnell, kostenlos und privat.",
     },
+    "otf-to-ttf": {
+      name: "OTF in TTF umwandeln",
+      description: "OTF online in TTF umwandeln. Schnell, kostenlos und privat.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF in TTF umwandeln",
+      description: "WOFF online in TTF umwandeln. Schnell, kostenlos und privat.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 in TTF umwandeln",
+      description: "WOFF2 online in TTF umwandeln. Schnell, kostenlos und privat.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF in WOFF2 umwandeln",
+      description: "TTF online in WOFF2 umwandeln. Schnell, kostenlos und privat.",
+    },
     // END conversion-presets
     resize: {
       name: "Bildgröße ändern",

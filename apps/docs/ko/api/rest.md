@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 비례식 계산기 | `a`, `b`, `c`, `mode`(direct/inverse). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
 | `base64` | Base64 인코딩 / 디코딩 | `text`, `mode`(encode/decode), `urlSafe`(bool). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
 | `excel-to-csv` | Excel을 CSV로 | `convert-spreadsheet`로 지원되는 전용 변환 프리셋 |
+| `otf-to-ttf` | OTF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff-to-ttf` | WOFF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff2-to-ttf` | WOFF2을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `ttf-to-woff2` | TTF을 WOFF2로 | `convert-font`로 지원되는 전용 변환 프리셋 |
 | `create-zip` | ZIP 생성 | - (다중 파일, 2-50개 파일) |
 | `extract-zip` | ZIP 추출 | - (봄 보호) |
 

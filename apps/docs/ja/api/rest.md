@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 比例計算機 | `a`, `b`, `c`, `mode`（direct/inverse）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
 | `base64` | Base64 エンコード / デコード | `text`, `mode`（encode/decode）, `urlSafe`（bool）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
 | `excel-to-csv` | Excel から CSV | `convert-spreadsheet` を基盤とする専用の変換プリセット |
+| `otf-to-ttf` | OTF から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `woff-to-ttf` | WOFF から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `woff2-to-ttf` | WOFF2 から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `ttf-to-woff2` | TTF から WOFF2 | `convert-font` を基盤とする専用の変換プリセット |
 | `create-zip` | ZIP の作成 | -（複数ファイル、2-50 ファイル） |
 | `extract-zip` | ZIP の展開 | -（ボム対策済み） |
 

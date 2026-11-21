@@ -391,6 +391,10 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `proportion-calculator` | Máy tính tỉ lệ | `a`, `b`, `c`, `mode` (direct/inverse). Thân JSON, không tải tệp lên; trả về giá trị còn thiếu. |
 | `base64` | Mã hóa / giải mã Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Thân JSON, không tải tệp lên; trả về văn bản đã chuyển đổi. |
 | `excel-to-csv` | Excel sang CSV | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-spreadsheet` |
+| `otf-to-ttf` | OTF sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `woff-to-ttf` | WOFF sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `woff2-to-ttf` | WOFF2 sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `ttf-to-woff2` | TTF sang WOFF2 | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
 | `create-zip` | Tạo ZIP | - (đa tệp, 2-50 tệp) |
 | `extract-zip` | Giải nén ZIP | - (chống bom nén) |
 

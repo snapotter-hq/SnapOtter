@@ -120,6 +120,13 @@ export const BASE_CONFIG: Record<string, BaseConfig> = {
     settingsKind: "none",
     displayBase: "convert-subtitles",
   },
+  "convert-font": {
+    group: "registry",
+    modality: "file",
+    category: "data",
+    settingsKind: "none",
+    displayBase: "convert-font",
+  },
 };
 
 const JPG = [".jpg", ".jpeg"];
@@ -590,6 +597,41 @@ export const CONVERSION_PRESETS: ConversionPreset[] = [
     base: "convert-spreadsheet",
     locked: { format: "csv" },
     sourceInputs: [".xlsx", ".xls"],
+  },
+
+  // Fonts (base: convert-font)
+  {
+    id: "otf-to-ttf",
+    from: "OTF",
+    to: "TTF",
+    base: "convert-font",
+    locked: { format: "ttf" },
+    sourceInputs: [".otf"],
+  },
+  {
+    id: "woff-to-ttf",
+    from: "WOFF",
+    to: "TTF",
+    base: "convert-font",
+    locked: { format: "ttf" },
+    sourceInputs: [".woff"],
+  },
+  {
+    id: "woff2-to-ttf",
+    from: "WOFF2",
+    to: "TTF",
+    base: "convert-font",
+    locked: { format: "ttf" },
+    sourceInputs: [".woff2"],
+  },
+  // WOFF2 wraps either outline flavour, so this one takes OTF as well.
+  {
+    id: "ttf-to-woff2",
+    from: "TTF",
+    to: "WOFF2",
+    base: "convert-font",
+    locked: { format: "woff2" },
+    sourceInputs: [".ttf", ".otf"],
   },
 ];
 

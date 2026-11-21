@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | حاسبة التناسب | `a`، `b`، `c`، `mode` (direct/inverse). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
 | `base64` | ترميز / فك ترميز Base64 | `text`، `mode` (encode/decode)، `urlSafe` (منطقي). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
 | `excel-to-csv` | Excel إلى CSV | إعداد تحويل جاهز مخصص مدعوم بـ `convert-spreadsheet` |
+| `otf-to-ttf` | OTF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff-to-ttf` | WOFF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff2-to-ttf` | WOFF2 إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `ttf-to-woff2` | TTF إلى WOFF2 | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
 | `create-zip` | إنشاء ZIP | - (متعدد الملفات، 2-50 ملفًا) |
 | `extract-zip` | استخراج ZIP | - (محمي من قنابل الضغط) |
 

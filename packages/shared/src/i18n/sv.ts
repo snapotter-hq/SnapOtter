@@ -695,6 +695,22 @@ export const sv: TranslationKeys = {
       name: "Excel till CSV",
       description: "Konvertera Excel till CSV online. Snabbt, gratis och privat.",
     },
+    "otf-to-ttf": {
+      name: "OTF till TTF",
+      description: "Konvertera OTF till TTF online. Snabbt, gratis och privat.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF till TTF",
+      description: "Konvertera WOFF till TTF online. Snabbt, gratis och privat.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 till TTF",
+      description: "Konvertera WOFF2 till TTF online. Snabbt, gratis och privat.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF till WOFF2",
+      description: "Konvertera TTF till WOFF2 online. Snabbt, gratis och privat.",
+    },
     // END conversion-presets
     resize: {
       name: "Ändra bildstorlek",

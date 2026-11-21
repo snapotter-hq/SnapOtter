@@ -391,6 +391,10 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `proportion-calculator` | Orantı Hesaplayıcı | `a`, `b`, `c`, `mode` (direct/inverse). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
 | `base64` | Base64 Kodla / Çöz | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
 | `excel-to-csv` | Excel'den CSV'ye | `convert-spreadsheet` tarafından desteklenen özel dönüştürme ön ayarı |
+| `otf-to-ttf` | OTF'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `woff-to-ttf` | WOFF'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `woff2-to-ttf` | WOFF2'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `ttf-to-woff2` | TTF'den WOFF2'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
 | `create-zip` | ZIP Oluştur | - (çok dosyalı, 2-50 dosya) |
 | `extract-zip` | ZIP Ayıkla | - (bomba korumalı) |
 

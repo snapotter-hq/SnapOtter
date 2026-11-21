@@ -391,6 +391,10 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `proportion-calculator` | Verhoudingscalculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
 | `base64` | Base64 coderen / decoderen | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
 | `excel-to-csv` | Excel naar CSV | speciale conversiepreset ondersteund door `convert-spreadsheet` |
+| `otf-to-ttf` | OTF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff-to-ttf` | WOFF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff2-to-ttf` | WOFF2 naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `ttf-to-woff2` | TTF naar WOFF2 | speciale conversiepreset ondersteund door `convert-font` |
 | `create-zip` | ZIP maken | - (meerdere bestanden, 2-50 bestanden) |
 | `extract-zip` | ZIP uitpakken | - (beschermd tegen zip-bommen) |
 

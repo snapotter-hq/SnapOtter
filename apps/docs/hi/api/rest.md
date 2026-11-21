@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | अनुपात कैलकुलेटर | `a`, `b`, `c`, `mode` (direct/inverse)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
 | `base64` | Base64 एनकोड / डिकोड | `text`, `mode` (encode/decode), `urlSafe` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
 | `excel-to-csv` | Excel से CSV | `convert-spreadsheet` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `otf-to-ttf` | OTF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff-to-ttf` | WOFF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff2-to-ttf` | WOFF2 से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `ttf-to-woff2` | TTF से WOFF2 | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
 | `create-zip` | ZIP बनाएँ | - (मल्टी-फ़ाइल, 2-50 फ़ाइलें) |
 | `extract-zip` | ZIP निकालें | - (bomb-संरक्षित) |
 

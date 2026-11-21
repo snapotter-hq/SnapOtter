@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 比例計算機 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 主體，不需上傳檔案；回傳缺少的值。 |
 | `base64` | Base64 編碼 / 解碼 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 主體，不需上傳檔案；回傳轉換後的文字。 |
 | `excel-to-csv` | Excel 轉 CSV | 由 `convert-spreadsheet` 支援的專屬轉換預設 |
+| `otf-to-ttf` | OTF 轉 TTF | 由 `convert-font` 支援的專屬轉換預設 |
+| `woff-to-ttf` | WOFF 轉 TTF | 由 `convert-font` 支援的專屬轉換預設 |
+| `woff2-to-ttf` | WOFF2 轉 TTF | 由 `convert-font` 支援的專屬轉換預設 |
+| `ttf-to-woff2` | TTF 轉 WOFF2 | 由 `convert-font` 支援的專屬轉換預設 |
 | `create-zip` | 建立 ZIP | - （多檔案，2-50 個檔案） |
 | `extract-zip` | 解壓 ZIP | - （防炸彈保護） |
 

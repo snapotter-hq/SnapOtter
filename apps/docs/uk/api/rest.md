@@ -392,6 +392,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | Калькулятор пропорцій | `a`, `b`, `c`, `mode` (direct/inverse). Тіло JSON, без завантаження файлу; повертає відсутнє значення. |
 | `base64` | Кодування / декодування Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Тіло JSON, без завантаження файлу; повертає перетворений текст. |
 | `excel-to-csv` | Excel у CSV | виділений пресет конвертації на основі `convert-spreadsheet` |
+| `otf-to-ttf` | OTF у TTF | виділений пресет конвертації на основі `convert-font` |
+| `woff-to-ttf` | WOFF у TTF | виділений пресет конвертації на основі `convert-font` |
+| `woff2-to-ttf` | WOFF2 у TTF | виділений пресет конвертації на основі `convert-font` |
+| `ttf-to-woff2` | TTF у WOFF2 | виділений пресет конвертації на основі `convert-font` |
 | `create-zip` | Створення ZIP | - (багатофайловий, 2-50 файлів) |
 | `extract-zip` | Витяг ZIP | - (захищено від zip-бомб) |
 

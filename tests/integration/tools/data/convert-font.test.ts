@@ -23,27 +23,32 @@ afterAll(async () => {
   await testApp.cleanup();
 });
 
-async function runTool(filename: string, content: Buffer, settings: Record<string, unknown>) {
+async function runTool(
+  filename: string,
+  content: Buffer,
+  settings: Record<string, unknown>,
+  toolId = "convert-font",
+) {
   const { body, contentType } = createMultipartPayload([
     { name: "file", filename, contentType: "application/octet-stream", content },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
     method: "POST",
-    url: "/api/v1/tools/files/convert-font",
+    url: `/api/v1/tools/files/${toolId}`,
     headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
     body,
   });
 }
 
 /** The converted bytes and filename, through the 202 path when the sync window closes. */
-async function convertedFont(res: Awaited<ReturnType<typeof runTool>>) {
+async function convertedFont(res: Awaited<ReturnType<typeof runTool>>, toolId = "convert-font") {
   const envelope = JSON.parse(res.body);
   if (res.statusCode === 202) {
     const artifact = await waitForDownloadedJobArtifact(
       testApp.app,
       adminToken,
-      "convert-font",
+      toolId,
       envelope.jobId,
     );
     return { bytes: artifact.buffer, filename: artifact.filename };
@@ -57,6 +62,12 @@ async function convertedFont(res: Awaited<ReturnType<typeof runTool>>) {
 describe("convert-font input checks (no fontTools needed)", () => {
   it("rejects a non-font with 400 before queueing a job", async () => {
     const res = await runTool("fake.ttf", Buffer.from("%PDF-1.7 not a font"), { format: "woff2" });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("isn't a TTF");
+  });
+
+  it("rejects a non-font sent to a font preset with 400 before queueing a job (#5053)", async () => {
+    const res = await runTool("fake.otf", Buffer.from("%PDF-1.7 not a font"), {}, "otf-to-ttf");
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toContain("isn't a TTF");
   });
@@ -80,6 +91,30 @@ describe.skipIf(!hasFontTools)("convert-font (requires fontTools)", () => {
       const fixture = readFixture(fixtures.data[source as "ttf" | "otf" | "woff2"]);
       const { bytes, filename } = await convertedFont(
         await runTool(`tiny.${source}`, fixture, { format: target }),
+      );
+      expect(filename).toMatch(new RegExp(`\\.${target}$`));
+      expect(bytes.subarray(0, 4).toString("hex")).toBe(MAGIC[target]);
+    },
+    60_000,
+  );
+});
+
+describe.skipIf(!hasFontTools)("font conversion presets lock their target (#5053)", () => {
+  const MAGIC: Record<string, string> = { ttf: "00010000", woff2: "774f4632" };
+
+  it.each([
+    ["otf-to-ttf", "otf", "ttf"],
+    ["woff-to-ttf", "woff", "ttf"],
+    ["woff2-to-ttf", "woff2", "ttf"],
+    ["ttf-to-woff2", "ttf", "woff2"],
+    ["ttf-to-woff2", "otf", "woff2"],
+  ])(
+    "%s turns a .%s into a .%s with no settings",
+    async (toolId, source, target) => {
+      const fixture = readFixture(fixtures.data[source as "ttf" | "otf" | "woff" | "woff2"]);
+      const { bytes, filename } = await convertedFont(
+        await runTool(`tiny.${source}`, fixture, {}, toolId),
+        toolId,
       );
       expect(filename).toMatch(new RegExp(`\\.${target}$`));
       expect(bytes.subarray(0, 4).toString("hex")).toBe(MAGIC[target]);

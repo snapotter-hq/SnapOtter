@@ -391,6 +391,10 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `proportion-calculator` | Calculateur de proportions | `a`, `b`, `c`, `mode` (direct/inverse). Corps JSON, aucun téléversement de fichier ; renvoie la valeur manquante. |
 | `base64` | Encoder / décoder en Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corps JSON, aucun téléversement de fichier ; renvoie le texte converti. |
 | `excel-to-csv` | Excel vers CSV | préréglage de conversion dédié adossé à `convert-spreadsheet` |
+| `otf-to-ttf` | OTF vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `woff-to-ttf` | WOFF vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `woff2-to-ttf` | WOFF2 vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `ttf-to-woff2` | TTF vers WOFF2 | préréglage de conversion dédié adossé à `convert-font` |
 | `create-zip` | Créer un ZIP | - (multi-fichiers, 2-50 fichiers) |
 | `extract-zip` | Extraire un ZIP | - (protégé contre les bombes) |
 

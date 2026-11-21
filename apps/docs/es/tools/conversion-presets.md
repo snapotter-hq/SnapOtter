@@ -157,6 +157,10 @@ Envía `multipart/form-data` con una parte `file` y una cadena JSON `settings` o
 | ID de preajuste | Convierte | Ruta | Herramienta base | Entradas aceptadas | Ajustes opcionales |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel a CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | ninguno |
+| `otf-to-ttf` | OTF a TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | ninguno |
+| `woff-to-ttf` | WOFF a TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | ninguno |
+| `woff2-to-ttf` | WOFF2 a TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | ninguno |
+| `ttf-to-woff2` | TTF a WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | ninguno |
 
 ## Notas {#notes}
 

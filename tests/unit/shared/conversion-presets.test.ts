@@ -43,6 +43,25 @@ describe("conversion presets", () => {
     for (const p of CONVERSION_PRESETS) expect(toolIds.has(p.id)).toBe(true);
   });
 
+  it("locks convert-font to the target format for each font preset (#5053)", () => {
+    const fonts = CONVERSION_PRESETS.filter((p) => p.base === "convert-font").map((p) => ({
+      id: p.id,
+      format: p.locked.format,
+      inputs: p.sourceInputs,
+    }));
+    expect(fonts).toEqual([
+      { id: "otf-to-ttf", format: "ttf", inputs: [".otf"] },
+      { id: "woff-to-ttf", format: "ttf", inputs: [".woff"] },
+      { id: "woff2-to-ttf", format: "ttf", inputs: [".woff2"] },
+      { id: "ttf-to-woff2", format: "woff2", inputs: [".ttf", ".otf"] },
+    ]);
+    const tools = expandConversionPresets().filter((t) => fonts.some((f) => f.id === t.id));
+    for (const tool of tools) {
+      expect(tool.modality).toBe("file");
+      expect(tool.category).toBe("data");
+    }
+  });
+
   it("preset keywords include the natural phrasing", () => {
     const jpgPng = expandConversionPresets().find((t) => t.id === "jpg-to-png");
     expect(jpgPng?.keywords).toContain("jpg to png");
