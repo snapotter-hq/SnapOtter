@@ -365,6 +365,34 @@ async function moveScimExternalIds(tx: { execute: typeof db.execute }): Promise<
     WHERE auth_provider = 'scim' AND external_id IS NOT NULL`);
 }
 
+/**
+ * Migration 0014 pins the old password defaults only where users already
+ * exist, and on a 1.x import the users arrive after migrations ran. Apply the
+ * same pin here so an imported install keeps the rules it had, after folding a
+ * 2.0/2.1 passwordRequireNumber row into passwordRequireDigit as 0012 does.
+ * Settings copied from the 1.x file win over the pinned defaults.
+ */
+async function keepLegacyPasswordPolicy(tx: { execute: typeof db.execute }): Promise<void> {
+  await tx.execute(sql`
+    UPDATE "settings" SET "key" = 'passwordRequireDigit'
+    WHERE "key" = 'passwordRequireNumber'
+      AND NOT EXISTS (SELECT 1 FROM "settings" WHERE "key" = 'passwordRequireDigit')
+  `);
+  await tx.execute(sql`DELETE FROM "settings" WHERE "key" = 'passwordRequireNumber'`);
+  await tx.execute(sql`
+    INSERT INTO "settings" ("key", "value", "updated_at")
+    SELECT defaults."key", defaults."value", now()
+    FROM (
+      VALUES
+        ('passwordMinLength', '8'),
+        ('passwordRequireUppercase', 'true'),
+        ('passwordRequireLowercase', 'true'),
+        ('passwordRequireDigit', 'true')
+    ) AS defaults ("key", "value")
+    ON CONFLICT ("key") DO NOTHING
+  `);
+}
+
 /** Live target columns for a public table (drizzle transaction handle). */
 async function targetColumns(
   tx: { execute: typeof db.execute },
@@ -468,6 +496,7 @@ export async function migrateFromSqlite(
       await mapUserTeamNamesToIds(tx);
       await moveScimExternalIds(tx);
       await repairOidcEmailLinks(tx, detached, taken);
+      if ((result.tables.users ?? 0) > 0) await keepLegacyPasswordPolicy(tx);
     });
   } finally {
     sqlite.close();

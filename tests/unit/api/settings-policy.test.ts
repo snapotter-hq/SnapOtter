@@ -119,15 +119,20 @@ describe("settings policy registry", () => {
       "passwordRequireLowercase",
       "passwordRequireDigit",
       "passwordRequireNumber",
-    ] as const)("treats default-on rule %s as enabled unless stored as false", (key) => {
-      expect(isPasswordRuleSettingKey(key)).toBe(true);
-      for (const onValue of [undefined, null, "true", "TRUE", "1", "0", "FALSE", "", "yes"]) {
-        expect(isPasswordRuleEnabled(key, onValue)).toBe(true);
-        expect(normalizePasswordRuleSetting(key, onValue)).toBe("true");
-      }
-      expect(isPasswordRuleEnabled(key, "false")).toBe(false);
-      expect(normalizePasswordRuleSetting(key, "false")).toBe("false");
-    });
+    ] as const)(
+      "treats rule %s as off with no row and on for any stored value but false",
+      (key) => {
+        expect(isPasswordRuleSettingKey(key)).toBe(true);
+        for (const onValue of ["true", "TRUE", "1", "0", "FALSE", "", "yes"]) {
+          expect(isPasswordRuleEnabled(key, onValue)).toBe(true);
+          expect(normalizePasswordRuleSetting(key, onValue)).toBe("true");
+        }
+        for (const offValue of [undefined, null, "false"]) {
+          expect(isPasswordRuleEnabled(key, offValue)).toBe(false);
+          expect(normalizePasswordRuleSetting(key, offValue)).toBe("false");
+        }
+      },
+    );
 
     it("treats passwordRequireSpecial as enabled only when stored as true", () => {
       expect(isPasswordRuleSettingKey("passwordRequireSpecial")).toBe(true);

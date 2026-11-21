@@ -148,11 +148,21 @@ base.describe("People Management: API", () => {
     expect(res.status).toBe(409);
   });
 
-  base("register rejects weak password", async () => {
+  // A new install has no password rules: anything but an empty password goes.
+  base("register accepts a simple password on a new install", async () => {
     const res = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
-      body: JSON.stringify({ username: "weakpw", password: "weak" }),
+      body: JSON.stringify({ username: "simplepw", password: "otter" }),
+    });
+    expect(res.status).toBe(201);
+  });
+
+  base("register rejects an empty password", async () => {
+    const res = await fetch(`${API}/api/auth/register`, {
+      method: "POST",
+      headers: authJson(token),
+      body: JSON.stringify({ username: "emptypw", password: "" }),
     });
     expect(res.status).toBe(400);
   });
@@ -235,7 +245,7 @@ base.describe("People Management: API", () => {
     expect(loginRes.status).toBe(200);
   });
 
-  base("reset password rejects weak password", async () => {
+  base("reset password rejects an empty password", async () => {
     const createRes = await fetch(`${API}/api/auth/register`, {
       method: "POST",
       headers: authJson(token),
@@ -246,7 +256,7 @@ base.describe("People Management: API", () => {
     const res = await fetch(`${API}/api/auth/users/${id}/reset-password`, {
       method: "POST",
       headers: authJson(token),
-      body: JSON.stringify({ newPassword: "weak" }),
+      body: JSON.stringify({ newPassword: "" }),
     });
     expect(res.status).toBe(400);
   });

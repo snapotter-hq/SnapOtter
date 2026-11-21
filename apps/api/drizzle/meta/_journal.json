@@ -99,6 +99,13 @@
       "when": 1795074249143,
       "tag": "0013_sessions_hash_token_id",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795157887376,
+      "tag": "0014_settings_password_policy_relaxed",
+      "breakpoints": true
     }
   ]
 }

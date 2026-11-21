@@ -56,7 +56,7 @@ describe("AdminSecuritySettings save errors", () => {
     expect(input).toHaveAttribute("min", "1");
   });
 
-  it("lets an admin switch the lowercase rule off and saves it (#1028)", async () => {
+  it("shows the lowercase rule off on a new install and saves it when switched on (#1028)", async () => {
     apiPut.mockResolvedValue({});
 
     render(<AdminSecuritySettings />);
@@ -65,15 +65,15 @@ describe("AdminSecuritySettings save errors", () => {
     const toggle = await screen.findByRole("switch", {
       name: en.settings.security.passwordRequireLowercase,
     });
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
 
     fireEvent.click(await screen.findByRole("button", { name: /save/i }));
     await waitFor(() =>
       expect(apiPut).toHaveBeenCalledWith(
         "/v1/settings",
-        expect.objectContaining({ passwordRequireLowercase: "false" }),
+        expect.objectContaining({ passwordRequireLowercase: "true" }),
       ),
     );
   });

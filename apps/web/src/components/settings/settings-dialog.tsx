@@ -2,6 +2,7 @@ import {
   APP_VERSION,
   CATEGORIES,
   CORE_AUDIT_EVENTS,
+  DEFAULT_PASSWORD_MIN_LENGTH,
   isPasswordRuleEnabled,
   isToolDisabled,
   isValidRoleName,
@@ -1551,7 +1552,7 @@ export function AdminSecuritySettings() {
       >
         <SettingNumberInput
           value={settings.passwordMinLength}
-          fallback="8"
+          fallback={String(DEFAULT_PASSWORD_MIN_LENGTH)}
           onChange={(v) => updateSetting("passwordMinLength", v)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
