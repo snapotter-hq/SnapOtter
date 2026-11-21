@@ -709,3 +709,195 @@ describe("isSvgClientError (#3580)", () => {
     expect(isSvgClientError("string error")).toBe(false);
   });
 });
+
+describe("sanitizeSvg: base64 raster data URIs on <image> (#5101)", () => {
+  const clean = (svg: string) => sanitizeSvg(Buffer.from(svg)).toString("utf-8");
+  // Real 3x2 files written by sharp.
+  const PNG =
+    "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWP4z8DQAMMMyBwAeUMI+0cxNA0AAAAASUVORK5CYII=";
+  const JPEG =
+    "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAMDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABQf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCDgBlJf//Z";
+  const GIF = "R0lGODlhAwACAIAAAExpcf8AACH5BAUAAAAALAAAAAADAAIAAAICjF8AOw==";
+  const WEBP =
+    "UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoDAAIAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=";
+  const SVG_B64 = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+  ).toString("base64");
+
+  /** A PNG signature and IHDR declaring `width` x `height`, then `pad` zero bytes. */
+  function pngHeader(width: number, height: number, pad = 0): string {
+    const buf = Buffer.alloc(33 + pad);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf, 0);
+    buf.writeUInt32BE(13, 8);
+    buf.write("IHDR", 12, "latin1");
+    buf.writeUInt32BE(width, 16);
+    buf.writeUInt32BE(height, 20);
+    buf[24] = 8;
+    buf[25] = 6;
+    return buf.toString("base64");
+  }
+
+  const kept = (out: string, payload: string) => out.includes(payload) && !out.includes("data:,");
+
+  it.each([
+    ["png on href", `<image href="data:image/png;base64,${PNG}" width="1" height="1"/>`, PNG],
+    ["png on xlink:href", `<image xlink:href="data:image/png;base64,${PNG}"/>`, PNG],
+    ["jpeg", `<image href="data:image/jpeg;base64,${JPEG}"/>`, JPEG],
+    ["gif", `<image href="data:image/gif;base64,${GIF}"/>`, GIF],
+    ["webp", `<image href="data:image/webp;base64,${WEBP}"/>`, WEBP],
+    ["single quotes", `<image href='data:image/png;base64,${PNG}'/>`, PNG],
+    ["mixed case scheme and type", `<image href="DATA:Image/PNG;Base64,${PNG}"/>`, PNG],
+    ["leading whitespace", `<image href="  data:image/png;base64,${PNG}"/>`, PNG],
+    [
+      "spaces in base64",
+      `<image href="data:image/png;base64,${PNG.slice(0, 20)} ${PNG.slice(20)}"/>`,
+      PNG.slice(20),
+    ],
+    ["namespace-prefixed element", `<svg:image href="data:image/png;base64,${PNG}"/>`, PNG],
+    ["href after other attributes", `<image x="0" y="0" href="data:image/png;base64,${PNG}">`, PNG],
+    ["entity-encoded data:", `<image href="&#100;ata:image/png;base64,${PNG}"/>`, PNG],
+    [
+      "a quoted > earlier in the tag",
+      `<image title="a > b" href="data:image/png;base64,${PNG}"/>`,
+      PNG,
+    ],
+    [
+      "after a comment with a quote",
+      `<!-- it's --><image href="data:image/png;base64,${PNG}"/>`,
+      PNG,
+    ],
+  ])("keeps a raster: %s", (_label, image, payload) => {
+    expect(kept(clean(`<svg>${image}</svg>`), payload)).toBe(true);
+  });
+
+  it("keeps a line-wrapped raster", () => {
+    // The control-character pass already joins the lines inside an href value.
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG.slice(0, 20)}\n  ${PNG.slice(20)}"/></svg>`,
+    );
+    expect(out).toContain(`href="data:image/png;base64,${PNG.slice(0, 20)}  ${PNG.slice(20)}"`);
+  });
+
+  it.each([
+    ["svg+xml base64", `<image href="data:image/svg+xml;base64,${SVG_B64}"/>`],
+    ["svg+xml plain", '<image href="data:image/svg+xml,<svg onload=alert(1)/>"/>'],
+    ["entity-encoded svg+xml", `<image href="&#100;ata:image/svg+xml;base64,${SVG_B64}"/>`],
+    ["upper-case svg+xml", `<image href="DATA:IMAGE/SVG+XML;BASE64,${SVG_B64}"/>`],
+    ["text/html", '<image href="data:text/html;base64,PHNjcmlwdD4="/>'],
+    ["svg bytes labelled png", `<image href="data:image/png;base64,${SVG_B64}"/>`],
+    ["jpeg bytes labelled png", `<image href="data:image/png;base64,${JPEG}"/>`],
+    ["png bytes labelled webp", `<image href="data:image/webp;base64,${PNG}"/>`],
+    ["truncated png", `<image href="data:image/png;base64,${PNG.slice(0, 12)}"/>`],
+    ["empty payload", '<image href="data:image/png;base64,"/>'],
+    ["non-base64 png", '<image href="data:image/png,rawbytes"/>'],
+    ["charset parameter", `<image href="data:image/png;charset=utf-8;base64,${PNG}"/>`],
+    ["parameter after base64", `<image href="data:image/png;base64;x=y,${PNG}"/>`],
+    ["parameter before base64", `<image href="data:image/png;x=1;base64,${PNG}"/>`],
+    ["lookalike type", `<image href="data:image/pngx;base64,${PNG}"/>`],
+    ["image/jpg", `<image href="data:image/jpg;base64,${JPEG}"/>`],
+    ["space before ;base64", `<image href="data:image/png ;base64,${PNG}"/>`],
+    ["non-base64 payload character", `<image href="data:image/png;base64,${PNG})"/>`],
+    ["named entity in payload", `<image href="data:image/png;base64,${PNG}&amp;"/>`],
+    ["unicode whitespace", `<image href="\u00a0data:image/png;base64,${PNG}"/>`],
+    ["unquoted value", `<image href=data:image/png;base64,${PNG}/>`],
+    ["unterminated value", `<image href="data:image/png;base64,${PNG}/>`],
+    ["mismatched quotes", `<image href="data:image/png;base64,${PNG}'/>`],
+    ["on <a href>", `<a href="data:image/png;base64,${PNG}"><text>x</text></a>`],
+    ["on <use>", `<use href="data:image/png;base64,${PNG}"/>`],
+    ["on a lookalike element", `<imagex href="data:image/png;base64,${PNG}"/>`],
+    ["on a lookalike attribute", `<image data-href="data:image/png;base64,${PNG}"/>`],
+    ["on a prefixed attribute", `<image x:href="data:image/png;base64,${PNG}"/>`],
+    ["outside any tag", `href="data:image/png;base64,${PNG}"`],
+    ["inside a comment", `<!-- <image href="data:image/png;base64,${PNG}"/> -->`],
+    [
+      "an <image> inside another tag's quoted value",
+      `<a title=">" <image href="data:image/png;base64,${PNG}">x</a>`,
+    ],
+    [
+      "an <image> inside a <use> tag's quoted value",
+      `<use title=">" <image href="data:image/png;base64,${PNG}"/>`,
+    ],
+    [
+      "an <a> after a stray quote that does not open a value",
+      `<image title=x"y > <a href="data:image/png;base64,${PNG}">" >`,
+    ],
+  ])("still blocks: %s", (_label, markup) => {
+    const out = clean(`<svg>${markup}</svg>`);
+    expect(out).not.toMatch(/href\s*=\s*["']?[\s\u00a0]*data:[^,]/i);
+  });
+
+  it("still strips <feImage> with a raster data URI", () => {
+    const out = clean(`<svg><filter><feImage href="data:image/png;base64,${PNG}"/></filter></svg>`);
+    expect(out).not.toContain("feImage");
+  });
+
+  it("neutralizes javascript: on the same element while keeping the raster", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG}" xlink:href="javascript:alert(1)"/></svg>`,
+    );
+    expect(out).toContain(`href="data:image/png;base64,${PNG}"`);
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain('xlink:href="data:,');
+  });
+
+  it("neutralizes javascript: before a raster on the same element", () => {
+    const out = clean(
+      `<svg><image xlink:href="javascript:alert(1)" href="data:image/png;base64,${PNG}"/></svg>`,
+    );
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain(`href="data:image/png;base64,${PNG}"`);
+  });
+
+  it("does not let a raster prefix carry an event handler", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG}&#34; onload=&#34;alert(1)"/></svg>`,
+    );
+    expect(out).not.toMatch(/\bonload\s*=/i);
+  });
+
+  it("blocks a raster wider than the side ceiling", () => {
+    const out = clean(`<svg><image href="data:image/png;base64,${pngHeader(16384, 1)}"/></svg>`);
+    expect(out).toContain('href="data:,');
+  });
+
+  it("blocks a raster that declares more pixels than the budget", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${pngHeader(10000, 10000)}"/></svg>`,
+    );
+    expect(out).toContain('href="data:,');
+  });
+
+  it("shares the pixel budget across every raster in the document", () => {
+    // 6000 x 6000 is 36 MP: one fits the 64 MP budget, the second does not.
+    const big = pngHeader(6000, 6000);
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${big}"/><image href="data:image/png;base64,${big}"/>` +
+        `<image href="data:image/png;base64,${PNG}"/></svg>`,
+    );
+    expect(out.split(`data:image/png;base64,${big}`)).toHaveLength(2);
+    expect(out).toContain(`data:image/png;base64,${PNG}`);
+    expect(out).toContain('href="data:,');
+  });
+
+  it("allows rasters on many <image> tags in linear time", () => {
+    const image = `<image href="data:image/png;base64,${pngHeader(1, 1, 1500)}"/>`;
+    const start = performance.now();
+    const out = clean(`<svg>${image.repeat(4000)}</svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.includes("data:,")).toBe(false);
+  });
+
+  it("does unbounded-quote raster scans in linear time", () => {
+    const start = performance.now();
+    const out = clean(`<svg><image ${'href="data:image/png;base64,AAAA '.repeat(20_000)}/></svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.includes("data:,")).toBe(true);
+  });
+
+  it("scans many unterminated quoted values in linear time", () => {
+    const start = performance.now();
+    const out = clean(`<svg>${'<image a="'.repeat(4000)}${"x".repeat(1_000_000)}</svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.length).toBeGreaterThan(1_000_000);
+  });
+});
