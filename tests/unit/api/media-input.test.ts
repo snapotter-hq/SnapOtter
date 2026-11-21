@@ -34,7 +34,10 @@ vi.mock("@snapotter/media-engine", async (importOriginal) => ({
 }));
 
 import { env } from "../../../apps/api/src/config.js";
-import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
+import {
+  decodeUtf16WithBom,
+  MediaInputHandler,
+} from "../../../apps/api/src/modality/media-input.js";
 
 let scratchDir: string;
 
@@ -457,5 +460,59 @@ describe("subtitle size cap (MAX_SUBTITLE_SIZE_MB, #4434)", () => {
     await expect(
       new MediaInputHandler("subtitle").prepare(srtOfSize(100), "subs.txt", { scratchDir }),
     ).rejects.toMatchObject({ message: "Not a valid subtitle file (.srt, .vtt, .ass)" });
+  });
+});
+
+describe("UTF-16 subtitles (#5051)", () => {
+  const srt = "1\n00:00:01,000 --> 00:00:04,000\nHéllo ✓\n\n";
+
+  function utf16le(text: string): Buffer {
+    return Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, "utf16le")]);
+  }
+
+  function utf16be(text: string): Buffer {
+    const body = Buffer.from(text, "utf16le").swap16();
+    return Buffer.concat([Buffer.from([0xfe, 0xff]), body]);
+  }
+
+  it.each([
+    ["little-endian", utf16le(srt)],
+    ["big-endian", utf16be(srt)],
+  ])("accepts a %s UTF-16 SRT and passes it on as UTF-8", async (_label, raw) => {
+    const prepared = await new MediaInputHandler("subtitle").prepare(raw, "subs.srt", {
+      scratchDir,
+    });
+    expect(prepared.filename).toBe("subs.srt");
+    expect(prepared.buffer.toString("utf8")).toBe(srt);
+  });
+
+  it("accepts a UTF-16 ASS file", async () => {
+    const ass = "[Script Info]\nTitle: test\n";
+    const prepared = await new MediaInputHandler("subtitle").prepare(utf16le(ass), "subs.ass", {
+      scratchDir,
+    });
+    expect(prepared.buffer.toString("utf8")).toBe(ass);
+  });
+
+  it("passes a UTF-8 subtitle on unchanged", async () => {
+    const raw = Buffer.from(srt, "utf8");
+    const prepared = await new MediaInputHandler("subtitle").prepare(raw, "subs.srt", {
+      scratchDir,
+    });
+    expect(prepared.buffer).toBe(raw);
+  });
+
+  it("still refuses UTF-16 text that is not a subtitle", async () => {
+    await expect(
+      new MediaInputHandler("subtitle").prepare(utf16le("just some notes\n"), "notes.srt", {
+        scratchDir,
+      }),
+    ).rejects.toMatchObject({ message: "Not a valid subtitle file (.srt, .vtt, .ass)" });
+  });
+
+  it("decodes only buffers that start with a UTF-16 byte order mark", () => {
+    expect(decodeUtf16WithBom(Buffer.from("plain"))).toBeNull();
+    expect(decodeUtf16WithBom(Buffer.from([0xff]))).toBeNull();
+    expect(decodeUtf16WithBom(Buffer.concat([utf16le("ab"), Buffer.from([0x63])]))).toBe("ab");
   });
 });
