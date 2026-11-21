@@ -15512,6 +15512,16 @@ paths:
                           total:
                             type: integer
                             description: Кількість сторінок у PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Присутній, лише якщо деякі сторінки читаються як текст, але містять і текст шрифтом без придатної мапи ToUnicode. Ці рядки лишаються у .txt у тому вигляді, в якому їх видобуто.
+                        properties:
+                          count:
+                            type: integer
+                            description: Сторінки, що читаються як текст, але містять і нечитабельний текст
+                          total:
+                            type: integer
+                            description: Кількість сторінок у PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36560,6 +36570,18 @@ x-i18n:
       provenance: machine
       outputHash: 90addab54d05
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 1b83ae24ab0b
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 83c0f8a40b71
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 5f54694eecfc
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 1b83ae24ab0b

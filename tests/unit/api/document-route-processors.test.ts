@@ -326,6 +326,27 @@ describe("document route processors", () => {
     });
   });
 
+  it("says how many readable pages also held unreadable text (#4947)", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 126,
+      hasText: true,
+      pages: 3,
+      emptyPages: 0,
+      unreadablePages: 0,
+      partlyUnreadablePages: 1,
+    });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const result = await config?.processV2?.(createCtx(scratchDir, "invoice.pdf"));
+      expect(result?.resultPayload).toEqual({
+        chars: 126,
+        partlyUnreadablePages: { count: 1, total: 3 },
+      });
+    });
+  });
+
   it("flattens PDFs through pdfFlattenPy", async () => {
     registerFlattenPdf(createMockApp());
     const config = getToolConfig("flatten-pdf");

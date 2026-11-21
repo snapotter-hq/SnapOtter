@@ -13,9 +13,10 @@ export function PdfToTextSettings() {
     useToolProcessor("pdf-to-text");
 
   // The .txt keeps those pages as extracted, so say they're there rather than
-  // let the junk pass as text (#954).
-  const unreadablePages =
-    currentEntry?.status === "completed" ? currentEntry.resultNotes?.unreadablePages : undefined;
+  // let the junk pass as text (#954), whole pages or lines within one (#4947).
+  const notes = currentEntry?.status === "completed" ? currentEntry.resultNotes : undefined;
+  const unreadablePages = notes?.unreadablePages;
+  const partlyUnreadablePages = notes?.partlyUnreadablePages;
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -39,6 +40,18 @@ export function PdfToTextSettings() {
           {format(s.unreadablePages, {
             count: unreadablePages.count,
             total: unreadablePages.total,
+          })}
+        </p>
+      )}
+
+      {partlyUnreadablePages && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="pdf-to-text-partly-unreadable-pages"
+        >
+          {format(s.partlyUnreadablePages, {
+            count: partlyUnreadablePages.count,
+            total: partlyUnreadablePages.total,
           })}
         </p>
       )}

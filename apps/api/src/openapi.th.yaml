@@ -15454,6 +15454,16 @@ paths:
                           total:
                             type: integer
                             description: จำนวนหน้าใน PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: มีเฉพาะเมื่อบางหน้าอ่านเป็นข้อความได้ แต่ยังมีข้อความในฟอนต์ที่ไม่มีแผนที่ ToUnicode ที่ใช้ได้ด้วย บรรทัดเหล่านั้นยังคงอยู่ในไฟล์ .txt ตามที่ดึงออกมา
+                        properties:
+                          count:
+                            type: integer
+                            description: หน้าที่อ่านเป็นข้อความได้แต่ยังมีข้อความที่อ่านไม่ได้ด้วย
+                          total:
+                            type: integer
+                            description: จำนวนหน้าใน PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36487,6 +36497,18 @@ x-i18n:
       provenance: machine
       outputHash: 064b829435ef
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: af957dde8485
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: f14ef299d581
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: b11dfb1ba821
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: af957dde8485

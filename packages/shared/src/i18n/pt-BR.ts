@@ -4237,6 +4237,8 @@ export const ptBR: TranslationKeys = {
       runOcr: "Executar OCR neste PDF",
       unreadablePages:
         "{count} de {total} páginas não têm uma camada de texto legível, então a parte delas no .txt pode sair ilegível. O OCR consegue ler essas páginas.",
+      partlyUnreadablePages:
+        "Em {count} de {total} páginas, parte do texto usa uma fonte que não corresponde a caracteres legíveis, então essas linhas podem sair ilegíveis no .txt. O OCR consegue lê-las.",
     },
     "pdf-to-markdown": {
       submit: "Converter para Markdown",

@@ -3915,6 +3915,8 @@ export const zhCN: TranslationKeys = {
       runOcr: "对此 PDF 运行 OCR",
       unreadablePages:
         "{total} 页中有 {count} 页没有可读的文本层，因此 .txt 中对应的部分可能是乱码。OCR 可以识别这些页面。",
+      partlyUnreadablePages:
+        "{total} 页中有 {count} 页的部分文本使用了无法映射为可读字符的字体，因此 .txt 中的这些行可能是乱码。OCR 可以识别它们。",
     },
     "pdf-to-markdown": {
       submit: "转换为 Markdown",

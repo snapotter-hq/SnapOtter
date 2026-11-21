@@ -15508,6 +15508,16 @@ paths:
                           total:
                             type: integer
                             description: Sidor i PDF-filen
+                      partlyUnreadablePages:
+                        type: object
+                        description: Finns bara när vissa sidor gick att läsa som text men också hade text i ett typsnitt utan användbar ToUnicode-tabell. Raderna finns kvar i .txt-filen som de extraherades.
+                        properties:
+                          count:
+                            type: integer
+                            description: Sidor som gick att läsa som text men också hade oläslig text
+                          total:
+                            type: integer
+                            description: Sidor i PDF-filen
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36555,6 +36565,18 @@ x-i18n:
       provenance: machine
       outputHash: 506a7cb00c7f
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 29080796fc5f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: ee750031e268
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 3bbe9f965f0d
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 29080796fc5f

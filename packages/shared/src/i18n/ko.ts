@@ -4158,6 +4158,8 @@ export const ko: TranslationKeys = {
       runOcr: "이 PDF에 OCR 실행",
       unreadablePages:
         "{total}페이지 중 {count}페이지에 읽을 수 있는 텍스트 레이어가 없어 .txt의 해당 부분이 깨져 보일 수 있습니다. OCR로 이 페이지들을 읽을 수 있습니다.",
+      partlyUnreadablePages:
+        "{total}페이지 중 {count}페이지에서 일부 텍스트가 읽을 수 있는 문자로 매핑되지 않는 글꼴로 되어 있어 .txt에서 해당 줄이 깨져 보일 수 있습니다. OCR로 읽을 수 있습니다.",
     },
     "pdf-to-markdown": {
       submit: "Markdown으로 변환",

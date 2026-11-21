@@ -4236,6 +4236,8 @@ export const tr: TranslationKeys = {
       runOcr: "Bu PDF'de OCR çalıştır",
       unreadablePages:
         "{total} sayfanın {count} tanesinde okunabilir bir metin katmanı yok, bu yüzden .txt dosyasındaki bu kısım bozuk çıkabilir. OCR bu sayfaları okuyabilir.",
+      partlyUnreadablePages:
+        "{total} sayfanın {count} tanesinde metnin bir kısmı okunabilir karakterlere eşlenmeyen bir yazı tipinde, bu yüzden bu satırlar .txt dosyasında bozuk çıkabilir. OCR bunları okuyabilir.",
     },
     "pdf-to-markdown": {
       submit: "Markdown'a Dönüştür",

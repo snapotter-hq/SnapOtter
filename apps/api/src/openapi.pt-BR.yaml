@@ -15512,6 +15512,16 @@ paths:
                           total:
                             type: integer
                             description: Páginas do PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Presente somente quando algumas páginas puderam ser lidas como texto, mas também tinham texto em uma fonte sem um mapa ToUnicode utilizável. Essas linhas permanecem no .txt como foram extraídas.
+                        properties:
+                          count:
+                            type: integer
+                            description: Páginas que puderam ser lidas como texto, mas também tinham texto ilegível
+                          total:
+                            type: integer
+                            description: Páginas do PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36560,6 +36570,18 @@ x-i18n:
       provenance: machine
       outputHash: 0d60c335a967
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 0a0b23b93a18
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: b447489bf909
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 4062137223a5
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 0a0b23b93a18
