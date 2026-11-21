@@ -1165,6 +1165,10 @@ export const fr: TranslationKeys = {
       name: "Recadrer un PDF",
       description: "Recadrez toutes les pages avec une marge uniforme",
     },
+    "resize-pdf-pages": {
+      name: "Redimensionner les pages PDF",
+      description: "Passez les pages en A4, Letter ou étiquette 4x6 po",
+    },
     "nup-pdf": {
       name: "Pages par feuille (N-up)",
       description: "Disposez plusieurs pages par feuille",
@@ -3988,6 +3992,28 @@ export const fr: TranslationKeys = {
       submit: "Recadrer",
       submitBatch: "Recadrer ({count} fichiers)",
       progressLabel: "Recadrage",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Format de page",
+      width: "Largeur",
+      height: "Hauteur",
+      unit: "Unité",
+      keepOrientation: "Garder l'orientation de chaque page",
+      fitHint:
+        "Le contenu est mis à l'échelle et centré, le texte et les codes-barres restent nets.",
+      submit: "Redimensionner",
+      submitBatch: "Redimensionner ({count} fichiers)",
+      progressLabel: "Redimensionnement",
+      sizes: {
+        "4x6in": "4 x 6 in (étiquette d'expédition)",
+        "100x150mm": "100 x 150 mm (étiquette d'expédition)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "Letter (US)",
+        legal: "Legal (US)",
+        custom: "Personnalisé",
+      },
     },
     "nup-pdf": {
       perSheet: "Pages par feuille",

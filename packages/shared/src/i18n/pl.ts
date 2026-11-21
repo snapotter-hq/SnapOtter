@@ -1157,6 +1157,10 @@ export const pl: TranslationKeys = {
       name: "Kadruj PDF",
       description: "Przytnij wszystkie strony z jednolitym marginesem",
     },
+    "resize-pdf-pages": {
+      name: "Zmień rozmiar stron PDF",
+      description: "Zmień strony na A4, Letter lub etykietę 4x6 cala",
+    },
     "nup-pdf": {
       name: "Strony na arkusz (N-up)",
       description: "Rozmieść wiele stron na jednym arkuszu",
@@ -3975,6 +3979,28 @@ export const pl: TranslationKeys = {
       submit: "Przytnij",
       submitBatch: "Przytnij ({count} plików)",
       progressLabel: "Przycinanie",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Rozmiar strony",
+      width: "Szerokość",
+      height: "Wysokość",
+      unit: "Jednostka",
+      keepOrientation: "Zachowaj orientację każdej strony",
+      fitHint:
+        "Treść jest skalowana do rozmiaru strony i wyśrodkowana, więc tekst i kody kreskowe pozostają ostre.",
+      submit: "Zmień rozmiar",
+      submitBatch: "Zmień rozmiar ({count} plików)",
+      progressLabel: "Zmiana rozmiaru",
+      sizes: {
+        "4x6in": "4 x 6 in (etykieta wysyłkowa)",
+        "100x150mm": "100 x 150 mm (etykieta wysyłkowa)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Niestandardowe",
+      },
     },
     "nup-pdf": {
       perSheet: "Stron na arkusz",

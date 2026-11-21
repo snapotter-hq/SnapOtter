@@ -181,6 +181,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "unlock-pdf": "document",
   "repair-pdf": "document",
   "crop-pdf": "document",
+  "resize-pdf-pages": "document",
   "nup-pdf": "document",
   "booklet-pdf": "document",
   "watermark-pdf": "document",

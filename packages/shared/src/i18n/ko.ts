@@ -1106,6 +1106,10 @@ export const ko: TranslationKeys = {
       name: "PDF 크롭",
       description: "균일한 여백으로 모든 페이지 크롭",
     },
+    "resize-pdf-pages": {
+      name: "PDF 페이지 크기 조정",
+      description: "페이지를 A4, 레터, 4x6인치 라벨 크기로 변경",
+    },
     "nup-pdf": {
       name: "한 장에 여러 페이지 (N-up)",
       description: "한 장에 여러 페이지 배치",
@@ -3898,6 +3902,28 @@ export const ko: TranslationKeys = {
       submit: "자르기",
       submitBatch: "자르기 ({count}개 파일)",
       progressLabel: "자르는 중",
+    },
+    "resize-pdf-pages": {
+      pageSize: "페이지 크기",
+      width: "너비",
+      height: "높이",
+      unit: "단위",
+      keepOrientation: "각 페이지 방향 유지",
+      fitHint:
+        "내용을 맞춤 크기로 조정해 가운데에 배치하므로 텍스트와 바코드가 선명하게 유지됩니다.",
+      submit: "크기 조정",
+      submitBatch: "크기 조정 ({count}개 파일)",
+      progressLabel: "크기 조정 중",
+      sizes: {
+        "4x6in": "4 x 6 in (배송 라벨)",
+        "100x150mm": "100 x 150 mm (배송 라벨)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US 레터",
+        legal: "US 리걸",
+        custom: "맞춤",
+      },
     },
     "nup-pdf": {
       perSheet: "시트당 페이지 수",

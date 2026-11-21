@@ -7278,6 +7278,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
 
+  "resize-pdf-pages": {
+    searchTitle: "Resize PDF Pages to 4x6, A4 or Letter Free",
+    longDescription:
+      "Change the page size of every page in a PDF. Pick A4, US Letter, A5, A6, a 4x6 in or 100x150 mm shipping label, or a custom size. Content is scaled to fit and centered without rasterizing, so text and barcodes stay sharp. SnapOtter runs on your own server, so documents stay on your network.",
+    useCases: [
+      "Turning a full-page carrier label into a 4x6 in page for a thermal label printer",
+      "Converting a US Letter document to A4 before printing in Europe",
+      "Shrinking pages to A5 or A6 for handouts and small booklets",
+      "Resizing every page in a batch of PDFs inside an automated pipeline",
+    ],
+    features: [
+      "Preset sizes including 4x6 in and 100x150 mm label stock",
+      "Custom page sizes in inches or millimetres",
+      "Scales to fit and centers, never stretches the content",
+      "Keeps vector text and barcodes sharp instead of rasterizing",
+      "Self-hosted processing keeps document content on your network",
+    ],
+    faqs: [
+      {
+        q: "Will a shipping label barcode still scan after resizing?",
+        a: "Yes. Pages are scaled as vectors, not turned into images, so barcodes keep crisp edges at any size. Processing runs on your own server.",
+      },
+      {
+        q: "What happens when the new size has a different shape?",
+        a: "The page is scaled to fit inside the new size and centered. The leftover space stays blank, so nothing is stretched or cut off.",
+      },
+      {
+        q: "Does it crop to the label on a Letter or A4 sheet?",
+        a: "No. Resizing keeps the whole page, so a label printed on a quarter of the sheet stays a quarter of the new page.",
+      },
+    ],
+  },
   "nup-pdf": {
     searchTitle: "N-up PDF Multiple Pages Per Sheet",
     longDescription:

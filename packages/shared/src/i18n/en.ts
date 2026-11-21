@@ -1113,6 +1113,10 @@ export const en = {
       name: "Crop PDF",
       description: "Crop all pages with a uniform margin",
     },
+    "resize-pdf-pages": {
+      name: "Resize PDF Pages",
+      description: "Resize pages to A4, Letter or a 4x6 in label",
+    },
     "nup-pdf": {
       name: "Pages Per Sheet (N-up)",
       description: "Arrange multiple pages per sheet",
@@ -3905,6 +3909,27 @@ export const en = {
       submit: "Crop",
       submitBatch: "Crop ({count} files)",
       progressLabel: "Cropping",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Page size",
+      width: "Width",
+      height: "Height",
+      unit: "Unit",
+      keepOrientation: "Match each page's orientation",
+      fitHint: "Content is scaled to fit and centered, so text and barcodes stay sharp.",
+      submit: "Resize",
+      submitBatch: "Resize ({count} files)",
+      progressLabel: "Resizing",
+      sizes: {
+        "4x6in": "4 x 6 in (shipping label)",
+        "100x150mm": "100 x 150 mm (shipping label)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Custom",
+      },
     },
     "nup-pdf": {
       perSheet: "Pages per sheet",

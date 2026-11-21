@@ -1163,6 +1163,10 @@ export const it: TranslationKeys = {
       name: "Ritaglia PDF",
       description: "Ritaglia tutte le pagine con un margine uniforme",
     },
+    "resize-pdf-pages": {
+      name: "Ridimensiona pagine PDF",
+      description: "Porta le pagine in A4, Letter o etichetta 4x6 in",
+    },
     "nup-pdf": {
       name: "Pagine per foglio (N-up)",
       description: "Dispone più pagine per foglio",
@@ -3978,6 +3982,28 @@ export const it: TranslationKeys = {
       submit: "Ritaglia",
       submitBatch: "Ritaglia ({count} file)",
       progressLabel: "Ritaglio",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Formato pagina",
+      width: "Larghezza",
+      height: "Altezza",
+      unit: "Unità",
+      keepOrientation: "Mantieni l'orientamento di ogni pagina",
+      fitHint:
+        "Il contenuto viene adattato e centrato, quindi testo e codici a barre restano nitidi.",
+      submit: "Ridimensiona",
+      submitBatch: "Ridimensiona ({count} file)",
+      progressLabel: "Ridimensionamento",
+      sizes: {
+        "4x6in": "4 x 6 in (etichetta di spedizione)",
+        "100x150mm": "100 x 150 mm (etichetta di spedizione)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "Letter (US)",
+        legal: "Legal (US)",
+        custom: "Personalizzato",
+      },
     },
     "nup-pdf": {
       perSheet: "Pagine per foglio",

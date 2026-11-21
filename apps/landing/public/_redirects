@@ -273,6 +273,8 @@
 /tools/pdfa-convert /tools/pdf/pdfa-convert/ 301
 /tools/crop-pdf/ /tools/pdf/crop-pdf/ 301
 /tools/crop-pdf /tools/pdf/crop-pdf/ 301
+/tools/resize-pdf-pages/ /tools/pdf/resize-pdf-pages/ 301
+/tools/resize-pdf-pages /tools/pdf/resize-pdf-pages/ 301
 /tools/nup-pdf/ /tools/pdf/nup-pdf/ 301
 /tools/nup-pdf /tools/pdf/nup-pdf/ 301
 /tools/booklet-pdf/ /tools/pdf/booklet-pdf/ 301
