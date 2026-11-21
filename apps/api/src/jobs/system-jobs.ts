@@ -479,6 +479,34 @@ async function backfillTeamRetentionDeadlines(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.id));
 }
 
+/**
+ * Clear a job's deadline when no team override backs it, so its files follow
+ * the global tempFileMaxAgeHours setting (#5121). Before #5100, enqueue wrote
+ * a FILE_MAX_AGE_HOURS deadline for a team without an override or a team row
+ * that no longer exists. A team that later clears its override, or a user who
+ * moves to such a team, keeps the old deadline the same way. A cleared
+ * override can't be told apart from one never set, so both lose the deadline.
+ * Returns how many rows were cleared.
+ */
+async function clearUnbackedTeamRetentionDeadlines(): Promise<number> {
+  if (!(await isEnterpriseFeatureEnabled("team_retention_overrides", "cron"))) return 0;
+
+  const rows = await db
+    .update(schema.jobs)
+    .set({ deleteAfter: null })
+    .from(schema.users)
+    .leftJoin(schema.teams, eq(schema.teams.id, schema.users.team))
+    .where(
+      and(
+        eq(schema.jobs.userId, schema.users.id),
+        isNotNull(schema.jobs.deleteAfter),
+        isNull(schema.teams.retentionHours),
+      ),
+    )
+    .returning({ id: schema.jobs.id });
+  return rows.length;
+}
+
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
   const heldUserRows = await db
@@ -516,6 +544,18 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     backfilled = await backfillTeamRetentionDeadlines();
   } catch (err) {
     logger.error({ err }, "Storage TTL: team retention deadline backfill failed");
+  }
+  // Before the deadline select, so a cleared job goes to the global sweep
+  // this pass instead of being deleted on its stale deadline.
+  try {
+    const cleared = await clearUnbackedTeamRetentionDeadlines();
+    if (cleared > 0) {
+      logger.info(
+        `Storage TTL: cleared ${cleared} team retention deadlines with no team override behind them`,
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, "Storage TTL: clearing team retention deadlines with no override failed");
   }
   // A failed deadline deletion is a retention promise not kept, so it is
   // counted and logged like the global sweep's failures, never dropped (#1442).
