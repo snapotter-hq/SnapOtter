@@ -675,6 +675,22 @@ export const id: TranslationKeys = {
       name: "AIFF ke M4A",
       description: "Konversi AIFF ke M4A online. Cepat, gratis, dan privat.",
     },
+    "srt-to-vtt": {
+      name: "SRT ke VTT",
+      description: "Konversi SRT ke VTT online. Cepat, gratis, dan privat.",
+    },
+    "vtt-to-srt": {
+      name: "VTT ke SRT",
+      description: "Konversi VTT ke SRT online. Cepat, gratis, dan privat.",
+    },
+    "ass-to-srt": {
+      name: "ASS ke SRT",
+      description: "Konversi ASS ke SRT online. Cepat, gratis, dan privat.",
+    },
+    "srt-to-ass": {
+      name: "SRT ke ASS",
+      description: "Konversi SRT ke ASS online. Cepat, gratis, dan privat.",
+    },
     "excel-to-csv": {
       name: "Excel ke CSV",
       description: "Konversi Excel ke CSV online. Cepat, gratis, dan privat.",
@@ -1093,7 +1109,7 @@ export const id: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Ekstrak Subtitle",
-      description: "Keluarkan trek subtitle dari video sebagai file SRT",
+      description: "Keluarkan trek subtitle dari video sebagai file SRT, WebVTT, atau ASS",
     },
     "convert-subtitles": {
       name: "Konversi Subtitle",
@@ -3763,6 +3779,7 @@ export const id: TranslationKeys = {
       progressLabel: "Menyisipkan subtitle",
     },
     "extract-subtitles": {
+      format: "Format Output",
       submit: "Ekstrak Subtitle",
       submitBatch: "Ekstrak Subtitle ({count} file)",
       progressLabel: "Mengekstrak subtitle",

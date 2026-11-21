@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 轉換預設 {#conversion-presets}
 
-共用目錄包含 83 個專屬的轉換預設端點，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 與 `excel-to-csv`。預設是第一級工具路由：
+共用目錄包含 117 個專屬的轉換預設端點，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 與 `excel-to-csv`。預設是第一級工具路由：
 
 `POST /api/v1/tools/<section>/<presetId>`
 

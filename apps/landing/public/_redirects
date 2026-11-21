@@ -565,6 +565,14 @@
 /tools/aiff-to-ogg /tools/audio/aiff-to-ogg/ 301
 /tools/aiff-to-m4a/ /tools/audio/aiff-to-m4a/ 301
 /tools/aiff-to-m4a /tools/audio/aiff-to-m4a/ 301
+/tools/srt-to-vtt/ /tools/video/srt-to-vtt/ 301
+/tools/srt-to-vtt /tools/video/srt-to-vtt/ 301
+/tools/vtt-to-srt/ /tools/video/vtt-to-srt/ 301
+/tools/vtt-to-srt /tools/video/vtt-to-srt/ 301
+/tools/ass-to-srt/ /tools/video/ass-to-srt/ 301
+/tools/ass-to-srt /tools/video/ass-to-srt/ 301
+/tools/srt-to-ass/ /tools/video/srt-to-ass/ 301
+/tools/srt-to-ass /tools/video/srt-to-ass/ 301
 /tools/excel-to-csv/ /tools/files/excel-to-csv/ 301
 /tools/excel-to-csv /tools/files/excel-to-csv/ 301
 /tools/compress-image-to-20kb/ /tools/image/compress-image-to-20kb/ 301

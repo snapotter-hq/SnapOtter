@@ -676,6 +676,22 @@ export const nl: TranslationKeys = {
       name: "AIFF naar M4A",
       description: "Zet AIFF online om naar M4A. Snel, gratis en privé.",
     },
+    "srt-to-vtt": {
+      name: "SRT naar VTT",
+      description: "Zet SRT online om naar VTT. Snel, gratis en privé.",
+    },
+    "vtt-to-srt": {
+      name: "VTT naar SRT",
+      description: "Zet VTT online om naar SRT. Snel, gratis en privé.",
+    },
+    "ass-to-srt": {
+      name: "ASS naar SRT",
+      description: "Zet ASS online om naar SRT. Snel, gratis en privé.",
+    },
+    "srt-to-ass": {
+      name: "SRT naar ASS",
+      description: "Zet SRT online om naar ASS. Snel, gratis en privé.",
+    },
     "excel-to-csv": {
       name: "Excel naar CSV",
       description: "Zet Excel online om naar CSV. Snel, gratis en privé.",
@@ -1096,7 +1112,7 @@ export const nl: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Ondertitels extraheren",
-      description: "Haal het ondertitelspoor uit een video als SRT-bestand",
+      description: "Haal het ondertitelspoor uit een video als SRT-, WebVTT- of ASS-bestand",
     },
     "convert-subtitles": {
       name: "Ondertitels converteren",
@@ -3781,6 +3797,7 @@ export const nl: TranslationKeys = {
       progressLabel: "Ondertitels insluiten",
     },
     "extract-subtitles": {
+      format: "Uitvoerformaat",
       submit: "Ondertitels extraheren",
       submitBatch: "Ondertitels extraheren ({count} bestanden)",
       progressLabel: "Ondertitels extraheren",

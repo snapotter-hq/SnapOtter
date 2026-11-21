@@ -80,6 +80,29 @@ describe.skipIf(!ffmpegAvailable())("extract-subtitles (requires ffmpeg)", () =>
     expect(srtContent).toContain("SnapOtter subtitle one");
   }, 60_000);
 
+  it("writes WebVTT when the format setting asks for it (#5052)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny-subs.mkv", contentType: "video/x-matroska", content: MKV },
+      { name: "settings", content: JSON.stringify({ format: "vtt" }) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/video/extract-subtitles",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect([200, 202], res.body.slice(0, 500)).toContain(res.statusCode);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toMatch(/\.vtt$/);
+
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    const vtt = dl.rawPayload.toString("utf8");
+    expect(vtt.startsWith("WEBVTT")).toBe(true);
+    expect(vtt).toContain("SnapOtter subtitle one");
+  }, 60_000);
+
   it("rejects a video with no subtitle track (400)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
@@ -117,6 +140,8 @@ describe.skipIf(!ffmpegAvailable())("extract-subtitles (requires ffmpeg)", () =>
 
     expect(res.statusCode).toBe(422);
     const parsed = JSON.parse(res.body);
-    expect(parsed.error).toBe("Image-based subtitle tracks cannot be converted to SRT without OCR");
+    expect(parsed.error).toBe(
+      "Image-based subtitle tracks cannot be converted to text subtitles without OCR",
+    );
   }, 60_000);
 });

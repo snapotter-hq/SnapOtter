@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Cấu hình chuyển đổi sẵn {#conversion-presets}
 
-Danh mục dùng chung bao gồm 83 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
+Danh mục dùng chung bao gồm 117 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

@@ -11518,6 +11518,11 @@ paths:
                   type: string
                   format: binary
                   description: एम्बेडेड सबटाइटल ट्रैक वाली वीडियो फ़ाइल
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -23534,6 +23539,294 @@ paths:
                   type: string
                   description: |
                     extract-audio पाइपलाइन का उपयोग करने वाला समर्पित MP4 से OGG कनवर्टर।
+                    आउटपुट फ़ॉर्मेट endpoint द्वारा तय है।
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE प्रोग्रेस ट्रैकिंग के लिए क्लाइंट द्वारा दिया गया जॉब ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: प्रोसेस की गई फ़ाइल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: अमान्य इनपुट या सेटिंग्स
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: प्रोसेसिंग विफल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags:
+        - Video
+      summary: SRT to VTT
+      description: |
+        SRT को VTT में बदलें
+        यह `convert-subtitles` द्वारा समर्थित एक समर्पित conversion preset endpoint है।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT से VTT इनपुट फ़ाइल (.srt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles पाइपलाइन का उपयोग करने वाला समर्पित SRT से VTT कनवर्टर।
+                    आउटपुट फ़ॉर्मेट endpoint द्वारा तय है।
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE प्रोग्रेस ट्रैकिंग के लिए क्लाइंट द्वारा दिया गया जॉब ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: प्रोसेस की गई फ़ाइल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: अमान्य इनपुट या सेटिंग्स
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: प्रोसेसिंग विफल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags:
+        - Video
+      summary: VTT to SRT
+      description: |
+        VTT को SRT में बदलें
+        यह `convert-subtitles` द्वारा समर्थित एक समर्पित conversion preset endpoint है।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VTT से SRT इनपुट फ़ाइल (.vtt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles पाइपलाइन का उपयोग करने वाला समर्पित VTT से SRT कनवर्टर।
+                    आउटपुट फ़ॉर्मेट endpoint द्वारा तय है।
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE प्रोग्रेस ट्रैकिंग के लिए क्लाइंट द्वारा दिया गया जॉब ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: प्रोसेस की गई फ़ाइल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: अमान्य इनपुट या सेटिंग्स
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: प्रोसेसिंग विफल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags:
+        - Video
+      summary: ASS to SRT
+      description: |
+        ASS को SRT में बदलें
+        यह `convert-subtitles` द्वारा समर्थित एक समर्पित conversion preset endpoint है।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ASS से SRT इनपुट फ़ाइल (.ass)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles पाइपलाइन का उपयोग करने वाला समर्पित ASS से SRT कनवर्टर।
+                    आउटपुट फ़ॉर्मेट endpoint द्वारा तय है।
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE प्रोग्रेस ट्रैकिंग के लिए क्लाइंट द्वारा दिया गया जॉब ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: प्रोसेस की गई फ़ाइल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: अमान्य इनपुट या सेटिंग्स
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: प्रमाणीकरण आवश्यक है
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: प्रोसेसिंग विफल
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags:
+        - Video
+      summary: SRT to ASS
+      description: |
+        SRT को ASS में बदलें
+        यह `convert-subtitles` द्वारा समर्थित एक समर्पित conversion preset endpoint है।
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT से ASS इनपुट फ़ाइल (.srt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles पाइपलाइन का उपयोग करने वाला समर्पित SRT से ASS कनवर्टर।
                     आउटपुट फ़ॉर्मेट endpoint द्वारा तय है।
                 clientJobId:
                   type: string

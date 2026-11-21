@@ -142,7 +142,7 @@ pnpm dev
 | Modalität | Anzahl | Beispielwerkzeuge |
 |----------|-------|---------------|
 | **Bild** | 112 | Größe ändern, Zuschneiden, Komprimieren, Konvertieren, Hintergrund entfernen, Hochskalieren, OCR, Wasserzeichen, Collage, Kolorieren, GIF-Werkzeuge, Formatvorgaben |
-| **Video** | 59 | Kürzen, Zuschneiden, Komprimieren, Konvertieren, Zusammenführen, Audio extrahieren, Automatische Untertitel, Video zu GIF, Größe ändern, Stabilisieren, Formatvorgaben |
+| **Video** | 63 | Kürzen, Zuschneiden, Komprimieren, Konvertieren, Zusammenführen, Audio extrahieren, Automatische Untertitel, Video zu GIF, Größe ändern, Stabilisieren, Formatvorgaben |
 | **Audio** | 57 | Kürzen, Zusammenführen, Konvertieren, Normalisieren, Rauschreduzierung, Transkribieren, Tonhöhe ändern, Überblenden, Klingelton-Ersteller, Formatvorgaben |
 | **PDF / Dokument** | 37 | Zusammenführen, Teilen, Komprimieren, OCR, Wasserzeichen, Schwärzen, Word zu PDF, Excel zu PDF, Drehen, Schützen, Reparieren |
 | **Dateien** | 25 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP extrahieren, Diagramm-Ersteller, YAML/JSON |

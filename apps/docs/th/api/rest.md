@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### พรีเซ็ตการแปลง {#conversion-presets}
 
-แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 83 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
+แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 117 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

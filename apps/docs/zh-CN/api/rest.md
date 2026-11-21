@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 转换预设 {#conversion-presets}
 
-共享目录包含 83 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
+共享目录包含 117 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
 
 `POST /api/v1/tools/<section>/<presetId>`
 

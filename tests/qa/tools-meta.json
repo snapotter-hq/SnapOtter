@@ -6782,6 +6782,42 @@
     "isAI": false
   },
   {
+    "id": "srt-to-vtt",
+    "name": "SRT to VTT",
+    "modality": "video",
+    "route": "/video/srt-to-vtt",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "vtt-to-srt",
+    "name": "VTT to SRT",
+    "modality": "video",
+    "route": "/video/vtt-to-srt",
+    "acceptedInputs": [".vtt"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ass-to-srt",
+    "name": "ASS to SRT",
+    "modality": "video",
+    "route": "/video/ass-to-srt",
+    "acceptedInputs": [".ass"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "srt-to-ass",
+    "name": "SRT to ASS",
+    "modality": "video",
+    "route": "/video/srt-to-ass",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "excel-to-csv",
     "name": "Excel to CSV",
     "modality": "document",

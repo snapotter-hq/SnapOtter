@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Пресеты конвертации {#conversion-presets}
 
-Общий каталог включает 83 специальных эндпоинта пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
+Общий каталог включает 117 специальных эндпоинтов пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

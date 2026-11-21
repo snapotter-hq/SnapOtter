@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 변환 프리셋 {#conversion-presets}
 
-공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 83개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
+공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 117개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 変換プリセット {#conversion-presets}
 
-共有カタログには、`jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg`、`excel-to-csv` など、83 個の専用変換プリセットエンドポイントが含まれています。プリセットはファーストクラスのツールルートです:
+共有カタログには、`jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg`、`excel-to-csv` など、117 個の専用変換プリセットエンドポイントが含まれています。プリセットはファーストクラスのツールルートです:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

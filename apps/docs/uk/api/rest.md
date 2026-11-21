@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Пресети конвертації {#conversion-presets}
 
-Спільний каталог містить 83 виділені кінцеві точки пресетів конвертації, як-от `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` і `excel-to-csv`. Пресети є повноцінними маршрутами інструментів:
+Спільний каталог містить 117 виділених кінцевих точок пресетів конвертації, як-от `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` і `excel-to-csv`. Пресети є повноцінними маршрутами інструментів:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

@@ -11474,6 +11474,11 @@ paths:
                   type: string
                   format: binary
                   description: ไฟล์วิดีโอที่มีแทร็กคำบรรยายฝังอยู่
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -23466,6 +23471,294 @@ paths:
                   type: string
                   description: |
                     ตัวแปลง MP4 เป็น OGG โดยเฉพาะ ใช้ pipeline extract-audio
+                    endpoint ล็อกรูปแบบผลลัพธ์
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: รหัสงานที่ไคลเอนต์กำหนดเองสำหรับติดตามความคืบหน้า SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: ไฟล์ที่ประมวลผลแล้ว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: อินพุตหรือการตั้งค่าไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: ต้องยืนยันตัวตน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: ประมวลผลไม่สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags:
+        - Video
+      summary: SRT เป็น VTT
+      description: |
+        แปลง SRT เป็น VTT
+        นี่คือเอนด์พอยต์ค่าตั้งล่วงหน้าสำหรับการแปลงโดยเฉพาะที่รองรับด้วย `convert-subtitles`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ไฟล์อินพุต SRT เป็น VTT (.srt)
+                settings:
+                  type: string
+                  description: |
+                    ตัวแปลง SRT เป็น VTT โดยเฉพาะ ใช้ pipeline convert-subtitles
+                    endpoint ล็อกรูปแบบผลลัพธ์
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: รหัสงานที่ไคลเอนต์กำหนดเองสำหรับติดตามความคืบหน้า SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: ไฟล์ที่ประมวลผลแล้ว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: อินพุตหรือการตั้งค่าไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: ต้องยืนยันตัวตน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: ประมวลผลไม่สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags:
+        - Video
+      summary: VTT เป็น SRT
+      description: |
+        แปลง VTT เป็น SRT
+        นี่คือเอนด์พอยต์ค่าตั้งล่วงหน้าสำหรับการแปลงโดยเฉพาะที่รองรับด้วย `convert-subtitles`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ไฟล์อินพุต VTT เป็น SRT (.vtt)
+                settings:
+                  type: string
+                  description: |
+                    ตัวแปลง VTT เป็น SRT โดยเฉพาะ ใช้ pipeline convert-subtitles
+                    endpoint ล็อกรูปแบบผลลัพธ์
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: รหัสงานที่ไคลเอนต์กำหนดเองสำหรับติดตามความคืบหน้า SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: ไฟล์ที่ประมวลผลแล้ว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: อินพุตหรือการตั้งค่าไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: ต้องยืนยันตัวตน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: ประมวลผลไม่สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags:
+        - Video
+      summary: ASS เป็น SRT
+      description: |
+        แปลง ASS เป็น SRT
+        นี่คือเอนด์พอยต์ค่าตั้งล่วงหน้าสำหรับการแปลงโดยเฉพาะที่รองรับด้วย `convert-subtitles`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ไฟล์อินพุต ASS เป็น SRT (.ass)
+                settings:
+                  type: string
+                  description: |
+                    ตัวแปลง ASS เป็น SRT โดยเฉพาะ ใช้ pipeline convert-subtitles
+                    endpoint ล็อกรูปแบบผลลัพธ์
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: รหัสงานที่ไคลเอนต์กำหนดเองสำหรับติดตามความคืบหน้า SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: ไฟล์ที่ประมวลผลแล้ว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: อินพุตหรือการตั้งค่าไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: ต้องยืนยันตัวตน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: ประมวลผลไม่สำเร็จ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags:
+        - Video
+      summary: SRT เป็น ASS
+      description: |
+        แปลง SRT เป็น ASS
+        นี่คือเอนด์พอยต์ค่าตั้งล่วงหน้าสำหรับการแปลงโดยเฉพาะที่รองรับด้วย `convert-subtitles`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ไฟล์อินพุต SRT เป็น ASS (.srt)
+                settings:
+                  type: string
+                  description: |
+                    ตัวแปลง SRT เป็น ASS โดยเฉพาะ ใช้ pipeline convert-subtitles
                     endpoint ล็อกรูปแบบผลลัพธ์
                 clientJobId:
                   type: string

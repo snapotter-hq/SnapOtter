@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Préréglages de conversion {#conversion-presets}
 
-SnapOtter expose 113 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
+SnapOtter expose 117 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
 
 ## Modèle de point de terminaison de l'API {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | `mp4-to-wav` | MP4 vers WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV vers WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 vers OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT vers VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT vers SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS vers SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT vers ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Préréglages audio {#audio-presets}
 

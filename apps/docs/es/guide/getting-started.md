@@ -142,7 +142,7 @@ pnpm dev
 | Modalidad | Cantidad | Herramientas de ejemplo |
 |----------|-------|---------------|
 | **Imagen** | 112 | Redimensionar, Recortar, Comprimir, Convertir, Eliminar fondo, Ampliar, OCR, Marca de agua, Collage, Colorear, Herramientas de GIF, preajustes de formato |
-| **Vídeo** | 59 | Cortar, Recortar encuadre, Comprimir, Convertir, Unir, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, preajustes de formato |
+| **Vídeo** | 63 | Cortar, Recortar encuadre, Comprimir, Convertir, Unir, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, preajustes de formato |
 | **Audio** | 57 | Cortar, Unir, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, preajustes de formato |
 | **PDF / Documento** | 37 | Unir, Dividir, Comprimir, OCR, Marca de agua, Censurar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
 | **Archivos** | 25 | CSV a JSON, JSON a XML, Unir CSV, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |

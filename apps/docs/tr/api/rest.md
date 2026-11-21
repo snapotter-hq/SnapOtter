@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Dönüştürme Ön Ayarları {#conversion-presets}
 
-Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 83 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
+Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 117 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Ustawienia wstępne konwersji {#conversion-presets}
 
-Wspólny katalog zawiera 83 dedykowane punkty końcowe ustawień wstępnych konwersji, takie jak `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` i `excel-to-csv`. Ustawienia wstępne to pełnoprawne trasy narzędzi:
+Wspólny katalog zawiera 117 dedykowanych punktów końcowych ustawień wstępnych konwersji, takie jak `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` i `excel-to-csv`. Ustawienia wstępne to pełnoprawne trasy narzędzi:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

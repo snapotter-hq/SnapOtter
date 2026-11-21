@@ -1,6 +1,6 @@
 # SnapOtter
 
-SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 294 tool routes across the five modalities, plus a layer-based image editor.
+SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 298 tool routes across the five modalities, plus a layer-based image editor.
 
 All processing happens locally. Files never leave your infrastructure.
 
@@ -40,7 +40,7 @@ Then run docker compose up -d, open http://localhost:1349, and log in with admin
 
 ## Tools
 
-294 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
+298 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
 ### Image
 
@@ -48,7 +48,7 @@ Resize Image, Crop Image, Rotate & Flip Image, Convert Image, Compress Image, Op
 
 ### Video
 
-Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to GIF, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Video Audio, Aspect Pad, Blur Pad, Watermark Video, Stabilize Video, GIF to Video, Video to WebP, Video to AVIF, Video to Frames, Merge Videos, Replace Audio, Burn Subtitles, Embed Subtitles, Extract Subtitles, Convert Subtitles, Images to Video, Clean Video Metadata, Extract Audio. Plus format converters: MOV to MP4, WEBM to MP4, MKV to MP4, AVI to MP4, MP4 to MOV, MP4 to WEBM, WEBM to MOV, MKV to MOV, AVI to MOV, MP4 to AVI, MOV to AVI, MKV to AVI, AVI to MKV, MP4 to GIF, MOV to GIF, MKV to GIF, AVI to GIF, GIF to MP4, GIF to WEBM, GIF to MOV, MP4 to MP3, MOV to MP3, MKV to MP3, WEBM to MP3, AVI to MP3, MP4 to WAV, MOV to WAV, MP4 to OGG.
+Auto Subtitles, Convert Video, Compress Video, Trim Video, Mute Video, Video to GIF, Resize Video, Crop Video, Rotate Video, Change FPS, Video Color, Video Speed, Reverse Video, Normalize Video Audio, Aspect Pad, Blur Pad, Watermark Video, Stabilize Video, GIF to Video, Video to WebP, Video to AVIF, Video to Frames, Merge Videos, Replace Audio, Burn Subtitles, Embed Subtitles, Extract Subtitles, Convert Subtitles, Images to Video, Clean Video Metadata, Extract Audio. Plus format converters: MOV to MP4, WEBM to MP4, MKV to MP4, AVI to MP4, MP4 to MOV, MP4 to WEBM, WEBM to MOV, MKV to MOV, AVI to MOV, MP4 to AVI, MOV to AVI, MKV to AVI, AVI to MKV, MP4 to GIF, MOV to GIF, MKV to GIF, AVI to GIF, GIF to MP4, GIF to WEBM, GIF to MOV, MP4 to MP3, MOV to MP3, MKV to MP3, WEBM to MP3, AVI to MP3, MP4 to WAV, MOV to WAV, MP4 to OGG, SRT to VTT, VTT to SRT, ASS to SRT, SRT to ASS.
 
 ### Audio
 

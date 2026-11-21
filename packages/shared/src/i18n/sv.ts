@@ -675,6 +675,22 @@ export const sv: TranslationKeys = {
       name: "AIFF till M4A",
       description: "Konvertera AIFF till M4A online. Snabbt, gratis och privat.",
     },
+    "srt-to-vtt": {
+      name: "SRT till VTT",
+      description: "Konvertera SRT till VTT online. Snabbt, gratis och privat.",
+    },
+    "vtt-to-srt": {
+      name: "VTT till SRT",
+      description: "Konvertera VTT till SRT online. Snabbt, gratis och privat.",
+    },
+    "ass-to-srt": {
+      name: "ASS till SRT",
+      description: "Konvertera ASS till SRT online. Snabbt, gratis och privat.",
+    },
+    "srt-to-ass": {
+      name: "SRT till ASS",
+      description: "Konvertera SRT till ASS online. Snabbt, gratis och privat.",
+    },
     "excel-to-csv": {
       name: "Excel till CSV",
       description: "Konvertera Excel till CSV online. Snabbt, gratis och privat.",
@@ -1092,7 +1108,7 @@ export const sv: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Extrahera undertexter",
-      description: "Hämta undertextspåret från en video som en SRT-fil",
+      description: "Hämta undertextspåret från en video som en SRT-, WebVTT- eller ASS-fil",
     },
     "convert-subtitles": {
       name: "Konvertera undertexter",
@@ -3758,6 +3774,7 @@ export const sv: TranslationKeys = {
       progressLabel: "Bäddar in undertexter",
     },
     "extract-subtitles": {
+      format: "Utdataformat",
       submit: "Extrahera undertexter",
       submitBatch: "Extrahera undertexter ({count} filer)",
       progressLabel: "Extraherar undertexter",

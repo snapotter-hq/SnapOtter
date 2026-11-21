@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### إعدادات التحويل الجاهزة {#conversion-presets}
 
-يتضمن الكتالوج المشترك 83 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
+يتضمن الكتالوج المشترك 117 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

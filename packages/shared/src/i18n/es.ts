@@ -675,6 +675,22 @@ export const es: TranslationKeys = {
       name: "AIFF a M4A",
       description: "Convierte AIFF a M4A en línea. Rápido, gratis y privado.",
     },
+    "srt-to-vtt": {
+      name: "SRT a VTT",
+      description: "Convierte SRT a VTT en línea. Rápido, gratis y privado.",
+    },
+    "vtt-to-srt": {
+      name: "VTT a SRT",
+      description: "Convierte VTT a SRT en línea. Rápido, gratis y privado.",
+    },
+    "ass-to-srt": {
+      name: "ASS a SRT",
+      description: "Convierte ASS a SRT en línea. Rápido, gratis y privado.",
+    },
+    "srt-to-ass": {
+      name: "SRT a ASS",
+      description: "Convierte SRT a ASS en línea. Rápido, gratis y privado.",
+    },
     "excel-to-csv": {
       name: "Excel a CSV",
       description: "Convierte Excel a CSV en línea. Rápido, gratis y privado.",
@@ -1080,7 +1096,7 @@ export const es: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Extraer subtítulos",
-      description: "Extrae la pista de subtítulos de un vídeo como archivo SRT",
+      description: "Extrae la pista de subtítulos de un vídeo como archivo SRT, WebVTT o ASS",
     },
     "convert-subtitles": {
       name: "Convertir subtítulos",
@@ -3757,6 +3773,7 @@ export const es: TranslationKeys = {
       progressLabel: "Insertando subtítulos",
     },
     "extract-subtitles": {
+      format: "Formato de salida",
       submit: "Extraer subtítulos",
       submitBatch: "Extraer subtítulos ({count} archivos)",
       progressLabel: "Extrayendo subtítulos",

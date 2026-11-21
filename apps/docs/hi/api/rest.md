@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### कन्वर्ज़न प्रीसेट {#conversion-presets}
 
-साझा कैटलॉग में 83 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
+साझा कैटलॉग में 117 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

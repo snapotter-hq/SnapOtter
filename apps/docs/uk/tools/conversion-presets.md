@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter надає 113 спеціалізовані кінцеві точки пресетів конвертації на додаток до базових інструментів-конвертерів. Кожен пресет фіксує формат виводу та делегує обробку своєму базовому конвеєру, тому поведінка, валідація та контракт виводу відповідають базовому інструменту, зазначеному нижче.
+SnapOtter надає 117 спеціалізовані кінцеві точки пресетів конвертації на додаток до базових інструментів-конвертерів. Кожен пресет фіксує формат виводу та делегує обробку своєму базовому конвеєру, тому поведінка, валідація та контракт виводу відповідають базовому інструменту, зазначеному нижче.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ SnapOtter надає 113 спеціалізовані кінцеві точки 
 | `mp4-to-wav` | MP4 у WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV у WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 у OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT у VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT у SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS у SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT у ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 

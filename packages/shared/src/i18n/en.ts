@@ -675,6 +675,22 @@ export const en = {
       name: "AIFF to M4A",
       description: "Convert AIFF to M4A online. Fast, free, private, no signup.",
     },
+    "srt-to-vtt": {
+      name: "SRT to VTT",
+      description: "Convert SRT to VTT online. Fast, free, private, no signup.",
+    },
+    "vtt-to-srt": {
+      name: "VTT to SRT",
+      description: "Convert VTT to SRT online. Fast, free, private, no signup.",
+    },
+    "ass-to-srt": {
+      name: "ASS to SRT",
+      description: "Convert ASS to SRT online. Fast, free, private, no signup.",
+    },
+    "srt-to-ass": {
+      name: "SRT to ASS",
+      description: "Convert SRT to ASS online. Fast, free, private, no signup.",
+    },
     "excel-to-csv": {
       name: "Excel to CSV",
       description: "Convert Excel to CSV online. Fast, free, private, no signup.",
@@ -1049,7 +1065,7 @@ export const en = {
     },
     "extract-subtitles": {
       name: "Extract Subtitles",
-      description: "Pull the subtitle track out of a video as an SRT file",
+      description: "Pull the subtitle track out of a video as an SRT, WebVTT or ASS file",
     },
     "convert-subtitles": {
       name: "Convert Subtitles",
@@ -3701,6 +3717,7 @@ export const en = {
       progressLabel: "Embedding subtitles",
     },
     "extract-subtitles": {
+      format: "Output format",
       submit: "Extract Subtitles",
       submitBatch: "Extract Subtitles ({count} files)",
       progressLabel: "Extracting subtitles",

@@ -671,6 +671,22 @@ export const th: TranslationKeys = {
       name: "AIFF เป็น M4A",
       description: "แปลง AIFF เป็น M4A ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
     },
+    "srt-to-vtt": {
+      name: "SRT เป็น VTT",
+      description: "แปลง SRT เป็น VTT ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "vtt-to-srt": {
+      name: "VTT เป็น SRT",
+      description: "แปลง VTT เป็น SRT ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "ass-to-srt": {
+      name: "ASS เป็น SRT",
+      description: "แปลง ASS เป็น SRT ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
+    "srt-to-ass": {
+      name: "SRT เป็น ASS",
+      description: "แปลง SRT เป็น ASS ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
+    },
     "excel-to-csv": {
       name: "Excel เป็น CSV",
       description: "แปลง Excel เป็น CSV ออนไลน์ รวดเร็ว ฟรี และเป็นส่วนตัว",
@@ -1083,7 +1099,7 @@ export const th: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "แยกคำบรรยาย",
-      description: "แยกแทร็กคำบรรยายจากวิดีโอเป็นไฟล์ SRT",
+      description: "แยกแทร็กคำบรรยายจากวิดีโอเป็นไฟล์ SRT, WebVTT หรือ ASS",
     },
     "convert-subtitles": {
       name: "แปลงคำบรรยาย",
@@ -3708,6 +3724,7 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังฝังคำบรรยาย",
     },
     "extract-subtitles": {
+      format: "รูปแบบผลลัพธ์",
       submit: "แยกคำบรรยาย",
       submitBatch: "แยกคำบรรยาย ({count} ไฟล์)",
       progressLabel: "กำลังแยกคำบรรยาย",

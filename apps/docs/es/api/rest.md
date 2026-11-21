@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preajustes de conversión {#conversion-presets}
 
-El catálogo compartido incluye 83 endpoints de preajustes de conversión dedicados, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` y `excel-to-csv`. Los preajustes son rutas de herramienta de primera clase:
+El catálogo compartido incluye 117 endpoints de preajustes de conversión dedicados, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` y `excel-to-csv`. Los preajustes son rutas de herramienta de primera clase:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

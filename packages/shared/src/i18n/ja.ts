@@ -677,6 +677,22 @@ export const ja: TranslationKeys = {
       name: "AIFFをM4Aに変換",
       description: "AIFFをM4Aにオンラインで変換。高速、無料、プライベート。",
     },
+    "srt-to-vtt": {
+      name: "SRTをVTTに変換",
+      description: "SRTをVTTにオンラインで変換。高速、無料、プライベート。",
+    },
+    "vtt-to-srt": {
+      name: "VTTをSRTに変換",
+      description: "VTTをSRTにオンラインで変換。高速、無料、プライベート。",
+    },
+    "ass-to-srt": {
+      name: "ASSをSRTに変換",
+      description: "ASSをSRTにオンラインで変換。高速、無料、プライベート。",
+    },
+    "srt-to-ass": {
+      name: "SRTをASSに変換",
+      description: "SRTをASSにオンラインで変換。高速、無料、プライベート。",
+    },
     "excel-to-csv": {
       name: "ExcelをCSVに変換",
       description: "ExcelをCSVにオンラインで変換。高速、無料、プライベート。",
@@ -1058,7 +1074,7 @@ export const ja: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "字幕抽出",
-      description: "動画から字幕トラックを SRT ファイルとして抽出",
+      description: "動画から字幕トラックを SRT、WebVTT、ASS ファイルとして抽出",
     },
     "convert-subtitles": {
       name: "字幕変換",
@@ -3717,6 +3733,7 @@ export const ja: TranslationKeys = {
       progressLabel: "字幕を埋め込み中",
     },
     "extract-subtitles": {
+      format: "出力形式",
       submit: "字幕を抽出",
       submitBatch: "字幕を抽出 ({count} ファイル)",
       progressLabel: "字幕を抽出中",

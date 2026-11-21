@@ -12,6 +12,7 @@ import { registerConversionPresets } from "../../../apps/api/src/routes/tools/co
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerConvertAudio } from "../../../apps/api/src/routes/tools/convert-audio.js";
 import { registerConvertSpreadsheet } from "../../../apps/api/src/routes/tools/convert-spreadsheet.js";
+import { registerConvertSubtitles } from "../../../apps/api/src/routes/tools/convert-subtitles.js";
 import { registerConvertVideo } from "../../../apps/api/src/routes/tools/convert-video.js";
 import { registerExtractAudio } from "../../../apps/api/src/routes/tools/extract-audio.js";
 import { registerGifToVideo } from "../../../apps/api/src/routes/tools/gif-to-video.js";
@@ -40,6 +41,7 @@ beforeAll(async () => {
   registerCompressPdf(app);
   registerConvertAudio(app);
   registerConvertSpreadsheet(app);
+  registerConvertSubtitles(app);
   registerConvertVideo(app);
   registerExtractAudio(app);
   registerGifToVideo(app);

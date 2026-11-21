@@ -8640,7 +8640,7 @@
       },
       {
         "key": "endS",
-        "values": [0.000001, 50.000001, 100.000001, null]
+        "values": [1e-6, 50.000001, 100.000001, null]
       },
       {
         "key": "cutStartS",
@@ -10078,8 +10078,24 @@
     "outputModality": "file",
     "isAI": false,
     "registered": true,
-    "axes": [],
-    "invalidProbes": []
+    "axes": [
+      {
+        "key": "format",
+        "values": ["srt", "vtt", "ass", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
   },
   {
     "id": "convert-subtitles",
@@ -10456,7 +10472,7 @@
       },
       {
         "key": "endS",
-        "values": [0.000001, 50.000001, 100.000001, null]
+        "values": [1e-6, 50.000001, 100.000001, null]
       },
       {
         "key": "cutStartS",
@@ -14655,6 +14671,62 @@
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "srt-to-vtt",
+    "name": "SRT to VTT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "vtt-to-srt",
+    "name": "VTT to SRT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".vtt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ass-to-srt",
+    "name": "ASS to SRT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".ass"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "srt-to-ass",
+    "name": "SRT to ASS",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
     "axes": [],
     "invalidProbes": []
   },

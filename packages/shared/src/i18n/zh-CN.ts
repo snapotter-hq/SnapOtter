@@ -468,6 +468,10 @@ export const zhCN: TranslationKeys = {
       name: "AIFF 转 M4A",
       description: "在线将 AIFF 转换为 M4A。快速、免费、私密。",
     },
+    "srt-to-vtt": { name: "SRT 转 VTT", description: "在线将 SRT 转换为 VTT。快速、免费、私密。" },
+    "vtt-to-srt": { name: "VTT 转 SRT", description: "在线将 VTT 转换为 SRT。快速、免费、私密。" },
+    "ass-to-srt": { name: "ASS 转 SRT", description: "在线将 ASS 转换为 SRT。快速、免费、私密。" },
+    "srt-to-ass": { name: "SRT 转 ASS", description: "在线将 SRT 转换为 ASS。快速、免费、私密。" },
     "excel-to-csv": {
       name: "Excel 转 CSV",
       description: "在线将 Excel 转换为 CSV。快速、免费、私密。",
@@ -837,7 +841,7 @@ export const zhCN: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "提取字幕",
-      description: "从视频中提取字幕轨道为 SRT 文件",
+      description: "从视频中提取字幕轨道为 SRT、WebVTT 或 ASS 文件",
     },
     "convert-subtitles": {
       name: "转换字幕",
@@ -3453,6 +3457,7 @@ export const zhCN: TranslationKeys = {
       progressLabel: "正在嵌入字幕",
     },
     "extract-subtitles": {
+      format: "输出格式",
       submit: "提取字幕",
       submitBatch: "提取字幕（{count} 个文件）",
       progressLabel: "正在提取字幕",

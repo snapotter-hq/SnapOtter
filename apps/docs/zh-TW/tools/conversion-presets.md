@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # 轉換預設 {#conversion-presets}
 
-除了基礎轉換工具之外，SnapOtter 還提供 113 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
+除了基礎轉換工具之外，SnapOtter 還提供 117 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ i18n_hash_version: 2
 | `mp4-to-wav` | MP4 轉 WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV 轉 WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 轉 OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT 轉 VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT 轉 SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS 轉 SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT 轉 ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 

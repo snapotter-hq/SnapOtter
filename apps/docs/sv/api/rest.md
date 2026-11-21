@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konverteringsförinställningar {#conversion-presets}
 
-Den delade katalogen innehåller 83 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
+Den delade katalogen innehåller 117 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

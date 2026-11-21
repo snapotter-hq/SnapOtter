@@ -21,7 +21,7 @@ import { OWN_STORE_TOOL_IDS, WARN_ONLY_TOOL_IDS } from "@/hooks/use-work-in-flig
  * is the real mapping the app uses. The "<toolId>-settings.tsx" filename
  * convention would be cheaper to follow but it is only a convention: crop,
  * adjust-colors and erase-object are already registered through wrappers, and
- * the 83 conversion presets all share one component.
+ * the conversion presets all share one component.
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

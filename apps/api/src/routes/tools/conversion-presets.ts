@@ -113,6 +113,9 @@ export function registerConversionPresets(
     }
     createToolRoute(app, {
       toolId: preset.id,
+      // A subtitle preset's .srt/.vtt/.ass upload must go through the subtitle
+      // input handler its base uses, not the video one its modality implies.
+      inputKinds: baseConfig.inputKinds,
       settingsSchema: presetSchema(preset.base),
       process: async () => {
         throw new Error(`${preset.id} is v2-only`);

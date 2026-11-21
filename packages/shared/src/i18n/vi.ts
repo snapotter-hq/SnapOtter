@@ -677,6 +677,22 @@ export const vi: TranslationKeys = {
       name: "AIFF sang M4A",
       description: "Chuyển đổi AIFF sang M4A trực tuyến. Nhanh, miễn phí và riêng tư.",
     },
+    "srt-to-vtt": {
+      name: "SRT sang VTT",
+      description: "Chuyển đổi SRT sang VTT trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "vtt-to-srt": {
+      name: "VTT sang SRT",
+      description: "Chuyển đổi VTT sang SRT trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "ass-to-srt": {
+      name: "ASS sang SRT",
+      description: "Chuyển đổi ASS sang SRT trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
+    "srt-to-ass": {
+      name: "SRT sang ASS",
+      description: "Chuyển đổi SRT sang ASS trực tuyến. Nhanh, miễn phí và riêng tư.",
+    },
     "excel-to-csv": {
       name: "Excel sang CSV",
       description: "Chuyển đổi Excel sang CSV trực tuyến. Nhanh, miễn phí và riêng tư.",
@@ -1095,7 +1111,7 @@ export const vi: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Trích xuất phụ đề",
-      description: "Trích xuất rãnh phụ đề từ video thành tệp SRT",
+      description: "Trích xuất rãnh phụ đề từ video thành tệp SRT, WebVTT hoặc ASS",
     },
     "convert-subtitles": {
       name: "Chuyển đổi phụ đề",
@@ -3758,6 +3774,7 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang nhúng phụ đề",
     },
     "extract-subtitles": {
+      format: "Định dạng đầu ra",
       submit: "Trích xuất phụ đề",
       submitBatch: "Trích xuất phụ đề ({count} tệp)",
       progressLabel: "Đang trích xuất phụ đề",

@@ -6,10 +6,27 @@ import {
 } from "../../../packages/shared/src/conversion-presets.js";
 
 describe("conversion presets", () => {
-  it("defines 113 presets with unique ids", () => {
-    expect(CONVERSION_PRESETS.length).toBe(113);
+  it("defines 117 presets with unique ids", () => {
+    expect(CONVERSION_PRESETS.length).toBe(117);
     const ids = CONVERSION_PRESETS.map((p) => p.id);
-    expect(new Set(ids).size).toBe(113);
+    expect(new Set(ids).size).toBe(117);
+  });
+
+  it("subtitle presets lock convert-subtitles' format and take one extension (#5052)", () => {
+    const subtitle = CONVERSION_PRESETS.filter((p) => p.base === "convert-subtitles");
+    expect(subtitle.map((p) => [p.id, p.locked, p.sourceInputs])).toEqual([
+      ["srt-to-vtt", { format: "vtt" }, [".srt"]],
+      ["vtt-to-srt", { format: "srt" }, [".vtt"]],
+      ["ass-to-srt", { format: "srt" }, [".ass"]],
+      ["srt-to-ass", { format: "ass" }, [".srt"]],
+    ]);
+    const tool = expandConversionPresets().find((t) => t.id === "srt-to-vtt");
+    expect(tool).toMatchObject({
+      modality: "video",
+      category: "video-subtitles",
+      outputModality: "file",
+    });
+    expect(tool?.keywords).toContain("srt to vtt");
   });
 
   it("every expanded preset is a valid Tool with route, keywords, modality", () => {

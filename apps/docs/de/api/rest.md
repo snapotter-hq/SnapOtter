@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konvertierungs-Presets {#conversion-presets}
 
-Der gemeinsame Katalog enthält 83 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
+Der gemeinsame Katalog enthält 117 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

@@ -112,6 +112,14 @@ export const BASE_CONFIG: Record<string, BaseConfig> = {
     settingsKind: "none",
     displayBase: "convert-spreadsheet",
   },
+  "convert-subtitles": {
+    group: "registry",
+    modality: "video",
+    outputModality: "file",
+    category: "video-subtitles",
+    settingsKind: "none",
+    displayBase: "convert-subtitles",
+  },
 };
 
 const JPG = [".jpg", ".jpeg"];
@@ -539,6 +547,40 @@ export const CONVERSION_PRESETS: ConversionPreset[] = [
   aud("aiff-to-flac", "AIFF", "FLAC", "flac", AIFF),
   aud("aiff-to-ogg", "AIFF", "OGG", "ogg", AIFF),
   aud("aiff-to-m4a", "AIFF", "M4A", "m4a", AIFF),
+
+  // Subtitles (base: convert-subtitles)
+  {
+    id: "srt-to-vtt",
+    from: "SRT",
+    to: "VTT",
+    base: "convert-subtitles",
+    locked: { format: "vtt" },
+    sourceInputs: [".srt"],
+  },
+  {
+    id: "vtt-to-srt",
+    from: "VTT",
+    to: "SRT",
+    base: "convert-subtitles",
+    locked: { format: "srt" },
+    sourceInputs: [".vtt"],
+  },
+  {
+    id: "ass-to-srt",
+    from: "ASS",
+    to: "SRT",
+    base: "convert-subtitles",
+    locked: { format: "srt" },
+    sourceInputs: [".ass"],
+  },
+  {
+    id: "srt-to-ass",
+    from: "SRT",
+    to: "ASS",
+    base: "convert-subtitles",
+    locked: { format: "ass" },
+    sourceInputs: [".srt"],
+  },
 
   // Data (base: convert-spreadsheet)
   {

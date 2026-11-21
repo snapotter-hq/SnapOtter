@@ -28,7 +28,7 @@ export const SUBTITLE_ENCODINGS = [
 
 export type SubtitleEncoding = (typeof SUBTITLE_ENCODINGS)[number];
 
-const CONTENT_TYPES: Record<(typeof SUBTITLE_OUTPUT_FORMATS)[number], string> = {
+export const SUBTITLE_CONTENT_TYPES: Record<(typeof SUBTITLE_OUTPUT_FORMATS)[number], string> = {
   srt: "application/x-subrip",
   vtt: "text/vtt",
   ass: "text/x-ssa",
@@ -101,7 +101,7 @@ export function registerConvertSubtitles(app: FastifyInstance) {
       return {
         scratchPath: outPath,
         filename: outName,
-        contentType: CONTENT_TYPES[settings.format],
+        contentType: SUBTITLE_CONTENT_TYPES[settings.format],
       };
     },
   });

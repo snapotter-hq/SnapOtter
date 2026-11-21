@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Préréglages de conversion {#conversion-presets}
 
-Le catalogue partagé inclut 83 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
+Le catalogue partagé inclut 117 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
 
 `POST /api/v1/tools/<section>/<presetId>`
 
