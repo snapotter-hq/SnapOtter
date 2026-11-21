@@ -2008,6 +2008,8 @@ export const de: TranslationKeys = {
         "KI-Hochskalierung ist rechenintensiv. Ohne GPU kann ein großes Bild mehrere Minuten dauern.",
       cpuResizedNote:
         "Dieser Server hat keine GPU, deshalb wurde das Bild vor dem Hochskalieren auf {width} × {height} verkleinert.",
+      cpuFitHint:
+        "Dieser Server hat keine GPU, deshalb wird dieses Bild vor dem Hochskalieren auf {width} × {height} verkleinert.",
       qualityFast: "Schnell",
       qualityBalanced: "Ausgewogen",
       qualityBest: "Beste",

@@ -8867,6 +8867,13 @@ paths:
                           type:
                             - string
                             - 'null'
+                  upscaleCpuMaxMp:
+                    type: [number, "null"]
+                    description: >-
+                      Largest input in megapixels this host upscales without a
+                      GPU before reducing it first (0 means no cap). Null when a
+                      GPU may run the upscale. Boot-time guess until the AI
+                      sidecar reports; the upscale result stays authoritative.
               example:
                 bundles:
                   - id: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
@@ -8892,6 +8899,7 @@ paths:
                       percent: 1
                       stage: example
                     error: example
+                upscaleCpuMaxMp: 4
         '401':
           description: Yêu cầu xác thực
           content:

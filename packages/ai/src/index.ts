@@ -156,6 +156,11 @@ export {
 export type { TranscribeOptions, TranscriptionResult, TranscriptSegment } from "./transcription.js";
 export { transcribeAudio } from "./transcription.js";
 export type { UpscaleOptions, UpscaleResult } from "./upscaling.js";
-export { MAX_CPU_UPSCALE_MP, MAX_CPU_UPSCALE_OUTPUT_MP, upscale } from "./upscaling.js";
+export {
+  MAX_CPU_UPSCALE_MP,
+  MAX_CPU_UPSCALE_OUTPUT_MP,
+  resolveMaxCpuUpscaleMp,
+  upscale,
+} from "./upscaling.js";
 export { acquireVenvLock } from "./venv-lock.js";
 export { resolveAiVenvPath } from "./venv-path.js";
