@@ -13,13 +13,15 @@ import {
   PASSPORT_SPECS,
   PRINT_LAYOUTS,
   ToolInputError,
+  toolInputErrorCode,
 } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
-import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
+import { insertToolJobAlias } from "../../jobs/enqueue.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, type Pool, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -33,6 +35,7 @@ import {
   withImageEncodeContext,
 } from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
+import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
@@ -45,12 +48,18 @@ import {
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
-import { recordInlineInputFile } from "../../lib/tool-audit.js";
+import { discardUnenqueuedUploads, settleUnenqueuedAlias } from "../../lib/upload-cleanup.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { hasEffectivePermission } from "../../permissions.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
-import { registerToolProcessFn } from "../tool-factory.js";
+import {
+  enqueueAndAwaitToolJob,
+  registerDirectJobProcessFn,
+  registerToolProcessFn,
+  type ToolProcessResultV2,
+  type ToolProcessV2,
+} from "../tool-factory.js";
 
 const landmarkPointSchema = z.object({ x: z.number(), y: z.number() });
 
@@ -65,8 +74,10 @@ const landmarksSchema = z.object({
   faceCenterX: z.number(),
 });
 
+const TOOL_ID = "passport-photo";
+
+/** What a generate job carries: the cutout itself is the job's input object. */
 const generateSettingsSchema = z.object({
-  jobId: z.string(),
   filename: z.string(),
   countryCode: z.string(),
   documentType: z.string().default("passport"),
@@ -83,6 +94,16 @@ const generateSettingsSchema = z.object({
   imageWidth: z.number(),
   imageHeight: z.number(),
 });
+
+const generateRequestSchema = generateSettingsSchema.extend({
+  /** Phase 1's jobId, naming the stored cutout. */
+  jobId: z.string(),
+  clientJobId: z.string().optional(),
+});
+
+function findCountrySpec(countryCode: string) {
+  return PASSPORT_SPECS.find((s) => s.code === countryCode);
+}
 
 /**
  * Generate a print sheet that tiles passport photos onto standard paper.
@@ -152,13 +173,244 @@ async function generatePrintSheet(
 }
 
 /**
+ * Phase 2's job: crop the analyzed cutout to the document's spec, then tile a
+ * print sheet when one was asked for. Failures keep the statuses the inline
+ * route answered: 400 for a result too large to build, 422 with details for
+ * anything else, and a server fault (storage, say) passes through as itself.
+ */
+export const processPassportGenerate: ToolProcessV2 = async ({
+  jobId,
+  inputs,
+  settings: raw,
+  report,
+}) => {
+  const {
+    filename,
+    countryCode,
+    documentType,
+    bgColor,
+    printLayout,
+    maxFileSizeKb,
+    dpi: userDpi,
+    customWidthMm,
+    customHeightMm,
+    zoom: userZoom,
+    adjustX,
+    adjustY,
+    landmarks: rawLandmarks,
+    imageWidth: imgW,
+    imageHeight: imgH,
+  } = generateSettingsSchema.parse(raw);
+  const bgRemovedBuffer = inputs[0].buffer;
+
+  const countrySpec = findCountrySpec(countryCode);
+  const baseDoc =
+    countrySpec?.documents.find((d) => d.type === documentType) ?? countrySpec?.documents[0];
+  // Build effective doc spec: custom dimensions/DPI override country defaults
+  const docSpec = {
+    ...(baseDoc ?? {
+      headHeightMin: 0.7,
+      headHeightMax: 0.8,
+      eyeLineFromBottom: 0.63,
+      bgColor: "#FFFFFF",
+      bgColors: ["#FFFFFF"],
+      label: "Custom",
+      type: "passport" as const,
+      dpi: 300,
+      width: 35,
+      height: 45,
+    }),
+    width: customWidthMm ?? baseDoc?.width ?? 35,
+    height: customHeightMm ?? baseDoc?.height ?? 45,
+    dpi: userDpi,
+  };
+
+  report(10, "Cropping");
+  try {
+    // Use actual bg-removed image dimensions for crop (may differ from
+    // the original image dimensions reported by the analyze endpoint).
+    const bgMeta = await sharp(bgRemovedBuffer).metadata();
+    const actualW = bgMeta.width ?? imgW;
+    const actualH = bgMeta.height ?? imgH;
+
+    // Convert normalized landmarks (0-1) to pixel coordinates in the
+    // bg-removed image space (scale if dimensions differ from original).
+    const scaleX = actualW / imgW;
+    const scaleY = actualH / imgH;
+    const crownYPx = (rawLandmarks.crown.y + adjustY) * imgH * scaleY;
+    const chinYPx = (rawLandmarks.chin.y + adjustY) * imgH * scaleY;
+    const eyeYPx = (rawLandmarks.eyeCenter.y + adjustY) * imgH * scaleY;
+    const faceCenterXPx = (rawLandmarks.faceCenterX + adjustX) * imgW * scaleX;
+
+    // Compute crop region from landmarks
+    const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
+    const headHeightPx = chinYPx - crownYPx;
+    const photoHeightPx = headHeightPx / targetHeadRatio;
+    const aspectRatio = docSpec.width / docSpec.height;
+    const photoWidthPx = photoHeightPx * aspectRatio;
+
+    // Position: eye line should be at eyeLineFromBottom from photo bottom
+    const baseTopY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
+    const baseLeftX = faceCenterXPx - photoWidthPx / 2;
+
+    // Apply zoom: zoom > 1 = tighter crop (less body), zoom < 1 = wider (more body)
+    // The zoomed region is centered on the base crop
+    const zoomedW = photoWidthPx / userZoom;
+    const zoomedH = photoHeightPx / userZoom;
+    const leftX = baseLeftX + (photoWidthPx - zoomedW) / 2;
+    const topY = baseTopY + (photoHeightPx - zoomedH) / 2;
+
+    // Parse background color
+    const hex = bgColor.replace("#", "");
+    const bgR = Number.parseInt(hex.slice(0, 2), 16);
+    const bgG = Number.parseInt(hex.slice(2, 4), 16);
+    const bgB = Number.parseInt(hex.slice(4, 6), 16);
+    const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
+
+    // Composite bg-removed subject onto colored background
+    const bgLayer = await sharp({
+      create: { width: actualW, height: actualH, channels: 4, background: bgRgb },
+    })
+      .composite([{ input: bgRemovedBuffer, blend: "over" }])
+      .png()
+      .toBuffer();
+
+    // The crop region may extend beyond the image (e.g. top of head above
+    // the photo). Instead of clamping (which cuts off the head), pad the
+    // image with background color so the full intended region is available.
+    const rawLeft = Math.round(leftX);
+    const rawTop = Math.round(topY);
+    const rawW = Math.round(zoomedW);
+    const rawH = Math.round(zoomedH);
+
+    const padLeft = Math.max(0, -rawLeft);
+    const padTop = Math.max(0, -rawTop);
+    const padRight = Math.max(0, rawLeft + rawW - actualW);
+    const padBottom = Math.max(0, rawTop + rawH - actualH);
+
+    let sourceForCrop = bgLayer;
+    if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+      // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
+      sourceForCrop = await sharp(bgLayer)
+        .extend({
+          top: padTop,
+          bottom: padBottom,
+          left: padLeft,
+          right: padRight,
+          background: bgRgb,
+        })
+        .png()
+        .toBuffer();
+    }
+
+    // Crop coordinates adjusted for padding
+    const cropLeft = rawLeft + padLeft;
+    const cropTop = rawTop + padTop;
+
+    // Target pixel dimensions at 300 DPI
+    const MM_PER_INCH = 25.4;
+    const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
+    const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
+
+    // Extract crop region and resize to target dimensions
+    let cropped = await sharp(sourceForCrop)
+      .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
+      .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+      .jpeg({ quality: 95 })
+      .toBuffer();
+
+    // Compress to fit within max file size if specified
+    if (maxFileSizeKb > 0) {
+      const targetBytes = kbToBytes(maxFileSizeKb);
+      let quality = 90;
+      while (cropped.length > targetBytes && quality > 1) {
+        quality = Math.max(1, quality - 5);
+        cropped = await sharp(sourceForCrop)
+          .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
+          .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+          .jpeg({ quality })
+          .toBuffer();
+      }
+      // The spec fixes the pixel dimensions, so there is nothing left to
+      // trade: say so instead of returning a photo over the cap (#1288).
+      if (cropped.length > targetBytes) {
+        throw new ToolInputError(
+          `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
+          { code: "TARGET_SIZE_UNREACHABLE" },
+        );
+      }
+    }
+
+    const stem = filename.replace(/\.[^.]+$/, "");
+    const resultPayload: Record<string, unknown> = {
+      dimensions: {
+        widthMm: docSpec.width,
+        heightMm: docSpec.height,
+        widthPx: targetWidthPx,
+        heightPx: targetHeightPx,
+        dpi: docSpec.dpi,
+      },
+      spec: {
+        country: countrySpec?.name ?? "Custom",
+        countryCode: countrySpec?.code ?? "CUSTOM",
+        documentType: docSpec.type,
+        documentLabel: docSpec.label,
+      },
+    };
+
+    // Generate print sheet if requested
+    let extraOutputs: ToolProcessResultV2["extraOutputs"];
+    if (printLayout !== "none") {
+      report(70, "Building print sheet");
+      const printBuffer = await generatePrintSheet(
+        cropped,
+        docSpec.width,
+        docSpec.height,
+        printLayout,
+      );
+
+      if (printBuffer) {
+        if (!jobId)
+          throw new Error("passport-photo generate needs its job id to link the print sheet");
+        const printFilename = `${stem}_passport_print_${printLayout}.jpg`;
+        extraOutputs = [{ name: printFilename, buffer: printBuffer, contentType: "image/jpeg" }];
+        resultPayload.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
+      }
+    }
+
+    return {
+      buffer: cropped,
+      filename: `${stem}_passport.jpg`,
+      contentType: "image/jpeg",
+      resultPayload,
+      extraOutputs,
+    };
+  } catch (err) {
+    if (hasServerErrorStatus(err)) throw err;
+    const tooLarge = imageSizeLimitError(err);
+    if (tooLarge) throw new InputValidationError(tooLarge.message, 400, undefined, tooLarge.code);
+    // The worker logs only server faults, and this one answers 422.
+    if (!isToolInputError(err)) {
+      logger.error({ err, toolId: TOOL_ID }, "Passport photo generation failed");
+    }
+    throw new InputValidationError(
+      "Passport photo generation failed",
+      422,
+      stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+      toolInputErrorCode(err),
+    );
+  }
+};
+
+/**
  * Passport photo tool with two-phase flow:
  *
  * Phase 1 (POST /passport-photo/analyze): AI face detection + bg removal.
  *   Returns landmarks, preview, and caches images for generate phase.
  *
  * Phase 2 (POST /passport-photo/generate): Sharp crop/resize/tile.
- *   Uses cached images. No AI re-run. Fast response.
+ *   Uses cached images. No AI re-run. Queued as a BullMQ job like the factory
+ *   tools: 200 with the result inside the sync window, 202 after it.
  */
 export function registerPassportPhoto(app: FastifyInstance) {
   // ── Phase 1: Analyze (face landmarks + bg removal) ────────────────
@@ -428,71 +680,37 @@ export function registerPassportPhoto(app: FastifyInstance) {
     },
   );
 
-  // ── Phase 2: Generate (crop + resize + tile) ─────────────────────
+  // ── Phase 2: Generate (crop + resize + tile), queued ─────────────
+  registerDirectJobProcessFn(TOOL_ID, processPassportGenerate);
+
   app.post(
     "/api/v1/tools/image/passport-photo/generate",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const parseResult = generateSettingsSchema.safeParse(request.body);
+      const parseResult = generateRequestSchema.safeParse(request.body);
       if (!parseResult.success) {
         return reply.status(400).send({
           error: "Invalid settings",
           details: formatZodErrors(parseResult.error.issues),
         });
       }
-      const parsed = parseResult.data;
+      const { jobId: analyzeJobId, clientJobId: clientJobIdRaw, ...settings } = parseResult.data;
 
-      const {
-        jobId,
-        filename,
-        countryCode,
-        documentType,
-        bgColor,
-        printLayout,
-        maxFileSizeKb,
-        dpi: userDpi,
-        customWidthMm,
-        customHeightMm,
-        zoom: userZoom,
-        adjustX,
-        adjustY,
-        landmarks: rawLandmarks,
-        imageWidth: imgW,
-        imageHeight: imgH,
-      } = parsed;
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw ?? null);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      const clientJobId = clientJobIdField ?? null;
 
-      // Look up country spec
-      const countrySpec = PASSPORT_SPECS.find((s) => s.code === countryCode);
-      if (!countrySpec && !customWidthMm) {
-        return reply.status(400).send({ error: `Unknown country code: ${countryCode}` });
+      if (!findCountrySpec(settings.countryCode) && !settings.customWidthMm) {
+        return reply.status(400).send({ error: `Unknown country code: ${settings.countryCode}` });
       }
 
-      const baseDoc =
-        countrySpec?.documents.find((d) => d.type === documentType) ?? countrySpec?.documents[0];
-      // Build effective doc spec: custom dimensions/DPI override country defaults
-      const docSpec = {
-        ...(baseDoc ?? {
-          headHeightMin: 0.7,
-          headHeightMax: 0.8,
-          eyeLineFromBottom: 0.63,
-          bgColor: "#FFFFFF",
-          bgColors: ["#FFFFFF"],
-          label: "Custom",
-          type: "passport" as const,
-          dpi: 300,
-          width: 35,
-          height: 45,
-        }),
-        width: customWidthMm ?? baseDoc?.width ?? 35,
-        height: customHeightMm ?? baseDoc?.height ?? 45,
-        dpi: userDpi,
-      };
-
-      // Read analyze's stored output outside the processing catch below, which
-      // answers 422 for anything. A missing object means the analysis expired
-      // and the client must re-run it (#1674); any other read failure is a
-      // storage fault and belongs to the error handler and Sentry.
-      const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
-      const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
+      // Read analyze's stored output before queueing. A missing object means
+      // the analysis expired and the client must re-run it (#1674); any other
+      // read failure is a storage fault and belongs to the error handler and
+      // Sentry.
+      const bgRemovedFilename = `${settings.filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+      const bgRemovedKey = `outputs/${analyzeJobId}/${bgRemovedFilename}`;
       // A key the store would refuse is the client's mistake, not a fault.
       if (!isValidObjectKey(bgRemovedKey)) {
         return reply.status(400).send({ error: "Invalid jobId or filename" });
@@ -504,7 +722,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         const [job] = await db
           .select({ userId: schema.jobs.userId })
           .from(schema.jobs)
-          .where(eq(schema.jobs.id, jobId));
+          .where(eq(schema.jobs.id, analyzeJobId));
         if (job?.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))) {
           return reply.status(404).send({ error: "Job not found" });
         }
@@ -517,198 +735,67 @@ export function registerPassportPhoto(app: FastifyInstance) {
         if (!isMissingObjectError(err)) throw err;
         // Expected once in a while; a stream of these means the volume or
         // bucket lost outputs it should still hold.
-        request.log.warn({ jobId, toolId: "passport-photo" }, "Analyze output missing at generate");
+        request.log.warn(
+          { jobId: analyzeJobId, toolId: TOOL_ID },
+          "Analyze output missing at generate",
+        );
         return reply.status(410).send({
           error: "This photo's analysis has expired. Analyze it again, then generate.",
           code: "ANALYSIS_EXPIRED",
         });
       }
-      recordInlineInputFile(request, bgRemovedBuffer.length);
 
+      // A fresh server-generated jobId, so Phase 2 never writes into a
+      // client-selected prefix or exposes the Phase 1 jobId.
+      const jobId = randomUUID();
+      // The cheap crop runs on the image pool rather than behind the AI
+      // pool's one-at-a-time background removals.
+      const pool: Pool = "image";
+      const enqueueState = { enqueued: false };
+      let aliasStamped = false;
       try {
-        // Use actual bg-removed image dimensions for crop (may differ from
-        // the original image dimensions reported by the analyze endpoint).
-        const bgMeta = await sharp(bgRemovedBuffer).metadata();
-        const actualW = bgMeta.width ?? imgW;
-        const actualH = bgMeta.height ?? imgH;
-
-        // Convert normalized landmarks (0-1) to pixel coordinates in the
-        // bg-removed image space (scale if dimensions differ from original).
-        const scaleX = actualW / imgW;
-        const scaleY = actualH / imgH;
-        const crownYPx = (rawLandmarks.crown.y + adjustY) * imgH * scaleY;
-        const chinYPx = (rawLandmarks.chin.y + adjustY) * imgH * scaleY;
-        const eyeYPx = (rawLandmarks.eyeCenter.y + adjustY) * imgH * scaleY;
-        const faceCenterXPx = (rawLandmarks.faceCenterX + adjustX) * imgW * scaleX;
-
-        // Compute crop region from landmarks
-        const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
-        const headHeightPx = chinYPx - crownYPx;
-        const photoHeightPx = headHeightPx / targetHeadRatio;
-        const aspectRatio = docSpec.width / docSpec.height;
-        const photoWidthPx = photoHeightPx * aspectRatio;
-
-        // Position: eye line should be at eyeLineFromBottom from photo bottom
-        const baseTopY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
-        const baseLeftX = faceCenterXPx - photoWidthPx / 2;
-
-        // Apply zoom: zoom > 1 = tighter crop (less body), zoom < 1 = wider (more body)
-        // The zoomed region is centered on the base crop
-        const zoomedW = photoWidthPx / userZoom;
-        const zoomedH = photoHeightPx / userZoom;
-        const leftX = baseLeftX + (photoWidthPx - zoomedW) / 2;
-        const topY = baseTopY + (photoHeightPx - zoomedH) / 2;
-
-        // Parse background color
-        const hex = bgColor.replace("#", "");
-        const bgR = Number.parseInt(hex.slice(0, 2), 16);
-        const bgG = Number.parseInt(hex.slice(2, 4), 16);
-        const bgB = Number.parseInt(hex.slice(4, 6), 16);
-        const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
-
-        // Composite bg-removed subject onto colored background
-        const bgLayer = await sharp({
-          create: { width: actualW, height: actualH, channels: 4, background: bgRgb },
-        })
-          .composite([{ input: bgRemovedBuffer, blend: "over" }])
-          .png()
-          .toBuffer();
-
-        // The crop region may extend beyond the image (e.g. top of head above
-        // the photo). Instead of clamping (which cuts off the head), pad the
-        // image with background color so the full intended region is available.
-        const rawLeft = Math.round(leftX);
-        const rawTop = Math.round(topY);
-        const rawW = Math.round(zoomedW);
-        const rawH = Math.round(zoomedH);
-
-        const padLeft = Math.max(0, -rawLeft);
-        const padTop = Math.max(0, -rawTop);
-        const padRight = Math.max(0, rawLeft + rawW - actualW);
-        const padBottom = Math.max(0, rawTop + rawH - actualH);
-
-        let sourceForCrop = bgLayer;
-        if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-          // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
-          sourceForCrop = await sharp(bgLayer)
-            .extend({
-              top: padTop,
-              bottom: padBottom,
-              left: padLeft,
-              right: padRight,
-              background: bgRgb,
-            })
-            .png()
-            .toBuffer();
+        // Stamp the client-facing alias before the upload so a cancel landing
+        // before the enqueue has a durable pointer to resolve (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId: user?.id ?? null, pool })) !==
+            false;
         }
 
-        // Crop coordinates adjusted for padding
-        const cropLeft = rawLeft + padLeft;
-        const cropTop = rawTop + padTop;
+        // The job gets its own copy: the worker and the storage sweep treat
+        // uploads/<jobId>/ as the job's, and analyze's output has to outlive
+        // this run so the user can generate again with other settings.
+        const inputRef = `uploads/${jobId}/${bgRemovedFilename}`;
+        await putObject(inputRef, bgRemovedBuffer);
 
-        // Target pixel dimensions at 300 DPI
-        const MM_PER_INCH = 25.4;
-        const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
-        const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
-
-        // Extract crop region and resize to target dimensions
-        let cropped = await sharp(sourceForCrop)
-          .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
-          .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
-          .jpeg({ quality: 95 })
-          .toBuffer();
-
-        // Compress to fit within max file size if specified
-        if (maxFileSizeKb > 0) {
-          const targetBytes = kbToBytes(maxFileSizeKb);
-          let quality = 90;
-          while (cropped.length > targetBytes && quality > 1) {
-            quality = Math.max(1, quality - 5);
-            cropped = await sharp(sourceForCrop)
-              .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
-              .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
-              .jpeg({ quality })
-              .toBuffer();
-          }
-          // The spec fixes the pixel dimensions, so there is nothing left to
-          // trade: say so instead of returning a photo over the cap (#1288).
-          if (cropped.length > targetBytes) {
-            throw new ToolInputError(
-              `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
-              { code: "TARGET_SIZE_UNREACHABLE" },
-            );
-          }
-        }
-
-        // Store under a fresh server-generated jobId so Phase 2 never writes
-        // into a client-selected prefix or exposes the Phase 1 jobId.
-        const outputJobId = randomUUID();
-        const stem = filename.replace(/\.[^.]+$/, "");
-        const outputFilename = `${stem}_passport.jpg`;
-        const outputs: { key: string; buffer: Buffer }[] = [
-          { key: `outputs/${outputJobId}/${outputFilename}`, buffer: cropped },
-        ];
-
-        const response: Record<string, unknown> = {
-          jobId: outputJobId,
-          downloadUrl: `/api/v1/download/${outputJobId}/${encodeURIComponent(outputFilename)}`,
-          dimensions: {
-            widthMm: docSpec.width,
-            heightMm: docSpec.height,
-            widthPx: targetWidthPx,
-            heightPx: targetHeightPx,
-            dpi: docSpec.dpi,
+        return await enqueueAndAwaitToolJob(request, reply, {
+          jobData: {
+            jobId,
+            toolId: TOOL_ID,
+            userId: user?.id ?? null,
+            username: user?.username,
+            requestIp: request.ip,
+            requestId: request.id,
+            pool,
+            inputRefs: [inputRef],
+            filename: bgRemovedFilename,
+            settings,
+            clientJobId: clientJobId ?? undefined,
+            kind: "tool",
+            analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
           },
-          spec: {
-            country: countrySpec?.name ?? "Custom",
-            countryCode: countrySpec?.code ?? "CUSTOM",
-            documentType: docSpec.type,
-            documentLabel: docSpec.label,
-          },
-        };
-
-        // Generate print sheet if requested
-        if (printLayout !== "none") {
-          const printBuffer = await generatePrintSheet(
-            cropped,
-            docSpec.width,
-            docSpec.height,
-            printLayout,
-          );
-
-          if (printBuffer) {
-            const printFilename = `${stem}_passport_print_${printLayout}.jpg`;
-            outputs.push({ key: `outputs/${outputJobId}/${printFilename}`, buffer: printBuffer });
-            response.printDownloadUrl = `/api/v1/download/${outputJobId}/${encodeURIComponent(printFilename)}`;
-          }
-        }
-
-        await recordCompletedToolJob({
-          jobId: outputJobId,
-          userId: user?.id ?? null,
-          toolId: "passport-photo",
-          outputRefs: outputs.map((o) => o.key),
+          inputFileCount: 1,
+          totalInputSize: bgRemovedBuffer.length,
+          state: enqueueState,
         });
-        for (const { key, buffer } of outputs) {
-          await putObject(key, buffer);
+      } finally {
+        if (!enqueueState.enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) await settleUnenqueuedAlias(jobId, clientJobId, request.log);
         }
-
-        return reply.send(response);
-      } catch (err) {
-        if (hasServerErrorStatus(err)) throw err;
-        const tooLarge = imageSizeLimitError(err);
-        if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
-        if (!isToolInputError(err)) {
-          request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
-        }
-        return reply.status(422).send({
-          error: "Passport photo generation failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-        });
       }
     },
   );
-
   // ── Pipeline/batch registry ──────────────────────────────────────
   const pipelineSettingsSchema = z.object({
     countryCode: z.string(),

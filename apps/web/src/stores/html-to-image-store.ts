@@ -5,11 +5,16 @@ import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api"
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { currentTranslations } from "@/lib/current-translations";
-import { failedFrameMessage, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  acceptedJobId,
+  followQueuedJob,
+  QueuedJobFailed,
+  QueuedJobStalled,
+} from "@/lib/follow-queued-job";
+import { failedFrameMessage } from "@/lib/progress-frames";
 import { safeRandomUUID } from "@/lib/uuid";
 
 const TOOL_ID = "html-to-image";
-const SSE_STALL_TIMEOUT_MS = 5 * 60_000;
 
 interface CaptureResponse {
   downloadUrl: string;
@@ -28,108 +33,6 @@ function isCaptureResponse(value: unknown): value is CaptureResponse {
         Number.isFinite(data.processedSize) &&
         data.processedSize >= 0))
   );
-}
-
-/** The job id a 202 answer names for its progress stream, if it names one. */
-function acceptedJobId(value: unknown): string | null {
-  if (!value || typeof value !== "object") return null;
-  const data = value as Record<string, unknown>;
-  const id = data.progressJobId ?? data.jobId;
-  return typeof id === "string" && id.length > 0 ? id : null;
-}
-
-/** A queued capture whose job failed; the frame says why. */
-class QueuedCaptureFailed extends Error {
-  constructor(readonly frame: ProgressFrame) {
-    super("Queued capture failed");
-    this.name = "QueuedCaptureFailed";
-  }
-}
-
-/** The progress stream went quiet for longer than any capture takes. */
-class QueuedCaptureStalled extends Error {
-  constructor() {
-    super("Queued capture stalled");
-    this.name = "QueuedCaptureStalled";
-  }
-}
-
-/**
- * Follow a capture the server queued (a 202 answer) over its progress stream
- * until the job settles: resolves with the completed frame's result, rejects
- * with QueuedCaptureFailed, QueuedCaptureStalled, or an AbortError when the
- * run is reset. The endpoint replays the terminal frame on reconnect, so a tab
- * that slept through the finish still gets it when it comes back.
- */
-function followQueuedCapture(
-  jobId: string,
-  signal: AbortSignal,
-  onProgress: (percent: number) => void,
-): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let es: EventSource | null = null;
-    let stall: ReturnType<typeof setTimeout> | null = null;
-    let done = false;
-
-    const settle = (finish: () => void) => {
-      if (done) return;
-      done = true;
-      if (stall) clearTimeout(stall);
-      es?.close();
-      es = null;
-      document.removeEventListener("visibilitychange", onVisible);
-      signal.removeEventListener("abort", onAbort);
-      finish();
-    };
-    const onAbort = () => settle(() => reject(new DOMException("Aborted", "AbortError")));
-    const resetStall = () => {
-      if (stall) clearTimeout(stall);
-      stall = setTimeout(
-        () => settle(() => reject(new QueuedCaptureStalled())),
-        SSE_STALL_TIMEOUT_MS,
-      );
-    };
-    const open = () => {
-      if (done) return;
-      es?.close();
-      es = new EventSource(appUrl(`/api/v1/jobs/${jobId}/progress`));
-      es.onmessage = (event) => {
-        let frame: ProgressFrame;
-        try {
-          frame = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-        if (frame.type === "heartbeat") {
-          resetStall();
-          return;
-        }
-        if (frame.type !== "single") return;
-        resetStall();
-        if (frame.phase === "complete") {
-          settle(() => resolve(frame.result));
-        } else if (frame.phase === "failed") {
-          settle(() => reject(new QueuedCaptureFailed(frame)));
-        } else if (typeof frame.percent === "number") {
-          onProgress(frame.percent);
-        }
-      };
-      // The browser reconnects a dropped stream by itself.
-      es.onerror = () => {};
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && es?.readyState !== EventSource.OPEN) open();
-    };
-
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-    signal.addEventListener("abort", onAbort);
-    document.addEventListener("visibilitychange", onVisible);
-    open();
-    resetStall();
-  });
 }
 
 interface HtmlToImageState {
@@ -285,7 +188,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         followedJobId = acceptedJobId(raw) ?? clientJobId;
         queuedJobId = followedJobId;
         set({ queued: true });
-        raw = await followQueuedCapture(followedJobId, controller.signal, (percent) => {
+        raw = await followQueuedJob(followedJobId, controller.signal, (percent) => {
           if (isCurrent()) set({ progress: percent });
         });
         if (!isCurrent()) return;
@@ -302,14 +205,14 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
       });
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
-      if (err instanceof QueuedCaptureFailed) {
+      if (err instanceof QueuedJobFailed) {
         set({
           error: failedFrameMessage(err.frame, "Capture failed", t.errors.canceled),
           capturing: false,
         });
         return;
       }
-      if (err instanceof QueuedCaptureStalled) {
+      if (err instanceof QueuedJobStalled) {
         // The job may still be running with nobody left to collect it.
         if (followedJobId) void cancelAbandonedJob(followedJobId, TOOL_ID);
         set({ error: t.errors.jobTrackingFailed, capturing: false });

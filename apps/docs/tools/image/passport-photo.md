@@ -79,6 +79,8 @@ If `clientJobId` is provided, progress is streamed (0-30% for face detection, 30
 
 Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached images from Phase 1 (no AI re-run).
 
+The crop runs as a queued job. If it finishes inside the synchronous wait window, you get the result below with `200`. A slower one answers `202` with `{"jobId":"...","async":true}`, and the result arrives on the job's progress stream; follow it as described in [Progress Tracking](/api/rest#progress-tracking). The job can be canceled with `POST /api/v1/jobs/{jobId}/cancel`. Up to 2.3.0 this endpoint always waited and answered `200`, so scripts that only handle `200` should also handle `202`.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -99,6 +101,7 @@ Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached i
 | landmarks | object | Yes | - | Landmarks object from Phase 1 response |
 | imageWidth | number | Yes | - | Image width from Phase 1 response |
 | imageHeight | number | Yes | - | Image height from Phase 1 response |
+| clientJobId | string | No | (generated) | Your own job id, so you can open the progress stream before the answer arrives |
 
 #### Example Request {#example-request-1}
 
@@ -128,6 +131,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

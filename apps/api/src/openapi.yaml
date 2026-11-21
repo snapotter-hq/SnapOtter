@@ -2149,7 +2149,11 @@ paths:
       description: |
         Phase 2 of passport photo generation. Uses the jobId and landmarks from
         the analyze phase to crop, resize, and tile the photo to the specified
-        country/document specification. Fast response (no AI re-run).
+        country/document specification (no AI re-run). The crop runs as a
+        queued job. One that finishes inside the sync window answers 200 with
+        the result; a slower one answers 202 with a job id, and the result
+        arrives on the job's progress stream at /api/v1/jobs/{jobId}/progress.
+        Releases up to 2.3.0 always held the request open and answered 200.
       security:
         - bearerAuth: []
       requestBody:
@@ -2220,6 +2224,11 @@ paths:
                 imageHeight:
                   type: integer
                   description: Original image height from analyze phase
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
               filename: photo.png
@@ -2249,6 +2258,10 @@ paths:
                     type: string
                   downloadUrl:
                     type: string
+                  originalSize:
+                    type: integer
+                  processedSize:
+                    type: integer
                   dimensions:
                     type: object
                     properties:
@@ -2291,6 +2304,34 @@ paths:
                   documentType: example
                   documentLabel: example
                 printDownloadUrl: example
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         "400":
           description: Invalid settings or unknown country code
           content:

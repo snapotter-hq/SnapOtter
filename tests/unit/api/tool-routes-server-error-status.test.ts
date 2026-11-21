@@ -617,8 +617,8 @@ describe("json-bodied routes", () => {
     app = undefined;
   });
 
-  // A plausible face on a 200x200 background-removed image, so generate gets
-  // through the crop maths and reaches the putObject call.
+  // The pre-queue checks of passport-photo's generate; the queued crop itself
+  // is pinned in passport-photo-generate-queue.test.ts (#4337).
   const passportBody = {
     jobId: "job",
     filename: "face.png",
@@ -636,11 +636,6 @@ describe("json-bodied routes", () => {
     imageWidth: 200,
     imageHeight: 200,
   };
-  const bgRemoved = () =>
-    sharp({ create: { width: 200, height: 200, channels: 4, background: "#fff" } })
-      .png()
-      .toBuffer();
-
   const cases = [
     {
       name: "barcode-generate",
@@ -659,21 +654,11 @@ describe("json-bodied routes", () => {
       fail: putObject,
       error: "QR code generation failed",
     },
-    {
-      name: "passport-photo generate",
-      register: registerPassportPhoto,
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-      setup: () => getObjectBuffer.mockImplementation(bgRemoved),
-      fail: putObject,
-      error: "Passport photo generation failed",
-    },
   ];
 
   for (const c of cases) {
     const fallbackStatus = c.status ?? 422;
     it(`${c.name} surfaces a storage 503 with its code instead of answering ${fallbackStatus}`, async () => {
-      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw storageDown();
       });
@@ -685,7 +670,6 @@ describe("json-bodied routes", () => {
     });
 
     it(`${c.name} still answers ${fallbackStatus} for an ordinary failure`, async () => {
-      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw new Error("bad input");
       });
@@ -802,73 +786,6 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(getObjectBuffer).not.toHaveBeenCalled();
-  });
-
-  it("passport-photo generate writes output under a fresh jobId rather than the client-supplied jobId", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    putObject.mockResolvedValue(undefined);
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.jobId).toBeTruthy();
-    expect(body.jobId).not.toBe(passportBody.jobId);
-    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/face_passport.jpg`);
-    expect(putObject).toHaveBeenCalledWith(
-      `outputs/${body.jobId}/face_passport.jpg`,
-      expect.any(Buffer),
-    );
-    // The fresh prefix gets its own row so the S3 TTL sweep can expire it.
-    expect(dbInsertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: body.jobId,
-        toolId: "passport-photo",
-        status: "completed",
-        outputRefs: [`outputs/${body.jobId}/face_passport.jpg`],
-      }),
-    );
-  });
-
-  it("passport-photo generate keeps the print sheet under the fresh jobId and its row", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    putObject.mockResolvedValue(undefined);
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: { ...passportBody, printLayout: "4x6" },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    const printKey = `outputs/${body.jobId}/face_passport_print_4x6.jpg`;
-    expect(body.printDownloadUrl).toBe(
-      `/api/v1/download/${body.jobId}/face_passport_print_4x6.jpg`,
-    );
-    expect(putObject).toHaveBeenCalledWith(printKey, expect.any(Buffer));
-    expect(dbInsertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: body.jobId,
-        outputRefs: [`outputs/${body.jobId}/face_passport.jpg`, printKey],
-      }),
-    );
-  });
-
-  it("passport-photo generate answers 500 and writes nothing when the job row can't be recorded", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    dbInsertValues.mockRejectedValue(new Error('Failed query: insert into "jobs" params: secret'));
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-    });
-    expect(res.statusCode).toBe(500);
-    expect(res.body).not.toMatch(/insert into|secret/);
-    expect(putObject).not.toHaveBeenCalled();
   });
 
   it("barcode-generate surfaces 507/503 storage and OOM faults and strips internal paths from 400 error messages (#4050)", async () => {

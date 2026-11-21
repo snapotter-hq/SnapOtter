@@ -70,6 +70,11 @@ export interface ToolProcessInputV2 {
 }
 
 export interface ToolProcessCtxV2 {
+  /**
+   * The job's own id: its outputs are served from /api/v1/download/<jobId>/.
+   * The worker always sets it; only direct calls (tests) leave it out.
+   */
+  jobId?: string;
   inputs: ToolProcessInputV2[];
   settings: unknown;
   scratchDir: string;
@@ -263,8 +268,10 @@ export function registerToolProcessFn(config: AnyToolRouteConfig): void {
  * Process fns the worker runs only for a custom route's own jobs (kind
  * "tool"). For a tool whose job input is not a file a pipeline step or batch
  * child could hand it: html-to-image queues the HTML or URL it was sent, not
- * an image. These stay out of the pipeline/batch registry above, so
- * getRegisteredToolIds and REGISTRY_EXEMPT are unaffected.
+ * an image, and passport-photo's generate queues an analyzed cutout plus its
+ * landmarks. For a kind "tool" job one of these wins over the tool's
+ * pipeline/batch config. These stay out of the pipeline/batch registry above,
+ * so getRegisteredToolIds and REGISTRY_EXEMPT are unaffected.
  */
 const directJobRegistry = new Map<string, ToolProcessV2>();
 
