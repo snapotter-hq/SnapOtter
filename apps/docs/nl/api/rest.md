@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: c42e7b3c57de
-i18n_source_hash: 641c3969deac
+i18n_output_hash: a742c3dcb372
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

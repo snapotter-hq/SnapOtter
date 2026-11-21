@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 85b433271124
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 046a7bca9d39
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

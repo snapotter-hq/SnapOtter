@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 2ee894f7ddea
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 28e04ca9f95b
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

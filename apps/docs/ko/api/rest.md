@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 61e08470b9d2
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 05eecf7d7390
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

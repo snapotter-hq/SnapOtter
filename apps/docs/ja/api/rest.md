@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: feb397a34d4b
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 22e34d1ecafe
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

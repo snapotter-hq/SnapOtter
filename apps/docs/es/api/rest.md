@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: ef4fdafec7b0
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 3ab07dc04f33
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 

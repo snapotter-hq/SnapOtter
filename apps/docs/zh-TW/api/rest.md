@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: dc662ee6df7c
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 3f934ab6f7b1
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
