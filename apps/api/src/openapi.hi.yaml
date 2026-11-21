@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter के लिए REST API, एक सेल्फ-होस्टेड फ़ाइल-प्रोसेसिंग इन्फ़्रास्ट्रक्चर जिसमें image, video, audio, PDF और दस्तावेज़ों के लिए 200+ टूल हैं।
+    SnapOtter के लिए REST API, फ़ाइलों के लिए ओपन-सोर्स टूलकिट, जिसमें image, video, audio, PDF और दस्तावेज़ों के लिए 200+ टूल हैं।
 
     ## प्रमाणीकरण
 
@@ -671,7 +671,9 @@ paths:
       tags:
         - Image
       summary: इमेज कंप्रेस
-      description: गुणवत्ता स्तर या लक्ष्य आकार के अनुसार image फ़ाइल आकार कम करें।
+      description: |
+        गुणवत्ता स्तर या लक्ष्य आकार के अनुसार image फ़ाइल आकार कम करें।
+        लक्ष्य-आकार मोड, अप्रचलित compress-image-to-{20,50,100,200,500}kb ऑपरेशनों का स्थान लेता है।
       security:
         - bearerAuth: []
       requestBody:
@@ -734,7 +736,8 @@ paths:
       summary: छवि को 20 KB तक संपीड़ित करें
       description: |
         एक छवि को 20 KB के लक्ष्य आकार तक संपीड़ित करें
-        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        यह targetSize मोड में `compress` द्वारा समर्थित एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        इसकी जगह POST /api/v1/tools/image/compress का उपयोग करें, जिसमें `mode` को `targetSize` पर और `targetSizeKb` को 20 पर सेट करें। इसे कम से कम एक माइनर रिलीज़ तक रखा जाएगा।
       security:
         - bearerAuth: []
       requestBody:
@@ -806,7 +809,8 @@ paths:
       summary: छवि को 50 KB तक संपीड़ित करें
       description: |
         एक छवि को 50 KB के लक्ष्य आकार तक संपीड़ित करें
-        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        यह targetSize मोड में `compress` द्वारा समर्थित एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        इसकी जगह POST /api/v1/tools/image/compress का उपयोग करें, जिसमें `mode` को `targetSize` पर और `targetSizeKb` को 50 पर सेट करें। इसे कम से कम एक माइनर रिलीज़ तक रखा जाएगा।
       security:
         - bearerAuth: []
       requestBody:
@@ -878,7 +882,8 @@ paths:
       summary: छवि को 100 KB तक संपीड़ित करें
       description: |
         एक छवि को 100 KB के लक्ष्य आकार तक संपीड़ित करें
-        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        यह targetSize मोड में `compress` द्वारा समर्थित एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        इसकी जगह POST /api/v1/tools/image/compress का उपयोग करें, जिसमें `mode` को `targetSize` पर और `targetSizeKb` को 100 पर सेट करें। इसे कम से कम एक माइनर रिलीज़ तक रखा जाएगा।
       security:
         - bearerAuth: []
       requestBody:
@@ -950,7 +955,8 @@ paths:
       summary: छवि को 200 KB तक संपीड़ित करें
       description: |
         एक छवि को 200 KB के लक्ष्य आकार तक संपीड़ित करें
-        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        यह targetSize मोड में `compress` द्वारा समर्थित एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        इसकी जगह POST /api/v1/tools/image/compress का उपयोग करें, जिसमें `mode` को `targetSize` पर और `targetSizeKb` को 200 पर सेट करें। इसे कम से कम एक माइनर रिलीज़ तक रखा जाएगा।
       security:
         - bearerAuth: []
       requestBody:
@@ -1022,7 +1028,8 @@ paths:
       summary: छवि को 500 KB तक संपीड़ित करें
       description: |
         एक छवि को 500 KB के लक्ष्य आकार तक संपीड़ित करें
-        यह `compress` द्वारा समर्थित targetSize मोड में एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        यह targetSize मोड में `compress` द्वारा समर्थित एक समर्पित संपीड़न प्रीसेट एंडपॉइंट है।
+        इसकी जगह POST /api/v1/tools/image/compress का उपयोग करें, जिसमें `mode` को `targetSize` पर और `targetSizeKb` को 500 पर सेट करें। इसे कम से कम एक माइनर रिलीज़ तक रखा जाएगा।
       security:
         - bearerAuth: []
       requestBody:
@@ -11666,7 +11673,7 @@ paths:
       tags:
         - Video
       summary: Clean Video Metadata
-      description: एक video से metadata हटाएं और जो मिला उसकी रिपोर्ट करें।
+      description: एक video से metadata हटाएं और जो मिला उसकी रिपोर्ट करें। `metadata.removed` ऐरे हटाए गए फ़ॉर्मेट टैग के नाम सूचीबद्ध करता है (मान वापस नहीं किए जाते)। खाली ऐरे का मतलब है कि कोई टैग नहीं हटाया गया।
       security:
         - bearerAuth: []
       requestBody:
@@ -25654,9 +25661,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 0a7d56a602a9
+      sourceHash: 822a74e130a5
       provenance: machine
-      outputHash: 7932bff8e4ea
+      outputHash: a798821bc53e
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
@@ -25790,49 +25797,49 @@ x-i18n:
       provenance: machine
       outputHash: e8fedf8f6e97
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 01549bece8b8
+      outputHash: 66c7eed413e8
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 9581e2f42ace
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: fc378b712ad0
+      outputHash: 01c088d08ecb
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 30f641ba4cde
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 1ef1fc2143fa
+      outputHash: f70a901d210c
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 83d791aefec6
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 8144361973be
+      outputHash: 27f19c98ddc4
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: c3433b1ea5c7
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 926c7ccdf929
+      outputHash: e748268425e3
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 528bcab226ba
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: d31771f638b9
+      outputHash: af30538975d9
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -27006,9 +27013,9 @@ x-i18n:
       provenance: machine
       outputHash: f2902a6112ff
     paths./api/v1/tools/video/video-metadata.post.description:
-      sourceHash: 25b0eb0d1f64
+      sourceHash: 689c9a69bd2f
       provenance: machine
-      outputHash: 18b0334db05f
+      outputHash: aaaa4b338058
     paths./api/v1/tools/video/auto-subtitles.post.summary:
       sourceHash: 61b5c42d8cd0
       provenance: machine

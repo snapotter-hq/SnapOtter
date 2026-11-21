@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter 的 REST API，一套自架的檔案處理基礎架構，提供 200+ 工具，涵蓋 image、video、audio、PDF 和文件。
+    SnapOtter 的 REST API，一套開源檔案工具集，提供 200+ 工具，涵蓋 image、video、audio、PDF 和文件。
 
     ## 驗證
 
@@ -671,7 +671,9 @@ paths:
       tags:
         - Image
       summary: 壓縮影像
-      description: 依品質等級或目標大小縮減圖片檔案大小。
+      description: |
+        依品質等級或目標大小縮減圖片檔案大小。
+        目標大小模式取代了已淘汰的 compress-image-to-{20,50,100,200,500}kb 操作。
       security:
         - bearerAuth: []
       requestBody:
@@ -735,6 +737,7 @@ paths:
       description: |
         將圖片壓縮至 20 KB 目標大小
         此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+        已由 POST /api/v1/tools/image/compress 取代，設定中 `mode` 為 `targetSize`，`targetSizeKb` 為 20。至少保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -807,6 +810,7 @@ paths:
       description: |
         將圖片壓縮至 50 KB 目標大小
         此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+        已由 POST /api/v1/tools/image/compress 取代，設定中 `mode` 為 `targetSize`，`targetSizeKb` 為 50。至少保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -879,6 +883,7 @@ paths:
       description: |
         將圖片壓縮至 100 KB 目標大小
         此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+        已由 POST /api/v1/tools/image/compress 取代，設定中 `mode` 為 `targetSize`，`targetSizeKb` 為 100。至少保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -951,6 +956,7 @@ paths:
       description: |
         將圖片壓縮至 200 KB 目標大小
         此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+        已由 POST /api/v1/tools/image/compress 取代，設定中 `mode` 為 `targetSize`，`targetSizeKb` 為 200。至少保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -1023,6 +1029,7 @@ paths:
       description: |
         將圖片壓縮至 500 KB 目標大小
         此為由 `compress` 在 targetSize 模式下支援的專用壓縮預設端點。
+        已由 POST /api/v1/tools/image/compress 取代，設定中 `mode` 為 `targetSize`，`targetSizeKb` 為 500。至少保留一個次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -11607,7 +11614,7 @@ paths:
       tags:
         - Video
       summary: 清理影片中繼資料
-      description: 從影片移除中繼資料並回報所發現的內容。
+      description: 從影片移除中繼資料並回報所發現的內容。`metadata.removed` 陣列列出已移除的格式標籤名稱（不傳回值）。空陣列表示沒有移除任何標籤。
       security:
         - bearerAuth: []
       requestBody:
@@ -25569,9 +25576,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 0a7d56a602a9
+      sourceHash: 822a74e130a5
       provenance: machine
-      outputHash: 97f9bece25ca
+      outputHash: 1e8cb11e41b9
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
@@ -25705,49 +25712,49 @@ x-i18n:
       provenance: machine
       outputHash: 3f5b322d3d67
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 4cc692d8cc1c
+      outputHash: d0fbccd25747
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 27abc071fab5
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 08e03fe33f17
+      outputHash: 2962262637ff
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: f4fed326e99d
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: b70d46a83da3
+      outputHash: ef6ce2f2ca65
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: e4e12fd272de
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: bac94d5cfe47
+      outputHash: 4abade4a711a
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 09842f184aa7
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: a3d1f0eed792
+      outputHash: 61794d6d9bc3
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 5c4b97062d9f
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: e3688edf3446
+      outputHash: 4fedce4531da
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -26921,9 +26928,9 @@ x-i18n:
       provenance: machine
       outputHash: 0899220ed84b
     paths./api/v1/tools/video/video-metadata.post.description:
-      sourceHash: 25b0eb0d1f64
+      sourceHash: 689c9a69bd2f
       provenance: machine
-      outputHash: 5056ffe03507
+      outputHash: 9d0e4c3df1c6
     paths./api/v1/tools/video/auto-subtitles.post.summary:
       sourceHash: 61b5c42d8cd0
       provenance: machine

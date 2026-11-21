@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    SnapOtter 的 REST API，一套自托管的文件处理基础设施，提供 200+ 工具，覆盖 image、video、audio、PDF 和文档。
+    SnapOtter 的 REST API，一套开源文件工具集，提供 200+ 工具，覆盖 image、video、audio、PDF 和文档。
 
     ## 身份验证
 
@@ -671,7 +671,9 @@ paths:
       tags:
         - Image
       summary: 压缩图片
-      description: 按质量级别或目标大小减小图像文件体积。
+      description: |
+        按质量级别或目标大小减小图像文件体积。
+        目标大小模式取代了已弃用的 compress-image-to-{20,50,100,200,500}kb 操作。
       security:
         - bearerAuth: []
       requestBody:
@@ -735,6 +737,7 @@ paths:
       description: |
         将图像压缩至 20 KB 目标大小
         这是由 `compress` 以 targetSize 模式支持的专用压缩预设端点。
+        已由 POST /api/v1/tools/image/compress 取代，设置中 `mode` 为 `targetSize`，`targetSizeKb` 为 20。至少保留一个次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -807,6 +810,7 @@ paths:
       description: |
         将图像压缩至 50 KB 目标大小
         这是由 `compress` 以 targetSize 模式支持的专用压缩预设端点。
+        已由 POST /api/v1/tools/image/compress 取代，设置中 `mode` 为 `targetSize`，`targetSizeKb` 为 50。至少保留一个次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -879,6 +883,7 @@ paths:
       description: |
         将图像压缩至 100 KB 目标大小
         这是由 `compress` 以 targetSize 模式支持的专用压缩预设端点。
+        已由 POST /api/v1/tools/image/compress 取代，设置中 `mode` 为 `targetSize`，`targetSizeKb` 为 100。至少保留一个次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -951,6 +956,7 @@ paths:
       description: |
         将图像压缩至 200 KB 目标大小
         这是由 `compress` 以 targetSize 模式支持的专用压缩预设端点。
+        已由 POST /api/v1/tools/image/compress 取代，设置中 `mode` 为 `targetSize`，`targetSizeKb` 为 200。至少保留一个次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -1023,6 +1029,7 @@ paths:
       description: |
         将图像压缩至 500 KB 目标大小
         这是由 `compress` 以 targetSize 模式支持的专用压缩预设端点。
+        已由 POST /api/v1/tools/image/compress 取代，设置中 `mode` 为 `targetSize`，`targetSizeKb` 为 500。至少保留一个次要版本。
       security:
         - bearerAuth: []
       requestBody:
@@ -11620,7 +11627,7 @@ paths:
       tags:
         - Video
       summary: 清理视频元数据
-      description: 去除视频的元数据并报告发现了哪些内容。
+      description: 去除视频的元数据并报告发现了哪些内容。`metadata.removed` 数组列出已移除的格式标签名称（不返回值）。空数组表示没有移除任何标签。
       security:
         - bearerAuth: []
       requestBody:
@@ -25582,9 +25589,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 0a7d56a602a9
+      sourceHash: 822a74e130a5
       provenance: machine
-      outputHash: 13e7fd3cd792
+      outputHash: f068f10ae9a9
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
@@ -25718,49 +25725,49 @@ x-i18n:
       provenance: machine
       outputHash: d438b0706b7d
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 3fc16e168580
+      outputHash: 3769edef6b50
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 6cae0263c716
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: f3ee3bd4c123
+      outputHash: a4357bd8e57c
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 76824b3935b2
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 4335c0828dba
+      outputHash: e3aa80467923
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 7e9cbd0deed7
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: a1245967379d
+      outputHash: 4918622c00c3
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: f24c2b251e2f
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: f4927ebe1ca1
+      outputHash: 58149a207741
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 23873a37a4da
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 73635033b11e
+      outputHash: c0dbbe31a658
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -26934,9 +26941,9 @@ x-i18n:
       provenance: machine
       outputHash: 06c5e33f5ad8
     paths./api/v1/tools/video/video-metadata.post.description:
-      sourceHash: 25b0eb0d1f64
+      sourceHash: 689c9a69bd2f
       provenance: machine
-      outputHash: cfc77f9b8849
+      outputHash: 117e9cabfd65
     paths./api/v1/tools/video/auto-subtitles.post.summary:
       sourceHash: 61b5c42d8cd0
       provenance: machine

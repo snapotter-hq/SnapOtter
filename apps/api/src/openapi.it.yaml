@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API di SnapOtter, un'infrastruttura self-hosted per l'elaborazione dei file con 200+ strumenti per image, video, audio, PDF e documenti.
+    REST API di SnapOtter, il toolkit open source per i file con 200+ strumenti per image, video, audio, PDF e documenti.
 
     ## Autenticazione
 
@@ -671,7 +671,9 @@ paths:
       tags:
         - Image
       summary: Comprimi Immagine
-      description: Riduci la dimensione del file immagine in base al livello di qualità o alla dimensione target.
+      description: |
+        Riduci la dimensione del file immagine in base al livello di qualità o alla dimensione target.
+        La modalità con dimensione target sostituisce le operazioni obsolete compress-image-to-{20,50,100,200,500}kb.
       security:
         - bearerAuth: []
       requestBody:
@@ -735,6 +737,7 @@ paths:
       description: |
         Comprimi un'immagine a una dimensione target di 20 KB
         Questo è un endpoint di preset di compressione dedicato supportato da `compress` in modalità targetSize.
+        Sostituito da POST /api/v1/tools/image/compress con l'impostazione `mode` su `targetSize` e `targetSizeKb` su 20. Mantenuto per almeno una release minore.
       security:
         - bearerAuth: []
       requestBody:
@@ -807,6 +810,7 @@ paths:
       description: |
         Comprimi un'immagine a una dimensione target di 50 KB
         Questo è un endpoint di preset di compressione dedicato supportato da `compress` in modalità targetSize.
+        Sostituito da POST /api/v1/tools/image/compress con l'impostazione `mode` su `targetSize` e `targetSizeKb` su 50. Mantenuto per almeno una release minore.
       security:
         - bearerAuth: []
       requestBody:
@@ -879,6 +883,7 @@ paths:
       description: |
         Comprimi un'immagine a una dimensione target di 100 KB
         Questo è un endpoint di preset di compressione dedicato supportato da `compress` in modalità targetSize.
+        Sostituito da POST /api/v1/tools/image/compress con l'impostazione `mode` su `targetSize` e `targetSizeKb` su 100. Mantenuto per almeno una release minore.
       security:
         - bearerAuth: []
       requestBody:
@@ -951,6 +956,7 @@ paths:
       description: |
         Comprimi un'immagine a una dimensione target di 200 KB
         Questo è un endpoint di preset di compressione dedicato supportato da `compress` in modalità targetSize.
+        Sostituito da POST /api/v1/tools/image/compress con l'impostazione `mode` su `targetSize` e `targetSizeKb` su 200. Mantenuto per almeno una release minore.
       security:
         - bearerAuth: []
       requestBody:
@@ -1023,6 +1029,7 @@ paths:
       description: |
         Comprimi un'immagine a una dimensione target di 500 KB
         Questo è un endpoint di preset di compressione dedicato supportato da `compress` in modalità targetSize.
+        Sostituito da POST /api/v1/tools/image/compress con l'impostazione `mode` su `targetSize` e `targetSizeKb` su 500. Mantenuto per almeno una release minore.
       security:
         - bearerAuth: []
       requestBody:
@@ -11668,7 +11675,7 @@ paths:
       tags:
         - Video
       summary: Pulisci metadati video
-      description: Rimuovi i metadati da un video e segnala ciò che è stato trovato.
+      description: Rimuovi i metadati da un video e segnala ciò che è stato trovato. L'array `metadata.removed` elenca i nomi dei tag di formato rimossi (i valori non vengono restituiti). Un array vuoto significa che non è stato rimosso alcun tag.
       security:
         - bearerAuth: []
       requestBody:
@@ -25659,9 +25666,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 0a7d56a602a9
+      sourceHash: 822a74e130a5
       provenance: machine
-      outputHash: ee34ec57345d
+      outputHash: 1f74c905f61d
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
@@ -25795,49 +25802,49 @@ x-i18n:
       provenance: machine
       outputHash: 75e5f4aa8f8c
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 4114f4dd6feb
+      outputHash: bb7b4831e4f0
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 3cbe07c73b5a
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: c80fc8148a85
+      outputHash: 42e546caa10e
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 8a3316530aae
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 50ee5af08b0c
+      outputHash: 8c26c188d9b2
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 1d728072e623
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 75f6db51a02d
+      outputHash: eb19cf5eca9e
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 5ce4bde2d97b
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: fcbe1665ced0
+      outputHash: c012e8431549
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 86b11dca15f1
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: d7a3c1a0321d
+      outputHash: 5e197a0817ae
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -27011,9 +27018,9 @@ x-i18n:
       provenance: machine
       outputHash: 4469415b8369
     paths./api/v1/tools/video/video-metadata.post.description:
-      sourceHash: 25b0eb0d1f64
+      sourceHash: 689c9a69bd2f
       provenance: machine
-      outputHash: e40d6ddbb983
+      outputHash: 52865da2df81
     paths./api/v1/tools/video/auto-subtitles.post.summary:
       sourceHash: 61b5c42d8cd0
       provenance: machine
