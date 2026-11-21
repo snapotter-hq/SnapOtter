@@ -5890,6 +5890,7 @@ export const de: TranslationKeys = {
     conversionFailed: "Konvertierung fehlgeschlagen",
     installFailed: "Installation konnte nicht gestartet werden",
     uninstallFailed: "Deinstallation fehlgeschlagen",
+    cancelInstallFailed: "Installation konnte nicht abgebrochen werden",
     resetFailed: "Zurücksetzen fehlgeschlagen",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5961,6 +5962,8 @@ export const de: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Speicherkontingent überschritten.",
       TARGET_SIZE_EXCEEDED: "Das Ergebnis kann die Zielgröße nicht erreichen.",
       TOO_MANY_FRAMES: "Diese Datei hat zu viele Frames, um verarbeitet zu werden.",
+      FEATURE_INSTALL_BUSY:
+        "Die Installation aktualisiert gerade die AI-Umgebung und kann jetzt nicht gestoppt werden. Sie ist gleich fertig.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
       PAGE_OUT_OF_RANGE:
         "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",

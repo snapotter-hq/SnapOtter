@@ -5846,6 +5846,7 @@ export const tr: TranslationKeys = {
     conversionFailed: "Dönüştürme başarısız oldu",
     installFailed: "Kurulum başlatılamadı",
     uninstallFailed: "Kaldırma başarısız oldu",
+    cancelInstallFailed: "Kurulum iptal edilemedi",
     resetFailed: "Sıfırlama başarısız oldu",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5908,6 +5909,8 @@ export const tr: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Depolama kotası aşıldı.",
       TARGET_SIZE_EXCEEDED: "Sonuç hedef boyuta ulaşamıyor.",
       TOO_MANY_FRAMES: "Bu dosyada işlenemeyecek kadar çok kare var.",
+      FEATURE_INSTALL_BUSY:
+        "Kurulum AI ortamını güncelliyor ve şu anda durdurulamaz. Kısa süre içinde tamamlanacak.",
       CANCELED: "İşlem iptal edildi.",
       PAGE_OUT_OF_RANGE: "Bu sayfa aralığı, bu PDF'de olmayan bir sayfa içeriyor.",
       INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",

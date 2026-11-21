@@ -5739,6 +5739,7 @@ export const th: TranslationKeys = {
     conversionFailed: "แปลงไฟล์ไม่สำเร็จ",
     installFailed: "เริ่มการติดตั้งไม่สำเร็จ",
     uninstallFailed: "ถอนการติดตั้งไม่สำเร็จ",
+    cancelInstallFailed: "ยกเลิกการติดตั้งไม่สำเร็จ",
     resetFailed: "รีเซ็ตไม่สำเร็จ",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "ผู้ดูแลระบบของคุณกำหนดให้ใช้การเข้าสู่ระบบแบบสองขั้นตอน ตั้งค่าเพื่อดำเนินการต่อ",
@@ -5796,6 +5797,7 @@ export const th: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "เกินโควตาพื้นที่จัดเก็บ",
       TARGET_SIZE_EXCEEDED: "ผลลัพธ์ไม่สามารถถึงขนาดเป้าหมายได้",
       TOO_MANY_FRAMES: "ไฟล์นี้มีเฟรมมากเกินไปที่จะประมวลผล",
+      FEATURE_INSTALL_BUSY: "การติดตั้งกำลังอัปเดตสภาพแวดล้อม AI และหยุดตอนนี้ไม่ได้ จะเสร็จในอีกไม่นาน",
       CANCELED: "ยกเลิกการดำเนินการแล้ว",
       PAGE_OUT_OF_RANGE: "ช่วงหน้านี้มีหน้าที่ไม่มีอยู่ใน PDF นี้",
       INVALID_PAGE_RANGE: "ช่วงหน้านี้ไม่ถูกต้อง ใช้หมายเลขหน้าเช่น 1-3,5",

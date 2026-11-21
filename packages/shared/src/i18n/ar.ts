@@ -5785,6 +5785,7 @@ export const ar: TranslationKeys = {
     conversionFailed: "فشل التحويل",
     installFailed: "تعذّر بدء التثبيت",
     uninstallFailed: "فشل إلغاء التثبيت",
+    cancelInstallFailed: "تعذّر إيقاف التثبيت",
     resetFailed: "فشلت إعادة التعيين",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "يتطلب مسؤولك تسجيل الدخول بالتحقق بخطوتين. أعدّه للمتابعة.",
@@ -5845,6 +5846,8 @@ export const ar: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "تم تجاوز حصة التخزين.",
       TARGET_SIZE_EXCEEDED: "لا يمكن أن تصل النتيجة إلى الحجم المستهدف.",
       TOO_MANY_FRAMES: "يحتوي هذا الملف على عدد كبير جدًا من الإطارات للمعالجة.",
+      FEATURE_INSTALL_BUSY:
+        "يقوم التثبيت بتحديث بيئة الذكاء الاصطناعي ولا يمكن إيقافه الآن. سينتهي قريبًا.",
       CANCELED: "تم إلغاء العملية.",
       PAGE_OUT_OF_RANGE: "يتضمن نطاق الصفحات هذا صفحة غير موجودة في ملف PDF هذا.",
       INVALID_PAGE_RANGE: "نطاق الصفحات هذا غير صالح. استخدم أرقام صفحات مثل 1-3,5.",

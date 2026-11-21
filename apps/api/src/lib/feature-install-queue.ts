@@ -91,6 +91,13 @@ export function dequeue(): QueuedInstall | null {
   return queue.shift() ?? null;
 }
 
+/** Remove a waiting (not yet started) install by job id; null when it isn't queued. */
+export function removeQueued(jobId: string): QueuedInstall | null {
+  const index = queue.findIndex((entry) => entry.jobId === jobId);
+  if (index === -1) return null;
+  return queue.splice(index, 1)[0];
+}
+
 /** Mark a bundle as the active install (called by the pump when it starts one). */
 export function setActive(entry: QueuedInstall | null): void {
   activeInstall = entry;

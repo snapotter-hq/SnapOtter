@@ -5875,6 +5875,7 @@ export const fr: TranslationKeys = {
     conversionFailed: "Échec de la conversion",
     installFailed: "Impossible de lancer l'installation",
     uninstallFailed: "Échec de la désinstallation",
+    cancelInstallFailed: "Impossible d'annuler l'installation",
     resetFailed: "Échec de la réinitialisation",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5945,6 +5946,8 @@ export const fr: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Quota de stockage dépassé.",
       TARGET_SIZE_EXCEEDED: "Le résultat ne peut pas atteindre la taille cible.",
       TOO_MANY_FRAMES: "Ce fichier contient trop d'images pour être traité.",
+      FEATURE_INSTALL_BUSY:
+        "L'installation met à jour l'environnement AI et ne peut pas être arrêtée maintenant. Elle se terminera sous peu.",
       CANCELED: "L'opération a été annulée.",
       PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
       INVALID_PAGE_RANGE:

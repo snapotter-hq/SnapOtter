@@ -69,6 +69,7 @@ describe("useFeaturesStore", () => {
       installing: {},
       errors: {},
       queued: [],
+      canceling: [],
       installAllActive: false,
       startTimes: {},
     });
@@ -522,6 +523,105 @@ describe("useFeaturesStore", () => {
       await useFeaturesStore.getState().uninstallBundle("fail-uninstall2");
 
       expect(useFeaturesStore.getState().errors["fail-uninstall2"]).toBe("Uninstall failed");
+    });
+  });
+
+  describe("cancelInstall() (#4763)", () => {
+    async function startStreamedInstall(bundleId: string) {
+      apiPostMock.mockResolvedValueOnce({ jobId: `job-${bundleId}` });
+      await useFeaturesStore.getState().installBundle(bundleId);
+      expect(FakeEventSource.instances).toHaveLength(1);
+      return FakeEventSource.instances[0];
+    }
+
+    it("asks the server to cancel and settles the canceled frame without an error", async () => {
+      const es = await startStreamedInstall("background-removal");
+      apiPostMock.mockResolvedValueOnce({ canceled: true });
+
+      await useFeaturesStore.getState().cancelInstall("background-removal");
+      expect(apiPostMock).toHaveBeenLastCalledWith(
+        "/v1/admin/features/background-removal/install/cancel",
+        {},
+      );
+      expect(useFeaturesStore.getState().canceling).toEqual(["background-removal"]);
+
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+      es.onmessage?.({
+        data: JSON.stringify({ phase: "failed", error: "Canceled", code: "CANCELED" }),
+      });
+
+      const state = useFeaturesStore.getState();
+      expect(es.closed).toBe(true);
+      expect(state.installing["background-removal"]).toBeUndefined();
+      expect(state.errors["background-removal"]).toBeUndefined();
+      expect(state.canceling).toEqual([]);
+    });
+
+    it("does not poll a cancel whose canceled frame beat the response", async () => {
+      const es = await startStreamedInstall("background-removal");
+      let answer: (value: unknown) => void = () => {};
+      apiPostMock.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+
+      vi.useFakeTimers();
+      try {
+        const cancel = useFeaturesStore.getState().cancelInstall("background-removal");
+        apiGetMock.mockResolvedValue({
+          bundles: [makeBundleState({ id: "background-removal", status: "not_installed" })],
+        });
+        es.onmessage?.({
+          data: JSON.stringify({ phase: "failed", error: "Canceled", code: "CANCELED" }),
+        });
+        answer({ canceled: true });
+        await cancel;
+        apiGetMock.mockClear();
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        expect(apiGetMock).not.toHaveBeenCalled();
+        expect(useFeaturesStore.getState().errors["background-removal"]).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("shows a refused cancel and clears it when the install then finishes", async () => {
+      const es = await startStreamedInstall("background-removal");
+      apiPostMock.mockRejectedValueOnce(new Error("busy writing the venv"));
+
+      await useFeaturesStore.getState().cancelInstall("background-removal");
+      let state = useFeaturesStore.getState();
+      expect(state.errors["background-removal"]).toBe("busy writing the venv");
+      expect(state.canceling).toEqual([]);
+      expect(state.installing["background-removal"]).toBeDefined();
+
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+      es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      state = useFeaturesStore.getState();
+      expect(state.installing["background-removal"]).toBeUndefined();
+      expect(state.errors["background-removal"]).toBeUndefined();
+    });
+
+    it("settles a canceled queued install from the poller without an error", async () => {
+      vi.useFakeTimers();
+      try {
+        apiPostMock.mockResolvedValueOnce({ jobId: "job-queued", queued: true });
+        await useFeaturesStore.getState().installBundle("face-detection");
+        expect(useFeaturesStore.getState().queued).toEqual(["face-detection"]);
+
+        apiPostMock.mockResolvedValueOnce({ canceled: true });
+        await useFeaturesStore.getState().cancelInstall("face-detection");
+
+        apiGetMock.mockResolvedValue({
+          bundles: [makeBundleState({ id: "face-detection", status: "not_installed" })],
+        });
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        const state = useFeaturesStore.getState();
+        expect(state.queued).toEqual([]);
+        expect(state.errors["face-detection"]).toBeUndefined();
+        expect(state.canceling).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

@@ -5837,6 +5837,7 @@ export const id: TranslationKeys = {
     conversionFailed: "Konversi gagal",
     installFailed: "Gagal memulai instalasi",
     uninstallFailed: "Pencopotan gagal",
+    cancelInstallFailed: "Tidak dapat membatalkan instalasi",
     resetFailed: "Pengaturan ulang gagal",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5899,6 +5900,8 @@ export const id: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Kuota penyimpanan terlampaui.",
       TARGET_SIZE_EXCEEDED: "Hasilnya tidak dapat mencapai ukuran target.",
       TOO_MANY_FRAMES: "File ini memiliki terlalu banyak frame untuk diproses.",
+      FEATURE_INSTALL_BUSY:
+        "Instalasi sedang memperbarui lingkungan AI dan tidak dapat dihentikan sekarang. Instalasi akan segera selesai.",
       CANCELED: "Operasi dibatalkan.",
       PAGE_OUT_OF_RANGE: "Rentang halaman itu mencakup halaman yang tidak ada di PDF ini.",
       INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",

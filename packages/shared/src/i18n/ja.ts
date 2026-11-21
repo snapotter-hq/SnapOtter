@@ -5788,6 +5788,7 @@ export const ja: TranslationKeys = {
     conversionFailed: "変換に失敗しました",
     installFailed: "インストールを開始できませんでした",
     uninstallFailed: "アンインストールに失敗しました",
+    cancelInstallFailed: "インストールをキャンセルできませんでした",
     resetFailed: "リセットに失敗しました",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "管理者により二要素認証が必要です。続けるには設定してください。",
@@ -5855,6 +5856,8 @@ export const ja: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "ストレージの容量を超えました。",
       TARGET_SIZE_EXCEEDED: "結果を目標サイズに収めることができません。",
       TOO_MANY_FRAMES: "このファイルはフレーム数が多すぎて処理できません。",
+      FEATURE_INSTALL_BUSY:
+        "インストールが AI 環境を更新中のため、今は停止できません。まもなく完了します。",
       CANCELED: "操作はキャンセルされました。",
       PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
       INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",

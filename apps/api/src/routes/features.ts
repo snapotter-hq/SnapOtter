@@ -4,6 +4,7 @@
  * GET  /api/v1/features                           - List feature bundles and their statuses
  * POST /api/v1/admin/features/:bundleId/install       - Install a feature bundle (async)
  * POST /api/v1/admin/tools/:toolId/features/install   - Install every bundle a tool requires
+ * POST /api/v1/admin/features/:bundleId/install/cancel - Cancel a queued or running install
  * POST /api/v1/admin/features/:bundleId/uninstall     - Uninstall a feature bundle
  * POST /api/v1/admin/features/reset                   - Wipe the AI venv/models, reset all bundles
  * GET  /api/v1/admin/features/disk-usage              - Get AI model disk usage
@@ -53,8 +54,11 @@ import {
   clearActive,
   dequeue,
   enqueue,
+  getActiveAndQueuedInstalls,
   getActiveBundleId,
+  getActiveInstallJobId,
   peekQueue,
+  removeQueued,
   setActive,
 } from "../lib/feature-install-queue.js";
 import {
@@ -106,6 +110,7 @@ import {
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import {
+  cancelSingleJobGuarded,
   refreshFeatureInstallStream,
   releaseFeatureInstallStream,
   reserveFeatureInstallStream,
@@ -359,6 +364,38 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
 }
 
 /**
+ * Why a cancel left an install running. "venv-write": the installer holds the
+ * venv writer lock, and a kill mid-write tears the shared venv every AI tool
+ * loads from, so that phase has to finish. "ocr": the OCR runtime installer
+ * has no cancel path yet.
+ */
+export type InstallCancelRefusal = "venv-write" | "ocr" | "not-found";
+export type InstallCancelResult =
+  | { canceled: true }
+  | { canceled: false; reason: InstallCancelRefusal };
+
+// Cancel hooks for running venv installers, keyed by job id. startInstall
+// registers one per child and finalizeOnce removes it.
+const activeInstallCancels = new Map<string, { cancel: () => InstallCancelResult }>();
+
+/**
+ * Cancel a feature install by its job id. A queued install leaves the queue
+ * and its job settles as canceled now; a running one is signalled, and its
+ * close handler settles the job and frees the locks the same way any other
+ * exit does, so the next queued bundle still starts.
+ */
+export async function cancelFeatureInstall(jobId: string): Promise<InstallCancelResult> {
+  if (removeQueued(jobId)) {
+    await cancelSingleJobGuarded({ jobId });
+    return { canceled: true };
+  }
+  const activeInstall = activeInstallCancels.get(jobId);
+  if (activeInstall) return activeInstall.cancel();
+  if (getActiveInstallJobId() === jobId) return { canceled: false, reason: "ocr" };
+  return { canceled: false, reason: "not-found" };
+}
+
+/**
  * Spawn the installer child for a bundle and wire up progress / analytics /
  * error reporting. The child is detached from any HTTP request, so it finalizes
  * via its own close/error handlers regardless of the connection. On exit it
@@ -435,10 +472,12 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
       }
     };
 
+    let canceled = false;
     let finalized = false;
     const finalizeOnce = (): boolean => {
       if (finalized) return false;
       finalized = true;
+      activeInstallCancels.delete(jobId);
       clearWatchdog();
       venvLockRequest.abort();
       releaseVenvOnce();
@@ -459,6 +498,42 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
     // handler does the teardown, so the stream error has nothing left to do.
     child.stdin?.on("error", () => {});
 
+    // The signal tells the installer why it is being stopped: SIGINT is a
+    // user cancel, which deletes the partial download, while the watchdog's
+    // SIGTERM keeps it so the retry resumes instead of starting over.
+    const terminateChild = (signal: "SIGINT" | "SIGTERM") => {
+      if (watchdog) {
+        clearInterval(watchdog);
+        watchdog = null;
+      }
+      try {
+        child.kill(signal);
+      } catch {
+        // child already gone
+      }
+      // Escalate to SIGKILL if the signal does not land (e.g. a C extension
+      // ignoring the signal); the close handler clears this grace timer.
+      killGrace ??= setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // already gone
+        }
+      }, 10_000);
+    };
+
+    activeInstallCancels.set(jobId, {
+      cancel: () => {
+        // Once granted, the installer may be mid-write into the shared venv.
+        if (releaseVenv) return { canceled: false, reason: "venv-write" };
+        // A second signal could land inside the installer's cleanup and cut it short.
+        if (canceled) return { canceled: true };
+        canceled = true;
+        terminateChild("SIGINT");
+        return { canceled: true };
+      },
+    });
+
     const grantVenvLock = () => {
       if (venvLockRequested) return;
       venvLockRequested = true;
@@ -467,8 +542,9 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
         (release) => {
           waitingForVenvLock = false;
           lastProgressAt = Date.now();
-          // The installer died while waiting; nothing will write the venv.
-          if (finalized) {
+          // The installer died or is being canceled while it waited; nothing
+          // will write the venv.
+          if (finalized || canceled) {
             release();
             return;
           }
@@ -498,24 +574,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
         if (!verdict.kill) return;
         watchdogError = verdict.reason;
         setInstallProgress(bundleId, null, watchdogError);
-        if (watchdog) {
-          clearInterval(watchdog);
-          watchdog = null;
-        }
-        try {
-          child.kill("SIGTERM");
-        } catch {
-          // child already gone
-        }
-        // Escalate to SIGKILL if SIGTERM does not land (e.g. a C extension
-        // ignoring the signal); the close handler clears this grace timer.
-        killGrace = setTimeout(() => {
-          try {
-            child.kill("SIGKILL");
-          } catch {
-            // already gone
-          }
-        }, 10_000);
+        terminateChild("SIGTERM");
       }, 30_000);
       watchdog.unref?.();
     }
@@ -582,6 +641,15 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
 
     child.on("close", (code, signal) => {
       if (!finalizeOnce()) return;
+
+      // An installer that finished before the signal landed did install the
+      // bundle, so only a non-zero exit counts as canceled.
+      if (canceled && code !== 0) {
+        setInstallProgress(bundleId, null, null);
+        void cancelSingleJobGuarded({ jobId });
+        pump();
+        return;
+      }
 
       if (code === 0) {
         invalidateCache();
@@ -1213,6 +1281,42 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       }
 
       return reply.status(202).send({ bundles: bundles.map(withJobUrls) });
+    },
+  );
+
+  // POST /api/v1/admin/features/:bundleId/install/cancel - Cancel a queued or running install
+  app.post(
+    "/api/v1/admin/features/:bundleId/install/cancel",
+    { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
+    async (request: FastifyRequest<{ Params: BundleIdParams }>, reply: FastifyReply) => {
+      const admin = await requirePermission("features:manage")(request, reply);
+      if (!admin) return reply;
+
+      const { bundleId } = request.params;
+
+      if (!FEATURE_BUNDLES[bundleId]) {
+        return reply.status(404).send({ error: `Unknown bundle: ${bundleId}` });
+      }
+
+      const install = getActiveAndQueuedInstalls().find((entry) => entry.bundleId === bundleId);
+      const result = install
+        ? await cancelFeatureInstall(install.jobId)
+        : ({ canceled: false, reason: "not-found" } as const);
+      if (result.canceled) return reply.send({ canceled: true, jobId: install?.jobId });
+
+      if (result.reason === "venv-write") {
+        return reply.status(409).send({
+          error:
+            "The install is updating the AI environment and can't be stopped right now. It will finish shortly.",
+          code: "FEATURE_INSTALL_BUSY",
+        });
+      }
+      return reply.status(409).send({
+        error:
+          result.reason === "ocr"
+            ? "An Accurate OCR install can't be canceled once it has started."
+            : `Bundle "${bundleId}" is not installing`,
+      });
     },
   );
 

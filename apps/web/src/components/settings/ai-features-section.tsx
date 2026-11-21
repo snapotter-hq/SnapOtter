@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -46,10 +47,12 @@ export function AiFeaturesSection() {
     installing,
     errors,
     queued,
+    canceling,
     installAllActive,
     startTimes,
     installBundle,
     uninstallBundle,
+    cancelInstall,
     reinstallBundle,
     installAll,
     resetEnvironment,
@@ -118,8 +121,10 @@ export function AiFeaturesSection() {
             onInstall={() => installBundle(bundle.id)}
             onUninstall={() => uninstallBundle(bundle.id)}
             onReinstall={() => reinstallBundle(bundle.id)}
+            onCancel={() => cancelInstall(bundle.id)}
             isInstalling={!!installing[bundle.id]}
             isQueued={queued.includes(bundle.id)}
+            isCanceling={canceling.includes(bundle.id)}
             startTime={startTimes[bundle.id] ?? null}
           />
         ))}
@@ -439,8 +444,10 @@ function BundleCard({
   onInstall,
   onUninstall,
   onReinstall,
+  onCancel,
   isInstalling,
   isQueued,
+  isCanceling,
   startTime,
 }: {
   bundle: FeatureBundleState;
@@ -449,8 +456,10 @@ function BundleCard({
   onInstall: () => void;
   onUninstall: () => void;
   onReinstall: () => void;
+  onCancel: () => void;
   isInstalling: boolean;
   isQueued: boolean;
+  isCanceling: boolean;
   startTime: number | null;
 }) {
   const { t, locale } = useTranslation();
@@ -464,6 +473,8 @@ function BundleCard({
   );
   const [now, setNow] = useState(Date.now());
   const status = isQueued ? "queued" : isInstalling ? "installing" : bundle.status;
+  // A started Accurate OCR install has no cancel path on the server.
+  const cancelable = status === "queued" || (status === "installing" && bundle.id !== "ocr");
 
   useEffect(() => {
     if (!isInstalling) return;
@@ -621,6 +632,21 @@ function BundleCard({
             >
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               {t.settings.aiFeatures.installing}
+            </button>
+          )}
+          {cancelable && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isCanceling}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {isCanceling ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {t.common.cancel}
             </button>
           )}
           {(status === "error" || displayedError) &&

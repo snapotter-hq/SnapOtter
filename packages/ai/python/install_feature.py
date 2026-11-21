@@ -24,6 +24,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -114,6 +115,46 @@ def release_venv_write_lock() -> None:
     with contextlib.suppress(OSError):
         sys.stderr.write(json.dumps({"venvLock": "release"}) + "\n")
         sys.stderr.flush()
+
+
+class InstallCancelled(BaseException):
+    """Raised from the SIGINT handler when the server cancels the install.
+
+    A BaseException so the many `except Exception` blocks on the download and
+    extract paths let it through to main(), which removes the partial files
+    (#4763). Their `finally` blocks still run on the way out.
+    """
+
+
+INSTALL_CANCELLED = "Install canceled"
+
+
+def _on_cancel_signal(signum, _frame) -> None:
+    # The server cancels with SIGINT, and only while the venv writer lock is
+    # free; its watchdog uses SIGTERM, whose default action keeps the partial
+    # download for the retry to resume. Should SIGINT arrive with the lock held
+    # anyway, die at once like a watchdog kill, so the venv.writing marker sends
+    # the venv to a reseed on the next boot instead of cleanup code running
+    # against a half-written venv.
+    if _venv_lock_held[0]:
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+        return
+    raise InstallCancelled()
+
+
+def remove_cancelled_install_files(ai_dir: str, bundle_id: str, keep_path: str = "") -> None:
+    """Remove what a canceled install left behind: the extract staging tree and
+    the downloaded archive with its resume sidecars. Nothing has been written
+    to the venv or recorded in installed.json before the venv lock, so these
+    are the only traces. `keep_path` is an archive the admin supplied through
+    SNAPOTTER_BUNDLE_LOCAL_PATH, which is theirs and stays."""
+    shutil.rmtree(os.path.join(ai_dir, f"staging-{bundle_id}"), ignore_errors=True)
+    tar_path = os.path.join(ai_dir, "staging", f"{bundle_id}-{detect_arch()}.tar.gz")
+    for path in (tar_path, tar_path + ".partial", tar_path + ".meta"):
+        if keep_path and os.path.abspath(path) == os.path.abspath(keep_path):
+            continue
+        _unlink_quietly(path)
 
 
 # -- Architecture detection --
@@ -649,6 +690,9 @@ def download_with_hf_hub(
                 repo_type="model",
                 local_dir=local_dir,
             )
+    except InstallCancelled:
+        _cleanup_hf_local_dir(local_dir, archive_file)
+        raise
     except Exception as e:
         emit_progress(
             progress_start,
@@ -2592,6 +2636,17 @@ def main() -> None:
     os.environ["TRANSFORMERS_OFFLINE"] = "0"
     try:
         _install()
+    except InstallCancelled:
+        # A second cancel must not interrupt the cleanup; the server's SIGKILL
+        # escalation still ends a cleanup that hangs.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        if len(sys.argv) >= 4:
+            remove_cancelled_install_files(
+                os.path.dirname(sys.argv[3]),
+                sys.argv[1],
+                os.environ.get("SNAPOTTER_BUNDLE_LOCAL_PATH", ""),
+            )
+        fail(INSTALL_CANCELLED)
     finally:
         for key, value in saved.items():
             if value is None:
@@ -3257,4 +3312,7 @@ def _install() -> None:
 
 
 if __name__ == "__main__":
+    # Only as a script: signal handlers can only be set from the main thread,
+    # and an in-process caller keeps its own SIGINT handling.
+    signal.signal(signal.SIGINT, _on_cancel_signal)
     main()

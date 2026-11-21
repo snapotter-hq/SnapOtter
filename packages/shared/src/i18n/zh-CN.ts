@@ -5514,6 +5514,7 @@ export const zhCN: TranslationKeys = {
     conversionFailed: "转换失败",
     installFailed: "无法开始安装",
     uninstallFailed: "卸载失败",
+    cancelInstallFailed: "无法取消安装",
     resetFailed: "重置失败",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "管理员要求启用双重验证。请先设置以继续。",
@@ -5571,6 +5572,7 @@ export const zhCN: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "已超出存储配额。",
       TARGET_SIZE_EXCEEDED: "结果无法达到目标大小。",
       TOO_MANY_FRAMES: "此文件的帧数过多，无法处理。",
+      FEATURE_INSTALL_BUSY: "安装正在更新 AI 环境，现在无法停止。很快就会完成。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "该页码范围包含此 PDF 中不存在的页面。",
       INVALID_PAGE_RANGE: "该页码范围无效。请使用类似 1-3,5 的页码。",

@@ -38,6 +38,8 @@ interface FeaturesState {
   installing: Record<string, BundleProgress>;
   errors: Record<string, string>;
   queued: string[];
+  /** Bundles whose install the user canceled, until the server settles it. */
+  canceling: string[];
   installAllActive: boolean;
   startTimes: Record<string, number>;
 
@@ -48,6 +50,7 @@ interface FeaturesState {
   installBundle: (bundleId: string) => Promise<void>;
   installTool: (toolId: string) => Promise<void>;
   uninstallBundle: (bundleId: string) => Promise<void>;
+  cancelInstall: (bundleId: string) => Promise<void>;
   reinstallBundle: (bundleId: string) => Promise<void>;
   installAll: () => Promise<void>;
   clearError: (bundleId: string) => void;
@@ -122,6 +125,15 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
    * check whether the Install All run is done.
    */
   const onInstallSettled = (bundleId: string, errorMsg: string | null) => {
+    if (get().canceling.includes(bundleId)) {
+      set({ canceling: get().canceling.filter((id) => id !== bundleId) });
+    }
+    if (!errorMsg && get().errors[bundleId]) {
+      // A refused cancel leaves its message on a still-running install.
+      const errors = { ...get().errors };
+      delete errors[bundleId];
+      set({ errors });
+    }
     if (errorMsg) {
       if (get().installAllActive && !installAllRetried.has(bundleId)) {
         installAllRetried.add(bundleId);
@@ -189,7 +201,12 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       stopPolling(bundleId);
       stopTracking(bundleId);
       const failed = !updated || updated.status === "not_installed" || updated.status === "error";
-      onInstallSettled(bundleId, failed ? (updated?.error ?? "Installation failed") : null);
+      // A canceled install lands back on not_installed with no error.
+      const canceled = updated?.status === "not_installed" && get().canceling.includes(bundleId);
+      onInstallSettled(
+        bundleId,
+        failed && !canceled ? (updated?.error ?? "Installation failed") : null,
+      );
     }, 3000);
     pollRefs[bundleId] = timer;
   };
@@ -243,6 +260,11 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           stopTracking(bundleId);
           const t = currentTranslations();
           const code = typeof data.code === "string" ? data.code : undefined;
+          if (code === "CANCELED") {
+            refreshBundles();
+            onInstallSettled(bundleId, null);
+            return;
+          }
           onInstallSettled(bundleId, translatedCodeMessage(t, code, 0) ?? t.errors.installFailed);
           return;
         }
@@ -325,6 +347,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     installing: {},
     errors: {},
     queued: [],
+    canceling: [],
     installAllActive: false,
     startTimes: {},
     resetError: null,
@@ -529,6 +552,28 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           },
         });
       }
+    },
+
+    cancelInstall: async (bundleId: string) => {
+      if (get().canceling.includes(bundleId)) return;
+      set({ canceling: [...get().canceling, bundleId] });
+      try {
+        await apiPost(`/v1/admin/features/${bundleId}/install/cancel`, {});
+      } catch (err) {
+        const t = currentTranslations();
+        set({
+          canceling: get().canceling.filter((id) => id !== bundleId),
+          errors: {
+            ...get().errors,
+            [bundleId]: userErrorMessage(t, err, t.errors.cancelInstallFailed),
+          },
+        });
+        return;
+      }
+      // The server settles the job once the installer has exited; the open
+      // stream or the poller sees that and clears the card. The canceled frame
+      // can beat this response, and then there is nothing left to watch.
+      if (!esRefs[bundleId] && get().canceling.includes(bundleId)) startPolling(bundleId);
     },
 
     reinstallBundle: async (bundleId: string) => {

@@ -5820,6 +5820,7 @@ export const vi: TranslationKeys = {
     conversionFailed: "Chuyển đổi thất bại",
     installFailed: "Không thể bắt đầu cài đặt",
     uninstallFailed: "Gỡ cài đặt thất bại",
+    cancelInstallFailed: "Không thể hủy cài đặt",
     resetFailed: "Đặt lại thất bại",
     codes: {
       MFA_ENROLLMENT_REQUIRED: "Quản trị viên yêu cầu đăng nhập hai bước. Thiết lập để tiếp tục.",
@@ -5881,6 +5882,8 @@ export const vi: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Đã vượt quá hạn mức lưu trữ.",
       TARGET_SIZE_EXCEEDED: "Kết quả không thể đạt kích thước mục tiêu.",
       TOO_MANY_FRAMES: "Tệp này có quá nhiều khung hình để xử lý.",
+      FEATURE_INSTALL_BUSY:
+        "Quá trình cài đặt đang cập nhật môi trường AI và không thể dừng lúc này. Sẽ sớm hoàn tất.",
       CANCELED: "Thao tác đã bị hủy.",
       PAGE_OUT_OF_RANGE: "Phạm vi trang đó có một trang mà PDF này không có.",
       INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",

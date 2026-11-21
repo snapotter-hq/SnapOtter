@@ -109,11 +109,17 @@ export function registerJobRoutes(app: FastifyInstance): void {
       const { jobId } = request.params;
 
       const [job] = await db
-        .select({ userId: schema.jobs.userId })
+        .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
         .from(schema.jobs)
         .where(eq(schema.jobs.id, jobId));
 
       if (!job || (job.userId !== user.id && !(await hasEffectivePermission(user, "files:all")))) {
+        return reply.status(404).send({ error: "Job not found" });
+      }
+      // An AI bundle install is admin work: stopping one takes the same
+      // permission as the install route, not just ownership or files:all (#4763).
+      const settings = job.settings as { featureInstall?: unknown } | null;
+      if (settings?.featureInstall && !(await hasEffectivePermission(user, "features:manage"))) {
         return reply.status(404).send({ error: "Job not found" });
       }
 

@@ -5832,6 +5832,7 @@ export const sv: TranslationKeys = {
     conversionFailed: "Konverteringen misslyckades",
     installFailed: "Det gick inte att starta installationen",
     uninstallFailed: "Avinstallationen misslyckades",
+    cancelInstallFailed: "Det gick inte att avbryta installationen",
     resetFailed: "Återställningen misslyckades",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5898,6 +5899,8 @@ export const sv: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Lagringskvoten har överskridits.",
       TARGET_SIZE_EXCEEDED: "Resultatet kan inte nå målstorleken.",
       TOO_MANY_FRAMES: "Den här filen har för många bildrutor för att bearbetas.",
+      FEATURE_INSTALL_BUSY:
+        "Installationen uppdaterar AI-miljön och kan inte stoppas just nu. Den blir klar snart.",
       CANCELED: "Åtgärden avbröts.",
       PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",

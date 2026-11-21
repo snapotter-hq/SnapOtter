@@ -5846,6 +5846,7 @@ export const uk: TranslationKeys = {
     conversionFailed: "Не вдалося конвертувати",
     installFailed: "Не вдалося почати встановлення",
     uninstallFailed: "Не вдалося видалити встановлення",
+    cancelInstallFailed: "Не вдалося скасувати встановлення",
     resetFailed: "Не вдалося скинути",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5909,6 +5910,8 @@ export const uk: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Перевищено квоту сховища.",
       TARGET_SIZE_EXCEEDED: "Результат не може досягти цільового розміру.",
       TOO_MANY_FRAMES: "У цьому файлі забагато кадрів для обробки.",
+      FEATURE_INSTALL_BUSY:
+        "Встановлення оновлює середовище AI, і його зараз не можна зупинити. Воно скоро завершиться.",
       CANCELED: "Операцію скасовано.",
       PAGE_OUT_OF_RANGE: "У цьому діапазоні є сторінка, якої немає в цьому PDF.",
       INVALID_PAGE_RANGE:

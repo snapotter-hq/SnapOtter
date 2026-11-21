@@ -5855,6 +5855,7 @@ export const pl: TranslationKeys = {
     conversionFailed: "Konwersja nie powiodła się",
     installFailed: "Nie udało się rozpocząć instalacji",
     uninstallFailed: "Odinstalowanie nie powiodło się",
+    cancelInstallFailed: "Nie udało się anulować instalacji",
     resetFailed: "Resetowanie nie powiodło się",
     codes: {
       MFA_ENROLLMENT_REQUIRED:
@@ -5921,6 +5922,8 @@ export const pl: TranslationKeys = {
       STORAGE_QUOTA_EXCEEDED: "Przekroczono limit miejsca.",
       TARGET_SIZE_EXCEEDED: "Wynik nie może osiągnąć docelowego rozmiaru.",
       TOO_MANY_FRAMES: "Ten plik ma zbyt wiele klatek, aby go przetworzyć.",
+      FEATURE_INSTALL_BUSY:
+        "Instalacja aktualizuje środowisko AI i nie można jej teraz zatrzymać. Wkrótce się zakończy.",
       CANCELED: "Operację anulowano.",
       PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",
