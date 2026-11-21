@@ -181,6 +181,11 @@ export function wavPcmCodec(streams: Array<MediaStreamInfo | undefined>): string
   return WAV_PCM_CODECS[Math.max(0, ...streams.map(wavPcmRank))];
 }
 
+/** AIFF is big-endian PCM, so it takes WAV's depth in the matching be codec. */
+function aiffPcmCodec(stream: MediaStreamInfo | undefined): string {
+  return wavPcmCodec([stream]).replace(/le$/, "be");
+}
+
 /**
  * `encodeArgs` is a function so the encoder is resolved when a job builds its
  * command line, not when this module loads: resolving probes the ffmpeg
@@ -188,14 +193,20 @@ export function wavPcmCodec(streams: Array<MediaStreamInfo | undefined>): string
  */
 const AUDIO_OUTPUTS: Record<
   string,
-  Omit<AudioOutput, "encodeArgs"> & { encodeArgs: () => string[] }
+  Omit<AudioOutput, "encodeArgs"> & {
+    encodeArgs: (audio: MediaStreamInfo | undefined) => string[];
+  }
 > = {
   ".mp3": {
     ext: ".mp3",
     contentType: "audio/mpeg",
     encodeArgs: () => ["-c:a", resolveEncoder("mp3"), "-b:a", "192k"],
   },
-  ".wav": { ext: ".wav", contentType: "audio/wav", encodeArgs: () => ["-c:a", "pcm_s16le"] },
+  ".wav": {
+    ext: ".wav",
+    contentType: "audio/wav",
+    encodeArgs: (audio) => ["-c:a", wavPcmCodec([audio])],
+  },
   ".ogg": {
     ext: ".ogg",
     contentType: "audio/ogg",
@@ -220,16 +231,22 @@ const AUDIO_OUTPUTS: Record<
     contentType: "audio/mp4",
     encodeArgs: () => ["-c:a", "aac", "-b:a", "192k"],
   },
-  ".aiff": { ext: ".aiff", contentType: "audio/aiff", encodeArgs: () => ["-c:a", "pcm_s16be"] },
+  ".aiff": {
+    ext: ".aiff",
+    contentType: "audio/aiff",
+    encodeArgs: (audio) => ["-c:a", aiffPcmCodec(audio)],
+  },
 };
 
 /**
  * Encoder selection for filtered (re-encoded) audio outputs, keyed by the
  * SOURCE extension. Decode-only sources (wma/amr/ape/...) fall back to mp3.
+ * Pass the probed source stream so WAV and AIFF keep its bit depth (#5123);
+ * without one they're 16-bit.
  */
-export function audioOutputFor(srcExt: string): AudioOutput {
+export function audioOutputFor(srcExt: string, audio?: MediaStreamInfo): AudioOutput {
   const spec = AUDIO_OUTPUTS[srcExt.toLowerCase()] ?? AUDIO_OUTPUTS[".mp3"];
-  return { ext: spec.ext, contentType: spec.contentType, encodeArgs: spec.encodeArgs() };
+  return { ext: spec.ext, contentType: spec.contentType, encodeArgs: spec.encodeArgs(audio) };
 }
 
 export interface MediaRunResult {

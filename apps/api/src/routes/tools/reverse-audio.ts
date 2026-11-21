@@ -19,8 +19,15 @@ export function registerReverseAudio(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}_reversed${out.ext}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", "areverse", ...out.encodeArgs, outPath];
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath, { audio }) => {
+        return [
+          "-i",
+          inPath,
+          "-af",
+          "areverse",
+          ...audioOutputFor(origExt, audio).encodeArgs,
+          outPath,
+        ];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },
