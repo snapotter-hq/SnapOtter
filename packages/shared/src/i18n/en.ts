@@ -1409,6 +1409,7 @@ export const en = {
       customSize: "Custom Size",
       scale: "Scale",
       presets: "Presets",
+      presetsCropNote: "Presets crop the image to fill the exact size.",
       contentAware: "Content-Aware",
       aspectRatio: "Aspect Ratio",
       ratioFree: "Free",

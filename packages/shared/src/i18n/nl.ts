@@ -1469,6 +1469,8 @@ export const nl: TranslationKeys = {
       customSize: "Aangepast formaat",
       scale: "Schaal",
       presets: "Voorinstellingen",
+      presetsCropNote:
+        "Voorinstellingen snijden de afbeelding bij zodat die precies het formaat vult.",
       contentAware: "Inhoudsbewust",
       aspectRatio: "Beeldverhouding",
       ratioFree: "Vrij",

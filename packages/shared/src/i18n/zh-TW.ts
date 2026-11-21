@@ -1228,6 +1228,7 @@ export const zhTW: TranslationKeys = {
       customSize: "自訂大小",
       scale: "縮放",
       presets: "預設",
+      presetsCropNote: "預設會裁切圖片以填滿精確尺寸。",
       contentAware: "內容感知",
       aspectRatio: "長寬比",
       ratioFree: "自由",

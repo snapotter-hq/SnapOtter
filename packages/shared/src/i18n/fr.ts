@@ -1471,6 +1471,7 @@ export const fr: TranslationKeys = {
       customSize: "Taille personnalisée",
       scale: "Échelle",
       presets: "Préréglages",
+      presetsCropNote: "Les préréglages recadrent l'image pour remplir la taille exacte.",
       contentAware: "Intelligent",
       aspectRatio: "Rapport d'aspect",
       ratioFree: "Libre",
