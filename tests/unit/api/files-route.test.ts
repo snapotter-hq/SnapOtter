@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -1860,6 +1861,77 @@ describe("files route logic", () => {
       expect(reply.statusCode).toBe(200);
       expect(reply.headers["X-Original-Width"]).toBe("1");
       expect(reply.headers["X-Original-Height"]).toBe("1");
+    });
+
+    // Every tool auto-orients its input first, so the preview has to report and
+    // render the upright image, not the stored pixel grid (#5135).
+    function solidImage(width: number, height: number) {
+      return sharp({ create: { width, height, channels: 3, background: "red" } });
+    }
+
+    async function runPreview(filename: string, bytes: Buffer) {
+      const req = {
+        log: { warn: vi.fn(), error: vi.fn() },
+        file: async () => ({ filename, toBuffer: async () => bytes }),
+      };
+      const reply = makePreviewReply();
+      await previewHandler(req, reply);
+      return reply;
+    }
+
+    it("reports and renders an EXIF-rotated TIFF upright (#5135)", async () => {
+      const tiff = await solidImage(60, 40).withMetadata({ orientation: 6 }).tiff().toBuffer();
+
+      const reply = await runPreview("portrait.tiff", tiff);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers["X-Original-Width"]).toBe("40");
+      expect(reply.headers["X-Original-Height"]).toBe("60");
+      const preview = await sharp(reply.payload as Buffer).metadata();
+      expect([preview.width, preview.height]).toEqual([40, 60]);
+    });
+
+    it("keeps an unrotated TIFF's stored dimensions (#5135)", async () => {
+      const tiff = await solidImage(60, 40).tiff().toBuffer();
+
+      const reply = await runPreview("landscape.tiff", tiff);
+
+      expect(reply.headers["X-Original-Width"]).toBe("60");
+      expect(reply.headers["X-Original-Height"]).toBe("40");
+    });
+
+    it("turns ExifTool's sensor-grid RAW dimensions to match the upright decode (#5135)", async () => {
+      const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(await solidImage(40, 60).png().toBuffer());
+      mocks.readImageDimensions.mockResolvedValueOnce({ width: 6000, height: 4000 });
+
+      const reply = await runPreview("DSCF0001.RAF", rafMagic);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers["X-Original-Width"]).toBe("4000");
+      expect(reply.headers["X-Original-Height"]).toBe("6000");
+    });
+
+    it("keeps ExifTool's RAW dimensions when the decode has the same aspect (#5135)", async () => {
+      const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(await solidImage(60, 40).png().toBuffer());
+      mocks.readImageDimensions.mockResolvedValueOnce({ width: 6000, height: 4000 });
+
+      const reply = await runPreview("DSCF0001.RAF", rafMagic);
+
+      expect(reply.headers["X-Original-Width"]).toBe("6000");
+      expect(reply.headers["X-Original-Height"]).toBe("4000");
+    });
+
+    it("does not turn a HEIC decode that libheif already rotated (#5135)", async () => {
+      const heic = readFileSync(resolve(process.cwd(), "tests/fixtures/image/formats/sample.heic"));
+      mocks.decodeHeic.mockResolvedValueOnce(await solidImage(40, 60).png().toBuffer());
+
+      const reply = await runPreview("portrait.heic", heic);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers["X-Original-Width"]).toBe("40");
+      expect(reply.headers["X-Original-Height"]).toBe("60");
     });
 
     it("answers 503 ENGINE_UNAVAILABLE when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2) whose header Sharp reads (#2801)", async () => {
