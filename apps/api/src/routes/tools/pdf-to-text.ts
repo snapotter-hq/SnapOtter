@@ -1,28 +1,12 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type PdfTextResult, pdfTextPy } from "@snapotter/doc-engine";
-import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
+import { pdfTextPy } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { InputValidationError } from "../../modality/contract.js";
+import { noTextLayerError } from "../../lib/no-text-layer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
-
-const SCANNED_MESSAGE =
-  "This PDF has no extractable text layer. It looks scanned or image-only, so use the PDF OCR tool to read its text.";
-const UNREADABLE_MESSAGE =
-  "This PDF has a text layer, but its fonts don't map to readable characters, so use the PDF OCR tool to read its text.";
-
-/**
- * Only call it a scan when no page returned characters at all. A page whose
- * characters failed the readability test has a real text layer the user can
- * see on screen, so "image-only" would read as flatly wrong there (#954). An
- * older sidecar sends no counts, and keeps the wording it always had.
- */
-function noTextLayerMessage(result: PdfTextResult): string {
-  return (result.unreadablePages ?? 0) > 0 ? UNREADABLE_MESSAGE : SCANNED_MESSAGE;
-}
 
 export function registerPdfToText(app: FastifyInstance) {
   createToolRoute(app, {
@@ -45,14 +29,7 @@ export function registerPdfToText(app: FastifyInstance) {
       // (#589). The code lets the web app offer OCR as a button instead of a
       // dead end (#1164); OCR stays the user's call because it needs an AI
       // bundle and runs for minutes.
-      if (!result.hasText) {
-        throw new InputValidationError(
-          noTextLayerMessage(result),
-          422,
-          undefined,
-          NO_TEXT_LAYER_CODE,
-        );
-      }
+      if (!result.hasText) throw noTextLayerError(result);
       ctx.report(90, "Done");
 
       return {

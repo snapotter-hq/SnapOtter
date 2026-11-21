@@ -1,10 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pdfTextPy, pdfToMarkdownPy } from "@snapotter/doc-engine";
-import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { InputValidationError } from "../../modality/contract.js";
+import { noTextLayerError } from "../../lib/no-text-layer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
@@ -29,14 +28,7 @@ export function registerPdfToMarkdown(app: FastifyInstance) {
       const probe = await pdfTextPy(inPath, join(ctx.scratchDir, "text-probe.txt"), {
         signal: ctx.signal,
       });
-      if (!probe.hasText) {
-        throw new InputValidationError(
-          "This PDF has no extractable text layer. It looks scanned or image-only, so use the PDF OCR tool to read its text.",
-          422,
-          undefined,
-          NO_TEXT_LAYER_CODE,
-        );
-      }
+      if (!probe.hasText) throw noTextLayerError(probe);
 
       const outPath = join(ctx.scratchDir, `${base}.md`);
       ctx.report(15, "Converting to Markdown");

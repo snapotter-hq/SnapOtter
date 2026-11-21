@@ -4030,7 +4030,7 @@ export const vi: TranslationKeys = {
       submitBatch: "Trích xuất văn bản ({count} tệp)",
       progressLabel: "Đang trích xuất",
       scannedHint:
-        "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+        "PDF này không có văn bản đọc được để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
       runOcr: "Chạy OCR cho PDF này",
       unreadablePages:
         "{count} trên {total} trang không có lớp văn bản đọc được, nên phần đó trong tệp .txt có thể bị lỗi ký tự. OCR có thể đọc các trang đó.",
@@ -4040,7 +4040,7 @@ export const vi: TranslationKeys = {
       submitBatch: "Chuyển sang Markdown ({count} tệp)",
       progressLabel: "Đang chuyển đổi",
       scannedHint:
-        "PDF này là bản quét nên không có văn bản để chuyển sang Markdown. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+        "PDF này không có văn bản đọc được để chuyển sang Markdown. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
       runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-to-word": {
@@ -4049,7 +4049,7 @@ export const vi: TranslationKeys = {
       submitBatch: "Chuyển sang Word ({count} tệp)",
       progressLabel: "Đang chuyển đổi",
       scannedHint:
-        "PDF này là bản quét nên tệp Word sẽ chỉ chứa hình ảnh của các trang. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần chứ không phải tệp Word, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
+        "PDF này không có văn bản đọc được để đưa vào tệp Word. OCR có thể đọc văn bản, nhưng kết quả là văn bản thuần chứ không phải tệp Word, mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
       runOcr: "Chạy OCR cho PDF này",
     },
     "pdf-metadata": {

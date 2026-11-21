@@ -4043,7 +4043,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Wyodrębnij tekst ({count} plików)",
       progressLabel: "Wyodrębnianie",
       scannedHint:
-        "Ten PDF jest skanem, więc nie ma tekstu do wyodrębnienia. OCR może go odczytać, ale trwa to dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+        "Ten PDF nie zawiera czytelnego tekstu do wyodrębnienia. OCR może go odczytać, ale trwa to dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
       runOcr: "Uruchom OCR dla tego PDF-a",
       unreadablePages:
         "{count} z {total} stron nie ma czytelnej warstwy tekstu, więc ich część pliku .txt może być nieczytelna. OCR może odczytać te strony.",
@@ -4053,7 +4053,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Konwertuj do Markdown ({count} plików)",
       progressLabel: "Konwersja",
       scannedHint:
-        "Ten PDF jest skanem, więc nie ma w nim tekstu do zamiany na Markdown. OCR może odczytać tekst, ale daje zwykły tekst, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+        "Ten PDF nie zawiera czytelnego tekstu do zamiany na Markdown. OCR może odczytać tekst, ale daje zwykły tekst, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
       runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-to-word": {
@@ -4062,7 +4062,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Konwertuj do Word ({count} plików)",
       progressLabel: "Konwersja",
       scannedHint:
-        "Ten PDF jest skanem, więc plik Word zawierałby tylko obrazy stron. OCR może odczytać tekst, ale daje zwykły tekst zamiast pliku Word, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
+        "Ten PDF nie zawiera czytelnego tekstu, który można by umieścić w pliku Word. OCR może odczytać tekst, ale daje zwykły tekst zamiast pliku Word, trwa dłużej i wymaga zainstalowanego pakietu AI dla OCR.",
       runOcr: "Uruchom OCR dla tego PDF-a",
     },
     "pdf-metadata": {

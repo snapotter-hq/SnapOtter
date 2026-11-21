@@ -4036,7 +4036,7 @@ export const id: TranslationKeys = {
       submitBatch: "Ekstrak Teks ({count} file)",
       progressLabel: "Mengekstrak",
       scannedHint:
-        "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
+        "PDF ini tidak punya teks yang bisa dibaca untuk diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
       runOcr: "Jalankan OCR pada PDF ini",
       unreadablePages:
         "{count} dari {total} halaman tidak punya lapisan teks yang bisa dibaca, jadi bagiannya di file .txt mungkin kacau. OCR bisa membaca halaman-halaman itu.",
@@ -4046,7 +4046,7 @@ export const id: TranslationKeys = {
       submitBatch: "Konversi ke Markdown ({count} file)",
       progressLabel: "Mengonversi",
       scannedHint:
-        "PDF ini hasil pindaian, jadi tidak ada teks untuk diubah ke Markdown. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
+        "PDF ini tidak punya teks yang bisa dibaca untuk diubah ke Markdown. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
       runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-to-word": {
@@ -4055,7 +4055,7 @@ export const id: TranslationKeys = {
       submitBatch: "Konversi ke Word ({count} file)",
       progressLabel: "Mengonversi",
       scannedHint:
-        "PDF ini hasil pindaian, jadi file Word hanya akan berisi gambar halaman. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, bukan file Word, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
+        "PDF ini tidak punya teks yang bisa dibaca untuk dimasukkan ke file Word. OCR bisa membaca teksnya, tetapi hasilnya teks biasa, bukan file Word, butuh waktu lebih lama, dan paket AI OCR harus terpasang.",
       runOcr: "Jalankan OCR pada PDF ini",
     },
     "pdf-metadata": {

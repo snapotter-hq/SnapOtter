@@ -3971,7 +3971,7 @@ export const en = {
       submitBatch: "Extract Text ({count} files)",
       progressLabel: "Extracting",
       scannedHint:
-        "This PDF is scanned, so there's no text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
+        "This PDF has no readable text to extract. OCR can read it, but it takes longer and needs the OCR AI bundle installed.",
       runOcr: "Run OCR on this PDF",
       unreadablePages:
         "{count} of {total} pages have no readable text layer, so their part of the .txt may come out garbled. OCR can read those pages.",
@@ -3981,7 +3981,7 @@ export const en = {
       submitBatch: "Convert to Markdown ({count} files)",
       progressLabel: "Converting",
       scannedHint:
-        "This PDF is scanned, so there's no text to turn into Markdown. OCR can read the text, but it gives you plain text, takes longer, and needs the OCR AI bundle installed.",
+        "This PDF has no readable text to turn into Markdown. OCR can read the text, but it gives you plain text, takes longer, and needs the OCR AI bundle installed.",
       runOcr: "Run OCR on this PDF",
     },
     "pdf-to-word": {
@@ -3990,7 +3990,7 @@ export const en = {
       submitBatch: "Convert to Word ({count} files)",
       progressLabel: "Converting",
       scannedHint:
-        "This PDF is scanned, so a Word file would only hold pictures of the pages. OCR can read the text, but it gives you plain text rather than a Word file, takes longer, and needs the OCR AI bundle installed.",
+        "This PDF has no readable text to put in a Word file. OCR can read the text, but it gives you plain text rather than a Word file, takes longer, and needs the OCR AI bundle installed.",
       runOcr: "Run OCR on this PDF",
     },
     "pdf-metadata": {

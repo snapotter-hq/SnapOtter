@@ -3759,7 +3759,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "提取文本（{count} 个文件）",
       progressLabel: "正在提取",
       scannedHint:
-        "此 PDF 是扫描件，没有可提取的文本。OCR 可以识别它，但耗时更长，并且需要已安装 OCR AI 功能包。",
+        "此 PDF 没有可读的文本可提取。OCR 可以识别它，但耗时更长，并且需要已安装 OCR AI 功能包。",
       runOcr: "对此 PDF 运行 OCR",
       unreadablePages:
         "{total} 页中有 {count} 页没有可读的文本层，因此 .txt 中对应的部分可能是乱码。OCR 可以识别这些页面。",
@@ -3769,7 +3769,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "转换为 Markdown（{count} 个文件）",
       progressLabel: "正在转换",
       scannedHint:
-        "此 PDF 是扫描件，没有可转换为 Markdown 的文字。OCR 可以识别其中的文字，但得到的是纯文本，耗时更长，并且需要已安装 OCR AI 功能包。",
+        "此 PDF 没有可读的文字可转换为 Markdown。OCR 可以识别其中的文字，但得到的是纯文本，耗时更长，并且需要已安装 OCR AI 功能包。",
       runOcr: "对此 PDF 运行 OCR",
     },
     "pdf-to-word": {
@@ -3778,7 +3778,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "转换为 Word（{count} 个文件）",
       progressLabel: "正在转换",
       scannedHint:
-        "此 PDF 是扫描件，转换成 Word 文件也只会包含页面图片。OCR 可以识别其中的文字，但得到的是纯文本而不是 Word 文件，耗时更长，并且需要已安装 OCR AI 功能包。",
+        "此 PDF 没有可读的文字可放入 Word 文件。OCR 可以识别其中的文字，但得到的是纯文本而不是 Word 文件，耗时更长，并且需要已安装 OCR AI 功能包。",
       runOcr: "对此 PDF 运行 OCR",
     },
     "pdf-metadata": {
