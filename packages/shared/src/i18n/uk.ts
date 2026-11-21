@@ -861,6 +861,11 @@ export const uk: TranslationKeys = {
       description:
         "Створити штрихкоди у форматах Code 128, EAN-13, UPC-A, Code 39, ITF-14 та Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Калькулятор співвідношення сторін",
+      description:
+        "Обчисліть відсутню ширину або висоту зі збереженням співвідношення сторін і спростіть його",
+    },
     "chart-maker": {
       name: "Створення діаграм",
       description:
@@ -3362,6 +3367,20 @@ export const uk: TranslationKeys = {
       submit: "Створити штрихкод",
       download: "Завантажити штрихкод",
       generateFailed: "Не вдалося згенерувати штрихкод",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Поширене співвідношення",
+      custom: "Власне",
+      originalWidth: "Початкова ширина",
+      originalHeight: "Початкова висота",
+      newWidth: "Нова ширина",
+      newHeight: "Нова висота",
+      hint: "Введіть нову ширину або висоту, і друге значення буде обчислено.",
+      swap: "Поміняти орієнтацію",
+      round: "Округлювати до цілих пікселів",
+      ratio: "Співвідношення сторін",
+      submit: "Обчислити",
+      calculateFailed: "Не вдалося обчислити співвідношення сторін",
     },
     "chart-maker": {
       optionalChartTitle: "Заголовок діаграми (необов'язково)",

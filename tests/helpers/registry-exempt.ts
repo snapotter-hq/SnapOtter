@@ -10,6 +10,7 @@
  * cannot drive are exactly the ones with a contract that says so.
  */
 export const REGISTRY_EXEMPT = new Set([
+  "aspect-ratio-calculator",
   "auto-subtitles",
   "background-replace",
   "barcode-generate",

@@ -38,6 +38,8 @@ const EXEMPT: Record<string, string> = {
     "holds typed config, not a result; the image regenerates client-side the moment the page is open",
   "barcode-generate":
     "holds typed config, not a result; the image regenerates client-side the moment the page is open",
+  "aspect-ratio-calculator":
+    "produces no file: the answer is two numbers that come back from the typed dimensions in one click",
   "watermark-image":
     "hand-rolls its fetch but puts the result in the file store (setProcessedUrl), which the guard already reads",
   compose:

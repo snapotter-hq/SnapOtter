@@ -818,6 +818,11 @@ export const en = {
       name: "Barcode Generator",
       description: "Generate barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14, and Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Aspect Ratio Calculator",
+      description:
+        "Work out the missing width or height that keeps an aspect ratio, and simplify it",
+    },
     "chart-maker": {
       name: "Chart Maker",
       description: "Create bar, line, or pie charts from CSV or JSON data, up to 100 rows",
@@ -3293,6 +3298,20 @@ export const en = {
       submit: "Generate Barcode",
       download: "Download Barcode",
       generateFailed: "Failed to generate barcode",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Common ratio",
+      custom: "Custom",
+      originalWidth: "Original width",
+      originalHeight: "Original height",
+      newWidth: "New width",
+      newHeight: "New height",
+      hint: "Enter a new width or height and the other one is worked out for you.",
+      swap: "Swap orientation",
+      round: "Round to whole pixels",
+      ratio: "Aspect ratio",
+      submit: "Calculate",
+      calculateFailed: "Failed to calculate the aspect ratio",
     },
     "chart-maker": {
       optionalChartTitle: "Optional chart title",

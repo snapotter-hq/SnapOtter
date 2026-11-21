@@ -6,6 +6,7 @@ import { logger } from "../../lib/logger.js";
 import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerAspectPad } from "./aspect-pad.js";
+import { registerAspectRatioCalculator } from "./aspect-ratio-calculator.js";
 import { registerAudioChannels } from "./audio-channels.js";
 import { registerAudioMetadata } from "./audio-metadata.js";
 import { registerAudioSpeed } from "./audio-speed.js";
@@ -260,6 +261,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "qr-generate", register: registerQrGenerate },
     { id: "html-to-image", register: registerHtmlToImage },
     { id: "barcode-generate", register: registerBarcodeGenerate },
+    { id: "aspect-ratio-calculator", register: registerAspectRatioCalculator },
     { id: "barcode-read", register: registerBarcodeRead },
     { id: "image-to-base64", register: registerImageToBase64 },
 

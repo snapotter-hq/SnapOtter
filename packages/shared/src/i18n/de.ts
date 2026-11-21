@@ -866,6 +866,11 @@ export const de: TranslationKeys = {
       name: "Barcode-Generator",
       description: "Barcodes in Code 128, EAN-13, UPC-A, Code 39, ITF-14 und Data Matrix erstellen",
     },
+    "aspect-ratio-calculator": {
+      name: "Seitenverhältnis-Rechner",
+      description:
+        "Fehlende Breite oder Höhe bei gleichem Seitenverhältnis berechnen und das Verhältnis kürzen",
+    },
     "chart-maker": {
       name: "Diagramm-Ersteller",
       description:
@@ -3380,6 +3385,20 @@ export const de: TranslationKeys = {
       submit: "Barcode erstellen",
       download: "Barcode herunterladen",
       generateFailed: "Barcode konnte nicht erstellt werden",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Gängiges Verhältnis",
+      custom: "Benutzerdefiniert",
+      originalWidth: "Ursprüngliche Breite",
+      originalHeight: "Ursprüngliche Höhe",
+      newWidth: "Neue Breite",
+      newHeight: "Neue Höhe",
+      hint: "Neue Breite oder Höhe eingeben, der andere Wert wird berechnet.",
+      swap: "Ausrichtung tauschen",
+      round: "Auf ganze Pixel runden",
+      ratio: "Seitenverhältnis",
+      submit: "Berechnen",
+      calculateFailed: "Seitenverhältnis konnte nicht berechnet werden",
     },
     "chart-maker": {
       optionalChartTitle: "Optionaler Diagrammtitel",

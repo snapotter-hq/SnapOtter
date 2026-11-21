@@ -861,6 +861,11 @@ export const id: TranslationKeys = {
       description:
         "Buat barcode dalam format Code 128, EAN-13, UPC-A, Code 39, ITF-14, dan Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Kalkulator rasio aspek",
+      description:
+        "Hitung lebar atau tinggi yang hilang agar rasio aspek tetap sama, lalu sederhanakan",
+    },
     "chart-maker": {
       name: "Pembuat Grafik",
       description:
@@ -3354,6 +3359,20 @@ export const id: TranslationKeys = {
       submit: "Buat Barcode",
       download: "Unduh Barcode",
       generateFailed: "Gagal membuat barcode",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Rasio umum",
+      custom: "Kustom",
+      originalWidth: "Lebar asli",
+      originalHeight: "Tinggi asli",
+      newWidth: "Lebar baru",
+      newHeight: "Tinggi baru",
+      hint: "Masukkan lebar atau tinggi baru, nilai lainnya akan dihitung otomatis.",
+      swap: "Tukar orientasi",
+      round: "Bulatkan ke piksel utuh",
+      ratio: "Rasio aspek",
+      submit: "Hitung",
+      calculateFailed: "Gagal menghitung rasio aspek",
     },
     "chart-maker": {
       optionalChartTitle: "Judul grafik (opsional)",

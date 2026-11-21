@@ -552,7 +552,7 @@ test("canonical external-server and production commands collect their complete s
   );
   expect(productionOutput).toContain("crosscutting.qa.spec.ts");
   expect(productionOutput).toContain("settings-extended.qa.spec.ts");
-  expect(productionOutput).toContain("Total: 397 tests in 9 files");
+  expect(productionOutput).toContain("Total: 398 tests in 9 files");
 });
 
 test("embedded lifecycle tests use exact labeled resources and dynamic loopback ports", () => {

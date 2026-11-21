@@ -828,6 +828,10 @@ export const ja: TranslationKeys = {
       name: "バーコード生成",
       description: "Code 128、EAN-13、UPC-A、Code 39、ITF-14、Data Matrix のバーコードを生成",
     },
+    "aspect-ratio-calculator": {
+      name: "アスペクト比計算機",
+      description: "アスペクト比を保ったまま足りない幅または高さを求め、比を簡約",
+    },
     "chart-maker": {
       name: "チャート作成",
       description: "CSV または JSON データから棒グラフ、折れ線グラフ、円グラフを作成（最大100行）",
@@ -3310,6 +3314,20 @@ export const ja: TranslationKeys = {
       submit: "バーコードを生成",
       download: "バーコードをダウンロード",
       generateFailed: "バーコードの生成に失敗しました",
+    },
+    "aspect-ratio-calculator": {
+      preset: "よく使う比率",
+      custom: "カスタム",
+      originalWidth: "元の幅",
+      originalHeight: "元の高さ",
+      newWidth: "新しい幅",
+      newHeight: "新しい高さ",
+      hint: "新しい幅か高さを入力すると、もう一方が計算されます。",
+      swap: "縦横を入れ替え",
+      round: "整数ピクセルに丸める",
+      ratio: "アスペクト比",
+      submit: "計算",
+      calculateFailed: "アスペクト比の計算に失敗しました",
     },
     "chart-maker": {
       optionalChartTitle: "グラフタイトル（任意）",

@@ -860,6 +860,10 @@ export const pl: TranslationKeys = {
       description:
         "Generuj kody kreskowe w formatach Code 128, EAN-13, UPC-A, Code 39, ITF-14 i Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Kalkulator proporcji obrazu",
+      description: "Oblicz brakującą szerokość lub wysokość z zachowaniem proporcji i uprość je",
+    },
     "chart-maker": {
       name: "Kreator wykresów",
       description:
@@ -3360,6 +3364,20 @@ export const pl: TranslationKeys = {
       submit: "Generuj kod kreskowy",
       download: "Pobierz kod kreskowy",
       generateFailed: "Nie udało się wygenerować kodu kreskowego",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Popularna proporcja",
+      custom: "Własna",
+      originalWidth: "Oryginalna szerokość",
+      originalHeight: "Oryginalna wysokość",
+      newWidth: "Nowa szerokość",
+      newHeight: "Nowa wysokość",
+      hint: "Wpisz nową szerokość lub wysokość, a druga wartość zostanie obliczona.",
+      swap: "Zamień orientację",
+      round: "Zaokrąglaj do pełnych pikseli",
+      ratio: "Proporcje",
+      submit: "Oblicz",
+      calculateFailed: "Nie udało się obliczyć proporcji",
     },
     "chart-maker": {
       optionalChartTitle: "Opcjonalny tytuł wykresu",

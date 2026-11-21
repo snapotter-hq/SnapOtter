@@ -862,6 +862,11 @@ export const ru: TranslationKeys = {
       name: "Генератор штрихкодов",
       description: "Генерация штрихкодов Code 128, EAN-13, UPC-A, Code 39, ITF-14 и Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Калькулятор соотношения сторон",
+      description:
+        "Вычислите недостающую ширину или высоту с сохранением соотношения сторон и упростите его",
+    },
     "chart-maker": {
       name: "Создание диаграмм",
       description:
@@ -3361,6 +3366,20 @@ export const ru: TranslationKeys = {
       submit: "Создать штрихкод",
       download: "Скачать штрихкод",
       generateFailed: "Не удалось создать штрихкод",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Популярное соотношение",
+      custom: "Своё",
+      originalWidth: "Исходная ширина",
+      originalHeight: "Исходная высота",
+      newWidth: "Новая ширина",
+      newHeight: "Новая высота",
+      hint: "Введите новую ширину или высоту, и второе значение будет вычислено.",
+      swap: "Поменять ориентацию",
+      round: "Округлять до целых пикселей",
+      ratio: "Соотношение сторон",
+      submit: "Рассчитать",
+      calculateFailed: "Не удалось рассчитать соотношение сторон",
     },
     "chart-maker": {
       optionalChartTitle: "Заголовок диаграммы (необязательно)",

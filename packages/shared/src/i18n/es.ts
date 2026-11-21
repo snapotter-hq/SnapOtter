@@ -848,6 +848,11 @@ export const es: TranslationKeys = {
       description:
         "Genera códigos de barras en Code 128, EAN-13, UPC-A, Code 39, ITF-14 y Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Calculadora de relación de aspecto",
+      description:
+        "Calcula el ancho o alto que falta para mantener la relación de aspecto y simplifícala",
+    },
     "chart-maker": {
       name: "Creador de gráficos",
       description:
@@ -3349,6 +3354,20 @@ export const es: TranslationKeys = {
       submit: "Generar código de barras",
       download: "Descargar código de barras",
       generateFailed: "No se pudo generar el código de barras",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Relación común",
+      custom: "Personalizada",
+      originalWidth: "Ancho original",
+      originalHeight: "Alto original",
+      newWidth: "Nuevo ancho",
+      newHeight: "Nuevo alto",
+      hint: "Introduce un nuevo ancho o alto y se calculará el otro.",
+      swap: "Intercambiar orientación",
+      round: "Redondear a píxeles enteros",
+      ratio: "Relación de aspecto",
+      submit: "Calcular",
+      calculateFailed: "No se pudo calcular la relación de aspecto",
     },
     "chart-maker": {
       optionalChartTitle: "Título del gráfico (opcional)",

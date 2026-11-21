@@ -614,6 +614,17 @@ export const IMAGE_TOOLS: Tool[] = [
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "fast",
   },
+  {
+    id: "aspect-ratio-calculator",
+    name: "Aspect Ratio Calculator",
+    description: "Work out the missing width or height that keeps an aspect ratio, and simplify it",
+    category: "utilities",
+    icon: "Ratio",
+    route: "/aspect-ratio-calculator",
+    modality: "image",
+    acceptedInputs: IMAGE_INPUTS,
+    executionHint: "fast",
+  },
   // Layout & Composition
   {
     id: "collage",

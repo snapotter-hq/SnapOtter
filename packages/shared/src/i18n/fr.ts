@@ -867,6 +867,11 @@ export const fr: TranslationKeys = {
       description:
         "Générez des codes-barres aux formats Code 128, EAN-13, UPC-A, Code 39, ITF-14 et Data Matrix",
     },
+    "aspect-ratio-calculator": {
+      name: "Calculateur de format d'image",
+      description:
+        "Calculez la largeur ou la hauteur manquante qui conserve le format, puis simplifiez-le",
+    },
     "chart-maker": {
       name: "Créateur de graphiques",
       description:
@@ -3372,6 +3377,20 @@ export const fr: TranslationKeys = {
       submit: "Générer le code-barres",
       download: "Télécharger le code-barres",
       generateFailed: "Impossible de générer le code-barres",
+    },
+    "aspect-ratio-calculator": {
+      preset: "Format courant",
+      custom: "Personnalisé",
+      originalWidth: "Largeur d'origine",
+      originalHeight: "Hauteur d'origine",
+      newWidth: "Nouvelle largeur",
+      newHeight: "Nouvelle hauteur",
+      hint: "Saisissez une nouvelle largeur ou hauteur, l'autre est calculée pour vous.",
+      swap: "Inverser l'orientation",
+      round: "Arrondir au pixel près",
+      ratio: "Format",
+      submit: "Calculer",
+      calculateFailed: "Impossible de calculer le format",
     },
     "chart-maker": {
       optionalChartTitle: "Titre du graphique (optionnel)",

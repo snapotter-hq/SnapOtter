@@ -101,6 +101,8 @@
 /tools/image-to-base64 /tools/image/image-to-base64/ 301
 /tools/barcode-generate/ /tools/image/barcode-generate/ 301
 /tools/barcode-generate /tools/image/barcode-generate/ 301
+/tools/aspect-ratio-calculator/ /tools/image/aspect-ratio-calculator/ 301
+/tools/aspect-ratio-calculator /tools/image/aspect-ratio-calculator/ 301
 /tools/collage/ /tools/image/collage/ 301
 /tools/collage /tools/image/collage/ 301
 /tools/stitch/ /tools/image/stitch/ 301
