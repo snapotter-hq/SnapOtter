@@ -2846,7 +2846,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "flac-to-wav": {
     searchTitle: "FLAC to WAV Converter Online Free",
     longDescription:
-      "Convert FLAC audio to WAV. You are starting from FLAC, which is lossless compression, so bit-perfect audio at about half the size of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, but the WAV is written as 16-bit PCM, so a 24-bit source comes out at CD resolution. A 16-bit source comes through sample for sample. Runs on your own SnapOtter instance. Files never reach a third party.",
+      "Convert FLAC audio to WAV. You are starting from FLAC, which is lossless compression, so bit-perfect audio at about half the size of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
     useCases: [
       "Move a FLAC into WAV for editing or archiving",
       "Standardise a mixed music or voice library on a single format",
@@ -3526,7 +3526,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "aiff-to-wav": {
     searchTitle: "AIFF to WAV Converter Online Free",
     longDescription:
-      "Convert AIFF audio to WAV. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, but the WAV is written as 16-bit PCM, so a 24-bit source comes out at CD resolution. A 16-bit source comes through sample for sample. Runs on your own SnapOtter instance. Files never reach a third party.",
+      "Convert AIFF audio to WAV. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
     useCases: [
       "Move a AIFF into WAV for editing or archiving",
       "Standardise a mixed music or voice library on a single format",

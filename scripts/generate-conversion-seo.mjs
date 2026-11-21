@@ -734,9 +734,7 @@ function audioEntry(p) {
       : a.lossy && !b.lossy
         ? `${to} is lossless, but it cannot rebuild what ${from} already threw away. You get a larger file containing exactly what the ${from} held, which helps before editing and achieves nothing as an archive upgrade.`
         : !a.lossy && !b.lossy
-          ? to === "WAV"
-            ? "Both formats are lossless, but the WAV is written as 16-bit PCM, so a 24-bit source comes out at CD resolution. A 16-bit source comes through sample for sample."
-            : `Both formats are lossless, so every sample comes through untouched and only the container and the file size change.`
+          ? `Both formats are lossless, so every sample comes through untouched and only the container and the file size change.`
           : `${from} is lossless and ${to} is lossy, so this discards audio data in exchange for a much smaller file.`;
   return {
     searchTitle: `${from} to ${to} Converter Online Free`,
