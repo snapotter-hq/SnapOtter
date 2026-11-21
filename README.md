@@ -34,7 +34,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
 - **200+ tools across 5 modalities:**
   - **Image (113):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, plus dedicated format converters (JPG to PNG, HEIC to JPG, WebP to PNG, image to PDF, and more). Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats
   - **Video (59):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract/convert subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
-  - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
+  - **Audio (57):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
   - **PDF (36):** merge, split, compress, convert, protect/unlock, redact, sign, watermark, page numbers, multi-tool page editor, OCR, plus PDF to JPG/PNG/TIFF
   - **Files (27):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, font conversion, text case conversion, proportion calculator, ZIP create/extract, Base64 text encode/decode
 - **Image editor:** Free layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser and processes on your hardware

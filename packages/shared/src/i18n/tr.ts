@@ -555,6 +555,126 @@ export const tr: TranslationKeys = {
       name: "FLAC - MP3",
       description: "FLAC dosyasını çevrimiçi MP3 biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
     },
+    "mp3-to-flac": {
+      name: "MP3 - FLAC",
+      description: "MP3 dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 - OGG",
+      description: "MP3 dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 - M4A",
+      description: "MP3 dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wav-to-flac": {
+      name: "WAV - FLAC",
+      description: "WAV dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wav-to-ogg": {
+      name: "WAV - OGG",
+      description: "WAV dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wav-to-m4a": {
+      name: "WAV - M4A",
+      description: "WAV dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "flac-to-wav": {
+      name: "FLAC - WAV",
+      description: "FLAC dosyasını çevrimiçi WAV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC - OGG",
+      description: "FLAC dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC - M4A",
+      description: "FLAC dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "ogg-to-flac": {
+      name: "OGG - FLAC",
+      description: "OGG dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG - M4A",
+      description: "OGG dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "m4a-to-flac": {
+      name: "M4A - FLAC",
+      description: "M4A dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A - OGG",
+      description: "M4A dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aac-to-ogg": {
+      name: "AAC - OGG",
+      description: "AAC dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aac-to-m4a": {
+      name: "AAC - M4A",
+      description: "AAC dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "opus-to-mp3": {
+      name: "Opus - MP3",
+      description: "Opus dosyasını çevrimiçi MP3 biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "opus-to-wav": {
+      name: "Opus - WAV",
+      description: "Opus dosyasını çevrimiçi WAV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "opus-to-flac": {
+      name: "Opus - FLAC",
+      description: "Opus dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "opus-to-ogg": {
+      name: "Opus - OGG",
+      description: "Opus dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "opus-to-m4a": {
+      name: "Opus - M4A",
+      description: "Opus dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wma-to-mp3": {
+      name: "WMA - MP3",
+      description: "WMA dosyasını çevrimiçi MP3 biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wma-to-wav": {
+      name: "WMA - WAV",
+      description: "WMA dosyasını çevrimiçi WAV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wma-to-flac": {
+      name: "WMA - FLAC",
+      description: "WMA dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wma-to-ogg": {
+      name: "WMA - OGG",
+      description: "WMA dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "wma-to-m4a": {
+      name: "WMA - M4A",
+      description: "WMA dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF - MP3",
+      description: "AIFF dosyasını çevrimiçi MP3 biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF - WAV",
+      description: "AIFF dosyasını çevrimiçi WAV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF - FLAC",
+      description: "AIFF dosyasını çevrimiçi FLAC biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF - OGG",
+      description: "AIFF dosyasını çevrimiçi OGG biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF - M4A",
+      description: "AIFF dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
     "excel-to-csv": {
       name: "Excel - CSV",
       description: "Excel dosyasını çevrimiçi CSV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",

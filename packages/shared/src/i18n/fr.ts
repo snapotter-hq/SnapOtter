@@ -558,6 +558,126 @@ export const fr: TranslationKeys = {
       name: "FLAC en MP3",
       description: "Convertir FLAC en MP3 en ligne. Rapide, gratuit et privé.",
     },
+    "mp3-to-flac": {
+      name: "MP3 en FLAC",
+      description: "Convertir MP3 en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3 en OGG",
+      description: "Convertir MP3 en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3 en M4A",
+      description: "Convertir MP3 en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "wav-to-flac": {
+      name: "WAV en FLAC",
+      description: "Convertir WAV en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "wav-to-ogg": {
+      name: "WAV en OGG",
+      description: "Convertir WAV en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "wav-to-m4a": {
+      name: "WAV en M4A",
+      description: "Convertir WAV en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "flac-to-wav": {
+      name: "FLAC en WAV",
+      description: "Convertir FLAC en WAV en ligne. Rapide, gratuit et privé.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC en OGG",
+      description: "Convertir FLAC en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC en M4A",
+      description: "Convertir FLAC en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "ogg-to-flac": {
+      name: "OGG en FLAC",
+      description: "Convertir OGG en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG en M4A",
+      description: "Convertir OGG en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "m4a-to-flac": {
+      name: "M4A en FLAC",
+      description: "Convertir M4A en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A en OGG",
+      description: "Convertir M4A en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "aac-to-ogg": {
+      name: "AAC en OGG",
+      description: "Convertir AAC en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "aac-to-m4a": {
+      name: "AAC en M4A",
+      description: "Convertir AAC en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "opus-to-mp3": {
+      name: "Opus en MP3",
+      description: "Convertir Opus en MP3 en ligne. Rapide, gratuit et privé.",
+    },
+    "opus-to-wav": {
+      name: "Opus en WAV",
+      description: "Convertir Opus en WAV en ligne. Rapide, gratuit et privé.",
+    },
+    "opus-to-flac": {
+      name: "Opus en FLAC",
+      description: "Convertir Opus en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "opus-to-ogg": {
+      name: "Opus en OGG",
+      description: "Convertir Opus en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "opus-to-m4a": {
+      name: "Opus en M4A",
+      description: "Convertir Opus en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "wma-to-mp3": {
+      name: "WMA en MP3",
+      description: "Convertir WMA en MP3 en ligne. Rapide, gratuit et privé.",
+    },
+    "wma-to-wav": {
+      name: "WMA en WAV",
+      description: "Convertir WMA en WAV en ligne. Rapide, gratuit et privé.",
+    },
+    "wma-to-flac": {
+      name: "WMA en FLAC",
+      description: "Convertir WMA en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "wma-to-ogg": {
+      name: "WMA en OGG",
+      description: "Convertir WMA en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "wma-to-m4a": {
+      name: "WMA en M4A",
+      description: "Convertir WMA en M4A en ligne. Rapide, gratuit et privé.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF en MP3",
+      description: "Convertir AIFF en MP3 en ligne. Rapide, gratuit et privé.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF en WAV",
+      description: "Convertir AIFF en WAV en ligne. Rapide, gratuit et privé.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF en FLAC",
+      description: "Convertir AIFF en FLAC en ligne. Rapide, gratuit et privé.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF en OGG",
+      description: "Convertir AIFF en OGG en ligne. Rapide, gratuit et privé.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF en M4A",
+      description: "Convertir AIFF en M4A en ligne. Rapide, gratuit et privé.",
+    },
     "excel-to-csv": {
       name: "Excel en CSV",
       description: "Convertir Excel en CSV en ligne. Rapide, gratuit et privé.",

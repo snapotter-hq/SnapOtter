@@ -1,13 +1,14 @@
 ---
 description: "Các endpoint cấu hình chuyển đổi chuyên dụng được tạo từ danh mục công cụ SnapOtter."
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: 577c12759ced
+i18n_output_hash: 71757b2064cf
+i18n_hash_version: 2
 ---
 
 # Conversion Presets {#conversion-presets}
 
-Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 83 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
+Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 113 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -108,6 +109,36 @@ Gửi `multipart/form-data` với một phần `file` và một chuỗi JSON `se
 | `wav-to-mp3` | WAV to MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | none |
 | `mp3-to-wav` | MP3 to WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | none |
 | `flac-to-mp3` | FLAC to MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | none |
+| `mp3-to-flac` | MP3 to FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | none |
+| `mp3-to-ogg` | MP3 to OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | none |
+| `mp3-to-m4a` | MP3 to M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | none |
+| `wav-to-flac` | WAV to FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | none |
+| `wav-to-ogg` | WAV to OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | none |
+| `wav-to-m4a` | WAV to M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | none |
+| `flac-to-wav` | FLAC to WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | none |
+| `flac-to-ogg` | FLAC to OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | none |
+| `flac-to-m4a` | FLAC to M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | none |
+| `ogg-to-flac` | OGG to FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | none |
+| `ogg-to-m4a` | OGG to M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | none |
+| `m4a-to-flac` | M4A to FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | none |
+| `m4a-to-ogg` | M4A to OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | none |
+| `aac-to-ogg` | AAC to OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | none |
+| `aac-to-m4a` | AAC to M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | none |
+| `opus-to-mp3` | Opus to MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | none |
+| `opus-to-wav` | Opus to WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | none |
+| `opus-to-flac` | Opus to FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | none |
+| `opus-to-ogg` | Opus to OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | none |
+| `opus-to-m4a` | Opus to M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | none |
+| `wma-to-mp3` | WMA to MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | none |
+| `wma-to-wav` | WMA to WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | none |
+| `wma-to-flac` | WMA to FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | none |
+| `wma-to-ogg` | WMA to OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | none |
+| `wma-to-m4a` | WMA to M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | none |
+| `aiff-to-mp3` | AIFF to MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | none |
+| `aiff-to-wav` | AIFF to WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | none |
+| `aiff-to-flac` | AIFF to FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | none |
+| `aiff-to-ogg` | AIFF to OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | none |
+| `aiff-to-m4a` | AIFF to M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | none |
 
 ## PDF Presets {#pdf-presets}
 

@@ -80,8 +80,8 @@ describe("compress-pdf outranks its size presets (#1070)", () => {
 
 describe("a format we accept finds a tool that takes it (#4818)", () => {
   it.each([
-    ["opus", "convert-audio"],
-    ["wma", "convert-audio"],
+    ["amr", "convert-audio"],
+    ["ac3", "convert-audio"],
     ["nef", "convert"],
     ["arw", "convert"],
     ["cr2", "convert"],
@@ -108,7 +108,7 @@ describe("a format we accept finds a tool that takes it (#4818)", () => {
 
 describe("an x-to-y query no preset handles leads with the converter (#4818)", () => {
   it.each([
-    ["mp3 to ogg", "convert-audio"],
+    ["wav to aac", "convert-audio"],
     ["mp3 to opus", "convert-audio"],
     ["jpg to bmp", "convert"],
     ["nef to jpg", "convert"],
@@ -125,13 +125,29 @@ describe("an x-to-y query no preset handles leads with the converter (#4818)", (
 
   it("never offers a converter the caller filtered out (a disabled tool)", () => {
     const visible = TOOLS.filter((tool) => tool.id !== "convert-audio");
-    const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "mp3 to ogg");
+    const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "wav to aac");
     expect(results.map((tool) => tool.id)).not.toContain("convert-audio");
   });
 
   it("leaves a pair with its own preset alone", () => {
     expect(search("mp4 to mp3")[0]).toBe("mp4-to-mp3");
     expect(search("jpg to png")[0]).toBe("jpg-to-png");
+  });
+});
+
+describe("the audio preset matrix answers the searches that found nothing (#1099)", () => {
+  it.each([
+    ["opus to mp3", "opus-to-mp3"],
+    ["mp3 to ogg", "mp3-to-ogg"],
+    ["wav to flac", "wav-to-flac"],
+    ["wma to mp3", "wma-to-mp3"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
+  it.each(["opus", "wma", "aiff"])("a bare %s query leads with a preset that takes it", (ext) => {
+    const top = searchToolList(fuse, TOOLS, ext)[0];
+    expect(top?.acceptedInputs).toEqual([`.${ext}`]);
   });
 });
 

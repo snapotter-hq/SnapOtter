@@ -94,7 +94,7 @@ describe("tool pages", () => {
     const documented = new Set(PAGES.map((f) => path.basename(f, ".md")));
     const missing = TOOLS.filter((t) => !documented.has(t.id))
       .map((t) => t.id)
-      // The 83 conversion presets are covered collectively by
+      // Conversion presets are covered collectively by
       // apps/docs/tools/conversion-presets.md rather than one page each.
       .filter((id) => !id.includes("-to-"));
     expect(missing.sort()).toEqual([...UNDOCUMENTED].sort());
