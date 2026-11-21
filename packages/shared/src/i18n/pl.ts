@@ -602,6 +602,10 @@ export const pl: TranslationKeys = {
       description:
         "Optymalizacja obrazów dla sieci z konwersją formatu, kontrolą jakości i podglądem na żywo",
     },
+    "optimize-svg": {
+      name: "Optymalizacja SVG",
+      description: "Zmniejsz kod SVG za pomocą svgo i zachowaj wynik jako wektorowy SVG",
+    },
     "strip-metadata": {
       name: "Usuwanie metadanych obrazu",
       description: "Usuwanie EXIF, GPS i informacji o aparacie",
@@ -1561,6 +1565,17 @@ export const pl: TranslationKeys = {
       larger: "O {percent}% większy",
       submit: "Przetwórz i pobierz",
       submitBatch: "Przetwórz i pobierz ({count} plików)",
+      progressLabel: "Optymalizacja",
+    },
+    "optimize-svg": {
+      precision: "Precyzja dziesiętna",
+      precisionHint:
+        "Liczba miejsc po przecinku we współrzędnych. Mniej miejsc daje mniejszy plik.",
+      removeMetadata: "Usuń komentarze i metadane",
+      multipass: "Wykonaj wiele przebiegów",
+      pretty: "Sformatuj wynik czytelnie",
+      submit: "Optymalizuj SVG",
+      submitBatch: "Optymalizuj SVG ({count} plików)",
       progressLabel: "Optymalizacja",
     },
     "strip-metadata": {
@@ -5924,6 +5939,7 @@ export const pl: TranslationKeys = {
       TOO_MANY_FRAMES: "Ten plik ma zbyt wiele klatek, aby go przetworzyć.",
       FEATURE_INSTALL_BUSY:
         "Instalacja aktualizuje środowisko AI i nie można jej teraz zatrzymać. Wkrótce się zakończy.",
+      SVG_TOO_LARGE: "Ten plik SVG jest zbyt duży lub złożony, aby go zoptymalizować.",
       CANCELED: "Operację anulowano.",
       PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",

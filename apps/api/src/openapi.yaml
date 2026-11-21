@@ -1554,6 +1554,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/v1/tools/image/optimize-svg:
+    post:
+      operationId: optimizeSvg
+      tags: [Image]
+      summary: Optimize SVG
+      description: |
+        Minify SVG markup with svgo and return SVG, not a raster. The input is
+        sanitized before optimization and again after. `.svgz` input is
+        inflated first and the result is written as plain `.svg`. viewBox and
+        `<title>` are always kept. Input over 2 MB, measured after inflating,
+        is refused with 400 `SVG_TOO_LARGE`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SVG or SVGZ file to optimize
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `precision` (integer 0-8, default 3) - Decimal places kept in coordinates and numbers
+                    - `multipass` (boolean, default true) - Repeat optimization passes until the output stops shrinking
+                    - `removeMetadata` (boolean, default true) - Remove comments, `<metadata>`, `<desc>`, and editor namespaces
+                    - `pretty` (boolean, default false) - Indent the output instead of minifying it onto one line
+            example:
+              file: logo.svg
+              settings: '{}'
+      responses:
+        "200":
+          description: Optimized SVG
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/logo.svg
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input, including a file that is not SVG
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/image/image-enhancement:
     post:
       operationId: enhanceImage

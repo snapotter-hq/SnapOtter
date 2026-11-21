@@ -436,6 +436,10 @@ export const hi: TranslationKeys = {
       name: "वेब के लिए ऑप्टिमाइज़",
       description: "फॉर्मेट कन्वर्शन, क्वालिटी कंट्रोल और लाइव प्रीव्यू के साथ वेब के लिए इमेज ऑप्टिमाइज़ करें",
     },
+    "optimize-svg": {
+      name: "SVG ऑप्टिमाइज़",
+      description: "svgo से SVG कोड छोटा करें और नतीजा वेक्टर SVG ही रखें",
+    },
     "strip-metadata": {
       name: "इमेज मेटाडेटा हटाएं",
       description: "EXIF, GPS और कैमरा जानकारी हटाएं",
@@ -1380,6 +1384,16 @@ export const hi: TranslationKeys = {
       larger: "{percent}% बड़ा",
       submit: "प्रोसेस और डाउनलोड",
       submitBatch: "प्रोसेस और डाउनलोड ({count} फाइलें)",
+      progressLabel: "ऑप्टिमाइज़ हो रहा है",
+    },
+    "optimize-svg": {
+      precision: "दशमलव सटीकता",
+      precisionHint: "कोऑर्डिनेट में रखे जाने वाले दशमलव स्थान। कम स्थान से फ़ाइल छोटी होती है।",
+      removeMetadata: "कमेंट और मेटाडेटा हटाएं",
+      multipass: "कई पास चलाएं",
+      pretty: "आउटपुट को पढ़ने लायक फॉर्मेट करें",
+      submit: "SVG ऑप्टिमाइज़ करें",
+      submitBatch: "SVG ऑप्टिमाइज़ करें ({count} फाइलें)",
       progressLabel: "ऑप्टिमाइज़ हो रहा है",
     },
     "strip-metadata": {
@@ -5676,6 +5690,7 @@ export const hi: TranslationKeys = {
       TOO_MANY_FRAMES: "इस फ़ाइल में प्रोसेस करने के लिए बहुत ज़्यादा फ़्रेम हैं।",
       FEATURE_INSTALL_BUSY:
         "इंस्टॉलेशन AI वातावरण को अपडेट कर रहा है और इसे अभी रोका नहीं जा सकता। यह जल्द ही पूरा हो जाएगा।",
+      SVG_TOO_LARGE: "यह SVG ऑप्टिमाइज़ करने के लिए बहुत बड़ा या जटिल है।",
       CANCELED: "ऑपरेशन रद्द कर दिया गया।",
       PAGE_OUT_OF_RANGE: "इस पेज रेंज में ऐसा पेज है जो इस PDF में नहीं है।",
       INVALID_PAGE_RANGE: "यह पेज रेंज मान्य नहीं है। 1-3,5 जैसे पेज नंबर इस्तेमाल करें।",

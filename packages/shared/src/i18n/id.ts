@@ -605,6 +605,10 @@ export const id: TranslationKeys = {
       description:
         "Optimasi gambar untuk web dengan konversi format, kontrol kualitas, dan pratinjau langsung",
     },
+    "optimize-svg": {
+      name: "Optimasi SVG",
+      description: "Perkecil kode SVG dengan svgo dan tetap simpan hasilnya sebagai SVG vektor",
+    },
     "strip-metadata": {
       name: "Hapus Metadata Gambar",
       description: "Hapus EXIF, GPS, dan info kamera",
@@ -1562,6 +1566,17 @@ export const id: TranslationKeys = {
       larger: "{percent}% lebih besar",
       submit: "Proses & Unduh",
       submitBatch: "Proses & Unduh ({count} file)",
+      progressLabel: "Mengoptimasi",
+    },
+    "optimize-svg": {
+      precision: "Presisi Desimal",
+      precisionHint:
+        "Jumlah angka desimal pada koordinat. Lebih sedikit angka menghasilkan file lebih kecil.",
+      removeMetadata: "Hapus komentar dan metadata",
+      multipass: "Jalankan beberapa putaran",
+      pretty: "Rapikan format output",
+      submit: "Optimasi SVG",
+      submitBatch: "Optimasi SVG ({count} file)",
       progressLabel: "Mengoptimasi",
     },
     "strip-metadata": {
@@ -5902,6 +5917,7 @@ export const id: TranslationKeys = {
       TOO_MANY_FRAMES: "File ini memiliki terlalu banyak frame untuk diproses.",
       FEATURE_INSTALL_BUSY:
         "Instalasi sedang memperbarui lingkungan AI dan tidak dapat dihentikan sekarang. Instalasi akan segera selesai.",
+      SVG_TOO_LARGE: "SVG ini terlalu besar atau rumit untuk dioptimasi.",
       CANCELED: "Operasi dibatalkan.",
       PAGE_OUT_OF_RANGE: "Rentang halaman itu mencakup halaman yang tidak ada di PDF ini.",
       INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",

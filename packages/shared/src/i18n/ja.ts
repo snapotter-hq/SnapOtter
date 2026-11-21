@@ -597,6 +597,10 @@ export const ja: TranslationKeys = {
       name: "Web最適化",
       description: "フォーマット変換、品質調整、ライブプレビューでWeb向けに画像を最適化",
     },
+    "optimize-svg": {
+      name: "SVG最適化",
+      description: "svgoでSVGコードを圧縮し、結果をベクターSVGのまま保持",
+    },
     "strip-metadata": {
       name: "画像メタデータ削除",
       description: "EXIF、GPS、カメラ情報を削除",
@@ -1523,6 +1527,16 @@ export const ja: TranslationKeys = {
       larger: "{percent}%増加",
       submit: "処理してダウンロード",
       submitBatch: "処理してダウンロード（{count}ファイル）",
+      progressLabel: "最適化中",
+    },
+    "optimize-svg": {
+      precision: "小数点精度",
+      precisionHint: "座標に残す小数点以下の桁数。桁数が少ないほどファイルが小さくなります。",
+      removeMetadata: "コメントとメタデータを削除",
+      multipass: "複数回パスを実行",
+      pretty: "出力を整形",
+      submit: "SVGを最適化",
+      submitBatch: "SVGを最適化（{count}ファイル）",
       progressLabel: "最適化中",
     },
     "strip-metadata": {
@@ -5858,6 +5872,7 @@ export const ja: TranslationKeys = {
       TOO_MANY_FRAMES: "このファイルはフレーム数が多すぎて処理できません。",
       FEATURE_INSTALL_BUSY:
         "インストールが AI 環境を更新中のため、今は停止できません。まもなく完了します。",
+      SVG_TOO_LARGE: "このSVGは大きすぎるか複雑すぎるため最適化できません。",
       CANCELED: "操作はキャンセルされました。",
       PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
       INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",

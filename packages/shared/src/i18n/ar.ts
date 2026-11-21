@@ -601,6 +601,10 @@ export const ar: TranslationKeys = {
       name: "تحسين للويب",
       description: "تحسين الصور للويب مع تحويل الصيغة والتحكم بالجودة والمعاينة المباشرة",
     },
+    "optimize-svg": {
+      name: "تحسين SVG",
+      description: "تصغير شيفرة SVG باستخدام svgo مع الإبقاء على النتيجة بصيغة SVG متجهية",
+    },
     "strip-metadata": {
       name: "إزالة البيانات الوصفية للصورة",
       description: "إزالة بيانات EXIF و GPS ومعلومات الكاميرا",
@@ -1549,6 +1553,16 @@ export const ar: TranslationKeys = {
       larger: "أكبر بنسبة {percent}%",
       submit: "معالجة وتحميل",
       submitBatch: "معالجة وتحميل ({count} ملف)",
+      progressLabel: "جاري التحسين",
+    },
+    "optimize-svg": {
+      precision: "الدقة العشرية",
+      precisionHint: "عدد المنازل العشرية المحفوظة في الإحداثيات. كلما قلّت صغر حجم الملف.",
+      removeMetadata: "إزالة التعليقات والبيانات الوصفية",
+      multipass: "تشغيل عدة تمريرات",
+      pretty: "تنسيق المخرجات بشكل مقروء",
+      submit: "تحسين SVG",
+      submitBatch: "تحسين SVG ({count} ملف)",
       progressLabel: "جاري التحسين",
     },
     "strip-metadata": {
@@ -5848,6 +5862,7 @@ export const ar: TranslationKeys = {
       TOO_MANY_FRAMES: "يحتوي هذا الملف على عدد كبير جدًا من الإطارات للمعالجة.",
       FEATURE_INSTALL_BUSY:
         "يقوم التثبيت بتحديث بيئة الذكاء الاصطناعي ولا يمكن إيقافه الآن. سينتهي قريبًا.",
+      SVG_TOO_LARGE: "ملف SVG هذا كبير أو معقد جدًا بحيث يتعذر تحسينه.",
       CANCELED: "تم إلغاء العملية.",
       PAGE_OUT_OF_RANGE: "يتضمن نطاق الصفحات هذا صفحة غير موجودة في ملف PDF هذا.",
       INVALID_PAGE_RANGE: "نطاق الصفحات هذا غير صالح. استخدم أرقام صفحات مثل 1-3,5.",
