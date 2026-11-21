@@ -586,6 +586,67 @@ describe("sanitizeSvg: character references that encode XML syntax (#5102)", () 
   });
 });
 
+describe("sanitizeSvg: event handlers only where an attribute can start (#5122)", () => {
+  const clean = (svg: string) => sanitizeSvg(Buffer.from(svg)).toString("utf-8");
+
+  it.each([
+    ["a double-quoted value", '<svg><rect data-note="see onclick=foo" fill="red"/></svg>'],
+    ["a single-quoted value", '<svg><rect data-note=\'onload="x"\' fill="red"/></svg>'],
+    ["text", "<svg><text>Click onx=here</text></svg>"],
+    ["text after an end tag", "<svg><text><tspan>a</tspan> onx=b</text></svg>"],
+    ["a value next to a real handler's", '<svg><rect data-a="onx=1" onclick="evil()"/></svg>'],
+  ])("leaves on*= inside %s alone", (_label, input) => {
+    expect(XMLValidator.validate(input)).toBe(true);
+    const out = clean(input);
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out.replace(' onclick="evil()"', ' data-removed=""')).toBe(
+      input.replace(' onclick="evil()"', ' data-removed=""'),
+    );
+  });
+
+  it("does not end a tag at a > inside a quoted value", () => {
+    const out = clean('<svg><rect data-x="a>b" onclick="evil()"/></svg>');
+    expect(out).toBe('<svg><rect data-x="a>b" data-removed=""/></svg>');
+  });
+
+  it.each([
+    ["after a slash", "<svg/onload=alert(1)><rect/></svg>"],
+    ["straight after a quoted value", '<svg><rect x="a"onclick="alert(1)"/></svg>'],
+    ["after an = with no attribute name", '<svg><a ="x onload=alert(1)"><text>c</text></a></svg>'],
+    ["after an unquoted value holding a quote", '<svg><a x=y="z onload=alert(1)">c</a></svg>'],
+    [
+      "after a tag name an HTML parser reads through",
+      `<svg><a${String.fromCharCode(0xa0)}x=" onclick=alert(1) ">c</a></svg>`,
+    ],
+    [
+      "after a value that runs past the next <",
+      '<svg><a x="<b y=" onload=alert(1) z="">c</a></svg>',
+    ],
+    [
+      "after a comment that holds a >",
+      '<svg><!-- > <b x=" --> <rect onload=alert(1)/> <!-- " --></svg>',
+    ],
+    ["in a tag the file never closes", '<svg><rect data-x="1" onload=alert(1)'],
+    [
+      "that removing an external <use> joins onto a tag",
+      '<svg><\u00e9:image <use href="http://a">href="x:" onerror="alert(1)"/></svg>',
+    ],
+    [
+      "that removing an external <feImage> joins onto a tag",
+      '<svg><\u00e9:image <feImage href="data:x">onerror="alert(1)"/></svg>',
+    ],
+    [
+      "split by an external <use>",
+      '<svg><\u00e9:svg xmlns:\u00e9="x" o<use href="http://a">nload="alert(1)"/></svg>',
+    ],
+    ["after a tag that runs into the next <", '<svg><a x=y<b/q=" onload=alert(1) ">c</a></svg>'],
+  ])("still removes a handler %s", (_label, input) => {
+    const out = clean(input);
+    expect(out).not.toMatch(/on(load|click|error)\s*=/i);
+    expect(out).not.toContain("alert(1)");
+  });
+});
+
 describe("sanitizeSvg: paired dangerous-element removal", () => {
   const strip = (body: string) =>
     sanitizeSvg(
@@ -924,7 +985,9 @@ describe("sanitizeSvg: base64 raster data URIs on <image> (#5101)", () => {
     const out = clean(
       `<svg><image href="data:image/png;base64,${PNG}&#34; onload=&#34;alert(1)"/></svg>`,
     );
-    expect(out).not.toMatch(/\bonload\s*=/i);
+    // The `&#34;` references stay encoded, so `onload=` is text inside the
+    // one href value, which is itself neutralized, not an attribute.
+    expect(out).toMatch(/^<svg><image href="data:,[^"<>]*"\/><\/svg>$/);
   });
 
   it("blocks a raster wider than the side ceiling", () => {

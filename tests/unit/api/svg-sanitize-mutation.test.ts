@@ -127,9 +127,9 @@ describe("sanitizeSvg mutation kills: event-handler attributes", () => {
     expectKept(out);
   });
 
-  it("removes an unquoted event-handler value (second on* pattern)", () => {
-    // `onerror=alert(1)` with no quotes is caught by the `\bon\w+\s*=\s*\S+`
-    // pass, not the quoted one. Kills mutants that drop the unquoted variant.
+  it("removes an unquoted event-handler value", () => {
+    // `onerror=alert(1)` with no quotes takes the tag scanner's unquoted-value
+    // branch, not the quoted one. Kills mutants that drop the unquoted variant.
     const out = clean(`<svg><rect onerror=alert(1) id="keep"/></svg>`);
     expect(out).not.toContain("onerror");
     expect(out).not.toContain("alert");

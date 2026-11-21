@@ -210,6 +210,99 @@ function neutralizeHrefSchemes(input: string): string {
   return out + blockHrefSchemes(input.slice(pos), null);
 }
 
+/** The legacy handler pass: every `on*=` anywhere, whatever surrounds it. */
+function stripHandlersEverywhere(input: string): string {
+  return input
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, 'data-removed=""')
+    .replace(/\bon\w+\s*=\s*\S+/gi, 'data-removed=""');
+}
+
+// The patterns below follow the HTML tokenizer's tag states rather than XML's,
+// because HTML is the more lenient reader: an output an HTML parser could see
+// a handler in must not keep one. Whitespace is HTML's set, not `\s`, so a
+// character like U+00A0 that HTML reads as part of a name is read that way here.
+const TAG_START = /^<\/?[A-Za-z_:]/;
+const TAG_NAME = /<\/?[^\t\n\f\r />]*/y;
+const TAG_SEPARATORS = /[\t\n\f\r /]*/y;
+// The first character of an attribute name may be `=` or a quote, as in HTML.
+const ATTR_NAME = /[^\t\n\f\r />][^\t\n\f\r />=]*/y;
+const ATTR_EQUALS = /[\t\n\f\r ]*=[\t\n\f\r ]*/y;
+const UNQUOTED_VALUE = /[^\t\n\f\r >]*/y;
+const HANDLER_NAME = /\bon\w+$/i;
+
+function matchAt(pattern: RegExp, input: string, pos: number): string {
+  pattern.lastIndex = pos;
+  return pattern.exec(input)?.[0] ?? "";
+}
+
+/**
+ * Replace the event-handler attributes of one tag. `seg` runs from a `<`
+ * that opens a tag to just before the next `<`, so a quoted value or a tag
+ * that does not end inside it is one the readers may disagree about: that
+ * returns null and the caller falls back to the legacy pass. What follows
+ * the tag's `>` is text and is kept as is.
+ */
+function stripTagHandlers(seg: string): string | null {
+  let pos = matchAt(TAG_NAME, seg, 0).length;
+  let out = seg.slice(0, pos);
+  for (;;) {
+    const sep = matchAt(TAG_SEPARATORS, seg, pos);
+    out += sep;
+    pos += sep.length;
+    if (pos >= seg.length) return null;
+    if (seg[pos] === ">") return out + seg.slice(pos);
+
+    const start = pos;
+    const name = matchAt(ATTR_NAME, seg, pos);
+    pos += name.length;
+    const equals = matchAt(ATTR_EQUALS, seg, pos);
+    if (equals) {
+      pos += equals.length;
+      const quote = seg[pos];
+      if (quote === '"' || quote === "'") {
+        const close = seg.indexOf(quote, pos + 1);
+        if (close === -1) return null;
+        pos = close + 1;
+      } else {
+        pos += matchAt(UNQUOTED_VALUE, seg, pos).length;
+      }
+    }
+    out += equals && HANDLER_NAME.test(name) ? 'data-removed=""' : seg.slice(start, pos);
+  }
+}
+
+/**
+ * Neutralize event-handler attributes (onload, onclick, ...), name and value
+ * both, so no residual payload survives. Only attribute positions inside a
+ * tag count: `on*=` in a quoted value or in text is content, and rewriting it
+ * broke well-formed files (#5122). Anything that isn't plainly a tag (a
+ * comment, a processing instruction, a non-ASCII element name) gets the
+ * legacy pass. XML can't carry a raw `<` inside a tag and HTML reads these
+ * as text or comments, so the scan picks up again at the next `<`. The rest
+ * of the file gets the legacy pass once a tag or value runs past the next
+ * `<`, since from there an HTML and an XML reader can disagree about what is
+ * a value.
+ */
+function stripEventHandlers(input: string): string {
+  let pos = input.indexOf("<");
+  if (pos === -1) return input;
+  let out = input.slice(0, pos);
+  while (pos < input.length) {
+    const next = input.indexOf("<", pos + 1);
+    const end = next === -1 ? input.length : next;
+    const seg = input.slice(pos, end);
+    if (TAG_START.test(seg)) {
+      const stripped = stripTagHandlers(seg);
+      if (stripped === null) return out + stripHandlersEverywhere(input.slice(pos));
+      out += stripped;
+    } else {
+      out += stripHandlersEverywhere(seg);
+    }
+    pos = end;
+  }
+  return out;
+}
+
 /** Count matches of a `g` regex, stopping once the count passes `limit`. */
 function countMatches(input: string, pattern: RegExp, limit: number): number {
   pattern.lastIndex = 0;
@@ -371,17 +464,17 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
     );
   }
 
-  // Remove event handlers (onload, onclick, onerror, etc.)
-  // Replace both the attribute name and its value to prevent residual payloads.
-  svg = svg.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, 'data-removed=""');
-  svg = svg.replace(/\bon\w+\s*=\s*\S+/gi, 'data-removed=""');
-
   // ── Block <use> with external href (before generic href blocking) ──
   // `href` also matches the tail of `xlink:href`.
   svg = stripTags(svg, /<use\b/i, /href\s*=\s*["']https?:\/\//i);
 
   // ── Block <feImage> with external href (SSRF via SVG filter) ──
   svg = stripTags(svg, /<feImage\b/i, /href\s*=\s*["'](?:https?:\/\/|file:|data:)/i);
+
+  // After every pass that removes markup: cutting a tag out can join the
+  // text on either side into one tag, and what the handler pass left as
+  // text must stay text.
+  svg = stripEventHandlers(svg);
 
   // ── Block dangerous URI schemes in href / xlink:href ──
   // One pass covers javascript:, data:, file:, and http(s): on both `href` and
