@@ -8,6 +8,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { runPerFrame } from "../../lib/animated-image.js";
 import { isFeatureInstalled } from "../../lib/feature-status.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -119,41 +120,27 @@ export function growTrimBox(box: Box, padding: number, imgW: number, imgH: numbe
   return { left, top, width: right - left, height: bottom - top };
 }
 
-// Trim, then put back the margin from the original pixels, so it is real
-// backdrop rather than a padded canvas.
-async function trimWithMargin(
-  inputBuffer: Buffer,
-  settings: z.output<typeof settingsSchema>,
-  imgW: number,
-  imgH: number,
-): Promise<Buffer> {
-  if (settings.padding === 0) {
-    return sharp(inputBuffer).trim({ threshold: settings.threshold }).png().toBuffer();
-  }
-  const { info } = await sharp(inputBuffer)
-    .trim({ threshold: settings.threshold })
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const trimmed = {
-    left: -(info.trimOffsetLeft ?? 0),
-    top: -(info.trimOffsetTop ?? 0),
-    width: info.width,
-    height: info.height,
-  };
-  const region = growTrimBox(trimmed, settings.padding, imgW, imgH);
-  return sharp(inputBuffer).extract(region).png().toBuffer();
-}
+/**
+ * The crop a mode picked from page 1, applied to one page.
+ *
+ * A bare `sharp(inputBuffer)` reads page 1 only, so a multi-page TIFF or an
+ * animated GIF came back with one page and a 200 (#4878). Every mode chooses
+ * its region once, from page 1, and returns this so runPerFrame can give every
+ * page the same crop: the pages stay one size, and face mode pays for one
+ * detection rather than one per page.
+ *
+ * The pages it returns name PNG: an intermediate that names no format is
+ * written back in whatever container the upload arrived in, so a JPEG paid a
+ * second lossy generation per step and a GIF had the padding colour and the
+ * resampled edges forced through the palette it was read with (#1190). The
+ * route encodes once, at the output format it resolved.
+ */
+type PageCrop = (page: Buffer) => Promise<Buffer>;
 
-// The three crop strategies below hand their result back as a buffer for the
-// route to encode once, at the output format it resolved. Every one of those
-// hand-offs names PNG: an intermediate that names no format is written back in
-// whatever container the upload arrived in, so a JPEG paid a second lossy
-// generation per step and a GIF had the padding colour and the resampled edges
-// forced through the palette it was read with (#1190).
-async function processSubject(
+async function planSubject(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
-): Promise<Buffer> {
+): Promise<PageCrop> {
   const w = settings.width ?? 1080;
   const h = settings.height ?? 1080;
   const strategy =
@@ -182,31 +169,33 @@ async function processSubject(
     );
   }
 
-  if (settings.padding > 0) {
-    const oversize = await sharp(inputBuffer)
-      .resize(resizeW, resizeH, { fit: "cover", position: strategy })
-      .png()
-      .toBuffer();
+  // Sharp reports where attention or entropy put the window inside the cover
+  // intermediate, as negative offsets, and leaves them unset when the aspect
+  // ratios already match. Resizing "outside" builds that same intermediate, so
+  // extracting the window from it gives every page the pixels page 1 got.
+  const { info } = await sharp(inputBuffer)
+    .resize(resizeW, resizeH, { fit: "cover", position: strategy })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  // Padding crops the target out of the middle of the oversized window.
+  const window = {
+    left: -(info.cropOffsetLeft ?? 0) + Math.round((resizeW - w) / 2),
+    top: -(info.cropOffsetTop ?? 0) + Math.round((resizeH - h) / 2),
+    width: w,
+    height: h,
+  };
 
-    const extractLeft = Math.round((resizeW - w) / 2);
-    const extractTop = Math.round((resizeH - h) / 2);
-
-    return sharp(oversize)
-      .extract({ left: extractLeft, top: extractTop, width: w, height: h })
-      .png()
-      .toBuffer();
-  }
-
-  return sharp(inputBuffer).resize(w, h, { fit: "cover", position: strategy }).png().toBuffer();
+  return (page) =>
+    sharp(page).resize(resizeW, resizeH, { fit: "outside" }).extract(window).png().toBuffer();
 }
 
 const FACE_BUNDLE_ID = "face-detection";
 
-async function processFace(
+async function planFace(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
   signal?: AbortSignal,
-): Promise<Buffer> {
+): Promise<PageCrop> {
   // The route answers 501 first; batch and pipeline runs reach this directly.
   if (!isFeatureInstalled(FACE_BUNDLE_ID)) {
     throw new ToolInputError(
@@ -221,7 +210,7 @@ async function processFace(
   });
 
   if (result.facesDetected === 0) {
-    return processSubject(inputBuffer, { ...settings, strategy: "attention" });
+    return planSubject(inputBuffer, { ...settings, strategy: "attention" });
   }
 
   const meta = await sharp(inputBuffer).metadata();
@@ -261,17 +250,19 @@ async function processFace(
   const region = clampRegion(left, top, cropW, cropH, imgW, imgH);
 
   if (region.width < 1 || region.height < 1) {
-    return processSubject(inputBuffer, { ...settings, strategy: "attention" });
+    return planSubject(inputBuffer, { ...settings, strategy: "attention" });
   }
 
-  const extracted = await sharp(inputBuffer).extract(region).png().toBuffer();
-  return sharp(extracted).resize(targetW, targetH, { fit: "fill" }).png().toBuffer();
+  return async (page) => {
+    const extracted = await sharp(page).extract(region).png().toBuffer();
+    return sharp(extracted).resize(targetW, targetH, { fit: "fill" }).png().toBuffer();
+  };
 }
 
-async function processTrim(
+async function planTrim(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
-): Promise<Buffer> {
+): Promise<PageCrop> {
   // Sharp's trim needs each side to be at least 3 pixels. Both sides under 3 trip
   // its own check, and a 2 x 10 strip fails in the 3 x 3 median window libvips
   // runs first (skipped only with lineArt, which this tool never sets). Either way
@@ -284,25 +275,41 @@ async function processTrim(
     );
   }
 
-  const trimmed = await trimWithMargin(inputBuffer, settings, width, height);
+  // Trim finds the box; the margin then comes back from the original pixels,
+  // so it is real backdrop rather than a padded canvas.
+  const { info } = await sharp(inputBuffer)
+    .trim({ threshold: settings.threshold })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const trimmed = {
+    left: -(info.trimOffsetLeft ?? 0),
+    top: -(info.trimOffsetTop ?? 0),
+    width: info.width,
+    height: info.height,
+  };
+  const region = growTrimBox(trimmed, settings.padding, width, height);
 
-  if (settings.padToSquare || settings.targetSize) {
-    const { width: w, height: h } = await sharp(trimmed).metadata();
-    const target = settings.targetSize || Math.max(w, h);
-    // The padded square is re-read below; one past the 64 MP limit would allocate
-    // an oversized intermediate. Only reachable without a targetSize, since that is
-    // capped by the schema.
-    if (target * target > MAX_STEP_PIXELS) {
-      throw new ToolInputError(
-        `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_TRIM_SQUARE_SIDE} or less.`,
-        { code: "RESULT_TOO_LARGE" },
-      );
-    }
-    const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));
-    const padG = Math.round(Number.parseInt(settings.padColor.slice(3, 5), 16));
-    const padB = Math.round(Number.parseInt(settings.padColor.slice(5, 7), 16));
+  if (!settings.padToSquare && !settings.targetSize) {
+    return (page) => sharp(page).extract(region).png().toBuffer();
+  }
 
-    return sharp(trimmed)
+  const target = settings.targetSize || Math.max(region.width, region.height);
+  // The padded square is re-read by the route; one past the 64 MP limit would
+  // allocate an oversized intermediate. Only reachable without a targetSize,
+  // since that is capped by the schema.
+  if (target * target > MAX_STEP_PIXELS) {
+    throw new ToolInputError(
+      `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_TRIM_SQUARE_SIDE} or less.`,
+      { code: "RESULT_TOO_LARGE" },
+    );
+  }
+  const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));
+  const padG = Math.round(Number.parseInt(settings.padColor.slice(3, 5), 16));
+  const padB = Math.round(Number.parseInt(settings.padColor.slice(5, 7), 16));
+
+  return async (page) => {
+    const cropped = await sharp(page).extract(region).png().toBuffer();
+    return sharp(cropped)
       .resize({
         width: target,
         height: target,
@@ -311,9 +318,17 @@ async function processTrim(
       })
       .png()
       .toBuffer();
-  }
+  };
+}
 
-  return trimmed;
+function planCrop(
+  inputBuffer: Buffer,
+  settings: z.output<typeof settingsSchema>,
+  signal?: AbortSignal,
+): Promise<PageCrop> {
+  if (settings.mode === "face") return planFace(inputBuffer, settings, signal);
+  if (settings.mode === "trim") return planTrim(inputBuffer, settings);
+  return planSubject(inputBuffer, settings);
 }
 
 export function registerSmartCrop(app: FastifyInstance) {
@@ -327,23 +342,22 @@ export function registerSmartCrop(app: FastifyInstance) {
       (s) => s?.mode ?? "subject",
       async (inputBuffer, settings, filename, ctx) => {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename, settings.quality);
-        let result: Buffer;
+        let pages: Buffer | undefined;
+        let cropped: Buffer;
 
         try {
-          if (settings.mode === "face") {
-            result = await processFace(inputBuffer, settings, ctx?.signal);
-          } else if (settings.mode === "trim") {
-            result = await processTrim(inputBuffer, settings);
-          } else {
-            result = await processSubject(inputBuffer, settings);
-          }
+          const crop = await planCrop(inputBuffer, settings, ctx?.signal);
+          pages = await runPerFrame(inputBuffer, outputFormat, crop);
+          cropped = pages ?? (await crop(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
 
-        result = await sharp(result)
-          .toFormat(outputFormat.format, outputFormat.encoderOptions)
-          .toBuffer();
+        const result =
+          pages ??
+          (await sharp(cropped)
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
+            .toBuffer());
 
         const stem = filename.replace(/\.[^.]+$/, "");
         const outputFilename = `${stem}_smartcrop.${outputFormat.extension}`;
