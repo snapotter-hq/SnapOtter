@@ -548,19 +548,26 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     try {
+      // Tools auto-orient their input before running, so report and render the
+      // upright image rather than the stored pixel grid (#5135).
       const preMeta = await sharp(buffer).metadata();
-      let origWidth = preMeta.width ?? 0;
-      let origHeight = preMeta.height ?? 0;
+      let origWidth = preMeta.autoOrient?.width ?? preMeta.width ?? 0;
+      let origHeight = preMeta.autoOrient?.height ?? preMeta.height ?? 0;
 
       if (validation.format === "raw" && fallbackFormat !== "svg") {
         const dims = await readImageDimensions(originalBuffer, ext);
         if (dims) {
-          origWidth = dims.width;
-          origHeight = dims.height;
+          // ExifTool reports the sensor grid, before the camera's rotation that
+          // the RAW decoders apply, so turn it to match the decoded image.
+          const turned =
+            origWidth !== origHeight && dims.width > dims.height !== origWidth > origHeight;
+          origWidth = turned ? dims.height : dims.width;
+          origHeight = turned ? dims.width : dims.height;
         }
       }
 
       const webp = await sharp(buffer)
+        .rotate()
         .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
