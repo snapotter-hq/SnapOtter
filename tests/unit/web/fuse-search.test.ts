@@ -39,6 +39,12 @@ describe("the normalizer keeps the words that name a tool (#1327)", () => {
   });
 });
 
+describe("a plural alias searches like its singular (#4900)", () => {
+  it("resize photos leads with resize", () => {
+    expect(search("resize photos")[0]).toBe("resize");
+  });
+});
+
 describe("a base tool outranks its presets on its own name (#1322)", () => {
   // The five compress-image-to-N-kb presets carry many "compress ..."
   // keywords; the base tool had none, so a bare "compress" ranked every

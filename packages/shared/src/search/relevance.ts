@@ -97,27 +97,14 @@ export function withinOneEdit(a: string, b: string): boolean {
 }
 
 /**
- * The word starts a word of the tool's, or is a plural of one. A plural is also
- * tried in canonical form, since the normalizer maps "photo" to "image" but
- * leaves "photos" alone.
+ * The word starts a word of the tool's, or is a plural of one. A plural alias
+ * ("photos") arrives already canonical, since the normalizer maps it (#4900).
  */
 function exactMatch(word: string, words: string[]): boolean {
   if (words.some((w) => w.startsWith(word))) return true;
   if (!word.endsWith("s")) return false;
   const singular = word.slice(0, -1);
-  const canonical = canonicalSingular(singular);
-  return words.some((w) => w === singular || w === canonical);
-}
-
-const canonicalCache = new Map<string, string>();
-function canonicalSingular(singular: string): string {
-  let canonical = canonicalCache.get(singular);
-  if (canonical === undefined) {
-    canonical = normalizeSearchQuery(singular);
-    if (canonicalCache.size > 500) canonicalCache.clear();
-    canonicalCache.set(singular, canonical);
-  }
-  return canonical;
+  return words.some((w) => w === singular);
 }
 
 /**
