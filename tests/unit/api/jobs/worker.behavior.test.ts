@@ -6587,6 +6587,7 @@ describe("first-processed onboarding marker (#4909)", () => {
         setSettingIfAbsent: setSettingIfAbsentMock,
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getDirectJobProcessFn: vi.fn(),
         getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
       }));
       vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
