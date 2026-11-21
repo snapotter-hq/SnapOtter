@@ -1142,7 +1142,7 @@ export const ar: TranslationKeys = {
     },
     "crop-pdf": {
       name: "اقتصاص PDF",
-      description: "اقتصاص جميع الصفحات بهامش موحد",
+      description: "اقتصاص الصفحات حسب الهوامش أو إلى منطقة",
     },
     "nup-pdf": {
       name: "صفحات لكل ورقة (N-up)",
@@ -3908,6 +3908,19 @@ export const ar: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "الهامش (نقاط)",
+      mode: "الاقتصاص حسب",
+      modeUniform: "هامش موحد لكل الحواف",
+      modeSides: "هامش لكل حافة",
+      modeRegion: "منطقة",
+      top: "أعلى (نقاط)",
+      right: "يمين (نقاط)",
+      bottom: "أسفل (نقاط)",
+      left: "يسار (نقاط)",
+      x: "من اليسار (نقاط)",
+      y: "من الأعلى (نقاط)",
+      width: "العرض (نقاط)",
+      height: "الارتفاع (نقاط)",
+      regionHint: "يُقاس من الزاوية العلوية اليسرى لكل صفحة. ملصق 4x6 بوصة يساوي 288 x 432 نقطة.",
       submit: "قص",
       submitBatch: "قص ({count} ملفات)",
       progressLabel: "جارٍ القص",

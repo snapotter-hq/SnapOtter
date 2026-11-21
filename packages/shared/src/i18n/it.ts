@@ -1156,7 +1156,7 @@ export const it: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Ritaglia PDF",
-      description: "Ritaglia tutte le pagine con un margine uniforme",
+      description: "Ritaglia le pagine per margini o su un'area",
     },
     "nup-pdf": {
       name: "Pagine per foglio (N-up)",
@@ -3944,6 +3944,20 @@ export const it: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Margine (punti)",
+      mode: "Ritaglia per",
+      modeUniform: "Stesso margine su ogni bordo",
+      modeSides: "Margine per bordo",
+      modeRegion: "Area",
+      top: "Alto (punti)",
+      right: "Destra (punti)",
+      bottom: "Basso (punti)",
+      left: "Sinistra (punti)",
+      x: "Da sinistra (punti)",
+      y: "Dall'alto (punti)",
+      width: "Larghezza (punti)",
+      height: "Altezza (punti)",
+      regionHint:
+        "Misurato dall'angolo in alto a sinistra di ogni pagina. Un'etichetta da 4x6 pollici misura 288 x 432 punti.",
       submit: "Ritaglia",
       submitBatch: "Ritaglia ({count} file)",
       progressLabel: "Ritaglio",

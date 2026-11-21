@@ -231,7 +231,7 @@ export const DOCUMENT_TOOLS: Tool[] = [
   {
     id: "crop-pdf",
     name: "Crop PDF",
-    description: "Crop all pages with a uniform margin",
+    description: "Crop pages by margins or to a region",
     category: "pdf-optimize",
     icon: "Crop",
     route: "/crop-pdf",

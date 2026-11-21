@@ -1152,7 +1152,7 @@ export const ptBR: TranslationKeys = {
     },
     "crop-pdf": {
       name: "Recortar PDF",
-      description: "Recorte todas as páginas com uma margem uniforme",
+      description: "Recorte as páginas por margens ou para uma região",
     },
     "nup-pdf": {
       name: "Páginas por Folha (N-up)",
@@ -3942,6 +3942,20 @@ export const ptBR: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "Margem (pontos)",
+      mode: "Recortar por",
+      modeUniform: "Mesma margem em todas as bordas",
+      modeSides: "Margem por borda",
+      modeRegion: "Região",
+      top: "Topo (pontos)",
+      right: "Direita (pontos)",
+      bottom: "Base (pontos)",
+      left: "Esquerda (pontos)",
+      x: "Da esquerda (pontos)",
+      y: "Do topo (pontos)",
+      width: "Largura (pontos)",
+      height: "Altura (pontos)",
+      regionHint:
+        "Medido a partir do canto superior esquerdo de cada página. Uma etiqueta de 4x6 pol. tem 288 x 432 pontos.",
       submit: "Recortar",
       submitBatch: "Recortar ({count} arquivos)",
       progressLabel: "Recortando",
