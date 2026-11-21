@@ -6,7 +6,7 @@ import { pandocAvailable } from "@snapotter/doc-engine";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
-import { pythonWith } from "../../../helpers/python-gate.js";
+import { hasWeasyprint } from "../../../helpers/python-gate.js";
 import { startRequestRecorder } from "../../../helpers/request-recorder.js";
 import {
   buildTestApp,
@@ -214,7 +214,7 @@ describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
   }, 90_000);
 });
 
-describe.skipIf(!pandocAvailable() || !pythonWith("weasyprint"))(
+describe.skipIf(!pandocAvailable() || !hasWeasyprint)(
   "epub-convert pdf (requires pandoc + weasyprint)",
   () => {
     it("converts a book with an external link and never fetches its remote image", async () => {

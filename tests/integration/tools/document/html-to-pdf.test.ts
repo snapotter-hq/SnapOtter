@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
-import { pythonWith } from "../../../helpers/python-gate.js";
+import { hasWeasyprint } from "../../../helpers/python-gate.js";
 import { startRequestRecorder } from "../../../helpers/request-recorder.js";
 import { waitForDownloadedJobArtifact } from "../../settle-job.js";
 import {
@@ -18,8 +18,6 @@ import {
 const HTML = readFixture(fixtures.document.tiny("html"));
 const PNG_1X1_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
-const hasWeasyprint = pythonWith("weasyprint");
 
 let testApp: TestApp;
 let adminToken: string;

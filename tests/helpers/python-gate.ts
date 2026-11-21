@@ -44,16 +44,31 @@ export function resolvePython({
 
 export const pythonBin = resolvePython();
 
+/** Check whether a Python snippet runs cleanly under the resolved interpreter. */
+function pythonRuns(code: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!pythonBin) return false;
+  const res = spawnSync(pythonBin, ["-c", code], { encoding: "utf8", env });
+  return res.status === 0;
+}
+
 /** Check whether a Python module is importable by the resolved interpreter. */
 export function pythonWith(mod: string): boolean {
-  if (!pythonBin) return false;
-  const res = spawnSync(pythonBin, ["-c", `import ${mod}`], { encoding: "utf8" });
-  return res.status === 0;
+  return pythonRuns(`import ${mod}`);
+}
+
+/**
+ * Probe the imports doc_html_pdf.py needs, not just the package. WeasyPrint
+ * releases without weasyprint.urls.URLFetcher (Ubuntu 24.04's apt 61.1)
+ * import fine and then fail every conversion (#5077).
+ */
+export function weasyprintUsable(env: NodeJS.ProcessEnv = process.env): boolean {
+  return pythonRuns("from weasyprint import HTML\nfrom weasyprint.urls import URLFetcher", env);
 }
 
 export const hasPython = pythonBin !== null;
 export const hasFitz = hasPython && pythonWith("fitz");
 export const hasPikepdf = hasPython && pythonWith("pikepdf");
+export const hasWeasyprint = hasPython && weasyprintUsable();
 
 export interface GeneratedPythonCapabilities {
   fitz: boolean;
@@ -70,7 +85,7 @@ const GENERATED_PYTHON_CAPABILITIES: GeneratedPythonCapabilities = {
   markdown: hasPython && pythonWith("markdown"),
   pdf2docx: hasPython && pythonWith("pdf2docx"),
   pikepdf: hasPikepdf,
-  weasyprint: hasPython && pythonWith("weasyprint"),
+  weasyprint: hasWeasyprint,
 };
 
 const GENERATED_TOOL_MODULES: Readonly<
