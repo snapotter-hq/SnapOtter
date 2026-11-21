@@ -70,8 +70,8 @@ describe("computeDeleteAfter logic (source verification)", () => {
     expect(source).toContain("eq(schema.teams.id, userRow[0].team)");
   });
 
-  it("falls back to FILE_MAX_AGE_HOURS when team has no retentionHours", () => {
-    expect(source).toContain("env.FILE_MAX_AGE_HOURS");
+  it("returns early when the team has no retentionHours instead of using an env fallback (#5100)", () => {
+    expect(source).toMatch(/retentionHours\s*==\s*null\)\s*return/);
   });
 
   it("computes deleteAfter as retentionHours converted to milliseconds from now", () => {
