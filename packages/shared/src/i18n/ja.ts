@@ -3991,6 +3991,8 @@ export const ja: TranslationKeys = {
       scannedHint:
         "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
       runOcr: "このPDFでOCRを実行",
+      unreadablePages:
+        "{total}ページ中{count}ページに読み取れるテキストレイヤーがないため、.txtのその部分は文字化けしている可能性があります。OCRならそれらのページを読み取れます。",
     },
     "pdf-to-markdown": {
       submit: "Markdownに変換",

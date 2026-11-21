@@ -4034,6 +4034,8 @@ export const sv: TranslationKeys = {
       scannedHint:
         "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
       runOcr: "Kör OCR på den här PDF:en",
+      unreadablePages:
+        "{count} av {total} sidor saknar ett läsbart textlager, så deras del av .txt-filen kan bli oläslig. OCR kan läsa de sidorna.",
     },
     "pdf-to-markdown": {
       submit: "Konvertera till Markdown",

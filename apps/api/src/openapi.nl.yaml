@@ -15320,6 +15320,16 @@ paths:
                       chars:
                         type: integer
                         description: Aantal geëxtraheerde tekens
+                      unreadablePages:
+                        type: object
+                        description: Alleen aanwezig als sommige pagina's tekens bevatten die niet als tekst te lezen waren (lettertypen zonder bruikbare ToUnicode-tabel). Die pagina's blijven in de .txt staan zoals ze zijn geëxtraheerd.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pagina's waarvan de tekstlaag niet als tekst te lezen was
+                          total:
+                            type: integer
+                            description: Pagina's in de PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33651,6 +33661,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: cb336ad44dce
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: 317ef80841d4
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 7b3ed1b36972
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 91b549f244cb
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

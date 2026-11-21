@@ -15377,6 +15377,16 @@ paths:
                       chars:
                         type: integer
                         description: Кількість вилучених символів
+                      unreadablePages:
+                        type: object
+                        description: Присутній, лише якщо на деяких сторінках були символи, що не читаються як текст (шрифти без придатної мапи ToUnicode). Ці сторінки лишаються у .txt у тому вигляді, в якому їх видобуто.
+                        properties:
+                          count:
+                            type: integer
+                            description: Сторінки, текстовий шар яких не читається як текст
+                          total:
+                            type: integer
+                            description: Кількість сторінок у PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33723,6 +33733,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 7a6e045fa392
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: 047122ab29a0
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 90addab54d05
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 1b83ae24ab0b
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

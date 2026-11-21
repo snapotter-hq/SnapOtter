@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pdfTextPy } from "@snapotter/doc-engine";
+import { type PdfTextResult, pdfTextPy } from "@snapotter/doc-engine";
 import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -8,6 +8,21 @@ import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
+
+const SCANNED_MESSAGE =
+  "This PDF has no extractable text layer. It looks scanned or image-only, so use the PDF OCR tool to read its text.";
+const UNREADABLE_MESSAGE =
+  "This PDF has a text layer, but its fonts don't map to readable characters, so use the PDF OCR tool to read its text.";
+
+/**
+ * Only call it a scan when no page returned characters at all. A page whose
+ * characters failed the readability test has a real text layer the user can
+ * see on screen, so "image-only" would read as flatly wrong there (#954). An
+ * older sidecar sends no counts, and keeps the wording it always had.
+ */
+function noTextLayerMessage(result: PdfTextResult): string {
+  return (result.unreadablePages ?? 0) > 0 ? UNREADABLE_MESSAGE : SCANNED_MESSAGE;
+}
 
 export function registerPdfToText(app: FastifyInstance) {
   createToolRoute(app, {
@@ -32,7 +47,7 @@ export function registerPdfToText(app: FastifyInstance) {
       // bundle and runs for minutes.
       if (!result.hasText) {
         throw new InputValidationError(
-          "This PDF has no extractable text layer. It looks scanned or image-only, so use the PDF OCR tool to read its text.",
+          noTextLayerMessage(result),
           422,
           undefined,
           NO_TEXT_LAYER_CODE,
@@ -44,7 +59,15 @@ export function registerPdfToText(app: FastifyInstance) {
         scratchPath: outPath,
         filename: `${base}.txt`,
         contentType: "text/plain",
-        resultPayload: { chars: result.chars },
+        // The .txt keeps every page as extracted, unreadable ones included:
+        // dropping text on a heuristic is worse than showing it. Say how many
+        // pages it was so the junk isn't silent (#954).
+        resultPayload: {
+          chars: result.chars,
+          ...(result.unreadablePages && result.pages
+            ? { unreadablePages: { count: result.unreadablePages, total: result.pages } }
+            : {}),
+        },
       };
     },
   });

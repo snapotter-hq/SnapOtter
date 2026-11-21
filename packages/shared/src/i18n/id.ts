@@ -4038,6 +4038,8 @@ export const id: TranslationKeys = {
       scannedHint:
         "PDF ini hasil pindaian, jadi tidak ada teks yang bisa diekstrak. OCR bisa membacanya, tetapi butuh waktu lebih lama dan paket AI OCR harus terpasang.",
       runOcr: "Jalankan OCR pada PDF ini",
+      unreadablePages:
+        "{count} dari {total} halaman tidak punya lapisan teks yang bisa dibaca, jadi bagiannya di file .txt mungkin kacau. OCR bisa membaca halaman-halaman itu.",
     },
     "pdf-to-markdown": {
       submit: "Konversi ke Markdown",

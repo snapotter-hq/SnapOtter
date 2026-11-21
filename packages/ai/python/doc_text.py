@@ -1,4 +1,7 @@
-"""Extract plain text. Args: {"path": in, "out": out-txt-path}. Prints {"chars": N, "hasText": bool}."""
+"""Extract plain text. Args: {"path": in, "out": out-txt-path}.
+
+Prints {"chars": N, "hasText": bool, "pages": N, "emptyPages": N, "unreadablePages": N}.
+"""
 import json
 import re
 import sys
@@ -65,6 +68,33 @@ def has_readable_text(text):
         and unicodedata.category(char) not in ("Cc", "Cf")
         for char in text
     )
+
+
+def tally_pages(parts, judged):
+    """Count the pages that gave back nothing and the pages whose text can't be read.
+
+    parts is each page's extracted text, judged the text its readability
+    verdict was made on (see main). A page with no readable text is empty
+    when its extraction was blank, the shape of a scanned or image-only page
+    (#589), and unreadable when it returned characters that failed the test:
+    control codes (#724) or glyph ids (#955). The route words its 422 from
+    the difference and reports unreadable pages on a document that otherwise
+    extracted, rather than assume a scan for both (#954).
+    """
+    empty = unreadable = 0
+    for part, verdict_text in zip(parts, judged):
+        if has_readable_text(verdict_text):
+            continue
+        if part.strip():
+            unreadable += 1
+        else:
+            empty += 1
+    return {
+        "pages": len(parts),
+        "emptyPages": empty,
+        "unreadablePages": unreadable,
+        "hasText": len(parts) > empty + unreadable,
+    }
 
 
 # Leading object number of an indirect reference such as "10 0 R" or "[10 0 R]".
@@ -488,11 +518,12 @@ def main():
         # map returns raw glyph ids that render blank (#724), and a composite
         # font with no map returns glyph ids that look like letters (#955).
         # len(text) alone can't tell any of them apart, so the caller uses this
-        # to offer OCR instead of handing back a file the user can't read.
-        has_text = any(has_readable_text(part) for part in judged)
+        # to offer OCR instead of handing back a file the user can't read. The
+        # page counts say which of those it was, and on how many pages (#954).
+        tally = tally_pages(parts, judged)
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(text)
-        print(json.dumps({"chars": len(text), "hasText": has_text}))
+        print(json.dumps({"chars": len(text), **tally}))
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
         sys.exit(1)

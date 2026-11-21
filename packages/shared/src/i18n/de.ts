@@ -4066,6 +4066,8 @@ export const de: TranslationKeys = {
       scannedHint:
         "Dieses PDF ist gescannt, es gibt also keinen Text zu extrahieren. OCR kann es lesen, braucht aber länger und setzt das installierte OCR-KI-Paket voraus.",
       runOcr: "OCR auf dieses PDF anwenden",
+      unreadablePages:
+        "{count} von {total} Seiten haben keine lesbare Textebene, daher kann ihr Teil der .txt-Datei unleserlich sein. OCR kann diese Seiten lesen.",
     },
     "pdf-to-markdown": {
       submit: "In Markdown konvertieren",

@@ -51,6 +51,7 @@ export {
   convertFontPy,
   type DocsScriptOptions,
   htmlToPdfPy,
+  type PdfTextResult,
   pdfFlattenPy,
   pdfMetadataGetPy,
   pdfMetadataSetPy,

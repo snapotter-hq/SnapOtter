@@ -15304,6 +15304,16 @@ paths:
                       chars:
                         type: integer
                         description: 擷取的字元數
+                      unreadablePages:
+                        type: object
+                        description: 僅當部分頁面包含無法作為文字讀取的字元時出現（字型缺少可用的 ToUnicode 對應）。這些頁面會依擷取結果保留在 .txt 中。
+                        properties:
+                          count:
+                            type: integer
+                            description: 文字圖層無法作為文字讀取的頁數
+                          total:
+                            type: integer
+                            description: PDF 的總頁數
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33633,6 +33643,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: ac713016bbfe
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: 168b13a0a28f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 80c7ee122642
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 0d0956fb7787
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

@@ -25,6 +25,10 @@ export function pickResultNotes(source: unknown): ResultNotes | null {
   if (rows && typeof rows.charted === "number" && typeof rows.skipped === "number") {
     notes.chartRows = { charted: rows.charted, skipped: rows.skipped };
   }
+  const pages = raw.unreadablePages as { count?: unknown; total?: unknown } | undefined;
+  if (pages && typeof pages.count === "number" && typeof pages.total === "number") {
+    notes.unreadablePages = { count: pages.count, total: pages.total };
+  }
   return Object.keys(notes).length > 0 ? notes : null;
 }
 

@@ -15321,6 +15321,16 @@ paths:
                       chars:
                         type: integer
                         description: 抽出された文字数
+                      unreadablePages:
+                        type: object
+                        description: 一部のページにテキストとして読み取れない文字があった場合（使用可能な ToUnicode マップを持たないフォント）にのみ含まれます。それらのページは抽出されたまま .txt に残ります。
+                        properties:
+                          count:
+                            type: integer
+                            description: テキストレイヤーがテキストとして読み取れなかったページ数
+                          total:
+                            type: integer
+                            description: PDF の総ページ数
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33652,6 +33662,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 2405437f1feb
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: a01786290644
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 539b025d854d
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 625a561b210b
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

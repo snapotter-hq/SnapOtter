@@ -4032,6 +4032,8 @@ export const vi: TranslationKeys = {
       scannedHint:
         "PDF này là bản quét nên không có văn bản để trích xuất. OCR có thể đọc được, nhưng mất nhiều thời gian hơn và cần cài gói AI cho OCR.",
       runOcr: "Chạy OCR cho PDF này",
+      unreadablePages:
+        "{count} trên {total} trang không có lớp văn bản đọc được, nên phần đó trong tệp .txt có thể bị lỗi ký tự. OCR có thể đọc các trang đó.",
     },
     "pdf-to-markdown": {
       submit: "Chuyển sang Markdown",

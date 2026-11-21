@@ -15379,6 +15379,16 @@ paths:
                       chars:
                         type: integer
                         description: عدد الأحرف المستخرجة
+                      unreadablePages:
+                        type: object
+                        description: يظهر فقط عندما تحتوي بعض الصفحات على أحرف لا تُقرأ كنص (خطوط بلا خريطة ToUnicode صالحة). تبقى هذه الصفحات في ملف .txt كما استُخرجت.
+                        properties:
+                          count:
+                            type: integer
+                            description: الصفحات التي لم تُقرأ طبقة النص فيها كنص
+                          total:
+                            type: integer
+                            description: عدد صفحات ملف PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33725,6 +33735,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 7c8b816aaac3
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: cf4593beb9dd
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 6d70508324fc
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: d6020c2cf45a
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

@@ -4042,6 +4042,8 @@ export const tr: TranslationKeys = {
       scannedHint:
         "Bu PDF taranmış, bu yüzden çıkarılacak metin yok. OCR okuyabilir, ancak daha uzun sürer ve OCR yapay zeka paketinin kurulu olmasını gerektirir.",
       runOcr: "Bu PDF'de OCR çalıştır",
+      unreadablePages:
+        "{total} sayfanın {count} tanesinde okunabilir bir metin katmanı yok, bu yüzden .txt dosyasındaki bu kısım bozuk çıkabilir. OCR bu sayfaları okuyabilir.",
     },
     "pdf-to-markdown": {
       submit: "Markdown'a Dönüştür",

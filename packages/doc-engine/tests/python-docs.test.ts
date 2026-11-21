@@ -314,6 +314,22 @@ describe("pdfTextPy", () => {
     ).resolves.toEqual({ chars: 0, hasText: false });
   });
 
+  it("passes the per-page counts through (#954)", async () => {
+    runDocsScript.mockResolvedValueOnce(
+      '{"chars": 52, "hasText": true, "pages": 3, "emptyPages": 1, "unreadablePages": 1}',
+    );
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).resolves.toEqual({ chars: 52, hasText: true, pages: 3, emptyPages: 1, unreadablePages: 1 });
+  });
+
+  it("leaves the per-page counts off when an older sidecar omits or garbles them", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 9, "hasText": true, "pages": "3"}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).resolves.toEqual({ chars: 9, hasText: true });
+  });
+
   it("throws the reported error", async () => {
     runDocsScript.mockResolvedValueOnce('{"error": "text extract failed"}');
     await expect(

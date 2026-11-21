@@ -199,22 +199,40 @@ export async function pdfRedactPy(
   return { found: parsed.found };
 }
 
+/**
+ * What doc_text reports. The page counts split the pages with no readable text
+ * into ones that came back blank (a scan) and ones whose text failed the
+ * readability test (fonts with no usable ToUnicode map), so the caller can say
+ * which (#954). An older sidecar sends no counts.
+ */
+export interface PdfTextResult {
+  chars: number;
+  hasText: boolean;
+  pages?: number;
+  emptyPages?: number;
+  unreadablePages?: number;
+}
+
 /** Extract plain text from a PDF (PyMuPDF get_text). */
 export async function pdfTextPy(
   inPath: string,
   outTxtPath: string,
   opts?: DocsScriptOptions,
-): Promise<{ chars: number; hasText: boolean }> {
+): Promise<PdfTextResult> {
   const runOpts = buildDocsRunOpts(opts);
   const stdout = await runDocsScript(
     "doc_text",
     { path: inPath, out: outTxtPath },
     ...(runOpts ? [runOpts] : []),
   ).catch(withDamageClassification);
-  const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
-    "doc_text",
-    stdout,
-  );
+  const parsed = parseDocsJson<{
+    chars?: number;
+    hasText?: boolean;
+    pages?: unknown;
+    emptyPages?: unknown;
+    unreadablePages?: unknown;
+    error?: string;
+  }>("doc_text", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_text failed: ${formatDocsError(parsed.error, stdout)}`);
   }
@@ -223,7 +241,15 @@ export async function pdfTextPy(
   }
   // Fall back to a chars>0 heuristic if an older sidecar omits hasText.
   const hasText = parsed.hasText ?? parsed.chars > 0;
-  return { chars: parsed.chars, hasText };
+  const { pages, emptyPages, unreadablePages } = parsed;
+  if (
+    typeof pages !== "number" ||
+    typeof emptyPages !== "number" ||
+    typeof unreadablePages !== "number"
+  ) {
+    return { chars: parsed.chars, hasText };
+  }
+  return { chars: parsed.chars, hasText, pages, emptyPages, unreadablePages };
 }
 
 /** PDF to Markdown with inferred headings, lists and tables (PyMuPDF). Long-running: 5 min timeout. */

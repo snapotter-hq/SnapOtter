@@ -15371,6 +15371,16 @@ paths:
                       chars:
                         type: integer
                         description: 추출된 문자 수
+                      unreadablePages:
+                        type: object
+                        description: 일부 페이지에 텍스트로 읽히지 않는 문자가 있을 때만 포함됩니다(사용 가능한 ToUnicode 맵이 없는 글꼴). 해당 페이지는 추출된 그대로 .txt에 남습니다.
+                        properties:
+                          count:
+                            type: integer
+                            description: 텍스트 레이어가 텍스트로 읽히지 않은 페이지 수
+                          total:
+                            type: integer
+                            description: PDF의 전체 페이지 수
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33717,6 +33727,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 8da8efaa2c3b
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: c5e281b84d7d
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 2e53351d34e3
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 480c4395cd32
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

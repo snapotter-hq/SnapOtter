@@ -55,7 +55,13 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfScrubProducerPy: vi.fn(),
   pdfSignPy: vi.fn(async () => ({ placed: 1 })),
-  pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
+  pdfTextPy: vi.fn(async () => ({
+    chars: 12,
+    hasText: true,
+    pages: 1,
+    emptyPages: 0,
+    unreadablePages: 0,
+  })),
   pdfToMarkdownPy: vi.fn(async () => ({ chars: 42 })),
   pdfToWordPy: vi.fn(),
   qpdfAssemblePages: vi.fn(),
@@ -235,6 +241,85 @@ describe("document route processors", () => {
         message: expect.stringMatching(/text layer/i),
         statusCode: 422,
         code: "NO_TEXT_LAYER",
+      });
+    });
+  });
+
+  it("blames a scan only when the pages came back empty (#954)", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 2,
+      hasText: false,
+      pages: 3,
+      emptyPages: 3,
+      unreadablePages: 0,
+    });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/scanned or image-only.*OCR/),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+    });
+  });
+
+  it("does not call a PDF with an unreadable text layer scanned (#954)", async () => {
+    // Text is visible on screen, but its fonts carry no usable ToUnicode map.
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 40,
+      hasText: false,
+      pages: 2,
+      emptyPages: 1,
+      unreadablePages: 1,
+    });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "glyph-ids.pdf");
+      const caught = await config?.processV2?.(ctx).catch((err: unknown) => err);
+      expect(caught).toMatchObject({
+        message: expect.stringMatching(/text layer.*OCR/),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+      expect((caught as Error).message).not.toMatch(/scanned|image-only/);
+    });
+  });
+
+  it("keeps the scan wording when an older sidecar sends no page counts", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({ chars: 0, hasText: false });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/scanned or image-only/),
+        statusCode: 422,
+      });
+    });
+  });
+
+  it("says how many pages had no readable text when the rest extracted (#954)", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 52,
+      hasText: true,
+      pages: 5,
+      emptyPages: 0,
+      unreadablePages: 2,
+    });
+    registerPdfToText(createMockApp());
+    const config = getToolConfig("pdf-to-text");
+
+    await withScratch(async (scratchDir) => {
+      const result = await config?.processV2?.(createCtx(scratchDir, "invoice.pdf"));
+      expect(result?.resultPayload).toEqual({
+        chars: 52,
+        unreadablePages: { count: 2, total: 5 },
       });
     });
   });

@@ -15373,6 +15373,16 @@ paths:
                       chars:
                         type: integer
                         description: Antal extraherade tecken
+                      unreadablePages:
+                        type: object
+                        description: Finns bara när vissa sidor hade tecken som inte gick att läsa som text (typsnitt utan användbar ToUnicode-tabell). Sidorna finns kvar i .txt-filen som de extraherades.
+                        properties:
+                          count:
+                            type: integer
+                            description: Sidor vars textlager inte gick att läsa som text
+                          total:
+                            type: integer
+                            description: Sidor i PDF-filen
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33718,6 +33728,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: 92bb81504fb3
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: aaeecc3f8962
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 506a7cb00c7f
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 29080796fc5f
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

@@ -15373,6 +15373,16 @@ paths:
                       chars:
                         type: integer
                         description: Anzahl der extrahierten Zeichen
+                      unreadablePages:
+                        type: object
+                        description: Nur vorhanden, wenn einige Seiten Zeichen enthielten, die sich nicht als Text lesen ließen (Schriften ohne brauchbare ToUnicode-Zuordnung). Diese Seiten bleiben so in der .txt, wie sie extrahiert wurden.
+                        properties:
+                          count:
+                            type: integer
+                            description: Seiten, deren Textebene sich nicht als Text lesen ließ
+                          total:
+                            type: integer
+                            description: Seiten im PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -33719,6 +33729,18 @@ x-i18n:
       sourceHash: aecd4aba8b84
       provenance: machine
       outputHash: cdd829b6a2f7
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/description:
+      sourceHash: 4fda98c8475a
+      provenance: machine
+      outputHash: 7bfaf5977f58
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/count/description:
+      sourceHash: b66c9f6f3e20
+      provenance: machine
+      outputHash: 13d9a3379d25
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: c387aa018272
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

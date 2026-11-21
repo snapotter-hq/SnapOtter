@@ -3762,6 +3762,8 @@ export const zhTW: TranslationKeys = {
       scannedHint:
         "此 PDF 是掃描檔，沒有可擷取的文字。OCR 可以辨識它，但耗時較長，且需要已安裝 OCR AI 功能包。",
       runOcr: "對此 PDF 執行 OCR",
+      unreadablePages:
+        "{total} 頁中有 {count} 頁沒有可讀的文字層，因此 .txt 中對應的部分可能是亂碼。OCR 可以辨識這些頁面。",
     },
     "pdf-to-markdown": {
       submit: "轉換為 Markdown",

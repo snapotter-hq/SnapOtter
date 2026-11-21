@@ -15127,6 +15127,16 @@ paths:
                       chars:
                         type: integer
                         description: Number of characters extracted
+                      unreadablePages:
+                        type: object
+                        description: Present only when some pages had characters that didn't read as text (fonts with no usable ToUnicode map). Those pages stay in the .txt as extracted.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pages whose text layer didn't read as text
+                          total:
+                            type: integer
+                            description: Pages in the PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
