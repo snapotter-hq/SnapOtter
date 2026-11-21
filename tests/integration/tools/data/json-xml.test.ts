@@ -124,4 +124,20 @@ describe("json-xml (pure JS, no skipIf)", () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe("NESTING_TOO_DEEP");
   }, 30_000);
+
+  // #4379: fast-xml-parser is lenient, so an unclosed root used to come back
+  // as a 200 with whatever it had read so far.
+  it("rejects XML with an unclosed root instead of returning partial JSON", async () => {
+    const res = await runTool(
+      "malformed.xml",
+      Buffer.from("<people><person><name>Ada</name></person>"),
+      {
+        pretty: true,
+      },
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(
+      "XML parse failed: Unclosed tag 'people'. (line 1, column 1)",
+    );
+  }, 30_000);
 });
