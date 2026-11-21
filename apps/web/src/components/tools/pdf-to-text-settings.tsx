@@ -1,5 +1,8 @@
 import { ProgressCard } from "@/components/common/progress-card";
-import { ScannedPdfOcrHandoff } from "@/components/common/scanned-pdf-ocr-handoff";
+import {
+  ScannedPdfOcrHandoff,
+  UnreadablePagesOcrHandoff,
+} from "@/components/common/scanned-pdf-ocr-handoff";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -43,6 +46,7 @@ export function PdfToTextSettings() {
           })}
         </p>
       )}
+      <UnreadablePagesOcrHandoff label={s.runOcr} testId="pdf-to-text-run-ocr-unreadable" />
 
       {partlyUnreadablePages && (
         <p
