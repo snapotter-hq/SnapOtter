@@ -14,6 +14,7 @@ import { registerAutoSubtitles } from "./auto-subtitles.js";
 import { registerBackgroundReplace } from "./background-replace.js";
 import { registerBarcodeGenerate } from "./barcode-generate.js";
 import { registerBarcodeRead } from "./barcode-read.js";
+import { registerBase64 } from "./base64.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurBackground } from "./blur-background.js";
 import { registerBlurFaces } from "./blur-faces.js";
@@ -401,6 +402,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "yaml-json", register: registerYamlJson },
     { id: "convert-case", register: registerConvertCase },
     { id: "proportion-calculator", register: registerProportionCalculator },
+    { id: "base64", register: registerBase64 },
 
     // AI Tools
     { id: "background-replace", register: registerBackgroundReplace },

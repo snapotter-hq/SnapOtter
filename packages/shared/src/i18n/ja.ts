@@ -1234,6 +1234,10 @@ export const ja: TranslationKeys = {
       name: "比例計算機",
       description: "比例の計算: 既知の3つの値からXを求めます",
     },
+    base64: {
+      name: "Base64 エンコード / デコード",
+      description: "テキストを Base64 にエンコード、または Base64 をテキストにデコード",
+    },
     "create-zip": {
       name: "ZIP 作成",
       description: "複数のファイルを1つの ZIP アーカイブにまとめる",
@@ -4159,6 +4163,18 @@ export const ja: TranslationKeys = {
       zeroDivisorDirect: "正比例ではAに0は使えません",
       zeroDivisorInverse: "反比例ではCに0は使えません",
     },
+    base64: {
+      encode: "エンコード",
+      decode: "デコード",
+      encodeInput: "エンコードするテキスト",
+      decodeInput: "デコードする Base64",
+      encodePlaceholder: "テキストを貼り付けるか入力",
+      decodePlaceholder: "Base64 を貼り付け（空白と改行は無視されます）",
+      urlSafe: "URL セーフ（- と _、パディングなし）",
+      converting: "変換中",
+      result: "結果",
+      tooLong: "{count} 文字あります。上限は {max} 文字です。",
+    },
     "create-zip": {
       submit: "ZIPを作成",
       submitBatch: "ZIPを作成 ({count}ファイル)",
@@ -5776,7 +5792,11 @@ export const ja: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "この背景除去は期限切れです。最初からやり直してください。",
       BROWSER_CRASHED: "レンダリング中にブラウザがクラッシュしました。もう一度お試しください。",
       BROWSER_NOT_AVAILABLE: "このツールに必要なブラウザは現在利用できません。",
+      DECODED_DATA_NOT_TEXT:
+        "この Base64 はテキストではなくバイナリデータになるため、ここには表示できません。",
       DEPENDENCY_VALIDATION_FAILED: "この設定は、無効な別の設定に依存しています。",
+      ENCODED_TEXT_INVALID:
+        "有効な Base64 ではありません。余分な文字や末尾の欠けがないか確認してください。",
       FEATURE_CPU_UNSUPPORTED:
         "この機能には AVX に対応した CPU が必要ですが、このサーバーの CPU は対応していません。",
       FEATURE_INCOMPATIBLE: "この機能は現在の設定では実行できません。",

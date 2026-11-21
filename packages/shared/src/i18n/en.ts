@@ -1224,6 +1224,10 @@ export const en = {
       name: "Proportion Calculator",
       description: "Solve the rule of three: find X from three known values",
     },
+    base64: {
+      name: "Base64 Encode / Decode",
+      description: "Encode text to Base64 or decode Base64 back to text",
+    },
     "create-zip": {
       name: "Create ZIP",
       description: "Bundle multiple files into a single ZIP archive",
@@ -4142,6 +4146,18 @@ export const en = {
       zeroDivisorDirect: "A can't be 0 in a direct proportion",
       zeroDivisorInverse: "C can't be 0 in an inverse proportion",
     },
+    base64: {
+      encode: "Encode",
+      decode: "Decode",
+      encodeInput: "Text to encode",
+      decodeInput: "Base64 to decode",
+      encodePlaceholder: "Paste or type text",
+      decodePlaceholder: "Paste Base64 (spaces and line breaks are ignored)",
+      urlSafe: "URL-safe (- and _, no padding)",
+      converting: "Converting",
+      result: "Result",
+      tooLong: "This is {count} characters long. The limit is {max}.",
+    },
     "create-zip": {
       submit: "Create ZIP",
       submitBatch: "Create ZIP ({count} files)",
@@ -5746,7 +5762,10 @@ export const en = {
       BACKGROUND_REMOVAL_EXPIRED: "This background removal has expired. Start again.",
       BROWSER_CRASHED: "The browser crashed while rendering. Try again.",
       BROWSER_NOT_AVAILABLE: "The browser this tool needs isn't available right now.",
+      DECODED_DATA_NOT_TEXT:
+        "This Base64 decodes to binary data, not text, so it can't be shown here.",
       DEPENDENCY_VALIDATION_FAILED: "This setting depends on another setting that isn't valid.",
+      ENCODED_TEXT_INVALID: "That isn't valid Base64. Check for stray characters or a cut-off end.",
       FEATURE_CPU_UNSUPPORTED:
         "This feature needs a CPU with AVX support, and this server's CPU doesn't have it.",
       FEATURE_INCOMPATIBLE: "This feature can't run with the current settings.",

@@ -1271,6 +1271,10 @@ export const uk: TranslationKeys = {
       name: "Калькулятор пропорцій",
       description: "Розв'яжіть пропорцію: знайдіть X за трьома відомими значеннями",
     },
+    base64: {
+      name: "Кодування / декодування Base64",
+      description: "Кодуйте текст у Base64 або декодуйте Base64 назад у текст",
+    },
     "create-zip": {
       name: "Створення ZIP",
       description: "Запакувати кілька файлів в один архів ZIP",
@@ -4213,6 +4217,18 @@ export const uk: TranslationKeys = {
       zeroDivisorDirect: "У прямій пропорції A не може дорівнювати 0",
       zeroDivisorInverse: "В оберненій пропорції C не може дорівнювати 0",
     },
+    base64: {
+      encode: "Закодувати",
+      decode: "Декодувати",
+      encodeInput: "Текст для кодування",
+      decodeInput: "Base64 для декодування",
+      encodePlaceholder: "Вставте або введіть текст",
+      decodePlaceholder: "Вставте Base64 (пробіли та розриви рядків ігноруються)",
+      urlSafe: "Безпечно для URL (- і _, без доповнення)",
+      converting: "Конвертація",
+      result: "Результат",
+      tooLong: "Довжина {count} символів. Максимум {max}.",
+    },
     "create-zip": {
       submit: "Створити ZIP",
       submitBatch: "Створити ZIP ({count} файлів)",
@@ -5835,8 +5851,12 @@ export const uk: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "Термін дії цього видалення фону минув. Почніть знову.",
       BROWSER_CRASHED: "Браузер аварійно завершив роботу під час рендерингу. Спробуйте ще раз.",
       BROWSER_NOT_AVAILABLE: "Браузер, потрібний цьому інструменту, зараз недоступний.",
+      DECODED_DATA_NOT_TEXT:
+        "Цей Base64 містить двійкові дані, а не текст, тож показати його тут не можна.",
       DEPENDENCY_VALIDATION_FAILED:
         "Це налаштування залежить від іншого налаштування, яке недійсне.",
+      ENCODED_TEXT_INVALID:
+        "Це некоректний Base64. Перевірте, чи немає зайвих символів або обрізаного кінця.",
       FEATURE_CPU_UNSUPPORTED:
         "Для цієї функції потрібен процесор із підтримкою AVX, а процесор цього сервера її не має.",
       FEATURE_INCOMPATIBLE: "Ця функція не може працювати з поточними налаштуваннями.",

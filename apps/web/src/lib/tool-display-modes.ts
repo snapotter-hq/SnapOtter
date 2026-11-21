@@ -215,6 +215,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "convert-font": "no-comparison",
   "convert-case": "no-dropzone",
   "proportion-calculator": "no-dropzone",
+  base64: "no-dropzone",
   "create-zip": "no-comparison",
   "extract-zip": "no-comparison",
 };

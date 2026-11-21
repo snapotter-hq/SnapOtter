@@ -15,6 +15,7 @@ export const REGISTRY_EXEMPT = new Set([
   "background-replace",
   "barcode-generate",
   "barcode-read",
+  "base64",
   "blur-background",
   "bulk-rename",
   "collage",

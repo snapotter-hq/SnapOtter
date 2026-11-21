@@ -1273,6 +1273,10 @@ export const tr: TranslationKeys = {
       name: "Orantı Hesaplayıcı",
       description: "Üçlü kuralını çözün: bilinen üç değerden X'i bulun",
     },
+    base64: {
+      name: "Base64 Kodla / Çöz",
+      description: "Metni Base64'e kodlayın veya Base64'ü yeniden metne çözün",
+    },
     "create-zip": {
       name: "ZIP Oluştur",
       description: "Birden fazla dosyayı tek bir ZIP arşivinde paketle",
@@ -4211,6 +4215,18 @@ export const tr: TranslationKeys = {
       zeroDivisorDirect: "Doğru orantıda A 0 olamaz",
       zeroDivisorInverse: "Ters orantıda C 0 olamaz",
     },
+    base64: {
+      encode: "Kodla",
+      decode: "Çöz",
+      encodeInput: "Kodlanacak metin",
+      decodeInput: "Çözülecek Base64",
+      encodePlaceholder: "Metin yapıştırın veya yazın",
+      decodePlaceholder: "Base64 yapıştırın (boşluklar ve satır sonları yok sayılır)",
+      urlSafe: "URL için güvenli (- ve _, dolgu yok)",
+      converting: "Dönüştürülüyor",
+      result: "Sonuç",
+      tooLong: "Bu metin {count} karakter. Sınır {max}.",
+    },
     "create-zip": {
       submit: "ZIP Oluştur",
       submitBatch: "ZIP Oluştur ({count} dosya)",
@@ -5835,7 +5851,11 @@ export const tr: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "Bu arka plan kaldırma işleminin süresi doldu. Baştan başlayın.",
       BROWSER_CRASHED: "Tarayıcı oluşturma sırasında çöktü. Yeniden deneyin.",
       BROWSER_NOT_AVAILABLE: "Bu aracın ihtiyaç duyduğu tarayıcı şu anda kullanılamıyor.",
+      DECODED_DATA_NOT_TEXT:
+        "Bu Base64 metin değil, ikili veri içeriyor; bu yüzden burada gösterilemiyor.",
       DEPENDENCY_VALIDATION_FAILED: "Bu ayar, geçerli olmayan başka bir ayara bağlı.",
+      ENCODED_TEXT_INVALID:
+        "Bu geçerli bir Base64 değil. Fazladan karakter ya da kesik bir son olup olmadığını kontrol edin.",
       FEATURE_CPU_UNSUPPORTED:
         "Bu özellik AVX destekli bir işlemci gerektirir ve bu sunucunun işlemcisinde bu destek yok.",
       FEATURE_INCOMPATIBLE: "Bu özellik mevcut ayarlarla çalışamaz.",

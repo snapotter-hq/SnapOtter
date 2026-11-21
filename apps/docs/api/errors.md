@@ -158,6 +158,8 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `PDF_PASSWORD_PROTECTED` | 400 | The PDF is encrypted and this tool can't open it. | Unlock it with Unlock PDF first. |
 | `NO_AUDIO_TRACK` | 400 | The file has no audio stream for an audio tool to use. | Send a file that has audio. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg couldn't read the audio or video: it found no packets, no codec parameters, no `moov` atom, or data it can't parse. | Check the file plays in a media player, or re-export it, then retry. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode got input that isn't Base64. Whitespace is ignored and both the standard and URL-safe alphabets are accepted. | Check the text for stray characters or a cut-off end. |
+| `DECODED_DATA_NOT_TEXT` | 400 | The Base64 is valid but decodes to binary data, not UTF-8 text. | Decode it with a tool that saves a file instead of showing text. |
 | `PAGE_OUT_OF_RANGE` | 400 | The page range names a page the PDF doesn't have. | Check the page count and send a range inside it. |
 | `INVALID_PAGE_RANGE` | 400 | The page range isn't valid syntax. | Use page numbers like `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages was asked to remove every page. | Keep at least one page. |

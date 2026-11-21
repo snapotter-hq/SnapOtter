@@ -633,6 +633,7 @@ function buildBaseTheme() {
               { text: "Convert Font", link: "/tools/files/convert-font" },
               { text: "Convert Case", link: "/tools/files/convert-case" },
               { text: "Proportion Calculator", link: "/tools/files/proportion-calculator" },
+              { text: "Base64 Encode / Decode", link: "/tools/files/base64" },
               { text: "Create ZIP", link: "/tools/files/create-zip" },
               { text: "Extract ZIP", link: "/tools/files/extract-zip" },
             ],

@@ -383,6 +383,7 @@ describe("toolRegistry", () => {
       "convert-case",
       "proportion-calculator",
       "aspect-ratio-calculator",
+      "base64",
     ]);
     for (const [toolId, entry] of toolRegistry) {
       if (entry.displayMode === "no-dropzone" && !selfContainedTools.has(toolId)) {

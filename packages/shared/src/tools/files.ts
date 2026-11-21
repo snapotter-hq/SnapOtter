@@ -144,6 +144,18 @@ export const FILE_TOOLS: Tool[] = [
     acceptedInputs: [],
     executionHint: "fast",
   },
+  {
+    id: "base64",
+    name: "Base64 Encode / Decode",
+    description: "Encode text to Base64 or decode Base64 back to text",
+    keywords: ["encode", "decode", "base64url", "text"],
+    category: "data",
+    icon: "Binary",
+    route: "/base64",
+    modality: "file",
+    acceptedInputs: [],
+    executionHint: "fast",
+  },
   // Archives
   {
     id: "create-zip",

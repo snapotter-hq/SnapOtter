@@ -883,6 +883,11 @@ const ProportionCalculatorSettings = lazy(() =>
     default: m.ProportionCalculatorSettings,
   })),
 );
+const Base64Settings = lazy(() =>
+  import("@/components/tools/base64-settings").then((m) => ({
+    default: m.Base64Settings,
+  })),
+);
 const CreateZipSettings = lazy(() =>
   import("@/components/tools/create-zip-settings").then((m) => ({
     default: m.CreateZipSettings,
@@ -1242,6 +1247,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],
   ["convert-case", { Settings: ConvertCaseSettings }],
   ["proportion-calculator", { Settings: ProportionCalculatorSettings }],
+  ["base64", { Settings: Base64Settings }],
   ["create-zip", { Settings: CreateZipSettings }],
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];

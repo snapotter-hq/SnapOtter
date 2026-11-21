@@ -150,7 +150,7 @@ describe("a remove query doesn't rank the tools that add the thing (#4818)", () 
 
 describe("a query with no real match reaches the empty state (#4818)", () => {
   // Tools we don't have: the empty state's feedback prompt is how we hear about them.
-  it.each(["email", "discord", "youtube", "curve text", "base64 decode", "text to audio"])(
+  it.each(["email", "discord", "youtube", "curve text", "text to audio"])(
     "%s finds nothing",
     (q) => {
       expect(search(q)).toEqual([]);
@@ -173,6 +173,7 @@ describe("a query with no real match reaches the empty state (#4818)", () => {
     ["make video smaller", "compress-video"],
     ["jpg naar png", "jpg-to-png"],
     ["otf to ttf", "convert-font"],
+    ["base64 decode", "base64"],
   ])("a typo or synonym like %s still finds %s", (q, id) => {
     expect(search(q).slice(0, 3)).toContain(id);
   });

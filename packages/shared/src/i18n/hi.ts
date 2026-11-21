@@ -1092,6 +1092,10 @@ export const hi: TranslationKeys = {
       name: "अनुपात कैलकुलेटर",
       description: "त्रैराशिक नियम हल करें: तीन ज्ञात मानों से X निकालें",
     },
+    base64: {
+      name: "Base64 एनकोड / डिकोड",
+      description: "टेक्स्ट को Base64 में एनकोड करें या Base64 को वापस टेक्स्ट में डिकोड करें",
+    },
     "create-zip": {
       name: "ZIP बनाएँ",
       description: "कई फ़ाइलों को एक ZIP आर्काइव में बंडल करें",
@@ -4005,6 +4009,18 @@ export const hi: TranslationKeys = {
       zeroDivisorDirect: "प्रत्यक्ष अनुपात में A का मान 0 नहीं हो सकता",
       zeroDivisorInverse: "व्युत्क्रम अनुपात में C का मान 0 नहीं हो सकता",
     },
+    base64: {
+      encode: "एनकोड करें",
+      decode: "डिकोड करें",
+      encodeInput: "एनकोड करने के लिए टेक्स्ट",
+      decodeInput: "डिकोड करने के लिए Base64",
+      encodePlaceholder: "टेक्स्ट पेस्ट करें या लिखें",
+      decodePlaceholder: "Base64 पेस्ट करें (स्पेस और लाइन ब्रेक अनदेखे किए जाते हैं)",
+      urlSafe: "URL-सुरक्षित (- और _, बिना पैडिंग)",
+      converting: "कन्वर्ट हो रहा है",
+      result: "परिणाम",
+      tooLong: "यह {count} अक्षर लंबा है। सीमा {max} है।",
+    },
     "create-zip": {
       submit: "ZIP बनाएँ",
       submitBatch: "ZIP बनाएँ ({count} फ़ाइलें)",
@@ -5602,7 +5618,10 @@ export const hi: TranslationKeys = {
       BACKGROUND_REMOVAL_EXPIRED: "यह बैकग्राउंड हटाने का सत्र समाप्त हो गया है। फिर से शुरू करें।",
       BROWSER_CRASHED: "रेंडर करते समय ब्राउज़र क्रैश हो गया। फिर से कोशिश करें।",
       BROWSER_NOT_AVAILABLE: "इस टूल को जिस ब्राउज़र की ज़रूरत है, वह अभी उपलब्ध नहीं है।",
+      DECODED_DATA_NOT_TEXT:
+        "यह Base64 टेक्स्ट नहीं, बाइनरी डेटा में डिकोड होता है, इसलिए इसे यहाँ नहीं दिखाया जा सकता।",
       DEPENDENCY_VALIDATION_FAILED: "यह सेटिंग एक ऐसी सेटिंग पर निर्भर है जो मान्य नहीं है।",
+      ENCODED_TEXT_INVALID: "यह मान्य Base64 नहीं है। अतिरिक्त अक्षर या कटा हुआ अंत जाँचें।",
       FEATURE_CPU_UNSUPPORTED:
         "इस फ़ीचर के लिए AVX सपोर्ट वाला CPU चाहिए, और इस सर्वर के CPU में यह नहीं है।",
       FEATURE_INCOMPATIBLE: "यह फ़ीचर मौजूदा सेटिंग के साथ नहीं चल सकता।",
