@@ -720,7 +720,12 @@ describe("landing searchTools with real catalog metadata", () => {
       expect(ids(result.related)).toEqual([]);
     });
 
-    it.each(["curve text", "base64 decode"])("shows the empty state for %j", (query) => {
+    it("finds the base64 tool for base64 decode", () => {
+      const result = search("base64 decode");
+      expect(ids(result.results)[0]).toBe("base64");
+    });
+
+    it.each(["curve text"])("shows the empty state for %j", (query) => {
       const result = search(query);
       expect(result.results).toEqual([]);
       expect(result.related).toEqual([]);
