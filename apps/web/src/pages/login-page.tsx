@@ -319,6 +319,7 @@ export function LoginPage() {
   } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [username, setUsername] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<"idp_logout_failed" | null>(null);
@@ -895,12 +896,20 @@ export function LoginPage() {
                   />
                 </div>
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium mb-1 text-foreground"
-                  >
-                    {t.auth.password}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="password" className="text-sm font-medium text-foreground">
+                      {t.auth.password}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgot((open) => !open)}
+                      aria-expanded={showForgot}
+                      aria-controls="forgot-password-help"
+                      className="text-xs text-primary-ink hover:underline focus:outline-none focus-visible:underline"
+                    >
+                      {t.auth.forgotPassword}
+                    </button>
+                  </div>
                   <input
                     id="password"
                     type="password"
@@ -912,6 +921,29 @@ export function LoginPage() {
                     className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     required
                   />
+                  {showForgot && (
+                    <div
+                      id="forgot-password-help"
+                      className="mt-2 space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+                    >
+                      <p>{t.auth.forgotPasswordHelp}</p>
+                      <code
+                        dir="ltr"
+                        className="block break-all rounded bg-background px-2 py-1.5 font-mono text-foreground"
+                      >
+                        docker exec -it snapotter snapotter-admin reset-password{" "}
+                        {username || "<username>"}
+                      </code>
+                      <a
+                        href="https://docs.snapotter.com/guide/account-recovery#reset-a-forgotten-password"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block text-primary-ink underline"
+                      >
+                        {t.auth.forgotPasswordGuide}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 {!errorFromRedirect && error && (
                   <p role="alert" className="text-sm text-destructive">

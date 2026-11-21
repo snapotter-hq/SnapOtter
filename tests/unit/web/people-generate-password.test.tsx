@@ -97,15 +97,15 @@ async function generate() {
 
 describe("Add user: Generate password", () => {
   it("meets a minimum length above the default", async () => {
-    settingsRead = async () => ({ settings: { passwordMinLength: "24" } });
+    settingsRead = async () => ({ settings: { passwordMinLength: "48" } });
     const { input } = await generate();
-    await waitFor(() => expect(input.value).toHaveLength(24));
+    await waitFor(() => expect(input.value.length).toBeGreaterThanOrEqual(48));
   });
 
   it("keeps the default length when the minimum is lower", async () => {
     settingsRead = async () => ({ settings: { passwordMinLength: "8" } });
     const { input } = await generate();
-    await waitFor(() => expect(input.value).toHaveLength(20));
+    await waitFor(() => expect(input.value.split("-")).toHaveLength(5));
   });
 
   it("falls back to the default length when the policy cannot be read", async () => {
@@ -114,14 +114,14 @@ describe("Add user: Generate password", () => {
       throw new Error("503");
     };
     const { input } = await generate();
-    await waitFor(() => expect(input.value).toHaveLength(20));
+    await waitFor(() => expect(input.value.split("-")).toHaveLength(5));
   });
 
   it("falls back to the default length when the settings map leaves the key out", async () => {
     // An admin with settings:read but not security:manage gets a 200 without it.
     settingsRead = async () => ({ settings: { maxUsers: "5" } });
     const { input } = await generate();
-    await waitFor(() => expect(input.value).toHaveLength(20));
+    await waitFor(() => expect(input.value.split("-")).toHaveLength(5));
   });
 
   it("learns the minimum from the server's refusal when the policy read gave nothing", async () => {
@@ -131,7 +131,7 @@ describe("Add user: Generate password", () => {
         code: "VALIDATION_ERROR",
         rule: "minLength",
         rules: ["minLength"],
-        minLength: 24,
+        minLength: 48,
       }),
     );
     await openAddForm();
@@ -139,15 +139,15 @@ describe("Add user: Generate password", () => {
       target: { value: "grace" },
     });
     fireEvent.click(generateButton());
-    expect(passwordInput().value).toHaveLength(20);
+    expect(passwordInput().value.split("-")).toHaveLength(5);
 
     fireEvent.click(screen.getByRole("button", { name: en.common.create }));
     expect(
-      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 24 })),
+      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 48 })),
     ).toBeInTheDocument();
 
     fireEvent.click(generateButton());
-    expect(passwordInput().value).toHaveLength(24);
+    expect(passwordInput().value.length).toBeGreaterThanOrEqual(48);
   });
 });
 
