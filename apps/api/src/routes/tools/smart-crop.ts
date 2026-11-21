@@ -347,7 +347,7 @@ export function registerSmartCrop(app: FastifyInstance) {
 
         try {
           const crop = await planCrop(inputBuffer, settings, ctx?.signal);
-          pages = await runPerFrame(inputBuffer, outputFormat.format, crop);
+          pages = await runPerFrame(inputBuffer, outputFormat, crop);
           cropped = pages ?? (await crop(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
