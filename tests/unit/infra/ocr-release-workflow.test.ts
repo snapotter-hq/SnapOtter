@@ -1489,8 +1489,10 @@ describe("OCR v3 bundle release workflow", () => {
       const outputPath = path.join(tempRoot, `${caseName}.output`);
       const logPath = path.join(tempRoot, `${caseName}.docker.log`);
       const stateDir = path.join(tempRoot, `${caseName}.state`);
-      execFileSync("mkdir", ["-p", stateDir]);
+      const runnerTemp = path.join(tempRoot, `${caseName}.runner-temp`);
+      execFileSync("mkdir", ["-p", stateDir, runnerTemp]);
       let exitCode = 0;
+      let stderr = "";
       try {
         execFileSync("bash", ["--noprofile", "--norc", scriptPath], {
           env: {
@@ -1513,23 +1515,35 @@ describe("OCR v3 bundle release workflow", () => {
             PLATFORM: "linux/amd64",
             PLATFORM_PAIR: "linux-amd64",
             RELEASE_COMMIT: releaseCommit,
+            RUNNER_TEMP: runnerTemp,
             VERSION: version,
           },
           stdio: "pipe",
         });
       } catch (error) {
-        exitCode = (error as { status?: number }).status ?? -1;
+        const failure = error as { status?: number; stderr?: Buffer };
+        exitCode = failure.status ?? -1;
+        stderr = failure.stderr?.toString() ?? "";
       }
       return {
         exitCode,
-        log: readFileSync(logPath, "utf8"),
+        // The fake docker writes this log on its first call, so a script that
+        // fails before reaching docker leaves none. Return an empty log and the
+        // script's stderr so the assertion says why, not ENOENT (#5107).
+        log: existsSync(logPath) ? readFileSync(logPath, "utf8") : "",
         output: existsSync(outputPath) ? readFileSync(outputPath, "utf8") : "",
+        runnerTemp,
+        stderr,
       };
     };
 
     try {
       const valid = runCase("valid-checkpoint", { tagMode: "missing" });
-      expect(valid.exitCode).toBe(0);
+      expect(valid.exitCode, valid.stderr).toBe(0);
+      // Scratch files go in the job's own RUNNER_TEMP. Shared /tmp paths broke
+      // on a self-hosted runner, where another user's leftovers can't be
+      // overwritten under fs.protected_regular and the step misread them (#5107).
+      expect(existsSync(path.join(valid.runnerTemp, "existing-release-manifest.error"))).toBe(true);
       expect(valid.output).toContain(`digest=${digest}\n`);
       expect(valid.output).toContain("reused=true\n");
       for (const registry of ["ghcr.io/snapotter-hq/snapotter", "snapotter/snapotter"]) {
