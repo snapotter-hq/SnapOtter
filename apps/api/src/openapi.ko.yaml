@@ -4539,24 +4539,35 @@ paths:
                   description: |
                     옵션이 담긴 JSON 문자열:
                     - `templateId` (문자열, 필수) - 격자 레이아웃을 정의하는 템플릿 ID
-                    - `cells` (배열, 선택) - 셀별 설정 재정의
+                    - `cells` (배열, 선택) - 셀별 설정 재정의. 셀의 `imageIndex`를 `-1`으로 설정하면 해당 셀을 비워 둡니다
                     - `gap` (숫자 0-500, 기본값 8) - 이미지 사이 간격(픽셀)
                     - `cornerRadius` (숫자 0-500, 기본값 0) - 모서리 둥근 반경
                     - `backgroundColor` (문자열, 기본값 "#FFFFFF") - 배경 채우기 색상
                     - `aspectRatio` (문자열, 기본값 "free") - 가로세로 비율 제약
                     - `outputFormat` (문자열, 기본값 "png") - 다음 중 하나: png, jpeg, webp, avif, jxl
                     - `quality` (숫자 1-100, 기본값 90) - 출력 품질
+
+                    `cells` 없이 보내는 경우 템플릿 셀마다 이미지를 하나씩 보내야 합니다. 이미지가 부족하면 코드 `INVALID_SETTINGS`와 함께 400이 반환됩니다. 템플릿 셀 수를 초과하는 이미지는 무시되며 응답의 `warnings`에 해당 파일 이름이 표시됩니다.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: 처리된 이미지
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: 템플릿이 담을 수 있는 것보다 많은 이미지를 업로드한 경우에 포함됩니다. 무시된 파일 이름을 알려 줍니다.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30433,13 +30444,17 @@ x-i18n:
       provenance: machine
       outputHash: 1a93a348a0e2
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 39b3880ccbff
+      outputHash: 10974ccdcdae
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 4ee0158bfac9
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 018c789651e9
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

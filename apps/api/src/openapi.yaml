@@ -4476,24 +4476,35 @@ paths:
                   description: |
                     JSON string with options:
                     - `templateId` (string, required) - Template ID defining the grid layout
-                    - `cells` (array, optional) - Per-cell configuration overrides
+                    - `cells` (array, optional) - Per-cell configuration overrides. Set a cell's `imageIndex` to `-1` to leave it empty
                     - `gap` (number 0-500, default 8) - Gap between images in pixels
                     - `cornerRadius` (number 0-500, default 0) - Corner rounding radius
                     - `backgroundColor` (string, default "#FFFFFF") - Background fill color
                     - `aspectRatio` (string, default "free") - Aspect ratio constraint
                     - `outputFormat` (string, default "png") - One of: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, default 90) - Output quality
+
+                    Without `cells`, send one image per template cell. Fewer images return 400 with code `INVALID_SETTINGS`. Images beyond the template's cell count are ignored and named in the response's `warnings`.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         "200":
           description: Processed image
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ToolResponse"
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Present when more images were uploaded than the template holds. Names the ignored files.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png

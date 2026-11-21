@@ -4511,24 +4511,35 @@ paths:
                   description: |
                     選項的 JSON 字串：
                     - `templateId`（string，必填）- 定義網格版面的範本 ID
-                    - `cells`（array，選填）- 各儲存格的設定覆寫
+                    - `cells`（array，選填）- 各儲存格的設定覆寫；將儲存格的`imageIndex`設為`-1`即可留空
                     - `gap`（number 0-500，預設 8）- 影像之間的間距（像素）
                     - `cornerRadius`（number 0-500，預設 0）- 圓角半徑
                     - `backgroundColor`（string，預設 "#FFFFFF"）- 背景填滿顏色
                     - `aspectRatio`（string，預設 "free"）- 長寬比限制
                     - `outputFormat`（string，預設 "png"）- 可為：png、jpeg、webp、avif、jxl
                     - `quality`（number 1-100，預設 90）- 輸出品質
+
+                    未提供`cells`時，範本的每個儲存格需對應一張圖片。圖片不足時會回傳 400，錯誤碼為`INVALID_SETTINGS`。超出範本儲存格數量的圖片會被忽略，並在回應的`warnings`中列出檔名。
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: 處理後的影像
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: 上傳的圖片多於範本可容納的數量時出現，列出被忽略的檔案。
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30349,13 +30360,17 @@ x-i18n:
       provenance: machine
       outputHash: 6c296e7349ca
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: e1f0b4717ef3
+      outputHash: 78cf4e2ac70b
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: b5fba7a96366
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 94d7cc78481e
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

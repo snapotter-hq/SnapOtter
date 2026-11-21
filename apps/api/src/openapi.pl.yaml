@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Ciąg JSON z opcjami:
                     - `templateId` (ciąg, wymagany) - ID szablonu określającego układ siatki
-                    - `cells` (tablica, opcjonalna) - Nadpisania ustawień poszczególnych komórek
+                    - `cells` (tablica, opcjonalna) - Nadpisania ustawień poszczególnych komórek. Ustaw `imageIndex` komórki na `-1`, aby pozostawić ją pustą
                     - `gap` (liczba 0-500, domyślnie 8) - Odstęp między obrazami w pikselach
                     - `cornerRadius` (liczba 0-500, domyślnie 0) - Promień zaokrąglenia rogów
                     - `backgroundColor` (ciąg, domyślnie "#FFFFFF") - Kolor wypełnienia tła
                     - `aspectRatio` (ciąg, domyślnie "free") - Ograniczenie proporcji
                     - `outputFormat` (ciąg, domyślnie "png") - Jedna z wartości: png, jpeg, webp, avif, jxl
                     - `quality` (liczba 1-100, domyślnie 90) - Jakość wyjściowa
+
+                    Bez `cells` wyślij jeden obraz na każdą komórkę szablonu. Przy mniejszej liczbie obrazów zwracany jest status 400 z kodem `INVALID_SETTINGS`. Obrazy ponad liczbę komórek szablonu są pomijane, a ich nazwy pojawiają się w polu `warnings` odpowiedzi.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Przetworzony obraz
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Występuje, gdy przesłano więcej obrazów, niż mieści szablon. Podaje nazwy pominiętych plików.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30439,13 +30450,17 @@ x-i18n:
       provenance: machine
       outputHash: 11319079bfdd
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: 6ff221d814d6
+      outputHash: df3e78563bc7
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 72b5ddd99de0
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 52faf5b6e4c8
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

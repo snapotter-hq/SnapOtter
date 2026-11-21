@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     Chuỗi JSON với các tùy chọn:
                     - `templateId` (chuỗi, bắt buộc) - ID mẫu xác định bố cục lưới
-                    - `cells` (mảng, tùy chọn) - Ghi đè cấu hình theo từng ô
+                    - `cells` (mảng, tùy chọn) - Ghi đè cấu hình theo từng ô. Đặt `imageIndex` của một ô thành `-1` để để trống ô đó
                     - `gap` (số 0-500, mặc định 8) - Khoảng cách giữa các ảnh tính bằng pixel
                     - `cornerRadius` (số 0-500, mặc định 0) - Bán kính bo góc
                     - `backgroundColor` (chuỗi, mặc định "#FFFFFF") - Màu nền
                     - `aspectRatio` (chuỗi, mặc định "free") - Ràng buộc tỷ lệ khung hình
                     - `outputFormat` (chuỗi, mặc định "png") - Một trong: png, jpeg, webp, avif, jxl
                     - `quality` (số 1-100, mặc định 90) - Chất lượng đầu ra
+
+                    Khi không có `cells`, hãy gửi một ảnh cho mỗi ô của mẫu. Nếu ít ảnh hơn, phản hồi là 400 với mã `INVALID_SETTINGS`. Các ảnh vượt quá số ô của mẫu sẽ bị bỏ qua và được liệt kê trong `warnings` của phản hồi.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Ảnh đã xử lý
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Có mặt khi số ảnh tải lên nhiều hơn số ô của mẫu. Liệt kê các tệp bị bỏ qua.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30437,13 +30448,17 @@ x-i18n:
       provenance: machine
       outputHash: cf64a370ec61
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: e386141fb2c6
+      outputHash: 21afb5f3ef1a
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: da23128ee660
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 9126e432d224
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

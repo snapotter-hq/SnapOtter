@@ -4511,24 +4511,35 @@ paths:
                   description: |
                     JSON-string met opties:
                     - `templateId` (string, verplicht) - Sjabloon-ID dat de rasterindeling bepaalt
-                    - `cells` (array, optioneel) - Configuratie-overschrijvingen per cel
+                    - `cells` (array, optioneel) - Configuratie-overschrijvingen per cel. Zet de `imageIndex` van een cel op `-1` om die leeg te laten
                     - `gap` (number 0-500, standaard 8) - Ruimte tussen afbeeldingen in pixels
                     - `cornerRadius` (number 0-500, standaard 0) - Straal van de hoekafronding
                     - `backgroundColor` (string, standaard "#FFFFFF") - Achtergrondvulkleur
                     - `aspectRatio` (string, standaard "free") - Beperking van de beeldverhouding
                     - `outputFormat` (string, standaard "png") - Een van: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, standaard 90) - Uitvoerkwaliteit
+
+                    Zonder `cells` stuur je één afbeelding per sjablooncel. Bij minder afbeeldingen volgt 400 met code `INVALID_SETTINGS`. Afbeeldingen boven het aantal cellen van het sjabloon worden genegeerd en genoemd in `warnings` van het antwoord.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Verwerkte afbeelding
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Aanwezig wanneer er meer afbeeldingen zijn geüpload dan het sjabloon kan bevatten. Noemt de genegeerde bestanden.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30367,13 +30378,17 @@ x-i18n:
       provenance: machine
       outputHash: 26f48730a3c3
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: bbc3f0b1d3c7
+      outputHash: e8b7694a6367
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 3e2b9051552e
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 3277d24bcf5c
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

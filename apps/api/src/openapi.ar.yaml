@@ -4539,24 +4539,35 @@ paths:
                   description: |
                     سلسلة JSON تحتوي على الخيارات:
                     - `templateId` (نص، مطلوب) - معرّف القالب الذي يحدد تخطيط الشبكة
-                    - `cells` (مصفوفة، اختياري) - تجاوزات الإعدادات لكل خلية
+                    - `cells` (مصفوفة، اختياري) - تجاوزات الإعدادات لكل خلية؛ اضبط `imageIndex` للخلية على `-1` لتركها فارغة
                     - `gap` (رقم من 0 إلى 500، الافتراضي 8) - المسافة بين الصور بالبكسل
                     - `cornerRadius` (رقم من 0 إلى 500، الافتراضي 0) - نصف قطر تدوير الزوايا
                     - `backgroundColor` (نص، الافتراضي "#FFFFFF") - لون تعبئة الخلفية
                     - `aspectRatio` (نص، الافتراضي "free") - قيد نسبة الأبعاد
                     - `outputFormat` (نص، الافتراضي "png") - واحد من: png، jpeg، webp، avif، jxl
                     - `quality` (رقم من 1 إلى 100، الافتراضي 90) - جودة المخرجات
+
+                    بدون `cells`، أرسل صورة واحدة لكل خلية في القالب. إذا كانت الصور أقل من ذلك، تُرجع الاستجابة 400 مع الرمز `INVALID_SETTINGS`. الصور التي تتجاوز عدد خلايا القالب يتم تجاهلها وتُذكر أسماؤها في `warnings` ضمن الاستجابة.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: الصورة المعالجة
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: يظهر عند رفع صور أكثر مما يتسع له القالب. يذكر أسماء الملفات التي تم تجاهلها.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30441,13 +30452,17 @@ x-i18n:
       provenance: machine
       outputHash: 2fbded5c71e9
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: e0d57006e291
+      outputHash: 692a61a07e67
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 65364cbef569
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: 64be04238d66
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

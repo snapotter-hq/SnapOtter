@@ -4540,24 +4540,35 @@ paths:
                   description: |
                     String JSON com as opções:
                     - `templateId` (string, obrigatório) - ID do modelo que define o layout em grade
-                    - `cells` (array, opcional) - Ajustes de configuração por célula
+                    - `cells` (array, opcional) - Ajustes de configuração por célula. Defina o `imageIndex` de uma célula como `-1` para deixá-la vazia
                     - `gap` (número de 0 a 500, padrão 8) - Espaço entre as imagens em pixels
                     - `cornerRadius` (número de 0 a 500, padrão 0) - Raio de arredondamento dos cantos
                     - `backgroundColor` (string, padrão "#FFFFFF") - Cor de preenchimento do fundo
                     - `aspectRatio` (string, padrão "free") - Restrição de proporção
                     - `outputFormat` (string, padrão "png") - Um de: png, jpeg, webp, avif, jxl
                     - `quality` (número de 1 a 100, padrão 90) - Qualidade de saída
+
+                    Sem `cells`, envie uma imagem por célula do modelo. Com menos imagens, a resposta é 400 com o código `INVALID_SETTINGS`. Imagens além do número de células do modelo são ignoradas e listadas em `warnings` na resposta.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: Imagem processada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Presente quando foram enviadas mais imagens do que o modelo comporta. Lista os arquivos ignorados.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30439,13 +30450,17 @@ x-i18n:
       provenance: machine
       outputHash: 690dff071174
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: cb335c2d5c16
+      outputHash: 81fd348944a8
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: c71b1654b090
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: e2b3933ddfaf
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine

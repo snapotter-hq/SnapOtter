@@ -4511,24 +4511,35 @@ paths:
                   description: |
                     オプションを含む JSON 文字列:
                     - `templateId` (string, 必須) - グリッドのレイアウトを定義するテンプレート ID
-                    - `cells` (array, 省略可) - セルごとの個別設定
+                    - `cells` (array, 省略可) - セルごとの個別設定。セルの`imageIndex`を`-1`にすると、そのセルは空のままになります
                     - `gap` (number 0-500, デフォルト 8) - 画像間の間隔（ピクセル）
                     - `cornerRadius` (number 0-500, デフォルト 0) - 角丸の半径
                     - `backgroundColor` (string, デフォルト "#FFFFFF") - 背景の塗りつぶし色
                     - `aspectRatio` (string, デフォルト "free") - 縦横比の制約
                     - `outputFormat` (string, デフォルト "png") - 次のいずれか: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, デフォルト 90) - 出力品質
+
+                    `cells`を指定しない場合は、テンプレートのセルごとに画像を1枚ずつ送信してください。画像が足りない場合は、コード`INVALID_SETTINGS`とともに400が返されます。テンプレートのセル数を超える画像は無視され、レスポンスの`warnings`にファイル名が示されます。
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         '200':
           description: 処理済み画像
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ToolResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ToolResponse'
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: テンプレートに収まる数より多くの画像がアップロードされた場合に含まれます。無視されたファイルの名前を示します。
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -30368,13 +30379,17 @@ x-i18n:
       provenance: machine
       outputHash: 3f2d77af1799
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: d38d5a1ee2de
+      sourceHash: 02f6ea254697
       provenance: machine
-      outputHash: fd94cf108fc8
+      outputHash: 5a9ca6be1572
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
       outputHash: 4f6b53ae2cba
+    ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/200/content/application~1json/schema/allOf/1/properties/warnings/description:
+      sourceHash: 3bc6aff0a4f8
+      provenance: machine
+      outputHash: d14036cb5d05
     ptr:/paths/~1api~1v1~1tools~1image~1collage/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
