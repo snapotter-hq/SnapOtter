@@ -7,13 +7,17 @@ ghcr_ref="ghcr.io/snapotter-hq/snapotter"
 dockerhub_ref="snapotter/snapotter"
 architecture="${PLATFORM#linux/}"
 expected_source="https://github.com/${GITHUB_REPOSITORY}"
+# Scratch files go in the job's own temp dir. A self-hosted runner shares /tmp
+# across jobs and users, and a leftover file another user owns can't be
+# overwritten under fs.protected_regular, so its stale contents get read (#5107).
+scratch="${RUNNER_TEMP:-/tmp}"
 
 registry_digest_state() {
   local reference="$1"
   local digest="$2"
   local label="$3"
-  local manifest="/tmp/${label}-release-platform-manifest.json"
-  local error="/tmp/${label}-release-platform-manifest.error"
+  local manifest="${scratch}/${label}-release-platform-manifest.json"
+  local error="${scratch}/${label}-release-platform-manifest.error"
   if docker buildx imagetools inspect "${reference}@${digest}" --raw \
     > "${manifest}" 2> "${error}"; then
     local actual_digest
@@ -108,15 +112,15 @@ image="${ghcr_ref}:${VERSION}"
 digest=""
 reuse_description=""
 if docker buildx imagetools inspect "${image}" --raw \
-  > /tmp/existing-release-manifest.json 2> /tmp/existing-release-manifest.error; then
-  jq -e '.manifests | type == "array"' /tmp/existing-release-manifest.json >/dev/null || {
+  > "${scratch}/existing-release-manifest.json" 2> "${scratch}/existing-release-manifest.error"; then
+  jq -e '.manifests | type == "array"' "${scratch}/existing-release-manifest.json" >/dev/null || {
     echo "::error::Existing ${image} is not a multi-platform image index"
     exit 1
   }
   mapfile -t platform_digests < <(
     jq -r --arg architecture "${architecture}" \
       '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $architecture) | .digest' \
-      /tmp/existing-release-manifest.json
+      "${scratch}/existing-release-manifest.json"
   )
   [[ ${#platform_digests[@]} -eq 1 ]] || {
     echo "::error::Existing ${image} does not contain exactly one ${PLATFORM} manifest"
@@ -126,8 +130,8 @@ if docker buildx imagetools inspect "${image}" --raw \
   reuse_description="${image} ${PLATFORM}"
 else
   if ! grep -Eqi 'manifest unknown|name unknown|not found' \
-    /tmp/existing-release-manifest.error; then
-    cat /tmp/existing-release-manifest.error >&2
+    "${scratch}/existing-release-manifest.error"; then
+    cat "${scratch}/existing-release-manifest.error" >&2
     echo "::error::Could not determine whether ${image} already exists"
     exit 1
   fi
@@ -144,12 +148,12 @@ else
   fi
   if ! gh api "repos/${GITHUB_REPOSITORY}/releases/${reuse_release_id}" \
     --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
-    > /tmp/existing-platform-asset-ids 2> /tmp/existing-platform-asset.error; then
+    > "${scratch}/existing-platform-asset-ids" 2> "${scratch}/existing-platform-asset.error"; then
     echo "::warning::Could not read ${asset_name}; rebuilding ${PLATFORM}"
     echo "reused=false" >> "$GITHUB_OUTPUT"
     exit 0
   fi
-  mapfile -t asset_ids < /tmp/existing-platform-asset-ids
+  mapfile -t asset_ids < "${scratch}/existing-platform-asset-ids"
   [[ ${#asset_ids[@]} -le 1 ]] || {
     echo "::error::GitHub release contains duplicate ${asset_name} checkpoints"
     exit 1
@@ -161,12 +165,12 @@ else
   fi
   if ! gh api -H "Accept: application/octet-stream" \
     "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_ids[0]}" \
-    > "/tmp/${asset_name}"; then
+    > "${scratch}/${asset_name}"; then
     echo "::warning::Could not download ${asset_name}; rebuilding ${PLATFORM}"
     echo "reused=false" >> "$GITHUB_OUTPUT"
     exit 0
   fi
-  checkpoint="/tmp/${asset_name}"
+  checkpoint="${scratch}/${asset_name}"
   digest="$(<"${checkpoint}")"
   if [[ "$(wc -c < "${checkpoint}")" -ne 72 ]] \
     || [[ "$(wc -l < "${checkpoint}")" -ne 1 ]] \
