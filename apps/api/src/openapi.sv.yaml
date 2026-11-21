@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API för SnapOtter, en självhostad infrastruktur för filbehandling med 200+ verktyg för image, video, audio, PDF och dokument.
+    REST API för SnapOtter, det öppna källkodsverktygspaketet för filer med 200+ verktyg för image, video, audio, PDF och dokument.
 
     ## Autentisering
 
@@ -671,7 +671,9 @@ paths:
       tags:
         - Image
       summary: Komprimera bild
-      description: Minska bildens filstorlek med kvalitetsnivå eller målstorlek.
+      description: |
+        Minska bildens filstorlek med kvalitetsnivå eller målstorlek.
+        Målstorleksläget ersätter de föråldrade compress-image-to-{20,50,100,200,500}kb-operationerna.
       security:
         - bearerAuth: []
       requestBody:
@@ -733,8 +735,9 @@ paths:
         - Image
       summary: Komprimera bild till 20 KB
       description: |
-        Komprimera en bild till målstorleken 20 KB.
-        Detta är ett särskilt komprimeringsförval för förutsägbara storleksmål som stöds av `compress` i targetSize-läge. Inställningar ignoreras. Slutpunkten låser läget till targetSize och targetSizeKb till 20.
+        Komprimera en bild till målstorleken 20 KB
+        Detta är en särskild endpoint för komprimeringsförval som stöds av `compress` i targetSize-läge.
+        Ersatt av POST /api/v1/tools/image/compress med `mode` satt till `targetSize` och `targetSizeKb` satt till 20. Behålls i minst en minor-version.
       security:
         - bearerAuth: []
       requestBody:
@@ -805,8 +808,9 @@ paths:
         - Image
       summary: Komprimera bild till 50 KB
       description: |
-        Komprimera en bild till målstorleken 50 KB.
-        Detta är ett särskilt komprimeringsförval för förutsägbara storleksmål som stöds av `compress` i targetSize-läge. Inställningar ignoreras. Slutpunkten låser läget till targetSize och targetSizeKb till 50.
+        Komprimera en bild till målstorleken 50 KB
+        Detta är en särskild endpoint för komprimeringsförval som stöds av `compress` i targetSize-läge.
+        Ersatt av POST /api/v1/tools/image/compress med `mode` satt till `targetSize` och `targetSizeKb` satt till 50. Behålls i minst en minor-version.
       security:
         - bearerAuth: []
       requestBody:
@@ -877,8 +881,9 @@ paths:
         - Image
       summary: Komprimera bild till 100 KB
       description: |
-        Komprimera en bild till målstorleken 100 KB.
-        Detta är ett särskilt komprimeringsförval för förutsägbara storleksmål som stöds av `compress` i targetSize-läge. Inställningar ignoreras. Slutpunkten låser läget till targetSize och targetSizeKb till 100.
+        Komprimera en bild till målstorleken 100 KB
+        Detta är en särskild endpoint för komprimeringsförval som stöds av `compress` i targetSize-läge.
+        Ersatt av POST /api/v1/tools/image/compress med `mode` satt till `targetSize` och `targetSizeKb` satt till 100. Behålls i minst en minor-version.
       security:
         - bearerAuth: []
       requestBody:
@@ -949,8 +954,9 @@ paths:
         - Image
       summary: Komprimera bild till 200 KB
       description: |
-        Komprimera en bild till målstorleken 200 KB.
-        Detta är ett särskilt komprimeringsförval för förutsägbara storleksmål som stöds av `compress` i targetSize-läge. Inställningar ignoreras. Slutpunkten låser läget till targetSize och targetSizeKb till 200.
+        Komprimera en bild till målstorleken 200 KB
+        Detta är en särskild endpoint för komprimeringsförval som stöds av `compress` i targetSize-läge.
+        Ersatt av POST /api/v1/tools/image/compress med `mode` satt till `targetSize` och `targetSizeKb` satt till 200. Behålls i minst en minor-version.
       security:
         - bearerAuth: []
       requestBody:
@@ -1021,8 +1027,9 @@ paths:
         - Image
       summary: Komprimera bild till 500 KB
       description: |
-        Komprimera en bild till målstorleken 500 KB.
-        Detta är ett särskilt komprimeringsförval för förutsägbara storleksmål som stöds av `compress` i targetSize-läge. Inställningar ignoreras. Slutpunkten låser läget till targetSize och targetSizeKb till 500.
+        Komprimera en bild till målstorleken 500 KB
+        Detta är en särskild endpoint för komprimeringsförval som stöds av `compress` i targetSize-läge.
+        Ersatt av POST /api/v1/tools/image/compress med `mode` satt till `targetSize` och `targetSizeKb` satt till 500. Behålls i minst en minor-version.
       security:
         - bearerAuth: []
       requestBody:
@@ -11630,7 +11637,7 @@ paths:
       tags:
         - Video
       summary: Rensa videometadata
-      description: Ta bort metadata från en video och rapportera vad som hittades.
+      description: Ta bort metadata från en video och rapportera vad som hittades. Arrayen `metadata.removed` listar namnen på de formattaggar som togs bort (värden returneras inte). En tom array betyder att inga taggar togs bort.
       security:
         - bearerAuth: []
       requestBody:
@@ -25617,9 +25624,9 @@ x-i18n:
   generator: scripts/i18n/adapters/api-spec.mjs
   entries:
     info.description:
-      sourceHash: 0a7d56a602a9
+      sourceHash: 822a74e130a5
       provenance: machine
-      outputHash: 9a2e40e6abf4
+      outputHash: f9b305827fef
     tags.Tools.description:
       sourceHash: 0f3ee28f3b19
       provenance: machine
@@ -25753,49 +25760,49 @@ x-i18n:
       provenance: machine
       outputHash: 5e1d9edc673e
     paths./api/v1/tools/image/compress.post.description:
-      sourceHash: 01f63e9e928a
+      sourceHash: 229888fd01a8
       provenance: machine
-      outputHash: 647012cf889b
+      outputHash: dc1a458d054d
     paths./api/v1/tools/image/compress-image-to-20kb.post.summary:
       sourceHash: 7b2b9d14367f
       provenance: machine
       outputHash: 8a24d5335a45
     paths./api/v1/tools/image/compress-image-to-20kb.post.description:
-      sourceHash: dbaf064a68d0
+      sourceHash: 27e2783705e2
       provenance: machine
-      outputHash: 2dfb6d74804a
+      outputHash: 1ff1d071c423
     paths./api/v1/tools/image/compress-image-to-50kb.post.summary:
       sourceHash: 404de90e70be
       provenance: machine
       outputHash: 25a5c598a77a
     paths./api/v1/tools/image/compress-image-to-50kb.post.description:
-      sourceHash: 17ad89889448
+      sourceHash: 423e4a006eca
       provenance: machine
-      outputHash: 5f50fe309cef
+      outputHash: d553cf801126
     paths./api/v1/tools/image/compress-image-to-100kb.post.summary:
       sourceHash: 871df45d5496
       provenance: machine
       outputHash: 6d3c372ea36f
     paths./api/v1/tools/image/compress-image-to-100kb.post.description:
-      sourceHash: 485abfab7e89
+      sourceHash: 955cdae931f6
       provenance: machine
-      outputHash: 09b21ea42fbe
+      outputHash: 116d924aea33
     paths./api/v1/tools/image/compress-image-to-200kb.post.summary:
       sourceHash: 58077de56ada
       provenance: machine
       outputHash: 827f49f29c23
     paths./api/v1/tools/image/compress-image-to-200kb.post.description:
-      sourceHash: 2326ab771a4e
+      sourceHash: f48e8139264c
       provenance: machine
-      outputHash: 82674d7f0b12
+      outputHash: e991f7590157
     paths./api/v1/tools/image/compress-image-to-500kb.post.summary:
       sourceHash: 8ddcd7ea07a9
       provenance: machine
       outputHash: 4ef3f0a9bbce
     paths./api/v1/tools/image/compress-image-to-500kb.post.description:
-      sourceHash: 7026713d7c84
+      sourceHash: d5bf9f2b587d
       provenance: machine
-      outputHash: 8a30f3ca9bdd
+      outputHash: 8df0115901d0
     paths./api/v1/tools/image/strip-metadata.post.summary:
       sourceHash: 1b49ff96cee6
       provenance: machine
@@ -26969,9 +26976,9 @@ x-i18n:
       provenance: machine
       outputHash: a50d7e14b80b
     paths./api/v1/tools/video/video-metadata.post.description:
-      sourceHash: 25b0eb0d1f64
+      sourceHash: 689c9a69bd2f
       provenance: machine
-      outputHash: d433ae9ad744
+      outputHash: 66f3361ca292
     paths./api/v1/tools/video/auto-subtitles.post.summary:
       sourceHash: 61b5c42d8cd0
       provenance: machine
