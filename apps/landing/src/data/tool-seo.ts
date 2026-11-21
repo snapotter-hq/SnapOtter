@@ -9466,6 +9466,42 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "convert-font": {
+    searchTitle: "Convert Fonts Between TTF, OTF, WOFF and WOFF2",
+    longDescription:
+      "Convert a font file between TrueType (TTF), OpenType (OTF), WOFF, and WOFF2. Turn a desktop font into WOFF2 for your website, or get a TTF out of an OTF for an app that only accepts TrueType. Conversion runs on your self-hosted SnapOtter instance, so licensed fonts never leave your server.",
+    useCases: [
+      "Turning a desktop TTF or OTF into WOFF2 for faster web font loading",
+      "Getting a TTF out of an OTF for design or office apps that only accept TrueType",
+      "Converting old WOFF web fonts to WOFF2 for smaller downloads",
+      "Unpacking a WOFF2 web font back to TTF or OTF to install it on a desktop",
+    ],
+    features: [
+      "Converts between TTF, OTF, WOFF, and WOFF2 in any direction",
+      "WOFF and WOFF2 output keeps the font outlines unchanged",
+      "OTF to TTF keeps every curve within 1 font unit of the original",
+      "Keeps the font's embedding permissions (the OS/2 fsType field) as they are",
+      "Works through the API, pipelines, and batch runs",
+    ],
+    faqs: [
+      {
+        q: "Which format should I use for a website?",
+        a: "WOFF2. Every modern browser supports it and it compresses better than WOFF, so pages load the font faster. Convert your TTF or OTF to WOFF2 and serve it with @font-face.",
+      },
+      {
+        q: "Does converting OTF to TTF change how the font looks?",
+        a: "Not visibly. OTF to TTF turns cubic curves into quadratic TrueType curves, and each one stays within 1 font unit of the original, which you can't see at normal sizes. The step isn't exactly reversible, so keep your original OTF.",
+      },
+      {
+        q: "Are the font's licensing flags kept?",
+        a: "Yes. The embedding permissions stored in the OS/2 fsType field are copied over unchanged. Conversion runs on your own SnapOtter server, so commercial or licensed fonts are never uploaded to a third party.",
+      },
+      {
+        q: "Which fonts can't be converted?",
+        a: "Font collections (.ttc) aren't supported. Variable TrueType fonts can't become OTF, and variable CFF2 fonts can't become TTF. Convert those to WOFF or WOFF2 instead, which keeps them variable.",
+      },
+    ],
+  },
   "create-zip": {
     searchTitle: "Create ZIP Archive From Files",
     longDescription:
