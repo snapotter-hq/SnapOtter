@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-Umgebungsvariablen mit Standardwerten. Konfigurieren Sie Authentifizierung, Speicher, KI-Modelle, Analytics und mehr."
-i18n_source_hash: caa895c0ba16
+i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: cab05c4856c7
+i18n_output_hash: d3903824532d
 i18n_hash_version: 2
 ---
 
@@ -17,11 +17,13 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen. Jede Variable hat ei
 | Variable | Standard | Beschreibung |
 |---|---|---|
 | `PORT` | `1349` | Port, auf dem der Server lauscht. |
+| `HOST` | `0.0.0.0` | IP-Adresse, auf der der Server lauscht. In einem Bridge-Netzwerk (dem Standard für `docker run` und Compose) behalten Sie `0.0.0.0` (oder `::`) bei, sonst funktionieren veröffentlichte Ports nicht mehr. Bei einer nativen Installation oder einem Container im Host-Netzwerk hält `127.0.0.1` die API vom Netzwerk fern; schalten Sie für den Fernzugriff einen Reverse Proxy davor. Der [eingebettete Modus](#embedded-mode) funktioniert nur mit `0.0.0.0`, `::` oder `127.0.0.1`, weil seine Startprüfung `127.0.0.1` aufruft. Mit jeder anderen Adresse, einschließlich `::1`, gilt der Container nie als gestartet, und ein späterer Absturz hält ihn an, statt den Server neu zu starten. Alles, was keine IP-Adresse ist, einschließlich `localhost`, stoppt den Server beim Start. |
 | `BASE_PATH` | (leer) | Öffentlicher Bereitstellungspfad, z. B. `/snapotter`. Leer oder `/` liefert die App im Stammverzeichnis der Domain aus. Wird zur Laufzeit angewendet; kein erneutes Bauen des Images erforderlich. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximale Anfragen pro Minute und IP. Auf 0 setzen, um die Ratenbegrenzung zu deaktivieren. |
 | `CORS_ORIGIN` | (leer) | Durch Kommas getrennte erlaubte Origins für CORS, oder leer für ausschließlich denselben Origin. |
 | `LOG_LEVEL` | `info` | Ausführlichkeit der Protokollierung. Eines von: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welche Peers die Client-IP über `X-Forwarded-For` setzen dürfen. Der Standard vertraut nur einem Peer aus einem privaten Netzwerk, sodass ein Reverse Proxy in einem Docker-Netzwerk oder LAN als vertrauenswürdig gilt, der gefälschte Header eines öffentlichen Clients dagegen nicht. Setzen Sie `true` nur, wenn ein von Ihnen kontrollierter Proxy auf einer öffentlichen Adresse vorgeschaltet ist. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (nicht gesetzt) | Beantwortet die Analytics-Frage beim ersten Start im Voraus, sodass niemand gefragt wird. Ist die Variable nicht gesetzt, fragt eine neue Instanz ihren Administrator und sendet nichts, bis er geantwortet hat. `off` startet sie mit ausgeschalteter Option „Anonyme Produktanalysen“, `on` mit eingeschalteter. Die Variable füllt die Einstellung nur aus, solange niemand eine gewählt hat. Sobald die Einstellung gespeichert ist, durch einen Administrator oder durch diese Variable, bewirkt eine Änderung der Variable nichts; ein Administrator kann sie weiterhin unter Einstellungen > System > Datenschutz ändern. |
 
 ### Authentifizierung {#authentication}
 
@@ -76,12 +78,15 @@ Starten Sie das Image ohne `DATABASE_URL` und ohne `REDIS_URL`, dann startet es 
 |---|---|---|
 | `EMBEDDED` | `auto` | Wird automatisch aktiviert, wenn `DATABASE_URL` und `REDIS_URL` beide nicht gesetzt sind. Auf `0` setzen, um ihn zu deaktivieren (die App bricht dann sofort ab, wenn kein externes `DATABASE_URL`/`REDIS_URL` gesetzt ist, statt stillschweigend eine Datenbank im Container zu starten). |
 | `REDIS_MAXMEMORY` | `512mb` | Speicherobergrenze für das eingebettete Redis (nur im eingebetteten Modus). Verringern Sie sie auf Hosts mit knappem Speicher wie einem Raspberry Pi. |
+| `EMBEDDED_PG_PORT` | `5432` | Loopback-Port für das eingebettete PostgreSQL (nur im eingebetteten Modus). Ändern Sie ihn nur, wenn der Container ein Netzwerk teilt, in dem 5432 belegt ist, etwa mit `--network host`. Er muss sich von `EMBEDDED_REDIS_PORT` unterscheiden und über 1023 liegen, weil PostgreSQL als unprivilegierter Benutzer läuft, der im Host-Netzwerk keinen privilegierten Port binden kann. |
+| `EMBEDDED_REDIS_PORT` | `6379` | Dasselbe für das eingebettete Redis, das ebenfalls als unprivilegierter Benutzer läuft. |
+| `EMBEDDED_DB_PASSWORDS` | (leer) | Auf `1` setzen, um beim nächsten Start zufällige Passwörter für die Rollen des eingebetteten PostgreSQL und für Redis zu erzeugen, die in `/data/.embedded-db-secrets` abgelegt werden. TCP-Anmeldungen benötigen sie dann. Auf einem Volume, das erstmals mit 2.3.0 oder später angelegt wurde, kann sich der PostgreSQL-Superuser überhaupt nicht über TCP anmelden; auf einem älteren Volume ist der Datenbankeigentümer der Superuser, und sein Passwort ist das, was ihn schützt. Verwenden Sie es immer dann, wenn andere Programme das Netzwerk des Containers teilen, etwa mit `--network host`. Es bleibt für dieses Volume aktiv: Die Passwörter werden bei jedem Start verwendet, auch wenn Sie diese Variable entfernen, und das Löschen von `/data/.embedded-db-secrets` bringt Ihnen nur neue ein, oder einen Start, der fehlschlägt, wenn die Variable nicht gesetzt ist. Wenn der Container nicht startet, weil eine dieser Dateien beschädigt ist, löschen Sie diese Datei mit `docker run --rm -v <volume>:/data --entrypoint rm snapotter/snapotter:<your tag> -r /data/.embedded-db-secrets/<name>` und starten Sie den Container erneut; der nächste Start erzeugt eine neue. Die Variable akzeptiert `1`, `0` oder leer, und jeder andere Wert bricht den Start ab. |
 | `EMBEDDED_REDIS_TIMEOUT_S` | `180` | Sekunden, die der Start darauf wartet, dass das eingebettete Redis auf `PING` antwortet, bevor er aufgibt. Bei einer Zeitüberschreitung hält der Container an und protokolliert den Grund, statt zu hängen. Ganze Sekunden von 1 bis 999999; es gibt keinen Wert für unbegrenzt, weil endloses Warten genau der Fehler ist, den diese Grenze verhindern soll. Erhöhen Sie ihn nur, wenn ein langsamer Host sie auslöst. |
 | `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | Dasselbe für das eingebettete PostgreSQL. Die Uhr startet, nachdem das `initdb` beim ersten Start abgeschlossen ist, sie deckt also den Serverstart und die Crash-Recovery ab, nicht die anfängliche Erstellung der Datenbank. |
 
 Upgrade von 1.x: Legen Sie Ihre alte `snapotter.db` unter `/data/snapotter.db` im Volume ab, dann importiert der eingebettete Modus sie beim ersten Start in das eingebettete PostgreSQL. Der Import läuft einmalig; spätere Starts überspringen ihn.
 
-Hinweis zur Telemetrie: Der eingebettete Modus übernimmt den Analytics-Standard des Images wie jede andere Konfiguration. Das veröffentlichte Image wird mit aktivierten Analytics ausgeliefert; bauen Sie mit `--build-arg SNAPOTTER_ANALYTICS=off` oder nutzen Sie das Opt-out des Admins in der App, um sie zu deaktivieren.
+Hinweis zur Telemetrie: Der eingebettete Modus übernimmt den Analytics-Standard des Images wie jede andere Konfiguration. Das veröffentlichte Image kann Analytics senden, aber eine neue Instanz fragt zuerst ihren Administrator und sendet nichts, bis er geantwortet hat. Um sie zu deaktivieren, antworten Sie mit Nein, bauen Sie mit `--build-arg SNAPOTTER_ANALYTICS=off`, setzen Sie `SNAPOTTER_ANALYTICS_DEFAULT=off` vor dem ersten Start oder nutzen Sie das Opt-out des Admins in der App.
 
 ### Verarbeitungslimits {#processing-limits}
 
@@ -92,11 +97,16 @@ Hinweis zur Telemetrie: Der eingebettete Modus übernimmt den Analytics-Standard
 | `CONCURRENT_JOBS` | `0` (automatisch) | Anzahl der Batch-Jobs, die parallel laufen. Auf 0 setzen, um sie anhand der verfügbaren CPU-Kerne automatisch zu ermitteln. |
 | `MAX_MEGAPIXELS` | `0` (unbegrenzt) | Maximal zulässige Bildauflösung in Megapixeln. Auf 0 setzen für unbegrenzt. |
 | `MAX_WORKER_THREADS` | `0` (automatisch) | Maximale Anzahl an Worker-Threads für die Bildverarbeitung. Auf 0 setzen, um sie anhand der verfügbaren CPU-Kerne automatisch zu ermitteln. |
-| `PROCESSING_TIMEOUT_S` | `0` (kein Limit) | Maximale Verarbeitungszeit pro Anfrage in Sekunden. Auf 0 setzen für kein Timeout. |
+| `PROCESSING_TIMEOUT_S` | `0` (kein Limit) | Timeout für jeden Aufruf des Python-Sidecars, der die KI-Tools ausführt, in Sekunden. Auf 0 setzen für kein Timeout. Es begrenzt keine Bild-, PDF- oder Medienjobs; das übernehmen `JOB_TIMEOUT_FAST_S` und `JOB_TIMEOUT_LONG_S`. |
+| `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Sekunden, die der Python-KI-Sidecar und die Laufzeitumgebung für präzises OCR untätig bleiben, bevor sie sich beenden und ihren Speicher freigeben (etwa 1,3 GB und 0,7 GB im aufgewärmten Zustand). Beide starten bei der nächsten Anfrage erneut, sodass der erste KI-Aufruf nach einem Beenden wegen Leerlaufs die Startkosten der Bibliotheken trägt, einige Sekunden. Auf 0 setzen, damit sie weiterlaufen. Der Standard entspricht `AI_SESSION_IDLE_TIMEOUT`, sodass geladene Modelle nicht früher verworfen werden, als diese Einstellung vorgibt. Wenn Sie `AI_SESSION_IDLE_TIMEOUT` erhöhen, erhöhen Sie diesen Wert entsprechend. |
+| `JOB_TIMEOUT_FAST_S` | `120` | Frist für einen Job in den schnellen Pools (Bild- und Dokumenttools), in Sekunden. Ein Job, der länger läuft, schlägt mit einem Timeout-Fehler fehl. Auf 0 setzen für kein Limit. |
+| `JOB_TIMEOUT_LONG_S` | `7200` | Frist für einen Job in den langen Pools (KI- und Medientools sowie jedes als lang laufend markierte Tool), in Sekunden. Auf 0 setzen für kein Limit. PDF-OCR in den Modi Balanced und Best verlängert seine eigene Frist anhand der Seitenzahl (2 bzw. 5 Minuten pro Seite), bis zu 6 Stunden, sodass Sie diesen Wert für ein großes PDF nicht erhöhen müssen. |
+| `SYNC_WAIT_MS` | `8000` | Wie lange eine Tool-Anfrage auf ihren Job wartet, bevor die API das Warten beendet und `202` mit einer Job-ID zurückgibt, der Sie über SSE folgen können, in Millisekunden. Den Job selbst stoppt das nicht. Auf 0 setzen, um auf den Job zu warten, egal wie lange er dauert. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximale Anzahl von Schritten in einer Pipeline. Auf 0 setzen für kein Limit. |
 | `MAX_CANVAS_PIXELS` | `0` (kein Limit) | Maximale Canvas-Größe in Pixeln für Ausgabebilder. Auf 0 setzen für kein Limit. |
 | `MAX_SVG_SIZE_MB` | `50` | Größte vor dem Bereinigen akzeptierte SVG-Datei in Megabyte. `0` verhält sich hier anders als in den Zeilen darum herum. Es hebt die Größenobergrenze vor dem Parsen vollständig auf, statt sie anzuheben, also lassen Sie diesen Wert gesetzt. |
 | `MAX_PDF_PAGES` | `0` (unbegrenzt) | Maximale Anzahl von PDF-Seiten für die Konvertierung von PDF in Bilder. Auf 0 setzen für unbegrenzt. |
+| `MAX_SETTINGS_PAYLOAD_KB` | `64` | Größtes `settings`-Feld, das eine Tool-Anfrage enthalten darf, in Kilobyte, gezählt in UTF-8-Bytes. Anfragen über dem Limit erhalten ein `400`. Auf 0 setzen für kein Limit. Echte Tool-Einstellungen sind weit kleiner als 64 KB, erhöhen Sie diesen Wert also nur, wenn ein Client ungewöhnlich große Einstellungen sendet. |
 
 ### Engines {#engines}
 
@@ -109,11 +119,15 @@ SnapOtter sucht jede Verarbeitungsbinärdatei im Container über `$PATH`, daher 
 | `QPDF_PATH` | (leer) | Pfad zu `qpdf`, das von den PDF-Tools und zur Prüfung hochgeladener PDFs verwendet wird. |
 | `SOFFICE_PATH` | (leer) | Pfad zu `soffice` von LibreOffice, das für Office-Dokumentkonvertierungen verwendet wird. |
 | `PDFCPU_PATH` | (leer) | Pfad zu `pdfcpu`, das von einigen PDF-Tools verwendet wird. |
+| `GS_PATH` | (leer) | Pfad zu `gs` von Ghostscript, das von den PDF-Tools und von PDF-OCR verwendet wird. |
+| `PANDOC_PATH` | (leer) | Pfad zu `pandoc`, das für Dokumentkonvertierungen verwendet wird. |
+| `SNAPOTTER_FONT_FILE` | (leer) | Schriftdatei für Text, der auf Video gezeichnet wird (Untertitel einbrennen, Video-Wasserzeichen). Leer verwendet die erste Schrift, die das Image findet. |
+| `SNAPOTTER_FONT_FAMILY` | (leer) | Familienname von `SNAPOTTER_FONT_FILE`. Leer bedeutet `Sans`. |
 | `SNAPOTTER_HW_ACCEL` | (leer) | Familie des Hardware-Videoencoders, `nvenc` oder `vaapi`. Leer kodiert in Software. |
 
 `SNAPOTTER_HW_ACCEL` benötigt ein ffmpeg, das mit dieser Encoder-Familie gebaut wurde, und das ffmpeg im Image hat keine von beiden. Mit der Binärdatei des Images fällt die Einstellung auf Software-Kodierung zurück und meldet das im Startprotokoll. Um sie zu nutzen, binden Sie Ihren eigenen ffmpeg-Build ein, verweisen `FFMPEG_PATH` und `FFPROBE_PATH` darauf und geben dem Container das GPU-Gerät. Setzen Sie für `nvenc` außerdem `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`: Das Image fordert nur `compute,utility` an, und ohne `video` bindet die NVIDIA-Runtime die Encode-Bibliothek nicht ein, sodass der Encoder zwar aufgelistet wird, aber jede Kodierung fehlschlägt. Ein Pfad-Override, der nicht existiert oder nicht ausführbar ist, wird ebenfalls im Startprotokoll genannt, und jeder Job, der diese Binärdatei benötigt, schlägt fehl, bis Sie den Pfad korrigieren oder die Variable entfernen.
 
-Die veröffentlichten Compose-Dateien reichen alle sechs aus `.env` durch, es genügt also, sie dort zu setzen.
+Die veröffentlichten Compose-Dateien reichen sie alle aus `.env` durch, es genügt also, sie dort zu setzen.
 
 ### Bereinigung {#cleanup}
 
