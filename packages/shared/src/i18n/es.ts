@@ -4031,7 +4031,7 @@ export const es: TranslationKeys = {
       submitBatch: "Extraer texto ({count} archivos)",
       progressLabel: "Extrayendo",
       scannedHint:
-        "Este PDF está escaneado, así que no hay texto que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
+        "Este PDF no tiene texto legible que extraer. El OCR puede leerlo, pero tarda más y requiere tener instalado el paquete de IA de OCR.",
       runOcr: "Ejecutar OCR en este PDF",
       unreadablePages:
         "{count} de {total} páginas no tienen una capa de texto legible, así que su parte del .txt puede salir ilegible. El OCR puede leer esas páginas.",
@@ -4041,7 +4041,7 @@ export const es: TranslationKeys = {
       submitBatch: "Convertir a Markdown ({count} archivos)",
       progressLabel: "Convirtiendo",
       scannedHint:
-        "Este PDF está escaneado, así que no hay texto que convertir a Markdown. El OCR puede leer el texto, pero te da texto plano, tarda más y requiere tener instalado el paquete de IA de OCR.",
+        "Este PDF no tiene texto legible que convertir a Markdown. El OCR puede leer el texto, pero te da texto plano, tarda más y requiere tener instalado el paquete de IA de OCR.",
       runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-to-word": {
@@ -4050,7 +4050,7 @@ export const es: TranslationKeys = {
       submitBatch: "Convertir a Word ({count} archivos)",
       progressLabel: "Convirtiendo",
       scannedHint:
-        "Este PDF está escaneado, así que un archivo de Word solo contendría imágenes de las páginas. El OCR puede leer el texto, pero te da texto plano en lugar de un archivo de Word, tarda más y requiere tener instalado el paquete de IA de OCR.",
+        "Este PDF no tiene texto legible para un archivo de Word. El OCR puede leer el texto, pero te da texto plano en lugar de un archivo de Word, tarda más y requiere tener instalado el paquete de IA de OCR.",
       runOcr: "Ejecutar OCR en este PDF",
     },
     "pdf-metadata": {

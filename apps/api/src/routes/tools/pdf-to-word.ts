@@ -1,10 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pdfTextPy, pdfToWordPy } from "@snapotter/doc-engine";
-import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { InputValidationError } from "../../modality/contract.js";
+import { noTextLayerError } from "../../lib/no-text-layer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
@@ -32,12 +31,10 @@ export function registerPdfToWord(app: FastifyInstance) {
         signal: ctx.signal,
       });
       if (!probe.hasText) {
-        throw new InputValidationError(
-          "This PDF has no extractable text layer. It looks scanned or image-only, so a Word file would only hold pictures of the pages. Use the PDF OCR tool to read its text instead.",
-          422,
-          undefined,
-          NO_TEXT_LAYER_CODE,
-        );
+        throw noTextLayerError(probe, {
+          scanned: "a Word file would only hold pictures of the pages",
+          unreadable: "a Word file would only hold the same unreadable characters",
+        });
       }
 
       const outPath = join(ctx.scratchDir, `${base}.docx`);
