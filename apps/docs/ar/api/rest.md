@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: c7df8dada0ae
-i18n_source_hash: a305a62638f0
+i18n_output_hash: 78c909ee827e
+i18n_source_hash: 718ef5066980
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 يقفل كل إعداد جاهز صيغة الإخراج ويفوّض إلى أداة أساسية مثل `convert` أو `convert-video` أو `extract-audio` أو `convert-audio` أو `image-to-pdf` أو `pdf-to-image` أو `svg-to-raster` أو `convert-spreadsheet`. راجع [إعدادات التحويل الجاهزة](/ar/tools/conversion-presets) للاطلاع على جدول المسارات الكامل والإعدادات الاختيارية.
 
+تعمل الإعدادات الجاهزة للضغط بالطريقة نفسها. تشغّل `compress-image-to-20kb` و`compress-image-to-50kb` و`compress-image-to-100kb` و`compress-image-to-200kb` و`compress-image-to-500kb` الأداة `compress`؛ وتشغّل `compress-pdf-to-100kb` و`compress-pdf-to-200kb` و`compress-pdf-to-500kb` و`compress-pdf-to-1mb` و`compress-pdf-to-2mb` الأداة `compress-pdf`. يثبّت كل واحد منها `mode` على `targetSize` و`targetSizeKb` على الحجم المذكور في اسمه.
+
 ### الأساسيات {#essentials}
 
 | معرّف الأداة | الاسم | الإعدادات الرئيسية |
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | معرّف الأداة | الاسم | نموذج الذكاء الاصطناعي | الإعدادات الرئيسية |
 |---------|------|---------|-------------|
 | `remove-background` | إزالة الخلفية | rembg (BiRefNet / U2-Net) | المرحلة 1: `model`، `edgeRefine` (0-3)، `decontaminate`. المرحلة 2 (`/api/v1/tools/image/remove-background/effects`) و`/batch` وخطوط المعالجة: `backgroundType` (transparent/color/gradient/blur، بالإضافة إلى image على `/effects`)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurEnabled`، `blurIntensity`، `shadowEnabled`، `shadowOpacity`، `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | إزالة خلفية GIF | rembg، إطاراً بإطار | `model`، `outputFormat` (webp/gif/apng)، `backgroundType` (transparent/color/gradient/blur/image)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurIntensity` (0-100)، `shadowEnabled`، `shadowOpacity` (0-100)، `edgeRefine` (0-3)، `decontaminate` |
 | `upscale` | تكبير الصورة | RealESRGAN | `scale` (2/4)، `model`، `faceEnhance`، `denoise`، `format`، `quality` |
 | `erase-object` | ممحاة الكائنات | LaMa (ONNX) | يُرسل القناع كجزء الملف الثاني (اسم الحقل `mask`)، `format`، `quality` |
 | `ocr` | OCR / استخراج النص | Tesseract (سريع)؛ RapidOCR + PP-OCR ONNX (متوازن/الأفضل) | `quality` (سريع/متوازن/الأفضل)، `language`، `enhance` |
@@ -249,6 +252,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | حدود وإطار | `width`، `color`، `style` (solid/gradient/pattern)، `borderRadius`، `padding`، `shadow` |
 | `beautify` | تجميل لقطة الشاشة | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent)، `gradientStops`، `padding`، `borderRadius`، `shadowPreset`، `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...)، `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt)، `watermarkText`، `outputFormat` |
 | `circle-crop` | قص دائري | `zoom` (1-5)، `offsetX`، `offsetY`، `borderWidth`، `borderColor`، `background` (transparent/hex)، `outputSize` |
+| `rounded-crop` | اقتصاص مستدير | `shape` (rounded-square/squircle)، `cornerRadius` (0-50، نسبة مئوية من الضلع الأقصر)، `zoom` (1-5)، `offsetX`، `offsetY`، `borderWidth`، `borderColor`، `background` (transparent/hex)، `outputSize` |
 | `image-pad` | تبطين الصورة | `target` (16:9/9:16/1:1/4:3/3:4/custom)، `ratioW`، `ratioH`، `background` (color/transparent/blur)، `color` (hex)، `padding` (0-50%) |
 | `sprite-sheet` | ورقة العفاريت | `columns` (1-16)، `padding`، `background` (hex)، `format` (png/webp/jpeg)، `quality` - متعدد الملفات (2-64 صورة) |
 
@@ -284,12 +288,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | تثبيت الفيديو | `smoothing` (5-60، بالإطارات) |
 | `gif-to-video` | GIF إلى فيديو | `format` (mp4/webm/mov) |
 | `video-to-webp` | فيديو إلى WebP | `fps`، `width`، `quality`، `loop` (منطقي) |
+| `video-to-avif` | فيديو إلى AVIF | `fps` (1-30)، `width` (64-1280)، `startS`، `durationS` (بحد أقصى 60 ثانية)، `quality` (1-100)، `loop` (منطقي) |
 | `video-to-frames` | فيديو إلى إطارات | `mode` (all/nth/timestamps)، `n`، `timestamps`، `format` (png/jpg) |
 | `merge-videos` | دمج مقاطع الفيديو | - (متعدد الملفات، مُطبَّق على دقة الفيديو الأول) |
 | `replace-audio` | استبدال الصوت | - (فيديو + ملف صوتي، ملفان) |
 | `burn-subtitles` | حرق الترجمات | `fontSize` (8-72) - فيديو + ملف ترجمة |
 | `embed-subtitles` | تضمين الترجمات | `language` (رمز ISO 639-2/B) - فيديو + ملف ترجمة |
 | `extract-subtitles` | استخراج الترجمات | - (يُخرج SRT) |
+| `convert-subtitles` | تحويل الترجمات | `format` (srt/vtt/ass)، `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | صور إلى فيديو | `secondsPerImage` (0.5-10)، `resolution` (1080p/720p/square)، `fps` - متعدد الملفات |
 | `video-metadata` | تنظيف البيانات الوصفية للفيديو | - |
 | `auto-subtitles` | ترجمات تلقائية (ذكاء اصطناعي) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi)، `format` (srt/vtt) |
@@ -328,6 +334,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | استخراج الصفحات | `range` (صيغة qpdf، مثال "1-5,8,10-z") |
 | `remove-pages` | إزالة الصفحات | `pages` (نطاق qpdf للإزالة) |
 | `organize-pdf` | تنظيم PDF | `order` (ترتيب صفحات qpdf، مثال "3,1,2,5-z") |
+| `multi-tool-pdf` | الأداة المتعددة لـ PDF | `items` (خطة الصفحات، `[{doc, page, rot}]`، حتى 1200 صفحة)، `pageCounts` - متعدد الملفات (حتى 20 ملف PDF) |
 | `protect-pdf` | حماية PDF | `userPassword`، `ownerPassword` (AES-256) |
 | `unlock-pdf` | إلغاء قفل PDF | `password` |
 | `repair-pdf` | إصلاح PDF | - |
@@ -344,6 +351,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | توقيع PDF | مسار multipart مخصص مع PDF `file`، وملفات التوقيع `sig0`، و`sig1`، ومصفوفة JSON `placements` |
 | `pdf-to-text` | PDF إلى نص | - |
 | `pdf-to-word` | PDF إلى Word | - |
+| `pdf-to-markdown` | PDF إلى Markdown | - (يُخرج ملف `.md`) |
 | `pdf-metadata` | البيانات الوصفية لـ PDF | `title`، `author`، `subject`، `keywords` |
 | `convert-document` | تحويل مستند | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | تحويل عرض تقديمي | `format` (pptx/odp) |
@@ -376,6 +384,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `yaml-json` | YAML / JSON | - (ثنائي الاتجاه) |
 | `xml-to-csv` | XML إلى CSV | - (يعثر تلقائيًا على العناصر المتكررة) |
 | `convert-font` | تحويل خط | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | تحويل حالة الأحرف | `text`، `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab)، `locale` (وسم BCP 47). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
+| `proportion-calculator` | حاسبة التناسب | `a`، `b`، `c`، `mode` (direct/inverse). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
 | `excel-to-csv` | Excel إلى CSV | إعداد تحويل جاهز مخصص مدعوم بـ `convert-spreadsheet` |
 | `create-zip` | إنشاء ZIP | - (متعدد الملفات، 2-50 ملفًا) |
 | `extract-zip` | استخراج ZIP | - (محمي من قنابل الضغط) |
