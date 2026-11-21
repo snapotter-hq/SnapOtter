@@ -687,7 +687,9 @@ jobs:
       - uses: ./.github/actions/doc-binaries
       - uses: ./.github/actions/setup
       - name: Run tests with coverage
-        run: pnpm vitest run --coverage tests/unit/ tests/integration/
+        run: pnpm vitest run --coverage tests/unit/ tests/integration/ packages/image-engine/tests packages/media-engine/tests packages/doc-engine/tests
+        # Same package suites as ci.yml's unit lane (#4936). Only image-engine's
+        # src is in the coverage include; media and doc engine run for parity.
         # Coverage instrumentation slows every test; fewer forks + a longer
         # timeout keep slow media tests (e.g. qr-generate) from timing out.
         env:
