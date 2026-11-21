@@ -380,7 +380,7 @@ export const DOCUMENT_TOOLS: Tool[] = [
     modality: "document",
     acceptedInputs: [".pdf"],
     executionHint: "fast",
-    keywords: ["remove metadata", "strip pdf metadata", "remove pdf metadata", "clean pdf"],
+    keywords: ["remove metadata", "strip metadata", "clean metadata", "clean"],
   },
   {
     id: "powerpoint-to-pdf",
