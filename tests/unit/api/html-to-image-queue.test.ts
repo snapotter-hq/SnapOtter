@@ -304,13 +304,17 @@ describe("html-to-image route queues a job (#4337)", () => {
 });
 
 describe("html-to-image job process fn", () => {
-  const ctx = (settings: Record<string, unknown>, source = "<p>queued</p>") => ({
+  const ctx = (
+    settings: Record<string, unknown>,
+    source = "<p>queued</p>",
+    signal = new AbortController().signal,
+  ) => ({
     inputs: [
       { buffer: Buffer.from(source, "utf8"), filename: "page.html", ref: "uploads/j/page.html" },
     ],
     settings,
     scratchDir: "/tmp/unused",
-    signal: new AbortController().signal,
+    signal,
     report: vi.fn(),
   });
 
@@ -323,6 +327,7 @@ describe("html-to-image job process fn", () => {
       viewportWidth: 375,
       viewportHeight: 812,
       isMobile: true,
+      signal: expect.any(AbortSignal),
     });
     expect(result).toEqual({
       buffer: Buffer.from("html-png"),
@@ -354,6 +359,7 @@ describe("html-to-image job process fn", () => {
       viewportWidth: 1920,
       viewportHeight: 1080,
       isMobile: false,
+      signal: expect.any(AbortSignal),
     });
     expect(captureHtml).not.toHaveBeenCalled();
     expect(result.filename).toBe("screenshot.jpg");
@@ -394,6 +400,25 @@ describe("html-to-image job process fn", () => {
     });
     vi.mocked(captureHtml).mockRejectedValueOnce(storage);
     await expect(processHtmlToImage(ctx({}))).rejects.toBe(storage);
+  });
+  it("hands the capture the job's signal and lets a cancel or deadline abort through as itself (#5004)", async () => {
+    const ac = new AbortController();
+    const job = ctx({}, "<p>queued</p>", ac.signal);
+    vi.mocked(captureHtml).mockImplementationOnce(async (_html, opts) => {
+      expect(opts.signal).toBe(ac.signal);
+      ac.abort();
+      throw opts.signal?.reason;
+    });
+    await expect(processHtmlToImage(job)).rejects.toMatchObject({ name: "AbortError" });
+
+    const deadline = new AbortController();
+    vi.mocked(captureHtml).mockImplementationOnce(async (_html, opts) => {
+      deadline.abort("timeout");
+      throw opts.signal?.reason;
+    });
+    await expect(processHtmlToImage(ctx({}, "<p>queued</p>", deadline.signal))).rejects.toBe(
+      "timeout",
+    );
   });
 });
 

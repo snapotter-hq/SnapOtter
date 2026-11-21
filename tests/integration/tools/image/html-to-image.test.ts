@@ -176,6 +176,7 @@ describe("HTML to Image", () => {
         viewportWidth: 375,
         viewportHeight: 812,
         isMobile: true,
+        signal: expect.any(AbortSignal),
       });
     });
   });

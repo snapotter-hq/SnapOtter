@@ -69,7 +69,12 @@ const BROWSER_CRASHED = "BROWSER_CRASHED";
  * PAGE_LOAD_TIMEOUT so the worker fails it once: a retry would hold the slot for
  * another full page-load timeout on a page that already timed out.
  */
-export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw, report }) => {
+export const processHtmlToImage: ToolProcessV2 = async ({
+  inputs,
+  settings: raw,
+  signal,
+  report,
+}) => {
   const settings = captureSettingsSchema.parse(raw);
   const preset =
     settings.devicePreset !== "custom"
@@ -82,6 +87,7 @@ export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw,
     viewportWidth: preset.width,
     viewportHeight: preset.height,
     isMobile: preset.isMobile,
+    signal,
   };
 
   report(10, "Loading page");
@@ -91,6 +97,9 @@ export const processHtmlToImage: ToolProcessV2 = async ({ inputs, settings: raw,
       ? await capturePage(settings.url, captureOpts)
       : await captureHtml(inputs[0].buffer.toString("utf8"), captureOpts);
   } catch (err) {
+    // A cancel or the job deadline closed the page. The worker settles both
+    // from the signal, and a 422 here would hide the timeout as a bad capture.
+    if (signal.aborted) throw err;
     if (hasServerErrorStatus(err)) throw err;
     const message = err instanceof Error ? err.message : "Unknown error";
     if (message.includes("Timeout") || message.includes("timeout")) {
