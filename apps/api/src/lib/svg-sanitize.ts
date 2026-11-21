@@ -2,13 +2,27 @@ import { gunzipSync } from "node:zlib";
 import { env } from "../config.js";
 
 /**
+ * Characters that are XML syntax. A reference to one of them stays encoded:
+ * decoding `&#34;` inside an attribute or `&#60;` in text would change the
+ * markup and break a well-formed input (#5102). None of them can spell a URI
+ * scheme, so the scheme checks lose nothing.
+ */
+const XML_SYNTAX_CHARS = new Set(['"', "'", "<", ">", "&"]);
+
+function decodeReference(ref: string, codePoint: number): string {
+  if (codePoint > 0x10ffff) return ref;
+  const char = String.fromCodePoint(codePoint);
+  return XML_SYNTAX_CHARS.has(char) ? ref : char;
+}
+
+/**
  * Decode common HTML/XML numeric character references (&#xNN; and &#NNN;)
  * so that obfuscated `javascript:` / `data:` URIs are caught by later regex passes.
  */
 function decodeNumericEntities(input: string): string {
   return input
-    .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_m, dec) => String.fromCharCode(Number.parseInt(dec, 10)));
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (m, hex) => decodeReference(m, Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (m, dec) => decodeReference(m, Number.parseInt(dec, 10)));
 }
 
 // Most removal steps below are written as scanners rather than single regexes
@@ -138,9 +152,12 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   svg = stripPaired(svg, /<!\[CDATA\[/gi, /\]\]>/g);
 
   // Decode numeric entities so obfuscated URIs (e.g. &#106;avascript:) are visible.
-  svg = decodeNumericEntities(svg);
+  // Repeat until stable: one pass can assemble a new reference from characters
+  // it just decoded (`&#&#49;06;` -> `&#106;`), which would leave a live
+  // `javascript:` reference in the output. Each pass shortens the string.
+  svg = stripUntilStable(svg, decodeNumericEntities);
 
-  // Count tag openings after decoding, since `&#60;` decodes to a real `<`.
+  // `&#60;` stays encoded, so only raw openings reach the passes below.
   // An opening counts whether or not a `>` ever closes it: unterminated
   // openings are exactly what makes the later passes expensive.
   if (countMatches(svg, /<[A-Za-z_]/g, MAX_SVG_ELEMENTS) > MAX_SVG_ELEMENTS) {
@@ -244,10 +261,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // In both patterns the whitespace after the quote sits inside the optional
   // group, so two `\s*` runs are never adjacent and a long run of spaces
   // cannot be split two ways (that backtracking is quadratic). Named entities
-  // are not decoded above, and an XML parser turns `url(&quot;https://...` back
-  // into a quoted URL, so `&quot;` and `&apos;` count as quotes here too.
+  // and references to quotes are not decoded above, and an XML parser turns
+  // `url(&quot;https://...` or `url(&#34;https://...` back into a quoted URL,
+  // so those count as quotes here too.
   svg = svg.replace(
-    /url\s*\(\s*(?:(["']|&quot;|&apos;)\s*)?(?:https?:\/\/|file:|data:)/gi,
+    /url\s*\(\s*(?:(["']|&quot;|&apos;|&#0*(?:34|39);|&#[xX]0*2[27];)\s*)?(?:https?:\/\/|file:|data:)/gi,
     "url($1data:,",
   );
 
