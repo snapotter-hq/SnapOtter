@@ -4,7 +4,11 @@ import sharp from "sharp";
 import { z } from "zod";
 import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  inputOutputFormat,
+  outputFormatFor,
+  resolveOutputFormat,
+} from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -35,6 +39,7 @@ export function registerBorder(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "border",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image border failed",
       (s) => (s?.shadow ? "shadow" : "border"),

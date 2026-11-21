@@ -101,6 +101,18 @@ export async function resolveOutputFormat(
 }
 
 /**
+ * A tool's `outputFormat` declaration (#5133) when it writes the format
+ * resolveOutputFormat picks: the input's own.
+ */
+export async function inputOutputFormat(
+  inputBuffer: Buffer,
+  _settings: unknown,
+  filename: string,
+): Promise<string> {
+  return (await resolveOutputFormat(inputBuffer, filename)).format;
+}
+
+/**
  * Describe one output format, without asking what the input was.
  *
  * For the handful of routes that pick their format themselves rather than from

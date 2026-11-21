@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -17,6 +17,7 @@ export function registerRotate(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "rotate",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image rotation failed",
       (s) => `${s?.angle ?? 0}_${s?.horizontal ? "h" : ""}${s?.vertical ? "v" : ""}`,

@@ -1,5 +1,10 @@
 import { extname } from "node:path";
-import { hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  toolInputErrorCode,
+} from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../lib/auto-orient.js";
@@ -35,6 +40,7 @@ export class ImageInputHandler implements InputHandler {
       maxPixels?: number;
       signal?: AbortSignal;
       log?: FastifyBaseLogger;
+      outputFormat?: (input: Buffer) => Promise<string | undefined>;
     },
   ): Promise<PreparedInput> {
     let fileBuffer = raw;
@@ -256,9 +262,17 @@ export class ImageInputHandler implements InputHandler {
     if (!isSvg) {
       opts.signal?.throwIfAborted();
       try {
-        fileBuffer = await autoOrient(fileBuffer, opts.log);
+        fileBuffer = await autoOrient(fileBuffer, opts.log, { outputFormat: opts.outputFormat });
       } catch (rawErr) {
         opts.signal?.throwIfAborted();
+        if (isToolInputError(rawErr)) {
+          throw new InputValidationError(
+            rawErr.message,
+            400,
+            undefined,
+            toolInputErrorCode(rawErr),
+          );
+        }
         const err = asDecoderOutOfMemory(rawErr);
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
         throw rawErr;

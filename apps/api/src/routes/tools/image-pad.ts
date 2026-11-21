@@ -5,7 +5,11 @@ import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  inputOutputFormat,
+  outputFormatFor,
+  resolveOutputFormat,
+} from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -86,6 +90,7 @@ export function registerImagePad(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "image-pad",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     // Rejects an oversized canvas at submit time. The same check runs per frame
     // in the job, which also covers pipeline and batch runs that skip this hook.
     preValidate: async ({ inputs, settings }) => {

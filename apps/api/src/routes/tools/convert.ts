@@ -105,6 +105,7 @@ export function registerConvert(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "convert",
     settingsSchema,
+    outputFormat: async (_input, settings) => settings.format,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image conversion failed",
       (s) => s.format,

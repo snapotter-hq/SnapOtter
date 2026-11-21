@@ -65,6 +65,18 @@ function resolveOutputFormat(
   return map[outputFormat] ?? { sharpFormat: null, ext: originalExt };
 }
 
+/** The format the tiles go out in, for autoOrient (#5133). */
+async function tileOutputFormat(
+  input: Buffer,
+  settings: z.infer<typeof settingsSchema>,
+): Promise<string> {
+  return (
+    resolveOutputFormat(settings.outputFormat, "").sharpFormat ??
+    (await sharp(input).metadata()).format ??
+    ""
+  );
+}
+
 function applyTileFormat(
   pipeline: Sharp,
   sharpFormat: SharpFormat | null,
@@ -229,7 +241,9 @@ export function registerSplit(app: FastifyInstance) {
 
     try {
       if (!isSvg) {
-        fileBuffer = await autoOrient(fileBuffer);
+        fileBuffer = await autoOrient(fileBuffer, undefined, {
+          outputFormat: (input) => tileOutputFormat(input, settings),
+        });
       }
       const metadata = await sharp(fileBuffer).metadata();
       const fullW = metadata.width ?? 0;
@@ -339,6 +353,10 @@ export function registerSplit(app: FastifyInstance) {
         JSON.stringify({ inputFileCount: 1, originalSize: fileBuffer.length }),
       );
     } catch (rawErr) {
+      if (isToolInputError(rawErr) && !reply.raw.headersSent) {
+        const code = toolInputErrorCode(rawErr);
+        return reply.status(400).send({ error: rawErr.message, ...(code && { code }) });
+      }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
@@ -359,6 +377,8 @@ export function registerSplit(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "split",
     settingsSchema,
+    outputFormat: (input, settings) =>
+      tileOutputFormat(input, settings as z.infer<typeof settingsSchema>),
     process: withImageEncodeContext<unknown>(
       "Image split failed",
       (s) => (s as z.infer<typeof settingsSchema>)?.outputFormat ?? "original",

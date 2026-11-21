@@ -762,7 +762,9 @@ describe("createToolRoute", () => {
       const bound = vi.mocked(req.log.child).mock.calls[0][0] as { jobId: string };
       expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ jobId: bound.jobId }));
       expect(enqueueToolJob).toHaveBeenCalledWith(expect.objectContaining({ jobId: bound.jobId }));
-      expect(vi.mocked(autoOrient)).toHaveBeenCalledWith(expect.any(Buffer), childLog);
+      expect(vi.mocked(autoOrient)).toHaveBeenCalledWith(expect.any(Buffer), childLog, {
+        outputFormat: undefined,
+      });
     });
 
     it("returns 200 success envelope when waitForJob resolves", async () => {

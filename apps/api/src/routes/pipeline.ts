@@ -15,10 +15,12 @@ import {
   FEATURE_BUNDLES,
   hasServerErrorStatus,
   isSafeMessageError,
+  isToolInputError,
   MODALITY_POOL,
   type Modality,
   modalityForExtension,
   TOOLS,
+  toolInputErrorCode,
   toolInputModality,
   toolOutputModality,
 } from "@snapotter/shared";
@@ -111,7 +113,7 @@ import {
   updateJobProgress,
   updateSingleFileProgress,
 } from "./progress.js";
-import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
+import { getRegisteredToolIds, getToolConfig, orientOutputFormat } from "./tool-factory.js";
 
 /**
  * Gate the saved-pipeline routes on the pipeline permissions.
@@ -231,6 +233,29 @@ function firstPipelineToolId(raw: string | null): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The first step's output format for autoOrient, read from the raw pipeline
+ * field because orientation runs before the pipeline is validated (#5133).
+ */
+function firstStepOutputFormat(raw: string | null, filename: string) {
+  let step: { toolId?: unknown; settings?: unknown } | undefined;
+  try {
+    step = (JSON.parse(raw ?? "{}") as { steps?: Array<typeof step> }).steps?.[0];
+  } catch {
+    return undefined;
+  }
+  if (typeof step?.toolId !== "string") return undefined;
+  const settings =
+    step.settings && typeof step.settings === "object"
+      ? (step.settings as Record<string, unknown>)
+      : undefined;
+  return orientOutputFormat(
+    resolvePipelineStepToolId({ toolId: step.toolId, settings }),
+    () => step?.settings ?? {},
+    filename,
+  );
 }
 
 /**
@@ -616,8 +641,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 }
               } else {
                 try {
-                  processBuffer = await autoOrient(processBuffer);
+                  processBuffer = await autoOrient(processBuffer, undefined, {
+                    outputFormat: firstStepOutputFormat(pipelineRaw, filename),
+                  });
                 } catch (rawErr) {
+                  if (isToolInputError(rawErr)) {
+                    const code = toolInputErrorCode(rawErr);
+                    return reply.status(400).send({ error: rawErr.message, ...(code && { code }) });
+                  }
                   const err = asDecoderOutOfMemory(rawErr);
                   if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                     const unavailable = engineUnavailable(err);
@@ -1901,8 +1932,25 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                 } else {
                   try {
-                    processBuffer = await autoOrient(processBuffer);
+                    processBuffer = await autoOrient(processBuffer, undefined, {
+                      outputFormat: orientOutputFormat(
+                        parsedSteps[0]?.resolvedToolId,
+                        () => pipeline.steps[0]?.settings ?? {},
+                        processFilename,
+                      ),
+                    });
                   } catch (rawErr) {
+                    if (isToolInputError(rawErr)) {
+                      const code = toolInputErrorCode(rawErr);
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: rawErr.message,
+                        statusCode: 400,
+                        ...(code && { code }),
+                      });
+                      continue;
+                    }
                     const err = asDecoderOutOfMemory(rawErr);
                     if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);

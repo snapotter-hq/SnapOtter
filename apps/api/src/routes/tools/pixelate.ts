@@ -3,7 +3,7 @@ import sharp, { type Sharp } from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -62,6 +62,7 @@ export function registerPixelate(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "pixelate",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image pixelation failed",
       (s) => (s?.region ? "region" : "full"),

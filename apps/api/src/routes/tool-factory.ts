@@ -149,6 +149,15 @@ export interface ToolRouteConfig<T> {
    * skip it, so the process function must refuse the same case itself.
    */
   missingBundle?: (settings: T) => string | null;
+  /**
+   * For a tool that keeps every page of a multi-page TIFF going back out as
+   * TIFF (#4850): the format it writes for this input and these settings. The
+   * orientation step asks it when a rotated page stack can't be turned as one,
+   * so that a TIFF output is refused the way the same file without its
+   * orientation tag is, rather than cut to page 1 (#5133). Tools that keep
+   * page 1 whatever the output leave it unset.
+   */
+  outputFormat?: (inputBuffer: Buffer, settings: T, filename: string) => Promise<string>;
   /** Zod schema that validates the settings JSON from the request. */
   settingsSchema: z.ZodType<T, z.ZodTypeDef, unknown>;
   /** The processing function: takes input buffer + validated settings, returns output. */
@@ -194,6 +203,7 @@ export interface AnyToolRouteConfig {
     settings: unknown;
   }) => Promise<void> | void;
   inputKinds?: ("video" | "audio" | "image" | "subtitle")[];
+  outputFormat?: (inputBuffer: Buffer, settings: unknown, filename: string) => Promise<string>;
   settingsSchema: z.ZodType<unknown, z.ZodTypeDef, unknown>;
   process: (
     inputBuffer: Buffer,
@@ -241,6 +251,34 @@ const toolRegistry = new Map<string, AnyToolRouteConfig>();
  */
 export function getToolConfig(toolId: string): AnyToolRouteConfig | undefined {
   return toolRegistry.get(toolId);
+}
+
+/**
+ * What autoOrient asks when a rotated multi-page TIFF can't be turned as one
+ * stack: the format this tool would write for these settings (#5133).
+ * Orientation runs before the settings are parsed, so they are parsed here, and
+ * only on that rare path. Settings that don't parse answer undefined (keep
+ * page 1); their own 400 follows. Undefined for a tool that declares no
+ * outputFormat, which keeps page 1 whatever it writes.
+ */
+export function orientOutputFormat(
+  toolId: string | undefined,
+  rawSettings: () => unknown,
+  filename: string,
+): ((input: Buffer) => Promise<string | undefined>) | undefined {
+  const config = toolId === undefined ? undefined : toolRegistry.get(toolId);
+  const outputFormat = config?.outputFormat;
+  if (!config || !outputFormat) return undefined;
+  return async (input) => {
+    let raw: unknown;
+    try {
+      raw = rawSettings();
+    } catch {
+      return undefined;
+    }
+    const parsed = config.settingsSchema.safeParse(raw);
+    return parsed.success ? await outputFormat(input, parsed.data, filename) : undefined;
+  };
 }
 
 /**
@@ -512,6 +550,11 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                 // normalization warn joinable to the job row, and filename says
                 // which of a multi-input upload it was (#1417).
                 log: request.log.child({ jobId, toolId: config.toolId, filename: fname }),
+                outputFormat: orientOutputFormat(
+                  config.toolId,
+                  () => (settingsRaw ? JSON.parse(settingsRaw) : {}),
+                  fname,
+                ),
                 lenient: config.skipStructuralValidation,
                 // Reject encrypted PDFs up front only for PDF-only tools (qpdf
                 // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the

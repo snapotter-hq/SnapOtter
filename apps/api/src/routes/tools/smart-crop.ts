@@ -11,7 +11,7 @@ import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { isFeatureInstalled } from "../../lib/feature-status.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 // Cap outputs and intermediate buffers at the same 64 MP limit as resize (#2064, #2203).
@@ -335,6 +335,7 @@ export function registerSmartCrop(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "smart-crop",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     missingBundle: (s) =>
       s.mode === "face" && !isFeatureInstalled(FACE_BUNDLE_ID) ? FACE_BUNDLE_ID : null,
     process: withImageEncodeContext<z.output<typeof settingsSchema>>(

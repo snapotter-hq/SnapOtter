@@ -61,6 +61,12 @@ export interface InputHandler {
        * Defaults to the process logger, which has no request binding (#1417).
        */
       log?: FastifyBaseLogger;
+      /**
+       * The format the tool will write, for autoOrient to decide whether a
+       * rotated multi-page TIFF it can't turn as one stack is refused or cut
+       * to page 1 (#5133). Built by orientOutputFormat in the tool factory.
+       */
+      outputFormat?: (input: Buffer) => Promise<string | undefined>;
     },
   ): Promise<PreparedInput>;
 }
