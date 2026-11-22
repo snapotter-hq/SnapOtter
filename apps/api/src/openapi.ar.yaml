@@ -2177,9 +2177,7 @@ paths:
         - Image
       summary: صورة جواز السفر - إنشاء
       description: |
-        المرحلة 2 من إنشاء صورة جواز السفر. تستخدم jobId والمعالم من
-        مرحلة التحليل لقص الصورة وتغيير حجمها وتبليطها وفق مواصفات
-        الدولة/الوثيقة المحددة. استجابة سريعة (دون إعادة تشغيل AI).
+        المرحلة 2 من إنشاء صورة جواز السفر. تستخدم jobId والمعالم من مرحلة التحليل لقص الصورة وتغيير حجمها وتبليطها وفق مواصفات الدولة/الوثيقة المحددة (دون إعادة تشغيل AI). يعمل القص كمهمة في قائمة الانتظار. المهمة التي تنتهي داخل نافذة المزامنة تُجاب بالرمز 200 مع النتيجة، أما الأبطأ فتُجاب بالرمز 202 مع معرّف مهمة، وتصل النتيجة عبر تدفق تقدم المهمة على المسار /api/v1/jobs/{jobId}/progress. كانت الإصدارات حتى 2.3.0 تُبقي الطلب مفتوحًا دائمًا وتجيب بالرمز 200.
       security:
         - bearerAuth: []
       requestBody:
@@ -2778,7 +2776,11 @@ paths:
                     - `text` (نص من 1 إلى 500 حرف، مطلوب) - نص التراكب
                     - `fontSize` (رقم من 8 إلى 200، الافتراضي 48) - حجم الخط بالبكسل
                     - `color` (سلسلة سداسية، الافتراضي "#FFFFFF") - لون النص
-                    - `position` (نص، الافتراضي "bottom") - واحد من: top، center، bottom
+                    - `position` (نص، الافتراضي "bottom") - واحد من: top، center، bottom، custom
+                    - `x` (رقم من 0 إلى 100، الافتراضي 50) - المركز الأفقي للنص كنسبة مئوية من عرض الصورة؛ يُستخدم عندما يكون الموضع custom
+                    - `y` (رقم من 0 إلى 100، الافتراضي 50) - المركز الرأسي للنص كنسبة مئوية من ارتفاع الصورة؛ يُستخدم عندما يكون الموضع custom
+                    - `wrap` (منطقي، الافتراضي true) - لف النص الطويل على عدة أسطر
+                    - `maxWidth` (رقم من 10 إلى 100، الافتراضي 90) - أقصى عرض يمكن أن يبلغه السطر الملفوف، كنسبة مئوية من عرض الصورة
                     - `backgroundBox` (منطقي، الافتراضي false) - إظهار مربع خلفية خلف النص
                     - `backgroundColor` (سلسلة سداسية، الافتراضي "#000000") - لون مربع الخلفية
                     - `shadow` (منطقي، الافتراضي true) - إضافة ظل للنص
@@ -3149,7 +3151,10 @@ paths:
       tags:
         - Image
       summary: صورة إلى SVG
-      description: تحويل صورة نقطية إلى صيغة SVG المتجهة باستخدام potrace (أبيض وأسود) أو VTracer (ملوّن).
+      description: |
+        تحويل صورة نقطية إلى صيغة SVG المتجهة باستخدام potrace (أبيض وأسود) أو VTracer (ملوّن).
+
+        تعمل كمهمة في قائمة الانتظار. التتبع الذي ينتهي داخل نافذة الانتظار المتزامنة يُجاب بالرمز 200 مع النتيجة، أما الأطول (مدخلات ملوّنة كبيرة أو مفصّلة) فيُجاب بالرمز 202 مع معرّف مهمة. تابع تقدمها عبر SSE ثم نزّل ملف SVG.
       security:
         - bearerAuth: []
       requestBody:
@@ -5893,7 +5898,7 @@ paths:
       tags:
         - Image
       summary: التقاط صفحة ويب كصورة
-      description: التقاط صفحة ويب كصورة لقطة شاشة عالية الجودة. تقبل جسم JSON مع رابط URL وخيارات الالتقاط.
+      description: التقاط صفحة ويب كصورة لقطة شاشة عالية الجودة. تقبل جسم JSON مع رابط URL وخيارات الالتقاط. يعمل الالتقاط كمهمة في قائمة الانتظار. الالتقاط الذي ينتهي داخل نافذة المزامنة يُجاب بالرمز 200 مع النتيجة، أما الأبطأ فيُجاب بالرمز 202 مع معرّف مهمة، وتصل النتيجة عبر تدفق تقدم المهمة على المسار /api/v1/jobs/{jobId}/progress. كانت الإصدارات حتى 2.3.0 تُبقي الطلب مفتوحًا دائمًا وتجيب بالرمز 200.
       security:
         - bearerAuth: []
       requestBody:
@@ -8926,12 +8931,10 @@ paths:
                             - string
                             - 'null'
                   upscaleCpuMaxMp:
-                    type: [number, "null"]
-                    description: >-
-                      Largest input in megapixels this host upscales without a
-                      GPU before reducing it first (0 means no cap). Null when a
-                      GPU may run the upscale. Boot-time guess until the AI
-                      sidecar reports; the upscale result stays authoritative.
+                    type:
+                      - number
+                      - 'null'
+                    description: أكبر مدخل بالميغابكسل يرفع هذا المضيف دقته دون وحدة GPU قبل تصغيره أولًا (0 تعني بلا حد). تكون القيمة null عندما قد تتولى وحدة GPU عملية الرفع. تقدير عند الإقلاع إلى أن يُبلغ مساعد AI بقيمته؛ وتبقى نتيجة الرفع هي المرجع.
               example:
                 bundles:
                   - id: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
@@ -9807,7 +9810,7 @@ paths:
                     type: boolean
                   reassignedUsers:
                     type: array
-                    description: Users moved off the deleted role onto "user" (disabled members onto "disabled:user").
+                    description: المستخدمون الذين نُقلوا من الدور المحذوف إلى "user" (والأعضاء المعطّلون إلى "disabled:user").
                     items:
                       type: object
                       properties:
@@ -10044,7 +10047,7 @@ paths:
                     سلسلة JSON تحتوي على الخيارات:
                     - `startS` (رقم >= 0، الافتراضي 0) - وقت البداية بالثواني
                     - `endS` (رقم، مطلوب) - وقت النهاية بالثواني (يجب أن يكون بعد startS)
-                    - `precise` (منطقي، الافتراضي false) - إعادة الترميز للقطع الدقيقة على مستوى الإطار بدلًا من البحث على الإطارات المفتاحية
+                    - `precise` (منطقي، الافتراضي false) - إعادة ترميز النطاق بالكامل للحصول على إطارات بداية ونهاية دقيقة بدلًا من النسخ بدءًا من الإطار المفتاحي التالي
             example:
               file: photo.png
               settings: '{}'
@@ -11560,12 +11563,11 @@ paths:
   /api/v1/tools/video/convert-subtitles:
     post:
       operationId: convertSubtitles
-      tags: [Video]
-      summary: Convert Subtitles
+      tags:
+        - Video
+      summary: تحويل الترجمات
       description: |
-        Convert a subtitle file between SRT, WebVTT and ASS. Converting from
-        ASS drops its positioning and effects. Input is capped by
-        MAX_SUBTITLE_SIZE_MB (1 MB by default).
+        تحويل ملف ترجمة بين SRT وWebVTT وASS. يؤدي التحويل من ASS إلى فقدان تحديد المواضع والتأثيرات. حجم المدخلات محدود بالمتغير MAX_SUBTITLE_SIZE_MB (1 MB افتراضيًا).
       security:
         - bearerAuth: []
       requestBody:
@@ -11574,53 +11576,54 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required:
+                - file
               properties:
                 file:
                   type: string
                   format: binary
-                  description: Subtitle file (.srt, .vtt or .ass)
+                  description: ملف ترجمة (.srt أو .vtt أو .ass)
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
-                    - `encoding` (string, default "auto") - Text encoding of the input. One of: auto, utf-8, windows-1252, windows-1250, windows-1251, windows-1256, iso-8859-2, gb18030, big5, shift_jis, euc-kr. "auto" reads valid UTF-8 as is and otherwise assumes Windows-1252
+                    سلسلة JSON تحتوي على الخيارات:
+                    - `format` (نص، الافتراضي "srt") - صيغة المخرجات. واحد من: srt، vtt، ass
+                    - `encoding` (نص، الافتراضي "auto") - ترميز نص المدخلات. واحد من: auto، utf-8، windows-1252، windows-1250، windows-1251، windows-1256، iso-8859-2، gb18030، big5، shift_jis، euc-kr. يقرأ "auto" ملف UTF-8 الصالح كما هو، وإلا يفترض Windows-1252
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
+                  description: معرّف المهمة الذي يحدده العميل لتتبع تقدم SSE
             example:
               file: subtitles.ass
               settings: '{"format":"srt"}'
               clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        "200":
-          description: Converted subtitle file
+        '200':
+          description: ملف الترجمة المحوَّل
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ToolResponse"
+                $ref: '#/components/schemas/ToolResponse'
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/subtitles.srt
                 originalSize: 2048
                 processedSize: 1536
-        "400":
-          description: Invalid input
+        '400':
+          description: إدخال غير صالح
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Authentication required
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: المصادقة مطلوبة
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnauthorizedError"
-        "413":
-          $ref: "#/components/responses/PayloadTooLarge"
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/video/images-to-video:
     post:
       operationId: imagesToVideo
@@ -11649,9 +11652,12 @@ paths:
                   type: string
                   description: |
                     سلسلة JSON تحتوي على الخيارات:
-                    - `secondsPerImage` (رقم من 0.5 إلى 10، الافتراضي 2) - مدة عرض كل صورة بالثواني
-                    - `resolution` (نص، الافتراضي "720p") - واحد من: 1080p، 720p، square
-                    - `fps` (عدد صحيح من 10 إلى 60، الافتراضي 30) - معدل الإطارات في الثانية للمخرجات
+                    - `outputFormat` (نص، الافتراضي "mp4") - واحد من: mp4، gif، webp
+                    - `secondsPerImage` (رقم من 0.5 إلى 10، الافتراضي 2) - لصيغة MP4 فقط. مدة عرض كل صورة بالثواني
+                    - `resolution` (نص، الافتراضي "720p") - لصيغة MP4 فقط. واحد من: 1080p، 720p، square
+                    - `fps` (عدد صحيح من 10 إلى 60، الافتراضي 30) - لصيغة MP4 فقط. معدل الإطارات في الثانية للمخرجات
+                    - `frameDelayMs` (عدد صحيح من 20 إلى 10000، الافتراضي 500) - لصيغتي GIF وWebP فقط. مدة عرض كل صورة بالميلي ثانية
+                    - `loop` (عدد صحيح من 0 إلى 100، الافتراضي 0) - لصيغتي GIF وWebP فقط. عدد مرات تشغيل الرسم المتحرك؛ القيمة 0 تعني التكرار إلى ما لا نهاية
             example:
               file:
                 - photo.png
@@ -16436,6 +16442,86 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/proportion-calculator:
+    post:
+      operationId: proportionCalculator
+      tags:
+        - Files
+      summary: حاسبة التناسب
+      description: |
+        حلّ قاعدة الثلاثة: أوجد القيمة الرابعة من ثلاث قيم. يقبل جسم JSON وليس multipart، ويعيد رقمًا بدلًا من ملف.
+
+        `direct`: نسبة A إلى B كنسبة C إلى X، إذن X = B * C / A. `inverse`: A * B = C * X، إذن X = A * B / C. تُقرَّب النتيجة إلى 15 رقمًا معنويًا.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - a
+                - b
+                - c
+              properties:
+                a:
+                  type: number
+                  description: القيمة المعروفة الأولى. لا يمكن أن تكون 0 في الوضع الطردي.
+                b:
+                  type: number
+                  description: القيمة المقابلة لـ a
+                c:
+                  type: number
+                  description: القيمة المعروفة الثالثة. لا يمكن أن تكون 0 في الوضع العكسي.
+                mode:
+                  type: string
+                  enum:
+                    - direct
+                    - inverse
+                  default: direct
+                  description: تناسب طردي أو عكسي
+            example:
+              a: 3
+              b: 6
+              c: 10
+              mode: direct
+      responses:
+        '200':
+          description: القيمة الناقصة
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - mode
+                  - x
+                properties:
+                  mode:
+                    type: string
+                    enum:
+                      - direct
+                      - inverse
+                  x:
+                    type: number
+                    description: القيمة المقابلة لـ c
+              example:
+                mode: direct
+                x: 20
+        '400':
+          description: إدخال غير صالح، أو قاسم صفري، أو نتيجة خارج النطاق
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: المصادقة مطلوبة
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/convert-font:
     post:
       operationId: convertFont
@@ -16588,102 +16674,16 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
-  /api/v1/tools/files/proportion-calculator:
-    post:
-      operationId: proportionCalculator
-      tags:
-        - Files
-      summary: حاسبة التناسب
-      description: |
-        حلّ قاعدة الثلاثة: أوجد القيمة الرابعة من ثلاث قيم. يقبل جسم JSON وليس multipart، ويعيد رقمًا بدلًا من ملف.
-
-        `direct`: نسبة A إلى B كنسبة C إلى X، إذن, X = B * C / A. `inverse`: A * B = C * X, إذن X = A * B / C. تُقرَّب النتيجة إلى 15 رقمًا معنويًا.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - a
-                - b
-                - c
-              properties:
-                a:
-                  type: number
-                  description: القيمة المعروفة الأولى. لا يمكن أن تكون 0 في الوضع الطردي.
-                b:
-                  type: number
-                  description: القيمة المقابلة لـ a
-                c:
-                  type: number
-                  description: القيمة المعروفة الثالثة. لا يمكن أن تكون 0 في الوضع العكسي.
-                mode:
-                  type: string
-                  enum:
-                    - direct
-                    - inverse
-                  default: direct
-                  description: تناسب طردي أو عكسي
-            example:
-              a: 3
-              b: 6
-              c: 10
-              mode: direct
-      responses:
-        '200':
-          description: القيمة الناقصة
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - mode
-                  - x
-                properties:
-                  mode:
-                    type: string
-                    enum:
-                      - direct
-                      - inverse
-                  x:
-                    type: number
-                    description: القيمة المقابلة لـ c
-              example:
-                mode: direct
-                x: 20
-        '400':
-          description: إدخال غير صالح، أو قاسم صفري، أو نتيجة خارج النطاق
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: المصادقة مطلوبة
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UnauthorizedError'
-        '413':
-          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/base64:
     post:
       operationId: base64Text
       tags:
         - Files
-      summary: Base64 Encode / Decode
+      summary: ترميز / فك ترميز Base64
       description: |
-        Encode UTF-8 text to Base64, or decode Base64 back to UTF-8 text. This tool
-        accepts a JSON body, not multipart, and answers with the converted text
-        instead of a file to download.
+        ترميز نص UTF-8 إلى Base64، أو فك ترميز Base64 إلى نص UTF-8. تقبل هذه الأداة جسم JSON وليس multipart، وتعيد النص المحوَّل بدلًا من ملف للتنزيل.
 
-        Decoding ignores whitespace and line breaks, accepts input with or without
-        padding, and takes both the standard (`+`, `/`) and URL-safe (`-`, `_`)
-        alphabets. Input that is not Base64 fails with `ENCODED_TEXT_INVALID`;
-        Base64 that decodes to binary data rather than UTF-8 text fails with
-        `DECODED_DATA_NOT_TEXT`.
+        يتجاهل فك الترميز المسافات الفارغة وفواصل الأسطر، ويقبل المدخلات مع الحشو أو بدونه، ويدعم الأبجديتين القياسية (`+`، `/`) والآمنة للروابط (`-`، `_`). المدخلات التي ليست Base64 تفشل بالخطأ `ENCODED_TEXT_INVALID`، وBase64 الذي يُفك إلى بيانات ثنائية وليس نص UTF-8 يفشل بالخطأ `DECODED_DATA_NOT_TEXT`.
       security:
         - bearerAuth: []
       requestBody:
@@ -16700,24 +16700,24 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 1000000
-                  description: Text to encode, or Base64 to decode
+                  description: النص المراد ترميزه، أو Base64 المراد فك ترميزه
                 mode:
                   type: string
                   enum:
                     - encode
                     - decode
-                  description: Conversion direction
+                  description: اتجاه التحويل
                 urlSafe:
                   type: boolean
                   default: false
-                  description: When encoding, use the URL-safe alphabet (`-` and `_`) without padding. Ignored when decoding.
+                  description: عند الترميز، استخدم الأبجدية الآمنة للروابط (`-` و`_`) دون حشو. يُتجاهل عند فك الترميز.
             example:
               text: Hello, World!
               mode: encode
               urlSafe: false
       responses:
         '200':
-          description: Converted text
+          description: النص المحوَّل
           content:
             application/json:
               schema:
@@ -16733,25 +16733,24 @@ paths:
                       - decode
                   result:
                     type: string
-                    description: The Base64 output when encoding, or the decoded text when decoding
+                    description: ناتج Base64 عند الترميز، أو النص المفكوك عند فك الترميز
               example:
                 mode: encode
                 result: SGVsbG8sIFdvcmxkIQ==
         '400':
-          description: Invalid input, input that is not Base64, or Base64 that does not decode to text
+          description: مدخلات غير صالحة، أو مدخلات ليست Base64، أو Base64 لا يُفك إلى نص
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          description: Authentication required
+          description: المصادقة مطلوبة
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
-
   /api/v1/tools/files/create-zip:
     post:
       operationId: createZip
@@ -18873,7 +18872,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: ملف HEIC للتحويل إلى JPG (.heic، .heif)
+                  description: ملف HEIC للتحويل إلى JPG ‏(.heic، .heif، .hif)
                 settings:
                   type: string
                   description: |
@@ -18945,7 +18944,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: ملف HEIC للتحويل إلى PNG (.heic، .heif)
+                  description: ملف HEIC للتحويل إلى PNG ‏(.heic، .heif، .hif)
                 settings:
                   type: string
                   description: |
@@ -19017,7 +19016,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: ملف HEIC للتحويل إلى AVIF (.heic، .heif)
+                  description: ملف HEIC للتحويل إلى AVIF ‏(.heic، .heif، .hif)
                 settings:
                   type: string
                   description: |
@@ -20801,7 +20800,7 @@ paths:
                   items:
                     type: string
                     format: binary
-                  description: ملفات HEIC للتحويل إلى PDF (.heic، .heif)
+                  description: ملفات HEIC للتحويل إلى PDF ‏(.heic، .heif، .hif)
                 settings:
                   type: string
                   description: |
@@ -28841,9 +28840,9 @@ x-i18n:
       provenance: machine
       outputHash: f204e035ccb1
     paths./api/v1/tools/image/passport-photo/generate.post.description:
-      sourceHash: d0edd7c634d9
+      sourceHash: 42fe1798fc61
       provenance: machine
-      outputHash: dc1c6fc5c8e0
+      outputHash: 60ff98bac04c
     paths./api/v1/tools/image/colorize.post.summary:
       sourceHash: 34df56e96234
       provenance: machine
@@ -28929,9 +28928,9 @@ x-i18n:
       provenance: machine
       outputHash: c1c83967b949
     paths./api/v1/tools/image/vectorize.post.description:
-      sourceHash: 3d5de38dc3f3
+      sourceHash: f635a39e1679
       provenance: machine
-      outputHash: 8447d7e04b2c
+      outputHash: afc7351335c2
     paths./api/v1/tools/image/svg-to-raster.post.summary:
       sourceHash: bccef23ad06b
       provenance: machine
@@ -29201,9 +29200,9 @@ x-i18n:
       provenance: machine
       outputHash: 6e7b6ee11288
     paths./api/v1/tools/image/html-to-image.post.description:
-      sourceHash: adb3e27eb0e6
+      sourceHash: 9f644fb184e8
       provenance: machine
-      outputHash: d2a46787aa0d
+      outputHash: 94480bb150d3
     paths./api/v1/tools/image/strip-metadata/inspect.post.summary:
       sourceHash: 26c48e56ad62
       provenance: machine
@@ -29892,6 +29891,14 @@ x-i18n:
       sourceHash: 4daf70632777
       provenance: machine
       outputHash: 0a594fb8e319
+    paths./api/v1/tools/video/convert-subtitles.post.summary:
+      sourceHash: 74ebb11bf0e2
+      provenance: machine
+      outputHash: ab89170e98e8
+    paths./api/v1/tools/video/convert-subtitles.post.description:
+      sourceHash: 099f157d28e7
+      provenance: machine
+      outputHash: 3c86f8dfbe91
     paths./api/v1/tools/video/images-to-video.post.summary:
       sourceHash: feb4b6d19902
       provenance: machine
@@ -30476,6 +30483,14 @@ x-i18n:
       sourceHash: 156ea77c8a62
       provenance: machine
       outputHash: eee23931c42a
+    paths./api/v1/tools/files/proportion-calculator.post.summary:
+      sourceHash: 90b715b4351f
+      provenance: machine
+      outputHash: 5dee32b59e66
+    paths./api/v1/tools/files/proportion-calculator.post.description:
+      sourceHash: 5890f7b8ad27
+      provenance: machine
+      outputHash: b1a9abb9d02c
     paths./api/v1/tools/files/convert-font.post.summary:
       sourceHash: d07a89cf190e
       provenance: machine
@@ -30492,14 +30507,14 @@ x-i18n:
       sourceHash: 01451dcad982
       provenance: machine
       outputHash: f280e50721a2
-    paths./api/v1/tools/files/proportion-calculator.post.summary:
-      sourceHash: 90b715b4351f
+    paths./api/v1/tools/files/base64.post.summary:
+      sourceHash: 0d7c51bc1de8
       provenance: machine
-      outputHash: 5dee32b59e66
-    paths./api/v1/tools/files/proportion-calculator.post.description:
-      sourceHash: 761348b12560
+      outputHash: bebe06f9db01
+    paths./api/v1/tools/files/base64.post.description:
+      sourceHash: 0be716bf8e64
       provenance: machine
-      outputHash: 09d26a6e3f99
+      outputHash: aebd2b17e88c
     paths./api/v1/tools/files/create-zip.post.summary:
       sourceHash: 8463eb4799ce
       provenance: machine
@@ -32904,6 +32919,10 @@ x-i18n:
       sourceHash: 9849b9a35e8f
       provenance: machine
       outputHash: 0ab09f72176c
+    ptr:/paths/~1api~1v1~1tools~1image~1passport-photo~1generate/post/requestBody/content/application~1json/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
     ptr:/paths/~1api~1v1~1tools~1image~1passport-photo~1generate/post/responses/200/description:
       sourceHash: 81db5ca8ffad
       provenance: machine
@@ -32912,6 +32931,14 @@ x-i18n:
       sourceHash: a0f958a73724
       provenance: machine
       outputHash: 4f49cea5676b
+    ptr:/paths/~1api~1v1~1tools~1image~1passport-photo~1generate/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: c81fabb6edd8
+    ptr:/paths/~1api~1v1~1tools~1image~1passport-photo~1generate/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: f688ee75d289
     ptr:/paths/~1api~1v1~1tools~1image~1passport-photo~1generate/post/responses/400/description:
       sourceHash: 650f58c39756
       provenance: machine
@@ -33061,9 +33088,9 @@ x-i18n:
       provenance: machine
       outputHash: abaabab8c67f
     ptr:/paths/~1api~1v1~1tools~1image~1text-overlay/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: af099804064e
+      sourceHash: 65bb5c60d917
       provenance: machine
-      outputHash: 248825b34c3e
+      outputHash: 93edcdb79f73
     ptr:/paths/~1api~1v1~1tools~1image~1text-overlay/post/responses/200/description:
       sourceHash: 82f006c19be1
       provenance: machine
@@ -33192,10 +33219,22 @@ x-i18n:
       sourceHash: 8a4a9af45322
       provenance: machine
       outputHash: 4f025d83537e
+    ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
     ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/responses/200/description:
       sourceHash: 9200ee06d1a0
       provenance: machine
       outputHash: f2e04cc1c2fd
+    ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: c81fabb6edd8
+    ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: f688ee75d289
     ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/responses/400/description:
       sourceHash: c9bbbe834722
       provenance: machine
@@ -33204,6 +33243,10 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1image~1vectorize/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: adc5cf023656
     ptr:/paths/~1api~1v1~1tools~1image~1svg-to-raster/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 2102f0a65ada
       provenance: machine
@@ -34068,10 +34111,22 @@ x-i18n:
       sourceHash: ed5f19739f2a
       provenance: machine
       outputHash: a7b5b8965aa1
+    ptr:/paths/~1api~1v1~1tools~1image~1html-to-image/post/requestBody/content/application~1json/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
     ptr:/paths/~1api~1v1~1tools~1image~1html-to-image/post/responses/200/description:
       sourceHash: 382acb4bc3f0
       provenance: machine
       outputHash: d127ee38f7d0
+    ptr:/paths/~1api~1v1~1tools~1image~1html-to-image/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: c81fabb6edd8
+    ptr:/paths/~1api~1v1~1tools~1image~1html-to-image/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: f688ee75d289
     ptr:/paths/~1api~1v1~1tools~1image~1html-to-image/post/responses/400/description:
       sourceHash: 9dd0bcae39c3
       provenance: machine
@@ -35020,6 +35075,10 @@ x-i18n:
       sourceHash: 76cd840cf4fc
       provenance: machine
       outputHash: 94d4c32a1949
+    ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/upscaleCpuMaxMp/description:
+      sourceHash: 1d8f94521fa4
+      provenance: machine
+      outputHash: 475b8901117a
     ptr:/paths/~1api~1v1~1features/get/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
@@ -35300,6 +35359,10 @@ x-i18n:
       sourceHash: 980f6f779005
       provenance: machine
       outputHash: a0c01a231019
+    ptr:/paths/~1api~1v1~1roles~1{id}/delete/responses/200/content/application~1json/schema/properties/reassignedUsers/description:
+      sourceHash: 7fe4cdb333d7
+      provenance: machine
+      outputHash: 130b0970317c
     ptr:/paths/~1api~1v1~1roles~1{id}/delete/responses/400/description:
       sourceHash: 0e00463e3f60
       provenance: machine
@@ -35385,9 +35448,9 @@ x-i18n:
       provenance: machine
       outputHash: 48edf4199a05
     ptr:/paths/~1api~1v1~1tools~1video~1trim-video/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 4e849a9855fc
+      sourceHash: 6a7312703b1d
       provenance: machine
-      outputHash: 57532a97c194
+      outputHash: c126723d52de
     ptr:/paths/~1api~1v1~1tools~1video~1trim-video/post/responses/200/description:
       sourceHash: fb43034e42ed
       provenance: machine
@@ -35896,14 +35959,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 6ce9ca0849aa
+      provenance: machine
+      outputHash: 41eac3d07457
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 3a470308c78e
+      provenance: machine
+      outputHash: 60ba3a4e700d
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/responses/200/description:
+      sourceHash: 6fc833ddd67d
+      provenance: machine
+      outputHash: 084e39e2923d
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: d9ea4a3bff3d
+    ptr:/paths/~1api~1v1~1tools~1video~1convert-subtitles/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
     ptr:/paths/~1api~1v1~1tools~1video~1images-to-video/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: bf55ebafd4a9
       provenance: machine
       outputHash: a6d01cec43a1
     ptr:/paths/~1api~1v1~1tools~1video~1images-to-video/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 0b0823ec3508
+      sourceHash: 7ff9dba07184
       provenance: machine
-      outputHash: f9fafaba8ec6
+      outputHash: c50d910e0f16
     ptr:/paths/~1api~1v1~1tools~1video~1images-to-video/post/responses/200/description:
       sourceHash: cc49dd03c792
       provenance: machine
@@ -37516,6 +37603,38 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/a/description:
+      sourceHash: 2990905e14d9
+      provenance: machine
+      outputHash: 13d8bdf6d6f5
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/b/description:
+      sourceHash: af681c11c64e
+      provenance: machine
+      outputHash: fa1fa913259b
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/c/description:
+      sourceHash: 2ded3c6e5910
+      provenance: machine
+      outputHash: c958000c1aa8
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 055edc0f915a
+      provenance: machine
+      outputHash: d7471913296a
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/description:
+      sourceHash: 7aef4dcae7e5
+      provenance: machine
+      outputHash: 26360c498c51
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/content/application~1json/schema/properties/x/description:
+      sourceHash: 3ac0dcdcdc98
+      provenance: machine
+      outputHash: 9cd9dd9c792a
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/400/description:
+      sourceHash: ddad6ca13b12
+      provenance: machine
+      outputHash: 347c7da0bf75
+    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
     ptr:/paths/~1api~1v1~1tools~1files~1convert-font/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: b7c599f9918f
       provenance: machine
@@ -37564,35 +37683,31 @@ x-i18n:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/a/description:
-      sourceHash: 2990905e14d9
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/requestBody/content/application~1json/schema/properties/text/description:
+      sourceHash: a95823232a1a
       provenance: machine
-      outputHash: 13d8bdf6d6f5
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/b/description:
-      sourceHash: af681c11c64e
+      outputHash: 97f95afce849
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/requestBody/content/application~1json/schema/properties/mode/description:
+      sourceHash: 4528d49dd1e3
       provenance: machine
-      outputHash: fa1fa913259b
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/c/description:
-      sourceHash: 2ded3c6e5910
+      outputHash: 42f0e9ddda00
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/requestBody/content/application~1json/schema/properties/urlSafe/description:
+      sourceHash: bd4e171838f6
       provenance: machine
-      outputHash: c958000c1aa8
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/requestBody/content/application~1json/schema/properties/mode/description:
-      sourceHash: 055edc0f915a
+      outputHash: 80fdbaf6062f
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/responses/200/description:
+      sourceHash: 637c8f6233f5
       provenance: machine
-      outputHash: d7471913296a
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/description:
-      sourceHash: 7aef4dcae7e5
+      outputHash: dd29f036a213
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/responses/200/content/application~1json/schema/properties/result/description:
+      sourceHash: f374ef93bd72
       provenance: machine
-      outputHash: 26360c498c51
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/200/content/application~1json/schema/properties/x/description:
-      sourceHash: 3ac0dcdcdc98
+      outputHash: '009489621477'
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/responses/400/description:
+      sourceHash: e9bddd3c347a
       provenance: machine
-      outputHash: 9cd9dd9c792a
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/400/description:
-      sourceHash: ddad6ca13b12
-      provenance: machine
-      outputHash: 347c7da0bf75
-    ptr:/paths/~1api~1v1~1tools~1files~1proportion-calculator/post/responses/401/description:
+      outputHash: e02a05bd4d1f
+    ptr:/paths/~1api~1v1~1tools~1files~1base64/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 0bd6546c4ecf
@@ -38349,9 +38464,9 @@ x-i18n:
       provenance: machine
       outputHash: adc5cf023656
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-jpg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
-      sourceHash: 2e305e3608d4
+      sourceHash: 48f80dc5725d
       provenance: machine
-      outputHash: 2d3d8ab9e92c
+      outputHash: 40e8201ec33a
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-jpg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
       sourceHash: 04b8b8e4c7e9
       provenance: machine
@@ -38377,9 +38492,9 @@ x-i18n:
       provenance: machine
       outputHash: adc5cf023656
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-png/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
-      sourceHash: 50e6c7a12dca
+      sourceHash: a456114817ff
       provenance: machine
-      outputHash: 27802c580047
+      outputHash: d99ce6730cf8
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-png/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
       sourceHash: a8c98441ad56
       provenance: machine
@@ -38405,9 +38520,9 @@ x-i18n:
       provenance: machine
       outputHash: adc5cf023656
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
-      sourceHash: cbcbddf67c11
+      sourceHash: 902b85926375
       provenance: machine
-      outputHash: 3484ed8144c3
+      outputHash: a1dc533f0655
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-avif/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
       sourceHash: 01c8e2d1c3c2
       provenance: machine
@@ -39089,9 +39204,9 @@ x-i18n:
       provenance: machine
       outputHash: adc5cf023656
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-pdf/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
-      sourceHash: 1cb08777d71f
+      sourceHash: c5a18377bee8
       provenance: machine
-      outputHash: b664517a6f42
+      outputHash: cead8853b85a
     ptr:/paths/~1api~1v1~1tools~1image~1heic-to-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
       sourceHash: 0b6d9b3332b0
       provenance: machine
