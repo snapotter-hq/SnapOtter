@@ -88,6 +88,8 @@ const CONVERSION_ALIASES = [
   "converter",
 ] as const;
 
+const MULTI_WORD_CONVERSION_ALIASES = CONVERSION_ALIASES.filter((alias) => alias.includes(" "));
+
 const CONNECTOR_TOKENS = new Set(["to"]);
 const CONVERSION_INTENT_TOKENS = new Set(contentTokens(CONVERSION_ALIASES.join(" ")));
 const DIRECTION_FILLER_TOKENS = new Set([
@@ -529,7 +531,18 @@ function consecutiveQueryPhrases(values: string[]): string[] {
   return unique(phrases);
 }
 
-function buildQuery(rawQuery: string): {
+// "change format yaml" has to score as "convert yaml": otherwise "change" and
+// "format" count as words the tool must contain, and none does (#5191).
+function canonicalizeConversionPhrases(rawQuery: string): string {
+  const padded = ` ${plainNormalize(rawQuery)} `;
+  const canonical = MULTI_WORD_CONVERSION_ALIASES.reduce(
+    (query, alias) => query.replaceAll(` ${alias} `, " convert "),
+    padded,
+  );
+  return canonical === padded ? rawQuery : canonical.trim();
+}
+
+function buildQuery(query: string): {
   normalized: string;
   phrases: string[];
   partialPhrases: string[];
@@ -539,6 +552,7 @@ function buildQuery(rawQuery: string): {
   conversionTargetTokens: string[];
   conversionDirection: ConversionDirection;
 } {
+  const rawQuery = canonicalizeConversionPhrases(query);
   // Split joined forms ("cr3tojpg") so the raw phrase doesn't demand a token
   // no tool contains (#1420).
   const raw = tokenize(plainNormalize(rawQuery)).map(expandCompactConversionToken).join(" ");

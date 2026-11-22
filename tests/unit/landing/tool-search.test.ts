@@ -354,6 +354,35 @@ describe("landing searchTools with real catalog metadata", () => {
     }
   });
 
+  // #5191: "change" and "format" counted as words the tool had to contain, so
+  // these phrases found nothing while "convert" found the converter.
+  it.each([
+    ["change format yaml", "convert yaml", "yaml-json"],
+    ["change format ttf", "convert ttf", "convert-font"],
+    ["change file type xml", "convert xml", "json-xml"],
+    ["format converter ttf", "convert ttf", "convert-font"],
+    ["Change File Type png to jpg", "convert png to jpg", "png-to-jpg"],
+  ])("ranks %j like %j", (query, convertQuery, id) => {
+    const ids = (q: string) =>
+      searchTools(realTools, { query: q, modality: "all", limit: 5 }).results.map(
+        (entry) => entry.item.id,
+      );
+    const result = searchTools(realTools, { query, modality: "all", limit: 5 });
+
+    expect(result.results[0]?.item.id).toBe(id);
+    expect(result.hasConfidentMatch).toBe(true);
+    expect(ids(query)).toEqual(ids(convertQuery));
+  });
+
+  it("does not read a bare format json as a conversion", () => {
+    const ids = (q: string) =>
+      searchTools(realTools, { query: q, modality: "all", limit: 5 }).results.map(
+        (entry) => entry.item.id,
+      );
+
+    expect(ids("format json")).not.toEqual(ids("convert json"));
+  });
+
   // #1326: the five compress-image-to-N-kb presets repeat "compress" across
   // name, keywords and description, and every repeat added to the score, so a
   // bare "compress" ranked all five above the tool people mean.
