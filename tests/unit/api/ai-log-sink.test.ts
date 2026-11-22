@@ -52,3 +52,20 @@ describe("API startup (#1500)", () => {
     expect(call).toBeLessThan(source.indexOf("const app = Fastify("));
   });
 });
+
+describe("integration test app (#5186)", () => {
+  it("routes AI logs to pino and stops the dispatcher like the real server", () => {
+    // Console lines from the async dispatcher can land after a file's last
+    // test and fail the shard with "Closing rpc while onUserConsoleLog was
+    // pending". tests/integration/platform/test-app-ai-logs.test.ts proves the
+    // behaviour; this pins it where no Postgres is needed.
+    const source = readFileSync(resolve(root, "tests/integration/test-server.ts"), "utf8");
+    const route = source.search(/^\s*routeAiLogsToPino\(\);$/m);
+    const stopSpine = source.indexOf("async function stopSpine(");
+
+    expect(route, "buildTestApp() no longer calls routeAiLogsToPino()").toBeGreaterThan(-1);
+    expect(route).toBeLessThan(source.indexOf("await app.ready();"));
+    expect(stopSpine).toBeGreaterThan(-1);
+    expect(source.indexOf("shutdownDispatcher();", stopSpine)).toBeGreaterThan(stopSpine);
+  });
+});
