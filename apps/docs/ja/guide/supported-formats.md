@@ -1,8 +1,8 @@
 ---
 description: "全モダリティにわたるサポート対象ファイルフォーマット。55種類以上の画像入力フォーマット、ビデオ、オーディオ、PDF、ファイルフォーマット。"
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: a5872e4aab51
+i18n_output_hash: f9d3061f0ca9
 ---
 
 # サポートされるフォーマット {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtterは入力で55種類以上、出力で17種類の画像フォーマッ�
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | デジタルシネマ、医用画像 |
 | QOI | .qoi | インラインTypeScriptコーデック | ゲーム開発、組み込みシステム |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhoneの写真 |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | iPhoneやSony製カメラの写真 |
 
 ### レガシー/システム (4) {#legacy-system-4}
 

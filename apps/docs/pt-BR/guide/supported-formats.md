@@ -1,8 +1,8 @@
 ---
 description: "Formatos de arquivo suportados em todas as modalidades - mais de 55 formatos de entrada de imagem, além de vídeo, áudio, PDF e formatos de arquivo."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: ef0623cfcfdc
+i18n_output_hash: b60f707367a5
 ---
 
 # Formatos Suportados {#supported-formats}
@@ -75,7 +75,7 @@ O SnapOtter suporta mais de 55 formatos de imagem para entrada e 17 formatos par
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Cinema digital, imagem médica |
 | QOI | .qoi | Codec TypeScript inline | Desenvolvimento de jogos, sistemas embarcados |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | Fotos de iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | Fotos de iPhone e câmeras Sony |
 
 ### Legado/Sistema (4) {#legacy-system-4}
 

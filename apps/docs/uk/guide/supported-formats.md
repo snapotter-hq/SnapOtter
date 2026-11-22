@@ -1,8 +1,8 @@
 ---
 description: "Підтримувані формати файлів у всіх модальностях - понад 55 форматів зображень для введення, а також відео, аудіо, PDF та файлові формати."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 3ae6fd2c03f0
+i18n_output_hash: 72d543d72ae7
 ---
 
 # Підтримувані формати {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter підтримує понад 55 форматів зображень �
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Цифрове кіно, медична візуалізація |
 | QOI | .qoi | Вбудований кодек TypeScript | Розробка ігор, вбудовані системи |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | Фото з iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | Фото з iPhone і камер Sony |
 
 ### Застарілі/системні (4) {#legacy-system-4}
 

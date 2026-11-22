@@ -1,8 +1,8 @@
 ---
 description: "Các định dạng tệp được hỗ trợ trên tất cả các modality - hơn 55 định dạng đầu vào hình ảnh, video, audio, PDF, và các định dạng tệp."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 5b1dbbf657f1
+i18n_output_hash: f4d88cdb201a
 ---
 
 # Các định dạng được hỗ trợ {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter hỗ trợ hơn 55 định dạng hình ảnh đầu vào và 17 đị
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Điện ảnh số, chẩn đoán hình ảnh y tế |
 | QOI | .qoi | Codec TypeScript nội tuyến | Phát triển game, hệ thống nhúng |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | Ảnh iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | Ảnh từ iPhone và máy ảnh Sony |
 
 ### Cũ/Hệ thống (4) {#legacy-system-4}
 

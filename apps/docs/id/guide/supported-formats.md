@@ -1,8 +1,8 @@
 ---
 description: "Format file yang didukung di semua modalitas - 55+ format masukan gambar, video, audio, PDF, dan format file."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 4bbbac7f641d
+i18n_output_hash: ab3a24f33a69
 ---
 
 # Format yang Didukung {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter mendukung 55+ format gambar untuk masukan dan 17 format untuk keluaran
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Sinema digital, pencitraan medis |
 | QOI | .qoi | Codec TypeScript inline | Pengembangan game, sistem tertanam |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | Foto iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | Foto iPhone dan kamera Sony |
 
 ### Lawas/Sistem (4) {#legacy-system-4}
 
