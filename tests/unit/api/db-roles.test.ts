@@ -1,3 +1,4 @@
+import { SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { resolveRoleSplit } from "../../../apps/api/src/db/roles.js";
 
@@ -140,6 +141,47 @@ describe("resolveRoleSplit", () => {
     const encoded = "postgres://snapotter_app:p%40ss%3Aword@db:5432/snapotter";
     const split = resolveRoleSplit(encoded, MIGRATION);
     expect(split).toMatchObject({ runtimePassword: "p@ss:word" });
+  });
+
+  // node-postgres re-encodes a connection string that holds a space or a bad
+  // % escape before parsing it, so these passwords log in as written. The
+  // expected values are what pg-connection-string's parse() returns.
+  it("keeps a malformed % escape in the password the way node-postgres does", () => {
+    const split = resolveRoleSplit("postgres://snapotter_app:p%zzw@db:5432/snapotter", MIGRATION);
+    expect(split).toMatchObject({ active: true, runtimePassword: "p%zzw" });
+  });
+
+  it("keeps a valid escape literal when the password also holds a space", () => {
+    const split = resolveRoleSplit("postgres://snapotter_app:p%2aw x@db:5432/snapotter", MIGRATION);
+    expect(split).toMatchObject({ active: true, runtimePassword: "p%2aw x" });
+  });
+
+  it("decodes an escaped space in the password", () => {
+    const split = resolveRoleSplit("postgres://snapotter_app:p%20w@db:5432/snapotter", MIGRATION);
+    expect(split).toMatchObject({ active: true, runtimePassword: "p w" });
+  });
+
+  it("rejects a password escape that is not valid UTF-8 with a SafeError", () => {
+    const bad = "postgres://snapotter_app:p%ffw@db:5432/snapotter";
+    expect(() => resolveRoleSplit(bad, MIGRATION)).toThrow(SafeError);
+    expect(() => resolveRoleSplit(bad, MIGRATION)).toThrow(/DATABASE_URL/);
+  });
+
+  it("leaves credentials alone in single-role mode, even an undecodable escape", () => {
+    const bad = "postgres://snapotter_app:p%ffw@db:5432/snapotter";
+    expect(resolveRoleSplit(bad, "")).toMatchObject({ active: false, migrationUrl: bad });
+  });
+
+  it("matches a migration role written with a raw space to an escaped one", () => {
+    const runtime = "postgres://snap%20otter:pw@db:5432/snapotter";
+    const migration = "postgres://snap otter:otherpw@db:5432/snapotter";
+    expect(resolveRoleSplit(runtime, migration)).toMatchObject({ reason: "same-role" });
+  });
+
+  it("rejects a migration role escape that is not valid UTF-8 with a SafeError", () => {
+    const bad = "postgres://own%ffer:ownerpw@db:5432/snapotter";
+    expect(() => resolveRoleSplit(RUNTIME, bad)).toThrow(SafeError);
+    expect(() => resolveRoleSplit(RUNTIME, bad)).toThrow(/DATABASE_MIGRATION_URL/);
   });
 
   it("rejects a runtime role that is not a safe identifier", () => {
