@@ -175,7 +175,7 @@ pnpm test:e2e:docs           # VitePress docs
 pnpm test:e2e:analytics      # Local analytics flows (starts local dev servers)
 pnpm test:e2e:noauth         # No-auth server (AUTH_ENABLED=false)
 pnpm test:e2e:external       # Complete browser suite against a running external server
-pnpm test:docker             # Unit + integration suite inside the Compose test image
+pnpm test:docker             # Unit + integration, then chromium e2e, in the Compose test image
 
 # Editor and demo e2e (no root alias)
 pnpm playwright test --config playwright.editor.config.ts
@@ -197,7 +197,7 @@ BASE_URL=http://127.0.0.1:1349 pnpm test:e2e:external
 This command neither starts Docker nor proves that the target is containerized.
 An unavailable target fails the Playwright run. Use `pnpm test:e2e:analytics` for
 local analytics flows, or `pnpm test:docker` to run the unit and integration suite
-in the Compose test image.
+and then the chromium e2e projects in the Compose test image.
 
 ### Environment Requirements
 
