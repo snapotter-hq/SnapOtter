@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 44fbe5fa13c5
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 510342e9d266
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konvertierungs-Presets {#conversion-presets}
 
-Der gemeinsame Katalog enthält 117 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
+Der gemeinsame Katalog enthält 121 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

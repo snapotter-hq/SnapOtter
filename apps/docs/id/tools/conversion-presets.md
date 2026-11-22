@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter menyediakan 117 endpoint preset konversi khusus selain tool konverter dasar. Setiap preset mengunci format output dan mendelegasikan ke pipeline pemrosesan dasarnya, sehingga perilaku, validasi, dan kontrak output-nya sesuai dengan tool dasar yang tercantum di bawah.
+SnapOtter menyediakan 121 endpoint preset konversi khusus selain tool konverter dasar. Setiap preset mengunci format output dan mendelegasikan ke pipeline pemrosesan dasarnya, sehingga perilaku, validasi, dan kontrak output-nya sesuai dengan tool dasar yang tercantum di bawah.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter biedt naast de basisconvertertools 117 speciale conversiepreset-endpoints. Elke preset vergrendelt het uitvoerformaat en delegeert naar de bijbehorende basisverwerkingspijplijn, zodat het gedrag, de validatie en het uitvoercontract overeenkomen met de hieronder vermelde basistool.
+SnapOtter biedt naast de basisconvertertools 121 speciale conversiepreset-endpoints. Elke preset vergrendelt het uitvoerformaat en delegeert naar de bijbehorende basisverwerkingspijplijn, zodat het gedrag, de validatie en het uitvoercontract overeenkomen met de hieronder vermelde basistool.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

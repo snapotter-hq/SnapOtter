@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Preajustes de conversión {#conversion-presets}
 
-SnapOtter expone 117 endpoints de preajustes de conversión dedicados además de las herramientas convertidoras base. Cada preajuste fija el formato de salida y delega en su canalización de procesamiento base, por lo que el comportamiento, la validación y el contrato de salida coinciden con la herramienta base indicada a continuación.
+SnapOtter expone 121 endpoints de preajustes de conversión dedicados además de las herramientas convertidoras base. Cada preajuste fija el formato de salida y delega en su canalización de procesamiento base, por lo que el comportamiento, la validación y el contrato de salida coinciden con la herramienta base indicada a continuación.
 
 ## Patrón del API Endpoint {#api-endpoint-pattern}
 

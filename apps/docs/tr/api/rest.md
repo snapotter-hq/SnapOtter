@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 046a7bca9d39
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 5d99906a61e8
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Dönüştürme Ön Ayarları {#conversion-presets}
 
-Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 117 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
+Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 121 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

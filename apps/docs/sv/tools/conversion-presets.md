@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter exponerar 117 dedikerade konverteringsförinställningsslutpunkter utöver bas-konverteringsverktygen. Varje förinställning låser utdataformatet och delegerar till sin bas-bearbetningspipeline, så att beteendet, valideringen och utdatakontraktet matchar bas-verktyget som listas nedan.
+SnapOtter exponerar 121 dedikerade konverteringsförinställningsslutpunkter utöver bas-konverteringsverktygen. Varje förinställning låser utdataformatet och delegerar till sin bas-bearbetningspipeline, så att beteendet, valideringen och utdatakontraktet matchar bas-verktyget som listas nedan.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

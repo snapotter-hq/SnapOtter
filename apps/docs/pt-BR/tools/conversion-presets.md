@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Predefinições de Conversão {#conversion-presets}
 
-O SnapOtter expõe 117 endpoints de predefinições de conversão dedicados, além das ferramentas conversoras base. Cada predefinição fixa o formato de saída e delega ao seu pipeline de processamento base, de modo que o comportamento, a validação e o contrato de saída correspondam à ferramenta base listada abaixo.
+O SnapOtter expõe 121 endpoints de predefinições de conversão dedicados, além das ferramentas conversoras base. Cada predefinição fixa o formato de saída e delega ao seu pipeline de processamento base, de modo que o comportamento, a validação e o contrato de saída correspondam à ferramenta base listada abaixo.
 
 ## Padrão de Endpoint da API {#api-endpoint-pattern}
 

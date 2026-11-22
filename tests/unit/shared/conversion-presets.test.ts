@@ -6,10 +6,10 @@ import {
 } from "../../../packages/shared/src/conversion-presets.js";
 
 describe("conversion presets", () => {
-  it("defines 117 presets with unique ids", () => {
-    expect(CONVERSION_PRESETS.length).toBe(117);
+  it("defines 121 presets with unique ids", () => {
+    expect(CONVERSION_PRESETS.length).toBe(121);
     const ids = CONVERSION_PRESETS.map((p) => p.id);
-    expect(new Set(ids).size).toBe(117);
+    expect(new Set(ids).size).toBe(121);
   });
 
   it("subtitle presets lock convert-subtitles' format and take one extension (#5052)", () => {

@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter stellt zusätzlich zu den Basis-Konverter-Tools 117 dedizierte Konvertierungs-Preset-Endpunkte bereit. Jedes Preset legt das Ausgabeformat fest und delegiert an seine Basis-Verarbeitungspipeline, sodass Verhalten, Validierung und Ausgabekontrakt dem unten aufgeführten Basis-Tool entsprechen.
+SnapOtter stellt zusätzlich zu den Basis-Konverter-Tools 121 dedizierte Konvertierungs-Preset-Endpunkte bereit. Jedes Preset legt das Ausgabeformat fest und delegiert an seine Basis-Verarbeitungspipeline, sodass Verhalten, Validierung und Ausgabekontrakt dem unten aufgeführten Basis-Tool entsprechen.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 514954c8bc89
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: bd3153d93d59
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konverteringsförinställningar {#conversion-presets}
 
-Den delade katalogen innehåller 117 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
+Den delade katalogen innehåller 121 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

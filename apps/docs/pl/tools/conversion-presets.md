@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter udostępnia 117 dedykowanych endpointów predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
+SnapOtter udostępnia 121 dedykowanych endpointów predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

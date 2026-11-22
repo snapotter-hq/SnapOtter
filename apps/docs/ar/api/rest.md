@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 4e6dee430962
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: f164d86ea413
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### إعدادات التحويل الجاهزة {#conversion-presets}
 
-يتضمن الكتالوج المشترك 117 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
+يتضمن الكتالوج المشترك 121 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

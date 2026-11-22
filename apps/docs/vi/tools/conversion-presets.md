@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 117 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
+Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 121 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

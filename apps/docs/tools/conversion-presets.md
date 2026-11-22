@@ -4,7 +4,7 @@ description: Dedicated conversion preset endpoints generated from the SnapOtter 
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter exposes 117 dedicated conversion preset endpoints in addition to the base converter tools. Each preset locks the output format and delegates to its base processing pipeline, so the behavior, validation, and output contract match the base tool listed below.
+SnapOtter exposes 121 dedicated conversion preset endpoints in addition to the base converter tools. Each preset locks the output format and delegates to its base processing pipeline, so the behavior, validation, and output contract match the base tool listed below.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

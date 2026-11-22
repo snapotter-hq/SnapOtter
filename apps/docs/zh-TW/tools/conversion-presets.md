@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # 轉換預設 {#conversion-presets}
 
-除了基礎轉換工具之外，SnapOtter 還提供 117 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
+除了基礎轉換工具之外，SnapOtter 還提供 121 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

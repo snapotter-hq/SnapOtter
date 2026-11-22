@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 3ff0a8ed5a48
+i18n_output_hash: 67126f5f3d61
 i18n_hash_version: 2
-i18n_source_hash: d772f94e7a5d
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Пресети конвертації {#conversion-presets}
 
-Спільний каталог містить 117 виділених кінцевих точок пресетів конвертації, як-от `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` і `excel-to-csv`. Пресети є повноцінними маршрутами інструментів:
+Спільний каталог містить 121 виділену кінцеву точку пресетів конвертації, як-от `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` і `excel-to-csv`. Пресети є повноцінними маршрутами інструментів:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

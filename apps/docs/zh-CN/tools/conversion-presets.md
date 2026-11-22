@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-除了基础转换器工具外，SnapOtter 还提供 117 个专用的转换预设端点。每个预设锁定输出格式并委托给其基础处理流程，因此其行为、校验和输出约定与下面列出的基础工具一致。
+除了基础转换器工具外，SnapOtter 还提供 121 个专用的转换预设端点。每个预设锁定输出格式并委托给其基础处理流程，因此其行为、校验和输出约定与下面列出的基础工具一致。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

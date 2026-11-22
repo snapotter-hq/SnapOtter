@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter, temel dönüştürücü araçlarına ek olarak 117 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
+SnapOtter, temel dönüştürücü araçlarına ek olarak 121 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 

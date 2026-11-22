@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: b85e5c14d250
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: de64318a0742
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### พรีเซ็ตการแปลง {#conversion-presets}
 
-แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 117 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
+แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 121 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

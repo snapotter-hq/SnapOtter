@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Préréglages de conversion {#conversion-presets}
 
-SnapOtter expose 117 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
+SnapOtter expose 121 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
 
 ## Modèle de point de terminaison de l'API {#api-endpoint-pattern}
 

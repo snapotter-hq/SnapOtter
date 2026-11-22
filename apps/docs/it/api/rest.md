@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 28e04ca9f95b
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: a12d1c342b33
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preset di conversione {#conversion-presets}
 
-Il catalogo condiviso include 117 endpoint dedicati ai preset di conversione, come `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. I preset sono route degli strumenti di prima classe:
+Il catalogo condiviso include 121 endpoint dedicati ai preset di conversione, come `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. I preset sono route degli strumenti di prima classe:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

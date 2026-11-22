@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 3f934ab6f7b1
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: e21be9a4863c
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 轉換預設 {#conversion-presets}
 
-共用目錄包含 117 個專屬的轉換預設端點，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 與 `excel-to-csv`。預設是第一級工具路由：
+共用目錄包含 121 個專屬的轉換預設端點，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 與 `excel-to-csv`。預設是第一級工具路由：
 
 `POST /api/v1/tools/<section>/<presetId>`
 
