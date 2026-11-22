@@ -15,6 +15,9 @@ describe("isEngineUnavailableFailure", () => {
     "ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)",
     "pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)",
     "soffice binary not found (set SOFFICE_PATH or install LibreOffice)",
+    // seamCarve's own wording, which content-aware-resize jobs fail with on a
+    // host without caire (#4987).
+    "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0",
   ])("treats a missing-binary message as engine-unavailable: %s", (message) => {
     expect(isEngineUnavailableFailure(new Error(message))).toBe(true);
   });

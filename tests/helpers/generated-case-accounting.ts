@@ -53,12 +53,12 @@ export function isEngineUnavailableResponse(statusCode: number, body: string): b
  * spawned. Match each engine's own "not found" wording, which it raises before
  * spawning anything. The lean docker test image ships without pdfcpu,
  * LibreOffice (soffice), and pandoc as well as ffmpeg, so all four gate the
- * same way. A real crash carries an exit code and stderr and has to stay a
- * failure.
+ * same way. CI shards have no caire, so content-aware-resize gates here too.
+ * A real crash carries an exit code and stderr and has to stay a failure.
  */
 export function isEngineUnavailableFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\b[^"]*?\bbinary not found\b/i.test(message)) {
+  if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc|caire)\b[^"]*?\bbinary not found\b/i.test(message)) {
     return true;
   }
   // A job payload carries the worker's fixed sentence, not the cause: it swaps
