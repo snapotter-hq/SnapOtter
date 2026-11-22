@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: b695afe5ec80
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 4df8c109bc93
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | ฮิสโทแกรม | `scale` (linear/log) - คืนค่าแผนภูมิฮิสโทแกรม RGB + สถิติต่อแชนเนล |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | ตัวสร้างบาร์โค้ด | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool) JSON body ไม่มีการอัปโหลดไฟล์ |
+| `aspect-ratio-calculator` | เครื่องคำนวณอัตราส่วนภาพ | `width`, `height`, `newWidth`, `newHeight`, `round` (bool) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
 
 ### เลย์เอาต์และการประกอบภาพ {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON เป็น XML | `pretty` (bool) - แบบสองทิศทาง |
 | `split-csv` | แยก CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | รวม CSV | - (หลายไฟล์ คอลัมน์ตรงกัน) |
+| `merge-text` | รวมไฟล์ข้อความ | `separator` (blank-line/rule/filename-heading) - หลายไฟล์ 2-50 ไฟล์ |
 | `yaml-json` | YAML / JSON | - (แบบสองทิศทาง) |
 | `xml-to-csv` | XML เป็น CSV | - (ค้นหาองค์ประกอบที่ซ้ำโดยอัตโนมัติ) |
 | `convert-font` | แปลงฟอนต์ | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | แปลงตัวพิมพ์ | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (แท็ก BCP 47) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
 | `proportion-calculator` | เครื่องคิดเลขสัดส่วน | `a`, `b`, `c`, `mode` (direct/inverse) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
+| `base64` | เข้ารหัส / ถอดรหัส Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
 | `excel-to-csv` | Excel เป็น CSV | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-spreadsheet` |
 | `create-zip` | สร้าง ZIP | - (หลายไฟล์ 2-50 ไฟล์) |
 | `extract-zip` | แตก ZIP | - (ป้องกัน bomb) |

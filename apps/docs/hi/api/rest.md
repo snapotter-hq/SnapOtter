@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: bf65de6c2265
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 1b3ae69a095b
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | हिस्टोग्राम | `scale` (linear/log) - RGB हिस्टोग्राम चार्ट + प्रति-चैनल आँकड़े लौटाता है |
 | `lqip-placeholder` | LQIP प्लेसहोल्डर | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | बारकोड जेनरेटर | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं। |
+| `aspect-ratio-calculator` | आस्पेक्ट रेशियो कैलकुलेटर | `width`, `height`, `newWidth`, `newHeight`, `round` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
 
 ### लेआउट और कंपोज़िशन {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON से XML | `pretty` (bool) - द्विदिशात्मक |
 | `split-csv` | CSV स्प्लिट करें | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV मर्ज करें | - (मल्टी-फ़ाइल, मेल खाते कॉलम) |
+| `merge-text` | टेक्स्ट फ़ाइलें मर्ज | `separator` (blank-line/rule/filename-heading) - मल्टी-फ़ाइल, 2-50 फ़ाइलें |
 | `yaml-json` | YAML / JSON | - (द्विदिशात्मक) |
 | `xml-to-csv` | XML से CSV | - (दोहराए जाने वाले तत्व स्वतः खोजता है) |
 | `convert-font` | फ़ॉन्ट कन्वर्ट | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | केस बदलें | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 टैग)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
 | `proportion-calculator` | अनुपात कैलकुलेटर | `a`, `b`, `c`, `mode` (direct/inverse)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
+| `base64` | Base64 एनकोड / डिकोड | `text`, `mode` (encode/decode), `urlSafe` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
 | `excel-to-csv` | Excel से CSV | `convert-spreadsheet` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
 | `create-zip` | ZIP बनाएँ | - (मल्टी-फ़ाइल, 2-50 फ़ाइलें) |
 | `extract-zip` | ZIP निकालें | - (bomb-संरक्षित) |

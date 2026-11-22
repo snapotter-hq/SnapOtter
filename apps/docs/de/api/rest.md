@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: e52f1c5b5c0e
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: d90a0b23dc5d
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `histogram` | Histogramm | `scale` (linear/log) - gibt RGB-Histogramm-Diagramm + Statistiken pro Kanal zurück |
 | `lqip-placeholder` | LQIP-Platzhalter | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode-Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON-Body, kein Datei-Upload. |
+| `aspect-ratio-calculator` | Seitenverhältnis-Rechner | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON-Body, kein Datei-Upload; gibt den fehlenden Wert zurück. |
 
 ### Layout & Komposition {#layout-composition}
 
@@ -381,11 +382,13 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `json-xml` | JSON zu XML | `pretty` (bool) - bidirektional |
 | `split-csv` | CSV aufteilen | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSVs zusammenführen | - (Mehrfachdatei, übereinstimmende Spalten) |
+| `merge-text` | Textdateien zusammenführen | `separator` (blank-line/rule/filename-heading) - Mehrfachdatei, 2-50 Dateien |
 | `yaml-json` | YAML / JSON | - (bidirektional) |
 | `xml-to-csv` | XML zu CSV | - (findet automatisch sich wiederholende Elemente) |
 | `convert-font` | Schrift konvertieren | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Groß-/Kleinschreibung ändern | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP-47-Tag). JSON-Body, kein Datei-Upload; gibt den umgewandelten Text zurück. |
 | `proportion-calculator` | Dreisatzrechner | `a`, `b`, `c`, `mode` (direct/inverse). JSON-Body, kein Datei-Upload; gibt den fehlenden Wert zurück. |
+| `base64` | Base64 kodieren / dekodieren | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-Body, kein Datei-Upload; gibt den umgewandelten Text zurück. |
 | `excel-to-csv` | Excel zu CSV | dediziertes Konvertierungs-Preset, gestützt auf `convert-spreadsheet` |
 | `create-zip` | ZIP erstellen | - (Mehrfachdatei, 2-50 Dateien) |
 | `extract-zip` | ZIP extrahieren | - (Bomben-geschützt) |

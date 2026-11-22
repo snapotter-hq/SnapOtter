@@ -238,6 +238,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `histogram` | Histogram | `scale` (linear/log) - returns RGB histogram chart + per-channel stats |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON body, no file upload. |
+| `aspect-ratio-calculator` | Aspect Ratio Calculator | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON body, no file upload; returns the missing value. |
 
 ### Layout & Composition {#layout-composition}
 
@@ -378,11 +379,13 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `json-xml` | JSON to XML | `pretty` (bool) - bidirectional |
 | `split-csv` | Split CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Merge CSVs | - (multi-file, matching columns) |
+| `merge-text` | Merge Text Files | `separator` (blank-line/rule/filename-heading) - multi-file, 2-50 files |
 | `yaml-json` | YAML / JSON | - (bidirectional) |
 | `xml-to-csv` | XML to CSV | - (auto-finds repeating elements) |
 | `convert-font` | Convert Font | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Convert Case | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 tag). JSON body, no file upload; returns the converted text. |
 | `proportion-calculator` | Proportion Calculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON body, no file upload; returns the missing value. |
+| `base64` | Base64 Encode / Decode | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON body, no file upload; returns the converted text. |
 | `excel-to-csv` | Excel to CSV | dedicated conversion preset backed by `convert-spreadsheet` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
 | `extract-zip` | Extract ZIP | - (bomb-protected) |

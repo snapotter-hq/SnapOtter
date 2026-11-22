@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 993d06b1a43a
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 05625539001e
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 히스토그램 | `scale`(linear/log) - RGB 히스토그램 차트 + 채널별 통계 반환 |
 | `lqip-placeholder` | LQIP 플레이스홀더 | `width`(4-64), `blur`, `strategy`(blur/pixelate/solid), `format`(webp/png/jpeg), `quality` |
 | `barcode-generate` | 바코드 생성기 | `text`, `type`(code128/ean13/upca/code39/itf14/datamatrix), `scale`(1-8), `includeText`(bool). JSON 본문, 파일 업로드 없음. |
+| `aspect-ratio-calculator` | 화면 비율 계산기 | `width`, `height`, `newWidth`, `newHeight`, `round`(bool). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
 
 ### 레이아웃 및 합성 {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON을 XML로 | `pretty`(bool) - 양방향 |
 | `split-csv` | CSV 분할 | `rowsPerFile`(1-1000000), `keepHeader`(bool) |
 | `merge-csvs` | CSV 병합 | - (다중 파일, 일치하는 열) |
+| `merge-text` | 텍스트 파일 병합 | `separator`(blank-line/rule/filename-heading) - 다중 파일, 2-50개 파일 |
 | `yaml-json` | YAML / JSON | - (양방향) |
 | `xml-to-csv` | XML을 CSV로 | - (반복 요소 자동 탐지) |
 | `convert-font` | 글꼴 변환 | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | 대소문자 변환 | `text`, `mode`(upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale`(BCP 47 태그). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
 | `proportion-calculator` | 비례식 계산기 | `a`, `b`, `c`, `mode`(direct/inverse). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
+| `base64` | Base64 인코딩 / 디코딩 | `text`, `mode`(encode/decode), `urlSafe`(bool). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
 | `excel-to-csv` | Excel을 CSV로 | `convert-spreadsheet`로 지원되는 전용 변환 프리셋 |
 | `create-zip` | ZIP 생성 | - (다중 파일, 2-50개 파일) |
 | `extract-zip` | ZIP 추출 | - (봄 보호) |

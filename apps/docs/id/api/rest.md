@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 40f805b184ec
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 1557558b7234
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `histogram` | Histogram | `scale` (linear/log) - mengembalikan grafik histogram RGB + statistik per kanal |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Body JSON, tanpa unggah file. |
+| `aspect-ratio-calculator` | Kalkulator rasio aspek | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
 
 ### Tata Letak & Komposisi {#layout-composition}
 
@@ -381,11 +382,13 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `json-xml` | JSON to XML | `pretty` (bool) - dua arah |
 | `split-csv` | Split CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Merge CSVs | - (multi-file, kolom yang cocok) |
+| `merge-text` | Gabung File Teks | `separator` (blank-line/rule/filename-heading) - multi-file, 2-50 file |
 | `yaml-json` | YAML / JSON | - (dua arah) |
 | `xml-to-csv` | XML to CSV | - (menemukan elemen berulang secara otomatis) |
 | `convert-font` | Konversi Font | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Ubah Huruf Besar/Kecil | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
 | `proportion-calculator` | Kalkulator Perbandingan | `a`, `b`, `c`, `mode` (direct/inverse). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
+| `base64` | Encode / Decode Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
 | `excel-to-csv` | Excel to CSV | preset konversi khusus yang didukung oleh `convert-spreadsheet` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Extract ZIP | - (terlindungi dari bomb) |

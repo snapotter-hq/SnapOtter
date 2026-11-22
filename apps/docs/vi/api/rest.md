@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: e71e5173c534
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: f8d730e26c10
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `histogram` | Biểu đồ tần suất | `scale` (linear/log) - trả về biểu đồ histogram RGB + thống kê từng kênh |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Trình tạo mã vạch | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Thân JSON, không tải tệp lên. |
+| `aspect-ratio-calculator` | Máy tính tỷ lệ khung hình | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Thân JSON, không tải tệp lên; trả về giá trị còn thiếu. |
 
 ### Bố cục & Sắp xếp {#layout-composition}
 
@@ -381,11 +382,13 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `json-xml` | JSON sang XML | `pretty` (bool) - hai chiều |
 | `split-csv` | Chia CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Ghép CSV | - (đa tệp, cột khớp nhau) |
+| `merge-text` | Ghép tệp văn bản | `separator` (blank-line/rule/filename-heading) - đa tệp, 2-50 tệp |
 | `yaml-json` | YAML / JSON | - (hai chiều) |
 | `xml-to-csv` | XML sang CSV | - (tự động tìm các phần tử lặp) |
 | `convert-font` | Chuyển đổi phông chữ | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Đổi chữ hoa/thường | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (thẻ BCP 47). Thân JSON, không tải tệp lên; trả về văn bản đã chuyển đổi. |
 | `proportion-calculator` | Máy tính tỉ lệ | `a`, `b`, `c`, `mode` (direct/inverse). Thân JSON, không tải tệp lên; trả về giá trị còn thiếu. |
+| `base64` | Mã hóa / giải mã Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Thân JSON, không tải tệp lên; trả về văn bản đã chuyển đổi. |
 | `excel-to-csv` | Excel sang CSV | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-spreadsheet` |
 | `create-zip` | Tạo ZIP | - (đa tệp, 2-50 tệp) |
 | `extract-zip` | Giải nén ZIP | - (chống bom nén) |

@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 1d4ef89ac8a2
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 6f7d086bcdd5
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 直方图 | `scale`（linear/log）- 返回 RGB 直方图图表 + 各通道统计 |
 | `lqip-placeholder` | LQIP 占位图 | `width`（4-64）、`blur`、`strategy`（blur/pixelate/solid）、`format`（webp/png/jpeg）、`quality` |
 | `barcode-generate` | 条形码生成器 | `text`、`type`（code128/ean13/upca/code39/itf14/datamatrix）、`scale`（1-8）、`includeText`（bool）。JSON 请求体，无需上传文件。 |
+| `aspect-ratio-calculator` | 宽高比计算器 | `width`、`height`、`newWidth`、`newHeight`、`round`（bool）。JSON 请求体，无需上传文件；返回缺失的值。 |
 
 ### 布局与合成 {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON 转 XML | `pretty`（bool）- 双向 |
 | `split-csv` | 拆分 CSV | `rowsPerFile`（1-1000000）、`keepHeader`（bool） |
 | `merge-csvs` | 合并 CSV | -（多文件，列匹配） |
+| `merge-text` | 合并文本文件 | `separator`（blank-line/rule/filename-heading） - 多文件，2-50 个文件 |
 | `yaml-json` | YAML / JSON | -（双向） |
 | `xml-to-csv` | XML 转 CSV | -（自动查找重复元素） |
 | `convert-font` | 转换字体 | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | 大小写转换 | `text`、`mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）、`locale`（BCP 47 标签）。JSON 请求体，无需上传文件；返回转换后的文本。 |
 | `proportion-calculator` | 比例计算器 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 请求体，无需上传文件；返回缺失的值。 |
+| `base64` | Base64 编码 / 解码 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 请求体，无需上传文件；返回转换后的文本。 |
 | `excel-to-csv` | Excel 转 CSV | 由 `convert-spreadsheet` 支撑的专用转换预设 |
 | `create-zip` | 创建 ZIP | -（多文件，2-50 个文件） |
 | `extract-zip` | 解压 ZIP | -（已做 ZIP 炸弹防护） |

@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 8bcf95e8aa36
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 31d2e1a3ae68
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `histogram` | Histograma | `scale` (linear/log) - devuelve un gráfico de histograma RGB + estadísticas por canal |
 | `lqip-placeholder` | Marcador de posición LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Generador de códigos de barras | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Cuerpo JSON, sin subida de archivo. |
+| `aspect-ratio-calculator` | Calculadora de relación de aspecto | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Cuerpo JSON, sin subida de archivo; devuelve el valor que falta. |
 
 ### Diseño y composición {#layout-composition}
 
@@ -381,11 +382,13 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `json-xml` | JSON a XML | `pretty` (bool) - bidireccional |
 | `split-csv` | Dividir CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Combinar CSV | - (multiarchivo, columnas coincidentes) |
+| `merge-text` | Unir archivos de texto | `separator` (blank-line/rule/filename-heading) - multiarchivo, 2-50 archivos |
 | `yaml-json` | YAML / JSON | - (bidireccional) |
 | `xml-to-csv` | XML a CSV | - (encuentra automáticamente los elementos repetidos) |
 | `convert-font` | Convertir fuente | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Convertir mayúsculas y minúsculas | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (etiqueta BCP 47). Cuerpo JSON, sin subida de archivo; devuelve el texto convertido. |
 | `proportion-calculator` | Calculadora de proporciones | `a`, `b`, `c`, `mode` (direct/inverse). Cuerpo JSON, sin subida de archivo; devuelve el valor que falta. |
+| `base64` | Codificar / decodificar Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Cuerpo JSON, sin subida de archivo; devuelve el texto convertido. |
 | `excel-to-csv` | Excel a CSV | preajuste de conversión dedicado respaldado por `convert-spreadsheet` |
 | `create-zip` | Crear ZIP | - (multiarchivo, 2-50 archivos) |
 | `extract-zip` | Extraer ZIP | - (protegido contra bombas) |

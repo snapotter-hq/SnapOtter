@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 4c2d9f344f41
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 2ceddbd16953
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | المخطط البياني | `scale` (linear/log) - يُرجع مخطط رسم بياني RGB + إحصائيات لكل قناة |
 | `lqip-placeholder` | عنصر نائب LQIP | `width` (4-64)، `blur`، `strategy` (blur/pixelate/solid)، `format` (webp/png/jpeg)، `quality` |
 | `barcode-generate` | مُولِّد الباركود | `text`، `type` (code128/ean13/upca/code39/itf14/datamatrix)، `scale` (1-8)، `includeText` (منطقي). نص JSON، دون رفع ملف. |
+| `aspect-ratio-calculator` | حاسبة نسبة العرض إلى الارتفاع | `width`، `height`، `newWidth`، `newHeight`، `round` (منطقي). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
 
 ### التخطيط والتركيب {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON إلى XML | `pretty` (منطقي) - ثنائي الاتجاه |
 | `split-csv` | تقسيم CSV | `rowsPerFile` (1-1000000)، `keepHeader` (منطقي) |
 | `merge-csvs` | دمج ملفات CSV | - (متعدد الملفات، أعمدة متطابقة) |
+| `merge-text` | دمج الملفات النصية | `separator` (blank-line/rule/filename-heading) - متعدد الملفات، 2-50 ملفًا |
 | `yaml-json` | YAML / JSON | - (ثنائي الاتجاه) |
 | `xml-to-csv` | XML إلى CSV | - (يعثر تلقائيًا على العناصر المتكررة) |
 | `convert-font` | تحويل خط | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | تحويل حالة الأحرف | `text`، `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab)، `locale` (وسم BCP 47). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
 | `proportion-calculator` | حاسبة التناسب | `a`، `b`، `c`، `mode` (direct/inverse). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
+| `base64` | ترميز / فك ترميز Base64 | `text`، `mode` (encode/decode)، `urlSafe` (منطقي). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
 | `excel-to-csv` | Excel إلى CSV | إعداد تحويل جاهز مخصص مدعوم بـ `convert-spreadsheet` |
 | `create-zip` | إنشاء ZIP | - (متعدد الملفات، 2-50 ملفًا) |
 | `extract-zip` | استخراج ZIP | - (محمي من قنابل الضغط) |

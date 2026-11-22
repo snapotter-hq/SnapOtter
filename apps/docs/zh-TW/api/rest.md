@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 5e8a0adc624e
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: f33a1427bf1c
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 直方圖 | `scale`（linear/log） - 回傳 RGB 直方圖圖表 + 各通道統計 |
 | `lqip-placeholder` | LQIP 佔位圖 | `width`（4-64）、`blur`、`strategy`（blur/pixelate/solid）、`format`（webp/png/jpeg）、`quality` |
 | `barcode-generate` | 條碼產生器 | `text`、`type`（code128/ean13/upca/code39/itf14/datamatrix）、`scale`（1-8）、`includeText`（bool）。JSON 主體，不需上傳檔案。 |
+| `aspect-ratio-calculator` | 長寬比計算器 | `width`、`height`、`newWidth`、`newHeight`、`round`（bool）。JSON 主體，不需上傳檔案；回傳缺少的值。 |
 
 ### 版面與構圖 {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON 轉 XML | `pretty`（bool） - 雙向 |
 | `split-csv` | 分割 CSV | `rowsPerFile`（1-1000000）、`keepHeader`（bool） |
 | `merge-csvs` | 合併 CSV | - （多檔案，欄位需相符） |
+| `merge-text` | 合併文字檔案 | `separator`（blank-line/rule/filename-heading） - 多檔案，2-50 個檔案 |
 | `yaml-json` | YAML / JSON | - （雙向） |
 | `xml-to-csv` | XML 轉 CSV | - （自動尋找重複元素） |
 | `convert-font` | 轉換字型 | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | 大小寫轉換 | `text`、`mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）、`locale`（BCP 47 標籤）。JSON 主體，不需上傳檔案；回傳轉換後的文字。 |
 | `proportion-calculator` | 比例計算機 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 主體，不需上傳檔案；回傳缺少的值。 |
+| `base64` | Base64 編碼 / 解碼 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 主體，不需上傳檔案；回傳轉換後的文字。 |
 | `excel-to-csv` | Excel 轉 CSV | 由 `convert-spreadsheet` 支援的專屬轉換預設 |
 | `create-zip` | 建立 ZIP | - （多檔案，2-50 個檔案） |
 | `extract-zip` | 解壓 ZIP | - （防炸彈保護） |

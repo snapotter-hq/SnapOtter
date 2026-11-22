@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 84f71608b622
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 419a6b7de182
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `histogram` | Histogramme | `scale` (linear/log) - renvoie un graphique d'histogramme RGB + statistiques par canal |
 | `lqip-placeholder` | Espace réservé LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Générateur de code-barres | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Corps JSON, aucun téléversement de fichier. |
+| `aspect-ratio-calculator` | Calculateur de format d'image | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Corps JSON, aucun téléversement de fichier ; renvoie la valeur manquante. |
 
 ### Mise en page et composition {#layout-composition}
 
@@ -381,11 +382,13 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `json-xml` | JSON vers XML | `pretty` (bool) - bidirectionnel |
 | `split-csv` | Diviser un CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Fusionner des CSV | - (multi-fichiers, colonnes correspondantes) |
+| `merge-text` | Fusionner des fichiers texte | `separator` (blank-line/rule/filename-heading) - multi-fichiers, 2-50 fichiers |
 | `yaml-json` | YAML / JSON | - (bidirectionnel) |
 | `xml-to-csv` | XML vers CSV | - (trouve automatiquement les éléments répétés) |
 | `convert-font` | Convertir une police | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Changer la casse | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (balise BCP 47). Corps JSON, aucun téléversement de fichier ; renvoie le texte converti. |
 | `proportion-calculator` | Calculateur de proportions | `a`, `b`, `c`, `mode` (direct/inverse). Corps JSON, aucun téléversement de fichier ; renvoie la valeur manquante. |
+| `base64` | Encoder / décoder en Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corps JSON, aucun téléversement de fichier ; renvoie le texte converti. |
 | `excel-to-csv` | Excel vers CSV | préréglage de conversion dédié adossé à `convert-spreadsheet` |
 | `create-zip` | Créer un ZIP | - (multi-fichiers, 2-50 fichiers) |
 | `extract-zip` | Extraire un ZIP | - (protégé contre les bombes) |

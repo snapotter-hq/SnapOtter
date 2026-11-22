@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 2a4320693584
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 0ecb79fb6ec7
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `histogram` | Histogram | `scale` (linear/log) - RGB histogram grafiği + kanal başına istatistikler döndürür |
 | `lqip-placeholder` | LQIP Yer Tutucu | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barkod Oluşturucu | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON gövdesi, dosya yükleme yok. |
+| `aspect-ratio-calculator` | En boy oranı hesaplayıcı | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
 
 ### Düzen ve Kompozisyon {#layout-composition}
 
@@ -381,11 +382,13 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `json-xml` | JSON'dan XML'e | `pretty` (bool) - çift yönlü |
 | `split-csv` | CSV'yi Böl | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV'leri Birleştir | - (çok dosyalı, eşleşen sütunlar) |
+| `merge-text` | Metin Dosyalarını Birleştir | `separator` (blank-line/rule/filename-heading) - çok dosyalı, 2-50 dosya |
 | `yaml-json` | YAML / JSON | - (çift yönlü) |
 | `xml-to-csv` | XML'den CSV'ye | - (yinelenen öğeleri otomatik bulur) |
 | `convert-font` | Yazı Tipi Dönüştür | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Büyük/Küçük Harf Dönüştür | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 etiketi). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
 | `proportion-calculator` | Orantı Hesaplayıcı | `a`, `b`, `c`, `mode` (direct/inverse). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
+| `base64` | Base64 Kodla / Çöz | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
 | `excel-to-csv` | Excel'den CSV'ye | `convert-spreadsheet` tarafından desteklenen özel dönüştürme ön ayarı |
 | `create-zip` | ZIP Oluştur | - (çok dosyalı, 2-50 dosya) |
 | `extract-zip` | ZIP Ayıkla | - (bomba korumalı) |

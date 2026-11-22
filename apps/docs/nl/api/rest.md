@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: 31821058dc3d
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 7b62451dadae
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `histogram` | Histogram | `scale` (linear/log) - retourneert een RGB-histogramgrafiek + statistieken per kanaal |
 | `lqip-placeholder` | LQIP-placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcodegenerator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON-body, geen bestandsupload. |
+| `aspect-ratio-calculator` | Beeldverhouding-calculator | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
 
 ### Layout & compositie {#layout-composition}
 
@@ -381,11 +382,13 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `json-xml` | JSON naar XML | `pretty` (bool) - bidirectioneel |
 | `split-csv` | CSV splitsen | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV's samenvoegen | - (meerdere bestanden, overeenkomende kolommen) |
+| `merge-text` | Tekstbestanden samenvoegen | `separator` (blank-line/rule/filename-heading) - meerdere bestanden, 2-50 bestanden |
 | `yaml-json` | YAML / JSON | - (bidirectioneel) |
 | `xml-to-csv` | XML naar CSV | - (vindt automatisch herhalende elementen) |
 | `convert-font` | Lettertype converteren | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Hoofdletters wijzigen | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47-tag). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
 | `proportion-calculator` | Verhoudingscalculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
+| `base64` | Base64 coderen / decoderen | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
 | `excel-to-csv` | Excel naar CSV | speciale conversiepreset ondersteund door `convert-spreadsheet` |
 | `create-zip` | ZIP maken | - (meerdere bestanden, 2-50 bestanden) |
 | `extract-zip` | ZIP uitpakken | - (beschermd tegen zip-bommen) |

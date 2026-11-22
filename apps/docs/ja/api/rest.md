@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 61df7dabbae7
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: de77721e539d
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | ヒストグラム | `scale`（linear/log） - RGB ヒストグラムチャートとチャンネルごとの統計を返す |
 | `lqip-placeholder` | LQIP プレースホルダー | `width`（4-64）, `blur`, `strategy`（blur/pixelate/solid）, `format`（webp/png/jpeg）, `quality` |
 | `barcode-generate` | バーコードジェネレーター | `text`, `type`（code128/ean13/upca/code39/itf14/datamatrix）, `scale`（1-8）, `includeText`（bool）。JSON ボディ、ファイルアップロードなし。 |
+| `aspect-ratio-calculator` | アスペクト比計算機 | `width`, `height`, `newWidth`, `newHeight`, `round`（bool）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
 
 ### レイアウトと構成 {#layout-composition}
 
@@ -381,11 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON から XML | `pretty`（bool） - 双方向 |
 | `split-csv` | CSV の分割 | `rowsPerFile`（1-1000000）, `keepHeader`（bool） |
 | `merge-csvs` | CSV の結合 | -（複数ファイル、列が一致するもの） |
+| `merge-text` | テキストファイル結合 | `separator`（blank-line/rule/filename-heading） - 複数ファイル、2-50 ファイル |
 | `yaml-json` | YAML / JSON | -（双方向） |
 | `xml-to-csv` | XML から CSV | -（繰り返し要素を自動検出） |
 | `convert-font` | フォント変換 | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | 大文字・小文字変換 | `text`, `mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）, `locale`（BCP 47 タグ）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
 | `proportion-calculator` | 比例計算機 | `a`, `b`, `c`, `mode`（direct/inverse）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
+| `base64` | Base64 エンコード / デコード | `text`, `mode`（encode/decode）, `urlSafe`（bool）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
 | `excel-to-csv` | Excel から CSV | `convert-spreadsheet` を基盤とする専用の変換プリセット |
 | `create-zip` | ZIP の作成 | -（複数ファイル、2-50 ファイル） |
 | `extract-zip` | ZIP の展開 | -（ボム対策済み） |

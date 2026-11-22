@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 74b1a9692185
-i18n_source_hash: 477830ee7b9e
+i18n_output_hash: 816dd5e15fc6
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -241,6 +241,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `histogram` | Histogram | `scale` (linear/log) - returnerar RGB-histogramdiagram + statistik per kanal |
 | `lqip-placeholder` | LQIP-platshållare | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Streckkodsgenerator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON-kropp, ingen filuppladdning. |
+| `aspect-ratio-calculator` | Bildförhållanderäknare | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON-kropp, ingen filuppladdning; ger det saknade värdet. |
 
 ### Layout och komposition {#layout-composition}
 
@@ -381,11 +382,13 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `json-xml` | JSON till XML | `pretty` (bool) - dubbelriktad |
 | `split-csv` | Dela CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Slå ihop CSV:er | - (flerfil, matchande kolumner) |
+| `merge-text` | Sammanfoga textfiler | `separator` (blank-line/rule/filename-heading) - flerfil, 2-50 filer |
 | `yaml-json` | YAML / JSON | - (dubbelriktad) |
 | `xml-to-csv` | XML till CSV | - (hittar automatiskt upprepade element) |
 | `convert-font` | Konvertera typsnitt | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Ändra skiftläge | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47-tagg). JSON-kropp, ingen filuppladdning; ger den konverterade texten. |
 | `proportion-calculator` | Proportionsräknare | `a`, `b`, `c`, `mode` (direct/inverse). JSON-kropp, ingen filuppladdning; ger det saknade värdet. |
+| `base64` | Base64-koda / avkoda | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-kropp, ingen filuppladdning; ger den konverterade texten. |
 | `excel-to-csv` | Excel till CSV | dedikerad konverteringsförinställning som backas upp av `convert-spreadsheet` |
 | `create-zip` | Skapa ZIP | - (flerfil, 2-50 filer) |
 | `extract-zip` | Extrahera ZIP | - (bombskyddad) |

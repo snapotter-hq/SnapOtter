@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 0856e9ff981f
+i18n_output_hash: cce029ed0269
 i18n_hash_version: 2
-i18n_source_hash: 477830ee7b9e
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -242,6 +242,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | Гістограма | `scale` (linear/log) - повертає діаграму RGB-гістограми + статистику по кожному каналу |
 | `lqip-placeholder` | LQIP-заповнювач | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Генератор штрихкодів | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Тіло JSON, без завантаження файлу. |
+| `aspect-ratio-calculator` | Калькулятор співвідношення сторін | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Тіло JSON, без завантаження файлу; повертає відсутнє значення. |
 
 ### Компонування й композиція {#layout-composition}
 
@@ -382,11 +383,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON у XML | `pretty` (bool) - двонапрямний |
 | `split-csv` | Розділення CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Об'єднання CSV | - (багатофайловий, збіжні стовпці) |
+| `merge-text` | Об'єднання текстових файлів | `separator` (blank-line/rule/filename-heading) - багатофайловий, 2-50 файлів |
 | `yaml-json` | YAML / JSON | - (двонапрямний) |
 | `xml-to-csv` | XML у CSV | - (автоматично знаходить повторювані елементи) |
 | `convert-font` | Конвертація шрифтів | `format` (ttf, otf, woff, woff2) |
 | `convert-case` | Змінити регістр | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (тег BCP 47). Тіло JSON, без завантаження файлу; повертає перетворений текст. |
 | `proportion-calculator` | Калькулятор пропорцій | `a`, `b`, `c`, `mode` (direct/inverse). Тіло JSON, без завантаження файлу; повертає відсутнє значення. |
+| `base64` | Кодування / декодування Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Тіло JSON, без завантаження файлу; повертає перетворений текст. |
 | `excel-to-csv` | Excel у CSV | виділений пресет конвертації на основі `convert-spreadsheet` |
 | `create-zip` | Створення ZIP | - (багатофайловий, 2-50 файлів) |
 | `extract-zip` | Витяг ZIP | - (захищено від zip-бомб) |
