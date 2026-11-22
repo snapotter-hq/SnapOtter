@@ -505,7 +505,14 @@ export function PassportPhotoSettings() {
     });
 
     const controller = new AbortController();
-    const run = beginPassportGenerateRun(() => controller.abort());
+    // Until the answer is read, the server may already have queued the job,
+    // and a cancel sent at the stop could land before the route stamps its
+    // alias (#886). A stop then leaves the request open, and the check after
+    // the answer cancels a 202 by clientJobId (#5115).
+    let awaitingAnswer = false;
+    const run = beginPassportGenerateRun(() => {
+      if (!awaitingAnswer) controller.abort();
+    });
     const targetAnalysis = analyzeResult;
     const isCurrent = () =>
       run.isCurrent() &&
@@ -543,6 +550,7 @@ export function PassportPhotoSettings() {
         clientJobId,
       };
 
+      awaitingAnswer = true;
       const response = await fetch(appUrl("/api/v1/tools/image/passport-photo/generate"), {
         method: "POST",
         headers,
@@ -580,7 +588,11 @@ export function PassportPhotoSettings() {
         if (err instanceof SyntaxError) return null;
         throw err;
       });
-      if (!isCurrent()) return;
+      awaitingAnswer = false;
+      if (!isCurrent()) {
+        if (response.status === 202) void cancelAbandonedJob(clientJobId, "passport-photo");
+        return;
+      }
       // The generate job outlasted the sync window: the server queued it and
       // the result arrives on the job's progress stream.
       if (response.status === 202) {
@@ -619,6 +631,7 @@ export function PassportPhotoSettings() {
         userErrorMessage(t, err, t.toolSettings["passport-photo"].photoGenerationFailed),
       );
     } finally {
+      awaitingAnswer = false;
       run.end();
       if (run.isCurrent()) {
         setGenerating(false);

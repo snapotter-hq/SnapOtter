@@ -92,13 +92,20 @@ let captureController: AbortController | null = null;
 let captureRunId = 0;
 // The progress id of the capture the server queued, while it is running.
 let queuedJobId: string | null = null;
+// The run whose request is out and whose answer is not read yet. The server
+// may already have queued its job, so a stop in that window leaves the request
+// open and the run cancels by clientJobId if the answer is a 202 (#5115). A
+// cancel sent at the stop could land before the route stamps the alias and
+// miss the job (#886).
+let awaitingAnswerRunId: number | null = null;
 
 /** Abort the current run and cancel its server job if the server queued one. */
 function abortCurrentCapture() {
+  const keepRequest = awaitingAnswerRunId === captureRunId;
   captureRunId++;
   const controller = captureController;
   captureController = null;
-  controller?.abort();
+  if (!keepRequest) controller?.abort();
   if (queuedJobId) {
     void cancelAbandonedJob(queuedJobId, TOOL_ID);
     queuedJobId = null;
@@ -149,6 +156,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     let followedJobId: string | null = null;
 
     try {
+      awaitingAnswerRunId = runId;
       const res = await fetch(appUrl("/api/v1/tools/image/html-to-image"), {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
@@ -180,7 +188,11 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         if (err instanceof SyntaxError) return null;
         throw err;
       });
-      if (!isCurrent()) return;
+      if (awaitingAnswerRunId === runId) awaitingAnswerRunId = null;
+      if (!isCurrent()) {
+        if (res.status === 202) void cancelAbandonedJob(clientJobId, TOOL_ID);
+        return;
+      }
 
       // The capture outlasted the sync window: the server queued it and the
       // result arrives on the job's progress stream.
@@ -227,6 +239,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         capturing: false,
       });
     } finally {
+      if (awaitingAnswerRunId === runId) awaitingAnswerRunId = null;
       if (captureController === controller) captureController = null;
       if (followedJobId && queuedJobId === followedJobId) queuedJobId = null;
       if (isCurrent()) set({ capturing: false, progress: null, queued: false });
