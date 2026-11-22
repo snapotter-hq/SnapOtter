@@ -134,6 +134,7 @@ test.describe("passport-photo generate after the analysis expired (#1674)", () =
         body: JSON.stringify({
           error: "Passport photo generation failed",
           details: "Couldn't get this photo under 1 KB at the required dimensions.",
+          code: "TARGET_SIZE_UNREACHABLE",
         }),
       }),
     );
@@ -144,8 +145,12 @@ test.describe("passport-photo generate after the analysis expired (#1674)", () =
 
     await generate.click();
 
+    // The panel shows the code's translated message, never the server's
+    // English details (#4447).
     await expect(
-      page.getByText("Couldn't get this photo under 1 KB at the required dimensions."),
+      page.getByText(
+        "This file can't be made small enough for the target size. Try a larger target.",
+      ),
     ).toBeVisible();
     // A wrong re-analysis would hang on the held mock and hide the button.
     await expect(generate).toBeVisible();
