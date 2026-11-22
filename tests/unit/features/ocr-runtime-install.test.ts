@@ -2439,6 +2439,62 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(clearTimeoutSpy).toHaveBeenCalledWith(retryTimers[0]);
   });
 
+  it("stops a running download when the caller's signal aborts, without calling it a timeout", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-caller-abort-"));
+    temporaryDirectories.push(directory);
+    const caller = new AbortController();
+    let fetchSignal: AbortSignal | undefined;
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementationOnce(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          fetchSignal = init?.signal ?? undefined;
+          fetchSignal?.addEventListener("abort", () => reject(fetchSignal?.reason), {
+            once: true,
+          });
+        }),
+    );
+
+    const download = downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [],
+      fetchImpl,
+      retry: { maxAttempts: 3, baseDelayMs: 0, maxDelayMs: 0, random: () => 0 },
+      signal: caller.signal,
+    });
+    await vi.waitFor(() => expect(fetchSignal).toBeDefined());
+    caller.abort();
+
+    const error = await download.catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(String((error as Error).message)).not.toContain("timed out");
+    expect(fetchSignal?.aborted).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it("makes no request when the caller's signal is already aborted", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-caller-preabort-"));
+    temporaryDirectories.push(directory);
+    const caller = new AbortController();
+    caller.abort();
+    const fetchImpl = vi.fn<typeof fetch>();
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [],
+        fetchImpl,
+        signal: caller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("roots serialized cache mutations in descriptors and a group-shared quarantine", () => {
     const source = readFileSync(
       join(process.cwd(), "apps/api/src/lib/ocr-runtime-install.ts"),

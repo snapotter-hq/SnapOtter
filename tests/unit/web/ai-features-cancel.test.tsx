@@ -89,9 +89,12 @@ describe("AiFeaturesSection install cancel (#4763)", () => {
     expect(button).toBeDisabled();
   });
 
-  it("offers no Cancel on a started Accurate OCR install, which the server can't stop", () => {
+  it("offers Cancel on a started Accurate OCR install (#4979)", () => {
     renderSection({ installing: { ocr: { percent: 40, stage: "Downloading" } } });
 
-    expect(cancelButtons()).toHaveLength(0);
+    const buttons = cancelButtons();
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(cancelInstall).toHaveBeenCalledWith("ocr");
   });
 });
