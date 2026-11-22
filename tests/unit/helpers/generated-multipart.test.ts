@@ -44,6 +44,18 @@ describe("generated multipart payloads", () => {
     ).toEqual(["file", "overlay", "settings"]);
   });
 
+  it("sends the companion image as the erase-object mask (#4930)", () => {
+    const fields = buildGeneratedMultipartFields({
+      toolId: "erase-object",
+      primary,
+      settings: {},
+      companions: { image, audio, subtitle },
+    });
+
+    expect(fields.map(({ name }) => name)).toEqual(["file", "mask", "settings"]);
+    expect(fields.find(({ name }) => name === "mask")?.filename).toBe("companion.png");
+  });
+
   it("builds valid mixed-kind tuples", () => {
     const subtitleFields = buildGeneratedMultipartFields({
       toolId: "burn-subtitles",

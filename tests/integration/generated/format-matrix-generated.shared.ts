@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ import {
   isRecordedRejection,
   requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
+import { formatMatrixPositiveControl } from "../../helpers/generated-fixtures.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
 import {
@@ -185,11 +186,17 @@ export function registerToolFormatMatrix(part: number): void {
         const toolFixtureFiles = process.env.FULL_MATRIX
           ? fixtureFiles
           : [...new Set([...fixtureFiles, ...(acceptedFixture ? [acceptedFixture] : [])])];
+        const positiveControl = formatMatrixPositiveControl(toolId);
+        const toolFixturePaths = [
+          ...toolFixtureFiles.map((filename) => join(fixtureDir.formats, filename)),
+          ...(positiveControl ? [positiveControl] : []),
+        ];
         const accounting = new GeneratedCaseAccounting(toolId, {
-          expectedAttempts: toolFixtureFiles.length,
+          expectedAttempts: toolFixturePaths.length,
         });
-        for (const fixture of toolFixtureFiles) {
-          const content = readFileSync(join(fixtureDir.formats, fixture));
+        for (const fixturePath of toolFixturePaths) {
+          const fixture = basename(fixturePath);
+          const content = readFileSync(fixturePath);
           const { body, contentType } = createMultipartPayload(
             buildGeneratedMultipartFields({
               toolId,
