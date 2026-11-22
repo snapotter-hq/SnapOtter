@@ -408,6 +408,22 @@ describe("convertDocument timeout", () => {
     }
   });
 
+  it("treats timeoutMs 0 as no deadline (LIBREOFFICE_TIMEOUT_S=0, #5201)", async () => {
+    const mod = await import("../src/libreoffice.js");
+    vi.useFakeTimers();
+    try {
+      const child = nextManual();
+      readdir.mockResolvedValueOnce(["report.pdf"]);
+      const pending = mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { timeoutMs: 0 });
+      await vi.advanceTimersByTimeAsync(86_400_000);
+      expect(child.killSignals).toEqual([]);
+      settleClose(child, { code: 0 });
+      await expect(pending).resolves.toBe("/outdir/report.pdf");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
     const mod = await import("../src/libreoffice.js");
     const ac = new AbortController();

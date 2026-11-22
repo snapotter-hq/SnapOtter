@@ -12,6 +12,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { rateLimitMax } from "../lib/rate-limit-max.js";
 import { isStorableJson } from "../lib/storable-json.js";
 import {
   getEffectivePermissions,
@@ -23,7 +24,10 @@ import { type AuthUser, computeKeyPrefix, hashPassword, requireAuth } from "../p
 // Per-route cap on the API-key management endpoints. Defaults to 30/min as an
 // anti-abuse guard; raised via env in the e2e suite, where many api-keys specs
 // hit the list endpoint in quick succession on a shared IP.
-const API_KEYS_RATE_LIMIT = { max: env.API_KEYS_RATE_LIMIT_PER_MIN, timeWindow: "1 minute" };
+const API_KEYS_RATE_LIMIT = {
+  max: rateLimitMax(env.API_KEYS_RATE_LIMIT_PER_MIN),
+  timeWindow: "1 minute",
+};
 
 export const createApiKeySchema = z.object({
   name: z.string().max(100, "Key name must be 100 characters or fewer").optional(),

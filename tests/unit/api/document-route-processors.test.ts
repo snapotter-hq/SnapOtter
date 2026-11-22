@@ -26,6 +26,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
     MAX_SVG_SIZE_MB: 10,
     MAX_UPLOAD_SIZE_MB: 50,
     RATE_LIMIT_PER_MIN: 0,
+    LIBREOFFICE_TIMEOUT_S: 120,
   },
 }));
 
@@ -125,6 +126,7 @@ import {
   runPandoc,
 } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
+import { env } from "../../../apps/api/src/config.js";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
@@ -1607,6 +1609,27 @@ describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3
         "pdf",
         { timeoutMs: 120_000, signal: pptCtx.signal },
       );
+    });
+  });
+
+  it("passes timeoutMs 0 (no deadline) when LIBREOFFICE_TIMEOUT_S=0 (#5201)", async () => {
+    registerWordToPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      vi.mocked(convertDocument).mockResolvedValue(join(scratchDir, "out.pdf"));
+      env.LIBREOFFICE_TIMEOUT_S = 0;
+      try {
+        const wordCtx = createCtx(scratchDir, "letter.docx");
+        await getToolConfig("word-to-pdf")?.processV2?.(wordCtx);
+        expect(convertDocument).toHaveBeenLastCalledWith(
+          join(scratchDir, "in-letter.docx"),
+          scratchDir,
+          "pdf",
+          { timeoutMs: 0, signal: wordCtx.signal },
+        );
+      } finally {
+        env.LIBREOFFICE_TIMEOUT_S = 120;
+      }
     });
   });
 

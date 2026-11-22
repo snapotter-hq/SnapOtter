@@ -36,6 +36,7 @@ import {
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
+import { rateLimitMax } from "../lib/rate-limit-max.js";
 import {
   evictExcessUserSessions,
   readMaxSessionsPerUser,
@@ -597,7 +598,7 @@ async function getLoginAttemptLimit(): Promise<number> {
     const parsed = parseInt(row.value, 10);
     if (!Number.isNaN(parsed) && parsed > 0) return parsed;
   }
-  return env.LOGIN_ATTEMPT_LIMIT;
+  return rateLimitMax(env.LOGIN_ATTEMPT_LIMIT);
 }
 
 // ── Per-username failed-login throttle (issue #820) ──────────────

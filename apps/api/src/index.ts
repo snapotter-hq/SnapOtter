@@ -54,6 +54,7 @@ import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
+import { rateLimitMax } from "./lib/rate-limit-max.js";
 import { redactUrl } from "./lib/redact-url.js";
 import { requestsInFlight, trackRequestsInFlight } from "./lib/requests-in-flight.js";
 import { classifyAnalyticsConsentOrigin, ensureDefaultSettings } from "./lib/settings-helpers.js";
@@ -453,9 +454,8 @@ app.addHook("onResponse", (request, reply, done) => {
 });
 
 // Always register rate-limit plugin so per-route limits (login brute-force protection) work.
-// max=0 means "unlimited" (50k/min) -- @fastify/rate-limit treats literal 0 as "block all".
 await app.register(rateLimit, {
-  max: env.RATE_LIMIT_PER_MIN > 0 ? env.RATE_LIMIT_PER_MIN : 50_000,
+  max: rateLimitMax(env.RATE_LIMIT_PER_MIN),
   timeWindow: "1 minute",
   allowList: (request) => !request.url.startsWith("/api/"),
 });

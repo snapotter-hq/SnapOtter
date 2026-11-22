@@ -292,6 +292,22 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
     expect(existsSync(join(previewDir, "aud.5678.part.mp3"))).toBe(true);
   });
 
+  it("keeps an hour-old conversion dir when LIBREOFFICE_TIMEOUT_S=0 means no deadline (#5201)", async () => {
+    config.LIBREOFFICE_TIMEOUT_S = 0;
+    try {
+      await mkdir(join(previewDir, "doc-slow01"));
+      const anHourAgo = new Date(Date.now() - 3_600_000);
+      await utimes(join(previewDir, "doc-slow01"), anHourAgo, anHourAgo);
+
+      const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+      await ensurePreviewDir();
+
+      expect(existsSync(join(previewDir, "doc-slow01"))).toBe(true);
+    } finally {
+      config.LIBREOFFICE_TIMEOUT_S = 120;
+    }
+  });
+
   it("sweeps once per process, even for concurrent first calls", async () => {
     const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
     const first = ensurePreviewDir();
