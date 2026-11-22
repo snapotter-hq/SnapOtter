@@ -108,6 +108,22 @@ describe.skipIf(!ffmpegAvailable())("volume-adjust (requires ffmpeg)", () => {
     60_000,
   );
 
+  it("keeps an .aif input as AIFF instead of re-encoding to mp3 (#5161)", async () => {
+    const res = await runTool(
+      { gainDb: 3 },
+      sineSource("tone.aif", "pcm_s16be"),
+      "tone.aif",
+      "audio/aiff",
+    );
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    expect(envelope.downloadUrl).toMatch(/tone_volume\.aif$/);
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.headers["content-type"]).toMatch(/^audio\/aiff/);
+    expect(await outputAudioCodec(dl.rawPayload, "out.aif")).toBe("pcm_s16be");
+  }, 60_000);
+
   it("rejects gainDb out of range (50)", async () => {
     const res = await runTool({ gainDb: 50 });
     expect(res.statusCode).toBe(400);

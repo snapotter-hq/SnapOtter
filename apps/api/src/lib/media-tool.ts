@@ -123,6 +123,7 @@ const EXT_AUDIO_CONTENT_TYPES: Record<string, string> = {
   ".opus": "audio/opus",
   ".wma": "audio/x-ms-wma",
   ".aiff": "audio/aiff",
+  ".aif": "audio/aiff",
 };
 
 /** Content type for a preserved-container audio output; mpeg fallback. */
@@ -233,6 +234,11 @@ const AUDIO_OUTPUTS: Record<
   },
   ".aiff": {
     ext: ".aiff",
+    contentType: "audio/aiff",
+    encodeArgs: (audio) => ["-c:a", aiffPcmCodec(audio)],
+  },
+  ".aif": {
+    ext: ".aif",
     contentType: "audio/aiff",
     encodeArgs: (audio) => ["-c:a", aiffPcmCodec(audio)],
   },
