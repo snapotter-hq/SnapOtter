@@ -5,7 +5,7 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
-import { hasServerErrorStatus } from "@snapotter/shared";
+import { hasServerErrorStatus, wrapWithMemoryLimit } from "@snapotter/shared";
 import { env } from "../config.js";
 import { InputValidationError } from "../modality/contract.js";
 import { stripInternalPaths } from "./errors.js";
@@ -122,10 +122,10 @@ export async function inspectMetadata(buffer: Buffer, filename: string): Promise
 
   try {
     await writeTempExclusive(tempPath, buffer);
-    const { stdout } = await execFileAsync(bin, ["-json", "-G", "-struct", "-n", tempPath], {
-      timeout: 60_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const { stdout } = await execFileAsync(
+      ...wrapWithMemoryLimit(bin, ["-json", "-G", "-struct", "-n", tempPath]),
+      { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 },
+    );
 
     const parsed = JSON.parse(stdout);
     const raw = parsed[0] ?? {};
@@ -203,7 +203,7 @@ export async function writeMetadata(
 
   try {
     await writeTempExclusive(tempPath, buffer);
-    await execFileAsync(bin, ["-overwrite_original", ...tags, tempPath], {
+    await execFileAsync(...wrapWithMemoryLimit(bin, ["-overwrite_original", ...tags, tempPath]), {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -237,8 +237,7 @@ export async function readImageDimensions(
   try {
     await writeTempExclusive(tempPath, buffer);
     const { stdout } = await execFileAsync(
-      bin,
-      ["-json", "-ImageWidth", "-ImageHeight", tempPath],
+      ...wrapWithMemoryLimit(bin, ["-json", "-ImageWidth", "-ImageHeight", tempPath]),
       { timeout: 10_000 },
     );
     const [data] = JSON.parse(stdout);
