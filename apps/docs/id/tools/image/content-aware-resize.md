@@ -1,8 +1,8 @@
 ---
 description: "Pengubahan ukuran seam-carving yang menambah atau menghapus piksel di sepanjang jalur berkepentingan rendah untuk mempertahankan konten kunci dan wajah."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 9e1054865a22
+i18n_output_hash: d5878215219f
 ---
 
 # Pengubahan Ukuran Sadar-Konten {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Catatan {#notes}
 
 - Menggunakan pustaka seam carving `caire` untuk pengubahan ukuran sadar-konten.
-- Hanya mengurangi dimensi (menghapus seam). Tidak dapat memperluas gambar melampaui ukuran aslinya.
+- Mengecilkan dengan menghapus seam atau memperbesar dengan menyisipkannya. Setiap sisi dapat bertambah paling banyak hingga 2x ukuran aslinya.
 - Opsi `protectFaces` menggunakan deteksi wajah AI untuk menandai area wajah sebagai berenergi tinggi, mencegah seam melewati wajah.
 - `blurRadius` mengontrol penghalusan sebelum perhitungan peta energi. Nilai lebih tinggi membuat peta energi lebih seragam, yang dapat membantu pada gambar berderau.
 - `sobelThreshold` memengaruhi seberapa agresif tepi dideteksi. Nilai lebih rendah mempertahankan lebih banyak tepi halus.

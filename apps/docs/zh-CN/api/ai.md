@@ -473,7 +473,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 **工具路由：** `content-aware-resize`  
 **引擎：** Go `caire` 二进制文件（非 Python，无 GPU 收益）
 
-通过移除低能量接缝智能地缩放图像，保留重要内容。
+通过移除或插入低能量接缝智能地缩放图像，保留重要内容。每条边最多可放大到原始尺寸的 2 倍。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|

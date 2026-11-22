@@ -472,7 +472,7 @@ Ein zusätzlicher Analyse-Endpunkt ist unter `POST /api/v1/tools/image/image-enh
 **Werkzeug-Route:** `content-aware-resize`  
 **Engine:** Go-Binary `caire` (kein Python - kein GPU-Vorteil)
 
-Ändert die Größe von Bildern intelligent, indem energiearme Nähte entfernt und wichtige Inhalte erhalten werden.
+Ändert die Größe von Bildern intelligent, indem energiearme Nähte entfernt oder eingefügt und wichtige Inhalte erhalten werden. Jede Seite kann auf höchstens das Doppelte ihrer ursprünglichen Größe wachsen.
 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|

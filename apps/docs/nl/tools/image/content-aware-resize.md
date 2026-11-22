@@ -1,8 +1,8 @@
 ---
 description: "Formaatwijziging met seam carving die pixels toevoegt of verwijdert langs paden van laag belang om belangrijke inhoud en gezichten te behouden."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 1834ea3b5341
+i18n_output_hash: 370e03960f5f
 ---
 
 # Inhoudsbewuste formaatwijziging {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Opmerkingen {#notes}
 
 - Gebruikt de seam-carving-bibliotheek `caire` voor inhoudsbewuste formaatwijziging.
-- Verkleint alleen afmetingen (verwijdert seams). Kan een afbeelding niet vergroten boven de oorspronkelijke grootte.
+- Verkleint door seams te verwijderen of vergroot door ze in te voegen. Elke zijde kan groeien tot maximaal het dubbele van de oorspronkelijke grootte.
 - De optie `protectFaces` gebruikt AI-gezichtsdetectie om gezichtsgebieden als hoog-energetisch te markeren, zodat er geen seams door gezichten lopen.
 - `blurRadius` regelt de gladstrijking vóór de berekening van de energiekaart. Hogere waarden maken de energiekaart uniformer, wat kan helpen bij ruisrijke afbeeldingen.
 - `sobelThreshold` bepaalt hoe agressief randen worden gedetecteerd. Lagere waarden behouden meer subtiele randen.

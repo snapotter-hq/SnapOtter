@@ -470,7 +470,7 @@ An additional analysis endpoint is available at `POST /api/v1/tools/image/image-
 **Tool route:** `content-aware-resize`
 **Engine:** Go `caire` binary (not Python - no GPU benefit)
 
-Intelligently resizes images by removing low-energy seams, preserving important content.
+Intelligently resizes images by removing or inserting low-energy seams, preserving important content. Each side can grow to at most 2x its original size.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

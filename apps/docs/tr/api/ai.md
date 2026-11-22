@@ -472,7 +472,7 @@ Görüntüyü analiz eder ve pozlama, kontrast, beyaz dengesi, doygunluk, keskin
 **Araç rotası:** `content-aware-resize`  
 **Motor:** Go `caire` ikilisi (Python değil, GPU avantajı yok)
 
-Düşük enerjili dikişleri kaldırarak görüntüleri akıllıca yeniden boyutlandırır, önemli içeriği korur.
+Düşük enerjili dikişleri kaldırarak veya ekleyerek görüntüleri akıllıca yeniden boyutlandırır, önemli içeriği korur. Her kenar, orijinal boyutunun en fazla 2 katına kadar büyüyebilir.
 
 | Parametre | Tür | Varsayılan | Açıklama |
 |-----------|------|---------|-------------|

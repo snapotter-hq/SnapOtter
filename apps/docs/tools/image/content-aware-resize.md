@@ -69,7 +69,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Notes {#notes}
 
 - Uses the `caire` seam carving library for content-aware resizing.
-- Only reduces dimensions (removes seams). Cannot expand an image beyond its original size.
+- Shrinks by removing seams or enlarges by inserting them. Each side can grow to at most 2x its original size.
 - The `protectFaces` option uses AI face detection to mark face regions as high-energy, preventing seams from passing through faces.
 - `blurRadius` controls smoothing before energy map calculation. Higher values make the energy map more uniform, which can help with noisy images.
 - `sobelThreshold` affects how aggressively edges are detected. Lower values preserve more subtle edges.

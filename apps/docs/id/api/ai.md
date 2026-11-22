@@ -472,7 +472,7 @@ Endpoint analisis tambahan tersedia di `POST /api/v1/tools/image/image-enhanceme
 **Rute alat:** `content-aware-resize`  
 **Mesin:** biner Go `caire` (bukan Python - tidak ada manfaat GPU)
 
-Mengubah ukuran gambar secara cerdas dengan menghapus seam berenergi rendah, mempertahankan konten penting.
+Mengubah ukuran gambar secara cerdas dengan menghapus atau menyisipkan seam berenergi rendah, mempertahankan konten penting. Setiap sisi dapat bertambah paling banyak hingga 2x ukuran aslinya.
 
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|

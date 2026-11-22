@@ -1,8 +1,8 @@
 ---
 description: "重要度の低い経路に沿ってピクセルを追加または削除するシーム彫刻リサイズで、重要なコンテンツと顔を保持します。"
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 7efd22830b4f
+i18n_output_hash: 5e8fe074827b
 ---
 
 # コンテンツ対応リサイズ {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## 補足 {#notes}
 
 - コンテンツ対応リサイズには `caire` シームカービングライブラリを使用します。
-- 寸法を縮小する（シームを削除する）のみです。画像を元のサイズより拡大することはできません。
+- シームを削除して縮小するか、シームを挿入して拡大します。各辺は元のサイズの最大2倍まで拡大できます。
 - `protectFaces` オプションはAI顔検出を使って顔領域を高エネルギーとしてマークし、シームが顔を通過するのを防ぎます。
 - `blurRadius` はエネルギーマップ計算前のスムージングを制御します。値が高いほどエネルギーマップがより均一になり、ノイズの多い画像に役立ちます。
 - `sobelThreshold` はエッジがどれだけ積極的に検出されるかに影響します。値が低いほど微細なエッジがより保持されます。

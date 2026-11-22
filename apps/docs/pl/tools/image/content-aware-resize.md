@@ -1,8 +1,8 @@
 ---
 description: "Zmiana rozmiaru metodą wycinania szwów, która dodaje lub usuwa piksele wzdłuż ścieżek o niskim znaczeniu, aby zachować kluczową zawartość i twarze."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 9948d5f06b9b
+i18n_output_hash: 263de1fa814b
 ---
 
 # Zmiana rozmiaru uwzględniająca treść {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Uwagi {#notes}
 
 - Wykorzystuje bibliotekę wycinania szwów `caire` do zmiany rozmiaru uwzględniającej treść.
-- Tylko zmniejsza wymiary (usuwa szwy). Nie może powiększyć obrazu poza jego oryginalny rozmiar.
+- Zmniejsza, usuwając szwy, lub powiększa, wstawiając je. Każdy bok może urosnąć maksymalnie do dwukrotności oryginalnego rozmiaru.
 - Opcja `protectFaces` używa wykrywania twarzy przez AI, aby oznaczyć obszary twarzy jako wysokoenergetyczne, uniemożliwiając przechodzenie szwów przez twarze.
 - `blurRadius` steruje wygładzaniem przed obliczeniem mapy energii. Wyższe wartości czynią mapę energii bardziej jednorodną, co może pomóc przy zaszumionych obrazach.
 - `sobelThreshold` wpływa na to, jak agresywnie wykrywane są krawędzie. Niższe wartości zachowują więcej subtelnych krawędzi.

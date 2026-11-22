@@ -1,8 +1,8 @@
 ---
 description: "Seam-Carving-Skalierung, die Pixel entlang wenig wichtiger Pfade hinzufügt oder entfernt, um Schlüsselinhalte und Gesichter zu bewahren."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 613ba1076685
+i18n_output_hash: 98f7aedd761d
 ---
 
 # Inhaltsbasierte Skalierung {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Hinweise {#notes}
 
 - Verwendet die Seam-Carving-Bibliothek `caire` für die inhaltsbasierte Skalierung.
-- Verkleinert nur die Abmessungen (entfernt Seams). Kann ein Bild nicht über seine ursprüngliche Größe hinaus vergrößern.
+- Verkleinert durch Entfernen von Seams oder vergrößert durch Einfügen von Seams. Jede Seite kann auf höchstens das Doppelte ihrer ursprünglichen Größe wachsen.
 - Die Option `protectFaces` nutzt die KI-Gesichtserkennung, um Gesichtsbereiche als hochenergetisch zu markieren und zu verhindern, dass Seams durch Gesichter verlaufen.
 - `blurRadius` steuert die Glättung vor der Berechnung der Energiekarte. Höhere Werte machen die Energiekarte gleichmäßiger, was bei verrauschten Bildern helfen kann.
 - `sobelThreshold` beeinflusst, wie aggressiv Kanten erkannt werden. Niedrigere Werte bewahren feinere Kanten.

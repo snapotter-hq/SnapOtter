@@ -472,7 +472,7 @@ Un endpoint di analisi aggiuntivo è disponibile su `POST /api/v1/tools/image/im
 **Route dello strumento:** `content-aware-resize`  
 **Motore:** binario Go `caire` (non Python, nessun beneficio dalla GPU)
 
-Ridimensiona in modo intelligente le immagini rimuovendo le cuciture a bassa energia, preservando i contenuti importanti.
+Ridimensiona in modo intelligente le immagini rimuovendo o inserendo cuciture a bassa energia, preservando i contenuti importanti. Ogni lato può crescere al massimo fino al doppio della sua dimensione originale.
 
 | Parametro | Tipo | Predefinito | Descrizione |
 |-----------|------|---------|-------------|

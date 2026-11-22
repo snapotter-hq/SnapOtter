@@ -1,8 +1,8 @@
 ---
 description: "낮은 중요도 경로를 따라 픽셀을 추가하거나 제거하여 핵심 콘텐츠와 얼굴을 보존하는 심 카빙(seam-carving) 크기 조정입니다."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 4e1b863a60fb
+i18n_output_hash: 14aa91503ed2
 ---
 
 # 콘텐츠 인식 크기 조정 {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## 참고 사항 {#notes}
 
 - 콘텐츠 인식 크기 조정에 `caire` 심 카빙 라이브러리를 사용합니다.
-- 치수를 줄이기만 합니다(심 제거). 이미지를 원래 크기 이상으로 확장할 수 없습니다.
+- 심을 제거해 축소하거나 심을 삽입해 확대합니다. 각 변은 원래 크기의 최대 2배까지 늘어날 수 있습니다.
 - `protectFaces` 옵션은 AI 얼굴 감지를 사용하여 얼굴 영역을 고에너지로 표시하여 심이 얼굴을 통과하지 못하게 합니다.
 - `blurRadius`은(는) 에너지 맵 계산 전에 스무딩을 제어합니다. 값이 높을수록 에너지 맵이 더 균일해져 노이즈가 있는 이미지에 도움이 될 수 있습니다.
 - `sobelThreshold`은(는) 에지가 얼마나 공격적으로 감지되는지에 영향을 미칩니다. 값이 낮을수록 더 미묘한 에지를 보존합니다.

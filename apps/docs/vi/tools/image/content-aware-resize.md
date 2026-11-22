@@ -1,8 +1,8 @@
 ---
 description: "Thay đổi kích thước bằng khắc đường nối, thêm hoặc bớt pixel dọc theo các đường ít quan trọng để giữ nội dung chính và khuôn mặt."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: db2295c225c9
+i18n_output_hash: 4d8b64dfc411
 ---
 
 # Thay đổi kích thước theo nội dung {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Ghi chú {#notes}
 
 - Sử dụng thư viện khắc đường nối `caire` để thay đổi kích thước theo nội dung.
-- Chỉ giảm kích thước (loại bỏ đường nối). Không thể mở rộng ảnh vượt quá kích thước ban đầu.
+- Thu nhỏ bằng cách loại bỏ đường nối hoặc phóng to bằng cách chèn thêm đường nối. Mỗi cạnh có thể tăng tối đa gấp 2 lần kích thước ban đầu.
 - Tùy chọn `protectFaces` dùng AI phát hiện khuôn mặt để đánh dấu vùng mặt là năng lượng cao, ngăn đường nối đi qua khuôn mặt.
 - `blurRadius` kiểm soát mức làm mượt trước khi tính bản đồ năng lượng. Giá trị cao hơn làm bản đồ năng lượng đồng đều hơn, có thể giú ích với ảnh nhiều nhiễu.
 - `sobelThreshold` ảnh hưởng đến mức độ quyết liệt khi phát hiện cạnh. Giá trị thấp hơn giữ lại nhiều cạnh tinh tế hơn.
