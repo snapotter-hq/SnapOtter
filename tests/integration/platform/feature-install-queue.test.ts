@@ -1796,6 +1796,9 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
         "../../../apps/api/src/lib/ocr-runtime-install.js"
       );
       vi.mocked(purgeOcrRuntimeDownloads).mockClear();
+      // A host without an OCR runtime target (macOS) reports that as the
+      // bundle's error before any install, so compare against it.
+      const errorBeforeInstall = (await getFeatureDetail("ocr"))?.error ?? null;
       const download = await holdOcrDownloadUntilAborted();
       const r1 = await postInstall("ocr");
       const { jobId } = JSON.parse(r1.body) as { jobId: string };
@@ -1812,7 +1815,7 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       expect(purgeOcrRuntimeDownloads).toHaveBeenCalledOnce();
       expect(hoisted.runOcrRuntimeInstallerMock).not.toHaveBeenCalled();
       const detail = await getFeatureDetail("ocr");
-      expect(detail?.error ?? null).toBeNull();
+      expect(detail?.error ?? null).toBe(errorBeforeInstall);
       expect(hoisted.reportErrorMock).not.toHaveBeenCalled();
       expect(
         hoisted.trackEventMock.mock.calls.some(
