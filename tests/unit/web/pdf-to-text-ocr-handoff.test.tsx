@@ -106,3 +106,155 @@ describe("pdf-to-text OCR handoff (#1164)", () => {
     expect(state.errorCode).toBeNull();
   });
 });
+
+describe("pdf-to-text OCR handoff after a run with unreadable pages (#5150)", () => {
+  const unreadable = { unreadablePages: { count: 2, total: 5 } };
+
+  it("offers OCR under the unreadable-pages note on a successful run", () => {
+    useFileStore.getState().setFiles([pdf("mixed.pdf")]);
+    act(() =>
+      useFileStore.getState().updateEntry(0, { status: "completed", resultNotes: unreadable }),
+    );
+    renderPanel();
+
+    expect(screen.getByTestId("pdf-to-text-unreadable-pages")).toBeInTheDocument();
+    expect(screen.getByTestId("pdf-to-text-run-ocr-unreadable")).toHaveTextContent(
+      en.toolSettings["pdf-to-text"].runOcr,
+    );
+    expect(screen.queryByTestId("pdf-to-text-run-ocr")).not.toBeInTheDocument();
+  });
+
+  it("offers OCR once under the partly-unreadable note (#4947)", () => {
+    useFileStore.getState().setFiles([pdf("odd-font.pdf")]);
+    act(() =>
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        resultNotes: { partlyUnreadablePages: { count: 1, total: 3 } },
+      }),
+    );
+    renderPanel();
+
+    expect(screen.getByTestId("pdf-to-text-partly-unreadable-pages")).toBeInTheDocument();
+    expect(screen.queryByTestId("pdf-to-text-unreadable-pages")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pdf-to-text-run-ocr-unreadable")).toBeInTheDocument();
+  });
+
+  it("shows a single OCR button when a file has both notes", () => {
+    useFileStore.getState().setFiles([pdf("both.pdf")]);
+    act(() =>
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        resultNotes: {
+          unreadablePages: { count: 1, total: 4 },
+          partlyUnreadablePages: { count: 2, total: 4 },
+        },
+      }),
+    );
+    renderPanel();
+
+    expect(screen.getAllByTestId("pdf-to-text-run-ocr-unreadable")).toHaveLength(1);
+  });
+
+  it("hands off a file flagged only as partly unreadable", () => {
+    useFileStore.getState().setFiles([pdf("clean.pdf"), pdf("odd-font.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      store.updateEntry(0, { status: "completed", resultNotes: null });
+      store.updateEntry(1, {
+        status: "completed",
+        resultNotes: { partlyUnreadablePages: { count: 1, total: 3 } },
+      });
+      store.setSelectedIndex(1);
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("pdf-to-text-run-ocr-unreadable"));
+
+    expect(useFileStore.getState().entries.map((entry) => entry.file.name)).toEqual([
+      "odd-font.pdf",
+    ]);
+  });
+
+  it("waits for a running batch to finish before offering OCR", () => {
+    useFileStore.getState().setFiles([pdf("mixed.pdf"), pdf("next.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      store.updateEntry(0, { status: "completed", resultNotes: unreadable });
+      store.updateEntry(1, { status: "processing" });
+      store.setProcessing(true);
+    });
+    renderPanel();
+
+    expect(screen.queryByTestId("pdf-to-text-run-ocr-unreadable")).not.toBeInTheDocument();
+
+    act(() => useFileStore.getState().setProcessing(false));
+    expect(screen.getByTestId("pdf-to-text-run-ocr-unreadable")).toBeInTheDocument();
+  });
+
+  it("offers nothing when every page read fine", () => {
+    useFileStore.getState().setFiles([pdf("clean.pdf")]);
+    act(() => useFileStore.getState().updateEntry(0, { status: "completed", resultNotes: null }));
+    renderPanel();
+
+    expect(screen.queryByTestId("pdf-to-text-run-ocr-unreadable")).not.toBeInTheDocument();
+  });
+
+  it("hands off only the files with unreadable pages, keeping readable ones out of OCR", () => {
+    useFileStore.getState().setFiles([pdf("clean.pdf"), pdf("mixed.pdf"), pdf("also-mixed.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      const result = (name: string) => ({
+        status: "completed" as const,
+        processedUrl: `blob:${name}`,
+        processedFilename: name,
+        processedSize: 12,
+      });
+      store.updateEntry(0, { ...result("clean.txt"), resultNotes: null });
+      store.updateEntry(1, { ...result("mixed.txt"), resultNotes: unreadable });
+      store.updateEntry(2, { ...result("also-mixed.txt"), resultNotes: unreadable });
+      store.setBatchZip(new Blob(["zip"]), "pdf-to-text.zip");
+      store.setSelectedIndex(2);
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("pdf-to-text-run-ocr-unreadable"));
+
+    expect(screen.getByTestId("location")).toHaveTextContent('/pdf/ocr-pdf|{"fromLibrary":true}');
+    const state = useFileStore.getState();
+    expect(state.entries.map((entry) => entry.file.name)).toEqual(["mixed.pdf", "also-mixed.pdf"]);
+    expect(state.currentEntry?.file.name).toBe("also-mixed.pdf");
+    // The .txt from this run must not show up on the OCR page as its result.
+    for (const entry of state.entries) {
+      expect(entry.status).toBe("pending");
+      expect(entry.error).toBeNull();
+      expect(entry.processedUrl).toBeNull();
+      expect(entry.processedFilename).toBeNull();
+      expect(entry.resultNotes).toBeNull();
+      expect(entry.claimed).toBe(false);
+    }
+    expect(state.batchZipBlob).toBeNull();
+  });
+
+  it("clears the run's result even when every file had unreadable pages", () => {
+    useFileStore.getState().setFiles([pdf("mixed.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      store.updateEntry(0, {
+        status: "completed",
+        processedUrl: "blob:mixed.txt",
+        processedFilename: "mixed.txt",
+        processedSize: 12,
+        resultNotes: unreadable,
+      });
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("pdf-to-text-run-ocr-unreadable"));
+
+    const [entry] = useFileStore.getState().entries;
+    expect(entry.file.name).toBe("mixed.pdf");
+    expect(entry.status).toBe("pending");
+    expect(entry.processedUrl).toBeNull();
+    expect(entry.resultNotes).toBeNull();
+  });
+});
