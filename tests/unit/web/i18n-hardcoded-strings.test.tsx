@@ -31,13 +31,16 @@ vi.mock("@/hooks/use-tool-processor", () => ({
 import { ImageViewer } from "@/components/common/image-viewer";
 import { MultiImageViewer } from "@/components/common/multi-image-viewer";
 import { PixelateSettings } from "@/components/tools/pixelate-settings";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { useFileStore } from "@/stores/file-store";
 
 // Render inside the real provider with an explicit stored locale choice, so
 // the async de bundle loads and every string below must come from it (#904).
 function renderDe(ui: React.ReactNode) {
   localStorage.setItem("snapotter-locale", "de");
+  // The real de chunk is a dynamic import that a slow host can't finish inside
+  // findByText's 1 s budget (#5193); i18n-context.test.tsx covers the real load.
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 
@@ -78,6 +81,7 @@ afterEach(() => {
   cleanup();
   useFileStore.setState({ files: [], entries: [], selectedIndex: 0 });
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("no hardcoded English in tool UI (#904)", () => {
