@@ -362,6 +362,9 @@ describe("landing searchTools with real catalog metadata", () => {
     ["change file type xml", "convert xml", "json-xml"],
     ["format converter ttf", "convert ttf", "convert-font"],
     ["Change File Type png to jpg", "convert png to jpg", "png-to-jpg"],
+    ["change-format jpg -> png", "convert jpg -> png", "jpg-to-png"],
+    ["change format", "convert", "convert"],
+    ["format converter", "convert", "convert"],
   ])("ranks %j like %j", (query, convertQuery, id) => {
     const ids = (q: string) =>
       searchTools(realTools, { query: q, modality: "all", limit: 5 }).results.map(

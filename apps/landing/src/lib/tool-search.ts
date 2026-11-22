@@ -88,7 +88,9 @@ const CONVERSION_ALIASES = [
   "converter",
 ] as const;
 
-const MULTI_WORD_CONVERSION_ALIASES = CONVERSION_ALIASES.filter((alias) => alias.includes(" "));
+const MULTI_WORD_CONVERSION_ALIAS_PATTERNS = CONVERSION_ALIASES.filter((alias) =>
+  alias.includes(" "),
+).map((alias) => new RegExp(`(^|[^a-z0-9])${alias.split(" ").join("[\\s_-]+")}(?![a-z0-9])`, "gi"));
 
 const CONNECTOR_TOKENS = new Set(["to"]);
 const CONVERSION_INTENT_TOKENS = new Set(contentTokens(CONVERSION_ALIASES.join(" ")));
@@ -532,14 +534,13 @@ function consecutiveQueryPhrases(values: string[]): string[] {
 }
 
 // "change format yaml" has to score as "convert yaml": otherwise "change" and
-// "format" count as words the tool must contain, and none does (#5191).
+// "format" count as words the tool must contain, and none does (#5191). Only
+// the phrase is swapped, so "jpg -> png" keeps its arrow.
 function canonicalizeConversionPhrases(rawQuery: string): string {
-  const padded = ` ${plainNormalize(rawQuery)} `;
-  const canonical = MULTI_WORD_CONVERSION_ALIASES.reduce(
-    (query, alias) => query.replaceAll(` ${alias} `, " convert "),
-    padded,
+  return MULTI_WORD_CONVERSION_ALIAS_PATTERNS.reduce(
+    (query, pattern) => query.replace(pattern, "$1convert"),
+    rawQuery,
   );
-  return canonical === padded ? rawQuery : canonical.trim();
 }
 
 function buildQuery(query: string): {
@@ -1071,9 +1072,11 @@ function relevantResults(rawQuery: string, candidates: ToolSearchResult[]): Tool
       result,
     ]),
   );
-  return filterRelevantTools(rawQuery, [...byTool.keys()], TASK_ALIAS_GROUPS).flatMap(
-    (tool) => byTool.get(tool) ?? [],
-  );
+  return filterRelevantTools(
+    canonicalizeConversionPhrases(rawQuery),
+    [...byTool.keys()],
+    TASK_ALIAS_GROUPS,
+  ).flatMap((tool) => byTool.get(tool) ?? []);
 }
 
 export function searchTools(
