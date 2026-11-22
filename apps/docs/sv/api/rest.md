@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: ef4c68652adf
-i18n_source_hash: 8c13236dfbb2
+i18n_output_hash: 6e4a08ac8619
+i18n_source_hash: 257573503eba
 i18n_provenance: human
 ---
 
@@ -343,7 +343,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `linearize-pdf` | Webboptimera PDF | - (linjärisera för snabb webbvisning) |
 | `grayscale-pdf` | Gråskala-PDF | - |
 | `pdfa-convert` | Konvertera till PDF/A | - (arkiverings-PDF/A-2) |
-| `crop-pdf` | Beskär PDF | `margin` (0-2000 punkter) |
+| `crop-pdf` | Beskär PDF | `mode` (uniform/sides/region), `margin` (0-2000 punkter), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | Ändra storlek på PDF-sidor | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Häftes-PDF | `perSheet` (2/4/6/8) |

@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 0470247fd3cc
-i18n_source_hash: 8c13236dfbb2
+i18n_output_hash: d896f482d816
+i18n_source_hash: 257573503eba
 i18n_provenance: human
 ---
 
@@ -343,7 +343,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `linearize-pdf` | Web-Optimize PDF | - (linearisasi untuk penayangan web cepat) |
 | `grayscale-pdf` | Grayscale PDF | - |
 | `pdfa-convert` | PDF/A Convert | - (PDF/A-2 arsip) |
-| `crop-pdf` | Crop PDF | `margin` (0-2000 poin) |
+| `crop-pdf` | Crop PDF | `mode` (uniform/sides/region), `margin` (0-2000 poin), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | Ubah Ukuran Halaman PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |

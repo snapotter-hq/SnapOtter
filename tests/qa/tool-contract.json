@@ -11766,11 +11766,57 @@
     "registered": true,
     "axes": [
       {
+        "key": "mode",
+        "values": ["uniform", "sides", "region", null]
+      },
+      {
         "key": "margin",
         "values": [0, 1000, 2000, null]
+      },
+      {
+        "key": "top",
+        "values": [0, 1000, 2000, null]
+      },
+      {
+        "key": "right",
+        "values": [0, 1000, 2000, null]
+      },
+      {
+        "key": "bottom",
+        "values": [0, 1000, 2000, null]
+      },
+      {
+        "key": "left",
+        "values": [0, 1000, 2000, null]
+      },
+      {
+        "key": "x",
+        "values": [0, 7200, 14400, null]
+      },
+      {
+        "key": "y",
+        "values": [0, 7200, 14400, null]
+      },
+      {
+        "key": "width",
+        "values": [1, 7200.5, 14400, null]
+      },
+      {
+        "key": "height",
+        "values": [1, 7200.5, 14400, null]
       }
     ],
     "invalidProbes": [
+      {
+        "key": "mode",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "mode",
+        "value": 12345,
+        "why": "wrong type"
+      },
       {
         "key": "margin",
         "value": -1,
@@ -11783,6 +11829,126 @@
       },
       {
         "key": "margin",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "top",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "top",
+        "value": 2001,
+        "why": "above declared max"
+      },
+      {
+        "key": "top",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "right",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "right",
+        "value": 2001,
+        "why": "above declared max"
+      },
+      {
+        "key": "right",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "bottom",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "bottom",
+        "value": 2001,
+        "why": "above declared max"
+      },
+      {
+        "key": "bottom",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "left",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "left",
+        "value": 2001,
+        "why": "above declared max"
+      },
+      {
+        "key": "left",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "x",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "x",
+        "value": 14401,
+        "why": "above declared max"
+      },
+      {
+        "key": "x",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "y",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "y",
+        "value": 14401,
+        "why": "above declared max"
+      },
+      {
+        "key": "y",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "width",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "width",
+        "value": 14401,
+        "why": "above declared max"
+      },
+      {
+        "key": "width",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "height",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "height",
+        "value": 14401,
+        "why": "above declared max"
+      },
+      {
+        "key": "height",
         "value": "not-a-number",
         "why": "wrong type"
       }
