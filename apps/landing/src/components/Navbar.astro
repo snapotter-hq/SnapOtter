@@ -49,19 +49,23 @@ const links: NavItem[] = [
 
     <!-- Desktop nav links -->
     <div class="hidden items-center gap-6 lg:flex">
-      <!-- Product dropdown (CSS-only: opens on hover and on keyboard focus) -->
-      <div class="group relative">
+      <!-- Product dropdown: hover opens it, and a click toggles data-open (see the
+           script below). It used to open on :focus-within instead, but Safari
+           doesn't focus a button on mouse click, so clicks did nothing there (#5080). -->
+      <div class="group relative" data-product-menu>
         <button
           type="button"
-          class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground group-focus-within:text-foreground"
+          class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground group-data-[open]:text-foreground"
           aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="product-menu"
         >
           {t(locale, "nav.product")}
-          <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-data-[open]:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <!-- pt clears the button-to-navbar-bottom gap so the panel opens below the
              navbar's bottom border line instead of overlapping up through it. -->
-        <div class="absolute left-0 top-full hidden pt-8 group-hover:block group-focus-within:block">
+        <div id="product-menu" class="absolute left-0 top-full hidden pt-8 group-hover:block group-data-[open]:block">
           <div class="w-64 rounded-xl border border-border bg-surface p-2 shadow-lg">
             {productLinks.map((item) => (
               <a
@@ -193,6 +197,32 @@ const links: NavItem[] = [
       menu.classList.toggle("hidden", !open);
       menuButton.querySelector(".menu-open")?.classList.toggle("hidden", open);
       menuButton.querySelector(".menu-close")?.classList.toggle("hidden", !open);
+    });
+  }
+
+  const productMenu = document.querySelector<HTMLElement>("[data-product-menu]");
+  const productButton = productMenu?.querySelector("button");
+  if (productMenu && productButton) {
+    const setOpen = (open: boolean) => {
+      productButton.setAttribute("aria-expanded", String(open));
+      productMenu.toggleAttribute("data-open", open);
+    };
+    productButton.addEventListener("click", () => {
+      setOpen(productButton.getAttribute("aria-expanded") !== "true");
+    });
+    document.addEventListener("click", (event) => {
+      if (!productMenu.contains(event.target as Node)) setOpen(false);
+    });
+    // A null relatedTarget is a click on something unfocusable, like the panel's
+    // padding; the document click handler above already covers clicks outside.
+    productMenu.addEventListener("focusout", (event) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !productMenu.contains(next)) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || productButton.getAttribute("aria-expanded") !== "true") return;
+      setOpen(false);
+      if (productMenu.contains(document.activeElement)) productButton.focus();
     });
   }
 
