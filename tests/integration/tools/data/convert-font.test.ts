@@ -67,9 +67,18 @@ describe("convert-font input checks (no fontTools needed)", () => {
   });
 
   it("rejects a non-font sent to a font preset with 400 before queueing a job (#5053)", async () => {
+    // A worker-side rejection answers with the same 400 (#1742), so only the
+    // missing job row shows the preset ran convert-font's preValidate.
+    const { db, schema } = await import("../../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    const presetJobs = () =>
+      db.select().from(schema.jobs).where(eq(schema.jobs.toolId, "otf-to-ttf"));
+    const before = (await presetJobs()).length;
+
     const res = await runTool("fake.otf", Buffer.from("%PDF-1.7 not a font"), {}, "otf-to-ttf");
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toContain("isn't a TTF");
+    expect(await presetJobs()).toHaveLength(before);
   });
 
   it("rejects an unknown target format with 400", async () => {
