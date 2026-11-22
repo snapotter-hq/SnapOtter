@@ -79,7 +79,11 @@ export async function processImageEnhancement(
   // The alpha channel is split out and rejoined through separate pipelines, and
   // a rejoin re-opens the buffer as a still, so animation is handled a frame at
   // a time (#1083).
-  const core = async (frameBuffer: Buffer, allowDeep: boolean): Promise<Buffer> => {
+  const core = async (
+    frameBuffer: Buffer,
+    allowDeep: boolean,
+    format = outputFormat,
+  ): Promise<Buffer> => {
     let inputBuffer = frameBuffer;
     const inputMeta = await sharp(inputBuffer).metadata();
     if (inputMeta.depth && inputMeta.depth !== "uchar") {
@@ -116,7 +120,7 @@ export async function processImageEnhancement(
     // the end. Encoding to JPEG first would quantize twice (#1302).
     const runDeep = settings.deepEnhance && allowDeep && isToolInstalled("noise-removal");
     if (settings.deepEnhance && allowDeep && !runDeep) deepEnhanceSkipped = "unavailable";
-    const passFormat = runDeep ? outputFormatFor("png") : outputFormat;
+    const passFormat = runDeep ? outputFormatFor("png") : format;
 
     let buffer: Buffer;
     if (alphaBuffer) {
@@ -197,7 +201,9 @@ export async function processImageEnhancement(
   // and a reason the client can show.
   let finalBuffer: Buffer;
   try {
-    const perFrame = await runPerFrame(rawBuffer, outputFormat, (frame) => core(frame, false));
+    const perFrame = await runPerFrame(rawBuffer, outputFormat, (frame, frameFormat) =>
+      core(frame, false, frameFormat),
+    );
     if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
     finalBuffer = perFrame ?? (await core(rawBuffer, true));
   } catch (err) {

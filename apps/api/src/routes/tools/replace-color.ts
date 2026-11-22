@@ -71,7 +71,7 @@ export function registerReplaceColor(app: FastifyInstance) {
 
         // The result is rebuilt from a raw buffer, which Sharp always reads as a
         // single page, so animation is handled a frame at a time (#1083).
-        const core = async (frame: Buffer): Promise<Buffer> => {
+        const core = async (frame: Buffer, format = useFormat): Promise<Buffer> => {
           // Get raw RGBA pixels
           const image = sharp(frame).ensureAlpha();
           const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
@@ -105,7 +105,7 @@ export function registerReplaceColor(app: FastifyInstance) {
           return await sharp(pixels, {
             raw: { width: info.width, height: info.height, channels: 4 },
           })
-            .toFormat(useFormat.format, useFormat.encoderOptions)
+            .toFormat(format.format, format.encoderOptions)
             .toBuffer();
         };
 

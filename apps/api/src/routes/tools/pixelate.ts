@@ -69,7 +69,7 @@ export function registerPixelate(app: FastifyInstance) {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         // mosaic() re-encodes to PNG between its two resizes, and the region path
         // composites, so animation is handled a frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const meta = await sharp(source).metadata();
           if (!meta.width || !meta.height) {
             // Defaulting to 1x1 here would hand back a one-pixel image with a 200.
@@ -119,9 +119,7 @@ export function registerPixelate(app: FastifyInstance) {
 
           // resolveOutputFormat leaves quality undefined for PNG, which keeps the
           // flat blocks free of palette dithering (#710).
-          return await pixelated
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          return await pixelated.toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;

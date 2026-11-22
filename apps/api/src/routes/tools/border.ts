@@ -59,7 +59,7 @@ export function registerBorder(app: FastifyInstance) {
         // Rounded corners and shadows composite over the canvas, and a composite
         // lands on the first frame only, so animation is handled a frame at a
         // time (#1083, #3067).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = useFormat): Promise<Buffer> => {
           let buf = source;
 
           // Both steps below name PNG so the colour they paint is not re-encoded in
@@ -178,7 +178,7 @@ export function registerBorder(app: FastifyInstance) {
               .toBuffer();
           }
 
-          return await sharp(buf).toFormat(useFormat.format, useFormat.encoderOptions).toBuffer();
+          return await sharp(buf).toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;
