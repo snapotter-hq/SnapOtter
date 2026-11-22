@@ -245,7 +245,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
 
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync(cmd, [inputPath, outputPath], {
+    await execFileAsync(...wrapWithMemoryLimit(cmd, [inputPath, outputPath]), {
       timeout: 120_000,
       signal: options.signal,
     }).catch((err: unknown) => {

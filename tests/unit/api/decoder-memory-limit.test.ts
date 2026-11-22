@@ -3,9 +3,9 @@
  * native processes, but the image decoders spawned ffmpeg, exiftool, djxl and
  * opj_decompress directly, so a crafted upload that reached one of them could
  * still grow until the container's OOM killer took every in-flight job with
- * it. Those now run through wrapWithMemoryLimit. ImageMagick and dcraw_emu
- * stay outside it: both use OpenMP, whose threads reserve far more address
- * space than they touch, and ImageMagick has its own -limit flags.
+ * it. Those now run through wrapWithMemoryLimit, and so does dcraw_emu since
+ * #5215. ImageMagick stays outside it: its OpenMP threads reserve far more
+ * address space than they touch, and it has its own -limit flags.
  *
  * The spy passes through to the real wrapper, so the shims below really run
  * under the /bin/sh shim. macOS can't set `ulimit -v`, so the recorded limit
@@ -35,6 +35,7 @@ const ORIGINAL = {
 };
 const PNG = join(process.cwd(), "tests/fixtures/image/valid/test-200x150.png");
 const JPEG = join(process.cwd(), "tests/fixtures/image/formats/sample.jpg");
+const TIFF = join(process.cwd(), "tests/fixtures/image/formats/sample.tiff");
 const dirs: string[] = [];
 let binDir: string;
 let limitLog: string;
@@ -125,7 +126,7 @@ exit 1`,
 
     expect(out[0]).toBe(0xff);
     expect(out[1]).toBe(0xd8);
-    expect(wrappedBinaries()).toEqual(["exiftool", "exiftool"]);
+    expect(wrappedBinaries()).toEqual(["exiftool", "dcraw_emu", "exiftool"]);
     expectCapped("exiftool");
   });
 
@@ -136,8 +137,19 @@ exit 1`,
     const out = await decodeToSharpCompat(readFixture(fixtures.image.formats("dng")), "raw", "dng");
 
     expect(out[0]).toBe(0xff);
-    expect(wrappedBinaries()).toEqual(["exiftool", "exiftool"]);
+    expect(wrappedBinaries()).toEqual(["dcraw_emu", "exiftool", "exiftool"]);
     expectCapped("exiftool");
+  });
+
+  it("caps dcraw_emu (#5215)", async () => {
+    // dcraw_emu appends .tiff to the input path it was given.
+    shim("dcraw_emu", `for a; do last=$a; done\n/bin/cp "${TIFF}" "$last.tiff"`);
+
+    const out = await decodeToSharpCompat(readFixture(fixtures.image.formats("dng")), "raw", "dng");
+
+    expect(out.subarray(1, 4).toString("ascii")).toBe("PNG");
+    expect(wrappedBinaries()).toEqual(["dcraw_emu"]);
+    expectCapped("dcraw_emu");
   });
 
   it("caps djxl and opj_decompress", async () => {

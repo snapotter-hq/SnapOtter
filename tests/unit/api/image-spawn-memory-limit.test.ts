@@ -40,7 +40,7 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
 
 const { apiToolPath, wrapWithMemoryLimit } = await import("@snapotter/shared");
 const { encodeJp2, encodeJxl } = await import("../../../apps/api/src/lib/format-encoders.js");
-const { encodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+const { decodeHeic, encodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
 const { inspectMetadata, readImageDimensions, writeMetadata } = await import(
   "../../../apps/api/src/lib/exiftool.js"
 );
@@ -52,6 +52,7 @@ const ORIGINAL = { PATH: process.env.PATH, [LIMIT_KEY]: process.env[LIMIT_KEY] }
 const PNG_PATH = join(process.cwd(), "tests/fixtures/image/valid/test-200x150.png");
 const PNG = readFileSync(PNG_PATH);
 const DNG = readFileSync(join(process.cwd(), "tests/fixtures/image/formats/sample.dng"));
+const HEIC = readFileSync(join(process.cwd(), "tests/fixtures/image/formats/sample.heic"));
 const dirs: string[] = [];
 let binDir: string;
 let limitLog: string;
@@ -201,5 +202,21 @@ describe("exiftool helpers under SUBPROCESS_MEMORY_LIMIT_MB (#5215)", () => {
     }
     expect(wrappedBinaries()).toEqual(["exiftool"]);
     expectCapped("exiftool");
+  });
+});
+
+describe("HEIF decoder under SUBPROCESS_MEMORY_LIMIT_MB (#5215)", () => {
+  it("caps heif-convert but not its --version probe", async () => {
+    shim(
+      "heif-convert",
+      `/bin/cp "${PNG_PATH}" "$2"`,
+      `if [ "$1" = "--version" ]; then exit 0; fi`,
+    );
+
+    const out = await decodeHeic(HEIC);
+
+    expect(out.equals(PNG)).toBe(true);
+    expect(wrappedBinaries()).toEqual(["heif-convert"]);
+    expectCapped("heif-convert");
   });
 });
