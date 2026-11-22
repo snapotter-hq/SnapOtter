@@ -31,8 +31,8 @@ export function registerNoiseReduction(app: FastifyInstance) {
       const nr = NR_MAP[settings.strength];
       const chain = `afftdn=nr=${nr}:nf=-50`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", chain, ...out.encodeArgs, outPath];
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath, { audio }) => {
+        return ["-i", inPath, "-af", chain, ...audioOutputFor(origExt, audio).encodeArgs, outPath];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },

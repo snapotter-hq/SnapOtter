@@ -60,9 +60,13 @@ export function registerFadeAudio(app: FastifyInstance) {
       const chain = parts.join(",");
 
       const outPath = join(ctx.scratchDir, "media", outName);
+      const { encodeArgs } = audioOutputFor(
+        origExt,
+        info.streams.find((s) => s.type === "audio"),
+      );
       await runFfmpegWithProgress(
         ctx,
-        ["-i", inPath, "-af", chain, ...out.encodeArgs, outPath],
+        ["-i", inPath, "-af", chain, ...encodeArgs, outPath],
         info.durationS,
       );
 

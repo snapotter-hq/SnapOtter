@@ -29,8 +29,8 @@ export function registerSilenceRemoval(app: FastifyInstance) {
         `silenceremove=start_periods=1:start_threshold=${t}dB:start_silence=0.1` +
         `:stop_periods=-1:stop_threshold=${t}dB:stop_duration=${d}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", chain, ...out.encodeArgs, outPath];
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath, { audio }) => {
+        return ["-i", inPath, "-af", chain, ...audioOutputFor(origExt, audio).encodeArgs, outPath];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },
