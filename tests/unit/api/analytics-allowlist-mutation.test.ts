@@ -37,6 +37,7 @@ function sampleValue(key: string): unknown {
   if (key === "tool_ids") return ["resize", "crop"];
   if (key.endsWith("_count") || key.endsWith("_ms") || key.startsWith("bytes_")) return 1;
   if (key.startsWith("is_") || key === "gpu_present") return true;
+  if (key === "action") return "installed";
   return "x";
 }
 

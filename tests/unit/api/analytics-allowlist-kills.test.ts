@@ -32,7 +32,9 @@ describe("analytics-allowlist: each allow-listed key is kept", () => {
   for (const [event, keys] of Object.entries(ALLOWED)) {
     for (const key of keys) {
       it(`${event}.${key} survives sanitization`, () => {
-        const value = key === "tool_ids" ? ["id-a", "id-b"] : "value";
+        // action is a closed set, so it needs a real value to survive (#4994).
+        const value =
+          key === "tool_ids" ? ["id-a", "id-b"] : key === "action" ? "installed" : "value";
         const out = sanitizeEventProperties(event, { [key]: value });
         expect(out[key]).toEqual(value);
       });
