@@ -1948,6 +1948,8 @@ export const en = {
         "AI upscaling is compute-heavy. Without a GPU, a large image can take several minutes.",
       cpuResizedNote:
         "This server has no GPU, so the image was reduced to {width} × {height} before upscaling.",
+      cpuFitHint:
+        "This server has no GPU, so this image will be reduced to {width} × {height} before upscaling.",
       qualityFast: "Fast",
       qualityBalanced: "Balanced",
       qualityBest: "Best",

@@ -2007,6 +2007,8 @@ export const tr: TranslationKeys = {
         "Yapay zeka ile büyütme yoğun işlem gerektirir. GPU olmadan büyük bir görüntü birkaç dakika sürebilir.",
       cpuResizedNote:
         "Bu sunucuda GPU yok, bu yüzden görüntü büyütmeden önce {width} × {height} boyutuna küçültüldü.",
+      cpuFitHint:
+        "Bu sunucuda GPU yok, bu yüzden bu görüntü büyütmeden önce {width} × {height} boyutuna küçültülecek.",
       qualityFast: "Hızlı",
       qualityBalanced: "Dengeli",
       qualityBest: "En İyi",

@@ -1994,6 +1994,8 @@ export const es: TranslationKeys = {
         "El escalado con IA consume muchos recursos. Sin GPU, una imagen grande puede tardar varios minutos.",
       cpuResizedNote:
         "Este servidor no tiene GPU, así que la imagen se redujo a {width} × {height} antes de escalarla.",
+      cpuFitHint:
+        "Este servidor no tiene GPU, así que esta imagen se reducirá a {width} × {height} antes de escalarla.",
       qualityFast: "Rápido",
       qualityBalanced: "Equilibrado",
       qualityBest: "Mejor",

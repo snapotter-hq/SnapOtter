@@ -2005,6 +2005,8 @@ export const pl: TranslationKeys = {
       cpuNote: "Skalowanie AI mocno obciąża procesor. Bez GPU duży obraz może zająć kilka minut.",
       cpuResizedNote:
         "Ten serwer nie ma GPU, więc przed skalowaniem obraz zmniejszono do {width} × {height}.",
+      cpuFitHint:
+        "Ten serwer nie ma GPU, więc przed skalowaniem ten obraz zostanie zmniejszony do {width} × {height}.",
       qualityFast: "Szybko",
       qualityBalanced: "Zrównoważona",
       qualityBest: "Najlepsza",

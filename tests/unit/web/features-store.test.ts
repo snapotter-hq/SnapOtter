@@ -64,6 +64,7 @@ describe("useFeaturesStore", () => {
   beforeEach(() => {
     useFeaturesStore.setState({
       bundles: [],
+      upscaleCpuMaxMp: null,
       loaded: false,
       loadError: false,
       installing: {},
@@ -126,6 +127,25 @@ describe("useFeaturesStore", () => {
       expect(useFeaturesStore.getState().bundles).toEqual(bundles);
       expect(useFeaturesStore.getState().loaded).toBe(true);
       expect(useFeaturesStore.getState().loadError).toBe(false);
+    });
+
+    it("keeps the CPU upscale ceiling the server reports (#5036)", async () => {
+      apiGetMock.mockResolvedValueOnce({ bundles: [], upscaleCpuMaxMp: 4 });
+      await useFeaturesStore.getState().fetch();
+      expect(useFeaturesStore.getState().upscaleCpuMaxMp).toBe(4);
+
+      // A GPU host reports null, and so does an older server that omits it.
+      apiGetMock.mockResolvedValueOnce({ bundles: [], upscaleCpuMaxMp: null });
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().upscaleCpuMaxMp).toBeNull();
+
+      apiGetMock.mockResolvedValueOnce({ bundles: [], upscaleCpuMaxMp: 0 });
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().upscaleCpuMaxMp).toBe(0);
+
+      apiGetMock.mockResolvedValueOnce({ bundles: [] });
+      await useFeaturesStore.getState().refresh();
+      expect(useFeaturesStore.getState().upscaleCpuMaxMp).toBeNull();
     });
 
     it("sets loadError = true on failure", async () => {

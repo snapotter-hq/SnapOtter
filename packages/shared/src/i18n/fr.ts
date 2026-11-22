@@ -2014,6 +2014,8 @@ export const fr: TranslationKeys = {
         "L'agrandissement par IA demande beaucoup de calcul. Sans GPU, une grande image peut prendre plusieurs minutes.",
       cpuResizedNote:
         "Ce serveur n'a pas de GPU, l'image a donc été réduite à {width} × {height} avant l'agrandissement.",
+      cpuFitHint:
+        "Ce serveur n'a pas de GPU, cette image sera donc réduite à {width} × {height} avant l'agrandissement.",
       qualityFast: "Rapide",
       qualityBalanced: "Équilibré",
       qualityBest: "Meilleure",

@@ -1757,6 +1757,7 @@ export const zhTW: TranslationKeys = {
       progressLabelBatch: "正在放大{count}張影像",
       cpuNote: "AI 放大對算力需求很高。若沒有 GPU，處理大圖可能需要幾分鐘。",
       cpuResizedNote: "此伺服器沒有 GPU，因此在放大前已將圖片縮小到 {width} × {height}。",
+      cpuFitHint: "此伺服器沒有 GPU，因此放大前會將這張圖片縮小到 {width} × {height}。",
       qualityFast: "快速",
       qualityBalanced: "平衡",
       qualityBest: "最佳",
