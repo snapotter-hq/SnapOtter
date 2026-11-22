@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 5af4c4a0679d
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: a096d5a03ebe
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 

@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 510342e9d266
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 3e93cb4994d5
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
