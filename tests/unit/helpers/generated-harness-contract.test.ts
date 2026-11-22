@@ -94,6 +94,22 @@ describe("generated QA harness contract", () => {
     expect(text).toMatch(/!PER_REQUEST_AI_GATED_TOOLS\.has\(toolId\)/);
   });
 
+  // #5207: OCR's Fast tier needs no bundle, so the settings matrix runs it. The
+  // shared set stays smart-crop only because the format matrix and fuzz baseline
+  // send OCR's "balanced" default, which 501s without the pack.
+  it("settings matrix runs ocr's Fast tier without sharing the gate bypass", () => {
+    const text = source("settings-matrix.test.ts");
+    const body = text.match(/const FAST_TIER_AI_GATED_TOOLS = new Set\(\[([^\]]*)\]\)/)?.[1];
+    expect(body, "FAST_TIER_AI_GATED_TOOLS not found in settings-matrix.test.ts").toBeDefined();
+    const fastTier = [...(body ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1] as string);
+    expect(fastTier).toEqual(["ocr", "ocr-pdf"]);
+    expect(text).toMatch(/!FAST_TIER_AI_GATED_TOOLS\.has\(toolId\)/);
+    for (const toolId of fastTier) {
+      expect(getRequiredBundlesForTool(toolId), `${toolId} has a required bundle`).toEqual([]);
+      expect(PER_REQUEST_AI_GATED_TOOLS.has(toolId)).toBe(false);
+    }
+  });
+
   it("multimodal matrix consumes the shared image-inclusive fixture index", () => {
     const text = source("format-matrix-multimodal.test.ts");
     expect(text).toContain("generatedFixtureDirectories");

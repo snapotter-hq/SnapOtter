@@ -1256,6 +1256,13 @@ const AI_GATED_TOOLS = new Set([
   "smart-crop",
 ]);
 
+// OCR's Fast tier is the bundled Tesseract, and with no pack an omitted tier
+// resolves to Fast, so only Balanced and Best need the ocr pack (#5207). Unlike
+// PER_REQUEST_AI_GATED_TOOLS this stays local: the format matrix and fuzz
+// baseline send defaultSettingsFor's "balanced" for OCR on purpose, so they must
+// keep the whole-tool gate.
+const FAST_TIER_AI_GATED_TOOLS = new Set(["ocr", "ocr-pdf"]);
+
 // Accepted status codes: 200 = success, 202 = async, 400 = bad settings,
 // 422 = processing failure, 415 = wrong type
 const ACCEPTED_STATUSES = new Set([200, 202, 400, 415, 422]);
@@ -1287,7 +1294,9 @@ describe("settings variation matrix", () => {
       ? findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings)
       : undefined;
     const aiGate =
-      AI_GATED_TOOLS.has(toolId) && !PER_REQUEST_AI_GATED_TOOLS.has(toolId)
+      AI_GATED_TOOLS.has(toolId) &&
+      !PER_REQUEST_AI_GATED_TOOLS.has(toolId) &&
+      !FAST_TIER_AI_GATED_TOOLS.has(toolId)
         ? requiredAiGate(toolId, {
             requireAiFeatures: REQUIRE_AI_FEATURES,
             firstMissingBundle: getFirstMissingBundleForTool,
