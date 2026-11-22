@@ -17,7 +17,7 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { AutomatePage } from "@/pages/automate-page";
 import { useFileStore } from "@/stores/file-store";
@@ -871,6 +871,14 @@ describe("automate initial saved pipelines load (#1987)", () => {
 
   it("does not re-fetch /api/v1/pipeline/list when a non-English locale finishes loading, and translates an initial load error into that locale (#2980)", async () => {
     storageMap.set("snapotter-locale", "de");
+    // A real chunk import can outlast findByText's 1 s default on a slow host
+    // (#5146), so the test hands out the German catalog itself and releases it
+    // once the English load error is on screen.
+    let releaseChunk!: () => void;
+    const chunk = new Promise<void>((resolve) => {
+      releaseChunk = resolve;
+    });
+    vi.spyOn(localeLoaders, "de").mockImplementation(() => chunk.then(() => ({ de })));
     server = {
       initialList: () => new Response("<html>502</html>", { status: 502 }),
       save: savedOk,
@@ -878,8 +886,13 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
     renderAutomate();
 
-    await screen.findByText(de.automate.importButton);
-    await waitFor(() => expect(screen.getByText(de.automate.loadFailed)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
+    await act(async () => {
+      releaseChunk();
+      await chunk;
+    });
+    expect(screen.getByText(de.automate.importButton)).toBeInTheDocument();
+    expect(screen.getByText(de.automate.loadFailed)).toBeInTheDocument();
     const listCalls = vi
       .mocked(fetch)
       .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
