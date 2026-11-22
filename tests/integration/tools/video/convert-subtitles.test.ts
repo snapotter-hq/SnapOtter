@@ -142,6 +142,21 @@ describe.skipIf(!ffmpegAvailable())(
       }
     }, 90_000);
 
+    it("converts several files through the srt-to-vtt preset's /batch", async () => {
+      const res = await post("/api/v1/tools/video/srt-to-vtt/batch", [
+        { name: "file", filename: "a.srt", contentType: "application/octet-stream", content: SRT },
+        { name: "file", filename: "b.srt", contentType: "application/octet-stream", content: SRT },
+      ]);
+
+      expect(res.statusCode).toBe(200);
+      const entries = new AdmZip(res.rawPayload).getEntries();
+      expect(entries).toHaveLength(2);
+      for (const entry of entries) {
+        expect(entry.entryName).toMatch(/\.vtt$/);
+        expect(entry.getData().toString("utf8").startsWith("WEBVTT")).toBe(true);
+      }
+    }, 90_000);
+
     it("runs as the first step of a pipeline", async () => {
       const res = await post("/api/v1/pipeline/execute", [
         {
