@@ -473,6 +473,35 @@ function aliasExpansionsFor(values: string[]): string[] {
   return unique(expansions);
 }
 
+// "join pdf" also reads as "merge pdf" and "combine pdf": swap each task
+// alias the query contains for the rest of its group (#5028).
+function aliasSubstitutionsFor(values: string[]): string[] {
+  const substitutions: string[] = [];
+
+  for (const value of values) {
+    for (const aliases of TASK_ALIAS_GROUPS) {
+      const normalizedAliases = unique(aliases.map((alias) => plainNormalize(alias)));
+      // Longest first, so "transparent png" swaps as a whole instead of also
+      // yielding "remove background png png" through "transparent".
+      const longestFirst = [...normalizedAliases].sort((a, b) => b.length - a.length);
+      const matched: string[] = [];
+      for (const alias of longestFirst) {
+        if (!containsPhrase(value, alias)) continue;
+        if (matched.some((longer) => containsPhrase(longer, alias))) continue;
+        matched.push(alias);
+        for (const replacement of normalizedAliases) {
+          if (replacement === alias) continue;
+          substitutions.push(
+            compactWhitespace(` ${value} `.replace(` ${alias} `, ` ${replacement} `)),
+          );
+        }
+      }
+    }
+  }
+
+  return unique(substitutions).filter((phrase) => !values.includes(phrase));
+}
+
 function makeSearchText(values: string[]): string {
   return unique(values.flatMap(normalizeForField)).join(" ");
 }
@@ -546,13 +575,17 @@ function canonicalizeConversionPhrases(rawQuery: string): string {
   );
 }
 
+type SearchQuery = ReturnType<typeof buildQuery>;
+
 function buildQuery(query: string): {
   normalized: string;
   phrases: string[];
   partialPhrases: string[];
+  aliasQueries: string[];
   tokens: string[];
   requiredTokens: string[];
   hasConversionIntent: boolean;
+  hasConversionAlias: boolean;
   conversionTargetTokens: string[];
   conversionDirection: ConversionDirection;
 } {
@@ -575,6 +608,7 @@ function buildQuery(query: string): {
   const partialPhrases = consecutiveQueryPhrases(basePhrases).filter(
     (phrase) => !phrases.includes(phrase),
   );
+  const aliasQueries = aliasSubstitutionsFor(basePhrases);
   const tokens = unique(contentTokens(basePhrases.join(" ")).map(normalizeBroadFormatToken));
   const requiredTokens = unique(
     contentTokens(basePhrases.join(" ")).map(normalizeBroadFormatToken),
@@ -587,9 +621,11 @@ function buildQuery(query: string): {
     normalized: normalizedOrRaw,
     phrases,
     partialPhrases,
+    aliasQueries,
     tokens,
     requiredTokens,
     hasConversionIntent,
+    hasConversionAlias,
     conversionTargetTokens,
     conversionDirection,
   };
@@ -863,15 +899,25 @@ function queryHasIdWords(queryTokens: string[], id: string): boolean {
   );
 }
 
-export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchResult {
-  const query = buildQuery(rawQuery);
+type ItemFields = {
+  inputField: SearchField;
+  nameField: SearchField;
+  fields: SearchField[];
+  strongConversionFields: SearchField[];
+  idField: SearchField;
+  directionText: string;
+  identityFields: SearchField[];
+  exactNameQueries: string[];
+};
 
-  if (!query.normalized) {
-    return { item, score: 0, reason: "empty query" };
-  }
-  if (query.conversionDirection.isNoopConversion) {
-    return { item, score: 0, reason: "same-format conversion" };
-  }
+// The fields depend only on the item, and the alias fallback scores every
+// item against several queries per keystroke, so build them once per item.
+// Keyed by object, so a caller that edits an item in place must pass a copy.
+const itemFieldsCache = new WeakMap<ToolSearchItem, ItemFields>();
+
+function itemFieldsFor(item: ToolSearchItem): ItemFields {
+  const cached = itemFieldsCache.get(item);
+  if (cached) return cached;
 
   const inputField = makeSearchField("input", item.acceptedInputs, {
     phraseScore: 25,
@@ -919,10 +965,46 @@ export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchRes
     fuzzyScore: 0,
   });
   const directionText = makeSearchText([item.id, item.name, ...(item.keywords ?? [])]);
+  const identityFields = [idField, nameField, keywordField];
+  const itemFields = {
+    inputField,
+    nameField,
+    fields,
+    strongConversionFields,
+    idField,
+    directionText,
+    identityFields,
+    exactNameQueries: normalizeForField(item.name),
+  };
+  itemFieldsCache.set(item, itemFields);
+  return itemFields;
+}
+
+export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchResult {
+  return scoreBuiltQuery(buildQuery(rawQuery), item);
+}
+
+function scoreBuiltQuery(query: SearchQuery, item: ToolSearchItem): ToolSearchResult {
+  if (!query.normalized) {
+    return { item, score: 0, reason: "empty query" };
+  }
+  if (query.conversionDirection.isNoopConversion) {
+    return { item, score: 0, reason: "same-format conversion" };
+  }
+
+  const {
+    inputField,
+    nameField,
+    fields,
+    strongConversionFields,
+    idField,
+    directionText,
+    identityFields,
+    exactNameQueries,
+  } = itemFieldsFor(item);
   const matchedConversionTargets = query.conversionTargetTokens.filter((token) =>
     [...strongConversionFields, idField].some((field) => fieldContainsToken(field, token)),
   );
-  const identityFields = [idField, nameField, keywordField];
   const hasConversionCapability =
     hasConverterIdentity(identityFields) ||
     hasOutputFamilyExtractionIdentity(item, identityFields, query.conversionDirection);
@@ -963,7 +1045,6 @@ export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchRes
   const reasons = new Set<string>();
   const matchedRequiredTokens = new Set<string>();
 
-  const exactNameQueries = normalizeForField(item.name);
   if (exactNameQueries.includes(query.normalized)) {
     score += 100;
     reasons.add("name exact match");
@@ -1105,6 +1186,30 @@ function relevantResults(rawQuery: string, candidates: ToolSearchResult[]): Tool
   ).flatMap((tool) => byTool.get(tool) ?? []);
 }
 
+/**
+ * Scores each tool against the alias forms of the query too ("join pdf" as
+ * "merge pdf"), keeping whichever is higher, but only when the literal query
+ * found nothing confident. A tool that uses the visitor's own word keeps its
+ * rank, and the alias groups' broad words ("transparent", "batch") can't
+ * reshuffle searches that already work (#5028). Conversion queries skip this:
+ * that alias group only signals intent, which scoreTool already reads.
+ */
+function withAliasFallback(rawQuery: string, scored: ToolSearchResult[]): ToolSearchResult[] {
+  const query = buildQuery(rawQuery);
+  if (query.hasConversionIntent || query.hasConversionAlias || query.aliasQueries.length === 0) {
+    return scored;
+  }
+  if (scored.some((result) => result.score >= CONFIDENT_SCORE_THRESHOLD)) return scored;
+
+  // Built once here: this runs on every keystroke, for every tool.
+  const aliasQueries = query.aliasQueries.map(buildQuery);
+  return scored.map((literal) =>
+    aliasQueries
+      .map((aliasQuery) => scoreBuiltQuery(aliasQuery, literal.item))
+      .reduce((best, alias) => (alias.score > best.score ? alias : best), literal),
+  );
+}
+
 export function searchTools(
   items: ToolSearchItem[],
   {
@@ -1132,7 +1237,7 @@ export function searchTools(
     };
   }
 
-  const candidates = [...scored]
+  const candidates = withAliasFallback(query, scored)
     .sort(compareResults)
     .filter((result) => result.score >= RELATED_SCORE_THRESHOLD);
   const sorted = relevantResults(query, candidates);

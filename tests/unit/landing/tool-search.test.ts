@@ -803,6 +803,20 @@ describe("landing searchTools with real catalog metadata", () => {
       expect(result.hasConfidentMatch).toBe(true);
     });
 
+    // #5028: an alias only kept the tool in the list; it has to rank it too, or
+    // ToolGrid shows the request prompt instead of the tool.
+    it.each([
+      ["combine pdf", "merge-pdf"],
+      ["join pdf", "merge-pdf"],
+      ["merge pdf", "merge-pdf"],
+      ["shrink pdf", "compress-pdf"],
+      ["black out pdf", "redact-pdf"],
+    ])("ranks the alias target first: %j leads with %s", (query, id) => {
+      const result = search(query);
+      expect(ids(result.results)[0]).toBe(id);
+      expect(result.hasConfidentMatch).toBe(true);
+    });
+
     it("scores a tool's id in typed order above the same words reordered", () => {
       const mergePdf = realTools.find((tool) => tool.id === "merge-pdf");
       if (!mergePdf) throw new Error("Missing merge-pdf");
@@ -813,6 +827,14 @@ describe("landing searchTools with real catalog metadata", () => {
 
     it("does not lift a conversion preset for the reverse direction", () => {
       expect(ids(search("png to jpg").results)).not.toContain("jpg-to-png");
+    });
+
+    it("does not swap aliases into a conversion query", () => {
+      // "batch convert log" as "multiple files convert log" pulled in every
+      // merge tool, none of which converts anything.
+      const result = search("batch convert log");
+      expect(ids(result.results)).toEqual([]);
+      expect(ids(result.related)).toEqual([]);
     });
 
     it("keeps a converter that names the format only in acceptedInputs", () => {
