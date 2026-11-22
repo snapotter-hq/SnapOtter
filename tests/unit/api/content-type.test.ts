@@ -18,3 +18,10 @@ describe("getContentType charset", () => {
     expect(getContentType("unknown-ext")).toBe("application/octet-stream");
   });
 });
+
+describe("getContentType audio", () => {
+  it("serves AIFF as audio/aiff under both extensions (#5161)", () => {
+    expect(getContentType("aiff")).toBe("audio/aiff");
+    expect(getContentType("aif")).toBe("audio/aiff");
+  });
+});

@@ -627,6 +627,7 @@ export function getContentType(ext: string): string {
     opus: "audio/opus",
     wma: "audio/x-ms-wma",
     aiff: "audio/aiff",
+    aif: "audio/aiff",
     amr: "audio/amr",
     ac3: "audio/ac3",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

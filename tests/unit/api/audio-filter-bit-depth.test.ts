@@ -141,6 +141,8 @@ const CASES: Array<[string, string, string, MediaStreamInfo | undefined]> = [
   ["in32.aiff", "pcm_s32be", "audio/aiff", AIFF_32],
   ["inf.aiff", "pcm_f32be", "audio/aiff", AIFF_FLOAT],
   ["in16.aiff", "pcm_s16be", "audio/aiff", AIFF_16],
+  ["in24.aif", "pcm_s24be", "audio/aiff", AIFF_24],
+  ["in16.aif", "pcm_s16be", "audio/aiff", AIFF_16],
   ["unprobed.wav", "pcm_s16le", "audio/wav", undefined],
 ];
 
