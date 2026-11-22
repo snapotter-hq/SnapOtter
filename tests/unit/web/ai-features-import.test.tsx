@@ -19,7 +19,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 
 import { AiFeaturesSection } from "@/components/settings/ai-features-section";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -236,6 +236,9 @@ describe("offline AI bundle import: FEATURE_NOT_INSTALLED (#1915)", () => {
       removeItem: (k: string) => void storage.delete(k),
       clear: () => storage.clear(),
     });
+    // A slow host can't finish the real de chunk's dynamic import inside
+    // findBy*'s 1 s budget (#5193); i18n-context.test.tsx covers the real load.
+    vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
     fetchMock.mockResolvedValue({
       ok: false,
       status: 501,
@@ -296,6 +299,7 @@ describe("bundle install progress", () => {
       removeItem: (k: string) => void storage.delete(k),
       clear: () => storage.clear(),
     });
+    vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
     vi.spyOn(Math, "random").mockReturnValue(0);
     const bundle: FeatureBundleState = {
       id: "background-removal",
