@@ -59,7 +59,7 @@
     "test:e2e:noauth": "playwright test --config playwright.noauth.config.ts",
     "test:e2e:external": "playwright test --config playwright.analytics.config.ts",
     "test:e2e:production": "playwright test --config tests/qa/playwright.qa.config.ts",
-    "test:docker": "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
+    "test:docker": "bash scripts/test-docker.sh",
     "check:license-boundary": "node scripts/check-license-boundary.mjs",
     "check:production-node-licenses": "node scripts/check-production-licenses.mjs",
     "check:production-licenses": "pnpm check:production-node-licenses",
