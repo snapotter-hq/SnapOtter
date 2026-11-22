@@ -531,9 +531,7 @@ test("canonical external-server and production commands collect their complete s
   expect(packageJson.scripts["test:e2e:analytics"]).toBe(
     "playwright test --config playwright.analytics-local.config.ts",
   );
-  expect(packageJson.scripts["test:docker"]).toBe(
-    "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
-  );
+  expect(packageJson.scripts["test:docker"]).toBe("bash scripts/test-docker.sh");
   expect(packageJson.scripts["test:e2e:production"]).toBe(
     "playwright test --config tests/qa/playwright.qa.config.ts",
   );

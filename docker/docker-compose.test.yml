@@ -1,6 +1,5 @@
 ###############################################################################
-# Test infrastructure - run with:
-#   docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit
+# Test infrastructure - run with `pnpm test:docker` (scripts/test-docker.sh)
 ###############################################################################
 name: snapotter-test
 services:

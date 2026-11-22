@@ -478,8 +478,11 @@ jobs:
         # test-e2e the moment test-unit exits, so test-e2e's SIGKILL (137) became
         # the result. Browser e2e is covered by the E2E Full/Serial/Cross-Browser
         # jobs; running test-e2e in-container too is a separate follow-up (it also
-        # would not fit this job's 60-minute budget alongside test-unit).
-        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit
+        # would not fit this job's 60-minute budget alongside test-unit). Naming
+        # test-unit keeps compose from creating test-e2e, which sat in Created and
+        # hung `up` once test-unit failed (#5001). pnpm test:docker runs the same
+        # command through scripts/test-docker.sh.
+        run: docker compose -f docker/docker-compose.test.yml up --build --exit-code-from test-unit test-unit
       - name: Report disk after the run
         # Free disk space prints headroom before the build, when it always looks
         # fine. Running out of space mid-suite shows up as one test file failing
