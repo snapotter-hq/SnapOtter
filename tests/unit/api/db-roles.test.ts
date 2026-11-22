@@ -164,4 +164,82 @@ describe("resolveRoleSplit", () => {
     const noPw = "postgres://snapotter_app@db:5432/snapotter";
     expect(() => resolveRoleSplit(noPw, MIGRATION)).toThrow(/password/i);
   });
+
+  // node-postgres takes ?user= and ?password= over the userinfo, so provisioning
+  // the userinfo role would grant a role the runtime pool never logs in as.
+  describe("query-param credentials", () => {
+    it("provisions the ?user= role node-postgres logs in as", () => {
+      const split = resolveRoleSplit(
+        "postgres://ignored:pw@db/snapotter?user=snapotter_app",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({
+        active: true,
+        runtimeRole: "snapotter_app",
+        runtimePassword: "pw",
+      });
+    });
+
+    it("provisions with the ?password= node-postgres logs in with", () => {
+      const split = resolveRoleSplit(
+        "postgres://snapotter_app:ignored@db/snapotter?password=p%40ss",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({ active: true, runtimePassword: "p@ss" });
+    });
+
+    it("accepts credentials given only as query params", () => {
+      const split = resolveRoleSplit(
+        "postgres://db/snapotter?user=snapotter_app&password=apppw",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({
+        active: true,
+        runtimeRole: "snapotter_app",
+        runtimePassword: "apppw",
+      });
+    });
+
+    it("uses the last value of a repeated ?user=", () => {
+      const split = resolveRoleSplit(
+        "postgres://x:pw@db/snapotter?user=first&user=snapotter_app",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({ runtimeRole: "snapotter_app" });
+    });
+
+    it("falls back to the userinfo when ?user= and ?password= are empty", () => {
+      const split = resolveRoleSplit(
+        "postgres://snapotter_app:p%40ss@db/snapotter?user=&password=",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({ runtimeRole: "snapotter_app", runtimePassword: "p@ss" });
+    });
+
+    it("uses the last value of a repeated ?password=", () => {
+      const split = resolveRoleSplit(
+        "postgres://snapotter_app:x@db/snapotter?password=a&password=b",
+        MIGRATION,
+      );
+      expect(split).toMatchObject({ runtimePassword: "b" });
+    });
+
+    it("treats a migration ?user= naming the runtime role as the same role", () => {
+      const migration = "postgres://snapotter:ownerpw@db/snapotter?user=snapotter_app";
+      const split = resolveRoleSplit(RUNTIME, migration);
+      expect(split).toMatchObject({ active: false, reason: "same-role" });
+    });
+
+    it("treats a migration ?user= naming another role as a split", () => {
+      const runtime = "postgres://snapotter:apppw@db/snapotter";
+      const migration = "postgres://snapotter:ownerpw@db/snapotter?user=owner";
+      const split = resolveRoleSplit(runtime, migration);
+      expect(split).toMatchObject({ active: true, runtimeRole: "snapotter" });
+    });
+
+    it("checks the ?user= role, not the userinfo, against the identifier rules", () => {
+      const bad = "postgres://snapotter_app:pw@db/snapotter?user=ev%20il";
+      expect(() => resolveRoleSplit(bad, MIGRATION)).toThrow(/role name/i);
+    });
+  });
 });
