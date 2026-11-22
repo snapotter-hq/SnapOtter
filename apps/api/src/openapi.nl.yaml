@@ -14217,8 +14217,8 @@ paths:
       operationId: resizePdfPages
       tags:
         - PDF
-      summary: Resize PDF Pages
-      description: Resize every page to a preset or custom size, such as a 4x6 in shipping label. Content is scaled to fit and centered without rasterizing.
+      summary: PDF-paginaformaat wijzigen
+      description: Wijzigt elke pagina naar een vooraf ingesteld of aangepast formaat, zoals een verzendlabel van 4x6 inch. De inhoud wordt passend geschaald en gecentreerd zonder te rasteren.
       security:
         - bearerAuth: []
       requestBody:
@@ -14233,22 +14233,22 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: PDF file to resize
+                  description: PDF-bestand waarvan het formaat wordt gewijzigd
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `pageSize` (string, default "4x6in") - One of: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
-                    - `width` (number, default 4) - Custom page width, used when pageSize is custom
-                    - `height` (number, default 6) - Custom page height, used when pageSize is custom
-                    - `unit` (string, default "in") - Unit for the custom size: in or mm. Each custom side must be 0.5-200 in (12.7-5080 mm)
-                    - `keepOrientation` (boolean, default false) - Turn the target size to match each page's orientation instead of forcing width x height
+                    JSON-string met opties:
+                    - `pageSize` (string, standaard "4x6in") - Een van: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
+                    - `width` (number, standaard 4) - Aangepaste paginabreedte, gebruikt als pageSize custom is
+                    - `height` (number, standaard 6) - Aangepaste paginahoogte, gebruikt als pageSize custom is
+                    - `unit` (string, standaard "in") - Eenheid voor het aangepaste formaat: in of mm. Elke aangepaste zijde moet binnen 0.5-200 in (12.7-5080 mm) vallen
+                    - `keepOrientation` (boolean, standaard false) - Draait het doelformaat mee met de oriëntatie van elke pagina in plaats van breedte x hoogte af te dwingen
             example:
               file: photo.png
               settings: '{}'
       responses:
         '200':
-          description: Resized PDF
+          description: PDF met gewijzigd formaat
           content:
             application/json:
               schema:
@@ -14261,13 +14261,13 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         '400':
-          description: Invalid input
+          description: Ongeldige invoer
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          description: Authentication required
+          description: Authenticatie vereist
           content:
             application/json:
               schema:
@@ -30229,6 +30229,14 @@ x-i18n:
       sourceHash: bf41f42bcf80
       provenance: machine
       outputHash: ab9cf5e8aea3
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.summary:
+      sourceHash: f039f9dab0da
+      provenance: machine
+      outputHash: 4467d0fd3341
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.description:
+      sourceHash: 9e7561e87b60
+      provenance: machine
+      outputHash: ee7f70b3470f
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36898,6 +36906,26 @@ x-i18n:
       provenance: machine
       outputHash: 9786d63053b6
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 1f8ca1b3be80
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: fb92ed6305d1
+      provenance: machine
+      outputHash: ac99670b3052
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 476b98ec148d
+      provenance: machine
+      outputHash: cda339491455
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/200/description:
+      sourceHash: d5564f0f993b
+      provenance: machine
+      outputHash: 65e60ab742f5
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 9786d63053b6
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 1f8ca1b3be80

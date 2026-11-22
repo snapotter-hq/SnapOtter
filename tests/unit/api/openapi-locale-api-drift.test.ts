@@ -9,6 +9,7 @@ const LOCALES = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
 // Units that drifted from the English spec and were re-translated in #4948:
 // whole operations that were added or rewritten, plus single properties added
 // to older operations. pdf-to-markdown is left to its own docs change.
+// resize-pdf-pages landed after that refresh and was translated in #5254.
 const DRIFTED_OPERATIONS = [
   "/api/v1/tools/image/passport-photo/generate",
   "/api/v1/tools/image/vectorize",
@@ -16,6 +17,7 @@ const DRIFTED_OPERATIONS = [
   "/api/v1/tools/video/convert-subtitles",
   "/api/v1/tools/files/base64",
   "/api/v1/tools/files/proportion-calculator",
+  "/api/v1/tools/pdf/resize-pdf-pages",
 ];
 const DRIFTED_UNITS = [
   "ptr:/paths/~1api~1v1~1features/get/responses/200/content/application~1json/schema/properties/upscaleCpuMaxMp/description",

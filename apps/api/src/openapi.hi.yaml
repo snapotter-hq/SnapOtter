@@ -14271,8 +14271,8 @@ paths:
       operationId: resizePdfPages
       tags:
         - PDF
-      summary: Resize PDF Pages
-      description: Resize every page to a preset or custom size, such as a 4x6 in shipping label. Content is scaled to fit and centered without rasterizing.
+      summary: PDF पेज का आकार बदलें
+      description: हर पेज का आकार किसी प्रीसेट या कस्टम साइज़ में बदलता है, जैसे 4x6 इंच का शिपिंग लेबल। कंटेंट को रास्टराइज़ किए बिना फ़िट होने तक स्केल करके बीच में रखा जाता है।
       security:
         - bearerAuth: []
       requestBody:
@@ -14287,22 +14287,22 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: PDF file to resize
+                  description: आकार बदलने के लिए PDF फ़ाइल
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `pageSize` (string, default "4x6in") - One of: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
-                    - `width` (number, default 4) - Custom page width, used when pageSize is custom
-                    - `height` (number, default 6) - Custom page height, used when pageSize is custom
-                    - `unit` (string, default "in") - Unit for the custom size: in or mm. Each custom side must be 0.5-200 in (12.7-5080 mm)
-                    - `keepOrientation` (boolean, default false) - Turn the target size to match each page's orientation instead of forcing width x height
+                    विकल्पों वाली JSON स्ट्रिंग:
+                    - `pageSize` (string, default "4x6in") - इनमें से एक: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
+                    - `width` (number, default 4) - कस्टम पेज चौड़ाई, जब pageSize custom हो तब इस्तेमाल होती है
+                    - `height` (number, default 6) - कस्टम पेज ऊँचाई, जब pageSize custom हो तब इस्तेमाल होती है
+                    - `unit` (string, default "in") - कस्टम साइज़ की इकाई: in या mm। हर कस्टम साइड 0.5-200 in (12.7-5080 mm) के बीच होनी चाहिए
+                    - `keepOrientation` (boolean, default false) - चौड़ाई x ऊँचाई थोपने के बजाय लक्ष्य साइज़ को हर पेज के ओरिएंटेशन के अनुसार घुमाएँ
             example:
               file: photo.png
               settings: '{}'
       responses:
         '200':
-          description: Resized PDF
+          description: आकार बदला गया PDF
           content:
             application/json:
               schema:
@@ -14315,13 +14315,13 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         '400':
-          description: Invalid input
+          description: अमान्य इनपुट
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          description: Authentication required
+          description: प्रमाणीकरण आवश्यक है
           content:
             application/json:
               schema:
@@ -30295,6 +30295,14 @@ x-i18n:
       sourceHash: bf41f42bcf80
       provenance: machine
       outputHash: 0579a1f7d73c
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.summary:
+      sourceHash: f039f9dab0da
+      provenance: machine
+      outputHash: c69fb2fecf16
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.description:
+      sourceHash: 9e7561e87b60
+      provenance: machine
+      outputHash: 1f06a3a6f96d
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36964,6 +36972,26 @@ x-i18n:
       provenance: machine
       outputHash: 793a6b875fe9
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: c2cc14123e88
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: fb92ed6305d1
+      provenance: machine
+      outputHash: 0858b8491fb5
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 476b98ec148d
+      provenance: machine
+      outputHash: 20ddb1a04321
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/200/description:
+      sourceHash: d5564f0f993b
+      provenance: machine
+      outputHash: 8287275599b2
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 793a6b875fe9
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: c2cc14123e88

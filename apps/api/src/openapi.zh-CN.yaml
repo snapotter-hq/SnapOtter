@@ -14214,8 +14214,8 @@ paths:
       operationId: resizePdfPages
       tags:
         - PDF
-      summary: Resize PDF Pages
-      description: Resize every page to a preset or custom size, such as a 4x6 in shipping label. Content is scaled to fit and centered without rasterizing.
+      summary: 调整 PDF 页面尺寸
+      description: 将每一页调整为预设或自定义尺寸，例如 4x6 英寸的快递标签。内容会等比缩放以适应页面并居中，不会栅格化。
       security:
         - bearerAuth: []
       requestBody:
@@ -14230,22 +14230,22 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: PDF file to resize
+                  description: 要调整尺寸的 PDF 文件
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `pageSize` (string, default "4x6in") - One of: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
-                    - `width` (number, default 4) - Custom page width, used when pageSize is custom
-                    - `height` (number, default 6) - Custom page height, used when pageSize is custom
-                    - `unit` (string, default "in") - Unit for the custom size: in or mm. Each custom side must be 0.5-200 in (12.7-5080 mm)
-                    - `keepOrientation` (boolean, default false) - Turn the target size to match each page's orientation instead of forcing width x height
+                    JSON 字符串，包含以下选项：
+                    - `pageSize`（字符串，默认 "4x6in"）- 可选值：4x6in、100x150mm、a4、a5、a6、letter、legal、custom
+                    - `width`（数字，默认 4）- 自定义页面宽度，pageSize 为 custom 时使用
+                    - `height`（数字，默认 6）- 自定义页面高度，pageSize 为 custom 时使用
+                    - `unit`（字符串，默认 "in"）- 自定义尺寸的单位：in 或 mm。自定义尺寸的每条边必须在 0.5-200 in（12.7-5080 mm）之间
+                    - `keepOrientation`（布尔值，默认 false）- 按每页的方向旋转目标尺寸，而不是强制使用宽度 x 高度
             example:
               file: photo.png
               settings: '{}'
       responses:
         '200':
-          description: Resized PDF
+          description: 调整尺寸后的 PDF
           content:
             application/json:
               schema:
@@ -14258,13 +14258,13 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         '400':
-          description: Invalid input
+          description: 输入无效
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          description: Authentication required
+          description: 需要身份验证
           content:
             application/json:
               schema:
@@ -30224,6 +30224,14 @@ x-i18n:
       sourceHash: bf41f42bcf80
       provenance: machine
       outputHash: ea4d342c7361
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.summary:
+      sourceHash: f039f9dab0da
+      provenance: machine
+      outputHash: 041705ce2b8b
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.description:
+      sourceHash: 9e7561e87b60
+      provenance: machine
+      outputHash: a2a62e31aa10
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36893,6 +36901,26 @@ x-i18n:
       provenance: machine
       outputHash: 619fce373c81
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 7febe43544a1
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: fb92ed6305d1
+      provenance: machine
+      outputHash: 6761b9350f8d
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 476b98ec148d
+      provenance: machine
+      outputHash: 19c21c37e478
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/200/description:
+      sourceHash: d5564f0f993b
+      provenance: machine
+      outputHash: 1f160a69c146
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 619fce373c81
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 7febe43544a1
