@@ -417,3 +417,50 @@ export const SEMANTIC_ORACLES: Record<string, SemanticOracle> = {
       ? null
       : "mono-to-stereo did not produce 2 channels",
 };
+
+/**
+ * Per-tool checks for routes that answer with JSON instead of an artifact.
+ * Each returns null when satisfied or a human-readable violation, like
+ * SEMANTIC_ORACLES. Without one, any non-empty JSON object passes.
+ */
+export type JsonResultOracle = (json: Record<string, unknown>) => string | null;
+
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/** True when `solved` is `other * scale` to within the route's rounding. */
+function keepsRatio(solved: number, other: number, scale: number): boolean {
+  return Math.abs(solved - other * scale) <= 1;
+}
+
+export const JSON_RESULT_ORACLES: Record<string, JsonResultOracle> = {
+  // Checked against the echoed inputs rather than one fixed answer, so the
+  // oracle holds whatever body a lane sends.
+  "aspect-ratio-calculator": (json) => {
+    const { width, height, ratio, newWidth, newHeight } = json;
+    if (typeof width !== "number" || typeof height !== "number") {
+      return "response does not echo a numeric width and height";
+    }
+    const match = typeof ratio === "string" ? /^(\d+):(\d+)$/.exec(ratio) : null;
+    if (!match) return `ratio ${JSON.stringify(ratio)} is not of the form a:b`;
+    const a = Number(match[1]);
+    const b = Number(match[2]);
+    if (gcd(a, b) !== 1) return `ratio ${ratio} is not simplified`;
+    // The route reduces sizes rounded to four decimal places, so 1.23456 x 1
+    // is correctly 6173:5000. Compare against the same rounding.
+    const expected = Math.round(width * 1e4) / Math.round(height * 1e4);
+    if (Math.abs(a / b - expected) > 1e-9 * expected) {
+      return `ratio ${ratio} does not match ${width}x${height}`;
+    }
+    if (typeof newWidth === "number" && typeof newHeight === "number") {
+      const holds =
+        keepsRatio(newHeight, newWidth, height / width) ||
+        keepsRatio(newWidth, newHeight, width / height);
+      if (!holds) {
+        return `newWidth x newHeight ${newWidth}x${newHeight} does not keep ${width}:${height}`;
+      }
+    }
+    return null;
+  },
+};

@@ -6055,6 +6055,42 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "aspect-ratio-calculator": {
+    searchTitle: "Aspect Ratio Calculator for Width and Height",
+    longDescription:
+      "Type the original width and height, then a new width or a new height, and get the other side worked out so the proportions stay the same. The ratio is reduced to its simplest form, so 1920 by 1080 reads as 16:9 and 8.5 by 11 as 17:22. Start from a common ratio such as 16:9, 4:3 or 9:16, swap between landscape and portrait, and round to whole pixels or keep two decimals. No file is uploaded. The numbers go to your own SnapOtter instance and nowhere else.",
+    useCases: [
+      "Finding the height that keeps a 1920 by 1080 screenshot at 16:9 when it has to be 1280 wide",
+      "Sizing a video export, thumbnail or banner to the dimensions a platform asks for",
+      "Checking whether a photo is 3:2, 4:3 or something else before cropping it",
+      "Working out print or layout sizes in inches or centimetres, where the sides are fractional",
+    ],
+    features: [
+      "Solves the missing new width or new height from the original size",
+      "Reduces any width and height to its simplest ratio, decimals included",
+      "Common ratio presets: 16:9, 4:3, 3:2, 1:1, 21:9, 9:16 and 4:5",
+      "One click to swap between landscape and portrait orientation",
+      "Rounds to whole pixels or keeps two decimal places",
+    ],
+    faqs: [
+      {
+        q: "How do I keep the aspect ratio when resizing?",
+        a: "Enter the original width and height, then type only the new width or only the new height. The calculator scales the other side by the same factor, so a 1920 by 1080 image resized to 1280 wide needs to be 720 high.",
+      },
+      {
+        q: "Does it work with sizes that aren't whole numbers?",
+        a: "Yes. Decimal sizes such as 8.5 by 11 are reduced to a whole-number ratio, 17:22 in that case. Turn off rounding to whole pixels and the solved side keeps two decimal places.",
+      },
+      {
+        q: "Does it resize my image?",
+        a: "No. It only does the arithmetic and never touches a file. Once you have the numbers, use Resize Image or Crop Image to apply them.",
+      },
+      {
+        q: "Can I use it from the API?",
+        a: "Yes. Send a JSON body with width, height and either newWidth or newHeight to the aspect-ratio-calculator endpoint, and it answers with the simplified ratio and the solved size.",
+      },
+    ],
+  },
   "circle-crop": {
     searchTitle: "Crop Image Into Circle Shape",
     longDescription:
