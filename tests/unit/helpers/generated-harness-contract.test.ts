@@ -26,6 +26,19 @@ describe("generated QA harness contract", () => {
     },
   );
 
+  // #5213: these harnesses call processV2 directly, so an optional-bundle-only
+  // tool must not be skipped whole, and each case checks its own bundle.
+  it.each(["fuzz-settings.test.ts", "settings-pairwise.test.ts"])(
+    "%s gates optional-bundle-only tools per case, not per tool",
+    (filename) => {
+      const text = source(filename);
+      expect(text).toMatch(/!PER_REQUEST_AI_GATED_TOOLS\.has\(toolId\)/);
+      expect(text).toMatch(
+        /findMissingSettingsBundle\(config, parsed\.data, REQUIRE_AI_FEATURES\)/,
+      );
+    },
+  );
+
   it.each([
     "format-matrix-generated.shared.ts",
     "format-matrix-multimodal.test.ts",

@@ -10,7 +10,10 @@ import {
   parseFuzzConfig,
   runFuzzCaseWithWatchdog,
 } from "../../helpers/fuzz-policy.js";
-import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
+import {
+  GeneratedCaseAccounting,
+  PER_REQUEST_AI_GATED_TOOLS,
+} from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
   generatedFixtureDirectories,
@@ -20,6 +23,7 @@ import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gat
 import {
   buildGeneratedProcessInputs,
   findMissingGeneratedPrerequisite,
+  findMissingSettingsBundle,
   isExpectedGeneratedRejection,
   runGeneratedTool,
 } from "../../helpers/run-generated-tool.js";
@@ -104,7 +108,11 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
     it(`${toolId} never crashes on schema-valid settings`, {
       timeout: budget.targetTimeoutMs,
     }, async (context) => {
-      if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
+      if (
+        (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) &&
+        !PER_REQUEST_AI_GATED_TOOLS.has(toolId) &&
+        !REQUIRE_AI_FEATURES
+      ) {
         return context.skip(
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
         );
@@ -134,9 +142,11 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
         throw new Error(`${toolId}: default settings do not satisfy the registered schema`);
       }
       accounting.attempt();
-      const missingBaselinePython = findMissingGeneratedPythonPrerequisite(toolId, baseline.data);
-      if (missingBaselinePython) {
-        accounting.skip("optional-feature", missingBaselinePython);
+      const missingBaselineFeature =
+        findMissingGeneratedPythonPrerequisite(toolId, baseline.data) ??
+        findMissingSettingsBundle(config, baseline.data, REQUIRE_AI_FEATURES);
+      if (missingBaselineFeature) {
+        accounting.skip("optional-feature", missingBaselineFeature);
       } else {
         const baselineOutput = await runFuzzCaseWithWatchdog(
           {
@@ -184,9 +194,11 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
             fc.pre(parsed.success);
             run += 1;
             accounting.attempt();
-            const missingCasePython = findMissingGeneratedPythonPrerequisite(toolId, parsed.data);
-            if (missingCasePython) {
-              accounting.skip("optional-feature", missingCasePython);
+            const missingCaseFeature =
+              findMissingGeneratedPythonPrerequisite(toolId, parsed.data) ??
+              findMissingSettingsBundle(config, parsed.data, REQUIRE_AI_FEATURES);
+            if (missingCaseFeature) {
+              accounting.skip("optional-feature", missingCaseFeature);
               return;
             }
             try {

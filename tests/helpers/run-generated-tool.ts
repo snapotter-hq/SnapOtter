@@ -77,6 +77,28 @@ export async function findMissingGeneratedPrerequisite(
 }
 
 /**
+ * The route answers a case whose settings need an uninstalled optional bundle
+ * (smart-crop's face mode) with a 501 before any job runs. runGeneratedTool
+ * calls processV2 directly and never meets that check, so generated lanes ask
+ * missingBundle themselves: a skip reason in ordinary runs, a failure when the
+ * campaign declares its AI features installed.
+ */
+export function findMissingSettingsBundle(
+  config: Pick<AnyToolRouteConfig, "toolId" | "missingBundle">,
+  settings: unknown,
+  requireAiFeatures: boolean,
+): string | undefined {
+  const bundleId = config.missingBundle?.(settings);
+  if (!bundleId) return undefined;
+  if (requireAiFeatures) {
+    throw new Error(
+      `${config.toolId}: REQUIRE_AI_FEATURES=1 but bundle "${bundleId}" is not installed`,
+    );
+  }
+  return `${config.toolId}: optional bundle "${bundleId}" is not installed for these settings`;
+}
+
+/**
  * Build deterministic processV2 inputs from compatible fixture candidates.
  * Mixed-input routes select by position; same-kind multi-input routes use a
  * second distinct fixture when available and otherwise reuse the first.

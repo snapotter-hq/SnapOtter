@@ -1,7 +1,10 @@
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
-import { GeneratedCaseAccounting } from "../../helpers/generated-case-accounting.js";
+import {
+  GeneratedCaseAccounting,
+  PER_REQUEST_AI_GATED_TOOLS,
+} from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
   generatedFixtureDirectories,
@@ -12,6 +15,7 @@ import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gat
 import {
   buildGeneratedProcessInputs,
   findMissingGeneratedPrerequisite,
+  findMissingSettingsBundle,
   isExpectedGeneratedRejection,
   runGeneratedTool,
 } from "../../helpers/run-generated-tool.js";
@@ -62,7 +66,11 @@ describe("pairwise settings matrix", () => {
 
   for (const toolId of toolIds) {
     it(`${toolId} survives its pairwise settings matrix`, async (context) => {
-      if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
+      if (
+        (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) &&
+        !PER_REQUEST_AI_GATED_TOOLS.has(toolId) &&
+        !REQUIRE_AI_FEATURES
+      ) {
         return context.skip(
           `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
         );
@@ -106,9 +114,11 @@ describe("pairwise settings matrix", () => {
       });
       for (const parsed of cases) {
         accounting.attempt();
-        const missingCasePython = findMissingGeneratedPythonPrerequisite(toolId, parsed.data);
-        if (missingCasePython) {
-          accounting.skip("optional-feature", missingCasePython);
+        const missingCaseFeature =
+          findMissingGeneratedPythonPrerequisite(toolId, parsed.data) ??
+          findMissingSettingsBundle(config, parsed.data, REQUIRE_AI_FEATURES);
+        if (missingCaseFeature) {
+          accounting.skip("optional-feature", missingCaseFeature);
           continue;
         }
         try {
