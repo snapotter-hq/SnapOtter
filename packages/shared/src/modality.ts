@@ -245,3 +245,25 @@ export function toolOutputModality(tool: {
 }): Modality {
   return tool.outputModality ?? tool.modality;
 }
+
+/**
+ * Why a pipeline step can't read the previous step's output, or null when it
+ * can. Any accepted extension counts, and a tool that accepts any input is
+ * never judged. Document and file tools count as one family: their output
+ * format follows their settings (csv-excel writes .xlsx, excel-to-csv writes
+ * .csv, ocr writes .txt), so the declared modality can't tell a valid chain
+ * from a broken one. Shared by the API's pre-run check and the builder's
+ * warning badge so the two agree (#4343, #4932).
+ */
+export function pipelineStepMismatch(
+  prev: { modality: Modality; outputModality?: Modality },
+  tool: { modality: Modality; acceptedInputs: string[] },
+): { expects: Modality; receives: Modality } | null {
+  if (tool.acceptedInputs.length === 0) return null;
+  const receives = toolOutputModality(prev);
+  const family = (m: Modality | null) => (m === "file" ? "document" : m);
+  if (tool.acceptedInputs.some((ext) => family(modalityForExtension(ext)) === family(receives))) {
+    return null;
+  }
+  return { expects: toolInputModality(tool), receives };
+}

@@ -19,4 +19,20 @@ describe("computeStepWarnings", () => {
   it("does not flag the first step when no file is uploaded yet", () => {
     expect(computeStepWarnings(["resize"], null)[0]).toBeNull();
   });
+  // #4932: the builder warned about chains the server's step check accepts.
+  it("does not flag a step whose tool also takes the previous step's output", () => {
+    // replace-audio lists video first but also takes audio.
+    expect(computeStepWarnings(["convert-audio", "replace-audio"], "audio")[1]).toBeNull();
+  });
+  it("treats document and file tools as one family", () => {
+    expect(computeStepWarnings(["csv-excel", "excel-to-pdf"], "file")[1]).toBeNull();
+    expect(computeStepWarnings(["excel-to-csv", "csv-json"], "document")[1]).toBeNull();
+    expect(computeStepWarnings(["csv-json", "trim-audio"], "file")[1]).toEqual({
+      expects: "audio",
+      receives: "file",
+    });
+  });
+  it("does not flag a step whose tool accepts any input", () => {
+    expect(computeStepWarnings(["resize", "create-zip"], "image")[1]).toBeNull();
+  });
 });
