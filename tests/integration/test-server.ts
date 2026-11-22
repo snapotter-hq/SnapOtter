@@ -20,7 +20,13 @@ mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { getDispatcherStatus, isGpuAvailable, shutdownDispatcher } from "@snapotter/ai";
+import {
+  getDispatcherStatus,
+  isGpuAvailable,
+  shutdownDispatcher,
+  shutdownDocsDispatcher,
+  shutdownOcrDispatcher,
+} from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
@@ -116,10 +122,13 @@ async function stopSpine(): Promise<void> {
     stopCancelListener(),
     closeQueueEvents(),
   ]);
-  // Workers are closed, so no job still needs the dispatcher. Left running, its
-  // child outlives the fork and keeps logging after the last test.
+  // Workers are closed, so no job still needs a dispatcher. Left running, their
+  // children outlive the fork and keep logging after the last test. Mirrors
+  // index.ts; the OCR shutdown reopens admission once its managers close, so a
+  // later buildTestApp() in the same file still gets OCR.
   shutdownDispatcher();
-  const rejected = results.find(
+  const sidecars = await Promise.allSettled([shutdownDocsDispatcher(), shutdownOcrDispatcher()]);
+  const rejected = [...results, ...sidecars].find(
     (result): result is PromiseRejectedResult => result.status === "rejected",
   );
   if (rejected) {
