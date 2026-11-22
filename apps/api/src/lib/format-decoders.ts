@@ -6,7 +6,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { resolveFfmpeg } from "@snapotter/media-engine";
-import { hasServerErrorStatus, isSafeMessageError, SafeError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  SafeError,
+  wrapWithMemoryLimit,
+} from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isRawExtension } from "./file-validation.js";
@@ -481,8 +486,13 @@ async function preflightEncodedDimensions(
     }
     try {
       const { stdout } = await execFileAsync(
-        "exiftool",
-        ["-fast2", "-s3", "-ImageWidth", "-ImageHeight", inputPath],
+        ...wrapWithMemoryLimit("exiftool", [
+          "-fast2",
+          "-s3",
+          "-ImageWidth",
+          "-ImageHeight",
+          inputPath,
+        ]),
         {
           timeout: 15_000,
           maxBuffer: 64 * 1024,
@@ -499,7 +509,10 @@ async function preflightEncodedDimensions(
       if (isImageSafetyError(error)) throw error;
       // Without exiftool the safety limits can't be checked at all, whatever
       // the file: that's the host, not the upload (#1428).
-      if ((error as NodeJS.ErrnoException).code === "ENOENT" && isBinarySpawnFailure(error)) {
+      if (
+        ((error as NodeJS.ErrnoException).code === "ENOENT" && isBinarySpawnFailure(error)) ||
+        shellFoundNoExiftool(error)
+      ) {
         throw new DecoderUnavailableError(
           "No exiftool found. Install exiftool (libimage-exiftool-perl) to check image dimensions safely.",
           error,
@@ -523,6 +536,17 @@ async function preflightEncodedDimensions(
     `Cannot safely decode ${format.toUpperCase()}: encoded dimensions are unavailable for the configured image safety limits`,
     exiftoolFailure !== undefined ? { cause: exiftoolFailure } : undefined,
   );
+}
+
+/**
+ * Under SUBPROCESS_MEMORY_LIMIT_MB the /bin/sh shim starts fine, so a missing
+ * exiftool is the shell's exit 127 and its "not found" line rather than
+ * ENOENT (#5204). A bare 127 stays apart: from a direct spawn it means the
+ * binary's shared libraries wouldn't load (#1429).
+ */
+function shellFoundNoExiftool(err: unknown): boolean {
+  const { code, stderr } = (err ?? {}) as { code?: unknown; stderr?: unknown };
+  return code === 127 && /\bexiftool: not found/.test(String(stderr ?? ""));
 }
 
 /**
@@ -763,6 +787,11 @@ export function buildImageMagickResourceLimitArgs(options: DecodeSafetyOptions =
   ];
 }
 
+// ImageMagick stays outside SUBPROCESS_MEMORY_LIMIT_MB (#5204): these -limit
+// flags bound it already, and its OpenMP threads reserve far more address
+// space than they use, so a `ulimit -v` cap sized for the other decoders could
+// fail ordinary decodes. dcraw_emu (LibRaw, also built with OpenMP) stays out
+// for the same reason until it's checked under the cap.
 function magickArgs(cmd: string, args: string[], options: DecodeSafetyOptions = {}): string[] {
   const limits = buildImageMagickResourceLimitArgs(options);
   const convertArgs = [...limits, ...args];
@@ -859,12 +888,15 @@ async function decodeRaw(
     // Attempt 2: ExifTool full-size embedded JPEG (JpgFromRaw). Many formats
     // (NEF, RW2, ...) embed a full-resolution JPEG under this tag.
     try {
-      const { stdout } = await execFileAsync("exiftool", ["-b", "-JpgFromRaw", inputPath], {
-        encoding: "buffer",
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 30_000,
-        signal: options.signal,
-      } as never);
+      const { stdout } = await execFileAsync(
+        ...wrapWithMemoryLimit("exiftool", ["-b", "-JpgFromRaw", inputPath]),
+        {
+          encoding: "buffer",
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 30_000,
+          signal: options.signal,
+        } as never,
+      );
       // stdout is a Buffer when encoding is "buffer"
       const jpegBuf = stdout as unknown as Buffer;
       // length guard + JPEG SOI marker
@@ -881,12 +913,15 @@ async function decodeRaw(
     // Attempt 3: ExifTool PreviewImage (some formats store the embedded image
     // under a different tag than JpgFromRaw).
     try {
-      const { stdout } = await execFileAsync("exiftool", ["-b", "-PreviewImage", inputPath], {
-        encoding: "buffer",
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 30_000,
-        signal: options.signal,
-      } as never);
+      const { stdout } = await execFileAsync(
+        ...wrapWithMemoryLimit("exiftool", ["-b", "-PreviewImage", inputPath]),
+        {
+          encoding: "buffer",
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 30_000,
+          signal: options.signal,
+        } as never,
+      );
       const previewBuf = stdout as unknown as Buffer;
       if (
         previewBuf &&
@@ -1021,8 +1056,16 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
 
     try {
       await execFileAsync(
-        resolveFfmpeg() ?? "ffmpeg",
-        ["-y", "-i", inputPath, "-pix_fmt", "rgba", "-update", "1", outputPath],
+        ...wrapWithMemoryLimit(resolveFfmpeg() ?? "ffmpeg", [
+          "-y",
+          "-i",
+          inputPath,
+          "-pix_fmt",
+          "rgba",
+          "-update",
+          "1",
+          outputPath,
+        ]),
         commandOptions(options, 120_000),
       );
     } catch (error) {
@@ -1095,7 +1138,10 @@ async function decodeJxl(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     // lacks a JXL delegate (common on Ubuntu stock packages).
     let djxlFailure: unknown;
     try {
-      await execFileAsync("djxl", [inputPath, outputPath], commandOptions(options, 120_000));
+      await execFileAsync(
+        ...wrapWithMemoryLimit("djxl", [inputPath, outputPath]),
+        commandOptions(options, 120_000),
+      );
       return await readFile(outputPath).catch((err: unknown) => {
         throw asDecoderOutOfMemory(err);
       });
@@ -1134,10 +1180,13 @@ async function decodeJp2(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     await writeTempExclusive(inputPath, buffer);
     let opjFailure: unknown;
     try {
-      await execFileAsync("opj_decompress", ["-i", inputPath, "-o", outputPath], {
-        timeout: 60_000,
-        signal: options.signal,
-      });
+      await execFileAsync(
+        ...wrapWithMemoryLimit("opj_decompress", ["-i", inputPath, "-o", outputPath]),
+        {
+          timeout: 60_000,
+          signal: options.signal,
+        },
+      );
       return await readFile(outputPath).catch((err: unknown) => {
         throw asDecoderOutOfMemory(err);
       });
