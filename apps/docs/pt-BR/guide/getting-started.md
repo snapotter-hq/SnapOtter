@@ -144,7 +144,7 @@ pnpm dev
 | **Imagem** | 112 | Redimensionar, Cortar, Comprimir, Converter, Remover fundo, Ampliar, OCR, Marca d'água, Colagem, Colorizar, Ferramentas de GIF, predefinições de formato |
 | **Vídeo** | 59 | Aparar, Cortar, Comprimir, Converter, Mesclar, Extrair áudio, Legendas automáticas, Vídeo para GIF, Redimensionar, Estabilizar, predefinições de formato |
 | **Áudio** | 57 | Aparar, Mesclar, Converter, Normalizar, Redução de ruído, Transcrever, Alterar tom, Fade, Criador de toques, predefinições de formato |
-| **PDF / Documento** | 36 | Mesclar, Dividir, Comprimir, OCR, Marca d'água, Redigir, Word para PDF, Excel para PDF, Girar, Proteger, Reparar |
+| **PDF / Documento** | 37 | Mesclar, Dividir, Comprimir, OCR, Marca d'água, Redigir, Word para PDF, Excel para PDF, Girar, Proteger, Reparar |
 | **Arquivos** | 25 | CSV para JSON, JSON para XML, Mesclar CSVs, Dividir CSV, Criar ZIP, Extrair ZIP, Criador de gráficos, YAML/JSON |
 
 ### Pipelines {#pipelines}

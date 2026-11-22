@@ -1284,6 +1284,10 @@ export const de: TranslationKeys = {
       name: "PDF zuschneiden",
       description: "Alle Seiten mit einheitlichem Rand zuschneiden",
     },
+    "resize-pdf-pages": {
+      name: "PDF-Seitengröße ändern",
+      description: "Seiten auf A4, Letter oder ein 4x6-Zoll-Etikett bringen",
+    },
     "nup-pdf": {
       name: "Seiten pro Blatt (N-up)",
       description: "Mehrere Seiten pro Blatt anordnen",
@@ -4130,6 +4134,27 @@ export const de: TranslationKeys = {
       submit: "Zuschneiden",
       submitBatch: "Zuschneiden ({count} Dateien)",
       progressLabel: "Wird zugeschnitten",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Seitengröße",
+      width: "Breite",
+      height: "Höhe",
+      unit: "Einheit",
+      keepOrientation: "Ausrichtung jeder Seite beibehalten",
+      fitHint: "Der Inhalt wird passend skaliert und zentriert, Text und Barcodes bleiben scharf.",
+      submit: "Größe ändern",
+      submitBatch: "Größe ändern ({count} Dateien)",
+      progressLabel: "Größe wird geändert",
+      sizes: {
+        "4x6in": "4 x 6 in (Versandetikett)",
+        "100x150mm": "100 x 150 mm (Versandetikett)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Benutzerdefiniert",
+      },
     },
     "nup-pdf": {
       perSheet: "Seiten pro Blatt",

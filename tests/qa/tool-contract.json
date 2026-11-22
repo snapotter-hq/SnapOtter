@@ -11695,6 +11695,75 @@
     ]
   },
   {
+    "id": "resize-pdf-pages",
+    "name": "Resize PDF Pages",
+    "modality": "document",
+    "section": "pdf",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "pageSize",
+        "values": ["4x6in", "100x150mm", "a4", "a5", "a6", "letter", "legal", "custom", null]
+      },
+      {
+        "key": "width",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "height",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "unit",
+        "values": ["in", "mm", null]
+      },
+      {
+        "key": "keepOrientation",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "pageSize",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "pageSize",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "width",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "height",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "unit",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "unit",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "keepOrientation",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "nup-pdf",
     "name": "Pages Per Sheet (N-up)",
     "modality": "document",

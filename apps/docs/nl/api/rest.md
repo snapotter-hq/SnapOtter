@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: 7b62451dadae
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: c42e7b3c57de
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `grayscale-pdf` | PDF grijswaarden | - |
 | `pdfa-convert` | PDF/A-conversie | - (archief-PDF/A-2) |
 | `crop-pdf` | PDF bijsnijden | `margin` (0-2000 punten) |
+| `resize-pdf-pages` | PDF-paginaformaat wijzigen | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up-PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Boekje-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF van watermerk voorzien | `text`, `position`, `fontSize`, `opacity`, `rotation` |

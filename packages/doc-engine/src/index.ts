@@ -40,10 +40,12 @@ export {
   type NupValue,
   type PdfcpuOptions,
   type PdfPageSize,
+  type PdfResizeOptions,
   pdfcpuBooklet,
   pdfcpuCropMargin,
   pdfcpuNup,
   pdfcpuPageSizes,
+  pdfcpuResize,
   pdfcpuTextStamp,
   type TextStampOptions,
 } from "./pdfcpu.js";

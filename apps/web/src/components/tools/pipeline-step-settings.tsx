@@ -143,6 +143,9 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "organize-pdf": lazy(() =>
     import("./organize-pdf-settings").then((m) => ({ default: m.OrganizePdfControls })),
   ),
+  "resize-pdf-pages": lazy(() =>
+    import("./resize-pdf-pages-settings").then((m) => ({ default: m.ResizePdfPagesControls })),
+  ),
   "nup-pdf": lazy(() => import("./nup-pdf-settings").then((m) => ({ default: m.NupPdfControls }))),
   "watermark-pdf": lazy(() =>
     import("./watermark-pdf-settings").then((m) => ({ default: m.WatermarkPdfControls })),

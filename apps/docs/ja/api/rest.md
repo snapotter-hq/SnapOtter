@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: de77721e539d
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: feb397a34d4b
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF のグレースケール化 | - |
 | `pdfa-convert` | PDF/A 変換 | -（アーカイブ用 PDF/A-2） |
 | `crop-pdf` | PDF のクロップ | `margin`（0-2000 ポイント） |
+| `resize-pdf-pages` | PDF ページサイズ変更 | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet`（2/3/4/8/9/12/16） |
 | `booklet-pdf` | ブックレット PDF | `perSheet`（2/4/6/8） |
 | `watermark-pdf` | PDF のウォーターマーク | `text`, `position`, `fontSize`, `opacity`, `rotation` |

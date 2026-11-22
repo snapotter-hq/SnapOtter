@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: cce029ed0269
+i18n_output_hash: b83e3fda2359
 i18n_hash_version: 2
-i18n_source_hash: baf6f1fff48e
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -344,6 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF у відтінках сірого | - |
 | `pdfa-convert` | Конвертація в PDF/A | - (архівний PDF/A-2) |
 | `crop-pdf` | Обрізання PDF | `margin` (0-2000 пунктів) |
+| `resize-pdf-pages` | Змінити розмір сторінок PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Буклет PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Водяний знак PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

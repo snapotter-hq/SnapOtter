@@ -126,6 +126,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "extract-pages": PDF_FIX,
   "remove-pages": PDF_FIX,
   "crop-pdf": PDF_FIX,
+  "resize-pdf-pages": PDF_FIX,
   "nup-pdf": PDF_FIX,
   "booklet-pdf": PDF_FIX,
   "organize-pdf": PDF_FIX,
@@ -988,6 +989,15 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "margin 0", settings: { margin: 0 } },
     { label: "margin 20", settings: { margin: 20 } },
     { label: "margin max", settings: { margin: 2000 } },
+  ],
+
+  "resize-pdf-pages": [
+    { label: "4x6 in label", settings: { pageSize: "4x6in" } },
+    { label: "A4 keep orientation", settings: { pageSize: "a4", keepOrientation: true } },
+    {
+      label: "custom 100x150 mm",
+      settings: { pageSize: "custom", width: 100, height: 150, unit: "mm" },
+    },
   ],
 
   "nup-pdf": [

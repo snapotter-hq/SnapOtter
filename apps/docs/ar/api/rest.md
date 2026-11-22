@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 2ceddbd16953
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: b9ae9f20d8b3
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF بتدرج رمادي | - |
 | `pdfa-convert` | التحويل إلى PDF/A | - (PDF/A-2 للأرشفة) |
 | `crop-pdf` | قص PDF | `margin` (0-2000 نقطة) |
+| `resize-pdf-pages` | تغيير حجم صفحات PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | كتيّب PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | علامة مائية على PDF | `text`، `position`، `fontSize`، `opacity`، `rotation` |

@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 4df8c109bc93
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: 44c977d67921
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF ระดับสีเทา | - |
 | `pdfa-convert` | แปลงเป็น PDF/A | - (PDF/A-2 สำหรับการเก็บถาวร) |
 | `crop-pdf` | ครอป PDF | `margin` (0-2000 จุด) |
+| `resize-pdf-pages` | ปรับขนาดหน้า PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | สมุดพับ PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | ลายน้ำ PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

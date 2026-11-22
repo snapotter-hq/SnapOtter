@@ -388,6 +388,66 @@ describe("pdfcpuNup", () => {
   });
 });
 
+describe("pdfcpuResize", () => {
+  it("builds resize 'dim:<w> <h>, enforce:true' <in> <out>", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdfcpu.js").then((m) =>
+      m.pdfcpuResize("/in.pdf", { width: 288, height: 432, keepOrientation: false }, "/out.pdf"),
+    );
+    expect(h.lastArgs()).toEqual([
+      "-c",
+      "disable",
+      "resize",
+      "dim:288 432, enforce:true",
+      "/in.pdf",
+      "/out.pdf",
+    ]);
+  });
+
+  it("lets pdfcpu turn the target to each page's orientation when keepOrientation is set", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdfcpu.js").then((m) =>
+      m.pdfcpuResize("/in.pdf", { width: 288, height: 432, keepOrientation: true }, "/out.pdf"),
+    );
+    expect(h.lastArgs()[3]).toBe("dim:288 432, enforce:false");
+  });
+
+  it("rounds the dimensions to two decimals", async () => {
+    h.nextClose({ code: 0 });
+    await import("../src/pdfcpu.js").then((m) =>
+      m.pdfcpuResize(
+        "/in.pdf",
+        { width: 283.46456, height: 425.19685, keepOrientation: false },
+        "/out.pdf",
+      ),
+    );
+    expect(h.lastArgs()[3]).toBe("dim:283.46 425.2, enforce:true");
+  });
+
+  it.each([
+    [0, 432],
+    [288, Number.NaN],
+    [35, 432],
+    [288, 14401],
+  ])("rejects a %s x %s point page before spawning", async (width, height) => {
+    await expect(
+      import("../src/pdfcpu.js").then((m) =>
+        m.pdfcpuResize("/in.pdf", { width, height, keepOrientation: false }, "/out.pdf"),
+      ),
+    ).rejects.toThrow("Page size must be 36-14400 points on each side");
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("accepts the boundary sizes 36 and 14400 points", async () => {
+    h.nextClose({ code: 0 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) =>
+        m.pdfcpuResize("/in.pdf", { width: 36, height: 14400, keepOrientation: false }, "/out.pdf"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe("pdfcpuBooklet", () => {
   it("builds booklet <out> <n> <in>", async () => {
     h.nextClose({ code: 0 });

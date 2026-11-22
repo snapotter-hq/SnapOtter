@@ -46,6 +46,7 @@ export const SCRUB_PDF_PRODUCER_TOOLS: ReadonlySet<string> = new Set([
   "grayscale-pdf",
   // pdfcpu layout tools (pdfcpu stamps itself on every write)
   "crop-pdf",
+  "resize-pdf-pages",
   "nup-pdf",
   "booklet-pdf",
   "watermark-pdf",

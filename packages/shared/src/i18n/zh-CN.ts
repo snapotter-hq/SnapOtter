@@ -1020,6 +1020,10 @@ export const zhCN: TranslationKeys = {
       name: "裁剪 PDF",
       description: "按统一边距裁剪所有页面",
     },
+    "resize-pdf-pages": {
+      name: "调整 PDF 页面尺寸",
+      description: "将页面调整为 A4、Letter 或 4x6 英寸标签",
+    },
     "nup-pdf": {
       name: "每张纸多页 (N-up)",
       description: "在每张纸上排列多个页面",
@@ -3790,6 +3794,27 @@ export const zhCN: TranslationKeys = {
       submit: "裁剪",
       submitBatch: "裁剪（{count} 个文件）",
       progressLabel: "正在裁剪",
+    },
+    "resize-pdf-pages": {
+      pageSize: "页面尺寸",
+      width: "宽度",
+      height: "高度",
+      unit: "单位",
+      keepOrientation: "保留每页的方向",
+      fitHint: "内容会等比缩放并居中，文字和条形码保持清晰。",
+      submit: "调整尺寸",
+      submitBatch: "调整尺寸（{count} 个文件）",
+      progressLabel: "正在调整尺寸",
+      sizes: {
+        "4x6in": "4 x 6 in (快递面单)",
+        "100x150mm": "100 x 150 mm (快递面单)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "美国信纸 (Letter)",
+        legal: "美国法律文书纸 (Legal)",
+        custom: "自定义",
+      },
     },
     "nup-pdf": {
       perSheet: "每张纸的页数",

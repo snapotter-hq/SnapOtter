@@ -167,6 +167,11 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
     case "organize-pdf": {
       return String(settings.order || "");
     }
+    case "resize-pdf-pages": {
+      if (settings.pageSize === "custom" && settings.width != null && settings.height != null)
+        return `${settings.width} x ${settings.height} ${settings.unit ?? "in"}`;
+      return settings.pageSize ? String(settings.pageSize) : "";
+    }
     case "nup-pdf": {
       if (settings.perSheet != null) return `${settings.perSheet}-up`;
       return "";

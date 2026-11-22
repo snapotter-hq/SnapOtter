@@ -1281,6 +1281,10 @@ export const vi: TranslationKeys = {
       name: "Cắt PDF",
       description: "Cắt tất cả các trang với lề đồng nhất",
     },
+    "resize-pdf-pages": {
+      name: "Đổi kích thước trang PDF",
+      description: "Đổi trang sang A4, Letter hoặc nhãn 4x6 inch",
+    },
     "nup-pdf": {
       name: "Số trang mỗi tờ (N-up)",
       description: "Xếp nhiều trang trên một tờ",
@@ -4098,6 +4102,27 @@ export const vi: TranslationKeys = {
       submit: "Cắt",
       submitBatch: "Cắt ({count} tệp)",
       progressLabel: "Đang cắt",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Kích thước trang",
+      width: "Chiều rộng",
+      height: "Chiều cao",
+      unit: "Đơn vị",
+      keepOrientation: "Giữ hướng của từng trang",
+      fitHint: "Nội dung được thu phóng cho vừa và căn giữa, nên chữ và mã vạch vẫn sắc nét.",
+      submit: "Đổi kích thước",
+      submitBatch: "Đổi kích thước ({count} tệp)",
+      progressLabel: "Đang đổi kích thước",
+      sizes: {
+        "4x6in": "4 x 6 in (nhãn vận chuyển)",
+        "100x150mm": "100 x 150 mm (nhãn vận chuyển)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Tùy chỉnh",
+      },
     },
     "nup-pdf": {
       perSheet: "Số trang mỗi tờ",

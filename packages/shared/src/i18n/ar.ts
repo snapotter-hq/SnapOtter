@@ -1269,6 +1269,10 @@ export const ar: TranslationKeys = {
       name: "اقتصاص PDF",
       description: "اقتصاص جميع الصفحات بهامش موحد",
     },
+    "resize-pdf-pages": {
+      name: "تغيير حجم صفحات PDF",
+      description: "غيّر حجم الصفحات إلى A4 أو Letter أو ملصق 4x6 بوصة",
+    },
     "nup-pdf": {
       name: "صفحات لكل ورقة (N-up)",
       description: "ترتيب عدة صفحات في ورقة واحدة",
@@ -4076,6 +4080,27 @@ export const ar: TranslationKeys = {
       submit: "قص",
       submitBatch: "قص ({count} ملفات)",
       progressLabel: "جارٍ القص",
+    },
+    "resize-pdf-pages": {
+      pageSize: "حجم الصفحة",
+      width: "العرض",
+      height: "الارتفاع",
+      unit: "الوحدة",
+      keepOrientation: "مطابقة اتجاه كل صفحة",
+      fitHint: "يُصغَّر المحتوى ليتناسب مع الصفحة ويُوسَّط، فتبقى النصوص والرموز الشريطية حادة.",
+      submit: "تغيير الحجم",
+      submitBatch: "تغيير الحجم ({count} ملفات)",
+      progressLabel: "جارٍ تغيير الحجم",
+      sizes: {
+        "4x6in": "4 x 6 in (ملصق شحن)",
+        "100x150mm": "100 x 150 mm (ملصق شحن)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "مخصص",
+      },
     },
     "nup-pdf": {
       perSheet: "صفحات لكل ورقة",

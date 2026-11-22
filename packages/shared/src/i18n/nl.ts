@@ -1282,6 +1282,10 @@ export const nl: TranslationKeys = {
       name: "PDF bijsnijden",
       description: "Snijd alle pagina's bij met een uniforme marge",
     },
+    "resize-pdf-pages": {
+      name: "PDF-paginaformaat wijzigen",
+      description: "Zet pagina's om naar A4, Letter of een label van 4x6 inch",
+    },
     "nup-pdf": {
       name: "Pagina's per vel (N-up)",
       description: "Plaats meerdere pagina's per vel",
@@ -4122,6 +4126,28 @@ export const nl: TranslationKeys = {
       submit: "Bijsnijden",
       submitBatch: "Bijsnijden ({count} bestanden)",
       progressLabel: "Bijsnijden",
+    },
+    "resize-pdf-pages": {
+      pageSize: "Paginaformaat",
+      width: "Breedte",
+      height: "Hoogte",
+      unit: "Eenheid",
+      keepOrientation: "Oriëntatie van elke pagina behouden",
+      fitHint:
+        "De inhoud wordt passend geschaald en gecentreerd, dus tekst en barcodes blijven scherp.",
+      submit: "Formaat wijzigen",
+      submitBatch: "Formaat wijzigen ({count} bestanden)",
+      progressLabel: "Formaat wijzigen",
+      sizes: {
+        "4x6in": "4 x 6 in (verzendlabel)",
+        "100x150mm": "100 x 150 mm (verzendlabel)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "Aangepast",
+      },
     },
     "nup-pdf": {
       perSheet: "Pagina's per vel",

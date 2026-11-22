@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 6f7d086bcdd5
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: 427061b4f171
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF 灰度化 | - |
 | `pdfa-convert` | PDF/A 转换 | -（归档级 PDF/A-2） |
 | `crop-pdf` | 裁剪 PDF | `margin`（0-2000 点） |
+| `resize-pdf-pages` | 调整 PDF 页面尺寸 | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet`（2/3/4/8/9/12/16） |
 | `booklet-pdf` | 小册子 PDF | `perSheet`（2/4/6/8） |
 | `watermark-pdf` | PDF 加水印 | `text`、`position`、`fontSize`、`opacity`、`rotation` |

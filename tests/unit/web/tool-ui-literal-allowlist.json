@@ -20,6 +20,7 @@
     "apps/web/src/components/common/multi-image-viewer.tsx::processed",
     "apps/web/src/components/layout/avatar-dropdown.tsx::admin",
     "apps/web/src/components/settings/settings-dialog.tsx::admin",
+    "apps/web/src/components/tools/resize-pdf-pages-settings.tsx::in",
     "apps/web/src/components/tools/split-canvas.tsx::image",
     "background-sizer",
     "Big5",

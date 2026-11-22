@@ -184,6 +184,74 @@ describe("NupPdfControls", async () => {
   });
 });
 
+describe("ResizePdfPagesControls (#4831)", async () => {
+  const { ResizePdfPagesControls } = await import("@/components/tools/resize-pdf-pages-settings");
+
+  it("emits the 4x6 in label defaults on mount", () => {
+    const onChange = vi.fn();
+    render(<ResizePdfPagesControls onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith({
+      pageSize: "4x6in",
+      width: 4,
+      height: 6,
+      unit: "in",
+      keepOrientation: false,
+    });
+  });
+
+  it("shows the custom size fields only for a custom page size", async () => {
+    const onChange = vi.fn();
+    render(<ResizePdfPagesControls onChange={onChange} />);
+    expect(screen.queryByLabelText(/^width$/i)).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText(/page size/i), "custom");
+    await userEvent.selectOptions(screen.getByLabelText(/^unit$/i), "mm");
+    const width = screen.getByLabelText(/^width$/i);
+    await userEvent.clear(width);
+    await userEvent.type(width, "100");
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pageSize: "custom", width: 100, unit: "mm" }),
+    );
+  });
+
+  it("keeps the physical size when the custom unit changes", async () => {
+    const onChange = vi.fn();
+    render(<ResizePdfPagesControls onChange={onChange} />);
+    await userEvent.selectOptions(screen.getByLabelText(/page size/i), "custom");
+    await userEvent.selectOptions(screen.getByLabelText(/^unit$/i), "mm");
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ width: 101.6, height: 152.4, unit: "mm" }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText(/^unit$/i), "in");
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ width: 4, height: 6, unit: "in" }),
+    );
+  });
+
+  it("emits keepOrientation when the box is ticked", async () => {
+    const onChange = vi.fn();
+    render(<ResizePdfPagesControls onChange={onChange} />);
+    await userEvent.click(screen.getByLabelText(/orientation/i));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ keepOrientation: true }));
+  });
+
+  it("initializes from incoming settings and ignores unknown values", () => {
+    const onChange = vi.fn();
+    render(
+      <ResizePdfPagesControls
+        settings={{ pageSize: "a4", unit: "cm", keepOrientation: true }}
+        onChange={onChange}
+      />,
+    );
+    expect(onChange).toHaveBeenLastCalledWith({
+      pageSize: "a4",
+      width: 4,
+      height: 6,
+      unit: "in",
+      keepOrientation: true,
+    });
+  });
+});
+
 describe("ChartMakerControls", async () => {
   const { ChartMakerControls } = await import("@/components/tools/chart-maker-settings");
 

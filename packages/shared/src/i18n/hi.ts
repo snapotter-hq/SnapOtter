@@ -1066,6 +1066,10 @@ export const hi: TranslationKeys = {
       name: "PDF क्रॉप",
       description: "एक समान मार्जिन से सभी पेज क्रॉप करें",
     },
+    "resize-pdf-pages": {
+      name: "PDF पेज का आकार बदलें",
+      description: "पेज को A4, Letter या 4x6 इंच लेबल के आकार में बदलें",
+    },
     "nup-pdf": {
       name: "प्रति शीट पेज (N-up)",
       description: "एक शीट पर कई पेज व्यवस्थित करें",
@@ -3867,6 +3871,27 @@ export const hi: TranslationKeys = {
       submit: "क्रॉप करें",
       submitBatch: "क्रॉप करें ({count} फ़ाइलें)",
       progressLabel: "क्रॉप हो रहा है",
+    },
+    "resize-pdf-pages": {
+      pageSize: "पेज का आकार",
+      width: "चौड़ाई",
+      height: "ऊंचाई",
+      unit: "इकाई",
+      keepOrientation: "हर पेज का ओरिएंटेशन बनाए रखें",
+      fitHint: "सामग्री को फ़िट करके बीच में रखा जाता है, इसलिए टेक्स्ट और बारकोड साफ़ रहते हैं।",
+      submit: "आकार बदलें",
+      submitBatch: "आकार बदलें ({count} फ़ाइलें)",
+      progressLabel: "आकार बदल रहा है",
+      sizes: {
+        "4x6in": "4 x 6 in (शिपिंग लेबल)",
+        "100x150mm": "100 x 150 mm (शिपिंग लेबल)",
+        a4: "A4",
+        a5: "A5",
+        a6: "A6",
+        letter: "US Letter",
+        legal: "US Legal",
+        custom: "कस्टम",
+      },
     },
     "nup-pdf": {
       perSheet: "प्रति शीट पृष्ठ",

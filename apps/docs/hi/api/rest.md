@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 1b3ae69a095b
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: 5b0f6dee6bcc
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF ग्रेस्केल | - |
 | `pdfa-convert` | PDF/A कन्वर्ट | - (आर्काइवल PDF/A-2) |
 | `crop-pdf` | PDF क्रॉप करें | `margin` (0-2000 पॉइंट) |
+| `resize-pdf-pages` | PDF पेज का आकार बदलें | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | बुकलेट PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF वॉटरमार्क करें | `text`, `position`, `fontSize`, `opacity`, `rotation` |
