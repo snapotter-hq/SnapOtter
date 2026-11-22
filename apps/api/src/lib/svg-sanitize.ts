@@ -110,13 +110,6 @@ const RASTER_DATA_URI =
   /^[\t\n\f\r ]*data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=\t\n\f\r ]*)$/i;
 
 /**
- * Total pixels the embedded rasters of one SVG may declare. librsvg decodes
- * every one at full size and keeps it for the render, so without a budget a
- * couple of MB of small, highly compressed PNGs cost GBs of memory.
- */
-const MAX_EMBEDDED_RASTER_PIXELS = MAX_RESIZE_OUTPUT_PIXELS;
-
-/**
  * True when the DANGEROUS_HREF match at `offset` in `tag` is a quoted `href`
  * or `xlink:href` whose entire value is a base64 PNG, JPEG, GIF or WebP that
  * really is that format and fits the remaining pixel budget, which it then
@@ -196,7 +189,12 @@ function tagEnd(input: string, lt: number): number {
  * whole-document replace would; it only adds knowing which tag each sits in.
  */
 function neutralizeHrefSchemes(input: string): string {
-  const budget = { pixels: MAX_EMBEDDED_RASTER_PIXELS };
+  // Total pixels the embedded rasters of one SVG may declare. librsvg decodes
+  // every one at full size and keeps it for the render, so without a budget a
+  // couple of MB of small, highly compressed PNGs cost GBs of memory. Read here
+  // rather than at module load, where a partial mock of @snapotter/shared in a
+  // test that only imports this module transitively would throw.
+  const budget = { pixels: MAX_RESIZE_OUTPUT_PIXELS };
   let out = "";
   let pos = 0;
   for (;;) {
