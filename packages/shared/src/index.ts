@@ -15,6 +15,7 @@ export * from "./constants.js";
 export * from "./conversion-presets.js";
 export * from "./disabled-tools.js";
 export * from "./features.js";
+export * from "./file-mime.js";
 export * from "./gpu-devices.js";
 export * from "./i18n/index.js";
 export * from "./image-mime.js";

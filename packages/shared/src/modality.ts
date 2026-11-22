@@ -117,6 +117,7 @@ export const AUDIO_INPUTS = [
   ".opus",
   ".wma",
   ".aiff",
+  ".aif",
   ".amr",
   ".ac3",
 ];

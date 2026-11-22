@@ -183,7 +183,7 @@ SnapOtter는 입력에 55개 이상, 출력에 17개 이미지 형식을 지원�
 | Ogg Vorbis | .ogg | 손실 | 오픈 형식 |
 | Opus | .opus | 손실 | 최신, 저지연 |
 | WMA | .wma | 손실 | Windows Media Audio |
-| AIFF | .aiff | 무압축 (PCM) | Apple 무압축 |
+| AIFF | .aiff, .aif | 무압축 (PCM) | Apple 무압축 |
 | AMR | .amr | 손실 | 음성 / 모바일 |
 | AC-3 | .ac3 | 손실 | Dolby Digital |
 

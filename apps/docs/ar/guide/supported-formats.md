@@ -183,7 +183,7 @@ i18n_output_hash: 2c294d200195
 | Ogg Vorbis | .ogg | مع فقدان | تنسيق مفتوح |
 | Opus | .opus | مع فقدان | حديث ومنخفض الكمون |
 | WMA | .wma | مع فقدان | Windows Media Audio |
-| AIFF | .aiff | غير مضغوط (PCM) | غير مضغوط من Apple |
+| AIFF | .aiff, .aif | غير مضغوط (PCM) | غير مضغوط من Apple |
 | AMR | .amr | مع فقدان | كلام / محمول |
 | AC-3 | .ac3 | مع فقدان | Dolby Digital |
 

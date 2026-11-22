@@ -318,6 +318,7 @@ describe("files route logic", () => {
       expect(getContentType("opus")).toBe("audio/opus");
       expect(getContentType("wma")).toBe("audio/x-ms-wma");
       expect(getContentType("aiff")).toBe("audio/aiff");
+      expect(getContentType("aif")).toBe("audio/aiff");
       expect(getContentType("amr")).toBe("audio/amr");
       expect(getContentType("ac3")).toBe("audio/ac3");
     });

@@ -37,6 +37,12 @@ describe("modalityForExtension", () => {
   it("returns null for unknown extensions", () => {
     expect(modalityForExtension(".xyz")).toBeNull();
   });
+  it("treats .aif like .aiff, so every tool that takes one takes both (#5194)", () => {
+    expect(modalityForExtension(".aif")).toBe("audio");
+    const aiffTools = TOOLS.filter((t) => t.acceptedInputs.includes(".aiff"));
+    expect(aiffTools.length).toBeGreaterThan(0);
+    for (const t of aiffTools) expect(t.acceptedInputs, t.id).toContain(".aif");
+  });
 });
 
 describe("toolOutputModality", () => {

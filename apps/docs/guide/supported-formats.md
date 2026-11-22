@@ -180,7 +180,7 @@ Audio is also processed by FFmpeg.
 | Ogg Vorbis | .ogg | Lossy | Open format |
 | Opus | .opus | Lossy | Modern, low-latency |
 | WMA | .wma | Lossy | Windows Media Audio |
-| AIFF | .aiff | Uncompressed (PCM) | Apple uncompressed |
+| AIFF | .aiff, .aif | Uncompressed (PCM) | Apple uncompressed |
 | AMR | .amr | Lossy | Speech / mobile |
 | AC-3 | .ac3 | Lossy | Dolby Digital |
 

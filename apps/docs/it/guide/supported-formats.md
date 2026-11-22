@@ -183,7 +183,7 @@ Anche l'audio è elaborato da FFmpeg.
 | Ogg Vorbis | .ogg | Con perdita | Formato aperto |
 | Opus | .opus | Con perdita | Moderno, a bassa latenza |
 | WMA | .wma | Con perdita | Windows Media Audio |
-| AIFF | .aiff | Non compresso (PCM) | Non compresso Apple |
+| AIFF | .aiff, .aif | Non compresso (PCM) | Non compresso Apple |
 | AMR | .amr | Con perdita | Voce / mobile |
 | AC-3 | .ac3 | Con perdita | Dolby Digital |
 

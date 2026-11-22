@@ -183,7 +183,7 @@ Ljud bearbetas också av FFmpeg.
 | Ogg Vorbis | .ogg | Förlustbehäftad | Öppet format |
 | Opus | .opus | Förlustbehäftad | Modern, låg latens |
 | WMA | .wma | Förlustbehäftad | Windows Media Audio |
-| AIFF | .aiff | Okomprimerad (PCM) | Apple okomprimerad |
+| AIFF | .aiff, .aif | Okomprimerad (PCM) | Apple okomprimerad |
 | AMR | .amr | Förlustbehäftad | Tal / mobil |
 | AC-3 | .ac3 | Förlustbehäftad | Dolby Digital |
 

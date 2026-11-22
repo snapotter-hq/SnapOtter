@@ -57,6 +57,7 @@ export const EXT_ALIASES: Readonly<Record<string, string>> = {
   ".markdown": ".md",
   ".heif": ".heic",
   ".hif": ".heic",
+  ".aif": ".aiff",
 };
 
 export interface FixtureEntry {

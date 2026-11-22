@@ -363,6 +363,7 @@ describe("user files route logic", () => {
       expect(extToMime(".opus")).toBe("audio/opus");
       expect(extToMime(".wma")).toBe("audio/x-ms-wma");
       expect(extToMime(".aiff")).toBe("audio/aiff");
+      expect(extToMime(".aif")).toBe("audio/aiff");
       expect(extToMime(".amr")).toBe("audio/amr");
       expect(extToMime(".ac3")).toBe("audio/ac3");
     });

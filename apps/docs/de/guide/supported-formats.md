@@ -183,7 +183,7 @@ Audio wird ebenfalls von FFmpeg verarbeitet.
 | Ogg Vorbis | .ogg | Verlustbehaftet | Offenes Format |
 | Opus | .opus | Verlustbehaftet | Modern, geringe Latenz |
 | WMA | .wma | Verlustbehaftet | Windows Media Audio |
-| AIFF | .aiff | Unkomprimiert (PCM) | Apple unkomprimiert |
+| AIFF | .aiff, .aif | Unkomprimiert (PCM) | Apple unkomprimiert |
 | AMR | .amr | Verlustbehaftet | Sprache / Mobil |
 | AC-3 | .ac3 | Verlustbehaftet | Dolby Digital |
 

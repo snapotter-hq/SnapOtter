@@ -183,7 +183,7 @@ Audio 同樣由 FFmpeg 處理。
 | Ogg Vorbis | .ogg | 有損 | 開放格式 |
 | Opus | .opus | 有損 | 現代、低延遲 |
 | WMA | .wma | 有損 | Windows Media Audio |
-| AIFF | .aiff | 未壓縮（PCM） | Apple 未壓縮 |
+| AIFF | .aiff, .aif | 未壓縮（PCM） | Apple 未壓縮 |
 | AMR | .amr | 有損 | 語音 / 行動裝置 |
 | AC-3 | .ac3 | 有損 | Dolby Digital |
 

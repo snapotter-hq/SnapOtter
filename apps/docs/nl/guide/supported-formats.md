@@ -183,7 +183,7 @@ Audio wordt eveneens verwerkt door FFmpeg.
 | Ogg Vorbis | .ogg | Lossy | Open formaat |
 | Opus | .opus | Lossy | Modern, lage latency |
 | WMA | .wma | Lossy | Windows Media Audio |
-| AIFF | .aiff | Ongecomprimeerd (PCM) | Apple ongecomprimeerd |
+| AIFF | .aiff, .aif | Ongecomprimeerd (PCM) | Apple ongecomprimeerd |
 | AMR | .amr | Lossy | Spraak / mobiel |
 | AC-3 | .ac3 | Lossy | Dolby Digital |
 

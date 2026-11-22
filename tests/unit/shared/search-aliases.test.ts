@@ -42,6 +42,10 @@ describe("normalizeSearchQuery", () => {
   it("expands synonyms jpeg -> jpg", () => {
     expect(normalizeSearchQuery("jpeg to png")).toBe("jpg to png");
   });
+  it("reads the short aif as aiff (#5194)", () => {
+    expect(normalizeSearchQuery("aif to mp3")).toBe("aiff to mp3");
+    expect(normalizeSearchQuery("aif2mp3")).toBe("aiff to mp3");
+  });
   it("reads Sony's hif as heic (#4825)", () => {
     expect(normalizeSearchQuery("hif to jpg")).toBe("heic to jpg");
     expect(normalizeSearchQuery("hif2jpg")).toBe("heic to jpg");

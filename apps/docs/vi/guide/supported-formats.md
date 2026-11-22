@@ -183,7 +183,7 @@ Audio cũng được xử lý bởi FFmpeg.
 | Ogg Vorbis | .ogg | Có mất dữ liệu | Định dạng mở |
 | Opus | .opus | Có mất dữ liệu | Hiện đại, độ trễ thấp |
 | WMA | .wma | Có mất dữ liệu | Windows Media Audio |
-| AIFF | .aiff | Không nén (PCM) | Không nén của Apple |
+| AIFF | .aiff, .aif | Không nén (PCM) | Không nén của Apple |
 | AMR | .amr | Có mất dữ liệu | Giọng nói / di động |
 | AC-3 | .ac3 | Có mất dữ liệu | Dolby Digital |
 

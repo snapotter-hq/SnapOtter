@@ -183,7 +183,7 @@ Audio również jest przetwarzane przez FFmpeg.
 | Ogg Vorbis | .ogg | Stratna | Otwarty format |
 | Opus | .opus | Stratna | Nowoczesny, niskie opóźnienie |
 | WMA | .wma | Stratna | Windows Media Audio |
-| AIFF | .aiff | Nieskompresowany (PCM) | Nieskompresowany Apple |
+| AIFF | .aiff, .aif | Nieskompresowany (PCM) | Nieskompresowany Apple |
 | AMR | .amr | Stratna | Mowa / mobilne |
 | AC-3 | .ac3 | Stratna | Dolby Digital |
 

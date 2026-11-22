@@ -183,7 +183,7 @@ Audio juga diproses oleh FFmpeg.
 | Ogg Vorbis | .ogg | Lossy | Format terbuka |
 | Opus | .opus | Lossy | Modern, latensi rendah |
 | WMA | .wma | Lossy | Windows Media Audio |
-| AIFF | .aiff | Tanpa kompresi (PCM) | Tanpa kompresi Apple |
+| AIFF | .aiff, .aif | Tanpa kompresi (PCM) | Tanpa kompresi Apple |
 | AMR | .amr | Lossy | Suara / seluler |
 | AC-3 | .ac3 | Lossy | Dolby Digital |
 
