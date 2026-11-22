@@ -106,6 +106,29 @@ describe("tool route", () => {
       error: expect.stringMatching(/2 pages of different sizes/),
     });
   }, 30_000);
+
+  it.each([
+    { toolId: "compose", second: "overlay" },
+    { toolId: "watermark-image", second: "watermark" },
+  ])(
+    "refuses the rotated base for $toolId, as for the unrotated one",
+    async ({ toolId, second }) => {
+      const parts = (base: Buffer) => [
+        tiffPart(base),
+        { name: second, filename: "mark.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: "{}" },
+      ];
+      const unrotated = await post(`/api/v1/tools/image/${toolId}`, parts(UNROTATED));
+      const rotated = await post(`/api/v1/tools/image/${toolId}`, parts(ROTATED));
+
+      expect(refusal(rotated)).toEqual(refusal(unrotated));
+      expect(refusal(rotated)).toMatchObject({
+        statusCode: 400,
+        error: expect.stringMatching(/2 pages of different sizes/),
+      });
+    },
+    30_000,
+  );
 });
 
 describe("tool batch", () => {

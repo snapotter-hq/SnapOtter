@@ -12,7 +12,7 @@ import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-dec
 import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 
@@ -94,6 +94,7 @@ export function registerCompose(app: FastifyInstance) {
       const imageHandler = inputHandlerFor("image");
       const base = await imageHandler.prepare(baseBuffer, filename, {
         scratchDir: tmpdir(),
+        outputFormat: (input) => inputOutputFormat(input, settings, filename),
       });
       const overlay = await imageHandler.prepare(overlayBuffer, overlayFilename, {
         scratchDir: tmpdir(),
