@@ -6091,6 +6091,8 @@ export const fr: TranslationKeys = {
       TOO_MANY_FRAMES: "Ce fichier contient trop d'images pour être traité.",
       FEATURE_INSTALL_BUSY:
         "L'installation met à jour l'environnement AI et ne peut pas être arrêtée maintenant. Elle se terminera sous peu.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Cet outil modifie une seule image à la fois. Séparez d'abord les pages ou les images en fichiers distincts.",
       CANCELED: "L'opération a été annulée.",
       PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
       INVALID_PAGE_RANGE:

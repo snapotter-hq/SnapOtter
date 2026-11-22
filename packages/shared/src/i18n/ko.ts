@@ -5951,6 +5951,8 @@ export const ko: TranslationKeys = {
       TOO_MANY_FRAMES: "이 파일은 프레임이 너무 많아 처리할 수 없습니다.",
       FEATURE_INSTALL_BUSY:
         "설치가 AI 환경을 업데이트하는 중이라 지금은 중지할 수 없습니다. 곧 완료됩니다.",
+      MULTI_FRAME_UNSUPPORTED:
+        "이 도구는 한 번에 이미지 하나만 편집합니다. 먼저 페이지나 프레임을 개별 이미지로 나누세요.",
       CANCELED: "작업이 취소되었습니다.",
       PAGE_OUT_OF_RANGE: "이 페이지 범위에 이 PDF에 없는 페이지가 포함되어 있습니다.",
       INVALID_PAGE_RANGE: "이 페이지 범위는 올바르지 않습니다. 1-3,5처럼 페이지 번호를 입력하세요.",

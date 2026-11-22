@@ -6066,6 +6066,8 @@ export const pl: TranslationKeys = {
       TOO_MANY_FRAMES: "Ten plik ma zbyt wiele klatek, aby go przetworzyć.",
       FEATURE_INSTALL_BUSY:
         "Instalacja aktualizuje środowisko AI i nie można jej teraz zatrzymać. Wkrótce się zakończy.",
+      MULTI_FRAME_UNSUPPORTED:
+        "To narzędzie edytuje jeden obraz naraz. Najpierw podziel strony lub klatki na osobne obrazy.",
       CANCELED: "Operację anulowano.",
       PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",

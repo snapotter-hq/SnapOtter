@@ -5681,6 +5681,7 @@ export const zhTW: TranslationKeys = {
       TARGET_SIZE_EXCEEDED: "結果無法達到目標大小。",
       TOO_MANY_FRAMES: "此檔案的影格數過多，無法處理。",
       FEATURE_INSTALL_BUSY: "安裝正在更新 AI 環境，目前無法停止。很快就會完成。",
+      MULTI_FRAME_UNSUPPORTED: "此工具一次只能編輯一張圖片。請先將各頁或各影格拆分為單獨的圖片。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "此頁碼範圍包含這份 PDF 沒有的頁面。",
       INVALID_PAGE_RANGE: "此頁碼範圍無效。請使用像 1-3,5 這樣的頁碼。",

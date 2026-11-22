@@ -6045,6 +6045,8 @@ export const id: TranslationKeys = {
       TOO_MANY_FRAMES: "File ini memiliki terlalu banyak frame untuk diproses.",
       FEATURE_INSTALL_BUSY:
         "Instalasi sedang memperbarui lingkungan AI dan tidak dapat dihentikan sekarang. Instalasi akan segera selesai.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Alat ini mengedit satu gambar dalam satu waktu. Pisahkan halaman atau frame menjadi gambar terpisah terlebih dahulu.",
       CANCELED: "Operasi dibatalkan.",
       PAGE_OUT_OF_RANGE: "Rentang halaman itu mencakup halaman yang tidak ada di PDF ini.",
       INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",

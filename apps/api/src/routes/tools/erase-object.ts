@@ -18,6 +18,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -374,6 +375,10 @@ registerAiJobHandler(
     "Object erasing failed",
     (s) => s?.format ?? "auto",
     async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
+      // The route has already resolved "auto" to the input's own format.
+      await assertSingleFrameFor(input, settings.format);
+
       // Second inputRef is the mask
       let maskBuffer: Buffer;
       try {
@@ -382,7 +387,6 @@ registerAiJobHandler(
         if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
         throw err;
       }
-      const settings = settingsSchema.parse(data.settings);
       const format = settings.format;
       const quality = settings.quality;
 

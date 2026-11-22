@@ -188,6 +188,40 @@ export async function isMultiPageTiff(buffer: Buffer, outputFormat: string): Pro
   return (await readTiffPagesFor(buffer, outputFormat)).animated;
 }
 
+/**
+ * Refuse a multi-frame input headed for a container that would keep its frames.
+ *
+ * For the AI tools, which run a model once per call (#5104). Running it once
+ * per page would multiply GPU or CPU time by the page count, and an animated
+ * GIF can have hundreds of frames, so they refuse the input rather than return
+ * frame 1 with a 200. The rule matches readAnimationFor: a GIF or WebP going
+ * out as GIF or WebP, or a TIFF going out as TIFF. Anything bound for a still
+ * format keeps frame 1, as convert does.
+ */
+export async function assertSingleFrameFor(buffer: Buffer, outputFormat: string): Promise<void> {
+  const container = animatedContainerFor(outputFormat);
+  if (!container) return;
+  let meta: Metadata;
+  try {
+    meta = await sharp(buffer).metadata();
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    // The tool decodes the same buffer next and reports its own error.
+    return;
+  }
+  const pages = meta.pages ?? 1;
+  if (pages <= 1) return;
+  const isTiff = meta.format === "tiff";
+  const keepsFrames =
+    container === "tiff" ? isTiff : meta.format === "gif" || meta.format === "webp";
+  if (!keepsFrames) return;
+  throw new ToolInputError(
+    `This file has ${pages} ${isTiff ? "pages" : "frames"}, and this tool edits one image at a time. Split it into separate images and try again.`,
+    { code: "MULTI_FRAME_UNSUPPORTED" },
+  );
+}
+
 /** Open a pipeline that keeps every frame; stills get the plain handle. */
 export function openAnimated(buffer: Buffer, info: FrameInfo): Sharp {
   return info.animated ? sharp(buffer, { animated: true }) : sharp(buffer);

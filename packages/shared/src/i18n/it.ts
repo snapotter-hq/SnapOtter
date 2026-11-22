@@ -6070,6 +6070,8 @@ export const it: TranslationKeys = {
       TOO_MANY_FRAMES: "Questo file ha troppi fotogrammi da elaborare.",
       FEATURE_INSTALL_BUSY:
         "L'installazione sta aggiornando l'ambiente IA e non può essere interrotta ora. Terminerà a breve.",
+      MULTI_FRAME_UNSUPPORTED:
+        "Questo strumento modifica un'immagine alla volta. Prima dividi le pagine o i fotogrammi in immagini separate.",
       CANCELED: "L'operazione è stata annullata.",
       PAGE_OUT_OF_RANGE: "Questo intervallo include una pagina che questo PDF non ha.",
       INVALID_PAGE_RANGE:

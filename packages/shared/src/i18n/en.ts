@@ -5964,6 +5964,8 @@ export const en = {
       TOO_MANY_FRAMES: "This file has too many frames to process.",
       FEATURE_INSTALL_BUSY:
         "The install is updating the AI environment and can't be stopped right now. It will finish shortly.",
+      MULTI_FRAME_UNSUPPORTED:
+        "This tool edits one image at a time. Split the pages or frames into separate images first.",
       CANCELED: "The operation was canceled.",
       PAGE_OUT_OF_RANGE: "That page range includes a page this PDF doesn't have.",
       INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",
