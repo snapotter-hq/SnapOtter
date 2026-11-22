@@ -893,6 +893,102 @@ describe("storageTtl team retention deadline backfill (#4938)", () => {
   });
 });
 
+// #5121: before #5100, enqueue wrote a FILE_MAX_AGE_HOURS deadline for a team
+// with no override, so those files expired on the env value instead of the
+// global tempFileMaxAgeHours setting.
+describe("storageTtl clears deadlines no team override backs (#5121)", () => {
+  const suffix = randomUUID().slice(0, 8);
+  const overrideTeamId = `stale-ret-team-${suffix}`;
+  const plainTeamId = `stale-plain-team-${suffix}`;
+  const overrideUserId = `stale-ret-user-${suffix}`;
+  const plainUserId = `stale-plain-user-${suffix}`;
+  // users.team has no foreign key, so a member can point at a deleted team.
+  const orphanUserId = `stale-orphan-user-${suffix}`;
+  const userIds = [overrideUserId, plainUserId, orphanUserId];
+  const jobIds: string[] = [];
+  const dirs: string[] = [];
+
+  beforeAll(async () => {
+    await db.insert(schema.teams).values([
+      { id: overrideTeamId, name: `Stale retention ${suffix}`, retentionHours: 1 },
+      { id: plainTeamId, name: `Stale plain ${suffix}` },
+    ]);
+    await db.insert(schema.users).values(
+      [
+        [overrideUserId, overrideTeamId],
+        [plainUserId, plainTeamId],
+        [orphanUserId, `gone-team-${suffix}`],
+      ].map(([id, team]) => ({
+        id,
+        username: id,
+        passwordHash: "hash",
+        role: "user",
+        team,
+        mustChangePassword: false,
+      })),
+    );
+  });
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    for (const d of dirs) await rm(d, { recursive: true, force: true }).catch(() => {});
+    if (jobIds.length > 0) await db.delete(schema.jobs).where(inArray(schema.jobs.id, jobIds));
+    await db.delete(schema.users).where(inArray(schema.users.id, userIds));
+    await db.delete(schema.teams).where(inArray(schema.teams.id, [overrideTeamId, plainTeamId]));
+  });
+
+  async function insertJob(userId: string, deleteAfter: Date): Promise<string> {
+    const id = `stale-${randomUUID()}`;
+    jobIds.push(id);
+    await db
+      .insert(schema.jobs)
+      .values({ id, userId, toolId: "resize", type: "single", status: "completed", deleteAfter });
+    // A fresh dir, so only the deadline sweep could remove it.
+    const dir = join(env.WORKSPACE_PATH, "uploads", id);
+    dirs.push(dir);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "f.bin"), "x");
+    return id;
+  }
+
+  async function deadlineOf(id: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ deleteAfter: schema.jobs.deleteAfter })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, id));
+    return row.deleteAfter;
+  }
+
+  it("clears a passed deadline with no override behind it and keeps the files, but honors an override's", async () => {
+    vi.spyOn(enterpriseFeature, "isEnterpriseFeatureEnabled").mockImplementation(
+      async (feature) => feature === "team_retention_overrides",
+    );
+    const passed = new Date(Date.now() - 60_000);
+    const noOverride = await insertJob(plainUserId, passed);
+    const missingTeam = await insertJob(orphanUserId, passed);
+    const override = await insertJob(overrideUserId, passed);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+    expect(await deadlineOf(noOverride)).toBeNull();
+    expect(await deadlineOf(missingTeam)).toBeNull();
+    expect((await deadlineOf(override))?.getTime()).toBe(passed.getTime());
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", noOverride))).toBe(true);
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", missingTeam))).toBe(true);
+    expect(existsSync(join(env.WORKSPACE_PATH, "uploads", override))).toBe(false);
+  });
+
+  it("leaves the deadline in place when team retention overrides are not licensed", async () => {
+    vi.spyOn(enterpriseFeature, "isEnterpriseFeatureEnabled").mockResolvedValue(false);
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const noOverride = await insertJob(plainUserId, future);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+    expect((await deadlineOf(noOverride))?.getTime()).toBe(future.getTime());
+  });
+});
+
 // -- scheduleSystemJobs -------------------------------------------------------
 
 describe("scheduleSystemJobs", () => {
