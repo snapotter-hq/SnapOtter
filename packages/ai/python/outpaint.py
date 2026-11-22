@@ -24,7 +24,7 @@ LAMA_MODEL_DIR = os.environ.get("LAMA_MODEL_DIR", os.path.join(_MODELS_BASE, "la
 LAMA_MODEL_PATH = os.path.join(LAMA_MODEL_DIR, "lama_fp32.onnx")
 LAMA_LOCAL_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "snapotter", "lama")
 LAMA_LOCAL_PATH = os.path.join(LAMA_LOCAL_CACHE, "lama_fp32.onnx")
-LAMA_HF_URL = "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"
+LAMA_HF_PATH = "Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"
 
 
 def _get_model_path():
@@ -34,12 +34,12 @@ def _get_model_path():
     if os.path.exists(LAMA_LOCAL_PATH):
         return LAMA_LOCAL_PATH
 
-    from offline_guard import ensure_download_allowed
+    from offline_guard import ensure_download_allowed, hf_url
     ensure_download_allowed("LaMa inpainting model (lama_fp32.onnx)")
     emit_progress(5, "Downloading LaMa model")
     os.makedirs(LAMA_LOCAL_CACHE, exist_ok=True)
     import urllib.request
-    urllib.request.urlretrieve(LAMA_HF_URL, LAMA_LOCAL_PATH)
+    urllib.request.urlretrieve(hf_url(LAMA_HF_PATH), LAMA_LOCAL_PATH)
     return LAMA_LOCAL_PATH
 
 
