@@ -84,6 +84,19 @@ describe("filterRelevantTools", () => {
     expect(filterRelevantTools("remove bg", [bg])).toEqual([bg]);
   });
 
+  // #5190: no tool names "files", so "merge pdf files" dropped merge-pdf.
+  it("does not require file or files", () => {
+    const merge = tool("merge-pdf", { description: "Combine multiple PDFs into one" });
+    expect(filterRelevantTools("merge pdf files", [merge])).toEqual([merge]);
+    expect(filterRelevantTools("merge pdf file", [merge])).toEqual([merge]);
+  });
+
+  it("still requires the other words of a file query", () => {
+    const zip = tool("zip-files", { modality: "file" });
+    const crop = tool("crop");
+    expect(filterRelevantTools("zip files", [zip, crop])).toEqual([zip]);
+  });
+
   it("keeps everything for a query made only of filler", () => {
     expect(filterRelevantTools("the", [watermark, crop])).toEqual([watermark, crop]);
   });

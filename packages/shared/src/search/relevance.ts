@@ -16,10 +16,12 @@ export interface SearchableTool {
  * print"), plus the "to", "from" and "into" of our Latin-script locales, since
  * people type "png till ico" (sv) or "jpg naar png" (nl) into the English
  * catalog. Words of one or two letters are never required, so "zu", "en" or
- * "do" don't need listing.
+ * "do" don't need listing. "file" and "files" pad a query ("merge pdf files")
+ * without naming a task, and few tools spell them out (#5190).
  */
 const STOP_WORDS = new Set([
   ...["and", "or", "with", "for", "my", "of", "in", "on", "by", "at", "how"],
+  ...["file", "files"],
   ...[
     "nach",
     "von",
