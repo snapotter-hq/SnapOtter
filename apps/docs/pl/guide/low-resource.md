@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: e6110005f438
+i18n_output_hash: 2d272941f8aa
 i18n_hash_version: 2
 ---
 # Konfiguracje o ograniczonych zasobach {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Uwagi dla maszyn klasy Pi:
 
 - **Dla woluminu danych i Postgres lepiej wybrać dysk SSD USB niż kartę SD.** Przestrzenie robocze zadań generują realne operacje dyskowe, a karty SD są zarówno wolne, jak i szybko się zużywają.
-- **Kontener all-in-one również tu działa** (wbudowane Postgres i Redis, gdy `DATABASE_URL`/`REDIS_URL` nie są ustawione), a na hoście z ograniczoną pamięcią warto obniżyć limit jego wbudowanego Redis przez `REDIS_MAXMEMORY` (zobacz [Konfiguracja](/pl/guide/configuration)). Compose daje dokładniejszą kontrolę nad każdą usługą, dlatego ta instrukcja z niego korzysta.
+- **Kontener all-in-one również tu działa** (wbudowane Postgres i Redis, gdy [`DATABASE_URL`](/pl/guide/configuration#env-database-url)/[`REDIS_URL`](/pl/guide/configuration#env-redis-url) nie są ustawione), a na hoście z ograniczoną pamięcią warto obniżyć limit jego wbudowanego Redis przez [`REDIS_MAXMEMORY`](/pl/guide/configuration#env-redis-maxmemory) (zobacz [Konfiguracja](/pl/guide/configuration)). Compose daje dokładniejszą kontrolę nad każdą usługą, dlatego ta instrukcja z niego korzysta.
 - **Na urządzeniach z 2 GB należy dodać swap.** Zapobiega to sytuacji, w której sporadyczny skok zużycia (duży PDF, zapomniana partia bez limitu) kończy się zabiciem procesu z powodu braku pamięci. zram to opcja przyjazna dla kart SD.
 - Obraz arm64 działa wyłącznie na CPU, na płytkach ARM nie ma CUDA.
 
@@ -86,15 +86,15 @@ Wszystkie limity to zmienne środowiskowe, w pełni opisane w [Konfiguracja](/pl
 
 | Zmienna | Sugestia dla małej maszyny | Co chroni |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Ile zadań działa równolegle. Automatyczne wykrywanie przyjmuje liczbę rdzeni CPU minus jeden, co jest w porządku na dużych maszynach, a zbyt ambitne na maszynie z 2 rdzeniami pod presją pamięci. |
-| `MAX_WORKER_THREADS` | `2` | Pula wątków przetwarzania obrazów. |
-| `MAX_BATCH_SIZE` | `5` | Partie to miejsce, w którym maszynom z 1-2 GB najpierw kończy się pamięć. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Chroni przed zajęciem całej przestrzeni roboczej przez jeden ogromny plik. |
-| `MAX_MEGAPIXELS` | `50` | Dekodowanie obrazu powyżej 100 MP kosztuje pamięć RAM niezależnie od rozmiaru pliku. |
+| [`CONCURRENT_JOBS`](/pl/guide/configuration#env-concurrent-jobs) | `1` | Ile zadań działa równolegle. Automatyczne wykrywanie przyjmuje liczbę rdzeni CPU minus jeden, co jest w porządku na dużych maszynach, a zbyt ambitne na maszynie z 2 rdzeniami pod presją pamięci. |
+| [`MAX_WORKER_THREADS`](/pl/guide/configuration#env-max-worker-threads) | `2` | Pula wątków przetwarzania obrazów. |
+| [`MAX_BATCH_SIZE`](/pl/guide/configuration#env-max-batch-size) | `5` | Partie to miejsce, w którym maszynom z 1-2 GB najpierw kończy się pamięć. |
+| [`MAX_UPLOAD_SIZE_MB`](/pl/guide/configuration#env-max-upload-size-mb) | `100` | Chroni przed zajęciem całej przestrzeni roboczej przez jeden ogromny plik. |
+| [`MAX_MEGAPIXELS`](/pl/guide/configuration#env-max-megapixels) | `50` | Dekodowanie obrazu powyżej 100 MP kosztuje pamięć RAM niezależnie od rozmiaru pliku. |
 | `MAX_VIDEO_DURATION_S` | `300` | Długie transkodowania blokują mały CPU na minuty lub godziny. |
-| `PROCESSING_TIMEOUT_S` | `600` | Twardy limit, dzięki któremu zbiegłe zadanie w końcu zwolni maszynę. |
+| [`PROCESSING_TIMEOUT_S`](/pl/guide/configuration#env-processing-timeout-s) | `600` | Twardy limit, dzięki któremu zbiegłe zadanie w końcu zwolni maszynę. |
 
-Te limity dotyczą tego, co serwer przyjmuje, więc należy ustawić je zgodnie z faktycznym użyciem, a nie jak najmniejsze. Jeśli wideo nie jest używane, limit `MAX_VIDEO_DURATION_S` nic nie kosztuje. Jeśli dokumenty są skanowane codziennie, nie należy ograniczać `MAX_PDF_PAGES`.
+Te limity dotyczą tego, co serwer przyjmuje, więc należy ustawić je zgodnie z faktycznym użyciem, a nie jak najmniejsze. Jeśli wideo nie jest używane, limit `MAX_VIDEO_DURATION_S` nic nie kosztuje. Jeśli dokumenty są skanowane codziennie, nie należy ograniczać [`MAX_PDF_PAGES`](/pl/guide/configuration#env-max-pdf-pages).
 
 ## Co pominąć {#what-to-skip}
 

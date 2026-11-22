@@ -2,7 +2,7 @@
 description: "Развёртывание SnapOtter в продакшене с Docker. Требования к оборудованию, настройка GPU и конфигурации обратного прокси для Nginx, Traefik и Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 41ae52f744e3
+i18n_output_hash: 93d63a04eb1f
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Монтирование каталогов**: вы управляете правами сами. Задайте `PUID`/`PGID` в соответствии с пользователем хоста:
+**Монтирование каталогов**: вы управляете правами сами. Задайте [`PUID`](/ru/guide/configuration#env-puid)/[`PGID`](/ru/guide/configuration#env-pgid) в соответствии с пользователем хоста:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | Переменная | По умолчанию | Описание |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Включить/отключить требование входа |
-| `DEFAULT_USERNAME` | `admin` | Имя начального администратора |
-| `DEFAULT_PASSWORD` | `admin` | Начальный пароль администратора (принудительная смена при первом входе) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (без ограничений) | Лимит загрузки на файл в МБ. Образ поставляется с `0`; сборка из исходников начинается со 100 |
-| `MAX_BATCH_SIZE` | `0` (без ограничений) | Максимум файлов в одном пакетном запросе. Образ поставляется с `0`; сборка из исходников начинается со 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Запросов API в минуту на IP (0 отключает ограничение) |
-| `MAX_USERS` | `0` (без ограничений) | Максимальное число учётных записей |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Каким пирам разрешено задавать IP клиента через `X-Forwarded-For`. По умолчанию только частные сети |
+| [`AUTH_ENABLED`](/ru/guide/configuration#env-auth-enabled) | `true` | Включить/отключить требование входа |
+| [`DEFAULT_USERNAME`](/ru/guide/configuration#env-default-username) | `admin` | Имя начального администратора |
+| [`DEFAULT_PASSWORD`](/ru/guide/configuration#env-default-password) | `admin` | Начальный пароль администратора (принудительная смена при первом входе) |
+| [`MAX_UPLOAD_SIZE_MB`](/ru/guide/configuration#env-max-upload-size-mb) | `0` (без ограничений) | Лимит загрузки на файл в МБ. Образ поставляется с `0`; сборка из исходников начинается со 100 |
+| [`MAX_BATCH_SIZE`](/ru/guide/configuration#env-max-batch-size) | `0` (без ограничений) | Максимум файлов в одном пакетном запросе. Образ поставляется с `0`; сборка из исходников начинается со 100 |
+| [`RATE_LIMIT_PER_MIN`](/ru/guide/configuration#env-rate-limit-per-min) | `1000` | Запросов API в минуту на IP (0 отключает ограничение) |
+| [`MAX_USERS`](/ru/guide/configuration#env-max-users) | `0` (без ограничений) | Максимальное число учётных записей |
+| [`TRUST_PROXY`](/ru/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Каким пирам разрешено задавать IP клиента через `X-Forwarded-For`. По умолчанию только частные сети |
 | `PUID` | `999` | Запускать от этого UID (для прав на смонтированные каталоги) |
 | `PGID` | `999` | Запускать от этого GID (для прав на смонтированные каталоги) |
-| `LOG_LEVEL` | `info` | Подробность логов: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (авто) | Максимум параллельных заданий обработки ИИ |
-| `SESSION_DURATION_HOURS` | `168` | Время жизни сессии входа (7 дней) |
-| `CORS_ORIGIN` | (пусто) | Разрешённые источники через запятую или пусто для того же источника |
+| [`LOG_LEVEL`](/ru/guide/configuration#env-log-level) | `info` | Подробность логов: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/ru/guide/configuration#env-concurrent-jobs) | `0` (авто) | Максимум параллельных заданий обработки ИИ |
+| [`SESSION_DURATION_HOURS`](/ru/guide/configuration#env-session-duration-hours) | `168` | Время жизни сессии входа (7 дней) |
+| [`CORS_ORIGIN`](/ru/guide/configuration#env-cors-origin) | (пусто) | Разрешённые источники через запятую или пусто для того же источника |
 
 ### Исходящий прокси и частный CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Развёртывание по подпути {#subpath}
 
-Чтобы обслуживать приложение по адресу `https://example.com/snapotter`, задайте `BASE_PATH=/snapotter` в окружении
+Чтобы обслуживать приложение по адресу `https://example.com/snapotter`, задайте [`BASE_PATH=/snapotter`](/ru/guide/configuration#env-base-path) в окружении
 контейнера SnapOtter и перезапустите его. Официальные файлы Compose для CPU и GPU
 также принимают `BASE_PATH` из вашей оболочки или файла Compose `.env`. Один и тот же
 образ работает по любому пути; пересборка фронтенда не нужна.
@@ -609,7 +609,7 @@ location /snapotter/ {
 Этот пример сохраняет префикс. Прокси, которые удаляют `/snapotter` перед
 пересылкой, тоже поддерживаются. Внутренние проверки работоспособности могут продолжать использовать
 `/api/v1/health`. Для OIDC или SAML также задайте
-`EXTERNAL_URL=https://example.com/snapotter` и обновите URL обратного вызова
+[`EXTERNAL_URL=https://example.com/snapotter`](/ru/guide/oidc#env-external-url) и обновите URL обратного вызова
 у поставщика удостоверений, добавив `/snapotter/api/auth/oidc/callback` или
 `/snapotter/api/auth/saml/callback` соответственно.
 

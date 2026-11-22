@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 接下来打开一个工具。可以从侧边栏中选择，也可以直接进入[缩放](http://localhost:1349/image/resize)，放入一张图像，然后下载结果。
 
-安装到此就完成了。这个单一容器包含运行所需的一切：未设置 `DATABASE_URL` 时，它会在回环接口上启动自己的 PostgreSQL 和 Redis（内嵌模式），并将所有数据保存在 `SnapOtter-data` 卷中。这是试用 SnapOtter 或在家庭实验室中自托管的最快方式。内嵌模式以 root 身份运行（默认），并且一旦你设置 `DATABASE_URL` 就会自动关闭。对于生产环境，请使用 [Docker Compose 堆栈](#docker-compose)，它将 PostgreSQL 和 Redis 放在各自的容器中。
+安装到此就完成了。这个单一容器包含运行所需的一切：未设置 [`DATABASE_URL`](/zh-CN/guide/configuration#env-database-url) 时，它会在回环接口上启动自己的 PostgreSQL 和 Redis（内嵌模式），并将所有数据保存在 `SnapOtter-data` 卷中。这是试用 SnapOtter 或在家庭实验室中自托管的最快方式。内嵌模式以 root 身份运行（默认），并且一旦你设置 `DATABASE_URL` 就会自动关闭。对于生产环境，请使用 [Docker Compose 堆栈](#docker-compose)，它将 PostgreSQL 和 Redis 放在各自的容器中。
 
 任务结果不会保存在数据卷中，因此容器被替换时（例如升级镜像）它们会消失，对应的下载链接也会失效。部署指南中的[保留任务输出](/zh-CN/guide/deployment#keeping-job-output)说明了如何保留它们。
 
@@ -156,13 +156,13 @@ pnpm dev
 3. 对单个文件运行，或一次性对整个批次运行。
 4. 保存流水线以便日后复用。
 
-流水线默认允许 20 个步骤。将 `MAX_PIPELINE_STEPS=0` 设置为不限制即可取消该上限。
+流水线默认允许 20 个步骤。将 [`MAX_PIPELINE_STEPS=0`](/zh-CN/guide/configuration#env-max-pipeline-steps) 设置为不限制即可取消该上限。
 
 ### 文件库 {#file-library}
 
 你处理过的每个文件都可以保存到 **文件** 库中。SnapOtter 会记录完整的版本历史，因此你可以追溯从原始上传到最终输出的每个处理步骤。
 
-保存是显式的：你保存到库中的结果会保留到你删除为止，而处理后未保存的结果会在 72 小时后自动清除（可通过 `FILE_MAX_AGE_HOURS` 配置）。
+保存是显式的：你保存到库中的结果会保留到你删除为止，而处理后未保存的结果会在 72 小时后自动清除（可通过 [`FILE_MAX_AGE_HOURS`](/zh-CN/guide/configuration#env-file-max-age-hours) 配置）。
 
 ### REST API 与 API 密钥 {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 在 **设置 → 团队** 下创建团队以对用户分组。
 
-设置 `AUTH_ENABLED=true`（或者对于无需登录的单用户/自用场景，设置 `false`）。
+设置 [`AUTH_ENABLED=true`](/zh-CN/guide/configuration#env-auth-enabled)（或者对于无需登录的单用户/自用场景，设置 `false`）。
 
 ## 在手机上使用 {#use-it-from-your-phone}
 

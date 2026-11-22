@@ -2,7 +2,7 @@
 description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 63386d8c2866
+i18n_output_hash: 5e0058f91086
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - Anda yang mengelola izin. Atur `PUID`/`PGID` agar sesuai dengan pengguna host Anda:
+**Bind mount** - Anda yang mengelola izin. Atur [`PUID`](/id/guide/configuration#env-puid)/[`PGID`](/id/guide/configuration#env-pgid) agar sesuai dengan pengguna host Anda:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ Error startup menyebutkan UID yang tepat untuk digunakan, jadi cara tercepat ada
 
 | Variabel | Default | Deskripsi |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Aktifkan/nonaktifkan kewajiban login |
-| `DEFAULT_USERNAME` | `admin` | Username admin awal |
-| `DEFAULT_PASSWORD` | `admin` | Kata sandi admin awal (wajib diganti saat login pertama) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (tanpa batas) | Batas unggah per file dalam MB. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
-| `MAX_BATCH_SIZE` | `0` (tanpa batas) | Maksimum file per permintaan batch. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Permintaan API per menit per IP (atur 0 untuk menonaktifkan) |
-| `MAX_USERS` | `0` (tanpa batas) | Jumlah maksimum akun pengguna |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien melalui `X-Forwarded-For`. Secara default hanya jaringan privat |
+| [`AUTH_ENABLED`](/id/guide/configuration#env-auth-enabled) | `true` | Aktifkan/nonaktifkan kewajiban login |
+| [`DEFAULT_USERNAME`](/id/guide/configuration#env-default-username) | `admin` | Username admin awal |
+| [`DEFAULT_PASSWORD`](/id/guide/configuration#env-default-password) | `admin` | Kata sandi admin awal (wajib diganti saat login pertama) |
+| [`MAX_UPLOAD_SIZE_MB`](/id/guide/configuration#env-max-upload-size-mb) | `0` (tanpa batas) | Batas unggah per file dalam MB. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
+| [`MAX_BATCH_SIZE`](/id/guide/configuration#env-max-batch-size) | `0` (tanpa batas) | Maksimum file per permintaan batch. Image dikirim dengan `0`; build dari sumber dimulai dari 100 |
+| [`RATE_LIMIT_PER_MIN`](/id/guide/configuration#env-rate-limit-per-min) | `1000` | Permintaan API per menit per IP (atur 0 untuk menonaktifkan) |
+| [`MAX_USERS`](/id/guide/configuration#env-max-users) | `0` (tanpa batas) | Jumlah maksimum akun pengguna |
+| [`TRUST_PROXY`](/id/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien melalui `X-Forwarded-For`. Secara default hanya jaringan privat |
 | `PUID` | `999` | Jalankan sebagai UID ini (untuk izin bind mount) |
 | `PGID` | `999` | Jalankan sebagai GID ini (untuk izin bind mount) |
-| `LOG_LEVEL` | `info` | Tingkat detail log: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (otomatis) | Maksimum job pemrosesan AI paralel |
-| `SESSION_DURATION_HOURS` | `168` | Masa berlaku sesi login (7 hari) |
-| `CORS_ORIGIN` | (kosong) | Origin yang diizinkan dipisahkan koma, atau kosong untuk same-origin |
+| [`LOG_LEVEL`](/id/guide/configuration#env-log-level) | `info` | Tingkat detail log: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/id/guide/configuration#env-concurrent-jobs) | `0` (otomatis) | Maksimum job pemrosesan AI paralel |
+| [`SESSION_DURATION_HOURS`](/id/guide/configuration#env-session-duration-hours) | `168` | Masa berlaku sesi login (7 hari) |
+| [`CORS_ORIGIN`](/id/guide/configuration#env-cors-origin) | (kosong) | Origin yang diizinkan dipisahkan koma, atau kosong untuk same-origin |
 
 ### Proxy keluar dan CA privat {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Deployment di bawah subpath {#subpath}
 
-Untuk melayani `https://example.com/snapotter`, atur `BASE_PATH=/snapotter` di environment
+Untuk melayani `https://example.com/snapotter`, atur [`BASE_PATH=/snapotter`](/id/guide/configuration#env-base-path) di environment
 kontainer SnapOtter dan mulai ulang. File Compose CPU dan GPU resmi
 juga menerima `BASE_PATH` dari shell Anda atau file `.env` Compose. Image yang sama
 bekerja di path mana pun; tidak perlu rebuild frontend.
@@ -609,7 +609,7 @@ location /snapotter/ {
 Contoh ini mempertahankan prefiks. Proxy yang menghapus `/snapotter` sebelum
 meneruskan juga didukung. Health check internal tetap dapat menggunakan
 `/api/v1/health`. Untuk OIDC atau SAML, atur juga
-`EXTERNAL_URL=https://example.com/snapotter` dan perbarui URL callback identity provider agar menyertakan `/snapotter/api/auth/oidc/callback` atau
+[`EXTERNAL_URL=https://example.com/snapotter`](/id/guide/oidc#env-external-url) dan perbarui URL callback identity provider agar menyertakan `/snapotter/api/auth/oidc/callback` atau
 `/snapotter/api/auth/saml/callback` secara berurutan.
 
 Skrip API tetap bekerja tanpa perubahan: URL dalam respons API, seperti

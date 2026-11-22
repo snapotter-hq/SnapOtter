@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 이제 도구를 열어 보세요. 사이드바에서 하나를 고르거나 [크기 조정](http://localhost:1349/image/resize)으로 바로 이동해 이미지를 넣고 결과를 내려받으면 됩니다.
 
-설치는 이게 전부입니다. 이 컨테이너 하나로 필요한 모든 것이 실행됩니다. `DATABASE_URL`를 설정하지 않으면 루프백 인터페이스에서 자체 PostgreSQL과 Redis를 시작하고(내장 모드) 모든 데이터를 `SnapOtter-data` 볼륨에 보관합니다. SnapOtter를 가장 빠르게 사용해 보거나 홈랩에서 셀프 호스팅하기에 좋은 방법입니다. 내장 모드는 root(기본값)로 실행되며 `DATABASE_URL`를 설정하는 즉시 자동으로 꺼집니다. 프로덕션에서는 PostgreSQL과 Redis를 각자의 컨테이너에 두는 [Docker Compose 스택](#docker-compose)을 사용하세요.
+설치는 이게 전부입니다. 이 컨테이너 하나로 필요한 모든 것이 실행됩니다. [`DATABASE_URL`](/ko/guide/configuration#env-database-url)를 설정하지 않으면 루프백 인터페이스에서 자체 PostgreSQL과 Redis를 시작하고(내장 모드) 모든 데이터를 `SnapOtter-data` 볼륨에 보관합니다. SnapOtter를 가장 빠르게 사용해 보거나 홈랩에서 셀프 호스팅하기에 좋은 방법입니다. 내장 모드는 root(기본값)로 실행되며 `DATABASE_URL`를 설정하는 즉시 자동으로 꺼집니다. 프로덕션에서는 PostgreSQL과 Redis를 각자의 컨테이너에 두는 [Docker Compose 스택](#docker-compose)을 사용하세요.
 
 작업 결과는 데이터 볼륨에 보관되지 않으므로 컨테이너가 교체되면 (예: 이미지 업그레이드) 사라지고, 다운로드 링크도 더 이상 작동하지 않습니다. 배포 가이드의 [작업 출력 보존](/ko/guide/deployment#keeping-job-output)에서 보존하는 방법을 안내합니다.
 
@@ -156,13 +156,13 @@ pnpm dev
 3. 파일 하나에 실행하거나 배치 전체에 한 번에 실행합니다.
 4. 나중에 다시 쓸 수 있도록 파이프라인을 저장합니다.
 
-파이프라인은 기본적으로 20단계까지 허용합니다. 제한을 없애려면 `MAX_PIPELINE_STEPS=0`를 설정하세요.
+파이프라인은 기본적으로 20단계까지 허용합니다. 제한을 없애려면 [`MAX_PIPELINE_STEPS=0`](/ko/guide/configuration#env-max-pipeline-steps)를 설정하세요.
 
 ### 파일 라이브러리 {#file-library}
 
 처리한 모든 파일을 **파일** 라이브러리에 저장할 수 있습니다. SnapOtter는 전체 버전 기록을 추적하므로 원본 업로드부터 최종 출력까지 모든 처리 단계를 되짚어 볼 수 있습니다.
 
-저장은 명시적으로 이루어집니다. 라이브러리에 저장한 결과는 삭제할 때까지 유지되고, 처리만 하고 저장하지 않은 결과는 72시간 후 자동으로 정리됩니다(`FILE_MAX_AGE_HOURS`로 변경 가능).
+저장은 명시적으로 이루어집니다. 라이브러리에 저장한 결과는 삭제할 때까지 유지되고, 처리만 하고 저장하지 않은 결과는 72시간 후 자동으로 정리됩니다([`FILE_MAX_AGE_HOURS`](/ko/guide/configuration#env-file-max-age-hours)로 변경 가능).
 
 ### REST API 및 API 키 {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ API 키는 **설정 → API 키**에서 생성합니다. 모든 엔드포인트�
 
 **설정 → 팀**에서 팀을 만들어 사용자를 묶을 수 있습니다.
 
-`AUTH_ENABLED=true`를 설정하세요(로그인 없이 혼자 사용하는 경우에는 `false`).
+[`AUTH_ENABLED=true`](/ko/guide/configuration#env-auth-enabled)를 설정하세요(로그인 없이 혼자 사용하는 경우에는 `false`).
 
 ## 휴대폰에서 사용하기 {#use-it-from-your-phone}
 

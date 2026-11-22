@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 Öppna nu ett verktyg. Välj ett i sidofältet, eller gå direkt till [Ändra storlek](http://localhost:1349/image/resize), släpp in en bild och ladda ner resultatet.
 
-Det är hela installationen. Den här enda containern kör allt den behöver: utan `DATABASE_URL` startar den sin egen PostgreSQL och Redis på loopback-gränssnittet (inbäddat läge) och lagrar all data i volymen `SnapOtter-data`. Det är det snabbaste sättet att testa SnapOtter eller drifta det själv på ett hemmalabb. Inbäddat läge körs som root (standard) och stängs av automatiskt så snart du anger `DATABASE_URL`. I produktion använder du [Docker Compose-stacken](#docker-compose), som håller PostgreSQL och Redis i egna containrar.
+Det är hela installationen. Den här enda containern kör allt den behöver: utan [`DATABASE_URL`](/sv/guide/configuration#env-database-url) startar den sin egen PostgreSQL och Redis på loopback-gränssnittet (inbäddat läge) och lagrar all data i volymen `SnapOtter-data`. Det är det snabbaste sättet att testa SnapOtter eller drifta det själv på ett hemmalabb. Inbäddat läge körs som root (standard) och stängs av automatiskt så snart du anger `DATABASE_URL`. I produktion använder du [Docker Compose-stacken](#docker-compose), som håller PostgreSQL och Redis i egna containrar.
 
 Jobbresultat sparas inte i datavolymen, så de försvinner när containern byts ut (vid en avbildsuppgradering, till exempel) och deras nedladdningslänkar slutar fungera. [Behålla jobbresultat](/sv/guide/deployment#keeping-job-output) i driftsättningsguiden visar hur du behåller dem.
 
@@ -156,13 +156,13 @@ Kedja ihop verktyg till arbetsflöden i flera steg och tillämpa dem på en bild
 3. Kör på en enskild fil eller på en hel batch på en gång.
 4. Spara pipelinen för att återanvända den senare.
 
-Pipelines tillåter 20 steg som standard. Ange `MAX_PIPELINE_STEPS=0` för att göra gränsen obegränsad.
+Pipelines tillåter 20 steg som standard. Ange [`MAX_PIPELINE_STEPS=0`](/sv/guide/configuration#env-max-pipeline-steps) för att göra gränsen obegränsad.
 
 ### Filbibliotek {#file-library}
 
 Varje fil du bearbetar kan sparas i ditt **Files**-bibliotek. SnapOtter håller reda på hela versionshistoriken så att du kan följa varje bearbetningssteg från den ursprungliga uppladdningen till det slutliga resultatet.
 
-Sparandet är uttryckligt: resultat som du sparar i biblioteket behålls tills du raderar dem, medan resultat som du bearbetar och lämnar osparade rensas automatiskt efter 72 timmar (kan konfigureras via `FILE_MAX_AGE_HOURS`).
+Sparandet är uttryckligt: resultat som du sparar i biblioteket behålls tills du raderar dem, medan resultat som du bearbetar och lämnar osparade rensas automatiskt efter 72 timmar (kan konfigureras via [`FILE_MAX_AGE_HOURS`](/sv/guide/configuration#env-file-max-age-hours)).
 
 ### REST API och API-nycklar {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Aktivera flera användare med rollbaserad åtkomstkontroll:
 
 Skapa team under **Settings → Teams** för att gruppera användare.
 
-Ange `AUTH_ENABLED=true` (eller `false` för en enskild användare/eget bruk utan inloggning).
+Ange [`AUTH_ENABLED=true`](/sv/guide/configuration#env-auth-enabled) (eller `false` för en enskild användare/eget bruk utan inloggning).
 
 ## Använd det från mobilen {#use-it-from-your-phone}
 

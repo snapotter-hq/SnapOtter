@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 845478399df6
+i18n_output_hash: a3212bfaa0b8
 i18n_hash_version: 2
 ---
 # 저사양 환경 구성 {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Pi급 장비를 위한 참고 사항입니다.
 
 - 데이터 볼륨과 Postgres에는 **SD 카드보다 USB SSD를 권장합니다.** 작업 공간은 실제 디스크 IO를 많이 쓰며, SD 카드는 느리고 금방 마모됩니다.
-- **올인원 단일 컨테이너도 여기서 동작합니다**(`DATABASE_URL`/`REDIS_URL`를 설정하지 않으면 내장 Postgres와 Redis 사용). 메모리가 제한된 호스트에서는 `REDIS_MAXMEMORY`로 내장 Redis 상한을 낮추세요([구성](/ko/guide/configuration) 참고). Compose는 서비스별로 더 세밀하게 제어할 수 있어서 이 안내에서는 Compose를 사용합니다.
+- **올인원 단일 컨테이너도 여기서 동작합니다**([`DATABASE_URL`](/ko/guide/configuration#env-database-url)/[`REDIS_URL`](/ko/guide/configuration#env-redis-url)를 설정하지 않으면 내장 Postgres와 Redis 사용). 메모리가 제한된 호스트에서는 [`REDIS_MAXMEMORY`](/ko/guide/configuration#env-redis-maxmemory)로 내장 Redis 상한을 낮추세요([구성](/ko/guide/configuration) 참고). Compose는 서비스별로 더 세밀하게 제어할 수 있어서 이 안내에서는 Compose를 사용합니다.
 - **2 GB 장비에는 스왑을 추가하세요.** 가끔 발생하는 급증(큰 PDF, 상한을 두지 않은 배치)이 메모리 부족으로 인한 종료로 이어지는 것을 막아 줍니다. SD 카드 환경에서는 zram이 적합합니다.
 - arm64 이미지는 CPU 전용이며, ARM 보드에서는 CUDA를 사용할 수 없습니다.
 
@@ -86,15 +86,15 @@ Pi급 장비를 위한 참고 사항입니다.
 
 | 변수 | 작은 장비 권장값 | 보호하는 대상 |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | 병렬로 실행되는 작업 수. 자동 감지는 CPU 코어 수에서 1을 뺀 값을 사용하는데, 큰 장비에서는 괜찮지만 메모리 압박을 받는 2코어 장비에서는 너무 공격적입니다. |
-| `MAX_WORKER_THREADS` | `2` | 이미지 처리 스레드 풀. |
-| `MAX_BATCH_SIZE` | `5` | 1~2 GB 장비에서 가장 먼저 메모리가 부족해지는 곳이 배치입니다. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 거대한 파일 하나가 작업 공간 전체를 차지하는 것을 막습니다. |
-| `MAX_MEGAPIXELS` | `50` | 100 MP 이상 이미지를 디코딩하면 파일 크기와 관계없이 RAM을 소모합니다. |
+| [`CONCURRENT_JOBS`](/ko/guide/configuration#env-concurrent-jobs) | `1` | 병렬로 실행되는 작업 수. 자동 감지는 CPU 코어 수에서 1을 뺀 값을 사용하는데, 큰 장비에서는 괜찮지만 메모리 압박을 받는 2코어 장비에서는 너무 공격적입니다. |
+| [`MAX_WORKER_THREADS`](/ko/guide/configuration#env-max-worker-threads) | `2` | 이미지 처리 스레드 풀. |
+| [`MAX_BATCH_SIZE`](/ko/guide/configuration#env-max-batch-size) | `5` | 1~2 GB 장비에서 가장 먼저 메모리가 부족해지는 곳이 배치입니다. |
+| [`MAX_UPLOAD_SIZE_MB`](/ko/guide/configuration#env-max-upload-size-mb) | `100` | 거대한 파일 하나가 작업 공간 전체를 차지하는 것을 막습니다. |
+| [`MAX_MEGAPIXELS`](/ko/guide/configuration#env-max-megapixels) | `50` | 100 MP 이상 이미지를 디코딩하면 파일 크기와 관계없이 RAM을 소모합니다. |
 | `MAX_VIDEO_DURATION_S` | `300` | 긴 트랜스코딩은 작은 CPU를 몇 분에서 몇 시간 동안 독점합니다. |
-| `PROCESSING_TIMEOUT_S` | `600` | 폭주한 작업이 결국 장비를 놓아 주도록 하는 하드 상한. |
+| [`PROCESSING_TIMEOUT_S`](/ko/guide/configuration#env-processing-timeout-s) | `600` | 폭주한 작업이 결국 장비를 놓아 주도록 하는 하드 상한. |
 
-이 상한은 서버가 받아들이는 항목에 적용되므로, 가능한 한 작게 잡기보다 실제로 사용하는 항목에 맞춰 설정하세요. 비디오를 전혀 쓰지 않는다면 `MAX_VIDEO_DURATION_S` 상한은 손해가 없습니다. 문서를 매일 스캔한다면 `MAX_PDF_PAGES`은 제한하지 마세요.
+이 상한은 서버가 받아들이는 항목에 적용되므로, 가능한 한 작게 잡기보다 실제로 사용하는 항목에 맞춰 설정하세요. 비디오를 전혀 쓰지 않는다면 `MAX_VIDEO_DURATION_S` 상한은 손해가 없습니다. 문서를 매일 스캔한다면 [`MAX_PDF_PAGES`](/ko/guide/configuration#env-max-pdf-pages)은 제한하지 마세요.
 
 ## 건너뛸 것 {#what-to-skip}
 

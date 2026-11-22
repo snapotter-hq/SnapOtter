@@ -24,7 +24,7 @@ Poi apra [http://localhost:1349](http://localhost:1349) e acceda con `admin` / `
 
 Ora apra uno strumento. Ne scelga uno dalla barra laterale oppure vada direttamente a [Ridimensiona](http://localhost:1349/image/resize), trascini un'immagine e scarichi il risultato.
 
-Questa è l'intera installazione. Questo singolo container esegue tutto ciò di cui ha bisogno: se `DATABASE_URL` non è impostato, avvia i propri PostgreSQL e Redis sull'interfaccia di loopback (modalità incorporata) e conserva tutti i dati nel volume `SnapOtter-data`. È il modo più rapido per provare SnapOtter o per il self-hosting in un homelab. La modalità incorporata viene eseguita come root (impostazione predefinita) e si disattiva automaticamente non appena imposta `DATABASE_URL`. Per la produzione, usi lo [stack Docker Compose](#docker-compose), che mantiene PostgreSQL e Redis nei propri container.
+Questa è l'intera installazione. Questo singolo container esegue tutto ciò di cui ha bisogno: se [`DATABASE_URL`](/it/guide/configuration#env-database-url) non è impostato, avvia i propri PostgreSQL e Redis sull'interfaccia di loopback (modalità incorporata) e conserva tutti i dati nel volume `SnapOtter-data`. È il modo più rapido per provare SnapOtter o per il self-hosting in un homelab. La modalità incorporata viene eseguita come root (impostazione predefinita) e si disattiva automaticamente non appena imposta `DATABASE_URL`. Per la produzione, usi lo [stack Docker Compose](#docker-compose), che mantiene PostgreSQL e Redis nei propri container.
 
 I risultati dei job non vengono conservati nel volume dei dati, quindi scompaiono quando il container viene sostituito (per esempio con un aggiornamento dell'immagine) e i loro link di download smettono di funzionare. [Conservare l'output dei job](/it/guide/deployment#keeping-job-output) nella guida alla distribuzione spiega come mantenerli.
 
@@ -156,13 +156,13 @@ Concateni gli strumenti in flussi di lavoro a più passaggi e li applichi a una 
 3. Esegua su un singolo file, oppure su un intero batch in una volta.
 4. Salvi la pipeline per riutilizzarla in seguito.
 
-Per impostazione predefinita le pipeline ammettono 20 passaggi. Imposti `MAX_PIPELINE_STEPS=0` per rendere il limite illimitato.
+Per impostazione predefinita le pipeline ammettono 20 passaggi. Imposti [`MAX_PIPELINE_STEPS=0`](/it/guide/configuration#env-max-pipeline-steps) per rendere il limite illimitato.
 
 ### Libreria dei file {#file-library}
 
 Ogni file elaborato può essere salvato nella libreria **File**. SnapOtter tiene traccia della cronologia completa delle versioni, così può ripercorrere ogni passaggio di elaborazione dall'upload originale all'output finale.
 
-Il salvataggio è esplicito: i risultati salvati nella libreria vengono conservati finché non li elimina, mentre i risultati elaborati e non salvati vengono rimossi automaticamente dopo 72 ore (configurabile tramite `FILE_MAX_AGE_HOURS`).
+Il salvataggio è esplicito: i risultati salvati nella libreria vengono conservati finché non li elimina, mentre i risultati elaborati e non salvati vengono rimossi automaticamente dopo 72 ore (configurabile tramite [`FILE_MAX_AGE_HOURS`](/it/guide/configuration#env-file-max-age-hours)).
 
 ### REST API e chiavi API {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Abiliti più utenti con controllo degli accessi basato sui ruoli:
 
 Crei i team in **Impostazioni → Team** per raggruppare gli utenti.
 
-Imposti `AUTH_ENABLED=true` (oppure `false` per uso singolo/personale senza login).
+Imposti [`AUTH_ENABLED=true`](/it/guide/configuration#env-auth-enabled) (oppure `false` per uso singolo/personale senza login).
 
 ## Usarlo dal telefono {#use-it-from-your-phone}
 

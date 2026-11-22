@@ -24,7 +24,7 @@ Lalu buka [http://localhost:1349](http://localhost:1349) dan masuk dengan `admin
 
 Sekarang buka sebuah alat. Pilih satu dari sidebar, atau langsung ke [Resize](http://localhost:1349/image/resize), letakkan gambar, lalu unduh hasilnya.
 
-Hanya itu instalasinya. Satu container ini menjalankan semua yang dibutuhkan: tanpa `DATABASE_URL` yang diatur, container memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode embedded) dan menyimpan semua data di volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Mode embedded berjalan sebagai root (default) dan mati secara otomatis begitu Anda mengatur `DATABASE_URL`. Untuk produksi, gunakan [stack Docker Compose](#docker-compose), yang menjaga PostgreSQL dan Redis dalam container masing-masing.
+Hanya itu instalasinya. Satu container ini menjalankan semua yang dibutuhkan: tanpa [`DATABASE_URL`](/id/guide/configuration#env-database-url) yang diatur, container memulai PostgreSQL dan Redis sendiri pada antarmuka loopback (mode embedded) dan menyimpan semua data di volume `SnapOtter-data`. Ini adalah cara tercepat untuk mencoba SnapOtter atau self-host di homelab. Mode embedded berjalan sebagai root (default) dan mati secara otomatis begitu Anda mengatur `DATABASE_URL`. Untuk produksi, gunakan [stack Docker Compose](#docker-compose), yang menjaga PostgreSQL dan Redis dalam container masing-masing.
 
 Hasil job tidak disimpan di volume data, jadi hasilnya hilang saat container diganti (misalnya saat upgrade image) dan tautan unduhnya berhenti berfungsi. [Menyimpan output job](/id/guide/deployment#keeping-job-output) di panduan Deployment menjelaskan cara menyimpannya.
 
@@ -156,13 +156,13 @@ Rangkai alat menjadi alur kerja multi-langkah dan terapkan pada satu gambar atau
 3. Jalankan pada satu file, atau seluruh batch sekaligus.
 4. Simpan pipeline untuk digunakan kembali nanti.
 
-Pipeline mengizinkan 20 langkah secara default. Atur `MAX_PIPELINE_STEPS=0` untuk membuat batasnya tanpa batas.
+Pipeline mengizinkan 20 langkah secara default. Atur [`MAX_PIPELINE_STEPS=0`](/id/guide/configuration#env-max-pipeline-steps) untuk membuat batasnya tanpa batas.
 
 ### Pustaka File {#file-library}
 
 Setiap file yang Anda proses dapat disimpan ke pustaka **Files** Anda. SnapOtter melacak riwayat versi lengkap sehingga Anda dapat menelusuri setiap langkah pemrosesan dari unggahan asli hingga hasil akhir.
 
-Penyimpanan bersifat eksplisit: hasil yang Anda simpan ke pustaka dipertahankan sampai Anda menghapusnya, sedangkan hasil yang Anda proses dan biarkan tidak tersimpan dibersihkan otomatis setelah 72 jam (dapat dikonfigurasi melalui `FILE_MAX_AGE_HOURS`).
+Penyimpanan bersifat eksplisit: hasil yang Anda simpan ke pustaka dipertahankan sampai Anda menghapusnya, sedangkan hasil yang Anda proses dan biarkan tidak tersimpan dibersihkan otomatis setelah 72 jam (dapat dikonfigurasi melalui [`FILE_MAX_AGE_HOURS`](/id/guide/configuration#env-file-max-age-hours)).
 
 ### REST API & API Key {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Aktifkan banyak pengguna dengan kontrol akses berbasis peran:
 
 Buat tim di bawah **Settings → Teams** untuk mengelompokkan pengguna.
 
-Atur `AUTH_ENABLED=true` (atau `false` untuk satu pengguna/penggunaan pribadi tanpa login).
+Atur [`AUTH_ENABLED=true`](/id/guide/configuration#env-auth-enabled) (atau `false` untuk satu pengguna/penggunaan pribadi tanpa login).
 
 ## Gunakan dari Ponsel Anda {#use-it-from-your-phone}
 

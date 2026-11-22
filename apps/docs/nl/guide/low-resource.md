@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: dd83f5f117df
+i18n_output_hash: a790667c5a1c
 i18n_hash_version: 2
 ---
 # Setups met weinig resources {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Opmerkingen voor machines van Pi-klasse:
 
 - **Geef de voorkeur aan een USB-SSD boven een SD-kaart** voor het datavolume en Postgres. Jobwerkruimtes doen echte schijf-I/O, en SD-kaarten zijn zowel traag als snel versleten.
-- **De all-in-one enkele container werkt hier ook** (embedded Postgres en Redis wanneer `DATABASE_URL`/`REDIS_URL` niet zijn ingesteld), en op een host met beperkt geheugen verlaagt u de limiet van de embedded Redis met `REDIS_MAXMEMORY` (zie [Configuratie](/nl/guide/configuration)). Compose geeft u fijnmaziger controle per service, en daarom gebruikt deze handleiding het.
+- **De all-in-one enkele container werkt hier ook** (embedded Postgres en Redis wanneer [`DATABASE_URL`](/nl/guide/configuration#env-database-url)/[`REDIS_URL`](/nl/guide/configuration#env-redis-url) niet zijn ingesteld), en op een host met beperkt geheugen verlaagt u de limiet van de embedded Redis met [`REDIS_MAXMEMORY`](/nl/guide/configuration#env-redis-maxmemory) (zie [Configuratie](/nl/guide/configuration)). Compose geeft u fijnmaziger controle per service, en daarom gebruikt deze handleiding het.
 - **Voeg swap toe op apparaten met 2 GB.** Zo eindigt een incidentele piek (een grote PDF, een batch waarvan u vergat de omvang te beperken) niet in een out-of-memory-kill. zram is de optie die vriendelijk is voor SD-kaarten.
 - De arm64-image gebruikt alleen de CPU; op ARM-boards is geen CUDA beschikbaar.
 
@@ -86,15 +86,15 @@ Alle limieten zijn omgevingsvariabelen, volledig beschreven in [Configuratie](/n
 
 | Variabele | Suggestie voor kleine machine | Wat het beschermt |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Hoeveel jobs parallel draaien. Automatische detectie gebruikt het aantal CPU-cores min één, wat prima is op grote machines en te gretig op een machine met 2 cores onder geheugendruk. |
-| `MAX_WORKER_THREADS` | `2` | Threadpool voor beeldverwerking. |
-| `MAX_BATCH_SIZE` | `5` | Bij batches loopt het geheugen van machines met 1-2 GB het eerst vol. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Voorkomt dat één enorm bestand de hele werkruimte bezet. |
-| `MAX_MEGAPIXELS` | `50` | Het decoderen van een afbeelding van 100+ MP kost RAM, ongeacht de bestandsgrootte. |
+| [`CONCURRENT_JOBS`](/nl/guide/configuration#env-concurrent-jobs) | `1` | Hoeveel jobs parallel draaien. Automatische detectie gebruikt het aantal CPU-cores min één, wat prima is op grote machines en te gretig op een machine met 2 cores onder geheugendruk. |
+| [`MAX_WORKER_THREADS`](/nl/guide/configuration#env-max-worker-threads) | `2` | Threadpool voor beeldverwerking. |
+| [`MAX_BATCH_SIZE`](/nl/guide/configuration#env-max-batch-size) | `5` | Bij batches loopt het geheugen van machines met 1-2 GB het eerst vol. |
+| [`MAX_UPLOAD_SIZE_MB`](/nl/guide/configuration#env-max-upload-size-mb) | `100` | Voorkomt dat één enorm bestand de hele werkruimte bezet. |
+| [`MAX_MEGAPIXELS`](/nl/guide/configuration#env-max-megapixels) | `50` | Het decoderen van een afbeelding van 100+ MP kost RAM, ongeacht de bestandsgrootte. |
 | `MAX_VIDEO_DURATION_S` | `300` | Lange transcodes monopoliseren een kleine CPU gedurende minuten tot uren. |
-| `PROCESSING_TIMEOUT_S` | `600` | Harde bovengrens zodat een op hol geslagen job de machine uiteindelijk vrijgeeft. |
+| [`PROCESSING_TIMEOUT_S`](/nl/guide/configuration#env-processing-timeout-s) | `600` | Harde bovengrens zodat een op hol geslagen job de machine uiteindelijk vrijgeeft. |
 
-Deze limieten gelden voor wat de server accepteert, dus stel ze in op wat u daadwerkelijk gebruikt in plaats van zo klein mogelijk. Als u nooit video gebruikt, kost een limiet van `MAX_VIDEO_DURATION_S` niets; scant u dagelijks documenten, beperk `MAX_PDF_PAGES` dan niet.
+Deze limieten gelden voor wat de server accepteert, dus stel ze in op wat u daadwerkelijk gebruikt in plaats van zo klein mogelijk. Als u nooit video gebruikt, kost een limiet van `MAX_VIDEO_DURATION_S` niets; scant u dagelijks documenten, beperk [`MAX_PDF_PAGES`](/nl/guide/configuration#env-max-pdf-pages) dan niet.
 
 ## Wat u beter overslaat {#what-to-skip}
 

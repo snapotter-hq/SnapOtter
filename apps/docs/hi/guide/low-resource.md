@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 5280b5fdddd6
+i18n_output_hash: c675d29992dc
 i18n_hash_version: 2
 ---
 # कम-संसाधन वाले सेटअप {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Pi-स्तर की मशीनों के लिए नोट्स:
 
 - डेटा volume और Postgres के लिए **SD card के बजाय USB SSD को प्राथमिकता दें।** Job workspaces में असली disk IO होता है, और SD cards धीमे भी होते हैं और जल्दी घिस भी जाते हैं।
-- **ऑल-इन-वन single container भी यहाँ काम करता है** (`DATABASE_URL`/`REDIS_URL` सेट न होने पर embedded Postgres और Redis), और मेमोरी-सीमित host पर आपको उसकी embedded Redis सीमा `REDIS_MAXMEMORY` से घटानी चाहिए ([Configuration](/hi/guide/configuration) देखें)। Compose आपको प्रति-service बेहतर नियंत्रण देता है, इसीलिए यह walkthrough उसका उपयोग करता है।
+- **ऑल-इन-वन single container भी यहाँ काम करता है** ([`DATABASE_URL`](/hi/guide/configuration#env-database-url)/[`REDIS_URL`](/hi/guide/configuration#env-redis-url) सेट न होने पर embedded Postgres और Redis), और मेमोरी-सीमित host पर आपको उसकी embedded Redis सीमा [`REDIS_MAXMEMORY`](/hi/guide/configuration#env-redis-maxmemory) से घटानी चाहिए ([Configuration](/hi/guide/configuration) देखें)। Compose आपको प्रति-service बेहतर नियंत्रण देता है, इसीलिए यह walkthrough उसका उपयोग करता है।
 - **2 GB वाले devices पर swap जोड़ें।** इससे कभी-कभार आने वाला उछाल (बड़ी PDF, या batch जिसे सीमित करना भूल गए) out-of-memory kill पर खत्म नहीं होता। zram SD-card के अनुकूल विकल्प है।
 - arm64 image केवल CPU के लिए है; ARM boards पर CUDA नहीं है।
 
@@ -86,15 +86,15 @@ Pi-स्तर की मशीनों के लिए नोट्स:
 
 | Variable | छोटे बॉक्स के लिए सुझाव | यह किसे बचाता है |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | कितने jobs समानांतर चलते हैं। Auto-detect CPU cores में से एक घटाकर चुनता है, जो बड़ी मशीनों पर ठीक है और मेमोरी दबाव में 2-core बॉक्स पर ज़रूरत से ज़्यादा उतावला। |
-| `MAX_WORKER_THREADS` | `2` | Image-processing thread pool। |
-| `MAX_BATCH_SIZE` | `5` | 1-2 GB की मशीनों में सबसे पहले batches में ही मेमोरी खत्म होती है। |
-| `MAX_UPLOAD_SIZE_MB` | `100` | एक अकेली विशाल फ़ाइल को पूरे workspace पर कब्ज़ा करने से रोकता है। |
-| `MAX_MEGAPIXELS` | `50` | 100+ MP की image decode करने में फ़ाइल के आकार से स्वतंत्र रूप से RAM लगती है। |
+| [`CONCURRENT_JOBS`](/hi/guide/configuration#env-concurrent-jobs) | `1` | कितने jobs समानांतर चलते हैं। Auto-detect CPU cores में से एक घटाकर चुनता है, जो बड़ी मशीनों पर ठीक है और मेमोरी दबाव में 2-core बॉक्स पर ज़रूरत से ज़्यादा उतावला। |
+| [`MAX_WORKER_THREADS`](/hi/guide/configuration#env-max-worker-threads) | `2` | Image-processing thread pool। |
+| [`MAX_BATCH_SIZE`](/hi/guide/configuration#env-max-batch-size) | `5` | 1-2 GB की मशीनों में सबसे पहले batches में ही मेमोरी खत्म होती है। |
+| [`MAX_UPLOAD_SIZE_MB`](/hi/guide/configuration#env-max-upload-size-mb) | `100` | एक अकेली विशाल फ़ाइल को पूरे workspace पर कब्ज़ा करने से रोकता है। |
+| [`MAX_MEGAPIXELS`](/hi/guide/configuration#env-max-megapixels) | `50` | 100+ MP की image decode करने में फ़ाइल के आकार से स्वतंत्र रूप से RAM लगती है। |
 | `MAX_VIDEO_DURATION_S` | `300` | लंबे transcodes छोटे CPU को मिनटों से घंटों तक घेरे रखते हैं। |
-| `PROCESSING_TIMEOUT_S` | `600` | कठोर सीमा, ताकि भागा हुआ job अंततः बॉक्स को मुक्त कर दे। |
+| [`PROCESSING_TIMEOUT_S`](/hi/guide/configuration#env-processing-timeout-s) | `600` | कठोर सीमा, ताकि भागा हुआ job अंततः बॉक्स को मुक्त कर दे। |
 
-ये सीमाएँ उस पर लागू होती हैं जो server स्वीकार करता है, इसलिए इन्हें जितना हो सके उतना छोटा रखने के बजाय अपने वास्तविक उपयोग के अनुसार सेट करें। यदि आप कभी video नहीं छूते, तो `MAX_VIDEO_DURATION_S` की सीमा कुछ नहीं बिगाड़ती; यदि आप रोज़ documents स्कैन करते हैं, तो `MAX_PDF_PAGES` को सीमित न करें।
+ये सीमाएँ उस पर लागू होती हैं जो server स्वीकार करता है, इसलिए इन्हें जितना हो सके उतना छोटा रखने के बजाय अपने वास्तविक उपयोग के अनुसार सेट करें। यदि आप कभी video नहीं छूते, तो `MAX_VIDEO_DURATION_S` की सीमा कुछ नहीं बिगाड़ती; यदि आप रोज़ documents स्कैन करते हैं, तो [`MAX_PDF_PAGES`](/hi/guide/configuration#env-max-pdf-pages) को सीमित न करें।
 
 ## क्या छोड़ दें {#what-to-skip}
 

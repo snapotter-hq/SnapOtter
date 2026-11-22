@@ -2,7 +2,7 @@
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: a9a07b980608
+i18n_output_hash: 42dc341dbccd
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount'lar**: İzinleri siz yönetirsiniz. `PUID`/`PGID` değerlerini ana makine kullanıcınızla eşleşecek şekilde ayarlayın:
+**Bind mount'lar**: İzinleri siz yönetirsiniz. [`PUID`](/tr/guide/configuration#env-puid)/[`PGID`](/tr/guide/configuration#env-pgid) değerlerini ana makine kullanıcınızla eşleşecek şekilde ayarlayın:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ Başlangıç hatası kullanılacak UID'yi tam olarak belirtir; bu yüzden en hı
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Oturum açma zorunluluğunu etkinleştirir/devre dışı bırakır |
-| `DEFAULT_USERNAME` | `admin` | İlk yönetici kullanıcı adı |
-| `DEFAULT_PASSWORD` | `admin` | İlk yönetici parolası (ilk oturum açmada değiştirilmesi zorunlu) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (sınırsız) | MB cinsinden dosya başına yükleme sınırı. İmaj `0` ile gelir; kaynaktan derlemede 100 ile başlar |
-| `MAX_BATCH_SIZE` | `0` (sınırsız) | Toplu istek başına en fazla dosya sayısı. İmaj `0` ile gelir; kaynaktan derlemede 100 ile başlar |
-| `RATE_LIMIT_PER_MIN` | `1000` | IP başına dakikadaki API istekleri (devre dışı bırakmak için 0 yapın) |
-| `MAX_USERS` | `0` (sınırsız) | En fazla kullanıcı hesabı sayısı |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Hangi eşlerin istemci IP'sini `X-Forwarded-For` üzerinden ayarlayabileceği. Varsayılan olarak yalnızca özel ağlar |
+| [`AUTH_ENABLED`](/tr/guide/configuration#env-auth-enabled) | `true` | Oturum açma zorunluluğunu etkinleştirir/devre dışı bırakır |
+| [`DEFAULT_USERNAME`](/tr/guide/configuration#env-default-username) | `admin` | İlk yönetici kullanıcı adı |
+| [`DEFAULT_PASSWORD`](/tr/guide/configuration#env-default-password) | `admin` | İlk yönetici parolası (ilk oturum açmada değiştirilmesi zorunlu) |
+| [`MAX_UPLOAD_SIZE_MB`](/tr/guide/configuration#env-max-upload-size-mb) | `0` (sınırsız) | MB cinsinden dosya başına yükleme sınırı. İmaj `0` ile gelir; kaynaktan derlemede 100 ile başlar |
+| [`MAX_BATCH_SIZE`](/tr/guide/configuration#env-max-batch-size) | `0` (sınırsız) | Toplu istek başına en fazla dosya sayısı. İmaj `0` ile gelir; kaynaktan derlemede 100 ile başlar |
+| [`RATE_LIMIT_PER_MIN`](/tr/guide/configuration#env-rate-limit-per-min) | `1000` | IP başına dakikadaki API istekleri (devre dışı bırakmak için 0 yapın) |
+| [`MAX_USERS`](/tr/guide/configuration#env-max-users) | `0` (sınırsız) | En fazla kullanıcı hesabı sayısı |
+| [`TRUST_PROXY`](/tr/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Hangi eşlerin istemci IP'sini `X-Forwarded-For` üzerinden ayarlayabileceği. Varsayılan olarak yalnızca özel ağlar |
 | `PUID` | `999` | Bu UID olarak çalıştır (bind mount izinleri için) |
 | `PGID` | `999` | Bu GID olarak çalıştır (bind mount izinleri için) |
-| `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (otomatik) | En fazla paralel AI işleme işi |
-| `SESSION_DURATION_HOURS` | `168` | Oturum açma oturumu ömrü (7 gün) |
-| `CORS_ORIGIN` | (boş) | Virgülle ayrılmış izin verilen kaynaklar; aynı kaynak için boş bırakın |
+| [`LOG_LEVEL`](/tr/guide/configuration#env-log-level) | `info` | Günlük ayrıntı düzeyi: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/tr/guide/configuration#env-concurrent-jobs) | `0` (otomatik) | En fazla paralel AI işleme işi |
+| [`SESSION_DURATION_HOURS`](/tr/guide/configuration#env-session-duration-hours) | `168` | Oturum açma oturumu ömrü (7 gün) |
+| [`CORS_ORIGIN`](/tr/guide/configuration#env-cors-origin) | (boş) | Virgülle ayrılmış izin verilen kaynaklar; aynı kaynak için boş bırakın |
 
 ### Giden proxy ve özel CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Alt yol altında dağıtım {#subpath}
 
-`https://example.com/snapotter` adresinden sunmak için SnapOtter konteyner ortamında `BASE_PATH=/snapotter` değerini ayarlayın ve konteyneri yeniden başlatın. Resmi CPU ve GPU Compose dosyaları `BASE_PATH` değerini kabuğunuzdan veya Compose `.env` dosyanızdan da kabul eder. Aynı imaj her yolda çalışır; ön yüzün yeniden derlenmesi gerekmez.
+`https://example.com/snapotter` adresinden sunmak için SnapOtter konteyner ortamında [`BASE_PATH=/snapotter`](/tr/guide/configuration#env-base-path) değerini ayarlayın ve konteyneri yeniden başlatın. Resmi CPU ve GPU Compose dosyaları `BASE_PATH` değerini kabuğunuzdan veya Compose `.env` dosyanızdan da kabul eder. Aynı imaj her yolda çalışır; ön yüzün yeniden derlenmesi gerekmez.
 
 `BASE_PATH`; harf, rakam, `_` veya `-` içeren, eğik çizgiyle ayrılmış bölümleri kabul eder; `/apps/snapotter` gibi iç içe yollar da dahildir. Sondaki eğik çizgi isteğe bağlıdır. Kök dağıtım için boş bırakın (varsayılan) veya `/` yapın.
 
@@ -601,7 +601,7 @@ location /snapotter/ {
 }
 ```
 
-Bu örnek ön eki korur. İletmeden önce `/snapotter` ön ekini kaldıran proxy'ler de desteklenir. Dahili sağlık denetimleri `/api/v1/health` adresini kullanmaya devam edebilir. OIDC veya SAML için ayrıca `EXTERNAL_URL=https://example.com/snapotter` değerini ayarlayın ve kimlik sağlayıcının geri çağırma URL'lerini sırasıyla `/snapotter/api/auth/oidc/callback` veya `/snapotter/api/auth/saml/callback` içerecek şekilde güncelleyin.
+Bu örnek ön eki korur. İletmeden önce `/snapotter` ön ekini kaldıran proxy'ler de desteklenir. Dahili sağlık denetimleri `/api/v1/health` adresini kullanmaya devam edebilir. OIDC veya SAML için ayrıca [`EXTERNAL_URL=https://example.com/snapotter`](/tr/guide/oidc#env-external-url) değerini ayarlayın ve kimlik sağlayıcının geri çağırma URL'lerini sırasıyla `/snapotter/api/auth/oidc/callback` veya `/snapotter/api/auth/saml/callback` içerecek şekilde güncelleyin.
 
 API betikleri değişmeden çalışmaya devam eder: API yanıtlarındaki URL'ler, örneğin bir aracın `downloadUrl` değeri, `BASE_PATH` ne olursa olsun `/api/` ile başlar. Bunları alan adı köküne göre çözümlemek yerine örneğinizin temel URL'sine ekleyin (`https://example.com/snapotter` + `/api/v1/download/...`).
 

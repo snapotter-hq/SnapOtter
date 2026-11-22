@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: f3a870d1a4ce
+i18n_output_hash: 04aec804fd9b
 i18n_hash_version: 2
 ---
 # Thiết lập cho tài nguyên thấp {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Lưu ý cho các máy cấp Pi:
 
 - **Ưu tiên SSD USB hơn thẻ SD** cho volume dữ liệu và Postgres. Không gian làm việc của job thực hiện nhiều IO đĩa, và thẻ SD vừa chậm vừa nhanh hỏng.
-- **Container all-in-one cũng chạy được ở đây** (Postgres và Redis nhúng khi `DATABASE_URL`/`REDIS_URL` không được đặt), và trên máy chủ hạn chế bộ nhớ, bạn nên hạ giới hạn Redis nhúng của nó bằng `REDIS_MAXMEMORY` (xem [Cấu hình](/vi/guide/configuration)). Compose cho phép kiểm soát chi tiết hơn theo từng dịch vụ, đó là lý do hướng dẫn này dùng nó.
+- **Container all-in-one cũng chạy được ở đây** (Postgres và Redis nhúng khi [`DATABASE_URL`](/vi/guide/configuration#env-database-url)/[`REDIS_URL`](/vi/guide/configuration#env-redis-url) không được đặt), và trên máy chủ hạn chế bộ nhớ, bạn nên hạ giới hạn Redis nhúng của nó bằng [`REDIS_MAXMEMORY`](/vi/guide/configuration#env-redis-maxmemory) (xem [Cấu hình](/vi/guide/configuration)). Compose cho phép kiểm soát chi tiết hơn theo từng dịch vụ, đó là lý do hướng dẫn này dùng nó.
 - **Thêm swap trên thiết bị 2 GB.** Swap giúp những đợt tăng đột biến thỉnh thoảng (một PDF lớn, một lô bạn quên đặt giới hạn) không kết thúc bằng việc bị kill do hết bộ nhớ. zram là lựa chọn thân thiện với thẻ SD.
 - Image arm64 chỉ chạy CPU; không có CUDA trên các bo mạch ARM.
 
@@ -86,15 +86,15 @@ Mọi giới hạn đều là biến môi trường, được mô tả đầy đ
 
 | Biến | Gợi ý cho máy nhỏ | Bảo vệ điều gì |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Số job chạy song song. Tự phát hiện dùng số nhân CPU trừ một, phù hợp với máy lớn nhưng quá hăng với máy 2 nhân khi thiếu bộ nhớ. |
-| `MAX_WORKER_THREADS` | `2` | Thread pool xử lý ảnh. |
-| `MAX_BATCH_SIZE` | `5` | Xử lý lô là nơi máy 1-2 GB hết bộ nhớ đầu tiên. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Ngăn một tệp khổng lồ chiếm toàn bộ không gian làm việc. |
-| `MAX_MEGAPIXELS` | `50` | Giải mã ảnh trên 100 MP tốn RAM bất kể dung lượng tệp. |
+| [`CONCURRENT_JOBS`](/vi/guide/configuration#env-concurrent-jobs) | `1` | Số job chạy song song. Tự phát hiện dùng số nhân CPU trừ một, phù hợp với máy lớn nhưng quá hăng với máy 2 nhân khi thiếu bộ nhớ. |
+| [`MAX_WORKER_THREADS`](/vi/guide/configuration#env-max-worker-threads) | `2` | Thread pool xử lý ảnh. |
+| [`MAX_BATCH_SIZE`](/vi/guide/configuration#env-max-batch-size) | `5` | Xử lý lô là nơi máy 1-2 GB hết bộ nhớ đầu tiên. |
+| [`MAX_UPLOAD_SIZE_MB`](/vi/guide/configuration#env-max-upload-size-mb) | `100` | Ngăn một tệp khổng lồ chiếm toàn bộ không gian làm việc. |
+| [`MAX_MEGAPIXELS`](/vi/guide/configuration#env-max-megapixels) | `50` | Giải mã ảnh trên 100 MP tốn RAM bất kể dung lượng tệp. |
 | `MAX_VIDEO_DURATION_S` | `300` | Các lần transcode dài chiếm dụng CPU nhỏ từ vài phút đến vài giờ. |
-| `PROCESSING_TIMEOUT_S` | `600` | Trần cứng để một job chạy mất kiểm soát cuối cùng cũng giải phóng máy. |
+| [`PROCESSING_TIMEOUT_S`](/vi/guide/configuration#env-processing-timeout-s) | `600` | Trần cứng để một job chạy mất kiểm soát cuối cùng cũng giải phóng máy. |
 
-Các giới hạn này áp dụng cho những gì máy chủ chấp nhận, nên hãy đặt chúng khớp với những gì bạn thực sự dùng thay vì đặt nhỏ nhất có thể. Nếu bạn không bao giờ dùng video, giới hạn `MAX_VIDEO_DURATION_S` không gây tốn kém gì; nếu bạn quét tài liệu hằng ngày, đừng giới hạn `MAX_PDF_PAGES`.
+Các giới hạn này áp dụng cho những gì máy chủ chấp nhận, nên hãy đặt chúng khớp với những gì bạn thực sự dùng thay vì đặt nhỏ nhất có thể. Nếu bạn không bao giờ dùng video, giới hạn `MAX_VIDEO_DURATION_S` không gây tốn kém gì; nếu bạn quét tài liệu hằng ngày, đừng giới hạn [`MAX_PDF_PAGES`](/vi/guide/configuration#env-max-pdf-pages).
 
 ## Nên bỏ qua gì {#what-to-skip}
 

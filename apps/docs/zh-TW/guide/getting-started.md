@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 現在開啟一個工具。您可以從側邊欄選一個，也可以直接前往[調整大小](http://localhost:1349/image/resize)，放入一張圖片，再下載結果。
 
-安裝就是這樣。這個單一容器包含執行所需的一切：未設定 `DATABASE_URL` 時，它會在 loopback 介面上啟動自己的 PostgreSQL 與 Redis（內嵌模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用伺服器自行架設最快的方式。內嵌模式以 root 身分執行（預設），一旦設定 `DATABASE_URL` 就會自動關閉。正式環境請使用 [Docker Compose 堆疊](#docker-compose)，它會把 PostgreSQL 與 Redis 放在各自的容器中。
+安裝就是這樣。這個單一容器包含執行所需的一切：未設定 [`DATABASE_URL`](/zh-TW/guide/configuration#env-database-url) 時，它會在 loopback 介面上啟動自己的 PostgreSQL 與 Redis（內嵌模式），並將所有資料保存在 `SnapOtter-data` 磁碟區中。這是試用 SnapOtter 或在家用伺服器自行架設最快的方式。內嵌模式以 root 身分執行（預設），一旦設定 `DATABASE_URL` 就會自動關閉。正式環境請使用 [Docker Compose 堆疊](#docker-compose)，它會把 PostgreSQL 與 Redis 放在各自的容器中。
 
 工作結果不會儲存在資料磁碟區中，因此容器被替換時（例如升級映像檔）它們會消失，對應的下載連結也會失效。部署指南中的[保留工作輸出](/zh-TW/guide/deployment#keeping-job-output)說明了如何保留它們。
 
@@ -156,13 +156,13 @@ pnpm dev
 3. 對單一檔案執行，或一次對整批檔案執行。
 4. 儲存管線以便日後重複使用。
 
-管線預設允許 20 個步驟。設定 `MAX_PIPELINE_STEPS=0` 可取消此上限。
+管線預設允許 20 個步驟。設定 [`MAX_PIPELINE_STEPS=0`](/zh-TW/guide/configuration#env-max-pipeline-steps) 可取消此上限。
 
 ### 檔案庫 {#file-library}
 
 您處理過的每個檔案都可以儲存到 **檔案** 庫。SnapOtter 會追蹤完整的版本歷程，讓您能追溯從原始上傳到最終輸出的每個處理步驟。
 
-儲存是明確的動作：您儲存到檔案庫的結果會保留到您刪除為止，而處理後未儲存的結果會在 72 小時後自動清除（可透過 `FILE_MAX_AGE_HOURS` 設定）。
+儲存是明確的動作：您儲存到檔案庫的結果會保留到您刪除為止，而處理後未儲存的結果會在 72 小時後自動清除（可透過 [`FILE_MAX_AGE_HOURS`](/zh-TW/guide/configuration#env-file-max-age-hours) 設定）。
 
 ### REST API 與 API 金鑰 {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 
 在 **設定 → 團隊** 下建立團隊，以將使用者分組。
 
-設定 `AUTH_ENABLED=true`（或設定 `false`，供單人或自用且無須登入的情境）。
+設定 [`AUTH_ENABLED=true`](/zh-TW/guide/configuration#env-auth-enabled)（或設定 `false`，供單人或自用且無須登入的情境）。
 
 ## 在手機上使用 {#use-it-from-your-phone}
 

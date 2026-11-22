@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: fc9d92806d5c
+i18n_output_hash: bd3201eed6ed
 i18n_hash_version: 2
 ---
 # 低资源配置 {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 针对 Pi 级别机器的说明：
 
 - **数据卷和 Postgres 优先使用 USB SSD，而不是 SD 卡。** 任务工作区会进行大量真实的磁盘 IO，而 SD 卡既慢又容易磨损。
-- **一体化的单容器在这里同样可用**（未设置 `DATABASE_URL`/`REDIS_URL` 时使用内嵌的 Postgres 和 Redis），在内存受限的主机上，你应当用 `REDIS_MAXMEMORY` 降低其内嵌 Redis 的上限（参阅[配置](/zh-CN/guide/configuration)）。Compose 让你可以对每个服务进行更精细的控制，这就是本指南使用它的原因。
+- **一体化的单容器在这里同样可用**（未设置 [`DATABASE_URL`](/zh-CN/guide/configuration#env-database-url)/[`REDIS_URL`](/zh-CN/guide/configuration#env-redis-url) 时使用内嵌的 Postgres 和 Redis），在内存受限的主机上，你应当用 [`REDIS_MAXMEMORY`](/zh-CN/guide/configuration#env-redis-maxmemory) 降低其内嵌 Redis 的上限（参阅[配置](/zh-CN/guide/configuration)）。Compose 让你可以对每个服务进行更精细的控制，这就是本指南使用它的原因。
 - **在 2 GB 设备上添加交换空间。** 它可以避免偶发的峰值（大型 PDF、忘记设置上限的批处理）以内存不足被终止告终。zram 是对 SD 卡友好的选项。
 - arm64 镜像仅支持 CPU；ARM 开发板上没有 CUDA。
 
@@ -86,15 +86,15 @@ services:
 
 | 变量 | 小型机器建议值 | 保护对象 |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | 并行运行多少个任务。自动检测使用 CPU 核心数减一，这对大型机器没问题，但对内存吃紧的 2 核机器来说过于激进。 |
-| `MAX_WORKER_THREADS` | `2` | 图像处理线程池。 |
-| `MAX_BATCH_SIZE` | `5` | 批处理是 1-2 GB 机器最先耗尽内存的地方。 |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 避免单个超大文件占满整个工作区。 |
-| `MAX_MEGAPIXELS` | `50` | 无论文件大小如何，解码 100 MP 以上的图像都会消耗内存。 |
+| [`CONCURRENT_JOBS`](/zh-CN/guide/configuration#env-concurrent-jobs) | `1` | 并行运行多少个任务。自动检测使用 CPU 核心数减一，这对大型机器没问题，但对内存吃紧的 2 核机器来说过于激进。 |
+| [`MAX_WORKER_THREADS`](/zh-CN/guide/configuration#env-max-worker-threads) | `2` | 图像处理线程池。 |
+| [`MAX_BATCH_SIZE`](/zh-CN/guide/configuration#env-max-batch-size) | `5` | 批处理是 1-2 GB 机器最先耗尽内存的地方。 |
+| [`MAX_UPLOAD_SIZE_MB`](/zh-CN/guide/configuration#env-max-upload-size-mb) | `100` | 避免单个超大文件占满整个工作区。 |
+| [`MAX_MEGAPIXELS`](/zh-CN/guide/configuration#env-max-megapixels) | `50` | 无论文件大小如何，解码 100 MP 以上的图像都会消耗内存。 |
 | `MAX_VIDEO_DURATION_S` | `300` | 长时间转码会让小型 CPU 被独占数分钟到数小时。 |
-| `PROCESSING_TIMEOUT_S` | `600` | 硬性上限，使失控的任务最终能释放机器。 |
+| [`PROCESSING_TIMEOUT_S`](/zh-CN/guide/configuration#env-processing-timeout-s) | `600` | 硬性上限，使失控的任务最终能释放机器。 |
 
-这些上限作用于服务器接受的内容，因此请根据你实际的使用情况来设置，而不是越小越好。如果你从不处理视频，`MAX_VIDEO_DURATION_S` 的上限不会有任何代价；如果你每天扫描文档，则不要限制 `MAX_PDF_PAGES`。
+这些上限作用于服务器接受的内容，因此请根据你实际的使用情况来设置，而不是越小越好。如果你从不处理视频，`MAX_VIDEO_DURATION_S` 的上限不会有任何代价；如果你每天扫描文档，则不要限制 [`MAX_PDF_PAGES`](/zh-CN/guide/configuration#env-max-pdf-pages)。
 
 ## 应当跳过的内容 {#what-to-skip}
 

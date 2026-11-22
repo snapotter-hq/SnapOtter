@@ -2,7 +2,7 @@
 description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 與 Cloudflare 的反向代理設定。"
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 9e8068c6e5b7
+i18n_output_hash: 31ee54283f3a
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**綁定掛載**：由您自行管理權限。請將 `PUID`/`PGID` 設定為與您的主機使用者相符：
+**綁定掛載**：由您自行管理權限。請將 [`PUID`](/zh-TW/guide/configuration#env-puid)/[`PGID`](/zh-TW/guide/configuration#env-pgid) 設定為與您的主機使用者相符：
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | 啟用 / 停用登入要求 |
-| `DEFAULT_USERNAME` | `admin` | 初始管理員使用者名稱 |
-| `DEFAULT_PASSWORD` | `admin` | 初始管理員密碼（首次登入時強制變更） |
-| `MAX_UPLOAD_SIZE_MB` | `0`（無限制） | 每個檔案的上傳限制（MB）。映像檔預設為 `0`；從原始碼建置則從 100 開始 |
-| `MAX_BATCH_SIZE` | `0`（無限制） | 每個批次請求的檔案數上限。映像檔預設為 `0`；從原始碼建置則從 100 開始 |
-| `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 即停用） |
-| `MAX_USERS` | `0`（無限制） | 使用者帳號數上限 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 允許哪些對等端透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私人網路 |
+| [`AUTH_ENABLED`](/zh-TW/guide/configuration#env-auth-enabled) | `true` | 啟用 / 停用登入要求 |
+| [`DEFAULT_USERNAME`](/zh-TW/guide/configuration#env-default-username) | `admin` | 初始管理員使用者名稱 |
+| [`DEFAULT_PASSWORD`](/zh-TW/guide/configuration#env-default-password) | `admin` | 初始管理員密碼（首次登入時強制變更） |
+| [`MAX_UPLOAD_SIZE_MB`](/zh-TW/guide/configuration#env-max-upload-size-mb) | `0`（無限制） | 每個檔案的上傳限制（MB）。映像檔預設為 `0`；從原始碼建置則從 100 開始 |
+| [`MAX_BATCH_SIZE`](/zh-TW/guide/configuration#env-max-batch-size) | `0`（無限制） | 每個批次請求的檔案數上限。映像檔預設為 `0`；從原始碼建置則從 100 開始 |
+| [`RATE_LIMIT_PER_MIN`](/zh-TW/guide/configuration#env-rate-limit-per-min) | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 即停用） |
+| [`MAX_USERS`](/zh-TW/guide/configuration#env-max-users) | `0`（無限制） | 使用者帳號數上限 |
+| [`TRUST_PROXY`](/zh-TW/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | 允許哪些對等端透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私人網路 |
 | `PUID` | `999` | 以此 UID 執行（用於綁定掛載權限） |
 | `PGID` | `999` | 以此 GID 執行（用於綁定掛載權限） |
-| `LOG_LEVEL` | `info` | 日誌詳細程度：fatal、error、warn、info、debug、trace |
-| `CONCURRENT_JOBS` | `0`（自動） | AI 並行處理工作數上限 |
-| `SESSION_DURATION_HOURS` | `168` | 登入工作階段的有效期限（7 天） |
-| `CORS_ORIGIN` | （空白） | 以逗號分隔的允許來源，留空則僅限同源 |
+| [`LOG_LEVEL`](/zh-TW/guide/configuration#env-log-level) | `info` | 日誌詳細程度：fatal、error、warn、info、debug、trace |
+| [`CONCURRENT_JOBS`](/zh-TW/guide/configuration#env-concurrent-jobs) | `0`（自動） | AI 並行處理工作數上限 |
+| [`SESSION_DURATION_HOURS`](/zh-TW/guide/configuration#env-session-duration-hours) | `168` | 登入工作階段的有效期限（7 天） |
+| [`CORS_ORIGIN`](/zh-TW/guide/configuration#env-cors-origin) | （空白） | 以逗號分隔的允許來源，留空則僅限同源 |
 
 ### 對外代理與私有 CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### 部署於子路徑下 {#subpath}
 
-若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器環境中設定 `BASE_PATH=/snapotter` 並重新啟動。正式的 CPU 與 GPU Compose 檔案也接受來自您 shell 或 Compose `.env` 檔案的 `BASE_PATH`。同一個映像檔可在任何路徑運作，無需重新建置前端。
+若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器環境中設定 [`BASE_PATH=/snapotter`](/zh-TW/guide/configuration#env-base-path) 並重新啟動。正式的 CPU 與 GPU Compose 檔案也接受來自您 shell 或 Compose `.env` 檔案的 `BASE_PATH`。同一個映像檔可在任何路徑運作，無需重新建置前端。
 
 `BASE_PATH` 接受以斜線分隔、由字母、數字、`_` 或 `-` 組成的區段，包括 `/apps/snapotter` 這類巢狀路徑。結尾斜線為選用。若為根路徑部署，請留空（預設），或設為 `/`。
 
@@ -601,7 +601,7 @@ location /snapotter/ {
 }
 ```
 
-此範例會保留前綴。在轉送之前先移除 `/snapotter` 的代理也同樣受支援。內部健康檢查可繼續使用 `/api/v1/health`。若使用 OIDC 或 SAML，請同時設定 `EXTERNAL_URL=https://example.com/snapotter`，並更新身分提供者的回呼 URL，分別加入 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
+此範例會保留前綴。在轉送之前先移除 `/snapotter` 的代理也同樣受支援。內部健康檢查可繼續使用 `/api/v1/health`。若使用 OIDC 或 SAML，請同時設定 [`EXTERNAL_URL=https://example.com/snapotter`](/zh-TW/guide/oidc#env-external-url)，並更新身分提供者的回呼 URL，分別加入 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
 
 API 指令碼無需修改即可繼續運作：API 回應中的 URL，例如工具的 `downloadUrl`，無論 `BASE_PATH` 為何，都以 `/api/` 開頭。請將它們附加到您執行個體的基底 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不要依網域根路徑來解析。
 

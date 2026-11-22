@@ -2,7 +2,7 @@
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 1bf173d153ad
+i18n_output_hash: 8f39e49d9c11
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - Bạn tự quản lý quyền. Đặt `PUID`/`PGID` khớp với người dùng trên máy chủ của bạn:
+**Bind mount** - Bạn tự quản lý quyền. Đặt [`PUID`](/vi/guide/configuration#env-puid)/[`PGID`](/vi/guide/configuration#env-pgid) khớp với người dùng trên máy chủ của bạn:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ Lỗi khi khởi động nêu chính xác UID cần dùng, nên cách nhanh nh�
 
 | Biến | Mặc định | Mô tả |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Bật/tắt yêu cầu đăng nhập |
-| `DEFAULT_USERNAME` | `admin` | Tên người dùng quản trị viên ban đầu |
-| `DEFAULT_PASSWORD` | `admin` | Mật khẩu quản trị viên ban đầu (bắt buộc đổi ở lần đăng nhập đầu tiên) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (không giới hạn) | Giới hạn tải lên theo từng tệp, tính bằng MB. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
-| `MAX_BATCH_SIZE` | `0` (không giới hạn) | Số tệp tối đa cho mỗi yêu cầu theo lô. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Số yêu cầu API mỗi phút cho mỗi IP (đặt 0 để tắt) |
-| `MAX_USERS` | `0` (không giới hạn) | Số tài khoản người dùng tối đa |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Mặc định chỉ các mạng riêng |
+| [`AUTH_ENABLED`](/vi/guide/configuration#env-auth-enabled) | `true` | Bật/tắt yêu cầu đăng nhập |
+| [`DEFAULT_USERNAME`](/vi/guide/configuration#env-default-username) | `admin` | Tên người dùng quản trị viên ban đầu |
+| [`DEFAULT_PASSWORD`](/vi/guide/configuration#env-default-password) | `admin` | Mật khẩu quản trị viên ban đầu (bắt buộc đổi ở lần đăng nhập đầu tiên) |
+| [`MAX_UPLOAD_SIZE_MB`](/vi/guide/configuration#env-max-upload-size-mb) | `0` (không giới hạn) | Giới hạn tải lên theo từng tệp, tính bằng MB. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
+| [`MAX_BATCH_SIZE`](/vi/guide/configuration#env-max-batch-size) | `0` (không giới hạn) | Số tệp tối đa cho mỗi yêu cầu theo lô. Image mặc định là `0`; bản build từ mã nguồn bắt đầu ở 100 |
+| [`RATE_LIMIT_PER_MIN`](/vi/guide/configuration#env-rate-limit-per-min) | `1000` | Số yêu cầu API mỗi phút cho mỗi IP (đặt 0 để tắt) |
+| [`MAX_USERS`](/vi/guide/configuration#env-max-users) | `0` (không giới hạn) | Số tài khoản người dùng tối đa |
+| [`TRUST_PROXY`](/vi/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Mặc định chỉ các mạng riêng |
 | `PUID` | `999` | Chạy với UID này (cho quyền bind mount) |
 | `PGID` | `999` | Chạy với GID này (cho quyền bind mount) |
-| `LOG_LEVEL` | `info` | Mức độ chi tiết của nhật ký: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (tự động) | Số tác vụ xử lý AI song song tối đa |
-| `SESSION_DURATION_HOURS` | `168` | Thời hạn phiên đăng nhập (7 ngày) |
-| `CORS_ORIGIN` | (trống) | Danh sách origin được phép, phân tách bằng dấu phẩy, hoặc để trống để chỉ cho cùng origin |
+| [`LOG_LEVEL`](/vi/guide/configuration#env-log-level) | `info` | Mức độ chi tiết của nhật ký: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/vi/guide/configuration#env-concurrent-jobs) | `0` (tự động) | Số tác vụ xử lý AI song song tối đa |
+| [`SESSION_DURATION_HOURS`](/vi/guide/configuration#env-session-duration-hours) | `168` | Thời hạn phiên đăng nhập (7 ngày) |
+| [`CORS_ORIGIN`](/vi/guide/configuration#env-cors-origin) | (trống) | Danh sách origin được phép, phân tách bằng dấu phẩy, hoặc để trống để chỉ cho cùng origin |
 
 ### Proxy đi ra và CA riêng {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Triển khai dưới subpath {#subpath}
 
-Để phục vụ tại `https://example.com/snapotter`, hãy đặt `BASE_PATH=/snapotter` trong môi trường
+Để phục vụ tại `https://example.com/snapotter`, hãy đặt [`BASE_PATH=/snapotter`](/vi/guide/configuration#env-base-path) trong môi trường
 container SnapOtter và khởi động lại nó. Các tệp Compose CPU và GPU chính thức
 cũng chấp nhận `BASE_PATH` từ shell của bạn hoặc tệp `.env` của Compose. Cùng một
 image hoạt động ở mọi đường dẫn; không cần build lại frontend.
@@ -609,7 +609,7 @@ location /snapotter/ {
 Ví dụ này giữ nguyên tiền tố. Các proxy loại bỏ `/snapotter` trước khi
 chuyển tiếp cũng được hỗ trợ. Các health check nội bộ có thể tiếp tục dùng
 `/api/v1/health`. Với OIDC hoặc SAML, hãy đặt thêm
-`EXTERNAL_URL=https://example.com/snapotter` và cập nhật các URL callback của
+[`EXTERNAL_URL=https://example.com/snapotter`](/vi/guide/oidc#env-external-url) và cập nhật các URL callback của
 nhà cung cấp danh tính để bao gồm `/snapotter/api/auth/oidc/callback` hoặc
 `/snapotter/api/auth/saml/callback` tương ứng.
 

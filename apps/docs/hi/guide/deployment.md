@@ -2,7 +2,7 @@
 description: "SnapOtter को Docker के साथ प्रोडक्शन में डिप्लॉय करें। हार्डवेयर आवश्यकताएँ, GPU सेटअप, और Nginx, Traefik तथा Cloudflare के लिए रिवर्स प्रॉक्सी कॉन्फ़िग।"
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 47e1f262cc33
+i18n_output_hash: 5baf283b4113
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**बाइंड माउंट** : अनुमतियाँ आप प्रबंधित करते हैं। `PUID`/`PGID` को अपने होस्ट उपयोगकर्ता से मिलाने के लिए सेट करें:
+**बाइंड माउंट** : अनुमतियाँ आप प्रबंधित करते हैं। [`PUID`](/hi/guide/configuration#env-puid)/[`PGID`](/hi/guide/configuration#env-pgid) को अपने होस्ट उपयोगकर्ता से मिलाने के लिए सेट करें:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | वेरिएबल | डिफ़ॉल्ट | विवरण |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | लॉगिन आवश्यकता सक्षम/अक्षम करें |
-| `DEFAULT_USERNAME` | `admin` | प्रारंभिक एडमिन उपयोगकर्ता नाम |
-| `DEFAULT_PASSWORD` | `admin` | प्रारंभिक एडमिन पासवर्ड (पहले लॉगिन पर बदलना अनिवार्य) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (असीमित) | MB में प्रति-फ़ाइल अपलोड सीमा। इमेज `0` के साथ आती है; सोर्स बिल्ड 100 से शुरू होता है |
-| `MAX_BATCH_SIZE` | `0` (असीमित) | प्रति बैच अनुरोध अधिकतम फ़ाइलें। इमेज `0` के साथ आती है; सोर्स बिल्ड 100 से शुरू होता है |
-| `RATE_LIMIT_PER_MIN` | `1000` | प्रति IP प्रति मिनट API अनुरोध (अक्षम करने के लिए 0 सेट करें) |
-| `MAX_USERS` | `0` (असीमित) | अधिकतम उपयोगकर्ता खाते |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | कौन से पीयर `X-Forwarded-For` के ज़रिए क्लाइंट IP सेट कर सकते हैं। डिफ़ॉल्ट रूप से केवल निजी नेटवर्क |
+| [`AUTH_ENABLED`](/hi/guide/configuration#env-auth-enabled) | `true` | लॉगिन आवश्यकता सक्षम/अक्षम करें |
+| [`DEFAULT_USERNAME`](/hi/guide/configuration#env-default-username) | `admin` | प्रारंभिक एडमिन उपयोगकर्ता नाम |
+| [`DEFAULT_PASSWORD`](/hi/guide/configuration#env-default-password) | `admin` | प्रारंभिक एडमिन पासवर्ड (पहले लॉगिन पर बदलना अनिवार्य) |
+| [`MAX_UPLOAD_SIZE_MB`](/hi/guide/configuration#env-max-upload-size-mb) | `0` (असीमित) | MB में प्रति-फ़ाइल अपलोड सीमा। इमेज `0` के साथ आती है; सोर्स बिल्ड 100 से शुरू होता है |
+| [`MAX_BATCH_SIZE`](/hi/guide/configuration#env-max-batch-size) | `0` (असीमित) | प्रति बैच अनुरोध अधिकतम फ़ाइलें। इमेज `0` के साथ आती है; सोर्स बिल्ड 100 से शुरू होता है |
+| [`RATE_LIMIT_PER_MIN`](/hi/guide/configuration#env-rate-limit-per-min) | `1000` | प्रति IP प्रति मिनट API अनुरोध (अक्षम करने के लिए 0 सेट करें) |
+| [`MAX_USERS`](/hi/guide/configuration#env-max-users) | `0` (असीमित) | अधिकतम उपयोगकर्ता खाते |
+| [`TRUST_PROXY`](/hi/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | कौन से पीयर `X-Forwarded-For` के ज़रिए क्लाइंट IP सेट कर सकते हैं। डिफ़ॉल्ट रूप से केवल निजी नेटवर्क |
 | `PUID` | `999` | इस UID के रूप में चलाएँ (बाइंड माउंट अनुमतियों के लिए) |
 | `PGID` | `999` | इस GID के रूप में चलाएँ (बाइंड माउंट अनुमतियों के लिए) |
-| `LOG_LEVEL` | `info` | लॉग विस्तार: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (अपने आप) | अधिकतम समानांतर AI प्रोसेसिंग जॉब |
-| `SESSION_DURATION_HOURS` | `168` | लॉगिन सेशन की अवधि (7 दिन) |
-| `CORS_ORIGIN` | (खाली) | अल्पविराम से अलग की गई अनुमत ऑरिजिन, या समान-ऑरिजिन के लिए खाली |
+| [`LOG_LEVEL`](/hi/guide/configuration#env-log-level) | `info` | लॉग विस्तार: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/hi/guide/configuration#env-concurrent-jobs) | `0` (अपने आप) | अधिकतम समानांतर AI प्रोसेसिंग जॉब |
+| [`SESSION_DURATION_HOURS`](/hi/guide/configuration#env-session-duration-hours) | `168` | लॉगिन सेशन की अवधि (7 दिन) |
+| [`CORS_ORIGIN`](/hi/guide/configuration#env-cors-origin) | (खाली) | अल्पविराम से अलग की गई अनुमत ऑरिजिन, या समान-ऑरिजिन के लिए खाली |
 
 ### आउटबाउंड प्रॉक्सी और निजी CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### सबपाथ के अंतर्गत डिप्लॉय करना {#subpath}
 
-`https://example.com/snapotter` पर सर्व करने के लिए, SnapOtter कंटेनर एनवायरनमेंट में `BASE_PATH=/snapotter` सेट करें और उसे रीस्टार्ट करें। आधिकारिक CPU और GPU Compose फ़ाइलें भी आपके शेल या Compose `.env` फ़ाइल से `BASE_PATH` स्वीकार करती हैं। वही इमेज किसी भी पाथ पर काम करती है; फ्रंटएंड को दोबारा बिल्ड करने की ज़रूरत नहीं है।
+`https://example.com/snapotter` पर सर्व करने के लिए, SnapOtter कंटेनर एनवायरनमेंट में [`BASE_PATH=/snapotter`](/hi/guide/configuration#env-base-path) सेट करें और उसे रीस्टार्ट करें। आधिकारिक CPU और GPU Compose फ़ाइलें भी आपके शेल या Compose `.env` फ़ाइल से `BASE_PATH` स्वीकार करती हैं। वही इमेज किसी भी पाथ पर काम करती है; फ्रंटएंड को दोबारा बिल्ड करने की ज़रूरत नहीं है।
 
 `BASE_PATH` अक्षरों, अंकों, `_` या `-` वाले स्लैश-पृथक सेगमेंट स्वीकार करता है, जिनमें `/apps/snapotter` जैसे नेस्टेड पाथ भी शामिल हैं। अंत में स्लैश वैकल्पिक है। रूट डिप्लॉयमेंट के लिए इसे खाली छोड़ें (डिफ़ॉल्ट), या `/` सेट करें।
 
@@ -601,7 +601,7 @@ location /snapotter/ {
 }
 ```
 
-यह उदाहरण प्रीफ़िक्स को बनाए रखता है। जो प्रॉक्सी फ़ॉरवर्ड करने से पहले `/snapotter` हटा देते हैं वे भी सपोर्टेड हैं। आंतरिक हेल्थ चेक `/api/v1/health` का उपयोग जारी रख सकते हैं। OIDC या SAML के लिए, `EXTERNAL_URL=https://example.com/snapotter` भी सेट करें और आइडेंटिटी प्रोवाइडर के कॉलबैक URL को अपडेट करें ताकि उनमें क्रमशः `/snapotter/api/auth/oidc/callback` या `/snapotter/api/auth/saml/callback` शामिल हो।
+यह उदाहरण प्रीफ़िक्स को बनाए रखता है। जो प्रॉक्सी फ़ॉरवर्ड करने से पहले `/snapotter` हटा देते हैं वे भी सपोर्टेड हैं। आंतरिक हेल्थ चेक `/api/v1/health` का उपयोग जारी रख सकते हैं। OIDC या SAML के लिए, [`EXTERNAL_URL=https://example.com/snapotter`](/hi/guide/oidc#env-external-url) भी सेट करें और आइडेंटिटी प्रोवाइडर के कॉलबैक URL को अपडेट करें ताकि उनमें क्रमशः `/snapotter/api/auth/oidc/callback` या `/snapotter/api/auth/saml/callback` शामिल हो।
 
 API स्क्रिप्ट बिना बदलाव के काम करती रहती हैं: API प्रतिक्रियाओं में URL, जैसे किसी टूल का `downloadUrl`, `BASE_PATH` चाहे जो हो, `/api/` से शुरू होते हैं। उन्हें डोमेन रूट के विरुद्ध हल करने के बजाय अपने इंस्टेंस के बेस URL (`https://example.com/snapotter` + `/api/v1/download/...`) में जोड़ें।
 

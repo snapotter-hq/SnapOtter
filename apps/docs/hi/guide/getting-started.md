@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 अब कोई tool खोलें। Sidebar से एक चुनें, या सीधे [Resize](http://localhost:1349/image/resize) पर जाएँ, कोई image डालें और नतीजा डाउनलोड करें।
 
-बस, इंस्टॉल पूरा। यह एक container वह सब कुछ चलाता है जिसकी उसे ज़रूरत है: `DATABASE_URL` सेट न होने पर यह loopback interface पर अपना PostgreSQL और Redis शुरू करता है (embedded मोड) और सारा डेटा `SnapOtter-data` volume में रखता है। SnapOtter को आज़माने या homelab पर self-host करने का यह सबसे तेज़ तरीका है। Embedded मोड root के रूप में चलता है (डिफ़ॉल्ट) और `DATABASE_URL` सेट करते ही अपने आप बंद हो जाता है। Production के लिए [Docker Compose stack](#docker-compose) का उपयोग करें, जिसमें PostgreSQL और Redis अपने अलग containers में रहते हैं।
+बस, इंस्टॉल पूरा। यह एक container वह सब कुछ चलाता है जिसकी उसे ज़रूरत है: [`DATABASE_URL`](/hi/guide/configuration#env-database-url) सेट न होने पर यह loopback interface पर अपना PostgreSQL और Redis शुरू करता है (embedded मोड) और सारा डेटा `SnapOtter-data` volume में रखता है। SnapOtter को आज़माने या homelab पर self-host करने का यह सबसे तेज़ तरीका है। Embedded मोड root के रूप में चलता है (डिफ़ॉल्ट) और `DATABASE_URL` सेट करते ही अपने आप बंद हो जाता है। Production के लिए [Docker Compose stack](#docker-compose) का उपयोग करें, जिसमें PostgreSQL और Redis अपने अलग containers में रहते हैं।
 
 जॉब के नतीजे डेटा वॉल्यूम में नहीं रखे जाते, इसलिए कंटेनर बदलने पर (जैसे इमेज अपग्रेड के समय) वे गायब हो जाते हैं और उनके डाउनलोड लिंक काम करना बंद कर देते हैं। डिप्लॉयमेंट गाइड का [जॉब आउटपुट सुरक्षित रखना](/hi/guide/deployment#keeping-job-output) सेक्शन बताता है कि उन्हें कैसे सुरक्षित रखें।
 
@@ -156,13 +156,13 @@ Tools को बहु-चरणीय workflows में जोड़ें �
 3. एक फ़ाइल पर चलाएँ, या पूरे batch पर एक साथ।
 4. बाद में दोबारा उपयोग के लिए pipeline सेव करें।
 
-Pipelines में डिफ़ॉल्ट रूप से 20 steps की अनुमति है। सीमा हटाने के लिए `MAX_PIPELINE_STEPS=0` सेट करें।
+Pipelines में डिफ़ॉल्ट रूप से 20 steps की अनुमति है। सीमा हटाने के लिए [`MAX_PIPELINE_STEPS=0`](/hi/guide/configuration#env-max-pipeline-steps) सेट करें।
 
 ### File Library {#file-library}
 
 आपकी प्रोसेस की गई हर फ़ाइल आपकी **Files** library में सेव की जा सकती है। SnapOtter पूरा version history रखता है, ताकि आप मूल upload से अंतिम output तक हर प्रोसेसिंग step का पता लगा सकें।
 
-सेव करना स्पष्ट रूप से करना होता है: library में सेव किए गए परिणाम आपके हटाने तक रखे जाते हैं, जबकि प्रोसेस करके बिना सेव छोड़े गए परिणाम 72 घंटे बाद अपने आप साफ़ हो जाते हैं (`FILE_MAX_AGE_HOURS` से कॉन्फ़िगर किया जा सकता है)।
+सेव करना स्पष्ट रूप से करना होता है: library में सेव किए गए परिणाम आपके हटाने तक रखे जाते हैं, जबकि प्रोसेस करके बिना सेव छोड़े गए परिणाम 72 घंटे बाद अपने आप साफ़ हो जाते हैं ([`FILE_MAX_AGE_HOURS`](/hi/guide/configuration#env-file-max-age-hours) से कॉन्फ़िगर किया जा सकता है)।
 
 ### REST API और API Keys {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Role-based access control के साथ कई उपयोगकर्ता
 
 उपयोगकर्ताओं को समूहित करने के लिए **Settings → Teams** में teams बनाएँ।
 
-`AUTH_ENABLED=true` सेट करें (या बिना login के अकेले/निजी उपयोग के लिए `false`)।
+[`AUTH_ENABLED=true`](/hi/guide/configuration#env-auth-enabled) सेट करें (या बिना login के अकेले/निजी उपयोग के लिए `false`)।
 
 ## इसे अपने फ़ोन से उपयोग करें {#use-it-from-your-phone}
 

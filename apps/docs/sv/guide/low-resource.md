@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: cd0ff395923b
+i18n_output_hash: 7f364acbff8e
 i18n_hash_version: 2
 ---
 # Miljöer med små resurser {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Anmärkningar för maskiner i Pi-klass:
 
 - **Föredra en USB-SSD framför ett SD-kort** för datavolymen och Postgres. Jobbens arbetsytor gör verklig disk-IO, och SD-kort är både långsamma och slits snabbt.
-- **Den allt-i-ett-container som körs ensam fungerar också här** (inbäddad Postgres och Redis när `DATABASE_URL`/`REDIS_URL` inte är angivna), och på en minnesbegränsad värd bör du sänka dess inbäddade Redis-tak med `REDIS_MAXMEMORY` (se [Konfiguration](/sv/guide/configuration)). Compose ger finare kontroll per tjänst, vilket är anledningen till att den här genomgången använder det.
+- **Den allt-i-ett-container som körs ensam fungerar också här** (inbäddad Postgres och Redis när [`DATABASE_URL`](/sv/guide/configuration#env-database-url)/[`REDIS_URL`](/sv/guide/configuration#env-redis-url) inte är angivna), och på en minnesbegränsad värd bör du sänka dess inbäddade Redis-tak med [`REDIS_MAXMEMORY`](/sv/guide/configuration#env-redis-maxmemory) (se [Konfiguration](/sv/guide/configuration)). Compose ger finare kontroll per tjänst, vilket är anledningen till att den här genomgången använder det.
 - **Lägg till swap på enheter med 2 GB.** Det gör att enstaka toppar (en stor PDF, en batch du glömde begränsa) inte slutar i att processen dödas på grund av slut på minne. zram är det SD-kortsvänliga alternativet.
 - Arm64-avbilden är endast CPU. Det finns inget CUDA på ARM-kort.
 
@@ -86,15 +86,15 @@ Alla tak är miljövariabler och dokumenteras fullständigt i [Konfiguration](/s
 
 | Variabel | Förslag för liten maskin | Vad den skyddar |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Hur många jobb som körs parallellt. Autodetekteringen använder antalet CPU-kärnor minus ett, vilket fungerar på stora maskiner men är för ivrigt på en maskin med 2 kärnor under minnestryck. |
-| `MAX_WORKER_THREADS` | `2` | Trådpoolen för bildbearbetning. |
-| `MAX_BATCH_SIZE` | `5` | Batcher är där maskiner med 1-2 GB först får slut på minne. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Hindrar en enda enorm fil från att uppta hela arbetsytan. |
-| `MAX_MEGAPIXELS` | `50` | Avkodning av en bild på över 100 MP kostar RAM oavsett filstorlek. |
+| [`CONCURRENT_JOBS`](/sv/guide/configuration#env-concurrent-jobs) | `1` | Hur många jobb som körs parallellt. Autodetekteringen använder antalet CPU-kärnor minus ett, vilket fungerar på stora maskiner men är för ivrigt på en maskin med 2 kärnor under minnestryck. |
+| [`MAX_WORKER_THREADS`](/sv/guide/configuration#env-max-worker-threads) | `2` | Trådpoolen för bildbearbetning. |
+| [`MAX_BATCH_SIZE`](/sv/guide/configuration#env-max-batch-size) | `5` | Batcher är där maskiner med 1-2 GB först får slut på minne. |
+| [`MAX_UPLOAD_SIZE_MB`](/sv/guide/configuration#env-max-upload-size-mb) | `100` | Hindrar en enda enorm fil från att uppta hela arbetsytan. |
+| [`MAX_MEGAPIXELS`](/sv/guide/configuration#env-max-megapixels) | `50` | Avkodning av en bild på över 100 MP kostar RAM oavsett filstorlek. |
 | `MAX_VIDEO_DURATION_S` | `300` | Långa omkodningar monopoliserar en liten CPU i minuter till timmar. |
-| `PROCESSING_TIMEOUT_S` | `600` | Hård övre gräns så att ett skenande jobb så småningom frigör maskinen. |
+| [`PROCESSING_TIMEOUT_S`](/sv/guide/configuration#env-processing-timeout-s) | `600` | Hård övre gräns så att ett skenande jobb så småningom frigör maskinen. |
 
-De här taken gäller vad servern accepterar, så ställ in dem efter vad du faktiskt använder i stället för så små som möjligt. Om du aldrig rör video kostar ett tak på `MAX_VIDEO_DURATION_S` ingenting. Om du skannar dokument dagligen, sätt inget tak på `MAX_PDF_PAGES`.
+De här taken gäller vad servern accepterar, så ställ in dem efter vad du faktiskt använder i stället för så små som möjligt. Om du aldrig rör video kostar ett tak på `MAX_VIDEO_DURATION_S` ingenting. Om du skannar dokument dagligen, sätt inget tak på [`MAX_PDF_PAGES`](/sv/guide/configuration#env-max-pdf-pages).
 
 ## Vad du bör hoppa över {#what-to-skip}
 

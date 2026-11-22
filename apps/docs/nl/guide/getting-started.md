@@ -24,7 +24,7 @@ Open daarna [http://localhost:1349](http://localhost:1349) en log in met `admin`
 
 Open nu een tool. Kies er een in de zijbalk, of ga direct naar [Formaat wijzigen](http://localhost:1349/image/resize), zet een afbeelding neer en download het resultaat.
 
-Dat is de hele installatie. Deze ene container draait alles wat nodig is: zonder ingestelde `DATABASE_URL` start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded modus) en bewaart hij alle data in het volume `SnapOtter-data`. Dit is de snelste manier om SnapOtter uit te proberen of zelf te hosten op een homelab. Embedded modus draait als root (de standaard) en schakelt automatisch uit zodra u `DATABASE_URL` instelt. Gebruik voor productie de [Docker Compose-stack](#docker-compose), waarin PostgreSQL en Redis in eigen containers draaien.
+Dat is de hele installatie. Deze ene container draait alles wat nodig is: zonder ingestelde [`DATABASE_URL`](/nl/guide/configuration#env-database-url) start hij zijn eigen PostgreSQL en Redis op de loopback-interface (embedded modus) en bewaart hij alle data in het volume `SnapOtter-data`. Dit is de snelste manier om SnapOtter uit te proberen of zelf te hosten op een homelab. Embedded modus draait als root (de standaard) en schakelt automatisch uit zodra u `DATABASE_URL` instelt. Gebruik voor productie de [Docker Compose-stack](#docker-compose), waarin PostgreSQL en Redis in eigen containers draaien.
 
 Taakresultaten worden niet in het datavolume bewaard, dus ze verdwijnen wanneer de container wordt vervangen (bijvoorbeeld bij een image-upgrade) en hun downloadlinks werken niet meer. [Taakuitvoer bewaren](/nl/guide/deployment#keeping-job-output) in de implementatiegids laat zien hoe u ze bewaart.
 
@@ -156,13 +156,13 @@ Koppel tools aan elkaar tot workflows met meerdere stappen en pas ze toe op éé
 3. Voer uit op één bestand, of op een hele batch tegelijk.
 4. Sla de pipeline op voor later hergebruik.
 
-Pipelines staan standaard 20 stappen toe. Stel `MAX_PIPELINE_STEPS=0` in om de limiet onbeperkt te maken.
+Pipelines staan standaard 20 stappen toe. Stel [`MAX_PIPELINE_STEPS=0`](/nl/guide/configuration#env-max-pipeline-steps) in om de limiet onbeperkt te maken.
 
 ### Bestandsbibliotheek {#file-library}
 
 Elk bestand dat u verwerkt, kan worden opgeslagen in uw **Files**-bibliotheek. SnapOtter houdt de volledige versiegeschiedenis bij, zodat u elke verwerkingsstap kunt terugvolgen van de oorspronkelijke upload tot het eindresultaat.
 
-Opslaan is expliciet: resultaten die u in de bibliotheek opslaat blijven bewaard tot u ze verwijdert, terwijl resultaten die u verwerkt maar niet opslaat na 72 uur automatisch worden gewist (instelbaar via `FILE_MAX_AGE_HOURS`).
+Opslaan is expliciet: resultaten die u in de bibliotheek opslaat blijven bewaard tot u ze verwijdert, terwijl resultaten die u verwerkt maar niet opslaat na 72 uur automatisch worden gewist (instelbaar via [`FILE_MAX_AGE_HOURS`](/nl/guide/configuration#env-file-max-age-hours)).
 
 ### REST API en API-sleutels {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Schakel meerdere gebruikers in met rolgebaseerde toegangscontrole:
 
 Maak teams aan onder **Settings → Teams** om gebruikers te groeperen.
 
-Stel `AUTH_ENABLED=true` in (of `false` voor gebruik door één persoon zonder aanmelding).
+Stel [`AUTH_ENABLED=true`](/nl/guide/configuration#env-auth-enabled) in (of `false` voor gebruik door één persoon zonder aanmelding).
 
 ## Gebruik het vanaf uw telefoon {#use-it-from-your-phone}
 

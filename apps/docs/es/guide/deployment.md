@@ -2,7 +2,7 @@
 description: "Despliegue de SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: aff4e88ed061
+i18n_output_hash: c4de73e4647d
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts**: usted gestiona los permisos. Configure `PUID`/`PGID` para que coincidan con su usuario del host:
+**Bind mounts**: usted gestiona los permisos. Configure [`PUID`](/es/guide/configuration#env-puid)/[`PGID`](/es/guide/configuration#env-pgid) para que coincidan con su usuario del host:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ El error de inicio indica el UID exacto que debe usar, así que el camino más r
 
 | Variable | Valor predeterminado | Descripción |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Habilitar o deshabilitar el requisito de inicio de sesión |
-| `DEFAULT_USERNAME` | `admin` | Nombre de usuario del administrador inicial |
-| `DEFAULT_PASSWORD` | `admin` | Contraseña del administrador inicial (cambio forzado en el primer inicio de sesión) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (sin límite) | Límite de subida por archivo en MB. La imagen incluye `0`; una compilación desde el código fuente empieza en 100 |
-| `MAX_BATCH_SIZE` | `0` (sin límite) | Máximo de archivos por solicitud por lotes. La imagen incluye `0`; una compilación desde el código fuente empieza en 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | Solicitudes de API por minuto por IP (establezca 0 para deshabilitar) |
-| `MAX_USERS` | `0` (sin límite) | Máximo de cuentas de usuario |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Qué peers pueden establecer la IP del cliente mediante `X-Forwarded-For`. Por defecto, solo redes privadas |
+| [`AUTH_ENABLED`](/es/guide/configuration#env-auth-enabled) | `true` | Habilitar o deshabilitar el requisito de inicio de sesión |
+| [`DEFAULT_USERNAME`](/es/guide/configuration#env-default-username) | `admin` | Nombre de usuario del administrador inicial |
+| [`DEFAULT_PASSWORD`](/es/guide/configuration#env-default-password) | `admin` | Contraseña del administrador inicial (cambio forzado en el primer inicio de sesión) |
+| [`MAX_UPLOAD_SIZE_MB`](/es/guide/configuration#env-max-upload-size-mb) | `0` (sin límite) | Límite de subida por archivo en MB. La imagen incluye `0`; una compilación desde el código fuente empieza en 100 |
+| [`MAX_BATCH_SIZE`](/es/guide/configuration#env-max-batch-size) | `0` (sin límite) | Máximo de archivos por solicitud por lotes. La imagen incluye `0`; una compilación desde el código fuente empieza en 100 |
+| [`RATE_LIMIT_PER_MIN`](/es/guide/configuration#env-rate-limit-per-min) | `1000` | Solicitudes de API por minuto por IP (establezca 0 para deshabilitar) |
+| [`MAX_USERS`](/es/guide/configuration#env-max-users) | `0` (sin límite) | Máximo de cuentas de usuario |
+| [`TRUST_PROXY`](/es/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Qué peers pueden establecer la IP del cliente mediante `X-Forwarded-For`. Por defecto, solo redes privadas |
 | `PUID` | `999` | Ejecutar con este UID (para permisos de bind mount) |
 | `PGID` | `999` | Ejecutar con este GID (para permisos de bind mount) |
-| `LOG_LEVEL` | `info` | Nivel de detalle del registro: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (automático) | Máximo de trabajos de procesamiento de IA en paralelo |
-| `SESSION_DURATION_HOURS` | `168` | Duración de la sesión de inicio de sesión (7 días) |
-| `CORS_ORIGIN` | (vacío) | Orígenes permitidos separados por comas, o vacío para el mismo origen |
+| [`LOG_LEVEL`](/es/guide/configuration#env-log-level) | `info` | Nivel de detalle del registro: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/es/guide/configuration#env-concurrent-jobs) | `0` (automático) | Máximo de trabajos de procesamiento de IA en paralelo |
+| [`SESSION_DURATION_HOURS`](/es/guide/configuration#env-session-duration-hours) | `168` | Duración de la sesión de inicio de sesión (7 días) |
+| [`CORS_ORIGIN`](/es/guide/configuration#env-cors-origin) | (vacío) | Orígenes permitidos separados por comas, o vacío para el mismo origen |
 
 ### Proxy saliente y CA privada {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Despliegue bajo una subruta {#subpath}
 
-Para servir `https://example.com/snapotter`, configure `BASE_PATH=/snapotter` en el entorno del
+Para servir `https://example.com/snapotter`, configure [`BASE_PATH=/snapotter`](/es/guide/configuration#env-base-path) en el entorno del
 contenedor de SnapOtter y reinícielo. Los archivos Compose oficiales para CPU y GPU
 también aceptan `BASE_PATH` desde su shell o desde el archivo `.env` de Compose. La misma
 imagen funciona en cualquier ruta; no hace falta recompilar el frontend.
@@ -609,7 +609,7 @@ location /snapotter/ {
 Este ejemplo conserva el prefijo. También se admiten los proxies que eliminan `/snapotter` antes de
 reenviar. Las comprobaciones de estado internas pueden seguir usando
 `/api/v1/health`. Para OIDC o SAML, configure también
-`EXTERNAL_URL=https://example.com/snapotter` y actualice las URL de callback del proveedor de identidad para que incluyan `/snapotter/api/auth/oidc/callback` o
+[`EXTERNAL_URL=https://example.com/snapotter`](/es/guide/oidc#env-external-url) y actualice las URL de callback del proveedor de identidad para que incluyan `/snapotter/api/auth/oidc/callback` o
 `/snapotter/api/auth/saml/callback` respectivamente.
 
 Los scripts de API siguen funcionando sin cambios: las URL de las respuestas de la API, como el

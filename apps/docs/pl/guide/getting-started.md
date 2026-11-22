@@ -24,7 +24,7 @@ Następnie należy otworzyć [http://localhost:1349](http://localhost:1349) i za
 
 Teraz można otworzyć narzędzie. Wystarczy wybrać jedno z paska bocznego albo przejść od razu do [Zmiany rozmiaru](http://localhost:1349/image/resize), upuścić obraz i pobrać wynik.
 
-To cała instalacja. Ten pojedynczy kontener uruchamia wszystko, czego potrzebuje: bez ustawionego `DATABASE_URL` startuje własne PostgreSQL i Redis na interfejsie loopback (tryb wbudowany) i przechowuje wszystkie dane w woluminie `SnapOtter-data`. To najszybszy sposób na wypróbowanie SnapOtter lub samodzielne hostowanie w domowym laboratorium. Tryb wbudowany działa jako root (domyślnie) i wyłącza się automatycznie, gdy tylko zostanie ustawione `DATABASE_URL`. W środowisku produkcyjnym należy użyć [stosu Docker Compose](#docker-compose), który trzyma PostgreSQL i Redis w osobnych kontenerach.
+To cała instalacja. Ten pojedynczy kontener uruchamia wszystko, czego potrzebuje: bez ustawionego [`DATABASE_URL`](/pl/guide/configuration#env-database-url) startuje własne PostgreSQL i Redis na interfejsie loopback (tryb wbudowany) i przechowuje wszystkie dane w woluminie `SnapOtter-data`. To najszybszy sposób na wypróbowanie SnapOtter lub samodzielne hostowanie w domowym laboratorium. Tryb wbudowany działa jako root (domyślnie) i wyłącza się automatycznie, gdy tylko zostanie ustawione `DATABASE_URL`. W środowisku produkcyjnym należy użyć [stosu Docker Compose](#docker-compose), który trzyma PostgreSQL i Redis w osobnych kontenerach.
 
 Wyniki zadań nie są przechowywane w wolumenie danych, więc znikają po wymianie kontenera (na przykład przy aktualizacji obrazu), a ich linki do pobrania przestają działać. [Zachowywanie wyników zadań](/pl/guide/deployment#keeping-job-output) w przewodniku wdrożenia wyjaśnia, jak je zachować.
 
@@ -156,13 +156,13 @@ Narzędzia można łączyć w wieloetapowe przepływy pracy i stosować je do je
 3. Uruchomić dla pojedynczego pliku albo całej partii naraz.
 4. Zapisać potok do ponownego użycia.
 
-Potoki domyślnie dopuszczają 20 kroków. Ustawienie `MAX_PIPELINE_STEPS=0` znosi to ograniczenie.
+Potoki domyślnie dopuszczają 20 kroków. Ustawienie [`MAX_PIPELINE_STEPS=0`](/pl/guide/configuration#env-max-pipeline-steps) znosi to ograniczenie.
 
 ### Biblioteka plików {#file-library}
 
 Każdy przetworzony plik można zapisać w bibliotece **Files**. SnapOtter śledzi pełną historię wersji, dzięki czemu można prześledzić każdy etap przetwarzania od oryginalnego przesłania do wyniku końcowego.
 
-Zapis jest jawny: wyniki zapisane w bibliotece są przechowywane do momentu ich usunięcia, a wyniki przetworzone i niezapisane są automatycznie usuwane po 72 godzinach (konfigurowalne przez `FILE_MAX_AGE_HOURS`).
+Zapis jest jawny: wyniki zapisane w bibliotece są przechowywane do momentu ich usunięcia, a wyniki przetworzone i niezapisane są automatycznie usuwane po 72 godzinach (konfigurowalne przez [`FILE_MAX_AGE_HOURS`](/pl/guide/configuration#env-file-max-age-hours)).
 
 ### REST API i klucze API {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Wielu użytkowników można włączyć z kontrolą dostępu opartą na rolach:
 
 Zespoły tworzy się w **Settings → Teams**, aby grupować użytkowników.
 
-Należy ustawić `AUTH_ENABLED=true` (lub `false` dla użytku jednoosobowego bez logowania).
+Należy ustawić [`AUTH_ENABLED=true`](/pl/guide/configuration#env-auth-enabled) (lub `false` dla użytku jednoosobowego bez logowania).
 
 ## Użycie na telefonie {#use-it-from-your-phone}
 

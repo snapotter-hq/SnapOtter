@@ -2,7 +2,7 @@
 description: "ติดตั้ง SnapOtter ในระบบจริงด้วย Docker ครอบคลุมความต้องการด้านฮาร์ดแวร์ การตั้งค่า GPU และการกำหนดค่า reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: a55184e665f6
+i18n_output_hash: ebcf0c2cabb3
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - คุณต้องจัดการสิทธิ์เอง ตั้งค่า `PUID`/`PGID` ให้ตรงกับผู้ใช้ของโฮสต์:
+**Bind mount** - คุณต้องจัดการสิทธิ์เอง ตั้งค่า [`PUID`](/th/guide/configuration#env-puid)/[`PGID`](/th/guide/configuration#env-pgid) ให้ตรงกับผู้ใช้ของโฮสต์:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | เปิด/ปิดข้อกำหนดการเข้าสู่ระบบ |
-| `DEFAULT_USERNAME` | `admin` | ชื่อผู้ใช้ผู้ดูแลระบบเริ่มต้น |
-| `DEFAULT_PASSWORD` | `admin` | รหัสผ่านผู้ดูแลระบบเริ่มต้น (บังคับเปลี่ยนเมื่อเข้าสู่ระบบครั้งแรก) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (ไม่จำกัด) | ขีดจำกัดการอัปโหลดต่อไฟล์เป็น MB อิมเมจมาพร้อม `0` ส่วนการสร้างจากซอร์สเริ่มต้นที่ 100 |
-| `MAX_BATCH_SIZE` | `0` (ไม่จำกัด) | จำนวนไฟล์สูงสุดต่อคำขอแบบชุด อิมเมจมาพร้อม `0` ส่วนการสร้างจากซอร์สเริ่มต้นที่ 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | คำขอ API ต่อนาทีต่อ IP (ตั้งเป็น 0 เพื่อปิด) |
-| `MAX_USERS` | `0` (ไม่จำกัด) | จำนวนบัญชีผู้ใช้สูงสุด |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | เพียร์ใดบ้างที่กำหนด IP ของไคลเอนต์ผ่าน `X-Forwarded-For` ได้ ค่าเริ่มต้นคือเครือข่ายส่วนตัวเท่านั้น |
+| [`AUTH_ENABLED`](/th/guide/configuration#env-auth-enabled) | `true` | เปิด/ปิดข้อกำหนดการเข้าสู่ระบบ |
+| [`DEFAULT_USERNAME`](/th/guide/configuration#env-default-username) | `admin` | ชื่อผู้ใช้ผู้ดูแลระบบเริ่มต้น |
+| [`DEFAULT_PASSWORD`](/th/guide/configuration#env-default-password) | `admin` | รหัสผ่านผู้ดูแลระบบเริ่มต้น (บังคับเปลี่ยนเมื่อเข้าสู่ระบบครั้งแรก) |
+| [`MAX_UPLOAD_SIZE_MB`](/th/guide/configuration#env-max-upload-size-mb) | `0` (ไม่จำกัด) | ขีดจำกัดการอัปโหลดต่อไฟล์เป็น MB อิมเมจมาพร้อม `0` ส่วนการสร้างจากซอร์สเริ่มต้นที่ 100 |
+| [`MAX_BATCH_SIZE`](/th/guide/configuration#env-max-batch-size) | `0` (ไม่จำกัด) | จำนวนไฟล์สูงสุดต่อคำขอแบบชุด อิมเมจมาพร้อม `0` ส่วนการสร้างจากซอร์สเริ่มต้นที่ 100 |
+| [`RATE_LIMIT_PER_MIN`](/th/guide/configuration#env-rate-limit-per-min) | `1000` | คำขอ API ต่อนาทีต่อ IP (ตั้งเป็น 0 เพื่อปิด) |
+| [`MAX_USERS`](/th/guide/configuration#env-max-users) | `0` (ไม่จำกัด) | จำนวนบัญชีผู้ใช้สูงสุด |
+| [`TRUST_PROXY`](/th/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | เพียร์ใดบ้างที่กำหนด IP ของไคลเอนต์ผ่าน `X-Forwarded-For` ได้ ค่าเริ่มต้นคือเครือข่ายส่วนตัวเท่านั้น |
 | `PUID` | `999` | รันด้วย UID นี้ (สำหรับสิทธิ์ของ bind mount) |
 | `PGID` | `999` | รันด้วย GID นี้ (สำหรับสิทธิ์ของ bind mount) |
-| `LOG_LEVEL` | `info` | ระดับความละเอียดของบันทึก: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (อัตโนมัติ) | จำนวนงานประมวลผล AI แบบขนานสูงสุด |
-| `SESSION_DURATION_HOURS` | `168` | อายุเซสชันการเข้าสู่ระบบ (7 วัน) |
-| `CORS_ORIGIN` | (ว่าง) | รายการ origin ที่อนุญาต คั่นด้วยจุลภาค หรือเว้นว่างสำหรับ origin เดียวกัน |
+| [`LOG_LEVEL`](/th/guide/configuration#env-log-level) | `info` | ระดับความละเอียดของบันทึก: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/th/guide/configuration#env-concurrent-jobs) | `0` (อัตโนมัติ) | จำนวนงานประมวลผล AI แบบขนานสูงสุด |
+| [`SESSION_DURATION_HOURS`](/th/guide/configuration#env-session-duration-hours) | `168` | อายุเซสชันการเข้าสู่ระบบ (7 วัน) |
+| [`CORS_ORIGIN`](/th/guide/configuration#env-cors-origin) | (ว่าง) | รายการ origin ที่อนุญาต คั่นด้วยจุลภาค หรือเว้นว่างสำหรับ origin เดียวกัน |
 
 ### พร็อกซีขาออกและ CA ส่วนตัว {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### การติดตั้งใต้ subpath {#subpath}
 
-หากต้องการให้บริการที่ `https://example.com/snapotter` ให้ตั้งค่า `BASE_PATH=/snapotter` ในสภาพแวดล้อมของคอนเทนเนอร์
+หากต้องการให้บริการที่ `https://example.com/snapotter` ให้ตั้งค่า [`BASE_PATH=/snapotter`](/th/guide/configuration#env-base-path) ในสภาพแวดล้อมของคอนเทนเนอร์
 SnapOtter แล้วรีสตาร์ท ไฟล์ Compose สำหรับ CPU และ GPU อย่างเป็นทางการ
 ยังรับ `BASE_PATH` จากเชลล์ของคุณหรือไฟล์ `.env` ของ Compose ได้ด้วย อิมเมจเดียวกัน
 ใช้ได้กับทุกเส้นทาง ไม่ต้องสร้างฟรอนต์เอนด์ใหม่
@@ -609,7 +609,7 @@ location /snapotter/ {
 ตัวอย่างนี้คงคำนำหน้าไว้ พร็อกซีที่ตัด `/snapotter` ก่อน
 ส่งต่อก็รองรับเช่นกัน การตรวจสอบสถานะภายในยังคงใช้
 `/api/v1/health` ได้ สำหรับ OIDC หรือ SAML ให้ตั้งค่า
-`EXTERNAL_URL=https://example.com/snapotter` และอัปเดต
+[`EXTERNAL_URL=https://example.com/snapotter`](/th/guide/oidc#env-external-url) และอัปเดต
 URL เรียกกลับของผู้ให้บริการระบุตัวตนให้มี `/snapotter/api/auth/oidc/callback` หรือ
 `/snapotter/api/auth/saml/callback` ตามลำดับ
 

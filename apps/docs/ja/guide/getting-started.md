@@ -24,7 +24,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 
 次はツールを開きます。サイドバーから選ぶか、[リサイズ](http://localhost:1349/image/resize)に直接移動して画像をドロップし、結果をダウンロードしてください。
 
-インストールはこれだけです。この 1 つのコンテナだけで、必要なものがすべて動きます。`DATABASE_URL` を設定しない場合、独自の PostgreSQL と Redis をループバックインターフェースで起動し（組み込みモード）、すべてのデータを `SnapOtter-data` ボリュームに保存します。SnapOtter を手早く試したり、ホームラボでセルフホストしたりするのに最適な方法です。組み込みモードは root（デフォルト）で動作し、`DATABASE_URL` を設定すると自動的に無効になります。本番環境では、PostgreSQL と Redis を別々のコンテナで動かす [Docker Compose スタック](#docker-compose)を使ってください。
+インストールはこれだけです。この 1 つのコンテナだけで、必要なものがすべて動きます。[`DATABASE_URL`](/ja/guide/configuration#env-database-url) を設定しない場合、独自の PostgreSQL と Redis をループバックインターフェースで起動し（組み込みモード）、すべてのデータを `SnapOtter-data` ボリュームに保存します。SnapOtter を手早く試したり、ホームラボでセルフホストしたりするのに最適な方法です。組み込みモードは root（デフォルト）で動作し、`DATABASE_URL` を設定すると自動的に無効になります。本番環境では、PostgreSQL と Redis を別々のコンテナで動かす [Docker Compose スタック](#docker-compose)を使ってください。
 
 ジョブの結果はデータボリュームに保存されないため、コンテナが置き換えられると (たとえばイメージのアップグレード時に) 消え、ダウンロードリンクも使えなくなります。保持する方法はデプロイガイドの[ジョブ出力の保持](/ja/guide/deployment#keeping-job-output)で説明しています。
 
@@ -156,13 +156,13 @@ pnpm dev
 3. 1 つのファイル、またはバッチ全体に対して一度に実行します。
 4. 後で再利用できるようにパイプラインを保存します。
 
-パイプラインはデフォルトで 20 ステップまで可能です。`MAX_PIPELINE_STEPS=0` を設定すると、制限なしになります。
+パイプラインはデフォルトで 20 ステップまで可能です。[`MAX_PIPELINE_STEPS=0`](/ja/guide/configuration#env-max-pipeline-steps) を設定すると、制限なしになります。
 
 ### ファイルライブラリ {#file-library}
 
 処理したファイルはすべて **Files** ライブラリに保存できます。SnapOtter は完全なバージョン履歴を記録するため、元のアップロードから最終出力までのすべての処理ステップをたどれます。
 
-保存は明示的な操作です。ライブラリに保存した結果は削除するまで保持され、処理後に保存しなかった結果は 72 時間後に自動的に消去されます（`FILE_MAX_AGE_HOURS` で設定可能）。
+保存は明示的な操作です。ライブラリに保存した結果は削除するまで保持され、処理後に保存しなかった結果は 72 時間後に自動的に消去されます（[`FILE_MAX_AGE_HOURS`](/ja/guide/configuration#env-file-max-age-hours) で設定可能）。
 
 ### REST API と API キー {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ API キーは **Settings → API Keys** で生成します。すべてのエン�
 
 **Settings → Teams** でチームを作成して、ユーザーをグループ化します。
 
-`AUTH_ENABLED=true` を設定します（ログインなしの個人利用の場合は `false`）。
+[`AUTH_ENABLED=true`](/ja/guide/configuration#env-auth-enabled) を設定します（ログインなしの個人利用の場合は `false`）。
 
 ## スマートフォンで使う {#use-it-from-your-phone}
 
