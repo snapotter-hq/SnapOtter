@@ -8,6 +8,7 @@ import {
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
   isRecordedRejection,
+  PER_REQUEST_AI_GATED_TOOLS,
   requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
@@ -1239,13 +1240,14 @@ describe("settings variation matrix", () => {
     const missingPython = allPythonVariationsUnavailable
       ? findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings)
       : undefined;
-    const aiGate = AI_GATED_TOOLS.has(toolId)
-      ? requiredAiGate(toolId, {
-          requireAiFeatures: REQUIRE_AI_FEATURES,
-          firstMissingBundle: getFirstMissingBundleForTool,
-          dataDir: process.env.DATA_DIR,
-        })
-      : undefined;
+    const aiGate =
+      AI_GATED_TOOLS.has(toolId) && !PER_REQUEST_AI_GATED_TOOLS.has(toolId)
+        ? requiredAiGate(toolId, {
+            requireAiFeatures: REQUIRE_AI_FEATURES,
+            firstMissingBundle: getFirstMissingBundleForTool,
+            dataDir: process.env.DATA_DIR,
+          })
+        : undefined;
     if (aiGate?.kind === "fail") {
       it(`${toolId} -- required AI bundle installed`, () => {
         throw new Error(aiGate.reason);
