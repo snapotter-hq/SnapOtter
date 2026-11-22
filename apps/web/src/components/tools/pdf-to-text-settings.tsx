@@ -46,7 +46,6 @@ export function PdfToTextSettings() {
           })}
         </p>
       )}
-      <UnreadablePagesOcrHandoff label={s.runOcr} testId="pdf-to-text-run-ocr-unreadable" />
 
       {partlyUnreadablePages && (
         <p
@@ -59,6 +58,7 @@ export function PdfToTextSettings() {
           })}
         </p>
       )}
+      <UnreadablePagesOcrHandoff label={s.runOcr} testId="pdf-to-text-run-ocr-unreadable" />
 
       {processing ? (
         <ProgressCard

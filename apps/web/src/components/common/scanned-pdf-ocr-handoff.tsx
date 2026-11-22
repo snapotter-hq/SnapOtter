@@ -11,7 +11,8 @@ interface ScannedPdfOcrHandoffProps {
 }
 
 function hasUnreadablePages(entry: FileEntry): boolean {
-  return entry.status === "completed" && entry.resultNotes?.unreadablePages != null;
+  const notes = entry.status === "completed" ? entry.resultNotes : null;
+  return notes?.unreadablePages != null || notes?.partlyUnreadablePages != null;
 }
 
 /**
@@ -79,7 +80,7 @@ export function ScannedPdfOcrHandoff({ hint, label, testId }: ScannedPdfOcrHando
 
 /**
  * Offers OCR after a successful run whose current file had pages with no
- * readable text (#5150). Only the files flagged that way go to OCR, so the
+ * readable text, or lines in an unmappable font (#5150). Only the files flagged that way go to OCR, so the
  * readable ones in a batch stay out of it, the same rule as #4143.
  */
 export function UnreadablePagesOcrHandoff({ label, testId }: { label: string; testId: string }) {

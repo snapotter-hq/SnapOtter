@@ -124,6 +124,57 @@ describe("pdf-to-text OCR handoff after a run with unreadable pages (#5150)", ()
     expect(screen.queryByTestId("pdf-to-text-run-ocr")).not.toBeInTheDocument();
   });
 
+  it("offers OCR once under the partly-unreadable note (#4947)", () => {
+    useFileStore.getState().setFiles([pdf("odd-font.pdf")]);
+    act(() =>
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        resultNotes: { partlyUnreadablePages: { count: 1, total: 3 } },
+      }),
+    );
+    renderPanel();
+
+    expect(screen.getByTestId("pdf-to-text-partly-unreadable-pages")).toBeInTheDocument();
+    expect(screen.queryByTestId("pdf-to-text-unreadable-pages")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pdf-to-text-run-ocr-unreadable")).toBeInTheDocument();
+  });
+
+  it("shows a single OCR button when a file has both notes", () => {
+    useFileStore.getState().setFiles([pdf("both.pdf")]);
+    act(() =>
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        resultNotes: {
+          unreadablePages: { count: 1, total: 4 },
+          partlyUnreadablePages: { count: 2, total: 4 },
+        },
+      }),
+    );
+    renderPanel();
+
+    expect(screen.getAllByTestId("pdf-to-text-run-ocr-unreadable")).toHaveLength(1);
+  });
+
+  it("hands off a file flagged only as partly unreadable", () => {
+    useFileStore.getState().setFiles([pdf("clean.pdf"), pdf("odd-font.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      store.updateEntry(0, { status: "completed", resultNotes: null });
+      store.updateEntry(1, {
+        status: "completed",
+        resultNotes: { partlyUnreadablePages: { count: 1, total: 3 } },
+      });
+      store.setSelectedIndex(1);
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("pdf-to-text-run-ocr-unreadable"));
+
+    expect(useFileStore.getState().entries.map((entry) => entry.file.name)).toEqual([
+      "odd-font.pdf",
+    ]);
+  });
+
   it("offers nothing when every page read fine", () => {
     useFileStore.getState().setFiles([pdf("clean.pdf")]);
     act(() => useFileStore.getState().updateEntry(0, { status: "completed", resultNotes: null }));
