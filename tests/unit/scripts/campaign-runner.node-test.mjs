@@ -673,7 +673,10 @@ test("terminates the owned process group on deadline and releases the lock", asy
       lockPath: campaign.lockPath,
       registry: campaign.registry,
       runId: "runner-timeout-001",
-      timeoutMs: 500,
+      // The deadline must outlast two Node boots (the gated child, then the command) on a
+      // loaded host, or the kill lands before the pid file exists (#5148). The child ignores
+      // SIGTERM, so the test always waits out the whole deadline: keep it no longer than needed.
+      timeoutMs: 3_000,
     });
 
     childPid = Number(readFileSync(childPidPath, "utf8"));
