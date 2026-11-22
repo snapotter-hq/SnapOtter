@@ -4980,3 +4980,56 @@ describe("pipeline step modality compatibility (#4343)", () => {
     }
   });
 });
+
+describe("pipeline input validation honours the first step's inputKinds (#5165)", () => {
+  // convert-subtitles is a video-modality tool that only takes subtitles. The
+  // video handler would ffprobe the .srt and reject it as having no video track.
+  registerToolProcessFn({
+    toolId: "convert-subtitles",
+    settingsSchema: z.record(z.unknown()),
+    inputKinds: ["subtitle"],
+    process: async (buf: Buffer) => ({
+      buffer: buf,
+      filename: "out.vtt",
+      contentType: "text/vtt",
+    }),
+  });
+  const srt = Buffer.from("1\n00:00:00,000 --> 00:00:01,000\nHello\n");
+  const pipeline = JSON.stringify({
+    steps: [{ toolId: "convert-subtitles", settings: { format: "vtt" } }],
+  });
+
+  it("/execute accepts a subtitle upload", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "a.srt", content: srt },
+      { type: "field", fieldname: "pipeline", value: pipeline },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(putObjectMock).toHaveBeenCalledTimes(1);
+    expect(flowAddMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("/batch accepts every subtitle upload", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "a.srt", content: srt },
+      { type: "file", filename: "b.srt", content: srt },
+      { type: "field", fieldname: "pipeline", value: pipeline },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(recordChildOutcomeMock).not.toHaveBeenCalled();
+    expect(flowAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalFiles: 2,
+          settings: expect.objectContaining({ flowChildCount: 2, fileIndexMap: [0, 1] }),
+        }),
+      }),
+    );
+  });
+});

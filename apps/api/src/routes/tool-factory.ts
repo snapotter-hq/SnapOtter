@@ -41,9 +41,8 @@ import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { hasPersistedJobRow, settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
-import { type InputHandler, InputValidationError } from "../modality/contract.js";
-import { inputHandlerFor } from "../modality/input-handler.js";
-import { MediaInputHandler, type MediaInputKind } from "../modality/media-input.js";
+import { InputValidationError } from "../modality/contract.js";
+import { inputHandlerForInput } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { updateSingleFileProgress } from "./progress.js";
@@ -488,22 +487,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
 
-        // Build per-position input handlers. Mixed-input image slots still need
-        // the image pipeline so RAW/HEIC/SVG inputs are normalized before jobs.
-        const kindHandlers: Map<MediaInputKind, InputHandler> = new Map();
-        function handlerForPosition(idx: number): InputHandler {
-          if (config.inputKinds) {
-            const kind = config.inputKinds[Math.min(idx, config.inputKinds.length - 1)];
-            let h = kindHandlers.get(kind);
-            if (!h) {
-              h = kind === "image" ? inputHandlerFor("image") : new MediaInputHandler(kind);
-              kindHandlers.set(kind, h);
-            }
-            return h;
-          }
-          return inputHandlerFor(modality);
-        }
-
         // Prepare all files through the modality input handler
         const inputRefs: string[] = [];
         const preparedInputs: { filename: string; buffer: Buffer }[] = [];
@@ -520,23 +503,27 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           let fname = upload.filename;
 
           try {
-            const prepared = await handlerForPosition(i).prepare(fileBuffer, fname, {
-              scratchDir,
-              // reqId comes with request.log; jobId and toolId make a
-              // normalization warn joinable to the job row, and filename says
-              // which of a multi-input upload it was (#1417).
-              log: request.log.child({ jobId, toolId: config.toolId, filename: fname }),
-              lenient: config.skipStructuralValidation,
-              // Reject encrypted PDFs up front only for PDF-only tools (qpdf
-              // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
-              // flag never forces a %PDF- header on non-PDF document tools
-              // (markdown/epub/docx converters). unlock-pdf opts out.
-              rejectPasswordProtected:
-                modality === "document" &&
-                !config.allowPasswordProtectedPdf &&
-                !!accepted?.length &&
-                accepted.every((e) => e === ".pdf"),
-            });
+            const prepared = await inputHandlerForInput(modality, config.inputKinds, i).prepare(
+              fileBuffer,
+              fname,
+              {
+                scratchDir,
+                // reqId comes with request.log; jobId and toolId make a
+                // normalization warn joinable to the job row, and filename says
+                // which of a multi-input upload it was (#1417).
+                log: request.log.child({ jobId, toolId: config.toolId, filename: fname }),
+                lenient: config.skipStructuralValidation,
+                // Reject encrypted PDFs up front only for PDF-only tools (qpdf
+                // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
+                // flag never forces a %PDF- header on non-PDF document tools
+                // (markdown/epub/docx converters). unlock-pdf opts out.
+                rejectPasswordProtected:
+                  modality === "document" &&
+                  !config.allowPasswordProtectedPdf &&
+                  !!accepted?.length &&
+                  accepted.every((e) => e === ".pdf"),
+              },
+            );
             fileBuffer = prepared.buffer;
             fname = prepared.filename;
           } catch (err) {

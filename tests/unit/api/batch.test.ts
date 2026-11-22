@@ -692,7 +692,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
         uploaded.push(data.toString());
       });
       const inputHandler = await import("../../../apps/api/src/modality/input-handler.js");
-      const prepareSpy = vi.spyOn(inputHandler, "inputHandlerFor").mockReturnValue({
+      const prepareSpy = vi.spyOn(inputHandler, "inputHandlerForInput").mockReturnValue({
         prepare: vi.fn(async (buffer: Buffer, filename: string) => ({ buffer, filename })),
       } as never);
       try {
@@ -713,6 +713,40 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }
     } finally {
       await rmReal(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("validates each upload by the tool's inputKinds, not its modality (#5165)", async () => {
+    // convert-subtitles is a video-modality tool whose only input kind is
+    // subtitle. The video handler would ffprobe the .srt and reject it.
+    mocks.getToolConfig.mockImplementation(() => ({
+      settingsSchema: z.record(z.unknown()),
+      inputKinds: ["subtitle"],
+    }));
+    const srt = Buffer.from("1\n00:00:00,000 --> 00:00:01,000\nHello\n");
+    try {
+      const reply = await invokeBatchRoute({
+        section: "video",
+        toolId: "convert-subtitles",
+        parts: [
+          { type: "file", filename: "a.srt", content: srt },
+          { type: "file", filename: "b.srt", content: srt },
+          { type: "field", fieldname: "settings", value: '{"format":"vtt"}' },
+        ],
+      });
+
+      expect(reply.statusCode).toBe(202);
+      expect(mocks.recordChildOutcome).not.toHaveBeenCalled();
+      expect(mocks.flowAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalFiles: 2,
+            settings: expect.objectContaining({ flowChildCount: 2, fileIndexMap: [0, 1] }),
+          }),
+        }),
+      );
+    } finally {
+      mocks.getToolConfig.mockImplementation(() => ({ settingsSchema: z.record(z.unknown()) }));
     }
   });
 

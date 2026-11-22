@@ -101,7 +101,7 @@ import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
-import { inputHandlerFor } from "../modality/input-handler.js";
+import { inputHandlerForInput } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
@@ -633,14 +633,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             } else {
               // Non-image input: validate/decode via the tool's modality handler.
               try {
-                const prepared = await inputHandlerFor(inputModality).prepare(
-                  processBuffer,
-                  filename,
-                  {
-                    scratchDir,
-                    lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
-                  },
-                );
+                const firstConfig = getToolConfig(firstToolId ?? "");
+                const prepared = await inputHandlerForInput(
+                  inputModality,
+                  firstConfig?.inputKinds,
+                ).prepare(processBuffer, filename, {
+                  scratchDir,
+                  lenient: firstConfig?.skipStructuralValidation,
+                });
                 processBuffer = prepared.buffer;
                 filename = prepared.filename;
               } catch (err) {
@@ -1924,15 +1924,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 }
               } else {
                 try {
-                  const prepared = await inputHandlerFor(batchModality).prepare(
-                    processBuffer,
-                    processFilename,
-                    {
-                      scratchDir,
-                      lenient: getToolConfig(parsedSteps[0]?.resolvedToolId ?? "")
-                        ?.skipStructuralValidation,
-                    },
-                  );
+                  const firstConfig = getToolConfig(parsedSteps[0]?.resolvedToolId ?? "");
+                  const prepared = await inputHandlerForInput(
+                    batchModality,
+                    firstConfig?.inputKinds,
+                  ).prepare(processBuffer, processFilename, {
+                    scratchDir,
+                    lenient: firstConfig?.skipStructuralValidation,
+                  });
                   processBuffer = prepared.buffer;
                   processFilename = prepared.filename;
                 } catch (err) {
