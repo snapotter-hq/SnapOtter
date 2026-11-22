@@ -343,6 +343,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `grayscale-pdf` | PDF grijswaarden | - |
 | `pdfa-convert` | PDF/A-conversie | - (archief-PDF/A-2) |
 | `crop-pdf` | PDF bijsnijden | `margin` (0-2000 punten) |
+| `resize-pdf-pages` | PDF-paginaformaat wijzigen | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up-PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Boekje-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF van watermerk voorzien | `text`, `position`, `fontSize`, `opacity`, `rotation` |

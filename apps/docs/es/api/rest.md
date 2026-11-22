@@ -343,6 +343,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `grayscale-pdf` | PDF en escala de grises | - |
 | `pdfa-convert` | Convertir a PDF/A | - (PDF/A-2 de archivo) |
 | `crop-pdf` | Recortar PDF | `margin` (0-2000 puntos) |
+| `resize-pdf-pages` | Cambiar tamaño de páginas PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Folleto PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Marca de agua en PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

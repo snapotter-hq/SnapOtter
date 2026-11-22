@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF 흑백화 | - |
 | `pdfa-convert` | PDF/A 변환 | - (보존용 PDF/A-2) |
 | `crop-pdf` | PDF 자르기 | `margin`(0-2000 포인트) |
+| `resize-pdf-pages` | PDF 페이지 크기 조정 | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet`(2/3/4/8/9/12/16) |
 | `booklet-pdf` | 소책자 PDF | `perSheet`(2/4/6/8) |
 | `watermark-pdf` | PDF 워터마크 | `text`, `position`, `fontSize`, `opacity`, `rotation` |

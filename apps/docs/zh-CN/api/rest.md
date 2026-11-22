@@ -343,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF 灰度化 | - |
 | `pdfa-convert` | PDF/A 转换 | -（归档级 PDF/A-2） |
 | `crop-pdf` | 裁剪 PDF | `margin`（0-2000 点） |
+| `resize-pdf-pages` | 调整 PDF 页面尺寸 | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet`（2/3/4/8/9/12/16） |
 | `booklet-pdf` | 小册子 PDF | `perSheet`（2/4/6/8） |
 | `watermark-pdf` | PDF 加水印 | `text`、`position`、`fontSize`、`opacity`、`rotation` |

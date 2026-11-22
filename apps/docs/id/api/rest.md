@@ -343,6 +343,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `grayscale-pdf` | Grayscale PDF | - |
 | `pdfa-convert` | PDF/A Convert | - (PDF/A-2 arsip) |
 | `crop-pdf` | Crop PDF | `margin` (0-2000 poin) |
+| `resize-pdf-pages` | Ubah Ukuran Halaman PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Watermark PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

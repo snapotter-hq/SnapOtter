@@ -343,6 +343,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `grayscale-pdf` | PDF thang xám | - |
 | `pdfa-convert` | Chuyển đổi PDF/A | - (PDF/A-2 lưu trữ) |
 | `crop-pdf` | Cắt PDF | `margin` (0-2000 điểm) |
+| `resize-pdf-pages` | Đổi kích thước trang PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Đóng dấu PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

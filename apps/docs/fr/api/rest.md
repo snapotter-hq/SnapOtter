@@ -343,6 +343,7 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `grayscale-pdf` | PDF en niveaux de gris | - |
 | `pdfa-convert` | Convertir en PDF/A | - (PDF/A-2 d'archivage) |
 | `crop-pdf` | Rogner un PDF | `margin` (0-2000 points) |
+| `resize-pdf-pages` | Redimensionner les pages PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N pages par feuille | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | PDF en livret | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Filigrane sur PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

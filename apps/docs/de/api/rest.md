@@ -343,6 +343,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `grayscale-pdf` | PDF in Graustufen | - |
 | `pdfa-convert` | PDF/A konvertieren | - (Archiv-PDF/A-2) |
 | `crop-pdf` | PDF zuschneiden | `margin` (0-2000 Punkte) |
+| `resize-pdf-pages` | PDF-Seitengröße ändern | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Broschüren-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF mit Wasserzeichen | `text`, `position`, `fontSize`, `opacity`, `rotation` |

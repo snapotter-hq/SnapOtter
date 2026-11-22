@@ -344,6 +344,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `grayscale-pdf` | PDF w skali szarości | - |
 | `pdfa-convert` | Konwersja do PDF/A | - (archiwalny PDF/A-2) |
 | `crop-pdf` | Kadrowanie PDF | `margin` (0-2000 punktów) |
+| `resize-pdf-pages` | Zmień rozmiar stron PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Broszura PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Znak wodny PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

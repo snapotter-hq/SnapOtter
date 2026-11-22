@@ -343,6 +343,7 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `grayscale-pdf` | Gråskala-PDF | - |
 | `pdfa-convert` | Konvertera till PDF/A | - (arkiverings-PDF/A-2) |
 | `crop-pdf` | Beskär PDF | `margin` (0-2000 punkter) |
+| `resize-pdf-pages` | Ändra storlek på PDF-sidor | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Häftes-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Vattenstämpla PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |

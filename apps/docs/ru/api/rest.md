@@ -344,6 +344,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF в оттенки серого | - |
 | `pdfa-convert` | Конвертация PDF/A | - (архивный PDF/A-2) |
 | `crop-pdf` | Обрезка PDF | `margin` (0-2000 пунктов) |
+| `resize-pdf-pages` | Изменить размер страниц PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Буклет PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Водяной знак PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
