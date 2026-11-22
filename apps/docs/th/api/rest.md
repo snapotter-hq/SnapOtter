@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | การตั้งค่าหลัก |
 |---------|------|-------------|
 | `optimize-for-web` | ปรับให้เหมาะกับเว็บ | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | เพิ่มประสิทธิภาพ SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | ลบเมทาดาทา | - |
 | `edit-metadata` | แก้ไขเมทาดาทา | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | เปลี่ยนชื่อแบบกลุ่ม | `pattern` (รองรับ `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

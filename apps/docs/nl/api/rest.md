@@ -172,6 +172,7 @@ Compressiepresets werken op dezelfde manier. `compress-image-to-20kb`, `compress
 | Tool-ID | Naam | Belangrijkste instellingen |
 |---------|------|-------------|
 | `optimize-for-web` | Optimaliseren voor web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG optimaliseren | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Metadata verwijderen | - |
 | `edit-metadata` | Metadata bewerken | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk hernoemen | `pattern` (ondersteunt `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

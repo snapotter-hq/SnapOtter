@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | 名稱 | 主要設定 |
 |---------|------|-------------|
 | `optimize-for-web` | Web 最佳化 | `format`（webp/jpeg/avif/png）、`quality`、`maxWidth`、`maxHeight`、`progressive`、`stripMetadata` |
+| `optimize-svg` | SVG 最佳化 | `precision`（0-8）、`multipass`（bool）、`removeMetadata`（bool）、`pretty`（bool） |
 | `strip-metadata` | 移除中繼資料 | - |
 | `edit-metadata` | 編輯中繼資料 | `title`、`description`、`author`、`copyright`、`keywords`、`gps`（lat/lon）、`dateTime` |
 | `bulk-rename` | 批次重新命名 | `pattern`（支援 `{n}`、`{date}`、`{original}`）、`startIndex`、`padding` |

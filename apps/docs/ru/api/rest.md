@@ -173,6 +173,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ID инструмента | Название | Ключевые настройки |
 |---------|------|-------------|
 | `optimize-for-web` | Оптимизация для веба | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Оптимизация SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Удаление метаданных | - |
 | `edit-metadata` | Редактирование метаданных | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Массовое переименование | `pattern` (поддерживает `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

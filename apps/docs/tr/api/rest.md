@@ -172,6 +172,7 @@ Sıkıştırma ön ayarları da aynı şekilde çalışır. `compress-image-to-2
 | Araç Kimliği | Ad | Anahtar ayarlar |
 |---------|------|-------------|
 | `optimize-for-web` | Web İçin İyileştir | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG Optimize Et | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Meta Verileri Kaldır | - |
 | `edit-metadata` | Meta Verileri Düzenle | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (enlem/boylam), `dateTime` |
 | `bulk-rename` | Toplu Yeniden Adlandır | `pattern` (`{n}`, `{date}`, `{original}` destekler), `startIndex`, `padding` |

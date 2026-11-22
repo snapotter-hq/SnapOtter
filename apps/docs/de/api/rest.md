@@ -172,6 +172,7 @@ Kompressions-Presets funktionieren genauso. `compress-image-to-20kb`, `compress-
 | Tool-ID | Name | Wichtige Einstellungen |
 |---------|------|-------------|
 | `optimize-for-web` | Für Web optimieren | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG optimieren | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Metadaten entfernen | - |
 | `edit-metadata` | Metadaten bearbeiten | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Massen-Umbenennung | `pattern` (unterstützt `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

@@ -169,6 +169,7 @@ Compression presets work the same way. `compress-image-to-20kb`, `compress-image
 | Tool ID | Name | Key settings |
 |---------|------|-------------|
 | `optimize-for-web` | Optimize for Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimize SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Strip Metadata | - |
 | `edit-metadata` | Edit Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk Rename | `pattern` (supports `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

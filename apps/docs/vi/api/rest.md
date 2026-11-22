@@ -172,6 +172,7 @@ Các preset nén hoạt động theo cách tương tự. `compress-image-to-20kb
 | ID công cụ | Tên | Cài đặt chính |
 |---------|------|-------------|
 | `optimize-for-web` | Tối ưu cho Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Tối ưu SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Xóa Metadata | - |
 | `edit-metadata` | Sửa Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Đổi tên hàng loạt | `pattern` (hỗ trợ `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

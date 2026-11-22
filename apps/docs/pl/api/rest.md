@@ -173,6 +173,7 @@ Ustawienia wstępne kompresji działają tak samo. `compress-image-to-20kb`, `co
 | ID narzędzia | Nazwa | Kluczowe ustawienia |
 |---------|------|-------------|
 | `optimize-for-web` | Optymalizacja pod kątem internetu | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optymalizacja SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Usuwanie metadanych | - |
 | `edit-metadata` | Edycja metadanych | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Zmiana nazw zbiorczo | `pattern` (obsługuje `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

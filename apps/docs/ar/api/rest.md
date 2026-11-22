@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | معرّف الأداة | الاسم | الإعدادات الرئيسية |
 |---------|------|-------------|
 | `optimize-for-web` | التحسين للويب | `format` (webp/jpeg/avif/png)، `quality`، `maxWidth`، `maxHeight`، `progressive`، `stripMetadata` |
+| `optimize-svg` | تحسين SVG | `precision` (0-8)، `multipass` (منطقي)، `removeMetadata` (منطقي)، `pretty` (منطقي) |
 | `strip-metadata` | إزالة البيانات الوصفية | - |
 | `edit-metadata` | تحرير البيانات الوصفية | `title`، `description`، `author`، `copyright`، `keywords`، `gps` (خط العرض/خط الطول)، `dateTime` |
 | `bulk-rename` | إعادة التسمية الجماعية | `pattern` (يدعم `{n}` و`{date}` و`{original}`)، `startIndex`، `padding` |

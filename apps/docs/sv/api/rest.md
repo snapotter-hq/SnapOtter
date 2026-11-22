@@ -172,6 +172,7 @@ Komprimeringsförinställningar fungerar på samma sätt. `compress-image-to-20k
 | Verktygs-ID | Namn | Nyckelinställningar |
 |---------|------|-------------|
 | `optimize-for-web` | Optimera för webben | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimera SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Ta bort metadata | - |
 | `edit-metadata` | Redigera metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Massomdöp | `pattern` (stöder `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

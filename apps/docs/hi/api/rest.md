@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | टूल ID | नाम | मुख्य सेटिंग्स |
 |---------|------|-------------|
 | `optimize-for-web` | वेब के लिए ऑप्टिमाइज़ करें | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG ऑप्टिमाइज़ | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | मेटाडेटा हटाएँ | - |
 | `edit-metadata` | मेटाडेटा संपादित करें | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | बल्क रीनेम | `pattern` (`{n}`, `{date}`, `{original}` का समर्थन करता है), `startIndex`, `padding` |

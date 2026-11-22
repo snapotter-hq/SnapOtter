@@ -172,6 +172,7 @@ Preset kompresi bekerja dengan cara yang sama. `compress-image-to-20kb`, `compre
 | ID Tool | Nama | Pengaturan utama |
 |---------|------|-------------|
 | `optimize-for-web` | Optimize for Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimasi SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Strip Metadata | - |
 | `edit-metadata` | Edit Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk Rename | `pattern` (mendukung `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

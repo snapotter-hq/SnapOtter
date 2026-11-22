@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 도구 ID | 이름 | 주요 설정 |
 |---------|------|-------------|
 | `optimize-for-web` | 웹용 최적화 | `format`(webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG 최적화 | `precision`(0-8), `multipass`(bool), `removeMetadata`(bool), `pretty`(bool) |
 | `strip-metadata` | 메타데이터 제거 | - |
 | `edit-metadata` | 메타데이터 편집 | `title`, `description`, `author`, `copyright`, `keywords`, `gps`(lat/lon), `dateTime` |
 | `bulk-rename` | 일괄 이름 변경 | `pattern`(`{n}`, `{date}`, `{original}` 지원), `startIndex`, `padding` |
