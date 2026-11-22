@@ -78,6 +78,19 @@ test.describe("Product Menu", () => {
     await expect(developersLink(page)).toBeHidden();
   });
 
+  // A real click leaves the pointer over the button, so hover alone would keep
+  // the panel showing under aria-expanded="false" (#5197).
+  test("a second real click hides it while the pointer stays over it", async ({ page }) => {
+    await productButton(page).click();
+    await expect(productButton(page)).toHaveAttribute("aria-expanded", "true");
+    await productButton(page).click();
+    await expect(productButton(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(developersLink(page)).toBeHidden();
+    await page.mouse.move(0, 400);
+    await productButton(page).hover();
+    await expect(developersLink(page)).toBeVisible();
+  });
+
   test("Escape closes it and moves focus back to the button", async ({ page }) => {
     await productButton(page).click();
     await page.mouse.move(0, 400);

@@ -52,9 +52,10 @@ const links: NavItem[] = [
       <!-- Product dropdown: hover opens it, and a click toggles data-open (see the
            script below). It used to open on :focus-within instead, but Safari
            doesn't focus a button on mouse click, so clicks did nothing there (#5080).
-           Escape sets data-dismissed to hide a hover-opened panel until the pointer
-           leaves or a click reopens it (WCAG 1.4.13). The panel is a list of links, so the button is a
-           disclosure with no aria-haspopup (#5183). -->
+           Escape, or a click that closes it, sets data-dismissed to hide a hovered
+           panel until the pointer leaves or a click reopens it (WCAG 1.4.13, #5197).
+           The panel is a list of links, so the button is a disclosure with no
+           aria-haspopup (#5183). -->
       <div class="group relative" data-product-menu>
         <button
           type="button"
@@ -211,7 +212,11 @@ const links: NavItem[] = [
       if (open) productMenu.removeAttribute("data-dismissed");
     };
     productButton.addEventListener("click", () => {
-      setOpen(productButton.getAttribute("aria-expanded") !== "true");
+      const open = productButton.getAttribute("aria-expanded") !== "true";
+      setOpen(open);
+      // The pointer is still over the button, so hover alone would keep the
+      // panel showing under aria-expanded="false" (#5197).
+      if (!open && productMenu.matches(":hover")) productMenu.setAttribute("data-dismissed", "");
     });
     document.addEventListener("click", (event) => {
       if (!productMenu.contains(event.target as Node)) setOpen(false);
