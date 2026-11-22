@@ -24225,6 +24225,2166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/mp3-to-flac:
+    post:
+      operationId: mp3ToFlacTool
+      tags:
+        - Audio
+      summary: MP3를 FLAC로
+      description: |
+        MP3를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: MP3에서 FLAC로 변환할 입력 파일(.mp3)
+                settings:
+                  type: string
+                  description: |
+                    MP3에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/mp3-to-ogg:
+    post:
+      operationId: mp3ToOggTool
+      tags:
+        - Audio
+      summary: MP3를 OGG로
+      description: |
+        MP3를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: MP3에서 OGG로 변환할 입력 파일(.mp3)
+                settings:
+                  type: string
+                  description: |
+                    MP3에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/mp3-to-m4a:
+    post:
+      operationId: mp3ToM4aTool
+      tags:
+        - Audio
+      summary: MP3를 M4A로
+      description: |
+        MP3를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: MP3에서 M4A로 변환할 입력 파일(.mp3)
+                settings:
+                  type: string
+                  description: |
+                    MP3에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wav-to-flac:
+    post:
+      operationId: wavToFlacTool
+      tags:
+        - Audio
+      summary: WAV를 FLAC로
+      description: |
+        WAV를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WAV에서 FLAC로 변환할 입력 파일(.wav)
+                settings:
+                  type: string
+                  description: |
+                    WAV에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wav-to-ogg:
+    post:
+      operationId: wavToOggTool
+      tags:
+        - Audio
+      summary: WAV를 OGG로
+      description: |
+        WAV를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WAV에서 OGG로 변환할 입력 파일(.wav)
+                settings:
+                  type: string
+                  description: |
+                    WAV에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wav-to-m4a:
+    post:
+      operationId: wavToM4aTool
+      tags:
+        - Audio
+      summary: WAV를 M4A로
+      description: |
+        WAV를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WAV에서 M4A로 변환할 입력 파일(.wav)
+                settings:
+                  type: string
+                  description: |
+                    WAV에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/flac-to-wav:
+    post:
+      operationId: flacToWavTool
+      tags:
+        - Audio
+      summary: FLAC를 WAV로
+      description: |
+        FLAC를 WAV로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: FLAC에서 WAV로 변환할 입력 파일(.flac)
+                settings:
+                  type: string
+                  description: |
+                    FLAC에서 WAV로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/flac-to-ogg:
+    post:
+      operationId: flacToOggTool
+      tags:
+        - Audio
+      summary: FLAC를 OGG로
+      description: |
+        FLAC를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: FLAC에서 OGG로 변환할 입력 파일(.flac)
+                settings:
+                  type: string
+                  description: |
+                    FLAC에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/flac-to-m4a:
+    post:
+      operationId: flacToM4aTool
+      tags:
+        - Audio
+      summary: FLAC를 M4A로
+      description: |
+        FLAC를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: FLAC에서 M4A로 변환할 입력 파일(.flac)
+                settings:
+                  type: string
+                  description: |
+                    FLAC에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/ogg-to-flac:
+    post:
+      operationId: oggToFlacTool
+      tags:
+        - Audio
+      summary: OGG를 FLAC로
+      description: |
+        OGG를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OGG에서 FLAC로 변환할 입력 파일(.ogg)
+                settings:
+                  type: string
+                  description: |
+                    OGG에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/ogg-to-m4a:
+    post:
+      operationId: oggToM4aTool
+      tags:
+        - Audio
+      summary: OGG를 M4A로
+      description: |
+        OGG를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OGG에서 M4A로 변환할 입력 파일(.ogg)
+                settings:
+                  type: string
+                  description: |
+                    OGG에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/m4a-to-flac:
+    post:
+      operationId: m4aToFlacTool
+      tags:
+        - Audio
+      summary: M4A를 FLAC로
+      description: |
+        M4A를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: M4A에서 FLAC로 변환할 입력 파일(.m4a)
+                settings:
+                  type: string
+                  description: |
+                    M4A에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/m4a-to-ogg:
+    post:
+      operationId: m4aToOggTool
+      tags:
+        - Audio
+      summary: M4A를 OGG로
+      description: |
+        M4A를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: M4A에서 OGG로 변환할 입력 파일(.m4a)
+                settings:
+                  type: string
+                  description: |
+                    M4A에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aac-to-ogg:
+    post:
+      operationId: aacToOggTool
+      tags:
+        - Audio
+      summary: AAC를 OGG로
+      description: |
+        AAC를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AAC에서 OGG로 변환할 입력 파일(.aac)
+                settings:
+                  type: string
+                  description: |
+                    AAC에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aac-to-m4a:
+    post:
+      operationId: aacToM4aTool
+      tags:
+        - Audio
+      summary: AAC를 M4A로
+      description: |
+        AAC를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AAC에서 M4A로 변환할 입력 파일(.aac)
+                settings:
+                  type: string
+                  description: |
+                    AAC에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/opus-to-mp3:
+    post:
+      operationId: opusToMp3Tool
+      tags:
+        - Audio
+      summary: Opus를 MP3로
+      description: |
+        Opus를 MP3로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Opus에서 MP3로 변환할 입력 파일(.opus)
+                settings:
+                  type: string
+                  description: |
+                    Opus에서 MP3로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/opus-to-wav:
+    post:
+      operationId: opusToWavTool
+      tags:
+        - Audio
+      summary: Opus를 WAV로
+      description: |
+        Opus를 WAV로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Opus에서 WAV로 변환할 입력 파일(.opus)
+                settings:
+                  type: string
+                  description: |
+                    Opus에서 WAV로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/opus-to-flac:
+    post:
+      operationId: opusToFlacTool
+      tags:
+        - Audio
+      summary: Opus를 FLAC로
+      description: |
+        Opus를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Opus에서 FLAC로 변환할 입력 파일(.opus)
+                settings:
+                  type: string
+                  description: |
+                    Opus에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/opus-to-ogg:
+    post:
+      operationId: opusToOggTool
+      tags:
+        - Audio
+      summary: Opus를 OGG로
+      description: |
+        Opus를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Opus에서 OGG로 변환할 입력 파일(.opus)
+                settings:
+                  type: string
+                  description: |
+                    Opus에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/opus-to-m4a:
+    post:
+      operationId: opusToM4aTool
+      tags:
+        - Audio
+      summary: Opus를 M4A로
+      description: |
+        Opus를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Opus에서 M4A로 변환할 입력 파일(.opus)
+                settings:
+                  type: string
+                  description: |
+                    Opus에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wma-to-mp3:
+    post:
+      operationId: wmaToMp3Tool
+      tags:
+        - Audio
+      summary: WMA를 MP3로
+      description: |
+        WMA를 MP3로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WMA에서 MP3로 변환할 입력 파일(.wma)
+                settings:
+                  type: string
+                  description: |
+                    WMA에서 MP3로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wma-to-wav:
+    post:
+      operationId: wmaToWavTool
+      tags:
+        - Audio
+      summary: WMA를 WAV로
+      description: |
+        WMA를 WAV로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WMA에서 WAV로 변환할 입력 파일(.wma)
+                settings:
+                  type: string
+                  description: |
+                    WMA에서 WAV로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wma-to-flac:
+    post:
+      operationId: wmaToFlacTool
+      tags:
+        - Audio
+      summary: WMA를 FLAC로
+      description: |
+        WMA를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WMA에서 FLAC로 변환할 입력 파일(.wma)
+                settings:
+                  type: string
+                  description: |
+                    WMA에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wma-to-ogg:
+    post:
+      operationId: wmaToOggTool
+      tags:
+        - Audio
+      summary: WMA를 OGG로
+      description: |
+        WMA를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WMA에서 OGG로 변환할 입력 파일(.wma)
+                settings:
+                  type: string
+                  description: |
+                    WMA에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/wma-to-m4a:
+    post:
+      operationId: wmaToM4aTool
+      tags:
+        - Audio
+      summary: WMA를 M4A로
+      description: |
+        WMA를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WMA에서 M4A로 변환할 입력 파일(.wma)
+                settings:
+                  type: string
+                  description: |
+                    WMA에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aiff-to-mp3:
+    post:
+      operationId: aiffToMp3Tool
+      tags:
+        - Audio
+      summary: AIFF를 MP3로
+      description: |
+        AIFF를 MP3로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AIFF에서 MP3로 변환할 입력 파일(.aiff)
+                settings:
+                  type: string
+                  description: |
+                    AIFF에서 MP3로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aiff-to-wav:
+    post:
+      operationId: aiffToWavTool
+      tags:
+        - Audio
+      summary: AIFF를 WAV로
+      description: |
+        AIFF를 WAV로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AIFF에서 WAV로 변환할 입력 파일(.aiff)
+                settings:
+                  type: string
+                  description: |
+                    AIFF에서 WAV로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aiff-to-flac:
+    post:
+      operationId: aiffToFlacTool
+      tags:
+        - Audio
+      summary: AIFF를 FLAC로
+      description: |
+        AIFF를 FLAC로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AIFF에서 FLAC로 변환할 입력 파일(.aiff)
+                settings:
+                  type: string
+                  description: |
+                    AIFF에서 FLAC로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aiff-to-ogg:
+    post:
+      operationId: aiffToOggTool
+      tags:
+        - Audio
+      summary: AIFF를 OGG로
+      description: |
+        AIFF를 OGG로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AIFF에서 OGG로 변환할 입력 파일(.aiff)
+                settings:
+                  type: string
+                  description: |
+                    AIFF에서 OGG로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/audio/aiff-to-m4a:
+    post:
+      operationId: aiffToM4aTool
+      tags:
+        - Audio
+      summary: AIFF를 M4A로
+      description: |
+        AIFF를 M4A로 변환
+        `convert-audio`이(가) 지원하는 전용 변환 프리셋 엔드포인트입니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: AIFF에서 M4A로 변환할 입력 파일(.aiff)
+                settings:
+                  type: string
+                  description: |
+                    AIFF에서 M4A로 변환하는 전용 변환기(convert-audio 파이프라인 사용).
+                    출력 형식은 엔드포인트가 고정됩니다.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE 진행률 추적용으로 클라이언트가 제공하는 작업 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 처리된 파일
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 잘못된 입력 또는 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 처리 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/tools/files/excel-to-csv:
     post:
       operationId: excelToCsvTool
@@ -28479,6 +30639,246 @@ x-i18n:
       sourceHash: e83797072608
       provenance: machine
       outputHash: 147d17ba3f84
+    paths./api/v1/tools/audio/mp3-to-flac.post.summary:
+      sourceHash: 5d70d5340093
+      provenance: machine
+      outputHash: 88d44c403856
+    paths./api/v1/tools/audio/mp3-to-flac.post.description:
+      sourceHash: c20683c65e4a
+      provenance: machine
+      outputHash: 47852ee4e99c
+    paths./api/v1/tools/audio/mp3-to-ogg.post.summary:
+      sourceHash: b57384583fd6
+      provenance: machine
+      outputHash: 00f10f1abca1
+    paths./api/v1/tools/audio/mp3-to-ogg.post.description:
+      sourceHash: 22953751d0e9
+      provenance: machine
+      outputHash: 5581a1649796
+    paths./api/v1/tools/audio/mp3-to-m4a.post.summary:
+      sourceHash: c451b31caa22
+      provenance: machine
+      outputHash: 654da586f351
+    paths./api/v1/tools/audio/mp3-to-m4a.post.description:
+      sourceHash: 15c7f5c8da40
+      provenance: machine
+      outputHash: 1befd19ccb6a
+    paths./api/v1/tools/audio/wav-to-flac.post.summary:
+      sourceHash: 4154202f2546
+      provenance: machine
+      outputHash: b06b2f1f3c78
+    paths./api/v1/tools/audio/wav-to-flac.post.description:
+      sourceHash: d9c42419851b
+      provenance: machine
+      outputHash: 312b34c94cee
+    paths./api/v1/tools/audio/wav-to-ogg.post.summary:
+      sourceHash: 4117d73e963b
+      provenance: machine
+      outputHash: 68fd91467285
+    paths./api/v1/tools/audio/wav-to-ogg.post.description:
+      sourceHash: dc82174d985b
+      provenance: machine
+      outputHash: 999852ef2bdb
+    paths./api/v1/tools/audio/wav-to-m4a.post.summary:
+      sourceHash: c6d0d396c98d
+      provenance: machine
+      outputHash: 19525d0a28d4
+    paths./api/v1/tools/audio/wav-to-m4a.post.description:
+      sourceHash: 727c8ab99c1c
+      provenance: machine
+      outputHash: d741ddd1089e
+    paths./api/v1/tools/audio/flac-to-wav.post.summary:
+      sourceHash: 748e35013458
+      provenance: machine
+      outputHash: a1130d45c647
+    paths./api/v1/tools/audio/flac-to-wav.post.description:
+      sourceHash: 19ad212f6e92
+      provenance: machine
+      outputHash: 4279718c46ed
+    paths./api/v1/tools/audio/flac-to-ogg.post.summary:
+      sourceHash: 03334d2aa598
+      provenance: machine
+      outputHash: e37e2edb6989
+    paths./api/v1/tools/audio/flac-to-ogg.post.description:
+      sourceHash: ca56bbdf2af2
+      provenance: machine
+      outputHash: 19c5a0b20563
+    paths./api/v1/tools/audio/flac-to-m4a.post.summary:
+      sourceHash: 80d56a649e6d
+      provenance: machine
+      outputHash: c231072a625f
+    paths./api/v1/tools/audio/flac-to-m4a.post.description:
+      sourceHash: bdb307786316
+      provenance: machine
+      outputHash: '055161083311'
+    paths./api/v1/tools/audio/ogg-to-flac.post.summary:
+      sourceHash: dfd21170f01b
+      provenance: machine
+      outputHash: 082700b2c485
+    paths./api/v1/tools/audio/ogg-to-flac.post.description:
+      sourceHash: 10a91789bfaf
+      provenance: machine
+      outputHash: 709e7654f657
+    paths./api/v1/tools/audio/ogg-to-m4a.post.summary:
+      sourceHash: 618b59842500
+      provenance: machine
+      outputHash: 0ab31c09d25e
+    paths./api/v1/tools/audio/ogg-to-m4a.post.description:
+      sourceHash: 519562fb7822
+      provenance: machine
+      outputHash: 77a7f542b1ce
+    paths./api/v1/tools/audio/m4a-to-flac.post.summary:
+      sourceHash: db922c460154
+      provenance: machine
+      outputHash: 6a5dd9c7c5f2
+    paths./api/v1/tools/audio/m4a-to-flac.post.description:
+      sourceHash: 96fdd383b222
+      provenance: machine
+      outputHash: 42b903daa374
+    paths./api/v1/tools/audio/m4a-to-ogg.post.summary:
+      sourceHash: 63d4dc96c667
+      provenance: machine
+      outputHash: 08aed77c649c
+    paths./api/v1/tools/audio/m4a-to-ogg.post.description:
+      sourceHash: 19172a1dc5e0
+      provenance: machine
+      outputHash: 0fc1c81e2ecb
+    paths./api/v1/tools/audio/aac-to-ogg.post.summary:
+      sourceHash: 277112826f7a
+      provenance: machine
+      outputHash: b9bc2ec0105b
+    paths./api/v1/tools/audio/aac-to-ogg.post.description:
+      sourceHash: f91860dbed75
+      provenance: machine
+      outputHash: d9e44e8554e3
+    paths./api/v1/tools/audio/aac-to-m4a.post.summary:
+      sourceHash: 9005c5af15c2
+      provenance: machine
+      outputHash: d0a2bf5614a1
+    paths./api/v1/tools/audio/aac-to-m4a.post.description:
+      sourceHash: 3f7686b17874
+      provenance: machine
+      outputHash: 9d94464ecfed
+    paths./api/v1/tools/audio/opus-to-mp3.post.summary:
+      sourceHash: 4a6a0424c707
+      provenance: machine
+      outputHash: b1806f986746
+    paths./api/v1/tools/audio/opus-to-mp3.post.description:
+      sourceHash: 69c0cf590848
+      provenance: machine
+      outputHash: 746fbcb16031
+    paths./api/v1/tools/audio/opus-to-wav.post.summary:
+      sourceHash: ac33aba186d0
+      provenance: machine
+      outputHash: 5637bae90174
+    paths./api/v1/tools/audio/opus-to-wav.post.description:
+      sourceHash: 0a036dd703bb
+      provenance: machine
+      outputHash: 4217070a7037
+    paths./api/v1/tools/audio/opus-to-flac.post.summary:
+      sourceHash: 3362467b228b
+      provenance: machine
+      outputHash: e7685b3c4881
+    paths./api/v1/tools/audio/opus-to-flac.post.description:
+      sourceHash: 95e4ee6c3972
+      provenance: machine
+      outputHash: c381297172e6
+    paths./api/v1/tools/audio/opus-to-ogg.post.summary:
+      sourceHash: d27e8e1b1ae0
+      provenance: machine
+      outputHash: aa938bdc959f
+    paths./api/v1/tools/audio/opus-to-ogg.post.description:
+      sourceHash: 79e72db33166
+      provenance: machine
+      outputHash: c70c3ca5adfb
+    paths./api/v1/tools/audio/opus-to-m4a.post.summary:
+      sourceHash: a1838954320d
+      provenance: machine
+      outputHash: f0112acd4299
+    paths./api/v1/tools/audio/opus-to-m4a.post.description:
+      sourceHash: 9f46dcaf78be
+      provenance: machine
+      outputHash: 11b3b15a8865
+    paths./api/v1/tools/audio/wma-to-mp3.post.summary:
+      sourceHash: af78f7437362
+      provenance: machine
+      outputHash: ee2615deb474
+    paths./api/v1/tools/audio/wma-to-mp3.post.description:
+      sourceHash: f49b630efb63
+      provenance: machine
+      outputHash: 1599e79768d1
+    paths./api/v1/tools/audio/wma-to-wav.post.summary:
+      sourceHash: f63dd3607687
+      provenance: machine
+      outputHash: 32446287070c
+    paths./api/v1/tools/audio/wma-to-wav.post.description:
+      sourceHash: ff6df8e5cf9c
+      provenance: machine
+      outputHash: 0687594e6e0c
+    paths./api/v1/tools/audio/wma-to-flac.post.summary:
+      sourceHash: 4890bfbc3898
+      provenance: machine
+      outputHash: 68da9b223796
+    paths./api/v1/tools/audio/wma-to-flac.post.description:
+      sourceHash: 08ec22b25bcc
+      provenance: machine
+      outputHash: f2d3a436ae5f
+    paths./api/v1/tools/audio/wma-to-ogg.post.summary:
+      sourceHash: 8706c563fa1f
+      provenance: machine
+      outputHash: 5c54fdbbe1c8
+    paths./api/v1/tools/audio/wma-to-ogg.post.description:
+      sourceHash: bb77d81beb68
+      provenance: machine
+      outputHash: 13743599bd38
+    paths./api/v1/tools/audio/wma-to-m4a.post.summary:
+      sourceHash: 566441be2660
+      provenance: machine
+      outputHash: e453ae062c45
+    paths./api/v1/tools/audio/wma-to-m4a.post.description:
+      sourceHash: 01c80a1a1c38
+      provenance: machine
+      outputHash: e56dda4d6f9d
+    paths./api/v1/tools/audio/aiff-to-mp3.post.summary:
+      sourceHash: 9b4532a0db60
+      provenance: machine
+      outputHash: 6f26dcfbbd90
+    paths./api/v1/tools/audio/aiff-to-mp3.post.description:
+      sourceHash: 57696d2393ea
+      provenance: machine
+      outputHash: 4a57200038ba
+    paths./api/v1/tools/audio/aiff-to-wav.post.summary:
+      sourceHash: 9ca33841159e
+      provenance: machine
+      outputHash: 567e5b660511
+    paths./api/v1/tools/audio/aiff-to-wav.post.description:
+      sourceHash: e5185576db0f
+      provenance: machine
+      outputHash: 666ef0fba858
+    paths./api/v1/tools/audio/aiff-to-flac.post.summary:
+      sourceHash: 11247889a5c3
+      provenance: machine
+      outputHash: a87a97bdf08b
+    paths./api/v1/tools/audio/aiff-to-flac.post.description:
+      sourceHash: 2d0139948968
+      provenance: machine
+      outputHash: 26853831ed3c
+    paths./api/v1/tools/audio/aiff-to-ogg.post.summary:
+      sourceHash: e403da0064ad
+      provenance: machine
+      outputHash: ad83607b2e48
+    paths./api/v1/tools/audio/aiff-to-ogg.post.description:
+      sourceHash: 6241b5f1e577
+      provenance: machine
+      outputHash: 21c2244bd257
+    paths./api/v1/tools/audio/aiff-to-m4a.post.summary:
+      sourceHash: e1e1f493ddad
+      provenance: machine
+      outputHash: 2a0b513a79d3
+    paths./api/v1/tools/audio/aiff-to-m4a.post.description:
+      sourceHash: 39e8cdea07e8
+      provenance: machine
+      outputHash: f7fefd91d5b7
     paths./api/v1/tools/files/excel-to-csv.post.summary:
       sourceHash: 8610a88e662a
       provenance: machine
@@ -37304,6 +39704,846 @@ x-i18n:
       provenance: machine
       outputHash: 3f38a45f6f11
     ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-mp3/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 273575eb4c4c
+      provenance: machine
+      outputHash: 52ebb2e7dc95
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 0454db5e13fa
+      provenance: machine
+      outputHash: 7b7bd59e6019
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 04658727933f
+      provenance: machine
+      outputHash: c1924a95eb27
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 31b92c71637c
+      provenance: machine
+      outputHash: bc193d163d0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 9bb8cdfa6ad4
+      provenance: machine
+      outputHash: 9b70bb7f36f9
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 6c99aa1ab2cf
+      provenance: machine
+      outputHash: 2bb42dbb280d
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1mp3-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 5fa99173b1cc
+      provenance: machine
+      outputHash: 096400edc862
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: ef82132f1868
+      provenance: machine
+      outputHash: 3df76c211edc
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: d6d74c66fe3d
+      provenance: machine
+      outputHash: b7a2460a0184
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 987d0391a7ef
+      provenance: machine
+      outputHash: 42703cc8c85e
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: f107d454e44a
+      provenance: machine
+      outputHash: b2994d6839eb
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: ed31d4871afe
+      provenance: machine
+      outputHash: 92fa4dba5d1f
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wav-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 7535f67020a0
+      provenance: machine
+      outputHash: eea4d7704bf6
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: bfd8f1fdb144
+      provenance: machine
+      outputHash: e3972bf7b1f1
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-wav/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 1fb8a02f23b3
+      provenance: machine
+      outputHash: 7213f99b73f7
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 45bb512a1fd7
+      provenance: machine
+      outputHash: 695525376a35
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: d325acfde9f5
+      provenance: machine
+      outputHash: 37afbca0c560
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: cc6bfe9c63f9
+      provenance: machine
+      outputHash: 75e7fc7b031e
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1flac-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 59ee7cfd6de9
+      provenance: machine
+      outputHash: b55b77d8c6e9
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: cfbfff4f1607
+      provenance: machine
+      outputHash: 1a310733c74f
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4744537b322a
+      provenance: machine
+      outputHash: 32aade5f1fd6
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 966db7d0b114
+      provenance: machine
+      outputHash: a1ad8aa6720d
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1ogg-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 69ad6c098728
+      provenance: machine
+      outputHash: 1fe2bc73272c
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 4f1d2605ee26
+      provenance: machine
+      outputHash: b6a68b4aeb99
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4aa5dd5fd568
+      provenance: machine
+      outputHash: 9eac85e66228
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 234efcf0ab00
+      provenance: machine
+      outputHash: 9a7303f0c57e
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1m4a-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: c622b83b1628
+      provenance: machine
+      outputHash: 79e875e2807a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 40a5bd55ce25
+      provenance: machine
+      outputHash: af486a1620b0
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 016c8b00ed1e
+      provenance: machine
+      outputHash: 0402e375b7dc
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 3343898a8574
+      provenance: machine
+      outputHash: 94ff25047bd0
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aac-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4cfed0f80f69
+      provenance: machine
+      outputHash: 0907c16206cf
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 9fa869ccdbe9
+      provenance: machine
+      outputHash: e659f0e39fa4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-mp3/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: a614e1a53d2c
+      provenance: machine
+      outputHash: 07d84f0d77c4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 05a1a255783b
+      provenance: machine
+      outputHash: 1b5ac8ec2ac8
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-wav/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: b4a6e68dece3
+      provenance: machine
+      outputHash: 4f0c8ab21018
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 71b950d28ea1
+      provenance: machine
+      outputHash: 9777f92cfa51
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 2443b7279647
+      provenance: machine
+      outputHash: 8c5ecfcc84df
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 044a18356a82
+      provenance: machine
+      outputHash: 2b20760aa87c
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 0e41b0baf8fc
+      provenance: machine
+      outputHash: ad3f9402c380
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 42a3e99d1105
+      provenance: machine
+      outputHash: 9ae073c99cc9
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1opus-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 016bb54fa2c2
+      provenance: machine
+      outputHash: 6351c4e093fb
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 3c55d3deb123
+      provenance: machine
+      outputHash: 6610395bff8b
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-mp3/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 3b49243ae57e
+      provenance: machine
+      outputHash: 6e1d22bdedb4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 1b26801f7cd7
+      provenance: machine
+      outputHash: 8dac5d944c00
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-wav/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 0d5de3510138
+      provenance: machine
+      outputHash: fd6d73683044
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 792c5a4d0808
+      provenance: machine
+      outputHash: a1c633536cc2
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: a48a7f56e36b
+      provenance: machine
+      outputHash: 17f48029f389
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: d9ec3dafdd10
+      provenance: machine
+      outputHash: 1ded6575145a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 06a46e9aa44e
+      provenance: machine
+      outputHash: 387725f62ba6
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: aff260cf382f
+      provenance: machine
+      outputHash: f8f27979ab75
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1wma-to-m4a/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 35dda7e39d0a
+      provenance: machine
+      outputHash: 3e19842f945d
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 86acbc62f4c8
+      provenance: machine
+      outputHash: 63407735b7f2
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-mp3/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 5137617d30d7
+      provenance: machine
+      outputHash: 528066f952d1
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 855b53ede351
+      provenance: machine
+      outputHash: 17c1afde7416
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-wav/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 181843e361ab
+      provenance: machine
+      outputHash: ea8d5574d241
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 3a12ee328b33
+      provenance: machine
+      outputHash: 64d4dea8566e
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-flac/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: c1afdcf64a04
+      provenance: machine
+      outputHash: 25e11cec6deb
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 5897a747764e
+      provenance: machine
+      outputHash: 8371b65e9fb2
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 5b493f828da9
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 44d130b0a2bf
+      provenance: machine
+      outputHash: 8c2fce5e2a9f
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 6efdee37a1a0
+      provenance: machine
+      outputHash: b2ae44ab9b8a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 3eb524f67cf4
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: c54ecca17662
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 963e4d680e0a
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1audio~1aiff-to-m4a/post/responses/422/description:
       sourceHash: 88ca7e4a48e4
       provenance: machine
       outputHash: 5b493f828da9

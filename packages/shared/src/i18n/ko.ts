@@ -554,6 +554,126 @@ export const ko: TranslationKeys = {
       name: "FLAC을(를) MP3(으)로",
       description: "FLAC을(를) MP3(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
     },
+    "mp3-to-flac": {
+      name: "MP3을(를) FLAC(으)로",
+      description: "MP3을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "mp3-to-ogg": {
+      name: "MP3을(를) OGG(으)로",
+      description: "MP3을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "mp3-to-m4a": {
+      name: "MP3을(를) M4A(으)로",
+      description: "MP3을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wav-to-flac": {
+      name: "WAV을(를) FLAC(으)로",
+      description: "WAV을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wav-to-ogg": {
+      name: "WAV을(를) OGG(으)로",
+      description: "WAV을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wav-to-m4a": {
+      name: "WAV을(를) M4A(으)로",
+      description: "WAV을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "flac-to-wav": {
+      name: "FLAC을(를) WAV(으)로",
+      description: "FLAC을(를) WAV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "flac-to-ogg": {
+      name: "FLAC을(를) OGG(으)로",
+      description: "FLAC을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "flac-to-m4a": {
+      name: "FLAC을(를) M4A(으)로",
+      description: "FLAC을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "ogg-to-flac": {
+      name: "OGG을(를) FLAC(으)로",
+      description: "OGG을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "ogg-to-m4a": {
+      name: "OGG을(를) M4A(으)로",
+      description: "OGG을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "m4a-to-flac": {
+      name: "M4A을(를) FLAC(으)로",
+      description: "M4A을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "m4a-to-ogg": {
+      name: "M4A을(를) OGG(으)로",
+      description: "M4A을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aac-to-ogg": {
+      name: "AAC을(를) OGG(으)로",
+      description: "AAC을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aac-to-m4a": {
+      name: "AAC을(를) M4A(으)로",
+      description: "AAC을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "opus-to-mp3": {
+      name: "Opus을(를) MP3(으)로",
+      description: "Opus을(를) MP3(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "opus-to-wav": {
+      name: "Opus을(를) WAV(으)로",
+      description: "Opus을(를) WAV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "opus-to-flac": {
+      name: "Opus을(를) FLAC(으)로",
+      description: "Opus을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "opus-to-ogg": {
+      name: "Opus을(를) OGG(으)로",
+      description: "Opus을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "opus-to-m4a": {
+      name: "Opus을(를) M4A(으)로",
+      description: "Opus을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wma-to-mp3": {
+      name: "WMA을(를) MP3(으)로",
+      description: "WMA을(를) MP3(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wma-to-wav": {
+      name: "WMA을(를) WAV(으)로",
+      description: "WMA을(를) WAV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wma-to-flac": {
+      name: "WMA을(를) FLAC(으)로",
+      description: "WMA을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wma-to-ogg": {
+      name: "WMA을(를) OGG(으)로",
+      description: "WMA을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "wma-to-m4a": {
+      name: "WMA을(를) M4A(으)로",
+      description: "WMA을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aiff-to-mp3": {
+      name: "AIFF을(를) MP3(으)로",
+      description: "AIFF을(를) MP3(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aiff-to-wav": {
+      name: "AIFF을(를) WAV(으)로",
+      description: "AIFF을(를) WAV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aiff-to-flac": {
+      name: "AIFF을(를) FLAC(으)로",
+      description: "AIFF을(를) FLAC(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF을(를) OGG(으)로",
+      description: "AIFF을(를) OGG(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF을(를) M4A(으)로",
+      description: "AIFF을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
     "excel-to-csv": {
       name: "Excel을(를) CSV(으)로",
       description: "Excel을(를) CSV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",

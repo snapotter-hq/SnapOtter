@@ -6503,6 +6503,276 @@
     "isAI": false
   },
   {
+    "id": "mp3-to-flac",
+    "name": "MP3 to FLAC",
+    "modality": "audio",
+    "route": "/audio/mp3-to-flac",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp3-to-ogg",
+    "name": "MP3 to OGG",
+    "modality": "audio",
+    "route": "/audio/mp3-to-ogg",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "mp3-to-m4a",
+    "name": "MP3 to M4A",
+    "modality": "audio",
+    "route": "/audio/mp3-to-m4a",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wav-to-flac",
+    "name": "WAV to FLAC",
+    "modality": "audio",
+    "route": "/audio/wav-to-flac",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wav-to-ogg",
+    "name": "WAV to OGG",
+    "modality": "audio",
+    "route": "/audio/wav-to-ogg",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wav-to-m4a",
+    "name": "WAV to M4A",
+    "modality": "audio",
+    "route": "/audio/wav-to-m4a",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "flac-to-wav",
+    "name": "FLAC to WAV",
+    "modality": "audio",
+    "route": "/audio/flac-to-wav",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "flac-to-ogg",
+    "name": "FLAC to OGG",
+    "modality": "audio",
+    "route": "/audio/flac-to-ogg",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "flac-to-m4a",
+    "name": "FLAC to M4A",
+    "modality": "audio",
+    "route": "/audio/flac-to-m4a",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ogg-to-flac",
+    "name": "OGG to FLAC",
+    "modality": "audio",
+    "route": "/audio/ogg-to-flac",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ogg-to-m4a",
+    "name": "OGG to M4A",
+    "modality": "audio",
+    "route": "/audio/ogg-to-m4a",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "m4a-to-flac",
+    "name": "M4A to FLAC",
+    "modality": "audio",
+    "route": "/audio/m4a-to-flac",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "m4a-to-ogg",
+    "name": "M4A to OGG",
+    "modality": "audio",
+    "route": "/audio/m4a-to-ogg",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aac-to-ogg",
+    "name": "AAC to OGG",
+    "modality": "audio",
+    "route": "/audio/aac-to-ogg",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aac-to-m4a",
+    "name": "AAC to M4A",
+    "modality": "audio",
+    "route": "/audio/aac-to-m4a",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "opus-to-mp3",
+    "name": "Opus to MP3",
+    "modality": "audio",
+    "route": "/audio/opus-to-mp3",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "opus-to-wav",
+    "name": "Opus to WAV",
+    "modality": "audio",
+    "route": "/audio/opus-to-wav",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "opus-to-flac",
+    "name": "Opus to FLAC",
+    "modality": "audio",
+    "route": "/audio/opus-to-flac",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "opus-to-ogg",
+    "name": "Opus to OGG",
+    "modality": "audio",
+    "route": "/audio/opus-to-ogg",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "opus-to-m4a",
+    "name": "Opus to M4A",
+    "modality": "audio",
+    "route": "/audio/opus-to-m4a",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wma-to-mp3",
+    "name": "WMA to MP3",
+    "modality": "audio",
+    "route": "/audio/wma-to-mp3",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wma-to-wav",
+    "name": "WMA to WAV",
+    "modality": "audio",
+    "route": "/audio/wma-to-wav",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wma-to-flac",
+    "name": "WMA to FLAC",
+    "modality": "audio",
+    "route": "/audio/wma-to-flac",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wma-to-ogg",
+    "name": "WMA to OGG",
+    "modality": "audio",
+    "route": "/audio/wma-to-ogg",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "wma-to-m4a",
+    "name": "WMA to M4A",
+    "modality": "audio",
+    "route": "/audio/wma-to-m4a",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aiff-to-mp3",
+    "name": "AIFF to MP3",
+    "modality": "audio",
+    "route": "/audio/aiff-to-mp3",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aiff-to-wav",
+    "name": "AIFF to WAV",
+    "modality": "audio",
+    "route": "/audio/aiff-to-wav",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aiff-to-flac",
+    "name": "AIFF to FLAC",
+    "modality": "audio",
+    "route": "/audio/aiff-to-flac",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aiff-to-ogg",
+    "name": "AIFF to OGG",
+    "modality": "audio",
+    "route": "/audio/aiff-to-ogg",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "aiff-to-m4a",
+    "name": "AIFF to M4A",
+    "modality": "audio",
+    "route": "/audio/aiff-to-m4a",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "excel-to-csv",
     "name": "Excel to CSV",
     "modality": "document",

@@ -37,7 +37,7 @@ interface FixtureSpec {
 
 /**
  * Map a source extension to a REAL fixture on disk plus its mime type. Every
- * extension actually used as the first `sourceInputs` entry across the 83
+ * extension actually used as the first `sourceInputs` entry across the
  * presets is wired here. Returns null when no fixture is mapped, which makes
  * the affected preset skip loudly (see the missing-fixture tracking below)
  * instead of faking coverage.
@@ -91,6 +91,12 @@ function specForExt(ext: string): FixtureSpec | null {
       return { path: fixtures.audio.tiny("mp3"), mime: "audio/mpeg" };
     case ".flac":
       return { path: fixtures.audio.tiny("flac"), mime: "audio/flac" };
+    case ".opus":
+      return { path: fixtures.audio.tiny("opus"), mime: "audio/opus" };
+    case ".wma":
+      return { path: fixtures.audio.tiny("wma"), mime: "audio/x-ms-wma" };
+    case ".aiff":
+      return { path: fixtures.audio.tiny("aiff"), mime: "audio/aiff" };
     case ".xlsx":
     case ".xls":
       return {

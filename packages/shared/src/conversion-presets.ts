@@ -124,6 +124,15 @@ const PSD = [".psd"];
 const EPS = [".eps"];
 const SVG = [".svg", ".svgz"];
 const PDF = [".pdf"];
+const MP3 = [".mp3"];
+const WAV = [".wav"];
+const FLAC = [".flac"];
+const AAC = [".aac"];
+const M4A = [".m4a"];
+const OGG = [".ogg"];
+const OPUS = [".opus"];
+const WMA = [".wma"];
+const AIFF = [".aiff"];
 
 /** image raster pairs on `convert` */
 function img(
@@ -134,6 +143,17 @@ function img(
   sourceInputs: string[],
 ): ConversionPreset {
   return { id, from, to, base: "convert", locked: { format }, sourceInputs };
+}
+
+/** audio pairs on `convert-audio` */
+function aud(
+  id: string,
+  from: string,
+  to: string,
+  format: string,
+  sourceInputs: string[],
+): ConversionPreset {
+  return { id, from, to, base: "convert-audio", locked: { format }, sourceInputs };
 }
 
 export const CONVERSION_PRESETS: ConversionPreset[] = [
@@ -479,86 +499,46 @@ export const CONVERSION_PRESETS: ConversionPreset[] = [
   }, // Tweak
 
   // Audio (base: convert-audio)
-  {
-    id: "m4a-to-mp3",
-    from: "M4A",
-    to: "MP3",
-    base: "convert-audio",
-    locked: { format: "mp3" },
-    sourceInputs: [".m4a"],
-  },
-  {
-    id: "m4a-to-wav",
-    from: "M4A",
-    to: "WAV",
-    base: "convert-audio",
-    locked: { format: "wav" },
-    sourceInputs: [".m4a"],
-  },
-  {
-    id: "aac-to-mp3",
-    from: "AAC",
-    to: "MP3",
-    base: "convert-audio",
-    locked: { format: "mp3" },
-    sourceInputs: [".aac"],
-  },
-  {
-    id: "aac-to-wav",
-    from: "AAC",
-    to: "WAV",
-    base: "convert-audio",
-    locked: { format: "wav" },
-    sourceInputs: [".aac"],
-  },
-  {
-    id: "aac-to-flac",
-    from: "AAC",
-    to: "FLAC",
-    base: "convert-audio",
-    locked: { format: "flac" },
-    sourceInputs: [".aac"],
-  },
-  {
-    id: "ogg-to-mp3",
-    from: "OGG",
-    to: "MP3",
-    base: "convert-audio",
-    locked: { format: "mp3" },
-    sourceInputs: [".ogg"],
-  },
-  {
-    id: "ogg-to-wav",
-    from: "OGG",
-    to: "WAV",
-    base: "convert-audio",
-    locked: { format: "wav" },
-    sourceInputs: [".ogg"],
-  },
-  {
-    id: "wav-to-mp3",
-    from: "WAV",
-    to: "MP3",
-    base: "convert-audio",
-    locked: { format: "mp3" },
-    sourceInputs: [".wav"],
-  },
-  {
-    id: "mp3-to-wav",
-    from: "MP3",
-    to: "WAV",
-    base: "convert-audio",
-    locked: { format: "wav" },
-    sourceInputs: [".mp3"],
-  },
-  {
-    id: "flac-to-mp3",
-    from: "FLAC",
-    to: "MP3",
-    base: "convert-audio",
-    locked: { format: "mp3" },
-    sourceInputs: [".flac"],
-  },
+  aud("m4a-to-mp3", "M4A", "MP3", "mp3", M4A),
+  aud("m4a-to-wav", "M4A", "WAV", "wav", M4A),
+  aud("aac-to-mp3", "AAC", "MP3", "mp3", AAC),
+  aud("aac-to-wav", "AAC", "WAV", "wav", AAC),
+  aud("aac-to-flac", "AAC", "FLAC", "flac", AAC),
+  aud("ogg-to-mp3", "OGG", "MP3", "mp3", OGG),
+  aud("ogg-to-wav", "OGG", "WAV", "wav", OGG),
+  aud("wav-to-mp3", "WAV", "MP3", "mp3", WAV),
+  aud("mp3-to-wav", "MP3", "WAV", "wav", MP3),
+  aud("flac-to-mp3", "FLAC", "MP3", "mp3", FLAC),
+  aud("mp3-to-flac", "MP3", "FLAC", "flac", MP3),
+  aud("mp3-to-ogg", "MP3", "OGG", "ogg", MP3),
+  aud("mp3-to-m4a", "MP3", "M4A", "m4a", MP3),
+  aud("wav-to-flac", "WAV", "FLAC", "flac", WAV),
+  aud("wav-to-ogg", "WAV", "OGG", "ogg", WAV),
+  aud("wav-to-m4a", "WAV", "M4A", "m4a", WAV),
+  aud("flac-to-wav", "FLAC", "WAV", "wav", FLAC),
+  aud("flac-to-ogg", "FLAC", "OGG", "ogg", FLAC),
+  aud("flac-to-m4a", "FLAC", "M4A", "m4a", FLAC),
+  aud("ogg-to-flac", "OGG", "FLAC", "flac", OGG),
+  aud("ogg-to-m4a", "OGG", "M4A", "m4a", OGG),
+  aud("m4a-to-flac", "M4A", "FLAC", "flac", M4A),
+  aud("m4a-to-ogg", "M4A", "OGG", "ogg", M4A),
+  aud("aac-to-ogg", "AAC", "OGG", "ogg", AAC),
+  aud("aac-to-m4a", "AAC", "M4A", "m4a", AAC),
+  aud("opus-to-mp3", "Opus", "MP3", "mp3", OPUS),
+  aud("opus-to-wav", "Opus", "WAV", "wav", OPUS),
+  aud("opus-to-flac", "Opus", "FLAC", "flac", OPUS),
+  aud("opus-to-ogg", "Opus", "OGG", "ogg", OPUS),
+  aud("opus-to-m4a", "Opus", "M4A", "m4a", OPUS),
+  aud("wma-to-mp3", "WMA", "MP3", "mp3", WMA),
+  aud("wma-to-wav", "WMA", "WAV", "wav", WMA),
+  aud("wma-to-flac", "WMA", "FLAC", "flac", WMA),
+  aud("wma-to-ogg", "WMA", "OGG", "ogg", WMA),
+  aud("wma-to-m4a", "WMA", "M4A", "m4a", WMA),
+  aud("aiff-to-mp3", "AIFF", "MP3", "mp3", AIFF),
+  aud("aiff-to-wav", "AIFF", "WAV", "wav", AIFF),
+  aud("aiff-to-flac", "AIFF", "FLAC", "flac", AIFF),
+  aud("aiff-to-ogg", "AIFF", "OGG", "ogg", AIFF),
+  aud("aiff-to-m4a", "AIFF", "M4A", "m4a", AIFF),
 
   // Data (base: convert-spreadsheet)
   {

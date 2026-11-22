@@ -387,6 +387,90 @@ export const hi: TranslationKeys = {
       name: "FLAC से MP3",
       description: "FLAC को MP3 में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
     },
+    "mp3-to-flac": {
+      name: "MP3 से FLAC",
+      description: "MP3 को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "mp3-to-ogg": { name: "MP3 से OGG", description: "MP3 को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "mp3-to-m4a": { name: "MP3 से M4A", description: "MP3 को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "wav-to-flac": {
+      name: "WAV से FLAC",
+      description: "WAV को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "wav-to-ogg": { name: "WAV से OGG", description: "WAV को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "wav-to-m4a": { name: "WAV से M4A", description: "WAV को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "flac-to-wav": {
+      name: "FLAC से WAV",
+      description: "FLAC को WAV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "flac-to-ogg": {
+      name: "FLAC से OGG",
+      description: "FLAC को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "flac-to-m4a": {
+      name: "FLAC से M4A",
+      description: "FLAC को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "ogg-to-flac": {
+      name: "OGG से FLAC",
+      description: "OGG को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "ogg-to-m4a": { name: "OGG से M4A", description: "OGG को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "m4a-to-flac": {
+      name: "M4A से FLAC",
+      description: "M4A को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "m4a-to-ogg": { name: "M4A से OGG", description: "M4A को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "aac-to-ogg": { name: "AAC से OGG", description: "AAC को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "aac-to-m4a": { name: "AAC से M4A", description: "AAC को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "opus-to-mp3": {
+      name: "Opus से MP3",
+      description: "Opus को MP3 में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "opus-to-wav": {
+      name: "Opus से WAV",
+      description: "Opus को WAV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "opus-to-flac": {
+      name: "Opus से FLAC",
+      description: "Opus को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "opus-to-ogg": {
+      name: "Opus से OGG",
+      description: "Opus को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "opus-to-m4a": {
+      name: "Opus से M4A",
+      description: "Opus को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "wma-to-mp3": { name: "WMA से MP3", description: "WMA को MP3 में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "wma-to-wav": { name: "WMA से WAV", description: "WMA को WAV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "wma-to-flac": {
+      name: "WMA से FLAC",
+      description: "WMA को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "wma-to-ogg": { name: "WMA से OGG", description: "WMA को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "wma-to-m4a": { name: "WMA से M4A", description: "WMA को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "aiff-to-mp3": {
+      name: "AIFF से MP3",
+      description: "AIFF को MP3 में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "aiff-to-wav": {
+      name: "AIFF से WAV",
+      description: "AIFF को WAV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "aiff-to-flac": {
+      name: "AIFF से FLAC",
+      description: "AIFF को FLAC में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "aiff-to-ogg": {
+      name: "AIFF से OGG",
+      description: "AIFF को OGG में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
+    "aiff-to-m4a": {
+      name: "AIFF से M4A",
+      description: "AIFF को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
+    },
     "excel-to-csv": {
       name: "Excel से CSV",
       description: "Excel को CSV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",

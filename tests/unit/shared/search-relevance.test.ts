@@ -190,7 +190,9 @@ describe("unnamedFormatKeywords", () => {
 
   it("is applied to the shipped catalog", () => {
     const keywordsOf = (id: string) => TOOLS.find((entry) => entry.id === id)?.keywords ?? [];
-    expect(keywordsOf("convert-audio")).toEqual(expect.arrayContaining(["opus", "wma"]));
+    expect(keywordsOf("convert-audio")).toEqual(expect.arrayContaining(["amr", "ac3"]));
+    // The #1099 presets name opus and wma, so those rank the presets instead.
+    expect(keywordsOf("convert-audio")).not.toContain("opus");
     expect(keywordsOf("convert")).toEqual(expect.arrayContaining(["nef", "arw", "cr2", "dng"]));
     expect(keywordsOf("convert")).not.toContain("png");
   });
