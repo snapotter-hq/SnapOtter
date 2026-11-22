@@ -15,9 +15,11 @@ vi.mock("@/components/common/waveform-player", () => ({
 }));
 
 import { FilePreview } from "@/components/files/file-details";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 
 beforeEach(() => {
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   storage.clear();
   vi.stubGlobal("localStorage", {
     getItem: (k: string) => storage.get(k) ?? null,

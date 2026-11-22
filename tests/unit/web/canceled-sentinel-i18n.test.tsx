@@ -22,7 +22,7 @@ import { ComposeSettings } from "@/components/tools/compose-settings";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { AutomatePage } from "@/pages/automate-page";
 import { ToolPage } from "@/pages/tool-page";
@@ -74,6 +74,8 @@ function seedCanceledEntry(opts?: { count?: number; mime?: string; name?: string
 describe("Canceled sentinel translation across pipeline processor, preview cards, and tool panels (#4008)", () => {
   beforeEach(() => {
     storageMap.clear();
+    // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+    vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
     vi.stubGlobal("localStorage", localStorageMock);
     vi.stubGlobal(
       "URL",

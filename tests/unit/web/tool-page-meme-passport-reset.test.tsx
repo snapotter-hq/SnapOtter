@@ -19,7 +19,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 import { en } from "@snapotter/shared";
 import { de } from "@snapotter/shared/i18n/de.js";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { useWorkInFlight } from "@/hooks/use-work-in-flight";
 import { ToolPage } from "@/pages/tool-page";
 import { useDuplicateStore } from "@/stores/duplicate-store";
@@ -136,6 +136,8 @@ function renderRoutes(
 }
 
 beforeEach(() => {
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   storageMap.clear();
   analyzeCalls = [];
   mobileMatches = false;

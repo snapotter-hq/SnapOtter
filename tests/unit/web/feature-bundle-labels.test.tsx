@@ -34,7 +34,7 @@ import { TemplateCard } from "@/components/automate/template-card";
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { AiInstallIndicator } from "@/components/layout/ai-install-indicator";
 import { AiFeaturesSection } from "@/components/settings/ai-features-section";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -56,6 +56,8 @@ function bundleState(id: string, overrides: Partial<FeatureBundleState> = {}): F
 
 function renderDe(ui: React.ReactNode) {
   storage.set("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 

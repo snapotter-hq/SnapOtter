@@ -54,7 +54,7 @@ import {
   SystemSection,
   TeamsSection,
 } from "@/components/settings/settings-dialog";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { useAnalyticsStore } from "@/stores/analytics-store";
 
@@ -92,6 +92,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
   storage.clear();
   storage.set("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   useAuth.mockReturnValue({
     loading: false,
     permissions: ["security:manage", "users:manage", "roles:manage", "teams:manage"],

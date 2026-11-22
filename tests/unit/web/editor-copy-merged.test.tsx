@@ -49,7 +49,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 import { de } from "@snapotter/shared/i18n/de.js";
 import { en } from "@snapotter/shared/i18n/en.js";
 import { EditorMenuBar } from "@/components/editor/editor-menu-bar";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { hotkeysModIsMeta } from "@/lib/platform";
 import { useEditorStore } from "@/stores/editor-store";
@@ -143,6 +143,8 @@ async function settle() {
 beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "en");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   useEditorStore.setState(INITIAL_STATE, true);
   stageHolder.current = null;
   copyImage.mockReset();

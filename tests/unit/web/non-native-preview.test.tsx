@@ -15,7 +15,7 @@ vi.stubGlobal("localStorage", {
 });
 
 import { NonNativePreview } from "@/components/common/non-native-preview";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 
 // The en catalog matches the old hardcoded English lines byte for byte, so
 // only a non-en render proves the rotating line comes from the catalog (#1269).
@@ -24,8 +24,10 @@ describe("NonNativePreview rotating progress line", () => {
 
   beforeEach(() => {
     storage.set("snapotter-locale", "de");
+    // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+    vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
     // Only the rotation interval is faked; the provider loads `de` through
-    // real promises and timeouts, which findByRole waits on.
+    // a stubbed but still async loader, which findByRole waits on.
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     // Keep the preview in its generating state for the whole test.
     vi.stubGlobal(
@@ -38,6 +40,7 @@ describe("NonNativePreview rotating progress line", () => {
     cleanup();
     storage.clear();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.stubGlobal("localStorage", {
       getItem: (k: string) => storage.get(k) ?? null,

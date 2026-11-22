@@ -31,13 +31,15 @@ vi.stubGlobal("localStorage", {
 
 import { ColorSettings } from "@/components/tools/color-settings";
 import { SharpeningSettings } from "@/components/tools/sharpening-settings";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { COLLAGE_TEMPLATES, collageTemplateLabel } from "@/lib/collage-templates";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
 
 function renderDe(ui: React.ReactNode) {
   storage.set("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 
@@ -79,6 +81,7 @@ afterEach(() => {
   cleanup();
   useFileStore.setState({ files: [], entries: [], selectedIndex: 0 });
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("shared-data labels are translatable (#906 follow-up)", () => {

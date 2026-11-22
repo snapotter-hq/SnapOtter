@@ -25,7 +25,7 @@ vi.stubGlobal("localStorage", {
 
 import { ContentAwareResizeControls } from "@/components/tools/content-aware-resize-settings";
 import { SmartCropControls } from "@/components/tools/smart-crop-settings";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 
 const smartCropEn = en.toolSettings["smart-crop"];
 const smartCropDe = de.toolSettings["smart-crop"];
@@ -34,6 +34,8 @@ const resizeDe = de.toolSettings["content-aware-resize"];
 
 function renderDe(ui: React.ReactNode) {
   storage.set("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 
@@ -50,6 +52,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("hint icons read the active locale (#2061)", () => {
