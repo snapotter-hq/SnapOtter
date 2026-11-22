@@ -8,7 +8,7 @@ import {
   generateLocaleLlmsTxt,
   resolveSpecFile,
 } from "../../../apps/api/src/routes/openapi-i18n.js";
-import { proseFields } from "../../../scripts/i18n/adapters/api-spec.mjs";
+import { makeApiSpecAdapter, proseFields } from "../../../scripts/i18n/adapters/api-spec.mjs";
 import { hash } from "../../../scripts/i18n/lib/hash.mjs";
 
 describe("resolveSpecFile", () => {
@@ -240,4 +240,38 @@ describe("OpenAPI intro positioning (#4916)", () => {
       for (const phrase of retired) expect(first, `${file}: ${phrase}`).not.toContain(phrase);
     }
   });
+});
+
+describe("locale specs match what the i18n adapter writes (#5012)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const locales = readdirSync(specDir)
+    .map((f) => f.match(/^openapi\.([A-Za-z-]+)\.yaml$/)?.[1])
+    .filter((l): l is string => Boolean(l));
+  const adapter = makeApiSpecAdapter({ dir: specDir });
+  // A hand edit here shows up as unrelated churn in the next import's diff. To
+  // regenerate, write `{}` to .i18n-batches/api.<locale>.done.json for each
+  // locale and run `pnpm i18n:translate --import --surface=api`.
+  const regenerate =
+    "the adapter's next write would rewrite this file; regenerate it through the adapter";
+
+  it("finds all 20 locale specs", () => {
+    expect(locales).toHaveLength(20);
+  });
+
+  it.each(locales)("openapi.%s.yaml is byte-identical to the adapter's output", async (locale) => {
+    const onDisk = readFileSync(join(specDir, `openapi.${locale}.yaml`), "utf8");
+    const rendered = adapter.render(locale, await adapter.load(locale));
+    expect(rendered === onDisk, regenerate).toBe(true);
+  });
+
+  it.each(locales)(
+    "openapi.%s.yaml machine entries still match their outputHash",
+    async (locale) => {
+      const drifted = [...(await adapter.load(locale))]
+        .filter(([, e]) => e.provenance === "machine" && hash(e.text) !== e.outputHash)
+        .map(([id]) => id);
+      // An import would flip each of these to provenance: human.
+      expect(drifted).toEqual([]);
+    },
+  );
 });

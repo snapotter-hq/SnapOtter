@@ -142,6 +142,54 @@ export function setProseField(spec, id, value) {
  * @param {{ dir?: string }} [opts]
  */
 export function makeApiSpecAdapter({ dir = DEFAULT_DIR } = {}) {
+  /**
+   * Build the locale spec text that write() puts on disk, without writing it.
+   * @param {string} locale
+   * @param {Map<string, import("../core.mjs").StoredEntry>} entries
+   * @returns {string}
+   */
+  function render(locale, entries) {
+    const english = loadEnglishSpec(dir);
+    const localized = clone(english);
+    const stamp = {};
+    const file = join(dir, `openapi.${locale}.yaml`);
+    // Text already in the locale file but unstamped (hand-written, or added
+    // before the stamp existed) survives a write that has no entry for it. A
+    // partial import used to put English back over it (#5012). It stays
+    // unstamped, so the next export still offers it for translation. The cost:
+    // an English fallback copied in by an earlier write no longer follows later
+    // English edits until that unit is translated.
+    const current = existsSync(file)
+      ? new Map(proseFields(yaml.load(readFileSync(file, "utf8"))))
+      : new Map();
+
+    // Replace only the prose fields that have a translation or existing locale
+    // text; anything else keeps its English text so the document is always
+    // complete and valid.
+    for (const [id] of proseFields(english)) {
+      const entry = entries.get(id);
+      if (!entry) {
+        if (current.has(id)) setProseField(localized, id, current.get(id));
+        continue;
+      }
+      setProseField(localized, id, entry.text);
+      stamp[id] = {
+        sourceHash: entry.sourceHash,
+        provenance: entry.provenance,
+        outputHash: entry.outputHash,
+        ...(entry.stale ? { stale: true } : {}),
+      };
+    }
+
+    localized["x-i18n"] = {
+      locale,
+      generator: "scripts/i18n/adapters/api-spec.mjs",
+      entries: stamp,
+    };
+
+    return yaml.dump(localized, { lineWidth: -1, noRefs: true });
+  }
+
   return {
     name: "api",
     async extract() {
@@ -149,33 +197,10 @@ export function makeApiSpecAdapter({ dir = DEFAULT_DIR } = {}) {
       return proseFields(spec).map(([id, sourceText]) => ({ id, sourceText, kind: "text" }));
     },
 
+    render,
+
     async write(locale, entries) {
-      const english = loadEnglishSpec(dir);
-      const localized = clone(english);
-      const stamp = {};
-
-      // Replace only the prose fields that have a translation; anything missing
-      // keeps its English text so the document is always complete and valid.
-      for (const [id] of proseFields(english)) {
-        const entry = entries.get(id);
-        if (!entry) continue;
-        setProseField(localized, id, entry.text);
-        stamp[id] = {
-          sourceHash: entry.sourceHash,
-          provenance: entry.provenance,
-          outputHash: entry.outputHash,
-          ...(entry.stale ? { stale: true } : {}),
-        };
-      }
-
-      localized["x-i18n"] = {
-        locale,
-        generator: "scripts/i18n/adapters/api-spec.mjs",
-        entries: stamp,
-      };
-
-      const out = yaml.dump(localized, { lineWidth: -1, noRefs: true });
-      writeFileSync(join(dir, `openapi.${locale}.yaml`), out, "utf8");
+      writeFileSync(join(dir, `openapi.${locale}.yaml`), render(locale, entries), "utf8");
     },
 
     async load(locale) {
