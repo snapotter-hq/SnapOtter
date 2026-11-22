@@ -80,14 +80,16 @@ export function ScannedPdfOcrHandoff({ hint, label, testId }: ScannedPdfOcrHando
 
 /**
  * Offers OCR after a successful run whose current file had pages with no
- * readable text, or lines in an unmappable font (#5150). Only the files flagged that way go to OCR, so the
- * readable ones in a batch stay out of it, the same rule as #4143.
+ * readable text, or lines in an unmappable font (#5150). Only the files
+ * flagged that way go to OCR, so the readable ones in a batch stay out of it,
+ * the same rule as #4143. Hidden while a batch is still running, since the
+ * handoff resets the store without cancelling that job.
  */
 export function UnreadablePagesOcrHandoff({ label, testId }: { label: string; testId: string }) {
-  const { currentEntry } = useFileStore();
+  const { currentEntry, processing } = useFileStore();
   const handoffToOcr = useOcrHandoff();
 
-  if (!OCR_TOOL || !currentEntry || !hasUnreadablePages(currentEntry)) return null;
+  if (!OCR_TOOL || processing || !currentEntry || !hasUnreadablePages(currentEntry)) return null;
 
   return (
     <OcrHandoffButton

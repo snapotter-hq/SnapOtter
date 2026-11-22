@@ -175,6 +175,22 @@ describe("pdf-to-text OCR handoff after a run with unreadable pages (#5150)", ()
     ]);
   });
 
+  it("waits for a running batch to finish before offering OCR", () => {
+    useFileStore.getState().setFiles([pdf("mixed.pdf"), pdf("next.pdf")]);
+    act(() => {
+      const store = useFileStore.getState();
+      store.updateEntry(0, { status: "completed", resultNotes: unreadable });
+      store.updateEntry(1, { status: "processing" });
+      store.setProcessing(true);
+    });
+    renderPanel();
+
+    expect(screen.queryByTestId("pdf-to-text-run-ocr-unreadable")).not.toBeInTheDocument();
+
+    act(() => useFileStore.getState().setProcessing(false));
+    expect(screen.getByTestId("pdf-to-text-run-ocr-unreadable")).toBeInTheDocument();
+  });
+
   it("offers nothing when every page read fine", () => {
     useFileStore.getState().setFiles([pdf("clean.pdf")]);
     act(() => useFileStore.getState().updateEntry(0, { status: "completed", resultNotes: null }));
