@@ -6,13 +6,7 @@ import { checkTrimMode, resolveTrimWindow, trimModeFields } from "../../lib/trim
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
-// Stream copy cannot cut below one codec frame (mp3 ~26ms, flac up to ~93ms);
-// smaller windows produce a container with zero audio frames.
-const MIN_TRIM_WINDOW_S = 0.1;
-
-const settingsSchema = z
-  .object(trimModeFields)
-  .superRefine((s, ctx) => checkTrimMode(s, ctx, MIN_TRIM_WINDOW_S));
+const settingsSchema = z.object(trimModeFields).superRefine((s, ctx) => checkTrimMode(s, ctx));
 
 export function registerTrimAudio(app: FastifyInstance) {
   createToolRoute(app, {
@@ -33,11 +27,6 @@ export function registerTrimAudio(app: FastifyInstance) {
           throw new InputValidationError("Could not determine audio duration");
         }
         const { startS, endS } = resolveTrimWindow(settings, info.durationS, "audio");
-        if (endS - startS < MIN_TRIM_WINDOW_S) {
-          throw new InputValidationError(
-            `Trim window is shorter than ${MIN_TRIM_WINDOW_S} seconds after resolving it against the audio duration`,
-          );
-        }
         // Fast seek with stream-copy for audio
         return [
           "-ss",

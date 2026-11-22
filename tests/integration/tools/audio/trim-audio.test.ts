@@ -78,7 +78,7 @@ describe.skipIf(!ffmpegAvailable())("trim-audio (requires ffmpeg)", () => {
     // the duration, leaving well under 0.1s either way.
     const res = await runTool({ startS: 0.98, endS: 9 });
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/Trim window/);
+    expect(JSON.parse(res.body).error).toMatch(/Less than 0\.1 seconds of the audio/);
   });
 
   it("cuts time off both ends without an end time (#728)", async () => {

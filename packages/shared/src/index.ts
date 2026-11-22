@@ -30,5 +30,6 @@ export * from "./section.js";
 export * from "./subprocess-limit.js";
 export * from "./target-size.js";
 export * from "./tool-errors.js";
+export * from "./trim-window.js";
 export * from "./types.js";
 export * from "./upscale-cpu-fit.js";

@@ -1,3 +1,4 @@
+import { isTrimWindowTooShort, MIN_TRIM_WINDOW_S } from "@snapotter/shared";
 import { z } from "zod";
 import { InputValidationError } from "../modality/contract.js";
 
@@ -23,11 +24,7 @@ type TrimModeSettings = {
   cutEndS: number;
 };
 
-export function checkTrimMode(
-  s: TrimModeSettings,
-  ctx: z.RefinementCtx,
-  minWindowS?: number,
-): void {
+export function checkTrimMode(s: TrimModeSettings, ctx: z.RefinementCtx): void {
   // Fields from the other mode would be silently dropped, so refuse them and
   // let an API caller find out that only one kind of trim applies.
   if (s.mode === "ends") {
@@ -66,17 +63,35 @@ export function checkTrimMode(
     });
     return;
   }
-  if (minWindowS !== undefined && s.endS - s.startS < minWindowS) {
+  if (isTrimWindowTooShort(s.startS, s.endS)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: `Trim window must be at least ${minWindowS} seconds`,
+      message: `Trim window must be at least ${MIN_TRIM_WINDOW_S} seconds`,
       path: ["endS"],
     });
   }
 }
 
-/** Turns validated settings into the absolute window to keep, given the probed duration. */
+/**
+ * Turns validated settings into the absolute window to keep, given the probed
+ * duration. Ends cuts and clamped range ends only become absolute here, so the
+ * minimum window is checked again after resolving.
+ */
 export function resolveTrimWindow(
+  s: TrimModeSettings,
+  durationS: number,
+  noun: "video" | "audio",
+): { startS: number; endS: number } {
+  const window = absoluteWindow(s, durationS, noun);
+  if (isTrimWindowTooShort(window.startS, window.endS)) {
+    throw new InputValidationError(
+      `Less than ${MIN_TRIM_WINDOW_S} seconds of the ${noun} is left to keep`,
+    );
+  }
+  return window;
+}
+
+function absoluteWindow(
   s: TrimModeSettings,
   durationS: number,
   noun: "video" | "audio",
