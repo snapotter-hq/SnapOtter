@@ -4249,6 +4249,9 @@ export const ko: TranslationKeys = {
       stripAll: "문서 메타데이터 제거",
       stripAllHint:
         "아래 항목을 쓰기 전에 날짜, Creator, Producer, 사용자 지정 필드, XMP를 지웁니다. PDF/A 파일은 규격 준수가 해제됩니다.",
+      removeAttachments: "첨부 파일도 제거",
+      removeAttachmentsHint:
+        "포함된 파일과 파일 첨부 주석을 삭제합니다. 전자 세금계산서(ZUGFeRD, Factur-X)와 PDF/A-3 파일은 첨부 데이터를 잃습니다.",
       title: "제목",
       author: "저자",
       subject: "주제",

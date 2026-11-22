@@ -4318,6 +4318,9 @@ export const sv: TranslationKeys = {
       stripAll: "Ta bort dokumentets metadata",
       stripAllHint:
         "Rensar datum, Creator, Producer, egna fält och XMP innan fälten nedan skrivs. PDF/A-filer förlorar sin överensstämmelse.",
+      removeAttachments: "Ta även bort bifogade filer",
+      removeAttachmentsHint:
+        "Tar bort inbäddade filer och filbilagekommentarer. E-fakturor (ZUGFeRD, Factur-X) och PDF/A-3-filer förlorar sina bifogade data.",
       title: "Titel",
       author: "Författare",
       subject: "Ämne",

@@ -4259,6 +4259,9 @@ export const th: TranslationKeys = {
       stripAll: "ลบข้อมูลเมตาของเอกสาร",
       stripAllHint:
         "ล้างวันที่ Creator Producer ฟิลด์ที่กำหนดเอง และ XMP ก่อนเขียนฟิลด์ด้านล่าง ไฟล์ PDF/A จะไม่เป็นไปตามมาตรฐานอีกต่อไป",
+      removeAttachments: "ลบไฟล์แนบด้วย",
+      removeAttachmentsHint:
+        "ลบไฟล์ที่ฝังไว้และคำอธิบายประกอบไฟล์แนบ ใบแจ้งหนี้อิเล็กทรอนิกส์ (ZUGFeRD, Factur-X) และไฟล์ PDF/A-3 จะสูญเสียข้อมูลที่แนบไว้",
       title: "ชื่อเรื่อง",
       author: "ผู้เขียน",
       subject: "หัวข้อ",

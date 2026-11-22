@@ -4328,6 +4328,9 @@ export const ptBR: TranslationKeys = {
       stripAll: "Remover os metadados do documento",
       stripAllHint:
         "Apaga datas, Creator, Producer, campos personalizados e XMP antes de gravar os campos abaixo. Arquivos PDF/A perdem a conformidade.",
+      removeAttachments: "Remover também os arquivos anexados",
+      removeAttachmentsHint:
+        "Apaga arquivos incorporados e anotações de anexo. Faturas eletrônicas (ZUGFeRD, Factur-X) e arquivos PDF/A-3 perdem os dados anexados.",
       title: "Título",
       author: "Autor",
       subject: "Assunto",

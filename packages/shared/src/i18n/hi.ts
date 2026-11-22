@@ -4067,6 +4067,9 @@ export const hi: TranslationKeys = {
       stripAll: "दस्तावेज़ का मेटाडेटा हटाएँ",
       stripAllHint:
         "नीचे के फ़ील्ड लिखने से पहले तारीखें, Creator, Producer, कस्टम फ़ील्ड और XMP हटा देता है। PDF/A फ़ाइलों की अनुरूपता खत्म हो जाती है।",
+      removeAttachments: "संलग्न फ़ाइलें भी हटाएँ",
+      removeAttachmentsHint:
+        "एम्बेड की गई फ़ाइलें और फ़ाइल अटैचमेंट एनोटेशन हटा देता है। ई-इनवॉइस (ZUGFeRD, Factur-X) और PDF/A-3 फ़ाइलों का संलग्न डेटा खो जाता है।",
       title: "शीर्षक",
       author: "लेखक",
       subject: "विषय",

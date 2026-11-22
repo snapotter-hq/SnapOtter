@@ -4315,6 +4315,9 @@ export const vi: TranslationKeys = {
       stripAll: "Xóa siêu dữ liệu tài liệu",
       stripAllHint:
         "Xóa ngày tháng, Creator, Producer, các trường tùy chỉnh và XMP trước khi ghi các trường bên dưới. Tệp PDF/A sẽ mất tính tuân thủ.",
+      removeAttachments: "Xóa cả tệp đính kèm",
+      removeAttachmentsHint:
+        "Xóa các tệp nhúng và chú thích tệp đính kèm. Hóa đơn điện tử (ZUGFeRD, Factur-X) và tệp PDF/A-3 sẽ mất dữ liệu đính kèm.",
       title: "Tiêu đề",
       author: "Tác giả",
       subject: "Chủ đề",

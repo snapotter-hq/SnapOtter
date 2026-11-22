@@ -4328,6 +4328,9 @@ export const uk: TranslationKeys = {
       stripAll: "Видалити метадані документа",
       stripAllHint:
         "Видаляє дати, Creator, Producer, користувацькі поля та XMP перед записом полів нижче. Файли PDF/A втрачають відповідність стандарту.",
+      removeAttachments: "Також видалити вкладені файли",
+      removeAttachmentsHint:
+        "Видаляє вбудовані файли та анотації з вкладеннями. Електронні рахунки (ZUGFeRD, Factur-X) і файли PDF/A-3 втрачають вкладені дані.",
       title: "Назва",
       author: "Автор",
       subject: "Тема",

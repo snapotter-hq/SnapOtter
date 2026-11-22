@@ -4255,6 +4255,9 @@ export const en = {
       stripAll: "Remove document metadata",
       stripAllHint:
         "Clears dates, Creator, Producer, custom fields and XMP before writing the fields below. PDF/A files lose conformance.",
+      removeAttachments: "Also remove attached files",
+      removeAttachmentsHint:
+        "Deletes embedded files and file attachment annotations. E-invoices (ZUGFeRD, Factur-X) and PDF/A-3 files lose their attached data.",
       title: "Title",
       author: "Author",
       subject: "Subject",

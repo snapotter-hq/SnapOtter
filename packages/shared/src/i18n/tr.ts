@@ -4327,6 +4327,9 @@ export const tr: TranslationKeys = {
       stripAll: "Belge meta verilerini kaldır",
       stripAllHint:
         "Aşağıdaki alanları yazmadan önce tarihleri, Creator, Producer, özel alanları ve XMP'yi temizler. PDF/A dosyaları uyumluluğunu kaybeder.",
+      removeAttachments: "Ekli dosyaları da kaldır",
+      removeAttachmentsHint:
+        "Gömülü dosyaları ve dosya eki açıklamalarını siler. E-faturalar (ZUGFeRD, Factur-X) ve PDF/A-3 dosyaları ekli verilerini kaybeder.",
       title: "Başlık",
       author: "Yazar",
       subject: "Konu",
