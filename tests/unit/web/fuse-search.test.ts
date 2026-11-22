@@ -164,7 +164,7 @@ describe("the audio preset matrix answers the searches that found nothing (#1099
 
   it.each(["opus", "wma", "aiff"])("a bare %s query leads with a preset that takes it", (ext) => {
     const top = searchToolList(fuse, TOOLS, ext)[0];
-    expect(top?.acceptedInputs).toEqual([`.${ext}`]);
+    expect(top?.acceptedInputs).toEqual(ext === "aiff" ? [".aiff", ".aif"] : [`.${ext}`]);
   });
 });
 
