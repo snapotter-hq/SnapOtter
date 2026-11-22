@@ -6915,6 +6915,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "video-to-avif": {
+    searchTitle: "Convert Video to Animated AVIF",
+    longDescription:
+      "Turn a video clip into an animated AVIF image, the royalty-free AV1-based format that usually comes out smaller than a GIF or animated WebP at the same visual quality. Pick the start point, clip length, frame rate, width, and quality, and SnapOtter encodes it on your own server.",
+    useCases: [
+      "Replace heavy GIF animations on a website with smaller AVIF files",
+      "Turn a short screen recording into a looping animation for product docs",
+      "Create animated hero images or product previews that load fast on mobile",
+      "Cut a highlight from a longer video into a compact animation for a blog post",
+    ],
+    features: [
+      "Royalty-free AV1 compression with a 1 to 100 quality setting",
+      "Choose the start time and clip length, up to 60 seconds per animation",
+      "Configurable frame rate up to 30 fps and width from 64 to 1280 pixels",
+      "Loop forever or play once",
+      "Runs entirely on your self-hosted instance with no data leaving your network",
+    ],
+    faqs: [
+      {
+        q: "Why use AVIF instead of GIF or WebP?",
+        a: "Animated AVIF uses AV1 compression, so it is usually smaller than an animated WebP and far smaller than a GIF at the same visual quality. It supports full color instead of GIF's 256-color palette, and the format is royalty-free. Conversion runs locally on your server.",
+      },
+      {
+        q: "Where does animated AVIF play?",
+        a: "Current versions of Chrome, Firefox, Safari, and Edge play animated AVIF. Some desktop image viewers and older apps show only the first frame, so keep a GIF or MP4 fallback for those. SnapOtter processes everything on your own infrastructure.",
+      },
+      {
+        q: "Why is conversion slower than GIF or WebP?",
+        a: "AV1 encoding takes more CPU work than older formats, which is why each animation is capped at 60 seconds. Shorter clips, a lower frame rate, or a smaller width finish faster. The audio track is dropped, since AVIF images carry no sound.",
+      },
+    ],
+  },
   "video-to-frames": {
     searchTitle: "Extract Video Frames as Images",
     longDescription:
