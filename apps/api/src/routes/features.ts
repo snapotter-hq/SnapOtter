@@ -40,6 +40,7 @@ import {
   shutdownDispatcher,
 } from "@snapotter/ai";
 import {
+  type AiBundleActionProperties,
   type AiInstallErrorKind,
   ANALYTICS_EVENTS,
   APP_VERSION,
@@ -201,12 +202,18 @@ async function handoffInstalledOcrRuntime(
   }
 }
 
+// Typed so an action missing from AI_BUNDLE_ACTIONS fails tsc instead of being
+// dropped by the allowlist at runtime.
+function trackBundleAction(properties: AiBundleActionProperties): void {
+  trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, { ...properties });
+}
+
 function trackInstallFailed(
   bundleId: string,
   installStartTime: number,
   errorKind: AiInstallErrorKind,
 ): void {
-  trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+  trackBundleAction({
     bundle_id: bundleId,
     action: "install_failed",
     duration_ms: Date.now() - installStartTime,
@@ -309,7 +316,7 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         stage: "Complete",
         result: { bundleId },
       });
-      trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+      trackBundleAction({
         bundle_id: bundleId,
         action: "installed",
         duration_ms: Date.now() - installStartTime,
@@ -409,7 +416,7 @@ export async function cancelFeatureInstall(jobId: string): Promise<InstallCancel
  */
 function startInstall(bundleId: string, jobId: string, installLockFd: number): void {
   void refreshReservedInstall(jobId);
-  trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+  trackBundleAction({
     bundle_id: bundleId,
     action: "install_started",
     duration_ms: 0,
@@ -664,7 +671,7 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
           stage: "Complete",
           result: { bundleId },
         });
-        trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+        trackBundleAction({
           bundle_id: bundleId,
           action: "installed",
           duration_ms: Date.now() - installStartTime,
@@ -1359,7 +1366,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
           markUninstalled(bundleId);
           setInstallProgress(bundleId, null, null);
-          trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+          trackBundleAction({
             bundle_id: bundleId,
             action: "uninstalled",
             duration_ms: 0,
@@ -1419,7 +1426,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         markUninstalled(bundleId);
         shutdownDispatcher();
 
-        trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+        trackBundleAction({
           bundle_id: bundleId,
           action: "uninstalled",
           duration_ms: 0,
@@ -1485,7 +1492,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
       }
       shutdownDispatcher();
 
-      trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+      trackBundleAction({
         bundle_id: "all",
         action: "reset_environment",
         duration_ms: 0,
@@ -1654,7 +1661,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           });
           invalidateCache();
           shutdownDispatcher();
-          trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+          trackBundleAction({
             bundle_id: legacyResult.bundleId,
             action: "imported",
             duration_ms: 0,
@@ -1688,7 +1695,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         });
         await handoffInstalledOcrRuntime(installResult, installLockFd);
         invalidateCache();
-        trackEvent(ANALYTICS_EVENTS.AI_BUNDLE_ACTION, {
+        trackBundleAction({
           bundle_id: "ocr",
           action: "imported",
           duration_ms: 0,

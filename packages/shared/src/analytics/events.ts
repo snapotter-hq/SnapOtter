@@ -104,10 +104,23 @@ export const AI_INSTALL_ERROR_KINDS = [
 
 export type AiInstallErrorKind = (typeof AI_INSTALL_ERROR_KINDS)[number];
 
+/** Every `ai_bundle_action` action. The allowlist drops any other value, and the
+ * telemetry docs test checks each one is documented. */
+export const AI_BUNDLE_ACTIONS = [
+  "install_started",
+  "installed",
+  "install_failed",
+  "uninstalled",
+  "reset_environment",
+  "imported",
+] as const;
+
+export type AiBundleAction = (typeof AI_BUNDLE_ACTIONS)[number];
+
 export interface AiBundleActionProperties {
   bundle_id: string;
-  action: "install_started" | "installed" | "install_failed" | "uninstalled";
-  /** Time since the install started; 0 for `install_started`. */
+  action: AiBundleAction;
+  /** Time since the install started on `installed` and `install_failed`; 0 otherwise. */
   duration_ms: number;
   /** Only on `install_failed`. */
   error_kind?: AiInstallErrorKind;
