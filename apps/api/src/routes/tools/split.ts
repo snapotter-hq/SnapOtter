@@ -241,9 +241,17 @@ export function registerSplit(app: FastifyInstance) {
 
     try {
       if (!isSvg) {
-        fileBuffer = await autoOrient(fileBuffer, undefined, {
-          outputFormat: (input) => tileOutputFormat(input, settings),
-        });
+        try {
+          fileBuffer = await autoOrient(fileBuffer, undefined, {
+            outputFormat: (input) => tileOutputFormat(input, settings),
+          });
+        } catch (err) {
+          // Only the orientation refusal is a 400 here; a later decode
+          // failure keeps the 422 below.
+          if (!isToolInputError(err)) throw err;
+          const code = toolInputErrorCode(err);
+          return reply.status(400).send({ error: err.message, ...(code && { code }) });
+        }
       }
       const metadata = await sharp(fileBuffer).metadata();
       const fullW = metadata.width ?? 0;
@@ -353,10 +361,6 @@ export function registerSplit(app: FastifyInstance) {
         JSON.stringify({ inputFileCount: 1, originalSize: fileBuffer.length }),
       );
     } catch (rawErr) {
-      if (isToolInputError(rawErr) && !reply.raw.headersSent) {
-        const code = toolInputErrorCode(rawErr);
-        return reply.status(400).send({ error: rawErr.message, ...(code && { code }) });
-      }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
