@@ -1672,7 +1672,9 @@ describe("own-store tool handlers abort and ignore late completions on store res
       usePassportPhotoStore.getState().reset();
     });
 
-    expect(fetchSignals[1]?.aborted).toBe(true);
+    // A generate stopped before its answer stays open so a late 202 can be
+    // canceled by clientJobId (#5115); the run still settles at once.
+    expect(fetchSignals[1]?.aborted).toBe(false);
     expect(usePassportPhotoStore.getState().generating).toBe(false);
 
     await act(async () => {
@@ -1732,7 +1734,9 @@ describe("own-store tool handlers abort and ignore late completions on store res
 
     useHtmlToImageStore.getState().reset();
 
-    expect(fetchSignals[0]?.aborted).toBe(true);
+    // A capture stopped before its answer stays open so a late 202 can be
+    // canceled by clientJobId (#5115); the run still settles at once.
+    expect(fetchSignals[0]?.aborted).toBe(false);
     expect(useHtmlToImageStore.getState().capturing).toBe(false);
 
     resolveCapture(

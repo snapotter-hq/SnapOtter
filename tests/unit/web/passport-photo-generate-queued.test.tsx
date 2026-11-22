@@ -196,4 +196,93 @@ describe("passport-photo generate after a 202", () => {
     expect(es.readyState).toBe(2);
     expect(usePassportPhotoStore.getState().generateResult).toBeNull();
   });
+
+  it("cancels by clientJobId when the run is reset before a late 202 arrives (#5115)", async () => {
+    renderAnalyzed();
+    let answer!: (res: Response) => void;
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          answer = resolve;
+          init.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    fireEvent.click(screen.getByTestId("passport-photo-generate"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body)) as Record<string, unknown>;
+
+    act(() => {
+      usePassportPhotoStore.getState().reset();
+    });
+    expect(cancelAbandonedJob).not.toHaveBeenCalled();
+
+    await act(async () => {
+      answer(await accepted("server-job-1"));
+    });
+
+    await waitFor(() =>
+      expect(cancelAbandonedJob).toHaveBeenCalledWith(String(body.clientJobId), "passport-photo"),
+    );
+    expect(cancelAbandonedJob).toHaveBeenCalledTimes(1);
+    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+  });
+
+  it("cancels a 202 that lands after the analysis it was generated from changed (#5115)", async () => {
+    renderAnalyzed();
+    let answer!: (res: Response) => void;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    fireEvent.click(screen.getByTestId("passport-photo-generate"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body)) as Record<string, unknown>;
+
+    act(() => {
+      usePassportPhotoStore
+        .getState()
+        .setAnalyzeResult({ ...ANALYZE_RESULT, jobId: "analyze-job-2" });
+    });
+    await act(async () => {
+      answer(await accepted("server-job-2"));
+    });
+
+    await waitFor(() =>
+      expect(cancelAbandonedJob).toHaveBeenCalledWith(String(body.clientJobId), "passport-photo"),
+    );
+    expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
+  it("leaves a generate that finished inside the sync window alone after a reset (#5115)", async () => {
+    renderAnalyzed();
+    let answer!: (res: Response) => void;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    fireEvent.click(screen.getByTestId("passport-photo-generate"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      usePassportPhotoStore.getState().reset();
+    });
+    await act(async () => {
+      answer(
+        new Response(JSON.stringify({ downloadUrl: "/api/v1/download/a/late.jpg" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    expect(cancelAbandonedJob).not.toHaveBeenCalled();
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+  });
 });

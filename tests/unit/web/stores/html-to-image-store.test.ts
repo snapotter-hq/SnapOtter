@@ -418,6 +418,103 @@ describe("useHtmlToImageStore", () => {
       }
     });
 
+    describe("a stop before the server answers (#5115)", () => {
+      /** Start a capture whose fetch stays pending until `answer` is called. */
+      function startPending() {
+        state().setUrl("https://example.com");
+        let answer!: (res: Response) => void;
+        fetchMock.mockImplementationOnce(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((resolve, reject) => {
+              answer = resolve;
+              init.signal?.addEventListener("abort", () =>
+                reject(new DOMException("Aborted", "AbortError")),
+              );
+            }),
+        );
+        const run = state().capture();
+        const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+        return { run, clientJobId: body.clientJobId as string, answer: (r: Response) => answer(r) };
+      }
+
+      it("cancels by clientJobId once a late 202 shows the job was queued", async () => {
+        const { run, clientJobId, answer } = startPending();
+        state().reset();
+        expect(state().capturing).toBe(false);
+        expect(cancelAbandonedJob).not.toHaveBeenCalled();
+
+        answer(await acceptedJson({ async: true, jobId: "run-8" }));
+        await run;
+
+        expect(cancelAbandonedJob).toHaveBeenCalledTimes(1);
+        expect(cancelAbandonedJob).toHaveBeenCalledWith(clientJobId, "html-to-image");
+        expect(FakeEventSource.instances).toHaveLength(0);
+        expect(state()).toMatchObject({ capturing: false, queued: false, resultUrl: null });
+      });
+
+      it("cancel works the same way", async () => {
+        const { run, clientJobId, answer } = startPending();
+        state().cancel();
+        answer(await acceptedJson({ async: true }));
+        await run;
+        expect(cancelAbandonedJob).toHaveBeenCalledWith(clientJobId, "html-to-image");
+        expect(FakeEventSource.instances).toHaveLength(0);
+      });
+
+      it("still cancels when the stop lands while the 202 body is being read", async () => {
+        state().setUrl("https://example.com");
+        let finishBody!: (data: unknown) => void;
+        fetchMock.mockResolvedValueOnce({
+          ok: true,
+          status: 202,
+          json: () =>
+            new Promise((resolve) => {
+              finishBody = resolve;
+            }),
+        } as Response);
+        const run = state().capture();
+        await flush();
+        const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+
+        state().reset();
+        finishBody({ async: true, jobId: "run-10" });
+        await run;
+
+        expect(cancelAbandonedJob).toHaveBeenCalledWith(body.clientJobId, "html-to-image");
+        expect(FakeEventSource.instances).toHaveLength(0);
+      });
+
+      it("leaves a job that finished inside the sync window alone", async () => {
+        const { run, answer } = startPending();
+        state().reset();
+        answer(await okJson({ downloadUrl: "/late.png", processedSize: 1 }));
+        await run;
+        expect(cancelAbandonedJob).not.toHaveBeenCalled();
+        expect(state().resultUrl).toBeNull();
+      });
+
+      it("does not let a stopped run's answer touch the next capture", async () => {
+        const first = startPending();
+        state().cancel();
+        fetchMock.mockResolvedValueOnce(await acceptedJson({ async: true, jobId: "run-9" }));
+        const second = state().capture();
+        await flush();
+        const es = FakeEventSource.instances[0];
+        expect(es.url).toBe("/api/v1/jobs/run-9/progress");
+
+        first.answer(await acceptedJson({ async: true }));
+        await first.run;
+        expect(cancelAbandonedJob).toHaveBeenCalledTimes(1);
+        expect(cancelAbandonedJob).toHaveBeenCalledWith(first.clientJobId, "html-to-image");
+        expect(state()).toMatchObject({ capturing: true, queued: true });
+
+        es.emit({ type: "single", phase: "complete", result: { downloadUrl: "/second.png" } });
+        await second;
+        expect(state().resultUrl).toBe("/second.png");
+        expect(cancelAbandonedJob).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it("does not cancel anything after a capture that finished inside the sync window", async () => {
       fetchMock.mockResolvedValueOnce(await okJson({ downloadUrl: "/out.png", processedSize: 1 }));
       state().setUrl("https://example.com");
