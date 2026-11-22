@@ -39,6 +39,11 @@ describe("trim value helpers (#728)", () => {
     expect(trimProblem({ ...RANGE, mode: "ends", cutEndS: 1 })).toBeNull();
   });
 
+  it("flags a range shorter than 0.1s, but not exactly 0.1s (#4960)", () => {
+    expect(trimProblem({ ...RANGE, startS: 5, endS: 5.05 })).toBe("windowTooShort");
+    expect(trimProblem({ ...RANGE, startS: 5, endS: 5.1 })).toBeNull();
+  });
+
   it("reads saved settings, treating anything but ends as a range", () => {
     expect(trimValueFrom({ startS: 4, endS: 9 }, RANGE)).toEqual({ ...RANGE, startS: 4, endS: 9 });
     expect(trimValueFrom({ mode: "ends", cutStartS: 2 }, RANGE)).toEqual({
@@ -119,6 +124,16 @@ describe("TrimFields (#728)", () => {
     await userEvent.selectOptions(screen.getByLabelText("Mode"), "ends");
     expect(screen.getByText(en.toolSettings["trim-video"].nothingToCut)).toBeTruthy();
     expect(screen.getByText(en.toolSettings["trim-video"].endsHint)).toBeTruthy();
+  });
+});
+
+describe("TrimFields minimum window (#4960)", () => {
+  it("shows the minimum inline when the range is too short", async () => {
+    render(<Harness onValidity={() => {}} />);
+    const start = screen.getByLabelText("Start");
+    await userEvent.clear(start);
+    await userEvent.type(start, "9.95");
+    expect(screen.getByText(en.toolSettings["trim-video"].windowTooShort)).toBeTruthy();
   });
 });
 

@@ -171,6 +171,25 @@ describe.skipIf(!ffmpegAvailable())("trim-video (requires ffmpeg)", () => {
     expect(info.durationS as number).toBeLessThan(0.75);
   }, 60_000);
 
+  it("rejects a range shorter than 0.1s before running ffmpeg (#4960)", async () => {
+    const res = await runTool({ startS: 0.4, endS: 0.45 });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).details).toMatch(/at least 0\.1 seconds/);
+  });
+
+  it("rejects an ends cut that leaves less than 0.1s (#4960)", async () => {
+    const probeFile = join(mkdtempSync(join(tmpdir(), "trim-probe-")), "tiny.mp4");
+    writeFileSync(probeFile, MP4);
+    const { durationS } = await probeMedia(probeFile);
+    const res = await runTool({
+      mode: "ends",
+      cutStartS: 0,
+      cutEndS: (durationS as number) - 0.05,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/Less than 0\.1 seconds of the video/);
+  });
+
   it("rejects an ends cut that leaves nothing (#728)", async () => {
     const res = await runTool({ mode: "ends", cutStartS: 0.6, cutEndS: 0.6 });
     expect(res.statusCode).toBe(400);

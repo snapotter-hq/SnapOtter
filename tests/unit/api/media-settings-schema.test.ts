@@ -41,13 +41,18 @@ describe("media time settings schemas", () => {
     expect(parses("trim-video", { startS: 0, endS: Number.MIN_VALUE })).toBe(false);
   });
 
-  it("rejects trim-audio windows shorter than the stream-copy floor", () => {
-    // Stream copy cannot cut below one codec frame (mp3 ~26ms, flac up to
-    // ~93ms), so windows under 0.1s ship a file with zero audio frames.
-    expect(parses("trim-audio", { startS: 0, endS: 0.000001 })).toBe(false);
-    expect(parses("trim-audio", { startS: 5, endS: 5.05 })).toBe(false);
-    expect(parses("trim-audio", { startS: 0, endS: 0.5 })).toBe(true);
-  });
+  it.each(["trim-audio", "trim-video"])(
+    "%s rejects windows shorter than 0.1s (#4960)",
+    (toolId) => {
+      // Below 0.1s, audio stream copy keeps no codec frame and a video window
+      // may hold no frame, so either way the file comes back empty.
+      expect(parses(toolId, { startS: 0, endS: 0.000001 })).toBe(false);
+      expect(parses(toolId, { startS: 5, endS: 5.05 })).toBe(false);
+      expect(parses(toolId, { startS: 9.9999, endS: 10 })).toBe(false);
+      expect(parses(toolId, { startS: 5, endS: 5.1 })).toBe(true);
+      expect(parses(toolId, { startS: 0, endS: 0.5 })).toBe(true);
+    },
+  );
 
   it.each(["trim-audio", "trim-video"])("%s still accepts a bare start/end range", (toolId) => {
     expect(parses(toolId, { startS: 1, endS: 4 })).toBe(true);

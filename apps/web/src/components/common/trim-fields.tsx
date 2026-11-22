@@ -1,3 +1,4 @@
+import { isTrimWindowTooShort } from "@snapotter/shared";
 import { useEffect, useRef, useState } from "react";
 import { TimecodeInput } from "@/components/common/timecode-input";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ export interface TrimFieldLabels {
   timeFormatHint: string;
   endTimeMustBeAfter: string;
   nothingToCut: string;
+  windowTooShort: string;
 }
 
 export function trimValueFrom(settings: Record<string, unknown>, fallback: TrimValue): TrimValue {
@@ -46,10 +48,20 @@ export function trimPayload(v: TrimValue): Record<string, unknown> {
     : { mode: "range", startS: v.startS, endS: v.endS };
 }
 
-export function trimProblem(v: TrimValue): "endBeforeStart" | "nothingToCut" | null {
+export type TrimProblem = "endBeforeStart" | "nothingToCut" | "windowTooShort";
+
+/** Ends cuts only resolve against the file's duration, so the server checks their window. */
+export function trimProblem(v: TrimValue): TrimProblem | null {
   if (v.mode === "ends") return v.cutStartS + v.cutEndS > 0 ? null : "nothingToCut";
-  return v.endS > v.startS ? null : "endBeforeStart";
+  if (v.endS <= v.startS) return "endBeforeStart";
+  return isTrimWindowTooShort(v.startS, v.endS) ? "windowTooShort" : null;
 }
+
+const PROBLEM_LABEL = {
+  endBeforeStart: "endTimeMustBeAfter",
+  nothingToCut: "nothingToCut",
+  windowTooShort: "windowTooShort",
+} as const satisfies Record<TrimProblem, keyof TrimFieldLabels>;
 
 interface TrimFieldsProps {
   idPrefix: string;
@@ -151,7 +163,7 @@ export function TrimFields({
         </p>
         {textValid && problem && (
           <p className="text-[10px] text-amber-700 dark:text-amber-400">
-            {problem === "nothingToCut" ? labels.nothingToCut : labels.endTimeMustBeAfter}
+            {labels[PROBLEM_LABEL[problem]]}
           </p>
         )}
       </div>

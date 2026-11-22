@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolveTrimWindow } from "../../../apps/api/src/lib/trim-window.js";
+import { z } from "zod";
+import {
+  checkTrimMode,
+  resolveTrimWindow,
+  trimModeFields,
+} from "../../../apps/api/src/lib/trim-window.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 
 const range = (startS: number, endS: number) => ({
@@ -47,5 +52,35 @@ describe("resolveTrimWindow (#728)", () => {
     expect(() => resolveTrimWindow(ends(8, 5), 10, "audio")).toThrow(
       /nothing of the audio is left/i,
     );
+  });
+});
+
+describe("minimum trim window (#4960)", () => {
+  const schema = z.object(trimModeFields).superRefine((s, ctx) => checkTrimMode(s, ctx));
+
+  it("refuses a range shorter than 0.1s before probing", () => {
+    const result = schema.safeParse({ startS: 9.9999, endS: 10 });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe("Trim window must be at least 0.1 seconds");
+  });
+
+  it("accepts exactly 0.1s despite float subtraction", () => {
+    expect(schema.safeParse({ startS: 5, endS: 5.1 }).success).toBe(true);
+  });
+
+  it("refuses an ends cut that leaves less than 0.1s", () => {
+    expect(() => resolveTrimWindow(ends(0, 9.9999), 10, "video")).toThrow(
+      new InputValidationError("Less than 0.1 seconds of the video is left to keep"),
+    );
+  });
+
+  it("refuses a range that clamps to less than 0.1s", () => {
+    expect(() => resolveTrimWindow(range(9.95, 20), 10, "audio")).toThrow(
+      /less than 0\.1 seconds of the audio/i,
+    );
+  });
+
+  it("keeps a clamped window of exactly 0.1s", () => {
+    expect(resolveTrimWindow(range(9.9, 20), 10, "video")).toEqual({ startS: 9.9, endS: 10 });
   });
 });
