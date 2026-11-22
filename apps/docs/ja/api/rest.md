@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 720f8261a033
-i18n_source_hash: 21592dbca884
+i18n_output_hash: de77721e539d
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 各プリセットは出力形式を固定し、`convert`、`convert-video`、`extract-audio`、`convert-audio`、`image-to-pdf`、`pdf-to-image`、`svg-to-raster`、`convert-spreadsheet` などのベースツールに委譲します。完全なルートテーブルとオプション設定については、[変換プリセット](/ja/tools/conversion-presets) を参照してください。
 
+圧縮プリセットも同じ仕組みです。`compress-image-to-20kb`、`compress-image-to-50kb`、`compress-image-to-100kb`、`compress-image-to-200kb`、`compress-image-to-500kb` は `compress` を実行し、`compress-pdf-to-100kb`、`compress-pdf-to-200kb`、`compress-pdf-to-500kb`、`compress-pdf-to-1mb`、`compress-pdf-to-2mb` は `compress-pdf` を実行します。どのプリセットも `mode` を `targetSize` に固定し、`targetSizeKb` を名前に含まれるサイズに固定します。
+
 ### 基本ツール {#essentials}
 
 | ツール ID | 名前 | 主な設定 |
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ツール ID | 名前 | AI モデル | 主な設定 |
 |---------|------|---------|-------------|
 | `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | フェーズ 1: `model`, `edgeRefine`（0-3）, `decontaminate`。フェーズ 2（`/api/v1/tools/image/remove-background/effects`）、`/batch`、およびパイプライン: `backgroundType`（transparent/color/gradient/blur、`/effects` ではさらに image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`（png/webp/avif） |
+| `remove-gif-background` | GIF 背景の削除 | rembg（フレームごと） | `model`, `outputFormat`（webp/gif/apng）, `backgroundType`（transparent/color/gradient/blur/image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity`（0-100）, `shadowEnabled`, `shadowOpacity`（0-100）, `edgeRefine`（0-3）, `decontaminate` |
 | `upscale` | 画像のアップスケール | RealESRGAN | `scale`（2/4）, `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | オブジェクト消しゴム | LaMa（ONNX） | マスクは 2 番目のファイルパートとして送信（フィールド名 `mask`）, `format`, `quality` |
 | `ocr` | OCR / テキスト抽出 | Tesseract (高速); RapidOCR + PP-OCR ONNX (バランス/ベスト) | `quality` (高速/バランス/最高)、`language`、`enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | ヒストグラム | `scale`（linear/log） - RGB ヒストグラムチャートとチャンネルごとの統計を返す |
 | `lqip-placeholder` | LQIP プレースホルダー | `width`（4-64）, `blur`, `strategy`（blur/pixelate/solid）, `format`（webp/png/jpeg）, `quality` |
 | `barcode-generate` | バーコードジェネレーター | `text`, `type`（code128/ean13/upca/code39/itf14/datamatrix）, `scale`（1-8）, `includeText`（bool）。JSON ボディ、ファイルアップロードなし。 |
+| `aspect-ratio-calculator` | アスペクト比計算機 | `width`, `height`, `newWidth`, `newHeight`, `round`（bool）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
 
 ### レイアウトと構成 {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | ボーダーとフレーム | `width`, `color`, `style`（solid/gradient/pattern）, `borderRadius`, `padding`, `shadow` |
 | `beautify` | スクリーンショットの装飾 | `backgroundType`（solid/linear-gradient/radial-gradient/image/transparent）, `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame`（none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...）, `socialPreset`（none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt）, `watermarkText`, `outputFormat` |
 | `circle-crop` | 円形クロップ | `zoom`（1-5）, `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background`（transparent/hex）, `outputSize` |
+| `rounded-crop` | 角丸クロップ | `shape`（rounded-square/squircle）, `cornerRadius`（0-50、短辺に対する割合）, `zoom`（1-5）, `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background`（transparent/hex）, `outputSize` |
 | `image-pad` | 画像パディング | `target`（16:9/9:16/1:1/4:3/3:4/custom）, `ratioW`, `ratioH`, `background`（color/transparent/blur）, `color`（hex）, `padding`（0-50%） |
 | `sprite-sheet` | スプライトシート | `columns`（1-16）, `padding`, `background`（hex）, `format`（png/webp/jpeg）, `quality` - 複数ファイル（2-64 枚の画像） |
 
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | 動画の手ぶれ補正 | `smoothing`（5-60、フレーム単位） |
 | `gif-to-video` | GIF から動画 | `format`（mp4/webm/mov） |
 | `video-to-webp` | 動画から WebP | `fps`, `width`, `quality`, `loop`（bool） |
+| `video-to-avif` | 動画を AVIF に変換 | `fps`（1-30）, `width`（64-1280）, `startS`, `durationS`（最大 60 秒）, `quality`（1-100）, `loop`（bool） |
 | `video-to-frames` | 動画からフレーム | `mode`（all/nth/timestamps）, `n`, `timestamps`, `format`（png/jpg） |
 | `merge-videos` | 動画の結合 | -（複数ファイル、最初の動画の解像度にノーマライズ） |
 | `replace-audio` | 音声の置き換え | -（動画 + 音声ファイル、2 ファイル） |
 | `burn-subtitles` | 字幕の焼き込み | `fontSize`（8-72） - 動画 + 字幕ファイル |
 | `embed-subtitles` | 字幕の埋め込み | `language`（ISO 639-2/B コード） - 動画 + 字幕ファイル |
 | `extract-subtitles` | 字幕の抽出 | -（SRT を出力） |
+| `convert-subtitles` | 字幕変換 | `format`（srt/vtt/ass）, `encoding`（auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr） |
 | `images-to-video` | 画像から動画 | `secondsPerImage`（0.5-10）, `resolution`（1080p/720p/square）, `fps` - 複数ファイル |
 | `video-metadata` | 動画メタデータのクリーン | - |
 | `auto-subtitles` | 自動字幕（AI） | `language`（auto/en/de/fr/es/zh/ja/ko/id/th/vi）, `format`（srt/vtt） |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | ページの抽出 | `range`（qpdf 構文、例 "1-5,8,10-z"） |
 | `remove-pages` | ページの削除 | `pages`（削除する qpdf 範囲） |
 | `organize-pdf` | PDF の整理 | `order`（qpdf ページ順、例 "3,1,2,5-z"） |
+| `multi-tool-pdf` | PDF マルチツール | `items`（ページ構成、`[{doc, page, rot}]`、最大 1200 ページ）, `pageCounts` - 複数ファイル（最大 20 個の PDF） |
 | `protect-pdf` | PDF の保護 | `userPassword`, `ownerPassword`（AES-256） |
 | `unlock-pdf` | PDF のロック解除 | `password` |
 | `repair-pdf` | PDF の修復 | - |
@@ -344,6 +352,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF の署名 | PDF `file`、署名ファイル `sig0`、`sig1`、`placements` JSON 配列を含むカスタムマルチパートルート |
 | `pdf-to-text` | PDF からテキスト | - |
 | `pdf-to-word` | PDF から Word | - |
+| `pdf-to-markdown` | PDF から Markdown | -（`.md` ファイルを出力） |
 | `pdf-metadata` | PDF メタデータ | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | ドキュメントの変換 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | プレゼンテーションの変換 | `format`（pptx/odp） |
@@ -373,9 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON から XML | `pretty`（bool） - 双方向 |
 | `split-csv` | CSV の分割 | `rowsPerFile`（1-1000000）, `keepHeader`（bool） |
 | `merge-csvs` | CSV の結合 | -（複数ファイル、列が一致するもの） |
+| `merge-text` | テキストファイル結合 | `separator`（blank-line/rule/filename-heading） - 複数ファイル、2-50 ファイル |
 | `yaml-json` | YAML / JSON | -（双方向） |
 | `xml-to-csv` | XML から CSV | -（繰り返し要素を自動検出） |
 | `convert-font` | フォント変換 | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | 大文字・小文字変換 | `text`, `mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）, `locale`（BCP 47 タグ）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
+| `proportion-calculator` | 比例計算機 | `a`, `b`, `c`, `mode`（direct/inverse）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
+| `base64` | Base64 エンコード / デコード | `text`, `mode`（encode/decode）, `urlSafe`（bool）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
 | `excel-to-csv` | Excel から CSV | `convert-spreadsheet` を基盤とする専用の変換プリセット |
 | `create-zip` | ZIP の作成 | -（複数ファイル、2-50 ファイル） |
 | `extract-zip` | ZIP の展開 | -（ボム対策済み） |

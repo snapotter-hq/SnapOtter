@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 6d0c6033ed7e
-i18n_source_hash: 21592dbca884
+i18n_output_hash: f33a1427bf1c
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 每個預設都會鎖定輸出格式，並委派給某個基底工具，例如 `convert`、`convert-video`、`extract-audio`、`convert-audio`、`image-to-pdf`、`pdf-to-image`、`svg-to-raster` 或 `convert-spreadsheet`。完整的路由表與選用設定請見 [轉換預設](/zh-TW/tools/conversion-presets)。
 
+壓縮預設的運作方式相同。`compress-image-to-20kb`、`compress-image-to-50kb`、`compress-image-to-100kb`、`compress-image-to-200kb` 與 `compress-image-to-500kb` 執行 `compress`；`compress-pdf-to-100kb`、`compress-pdf-to-200kb`、`compress-pdf-to-500kb`、`compress-pdf-to-1mb` 與 `compress-pdf-to-2mb` 執行 `compress-pdf`。每個預設都會將 `mode` 鎖定為 `targetSize`，並將 `targetSizeKb` 鎖定為名稱中的大小。
+
 ### 基本功能 {#essentials}
 
 | Tool ID | 名稱 | 主要設定 |
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | 名稱 | AI 模型 | 主要設定 |
 |---------|------|---------|-------------|
 | `remove-background` | 移除背景 | rembg（BiRefNet / U2-Net） | 階段 1：`model`、`edgeRefine`（0-3）、`decontaminate`。階段 2（`/api/v1/tools/image/remove-background/effects`）、`/batch` 與管線：`backgroundType`（transparent/color/gradient/blur，`/effects` 另支援 image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurEnabled`、`blurIntensity`、`shadowEnabled`、`shadowOpacity`、`outputFormat`（png/webp/avif） |
+| `remove-gif-background` | 移除 GIF 背景 | rembg，逐影格處理 | `model`、`outputFormat`（webp/gif/apng）、`backgroundType`（transparent/color/gradient/blur/image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurIntensity`（0-100）、`shadowEnabled`、`shadowOpacity`（0-100）、`edgeRefine`（0-3）、`decontaminate` |
 | `upscale` | 影像放大 | RealESRGAN | `scale`（2/4）、`model`、`faceEnhance`、`denoise`、`format`、`quality` |
 | `erase-object` | 物件消除 | LaMa（ONNX） | 遮罩以第二個檔案部分傳送（欄位名 `mask`）、`format`、`quality` |
 | `ocr` | OCR / 文字擷取 | Tesseract（快速）；RapidOCR + PP-OCR ONNX（平衡/最佳） | `quality`（快速/平衡/最佳）、`language`、`enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 直方圖 | `scale`（linear/log） - 回傳 RGB 直方圖圖表 + 各通道統計 |
 | `lqip-placeholder` | LQIP 佔位圖 | `width`（4-64）、`blur`、`strategy`（blur/pixelate/solid）、`format`（webp/png/jpeg）、`quality` |
 | `barcode-generate` | 條碼產生器 | `text`、`type`（code128/ean13/upca/code39/itf14/datamatrix）、`scale`（1-8）、`includeText`（bool）。JSON 主體，不需上傳檔案。 |
+| `aspect-ratio-calculator` | 長寬比計算器 | `width`、`height`、`newWidth`、`newHeight`、`round`（bool）。JSON 主體，不需上傳檔案；回傳缺少的值。 |
 
 ### 版面與構圖 {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | 邊框與框架 | `width`、`color`、`style`（solid/gradient/pattern）、`borderRadius`、`padding`、`shadow` |
 | `beautify` | 美化螢幕截圖 | `backgroundType`（solid/linear-gradient/radial-gradient/image/transparent）、`gradientStops`、`padding`、`borderRadius`、`shadowPreset`、`frame`（none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...）、`socialPreset`（none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt）、`watermarkText`、`outputFormat` |
 | `circle-crop` | 圓形裁切 | `zoom`（1-5）、`offsetX`、`offsetY`、`borderWidth`、`borderColor`、`background`（transparent/hex）、`outputSize` |
+| `rounded-crop` | 圓角裁切 | `shape`（rounded-square/squircle）、`cornerRadius`（0-50，為短邊的百分比）、`zoom`（1-5）、`offsetX`、`offsetY`、`borderWidth`、`borderColor`、`background`（transparent/hex）、`outputSize` |
 | `image-pad` | 影像填充 | `target`（16:9/9:16/1:1/4:3/3:4/custom）、`ratioW`、`ratioH`、`background`（color/transparent/blur）、`color`（hex）、`padding`（0-50%） |
 | `sprite-sheet` | 精靈圖表 | `columns`（1-16）、`padding`、`background`（hex）、`format`（png/webp/jpeg）、`quality` - 多檔案（2-64 張圖片） |
 
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | 影片穩定 | `smoothing`（5-60，以影格計） |
 | `gif-to-video` | GIF 轉影片 | `format`（mp4/webm/mov） |
 | `video-to-webp` | 影片轉 WebP | `fps`、`width`、`quality`、`loop`（bool） |
+| `video-to-avif` | 影片轉 AVIF | `fps`（1-30）、`width`（64-1280）、`startS`、`durationS`（最多 60 秒）、`quality`（1-100）、`loop`（bool） |
 | `video-to-frames` | 影片轉影格 | `mode`（all/nth/timestamps）、`n`、`timestamps`、`format`（png/jpg） |
 | `merge-videos` | 合併影片 | - （多檔案，正規化為第一段影片的解析度） |
 | `replace-audio` | 取代音訊 | - （影片 + 音訊檔，兩個檔案） |
 | `burn-subtitles` | 燒錄字幕 | `fontSize`（8-72） - 影片 + 字幕檔 |
 | `embed-subtitles` | 嵌入字幕 | `language`（ISO 639-2/B 代碼） - 影片 + 字幕檔 |
 | `extract-subtitles` | 擷取字幕 | - （輸出 SRT） |
+| `convert-subtitles` | 轉換字幕 | `format`（srt/vtt/ass）、`encoding`（auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr） |
 | `images-to-video` | 圖片轉影片 | `secondsPerImage`（0.5-10）、`resolution`（1080p/720p/square）、`fps` - 多檔案 |
 | `video-metadata` | 清除影片中繼資料 | - |
 | `auto-subtitles` | 自動字幕（AI） | `language`（auto/en/de/fr/es/zh/ja/ko/id/th/vi）、`format`（srt/vtt） |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | 擷取頁面 | `range`（qpdf 語法，例如 "1-5,8,10-z"） |
 | `remove-pages` | 移除頁面 | `pages`（要移除的 qpdf 範圍） |
 | `organize-pdf` | 整理 PDF | `order`（qpdf 頁面順序，例如 "3,1,2,5-z"） |
+| `multi-tool-pdf` | PDF 多功能工具 | `items`（頁面計畫，`[{doc, page, rot}]`，最多 1200 頁）、`pageCounts` - 多檔案（最多 20 個 PDF） |
 | `protect-pdf` | 保護 PDF | `userPassword`、`ownerPassword`（AES-256） |
 | `unlock-pdf` | 解鎖 PDF | `password` |
 | `repair-pdf` | 修復 PDF | - |
@@ -344,6 +352,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | 簽署 PDF | 自訂 multipart 路由，含 PDF `file`、簽名檔案 `sig0`、`sig1` 與 `placements` JSON 陣列 |
 | `pdf-to-text` | PDF 轉文字 | - |
 | `pdf-to-word` | PDF 轉 Word | - |
+| `pdf-to-markdown` | PDF 轉 Markdown | - （輸出 `.md` 檔案） |
 | `pdf-metadata` | PDF 中繼資料 | `title`、`author`、`subject`、`keywords`、`stripAll` |
 | `convert-document` | 轉換文件 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | 轉換簡報 | `format`（pptx/odp） |
@@ -373,9 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON 轉 XML | `pretty`（bool） - 雙向 |
 | `split-csv` | 分割 CSV | `rowsPerFile`（1-1000000）、`keepHeader`（bool） |
 | `merge-csvs` | 合併 CSV | - （多檔案，欄位需相符） |
+| `merge-text` | 合併文字檔案 | `separator`（blank-line/rule/filename-heading） - 多檔案，2-50 個檔案 |
 | `yaml-json` | YAML / JSON | - （雙向） |
 | `xml-to-csv` | XML 轉 CSV | - （自動尋找重複元素） |
 | `convert-font` | 轉換字型 | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | 大小寫轉換 | `text`、`mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）、`locale`（BCP 47 標籤）。JSON 主體，不需上傳檔案；回傳轉換後的文字。 |
+| `proportion-calculator` | 比例計算機 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 主體，不需上傳檔案；回傳缺少的值。 |
+| `base64` | Base64 編碼 / 解碼 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 主體，不需上傳檔案；回傳轉換後的文字。 |
 | `excel-to-csv` | Excel 轉 CSV | 由 `convert-spreadsheet` 支援的專屬轉換預設 |
 | `create-zip` | 建立 ZIP | - （多檔案，2-50 個檔案） |
 | `extract-zip` | 解壓 ZIP | - （防炸彈保護） |

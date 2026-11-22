@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: d14b78b5b085
-i18n_source_hash: 21592dbca884
+i18n_output_hash: 0ecb79fb6ec7
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve 
 
 Her ön ayar çıktı biçimini kilitler ve `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` veya `convert-spreadsheet` gibi bir temel araca yetki devreder. Eksiksiz yol tablosu ve isteğe bağlı ayarlar için [Dönüştürme Ön Ayarları](/tr/tools/conversion-presets) bölümüne bakın.
 
+Sıkıştırma ön ayarları da aynı şekilde çalışır. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` ve `compress-image-to-500kb` `compress` çalıştırır; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` ve `compress-pdf-to-2mb` ise `compress-pdf` çalıştırır. Her biri `mode` değerini `targetSize` olarak, `targetSizeKb` değerini de adındaki boyut olarak sabitler.
+
 ### Temel Öğeler {#essentials}
 
 | Araç Kimliği | Ad | Anahtar ayarlar |
@@ -195,6 +197,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | Araç Kimliği | Ad | Yapay Zeka Modeli | Anahtar ayarlar |
 |---------|------|---------|-------------|
 | `remove-background` | Arka Planı Kaldır | rembg (BiRefNet / U2-Net) | Aşama 1: `model`, `edgeRefine` (0-3), `decontaminate`. Aşama 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` ve işlem hatları: `backgroundType` (transparent/color/gradient/blur ve `/effects` üzerinde image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | GIF Arka Planını Kaldır | rembg, kare kare | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Görüntü Ölçek Büyütme | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Nesne Silici | LaMa (ONNX) | Maske ikinci dosya parçası olarak gönderilir (alan adı `mask`), `format`, `quality` |
 | `ocr` | OCR / Metin Çıkarma | Tesseract (hızlı); RapidOCR + PP-OCR ONNX (dengeli/en iyi) | `quality` (hızlı/dengeli/en iyi), `language`, `enhance` |
@@ -238,6 +241,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `histogram` | Histogram | `scale` (linear/log) - RGB histogram grafiği + kanal başına istatistikler döndürür |
 | `lqip-placeholder` | LQIP Yer Tutucu | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barkod Oluşturucu | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON gövdesi, dosya yükleme yok. |
+| `aspect-ratio-calculator` | En boy oranı hesaplayıcı | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
 
 ### Düzen ve Kompozisyon {#layout-composition}
 
@@ -249,6 +253,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `border` | Kenarlık ve Çerçeve | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Ekran Görüntüsünü Güzelleştir | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Dairesel Kırpma | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Yuvarlatılmış Kırpma | `shape` (rounded-square/squircle), `cornerRadius` (0-50, kısa kenarın yüzdesi), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Görüntü Dolgusu | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sayfası | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - çok dosyalı (2-64 görüntü) |
 
@@ -284,12 +289,14 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `stabilize-video` | Videoyu Sabitle | `smoothing` (5-60, kare cinsinden) |
 | `gif-to-video` | GIF'den Videoya | `format` (mp4/webm/mov) |
 | `video-to-webp` | Videodan WebP'ye | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Videodan AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (maks. 60sn), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Videodan Karelere | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Videoları Birleştir | - (çok dosyalı, ilk videonun çözünürlüğüne normalleştirilir) |
 | `replace-audio` | Sesi Değiştir | - (video + ses dosyası, iki dosya) |
 | `burn-subtitles` | Altyazıları Göm | `fontSize` (8-72) - video + altyazı dosyası |
 | `embed-subtitles` | Altyazıları Yerleştir | `language` (ISO 639-2/B kodu) - video + altyazı dosyası |
 | `extract-subtitles` | Altyazıları Çıkar | - (SRT çıktısı verir) |
+| `convert-subtitles` | Altyazı Dönüştür | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Görüntülerden Videoya | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/kare), `fps` - çok dosyalı |
 | `video-metadata` | Video Meta Verilerini Temizle | - |
 | `auto-subtitles` | Otomatik Altyazılar (Yapay Zeka) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -328,6 +335,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `extract-pages` | Sayfaları Çıkar | `range` (qpdf söz dizimi, örn. "1-5,8,10-z") |
 | `remove-pages` | Sayfaları Kaldır | `pages` (kaldırılacak qpdf aralığı) |
 | `organize-pdf` | PDF'yi Düzenle | `order` (qpdf sayfa sırası, örn. "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF Çoklu Araç | `items` (sayfa planı, `[{doc, page, rot}]`, en fazla 1200 sayfa), `pageCounts` - çok dosyalı (en fazla 20 PDF) |
 | `protect-pdf` | PDF'yi Koru | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | PDF Kilidini Aç | `password` |
 | `repair-pdf` | PDF'yi Onar | - |
@@ -344,6 +352,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `sign-pdf` | PDF İmzala | PDF `file`, imza dosyaları `sig0`, `sig1` ve `placements` JSON dizisi içeren özel multipart yol |
 | `pdf-to-text` | PDF'den Metne | - |
 | `pdf-to-word` | PDF'den Word'e | - |
+| `pdf-to-markdown` | PDF'den Markdown'a | - (`.md` dosyası döndürür) |
 | `pdf-metadata` | PDF Meta Verileri | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Belge Dönüştür | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Sunum Dönüştür | `format` (pptx/odp) |
@@ -373,9 +382,13 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `json-xml` | JSON'dan XML'e | `pretty` (bool) - çift yönlü |
 | `split-csv` | CSV'yi Böl | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV'leri Birleştir | - (çok dosyalı, eşleşen sütunlar) |
+| `merge-text` | Metin Dosyalarını Birleştir | `separator` (blank-line/rule/filename-heading) - çok dosyalı, 2-50 dosya |
 | `yaml-json` | YAML / JSON | - (çift yönlü) |
 | `xml-to-csv` | XML'den CSV'ye | - (yinelenen öğeleri otomatik bulur) |
 | `convert-font` | Yazı Tipi Dönüştür | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Büyük/Küçük Harf Dönüştür | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 etiketi). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
+| `proportion-calculator` | Orantı Hesaplayıcı | `a`, `b`, `c`, `mode` (direct/inverse). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
+| `base64` | Base64 Kodla / Çöz | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
 | `excel-to-csv` | Excel'den CSV'ye | `convert-spreadsheet` tarafından desteklenen özel dönüştürme ön ayarı |
 | `create-zip` | ZIP Oluştur | - (çok dosyalı, 2-50 dosya) |
 | `extract-zip` | ZIP Ayıkla | - (bomba korumalı) |

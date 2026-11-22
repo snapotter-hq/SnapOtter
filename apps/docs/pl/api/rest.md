@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 5436b0065c99
+i18n_output_hash: 37e6cfa7f7c3
 i18n_hash_version: 2
-i18n_source_hash: 21592dbca884
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -156,6 +156,8 @@ Wspólny katalog zawiera 83 dedykowane punkty końcowe ustawień wstępnych konw
 
 Każde ustawienie wstępne blokuje format wyjściowy i deleguje do narzędzia bazowego, takiego jak `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` lub `convert-spreadsheet`. Zobacz [Ustawienia wstępne konwersji](/pl/tools/conversion-presets), aby uzyskać kompletną tabelę tras i opcjonalne ustawienia.
 
+Ustawienia wstępne kompresji działają tak samo. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` i `compress-image-to-500kb` uruchamiają `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` i `compress-pdf-to-2mb` uruchamiają `compress-pdf`. Każde z nich blokuje `mode` na `targetSize`, a `targetSizeKb` na rozmiarze podanym w jego nazwie.
+
 ### Podstawy {#essentials}
 
 | ID narzędzia | Nazwa | Kluczowe ustawienia |
@@ -196,6 +198,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | ID narzędzia | Nazwa | Model AI | Kluczowe ustawienia |
 |---------|------|---------|-------------|
 | `remove-background` | Usuwanie tła | rembg (BiRefNet / U2-Net) | Etap 1: `model`, `edgeRefine` (0-3), `decontaminate`. Etap 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` i potoki: `backgroundType` (transparent/color/gradient/blur oraz image na `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Usuwanie tła GIF | rembg, klatka po klatce | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Powiększanie obrazu | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Wymazywanie obiektów | LaMa (ONNX) | Maska wysyłana jako druga część pliku (nazwa pola `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstrakcja tekstu | Tesseract (szybki); RapidOCR + PP-OCR ONNX (zrównoważony/najlepszy) | `quality` (szybki/zrównoważony/najlepszy), `language`, `enhance` |
@@ -239,6 +242,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `histogram` | Histogram | `scale` (linear/log) - zwraca wykres histogramu RGB + statystyki dla poszczególnych kanałów |
 | `lqip-placeholder` | Symbol zastępczy LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Generator kodów kreskowych | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Treść JSON, bez przesyłania pliku. |
+| `aspect-ratio-calculator` | Kalkulator proporcji obrazu | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Treść JSON, bez przesyłania pliku; zwraca brakującą wartość. |
 
 ### Układ i kompozycja {#layout-composition}
 
@@ -250,6 +254,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `border` | Obramowanie i ramka | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Upiększanie zrzutu ekranu | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Kadrowanie okrągłe | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Kadrowanie zaokrąglone | `shape` (rounded-square/squircle), `cornerRadius` (0-50, procent krótszego boku), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Dopełnianie obrazu | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Arkusz duszków | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - wieloplikowe (2-64 obrazy) |
 
@@ -285,12 +290,14 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `stabilize-video` | Stabilizacja wideo | `smoothing` (5-60, w klatkach) |
 | `gif-to-video` | GIF do wideo | `format` (mp4/webm/mov) |
 | `video-to-webp` | Wideo do WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Wideo na AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (maks. 60 s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Wideo do klatek | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Łączenie wideo | - (wieloplikowe, znormalizowane do rozdzielczości pierwszego wideo) |
 | `replace-audio` | Zamiana dźwięku | - (plik wideo + audio, dwa pliki) |
 | `burn-subtitles` | Wypalanie napisów | `fontSize` (8-72) - plik wideo + napisy |
 | `embed-subtitles` | Osadzanie napisów | `language` (kod ISO 639-2/B) - plik wideo + napisy |
 | `extract-subtitles` | Wyodrębnianie napisów | - (na wyjściu SRT) |
+| `convert-subtitles` | Konwertuj napisy | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Obrazy do wideo | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - wieloplikowe |
 | `video-metadata` | Czyszczenie metadanych wideo | - |
 | `auto-subtitles` | Automatyczne napisy (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -329,6 +336,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `extract-pages` | Wyodrębnianie stron | `range` (składnia qpdf, np. "1-5,8,10-z") |
 | `remove-pages` | Usuwanie stron | `pages` (zakres qpdf do usunięcia) |
 | `organize-pdf` | Organizacja PDF | `order` (kolejność stron qpdf, np. "3,1,2,5-z") |
+| `multi-tool-pdf` | Narzędzie wielofunkcyjne PDF | `items` (plan stron, `[{doc, page, rot}]`, do 1200 stron), `pageCounts` - wieloplikowe (do 20 plików PDF) |
 | `protect-pdf` | Ochrona PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Odblokowanie PDF | `password` |
 | `repair-pdf` | Naprawa PDF | - |
@@ -345,6 +353,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `sign-pdf` | Podpisywanie PDF | Niestandardowa trasa multipart z plikiem PDF `file`, plikami podpisu `sig0`, `sig1` oraz tablicą JSON `placements` |
 | `pdf-to-text` | PDF do tekstu | - |
 | `pdf-to-word` | PDF do Word | - |
+| `pdf-to-markdown` | PDF na Markdown | - (zwraca plik `.md`) |
 | `pdf-metadata` | Metadane PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Konwersja dokumentu | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Konwersja prezentacji | `format` (pptx/odp) |
@@ -374,9 +383,13 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `json-xml` | JSON do XML | `pretty` (bool) - dwukierunkowe |
 | `split-csv` | Dzielenie CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Łączenie plików CSV | - (wieloplikowe, pasujące kolumny) |
+| `merge-text` | Scal pliki tekstowe | `separator` (blank-line/rule/filename-heading) - wieloplikowe, 2-50 plików |
 | `yaml-json` | YAML / JSON | - (dwukierunkowe) |
 | `xml-to-csv` | XML do CSV | - (automatyczne wyszukiwanie powtarzających się elementów) |
 | `convert-font` | Konwertuj czcionkę | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Zmień wielkość liter | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (znacznik BCP 47). Treść JSON, bez przesyłania pliku; zwraca przekonwertowany tekst. |
+| `proportion-calculator` | Kalkulator proporcji | `a`, `b`, `c`, `mode` (direct/inverse). Treść JSON, bez przesyłania pliku; zwraca brakującą wartość. |
+| `base64` | Kodowanie / dekodowanie Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Treść JSON, bez przesyłania pliku; zwraca przekonwertowany tekst. |
 | `excel-to-csv` | Excel do CSV | dedykowane ustawienie wstępne konwersji oparte na `convert-spreadsheet` |
 | `create-zip` | Utwórz ZIP | - (wieloplikowe, 2-50 plików) |
 | `extract-zip` | Wypakuj ZIP | - (ochrona przed bombą) |

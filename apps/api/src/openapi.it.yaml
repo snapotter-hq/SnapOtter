@@ -15475,9 +15475,10 @@ paths:
   /api/v1/tools/pdf/pdf-to-markdown:
     post:
       operationId: pdfToMarkdown
-      tags: [PDF]
-      summary: PDF to Markdown
-      description: Convert a PDF to Markdown. Headings are inferred from font size, and lists, links and ruled tables are kept where the PDF has real structure; images are dropped. A scanned PDF with no text layer is refused with 422 and code NO_TEXT_LAYER, so run OCR on it instead.
+      tags:
+        - PDF
+      summary: PDF in Markdown
+      description: Converte un PDF in Markdown. I titoli vengono dedotti dalla dimensione del carattere, mentre elenchi, link e tabelle con linee vengono mantenuti dove il PDF ha una vera struttura; le immagini vengono scartate. Un PDF scansionato senza livello di testo viene rifiutato con 422 e codice NO_TEXT_LAYER, quindi esegui invece l'OCR.
       security:
         - bearerAuth: []
       requestBody:
@@ -15486,33 +15487,34 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required:
+                - file
               properties:
                 file:
                   type: string
                   format: binary
-                  description: PDF file to convert (.pdf)
+                  description: File PDF da convertire (.pdf)
                 clientJobId:
                   type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
                   maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
+                  description: ID del job fornito dal client per il monitoraggio dell'avanzamento SSE
             example:
               file: photo.png
               clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        "200":
-          description: Markdown file
+        '200':
+          description: File Markdown
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: "#/components/schemas/ToolResponse"
+                  - $ref: '#/components/schemas/ToolResponse'
                   - type: object
                     properties:
                       chars:
                         type: integer
-                        description: Number of characters in the Markdown output
+                        description: Numero di caratteri nell'output Markdown
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.md
@@ -15521,11 +15523,11 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 chars: 1
-        "202":
-          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+        '202':
+          description: Accettato per l'elaborazione asincrona. Segui l'avanzamento tramite SSE su /api/v1/jobs/{jobId}/progress.
           headers:
             Location:
-              description: Status URL for the job (same value as statusUrl).
+              description: URL di stato del job (stesso valore di statusUrl).
               schema:
                 type: string
           content:
@@ -15549,20 +15551,20 @@ paths:
                 progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 async: true
-        "400":
-          description: Invalid input
+        '400':
+          description: Input non valido
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: Authentication required
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autenticazione richiesta
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnauthorizedError"
-        "413":
-          $ref: "#/components/responses/PayloadTooLarge"
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/pdf/pdf-to-word:
     post:
       operationId: pdfToWord
@@ -27555,6 +27557,14 @@ x-i18n:
       sourceHash: f107a4082454
       provenance: machine
       outputHash: 0c9919f24a8f
+    paths./api/v1/tools/pdf/pdf-to-markdown.post.summary:
+      sourceHash: 0fdb5364d95b
+      provenance: machine
+      outputHash: a36d19c1264c
+    paths./api/v1/tools/pdf/pdf-to-markdown.post.description:
+      sourceHash: 067d922fa568
+      provenance: machine
+      outputHash: 22eb157149f1
     paths./api/v1/tools/pdf/pdf-to-word.post.summary:
       sourceHash: 283553b063ad
       provenance: machine
@@ -34096,6 +34106,38 @@ x-i18n:
       provenance: machine
       outputHash: 8721a48584f1
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: bf85c972835b
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 7fd4d9226639
+      provenance: machine
+      outputHash: 232da0ab7a67
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 2bd0d2105b4b
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/200/description:
+      sourceHash: 7e1e450abf75
+      provenance: machine
+      outputHash: e8f99ef8ca11
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/200/content/application~1json/schema/allOf/1/properties/chars/description:
+      sourceHash: 952d527eb323
+      provenance: machine
+      outputHash: b1d69ec466a8
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/202/description:
+      sourceHash: 2480a3a6861c
+      provenance: machine
+      outputHash: f64b09762535
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/202/headers/Location/description:
+      sourceHash: e4b6285b4516
+      provenance: machine
+      outputHash: 81e3c2791a5e
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 8721a48584f1
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-markdown/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: bf85c972835b

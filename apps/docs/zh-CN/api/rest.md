@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 473a0d035690
-i18n_source_hash: 21592dbca884
+i18n_output_hash: 6f7d086bcdd5
+i18n_source_hash: baf6f1fff48e
 i18n_provenance: human
 ---
 
@@ -155,6 +155,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 每个预设锁定输出格式，并委托给某个基础工具，例如 `convert`、`convert-video`、`extract-audio`、`convert-audio`、`image-to-pdf`、`pdf-to-image`、`svg-to-raster` 或 `convert-spreadsheet`。完整的路由表和可选设置见 [转换预设](/zh-CN/tools/conversion-presets)。
 
+预设的工作方式相同。`compress-image-to-20kb`、`compress-image-to-50kb`、`compress-image-to-100kb`、`compress-image-to-200kb` 和 `compress-image-to-500kb` 运行 `compress`；`compress-pdf-to-100kb`、`compress-pdf-to-200kb`、`compress-pdf-to-500kb`、`compress-pdf-to-1mb` 和 `compress-pdf-to-2mb` 运行 `compress-pdf`。每个预设都会把 `mode` 锁定为 `targetSize`，并把 `targetSizeKb` 锁定为名称中的大小。
+
 ### 基础工具 {#essentials}
 
 | 工具 ID | 名称 | 主要设置 |
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 工具 ID | 名称 | AI 模型 | 主要设置 |
 |---------|------|---------|-------------|
 | `remove-background` | 移除背景 | rembg (BiRefNet / U2-Net) | 阶段 1：`model`、`edgeRefine`（0-3）、`decontaminate`。阶段 2（`/api/v1/tools/image/remove-background/effects`）、`/batch` 和流水线：`backgroundType`（transparent/color/gradient/blur，`/effects` 还支持 image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurEnabled`、`blurIntensity`、`shadowEnabled`、`shadowOpacity`、`outputFormat`（png/webp/avif） |
+| `remove-gif-background` | 移除 GIF 背景 | rembg，逐帧处理 | `model`、`outputFormat`（webp/gif/apng）、`backgroundType`（transparent/color/gradient/blur/image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurIntensity`（0-100）、`shadowEnabled`、`shadowOpacity`（0-100）、`edgeRefine`（0-3）、`decontaminate` |
 | `upscale` | 图片放大 | RealESRGAN | `scale`（2/4）、`model`、`faceEnhance`、`denoise`、`format`、`quality` |
 | `erase-object` | 对象擦除 | LaMa (ONNX) | 蒙版作为第二个文件部分发送（字段名 `mask`）、`format`、`quality` |
 | `ocr` | OCR / 文本提取 | Tesseract（快速）； RapidOCR + PP-OCR ONNX（平衡/最佳） | `quality`（快速/平衡/最佳）、`language`、`enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 直方图 | `scale`（linear/log）- 返回 RGB 直方图图表 + 各通道统计 |
 | `lqip-placeholder` | LQIP 占位图 | `width`（4-64）、`blur`、`strategy`（blur/pixelate/solid）、`format`（webp/png/jpeg）、`quality` |
 | `barcode-generate` | 条形码生成器 | `text`、`type`（code128/ean13/upca/code39/itf14/datamatrix）、`scale`（1-8）、`includeText`（bool）。JSON 请求体，无需上传文件。 |
+| `aspect-ratio-calculator` | 宽高比计算器 | `width`、`height`、`newWidth`、`newHeight`、`round`（bool）。JSON 请求体，无需上传文件；返回缺失的值。 |
 
 ### 布局与合成 {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | 边框与相框 | `width`、`color`、`style`（solid/gradient/pattern）、`borderRadius`、`padding`、`shadow` |
 | `beautify` | 美化截图 | `backgroundType`（solid/linear-gradient/radial-gradient/image/transparent）、`gradientStops`、`padding`、`borderRadius`、`shadowPreset`、`frame`（none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...）、`socialPreset`（none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt）、`watermarkText`、`outputFormat` |
 | `circle-crop` | 圆形裁剪 | `zoom`（1-5）、`offsetX`、`offsetY`、`borderWidth`、`borderColor`、`background`（transparent/hex）、`outputSize` |
+| `rounded-crop` | 圆角裁剪 | `shape`（rounded-square/squircle）、`cornerRadius`（0-50，占短边的百分比）、`zoom`（1-5）、`offsetX`、`offsetY`、`borderWidth`、`borderColor`、`background`（transparent/hex）、`outputSize` |
 | `image-pad` | 图片留白 | `target`（16:9/9:16/1:1/4:3/3:4/custom）、`ratioW`、`ratioH`、`background`（color/transparent/blur）、`color`（hex）、`padding`（0-50%） |
 | `sprite-sheet` | 精灵图 | `columns`（1-16）、`padding`、`background`（hex）、`format`（png/webp/jpeg）、`quality` - 多文件（2-64 张图片） |
 
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | 视频防抖 | `smoothing`（5-60，以帧计） |
 | `gif-to-video` | GIF 转视频 | `format`（mp4/webm/mov） |
 | `video-to-webp` | 视频转 WebP | `fps`、`width`、`quality`、`loop`（bool） |
+| `video-to-avif` | 视频转 AVIF | `fps`（1-30）、`width`（64-1280）、`startS`、`durationS`（最长 60 秒）、`quality`（1-100）、`loop`（bool） |
 | `video-to-frames` | 视频转帧 | `mode`（all/nth/timestamps）、`n`、`timestamps`、`format`（png/jpg） |
 | `merge-videos` | 合并视频 | -（多文件，归一化到第一个视频的分辨率） |
 | `replace-audio` | 替换音频 | -（视频 + 音频文件，两个文件） |
 | `burn-subtitles` | 烧录字幕 | `fontSize`（8-72）- 视频 + 字幕文件 |
 | `embed-subtitles` | 嵌入字幕 | `language`（ISO 639-2/B 代码）- 视频 + 字幕文件 |
 | `extract-subtitles` | 提取字幕 | -（输出 SRT） |
+| `convert-subtitles` | 转换字幕 | `format`（srt/vtt/ass）、`encoding`（auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr） |
 | `images-to-video` | 图片转视频 | `secondsPerImage`（0.5-10）、`resolution`（1080p/720p/square）、`fps` - 多文件 |
 | `video-metadata` | 清理视频元数据 | - |
 | `auto-subtitles` | 自动字幕（AI） | `language`（auto/en/de/fr/es/zh/ja/ko/id/th/vi）、`format`（srt/vtt） |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | 提取页面 | `range`（qpdf 语法，例如 "1-5,8,10-z"） |
 | `remove-pages` | 删除页面 | `pages`（要删除的 qpdf 范围） |
 | `organize-pdf` | 整理 PDF | `order`（qpdf 页面顺序，例如 "3,1,2,5-z"） |
+| `multi-tool-pdf` | PDF 多功能工具 | `items`（页面方案，`[{doc, page, rot}]`，最多 1200 页）、`pageCounts` - 多文件（最多 20 个 PDF） |
 | `protect-pdf` | 保护 PDF | `userPassword`、`ownerPassword`（AES-256） |
 | `unlock-pdf` | 解锁 PDF | `password` |
 | `repair-pdf` | 修复 PDF | - |
@@ -344,6 +352,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF 签名 | 自定义 multipart 路由，带 PDF `file`、签名文件 `sig0`、`sig1` 和 `placements` JSON 数组 |
 | `pdf-to-text` | PDF 转文本 | - |
 | `pdf-to-word` | PDF 转 Word | - |
+| `pdf-to-markdown` | PDF 转 Markdown | -（输出 `.md` 文件） |
 | `pdf-metadata` | PDF 元数据 | `title`、`author`、`subject`、`keywords`、`stripAll` |
 | `convert-document` | 转换文档 | `format`（docx/odt/rtf/txt） |
 | `convert-presentation` | 转换演示文稿 | `format`（pptx/odp） |
@@ -373,9 +382,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON 转 XML | `pretty`（bool）- 双向 |
 | `split-csv` | 拆分 CSV | `rowsPerFile`（1-1000000）、`keepHeader`（bool） |
 | `merge-csvs` | 合并 CSV | -（多文件，列匹配） |
+| `merge-text` | 合并文本文件 | `separator`（blank-line/rule/filename-heading） - 多文件，2-50 个文件 |
 | `yaml-json` | YAML / JSON | -（双向） |
 | `xml-to-csv` | XML 转 CSV | -（自动查找重复元素） |
 | `convert-font` | 转换字体 | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | 大小写转换 | `text`、`mode`（upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab）、`locale`（BCP 47 标签）。JSON 请求体，无需上传文件；返回转换后的文本。 |
+| `proportion-calculator` | 比例计算器 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 请求体，无需上传文件；返回缺失的值。 |
+| `base64` | Base64 编码 / 解码 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 请求体，无需上传文件；返回转换后的文本。 |
 | `excel-to-csv` | Excel 转 CSV | 由 `convert-spreadsheet` 支撑的专用转换预设 |
 | `create-zip` | 创建 ZIP | -（多文件，2-50 个文件） |
 | `extract-zip` | 解压 ZIP | -（已做 ZIP 炸弹防护） |
