@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 816dd5e15fc6
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: a523c10de4a3
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 

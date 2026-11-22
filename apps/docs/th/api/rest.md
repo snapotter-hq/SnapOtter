@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 4df8c109bc93
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: 44c977d67921
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 

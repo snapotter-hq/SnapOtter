@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 1b3ae69a095b
-i18n_source_hash: baf6f1fff48e
+i18n_output_hash: 5b0f6dee6bcc
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 

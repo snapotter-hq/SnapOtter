@@ -1,8 +1,8 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: cce029ed0269
+i18n_output_hash: b83e3fda2359
 i18n_hash_version: 2
-i18n_source_hash: baf6f1fff48e
+i18n_source_hash: 641c3969deac
 i18n_provenance: human
 ---
 
