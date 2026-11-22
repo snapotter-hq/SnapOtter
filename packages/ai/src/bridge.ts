@@ -93,6 +93,11 @@ export function buildMinimalEnv(): Record<string, string> {
   const allowModelDownload = process.env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD?.toLowerCase();
   const modelDownloadsEnabled = allowModelDownload === "1" || allowModelDownload === "true";
   env.SNAPOTTER_ALLOW_MODEL_DOWNLOAD = modelDownloadsEnabled ? "1" : "0";
+  // A sidecar that may not download has no use for a mirror URL, which can
+  // carry credentials.
+  if (modelDownloadsEnabled && process.env.HF_ENDPOINT !== undefined) {
+    env.HF_ENDPOINT = process.env.HF_ENDPOINT;
+  }
   if (!modelDownloadsEnabled) {
     env.HF_HUB_OFFLINE = "1";
     env.TRANSFORMERS_OFFLINE = "1";

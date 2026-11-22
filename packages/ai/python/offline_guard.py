@@ -8,6 +8,7 @@ fallback downloads with SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1.
 """
 import contextlib
 import os
+import urllib.parse
 
 
 def downloads_allowed():
@@ -28,6 +29,23 @@ def ensure_download_allowed(what):
         "the feature bundle from Settings, or explicitly set "
         "SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1 to permit runtime downloads."
     )
+
+
+def hf_url(path):
+    """URL of a file on Hugging Face, honouring an HF_ENDPOINT mirror.
+
+    The bridge forwards HF_ENDPOINT to the sidecar only when runtime downloads
+    are enabled. An endpoint with credentials is refused without echoing it:
+    urllib puts the userinfo into its exception text, which the sidecars
+    report to the API.
+    """
+    endpoint = os.environ.get("HF_ENDPOINT", "").strip() or "https://huggingface.co"
+    if "@" in urllib.parse.urlsplit(endpoint).netloc:
+        raise RuntimeError(
+            "HF_ENDPOINT must not contain credentials. Set it to the mirror's "
+            "base URL, for example https://hf-mirror.com."
+        )
+    return f"{endpoint.rstrip('/')}/{path}"
 
 
 def library_workdir_path():
