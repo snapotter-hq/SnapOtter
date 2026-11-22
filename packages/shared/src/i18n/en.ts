@@ -4165,6 +4165,8 @@ export const en = {
       runOcr: "Run OCR on this PDF",
       unreadablePages:
         "{count} of {total} pages have no readable text layer, so their part of the .txt may come out garbled. OCR can read those pages.",
+      partlyUnreadablePages:
+        "On {count} of {total} pages, some text is in a font that doesn't map to readable characters, so those lines may come out garbled in the .txt. OCR can read them.",
     },
     "pdf-to-markdown": {
       submit: "Convert to Markdown",

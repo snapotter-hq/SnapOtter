@@ -15514,6 +15514,16 @@ paths:
                           total:
                             type: integer
                             description: عدد صفحات ملف PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: يظهر فقط عندما تُقرأ بعض الصفحات كنص لكنها تحتوي أيضًا على نص بخط بلا خريطة ToUnicode صالحة. تبقى تلك الأسطر في ملف .txt كما استُخرجت.
+                        properties:
+                          count:
+                            type: integer
+                            description: الصفحات التي قُرئت كنص لكنها احتوت أيضًا على نص غير مقروء
+                          total:
+                            type: integer
+                            description: عدد صفحات ملف PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36562,6 +36572,18 @@ x-i18n:
       provenance: machine
       outputHash: 6d70508324fc
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: d6020c2cf45a
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 11d6c718a8dd
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 6dea4be1cc1b
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: d6020c2cf45a

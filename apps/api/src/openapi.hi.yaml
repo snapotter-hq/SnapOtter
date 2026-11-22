@@ -15510,6 +15510,16 @@ paths:
                           total:
                             type: integer
                             description: PDF में पेजों की संख्या
+                      partlyUnreadablePages:
+                        type: object
+                        description: केवल तब मौजूद होता है जब कुछ पेज टेक्स्ट के रूप में पढ़े गए, पर उनमें ऐसे फ़ॉन्ट का टेक्स्ट भी था जिसमें उपयोगी ToUnicode मैप नहीं है। वे लाइनें .txt में वैसे ही रहती हैं जैसे निकाली गई थीं।
+                        properties:
+                          count:
+                            type: integer
+                            description: वे पेज जो टेक्स्ट के रूप में पढ़े गए, पर जिनमें न पढ़ा जा सकने वाला टेक्स्ट भी था
+                          total:
+                            type: integer
+                            description: PDF में पेजों की संख्या
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36555,6 +36565,18 @@ x-i18n:
       provenance: machine
       outputHash: 2ee6d4f3c2aa
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 0620e9c89e90
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 0e4ca1e369b7
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 79c5a2446266
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 0620e9c89e90

@@ -69,6 +69,8 @@ export interface ResultNotes {
   chartRows?: { charted: number; skipped: number };
   /** PDF to Text pages whose text layer didn't read as text (#954). */
   unreadablePages?: { count: number; total: number };
+  /** PDF to Text pages that read, but also hold text in a font that didn't (#4947). */
+  partlyUnreadablePages?: { count: number; total: number };
 }
 
 export interface FileEntry {

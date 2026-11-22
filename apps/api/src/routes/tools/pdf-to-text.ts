@@ -38,11 +38,17 @@ export function registerPdfToText(app: FastifyInstance) {
         contentType: "text/plain",
         // The .txt keeps every page as extracted, unreadable ones included:
         // dropping text on a heuristic is worse than showing it. Say how many
-        // pages it was so the junk isn't silent (#954).
+        // pages it was so the junk isn't silent (#954), including pages where
+        // only some of the text is junk (#4947).
         resultPayload: {
           chars: result.chars,
           ...(result.unreadablePages && result.pages
             ? { unreadablePages: { count: result.unreadablePages, total: result.pages } }
+            : {}),
+          ...(result.partlyUnreadablePages && result.pages
+            ? {
+                partlyUnreadablePages: { count: result.partlyUnreadablePages, total: result.pages },
+              }
             : {}),
         },
       };

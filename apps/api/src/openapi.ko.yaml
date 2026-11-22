@@ -15506,6 +15506,16 @@ paths:
                           total:
                             type: integer
                             description: PDF의 전체 페이지 수
+                      partlyUnreadablePages:
+                        type: object
+                        description: 일부 페이지가 텍스트로 읽혔지만 사용 가능한 ToUnicode 맵이 없는 글꼴의 텍스트도 포함했을 때만 포함됩니다. 해당 줄은 추출된 그대로 .txt에 남습니다.
+                        properties:
+                          count:
+                            type: integer
+                            description: 텍스트로 읽혔지만 읽을 수 없는 텍스트도 포함한 페이지 수
+                          total:
+                            type: integer
+                            description: PDF의 전체 페이지 수
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -36554,6 +36564,18 @@ x-i18n:
       provenance: machine
       outputHash: 2e53351d34e3
     ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/unreadablePages/properties/total/description:
+      sourceHash: 6acab2454785
+      provenance: machine
+      outputHash: 480c4395cd32
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/description:
+      sourceHash: 685f4b80846c
+      provenance: machine
+      outputHash: 37883d4afc58
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/count/description:
+      sourceHash: 9e3b96a91363
+      provenance: machine
+      outputHash: 12222b18ceae
+    ptr:/paths/~1api~1v1~1tools~1pdf~1pdf-to-text/post/responses/200/content/application~1json/schema/allOf/1/properties/partlyUnreadablePages/properties/total/description:
       sourceHash: 6acab2454785
       provenance: machine
       outputHash: 480c4395cd32

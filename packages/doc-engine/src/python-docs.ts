@@ -203,7 +203,9 @@ export async function pdfRedactPy(
  * What doc_text reports. The page counts split the pages with no readable text
  * into ones that came back blank (a scan) and ones whose text failed the
  * readability test (fonts with no usable ToUnicode map), so the caller can say
- * which (#954). An older sidecar sends no counts.
+ * which (#954). partlyUnreadablePages counts pages that did read but also hold
+ * text in a font that didn't (#4947). An older sidecar sends no counts, and a
+ * #954-era one sends all but the last.
  */
 export interface PdfTextResult {
   chars: number;
@@ -211,6 +213,7 @@ export interface PdfTextResult {
   pages?: number;
   emptyPages?: number;
   unreadablePages?: number;
+  partlyUnreadablePages?: number;
 }
 
 /** Extract plain text from a PDF (PyMuPDF get_text). */
@@ -231,6 +234,7 @@ export async function pdfTextPy(
     pages?: unknown;
     emptyPages?: unknown;
     unreadablePages?: unknown;
+    partlyUnreadablePages?: unknown;
     error?: string;
   }>("doc_text", stdout);
   if ("error" in parsed) {
@@ -241,7 +245,7 @@ export async function pdfTextPy(
   }
   // Fall back to a chars>0 heuristic if an older sidecar omits hasText.
   const hasText = parsed.hasText ?? parsed.chars > 0;
-  const { pages, emptyPages, unreadablePages } = parsed;
+  const { pages, emptyPages, unreadablePages, partlyUnreadablePages } = parsed;
   if (
     typeof pages !== "number" ||
     typeof emptyPages !== "number" ||
@@ -249,7 +253,14 @@ export async function pdfTextPy(
   ) {
     return { chars: parsed.chars, hasText };
   }
-  return { chars: parsed.chars, hasText, pages, emptyPages, unreadablePages };
+  return {
+    chars: parsed.chars,
+    hasText,
+    pages,
+    emptyPages,
+    unreadablePages,
+    ...(typeof partlyUnreadablePages === "number" ? { partlyUnreadablePages } : {}),
+  };
 }
 
 /** PDF to Markdown with inferred headings, lists and tables (PyMuPDF). Long-running: 5 min timeout. */
