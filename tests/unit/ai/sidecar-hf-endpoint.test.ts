@@ -64,6 +64,16 @@ print(json.dumps({
 const LAMA = "Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx";
 const NAFNET = "mikestealth/nafnet-models/resolve/main/NAFNet-SIDD-width64.pth";
 
+// The test points HOME at a scratch directory so the real ~/.cache can't hold
+// a LaMa file that skips the download. A python3 shim that finds its venv
+// through HOME (the fleet's does) would then break, so resolve the real
+// interpreter first.
+const python = pythonBin
+  ? spawnSync(pythonBin, ["-c", "import sys; print(sys.executable)"], {
+      encoding: "utf8",
+    }).stdout.trim()
+  : "";
+
 const directories: string[] = [];
 
 afterEach(() => {
@@ -85,7 +95,7 @@ function fallbackUrls(hfEndpoint: string | undefined): Record<string, unknown> {
   delete env.HF_ENDPOINT;
   delete env.LAMA_MODEL_DIR;
   if (hfEndpoint !== undefined) env.HF_ENDPOINT = hfEndpoint;
-  const res = spawnSync(pythonBin as string, ["-c", SCRIPT, pyDir], {
+  const res = spawnSync(python, ["-c", SCRIPT, pyDir], {
     encoding: "utf8",
     env,
     timeout: 20000,
