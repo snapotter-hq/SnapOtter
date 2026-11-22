@@ -1,8 +1,8 @@
 ---
 description: "Redimensionnement par découpe de coutures qui ajoute ou retire des pixels le long des chemins de faible importance afin de préserver le contenu clé et les visages."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: e3dc39310fda
+i18n_output_hash: d24ce2495c64
 ---
 
 # Redimensionnement adapté au contenu {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Notes {#notes}
 
 - Utilise la bibliothèque de découpe de coutures `caire` pour le redimensionnement adapté au contenu.
-- Réduit uniquement les dimensions (retire des coutures). Ne peut pas agrandir une image au-delà de sa taille d'origine.
+- Réduit en retirant des coutures ou agrandit en en insérant. Chaque côté peut atteindre au plus le double de sa taille d'origine.
 - L'option `protectFaces` utilise la détection de visages par IA pour marquer les régions des visages comme à haute énergie, empêchant les coutures de les traverser.
 - `blurRadius` contrôle le lissage avant le calcul de la carte d'énergie. Les valeurs plus élevées rendent la carte d'énergie plus uniforme, ce qui peut aider avec les images bruitées.
 - `sobelThreshold` influence l'agressivité de la détection des contours. Les valeurs plus basses préservent des contours plus subtils.

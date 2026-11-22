@@ -1,8 +1,8 @@
 ---
 description: "Redimensionamento por corte de costura (seam carving) que adiciona ou remove pixels ao longo de caminhos de baixa importância para preservar o conteúdo principal e os rostos."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 2eacedb4a530
+i18n_output_hash: c52d50f322c7
 ---
 
 # Redimensionamento com Reconhecimento de Conteúdo {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Notas {#notes}
 
 - Usa a biblioteca de corte de costura `caire` para o redimensionamento com reconhecimento de conteúdo.
-- Apenas reduz as dimensões (remove costuras). Não pode expandir uma imagem além do seu tamanho original.
+- Reduz removendo costuras ou amplia inserindo-as. Cada lado pode crescer até no máximo o dobro do seu tamanho original.
 - A opção `protectFaces` usa detecção de rostos por IA para marcar as regiões de rosto como de alta energia, impedindo que as costuras passem pelos rostos.
 - `blurRadius` controla a suavização antes do cálculo do mapa de energia. Valores maiores tornam o mapa de energia mais uniforme, o que pode ajudar com imagens ruidosas.
 - `sobelThreshold` afeta o quão agressivamente as bordas são detectadas. Valores menores preservam mais bordas sutis.

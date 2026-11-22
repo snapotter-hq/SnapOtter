@@ -472,7 +472,7 @@ En ytterligare analysslutpunkt finns tillgänglig på `POST /api/v1/tools/image/
 **Verktygsrutt:** `content-aware-resize`
 **Motor:** Go-binären `caire` (inte Python - ingen GPU-fördel)
 
-Ändrar storlek på bilder intelligent genom att ta bort lågenergisömmar och bevara viktigt innehåll.
+Ändrar storlek på bilder intelligent genom att ta bort eller infoga lågenergisömmar och bevara viktigt innehåll. Varje sida kan växa till högst dubbla sin ursprungliga storlek.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|

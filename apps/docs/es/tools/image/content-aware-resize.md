@@ -1,8 +1,8 @@
 ---
 description: "Redimensionado por seam carving que añade o elimina píxeles a lo largo de rutas de baja importancia para preservar el contenido clave y las caras."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: fc15d1d07157
+i18n_output_hash: fa90abf96729
 ---
 
 # Redimensionado con reconocimiento de contenido {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Notas {#notes}
 
 - Usa la biblioteca de seam carving `caire` para el redimensionado con reconocimiento de contenido.
-- Solo reduce dimensiones (elimina costuras). No puede expandir una imagen más allá de su tamaño original.
+- Reduce eliminando costuras o amplía insertándolas. Cada lado puede crecer como máximo hasta el doble de su tamaño original.
 - La opción `protectFaces` usa detección de caras por IA para marcar las regiones de caras como de alta energía, evitando que las costuras pasen a través de las caras.
 - `blurRadius` controla el suavizado antes del cálculo del mapa de energía. Los valores más altos hacen el mapa de energía más uniforme, lo que puede ayudar con imágenes ruidosas.
 - `sobelThreshold` afecta a la agresividad con la que se detectan los bordes. Los valores más bajos preservan bordes más sutiles.

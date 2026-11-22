@@ -1,8 +1,8 @@
 ---
 description: "Önemli içeriği ve yüzleri korumak için düşük önem taşıyan yollar boyunca piksel ekleyen veya kaldıran dikiş oyma yeniden boyutlandırma."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: b1c2a75d1480
+i18n_output_hash: 8af6a2ee0fd9
 ---
 
 # İçerik Duyarlı Yeniden Boyutlandırma {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Notlar {#notes}
 
 - İçerik duyarlı yeniden boyutlandırma için `caire` dikiş oyma kitaplığını kullanır.
-- Yalnızca boyutları küçültür (dikişleri kaldırır). Bir görüntüyü orijinal boyutunun ötesine genişletemez.
+- Dikişleri kaldırarak küçültür veya dikiş ekleyerek büyütür. Her kenar, orijinal boyutunun en fazla 2 katına kadar büyüyebilir.
 - `protectFaces` seçeneği, yüz bölgelerini yüksek enerjili olarak işaretlemek için AI yüz algılamasını kullanır ve dikişlerin yüzlerden geçmesini önler.
 - `blurRadius`, enerji haritası hesaplamasından önce düzeltmeyi denetler. Daha yüksek değerler enerji haritasını daha eşit hale getirir, bu da gürültülü görüntülere yardımcı olabilir.
 - `sobelThreshold`, kenarların ne kadar agresif algılandığını etkiler. Daha düşük değerler daha ince kenarları korur.

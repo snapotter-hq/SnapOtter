@@ -1,8 +1,8 @@
 ---
 description: "基于接缝裁剪的缩放，沿低重要性路径增删像素，以保留关键内容和人脸。"
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 6f195038282b
+i18n_output_hash: 2bc515137f68
 ---
 
 # 内容感知缩放 {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## 注意事项 {#notes}
 
 - 使用 `caire` 接缝裁剪库进行内容感知缩放。
-- 仅缩小尺寸（删除接缝）。无法将图片扩展到超过其原始尺寸。
+- 通过删除接缝缩小，或通过插入接缝放大。每条边最多可放大到原始尺寸的 2 倍。
 - `protectFaces` 选项使用 AI 人脸检测将人脸区域标记为高能量，防止接缝穿过人脸。
 - `blurRadius` 控制能量图计算前的平滑程度。较高的值会使能量图更均匀，这有助于处理噪点较多的图片。
 - `sobelThreshold` 影响边缘检测的激进程度。较低的值会保留更多细微的边缘。

@@ -1,8 +1,8 @@
 ---
 description: "Seam carving-storleksändring som lägger till eller tar bort pixlar längs banor med låg vikt för att bevara viktigt innehåll och ansikten."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 6b5ab962f55a
+i18n_output_hash: eed21c82d00c
 ---
 
 # Innehållsmedveten storleksändring {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Anteckningar {#notes}
 
 - Använder seam carving-biblioteket `caire` för innehållsmedveten storleksändring.
-- Minskar endast dimensioner (tar bort sömmar). Kan inte utöka en bild utöver dess ursprungliga storlek.
+- Förminskar genom att ta bort sömmar eller förstorar genom att infoga dem. Varje sida kan växa till högst dubbla sin ursprungliga storlek.
 - Alternativet `protectFaces` använder AI-ansiktsdetektering för att markera ansiktsområden som högenergi, vilket förhindrar att sömmar passerar genom ansikten.
 - `blurRadius` styr utjämning före beräkningen av energikartan. Högre värden gör energikartan mer enhetlig, vilket kan hjälpa med brusiga bilder.
 - `sobelThreshold` påverkar hur aggressivt kanter upptäcks. Lägre värden bevarar mer subtila kanter.

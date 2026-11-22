@@ -1,8 +1,8 @@
 ---
 description: "縫隙裁剪（seam-carving）縮放，沿低重要度路徑增減像素，以保留關鍵內容與臉部。"
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: d4331296878e
+i18n_output_hash: c169c3b2696e
 ---
 
 # 內容感知縮放 {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## 備註 {#notes}
 
 - 使用 `caire` 縫隙裁剪函式庫進行內容感知縮放。
-- 僅會縮小尺寸（移除縫隙）。無法將圖片擴大到超過原始尺寸。
+- 透過移除縫隙縮小，或透過插入縫隙放大。每一邊最多可放大到原始尺寸的 2 倍。
 - `protectFaces` 選項使用 AI 臉部偵測將臉部區域標記為高能量，避免縫隙穿越臉部。
 - `blurRadius` 控制能量圖計算前的平滑化。數值越高，能量圖越均勻，有助於處理雜訊較多的圖片。
 - `sobelThreshold` 影響邊緣偵測的激進程度。數值越低，越能保留細微的邊緣。

@@ -472,7 +472,7 @@ Một endpoint phân tích bổ sung có tại `POST /api/v1/tools/image/image-e
 **Đường dẫn công cụ:** `content-aware-resize`  
 **Engine:** binary Go `caire` (không phải Python, không hưởng lợi từ GPU)
 
-Đổi kích thước ảnh một cách thông minh bằng cách loại bỏ các đường nối năng lượng thấp, giữ lại nội dung quan trọng.
+Đổi kích thước ảnh một cách thông minh bằng cách loại bỏ hoặc chèn thêm các đường nối năng lượng thấp, giữ lại nội dung quan trọng. Mỗi cạnh có thể tăng tối đa gấp 2 lần kích thước ban đầu.
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|

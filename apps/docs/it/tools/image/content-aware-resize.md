@@ -1,8 +1,8 @@
 ---
 description: "Ridimensionamento con seam carving che aggiunge o rimuove pixel lungo i percorsi di minore importanza per preservare i contenuti chiave e i volti."
-i18n_source_hash: 16ea4c2778e1
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 5c2bd9ca5381
+i18n_output_hash: 81ab6ede5596
 ---
 
 # Ridimensionamento consapevole del contenuto {#content-aware-resize}
@@ -72,7 +72,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
 ## Note {#notes}
 
 - Usa la libreria di seam carving `caire` per il ridimensionamento consapevole del contenuto.
-- Riduce solo le dimensioni (rimuove le seam). Non può espandere un'immagine oltre la sua dimensione originale.
+- Riduce rimuovendo le seam o ingrandisce inserendole. Ogni lato può crescere al massimo fino al doppio della sua dimensione originale.
 - L'opzione `protectFaces` usa il rilevamento dei volti con IA per contrassegnare le regioni dei volti come ad alta energia, impedendo alle seam di attraversare i volti.
 - `blurRadius` controlla lo smoothing prima del calcolo della mappa di energia. Valori più alti rendono la mappa di energia più uniforme, il che può aiutare con le immagini rumorose.
 - `sobelThreshold` influisce su quanto aggressivamente vengono rilevati i bordi. Valori più bassi preservano bordi più sottili.
