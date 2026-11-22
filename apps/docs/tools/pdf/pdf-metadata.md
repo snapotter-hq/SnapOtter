@@ -20,7 +20,7 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 | author | string | No | - | Document author (max 500 characters) |
 | subject | string | No | - | Document subject (max 500 characters) |
 | keywords | string | No | - | Document keywords (max 500 characters) |
-| stripAll | boolean | No | false | Remove the whole Info dictionary (dates, Creator, Producer, custom keys) and the XMP stream, then write any fields given above |
+| stripAll | boolean | No | false | Remove the whole Info dictionary (dates, Creator, Producer, custom keys), every XMP stream (document, pages, images) and all PieceInfo application data, then write any fields given above |
 
 All parameters are optional. Omitted fields are left unchanged unless `stripAll` is set.
 
@@ -57,5 +57,5 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - The `metadata` field in the response contains the resulting metadata after any updates.
 - To read metadata without modifying it, omit the `settings` field or send an empty object.
 - Each metadata field is limited to 500 characters.
-- With `stripAll`, the response also carries `stripped`: the Info keys that were removed (`removed`), whether an XMP stream was removed (`xmpRemoved`), and the PDF/A level the input declared (`pdfa`, or `null`). Removing XMP breaks PDF/A conformance.
-- `stripAll` doesn't touch per-page metadata streams or embedded file attachments.
+- With `stripAll`, the response also carries `stripped`: the Info keys that were removed (`removed`), whether the document XMP stream was removed (`xmpRemoved`), the PDF/A level the input declared (`pdfa`, or `null`), how many XMP streams came off pages, images and other objects (`objectXmpRemoved`), and how many PieceInfo dictionaries were removed (`pieceInfoRemoved`). Removing XMP breaks PDF/A conformance.
+- `stripAll` doesn't touch embedded file attachments.

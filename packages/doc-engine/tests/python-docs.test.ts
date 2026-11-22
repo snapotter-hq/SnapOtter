@@ -581,12 +581,18 @@ describe("pdfMetadataSetPy", () => {
 describe("pdfMetadataStripPy", () => {
   it("calls doc_metadata mode:strip and returns what was removed", async () => {
     runDocsScript.mockResolvedValueOnce(
-      '{"ok": true, "removed": ["Author", "Creator"], "xmpRemoved": true, "pdfa": "2B"}',
+      '{"ok": true, "removed": ["Author", "Creator"], "xmpRemoved": true, "pdfa": "2B", "objectXmpRemoved": 3, "pieceInfoRemoved": 1}',
     );
     const result = await import("../src/python-docs.js").then((m) =>
       m.pdfMetadataStripPy("/in.pdf", "/out.pdf", { Title: "Public" }),
     );
-    expect(result).toEqual({ removed: ["Author", "Creator"], xmpRemoved: true, pdfa: "2B" });
+    expect(result).toEqual({
+      removed: ["Author", "Creator"],
+      xmpRemoved: true,
+      pdfa: "2B",
+      objectXmpRemoved: 3,
+      pieceInfoRemoved: 1,
+    });
     expect(firstCall()).toEqual([
       "doc_metadata",
       { path: "/in.pdf", out: "/out.pdf", mode: "strip", metadata: { Title: "Public" } },
@@ -594,12 +600,18 @@ describe("pdfMetadataStripPy", () => {
     ]);
   });
 
-  it("normalizes a missing PDF/A level and XMP flag", async () => {
+  it("normalizes a missing PDF/A level, XMP flag and object counts", async () => {
     runDocsScript.mockResolvedValueOnce('{"ok": true, "removed": [], "pdfa": ""}');
     const result = await import("../src/python-docs.js").then((m) =>
       m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {}),
     );
-    expect(result).toEqual({ removed: [], xmpRemoved: false, pdfa: null });
+    expect(result).toEqual({
+      removed: [],
+      xmpRemoved: false,
+      pdfa: null,
+      objectXmpRemoved: 0,
+      pieceInfoRemoved: 0,
+    });
   });
 
   it("throws the reported error", async () => {

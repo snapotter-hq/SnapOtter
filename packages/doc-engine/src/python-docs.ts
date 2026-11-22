@@ -355,11 +355,16 @@ export interface PdfMetadataStripResult {
   xmpRemoved: boolean;
   /** PDF/A level the input declared in XMP (e.g. "2B"), null when none. */
   pdfa: string | null;
+  /** XMP streams removed from pages, images and other objects besides the catalog. */
+  objectXmpRemoved: number;
+  /** PieceInfo (Illustrator, Acrobat private data) dictionaries removed. */
+  pieceInfoRemoved: number;
 }
 
 /**
- * Drop the whole Info dictionary and the catalog XMP stream, then write
- * `metadata` onto the clean document (pikepdf).
+ * Drop the whole Info dictionary, every XMP stream and every PieceInfo
+ * dictionary, then write `metadata` onto the clean document (pikepdf).
+ * Embedded files are kept.
  */
 export async function pdfMetadataStripPy(
   inPath: string,
@@ -377,6 +382,8 @@ export async function pdfMetadataStripPy(
     removed?: unknown;
     xmpRemoved?: unknown;
     pdfa?: unknown;
+    objectXmpRemoved?: unknown;
+    pieceInfoRemoved?: unknown;
     error?: string;
   }>("doc_metadata", stdout);
   if ("error" in parsed) {
@@ -389,6 +396,8 @@ export async function pdfMetadataStripPy(
     removed: parsed.removed.map(String),
     xmpRemoved: parsed.xmpRemoved === true,
     pdfa: typeof parsed.pdfa === "string" && parsed.pdfa ? parsed.pdfa : null,
+    objectXmpRemoved: typeof parsed.objectXmpRemoved === "number" ? parsed.objectXmpRemoved : 0,
+    pieceInfoRemoved: typeof parsed.pieceInfoRemoved === "number" ? parsed.pieceInfoRemoved : 0,
   };
 }
 
