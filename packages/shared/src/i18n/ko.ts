@@ -1535,6 +1535,7 @@ export const ko: TranslationKeys = {
       customSize: "맞춤 크기",
       scale: "스케일",
       presets: "프리셋",
+      presetsCropNote: "프리셋은 정확한 크기를 채우도록 이미지를 크롭합니다.",
       contentAware: "콘텐츠 인식",
       aspectRatio: "종횡비",
       ratioFree: "자유",

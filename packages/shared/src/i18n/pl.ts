@@ -1593,6 +1593,7 @@ export const pl: TranslationKeys = {
       customSize: "Rozmiar niestandardowy",
       scale: "Skala",
       presets: "Szablony",
+      presetsCropNote: "Szablony kadrują obraz, aby wypełnił dokładny rozmiar.",
       contentAware: "Z uwzględnieniem treści",
       aspectRatio: "Proporcje",
       ratioFree: "Dowolny",

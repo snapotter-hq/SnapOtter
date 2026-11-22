@@ -1556,6 +1556,7 @@ export const ja: TranslationKeys = {
       customSize: "カスタムサイズ",
       scale: "スケール",
       presets: "プリセット",
+      presetsCropNote: "プリセットは指定サイズちょうどに収まるよう画像をクロップします。",
       contentAware: "コンテンツ認識",
       aspectRatio: "アスペクト比",
       ratioFree: "自由",

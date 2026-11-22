@@ -1323,6 +1323,7 @@ export const zhCN: TranslationKeys = {
       customSize: "自定义大小",
       scale: "缩放",
       presets: "预设",
+      presetsCropNote: "预设会裁剪图片以填满精确尺寸。",
       contentAware: "内容感知",
       aspectRatio: "宽高比",
       ratioFree: "自由",

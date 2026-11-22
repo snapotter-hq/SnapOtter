@@ -1595,6 +1595,7 @@ export const id: TranslationKeys = {
       customSize: "Ukuran Kustom",
       scale: "Skala",
       presets: "Preset",
+      presetsCropNote: "Preset memotong gambar agar pas memenuhi ukuran yang tepat.",
       contentAware: "Sadar Konten",
       aspectRatio: "Rasio Aspek",
       ratioFree: "Bebas",

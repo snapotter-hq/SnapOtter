@@ -1572,6 +1572,7 @@ export const th: TranslationKeys = {
       customSize: "ขนาดกำหนดเอง",
       scale: "สเกล",
       presets: "พรีเซ็ต",
+      presetsCropNote: "พรีเซ็ตจะครอปภาพให้เต็มขนาดที่กำหนดพอดี",
       contentAware: "รับรู้เนื้อหา",
       aspectRatio: "อัตราส่วนภาพ",
       ratioFree: "อิสระ",
