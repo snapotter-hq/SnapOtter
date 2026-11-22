@@ -152,6 +152,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `NOT_ANIMATED` | 400 | Remove GIF Background received a still image. | Use Remove Background for still images. |
 | `TOO_MANY_FRAMES` | 400 | The animation has more frames than the server allows (`GIF_BG_MAX_FRAMES`). | Send a shorter animation, or ask an administrator to raise the limit. |
 | `TOO_MANY_PIXELS` | 400 | The animation's canvas times its frame count is over the server's limit: 268,402,689 pixels (16383 x 16383) for Remove GIF Background, or the GIF workload cap for other animated tools. | Send fewer frames or a smaller animation. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | An AI image tool got a multi-page TIFF or an animated GIF or WebP, and the output format would keep every frame. These tools run their model on one image at a time. | Split the file into separate images. Where the tool has an output format setting, a still format such as PNG processes the first frame only. |
 | `IMAGE_TOO_LARGE` | 400 | The image has more pixels than the decoder accepts. | Send a smaller image. |
 | `RESULT_TOO_LARGE` | 400 | The settings would produce an image larger than the encoder or pixel limit allows. | Use a smaller image or settings that make a smaller result. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice or pandoc couldn't open the document. It may be damaged, password-protected, or not the format its extension says. | Check the file opens in an office app, then send it again. |
