@@ -4087,7 +4087,7 @@ export const it: TranslationKeys = {
       submitBatch: "Estrai testo ({count} file)",
       progressLabel: "Estrazione",
       scannedHint:
-        "Questo PDF è una scansione, quindi non c'è testo da estrarre. L'OCR può leggerlo, ma richiede più tempo e il pacchetto IA per l'OCR installato.",
+        "Questo PDF non contiene testo leggibile da estrarre. L'OCR può leggerlo, ma richiede più tempo e il pacchetto IA per l'OCR installato.",
       runOcr: "Esegui l'OCR su questo PDF",
       unreadablePages:
         "{count} pagine su {total} non hanno un livello di testo leggibile, quindi la loro parte del .txt potrebbe risultare illeggibile. L'OCR può leggere quelle pagine.",
@@ -4097,7 +4097,7 @@ export const it: TranslationKeys = {
       submitBatch: "Converti in Markdown ({count} file)",
       progressLabel: "Conversione",
       scannedHint:
-        "Questo PDF è una scansione, quindi non c'è testo da convertire in Markdown. L'OCR può leggere il testo, ma restituisce testo semplice, richiede più tempo e il pacchetto IA per l'OCR installato.",
+        "Questo PDF non contiene testo leggibile da convertire in Markdown. L'OCR può leggere il testo, ma restituisce testo semplice, richiede più tempo e il pacchetto IA per l'OCR installato.",
       runOcr: "Esegui l'OCR su questo PDF",
     },
     "pdf-to-word": {
@@ -4106,7 +4106,7 @@ export const it: TranslationKeys = {
       submitBatch: "Converti in Word ({count} file)",
       progressLabel: "Conversione",
       scannedHint:
-        "Questo PDF è una scansione, quindi un file Word conterrebbe solo immagini delle pagine. L'OCR può leggere il testo, ma restituisce testo semplice invece di un file Word, richiede più tempo e il pacchetto IA per l'OCR installato.",
+        "Questo PDF non contiene testo leggibile da inserire in un file Word. L'OCR può leggere il testo, ma restituisce testo semplice invece di un file Word, richiede più tempo e il pacchetto IA per l'OCR installato.",
       runOcr: "Esegui l'OCR su questo PDF",
     },
     "pdf-metadata": {

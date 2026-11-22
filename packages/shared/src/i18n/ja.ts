@@ -4030,7 +4030,7 @@ export const ja: TranslationKeys = {
       submitBatch: "テキストを抽出 ({count}ファイル)",
       progressLabel: "抽出中",
       scannedHint:
-        "このPDFはスキャンされた画像のため、抽出できるテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+        "このPDFには、抽出できる読み取り可能なテキストがありません。OCRなら読み取れますが、時間がかかり、OCR用AIバンドルのインストールが必要です。",
       runOcr: "このPDFでOCRを実行",
       unreadablePages:
         "{total}ページ中{count}ページに読み取れるテキストレイヤーがないため、.txtのその部分は文字化けしている可能性があります。OCRならそれらのページを読み取れます。",
@@ -4040,7 +4040,7 @@ export const ja: TranslationKeys = {
       submitBatch: "Markdownに変換 ({count}ファイル)",
       progressLabel: "変換中",
       scannedHint:
-        "このPDFはスキャンされた画像のため、Markdownに変換できるテキストがありません。OCRならテキストを読み取れますが、結果はプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+        "このPDFには、Markdownに変換できる読み取り可能なテキストがありません。OCRならテキストを読み取れますが、結果はプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
       runOcr: "このPDFでOCRを実行",
     },
     "pdf-to-word": {
@@ -4049,7 +4049,7 @@ export const ja: TranslationKeys = {
       submitBatch: "Wordに変換 ({count}ファイル)",
       progressLabel: "変換中",
       scannedHint:
-        "このPDFはスキャンされた画像のため、Wordファイルにしてもページの画像しか入りません。OCRならテキストを読み取れますが、結果はWordファイルではなくプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
+        "このPDFには、Wordファイルに入れられる読み取り可能なテキストがありません。OCRならテキストを読み取れますが、結果はWordファイルではなくプレーンテキストになり、時間がかかり、OCR用AIバンドルのインストールが必要です。",
       runOcr: "このPDFでOCRを実行",
     },
     "pdf-metadata": {

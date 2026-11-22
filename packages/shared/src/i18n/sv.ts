@@ -4074,7 +4074,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Extrahera text ({count} filer)",
       progressLabel: "Extraherar",
       scannedHint:
-        "Den här PDF:en är skannad, så det finns ingen text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
+        "Den här PDF:en innehåller ingen läsbar text att extrahera. OCR kan läsa den, men det tar längre tid och kräver att OCR-AI-paketet är installerat.",
       runOcr: "Kör OCR på den här PDF:en",
       unreadablePages:
         "{count} av {total} sidor saknar ett läsbart textlager, så deras del av .txt-filen kan bli oläslig. OCR kan läsa de sidorna.",
@@ -4084,7 +4084,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Konvertera till Markdown ({count} filer)",
       progressLabel: "Konverterar",
       scannedHint:
-        "Den här PDF:en är skannad, så det finns ingen text att göra om till Markdown. OCR kan läsa texten, men ger dig ren text, tar längre tid och kräver att OCR-AI-paketet är installerat.",
+        "Den här PDF:en innehåller ingen läsbar text att göra om till Markdown. OCR kan läsa texten, men ger dig ren text, tar längre tid och kräver att OCR-AI-paketet är installerat.",
       runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-to-word": {
@@ -4093,7 +4093,7 @@ export const sv: TranslationKeys = {
       submitBatch: "Konvertera till Word ({count} filer)",
       progressLabel: "Konverterar",
       scannedHint:
-        "Den här PDF:en är skannad, så en Word-fil skulle bara innehålla bilder av sidorna. OCR kan läsa texten, men ger dig ren text i stället för en Word-fil, tar längre tid och kräver att OCR-AI-paketet är installerat.",
+        "Den här PDF:en innehåller ingen läsbar text att lägga i en Word-fil. OCR kan läsa texten, men ger dig ren text i stället för en Word-fil, tar längre tid och kräver att OCR-AI-paketet är installerat.",
       runOcr: "Kör OCR på den här PDF:en",
     },
     "pdf-metadata": {

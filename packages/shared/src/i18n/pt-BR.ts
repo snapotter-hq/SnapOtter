@@ -4084,7 +4084,7 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Extrair Texto ({count} arquivos)",
       progressLabel: "Extraindo",
       scannedHint:
-        "Este PDF é digitalizado, então não há texto para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
+        "Este PDF não tem texto legível para extrair. O OCR consegue lê-lo, mas leva mais tempo e exige o pacote de IA de OCR instalado.",
       runOcr: "Executar OCR neste PDF",
       unreadablePages:
         "{count} de {total} páginas não têm uma camada de texto legível, então a parte delas no .txt pode sair ilegível. O OCR consegue ler essas páginas.",
@@ -4094,7 +4094,7 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Converter para Markdown ({count} arquivos)",
       progressLabel: "Convertendo",
       scannedHint:
-        "Este PDF é digitalizado, então não há texto para converter em Markdown. O OCR consegue ler o texto, mas entrega texto simples, leva mais tempo e exige o pacote de IA de OCR instalado.",
+        "Este PDF não tem texto legível para converter em Markdown. O OCR consegue ler o texto, mas entrega texto simples, leva mais tempo e exige o pacote de IA de OCR instalado.",
       runOcr: "Executar OCR neste PDF",
     },
     "pdf-to-word": {
@@ -4103,7 +4103,7 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Converter para Word ({count} arquivos)",
       progressLabel: "Convertendo",
       scannedHint:
-        "Este PDF é digitalizado, então um arquivo do Word teria apenas imagens das páginas. O OCR consegue ler o texto, mas entrega texto simples em vez de um arquivo do Word, leva mais tempo e exige o pacote de IA de OCR instalado.",
+        "Este PDF não tem texto legível para colocar em um arquivo do Word. O OCR consegue ler o texto, mas entrega texto simples em vez de um arquivo do Word, leva mais tempo e exige o pacote de IA de OCR instalado.",
       runOcr: "Executar OCR neste PDF",
     },
     "pdf-metadata": {

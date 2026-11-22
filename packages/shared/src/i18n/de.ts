@@ -4107,7 +4107,7 @@ export const de: TranslationKeys = {
       submitBatch: "Text extrahieren ({count} Dateien)",
       progressLabel: "Wird extrahiert",
       scannedHint:
-        "Dieses PDF ist gescannt, es gibt also keinen Text zu extrahieren. OCR kann es lesen, braucht aber länger und setzt das installierte OCR-KI-Paket voraus.",
+        "Dieses PDF enthält keinen lesbaren Text zum Extrahieren. OCR kann es lesen, braucht aber länger und setzt das installierte OCR-KI-Paket voraus.",
       runOcr: "OCR auf dieses PDF anwenden",
       unreadablePages:
         "{count} von {total} Seiten haben keine lesbare Textebene, daher kann ihr Teil der .txt-Datei unleserlich sein. OCR kann diese Seiten lesen.",
@@ -4117,7 +4117,7 @@ export const de: TranslationKeys = {
       submitBatch: "In Markdown konvertieren ({count} Dateien)",
       progressLabel: "Wird konvertiert",
       scannedHint:
-        "Dieses PDF ist gescannt, es gibt also keinen Text, der zu Markdown werden kann. OCR kann den Text lesen, liefert aber reinen Text, braucht länger und setzt das installierte OCR-KI-Paket voraus.",
+        "Dieses PDF enthält keinen lesbaren Text, der zu Markdown werden kann. OCR kann den Text lesen, liefert aber reinen Text, braucht länger und setzt das installierte OCR-KI-Paket voraus.",
       runOcr: "OCR auf dieses PDF anwenden",
     },
     "pdf-to-word": {
@@ -4126,7 +4126,7 @@ export const de: TranslationKeys = {
       submitBatch: "In Word konvertieren ({count} Dateien)",
       progressLabel: "Wird konvertiert",
       scannedHint:
-        "Dieses PDF ist gescannt, eine Word-Datei würde also nur Bilder der Seiten enthalten. OCR kann den Text lesen, liefert aber reinen Text statt einer Word-Datei, braucht länger und setzt das installierte OCR-KI-Paket voraus.",
+        "Dieses PDF enthält keinen lesbaren Text für eine Word-Datei. OCR kann den Text lesen, liefert aber reinen Text statt einer Word-Datei, braucht länger und setzt das installierte OCR-KI-Paket voraus.",
       runOcr: "OCR auf dieses PDF anwenden",
     },
     "pdf-metadata": {

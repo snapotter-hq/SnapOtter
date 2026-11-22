@@ -609,11 +609,56 @@ describe("document route processors", () => {
     await withScratch(async (scratchDir) => {
       const ctx = createCtx(scratchDir, "scanned.pdf");
       await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
-        message: expect.stringMatching(/text layer[\s\S]*OCR/i),
+        message: expect.stringMatching(/scanned or image-only[\s\S]*OCR/),
         statusCode: 422,
         code: "NO_TEXT_LAYER",
       });
       expect(pdfToWordPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not call a PDF with an unreadable text layer scanned before converting it to Word (#4951)", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 40,
+      hasText: false,
+      pages: 2,
+      emptyPages: 1,
+      unreadablePages: 1,
+    });
+    registerPdfToWord(createMockApp());
+    const config = getToolConfig("pdf-to-word");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "glyph-ids.pdf");
+      const caught = await config?.processV2?.(ctx).catch((err: unknown) => err);
+      expect(caught).toMatchObject({
+        message: expect.stringMatching(/has a text layer[\s\S]*OCR/),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+      expect((caught as Error).message).not.toMatch(/scanned|image-only|pictures/);
+      expect(pdfToWordPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("keeps the scan wording for Word when no page returned characters", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 0,
+      hasText: false,
+      pages: 2,
+      emptyPages: 2,
+      unreadablePages: 0,
+    });
+    registerPdfToWord(createMockApp());
+    const config = getToolConfig("pdf-to-word");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "scanned.pdf");
+      await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
+        message: expect.stringMatching(/scanned or image-only[\s\S]*pictures of the pages/),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
     });
   });
 
@@ -657,10 +702,34 @@ describe("document route processors", () => {
     await withScratch(async (scratchDir) => {
       const ctx = createCtx(scratchDir, "scanned.pdf");
       await expect(config?.processV2?.(ctx)).rejects.toMatchObject({
-        message: expect.stringMatching(/text layer[\s\S]*OCR/i),
+        message: expect.stringMatching(/scanned or image-only[\s\S]*OCR/),
         statusCode: 422,
         code: "NO_TEXT_LAYER",
       });
+      expect(pdfToMarkdownPy).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not call a PDF with an unreadable text layer scanned before converting it to Markdown (#4951)", async () => {
+    vi.mocked(pdfTextPy).mockResolvedValueOnce({
+      chars: 40,
+      hasText: false,
+      pages: 1,
+      emptyPages: 0,
+      unreadablePages: 1,
+    });
+    registerPdfToMarkdown(createMockApp());
+    const config = getToolConfig("pdf-to-markdown");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "glyph-ids.pdf");
+      const caught = await config?.processV2?.(ctx).catch((err: unknown) => err);
+      expect(caught).toMatchObject({
+        message: expect.stringMatching(/has a text layer[\s\S]*OCR/),
+        statusCode: 422,
+        code: "NO_TEXT_LAYER",
+      });
+      expect((caught as Error).message).not.toMatch(/scanned|image-only/);
       expect(pdfToMarkdownPy).not.toHaveBeenCalled();
     });
   });

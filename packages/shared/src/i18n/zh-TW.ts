@@ -3800,7 +3800,7 @@ export const zhTW: TranslationKeys = {
       submitBatch: "擷取文字（{count} 個檔案）",
       progressLabel: "正在擷取",
       scannedHint:
-        "此 PDF 是掃描檔，沒有可擷取的文字。OCR 可以辨識它，但耗時較長，且需要已安裝 OCR AI 功能包。",
+        "此 PDF 沒有可讀的文字可擷取。OCR 可以辨識它，但耗時較長，且需要已安裝 OCR AI 功能包。",
       runOcr: "對此 PDF 執行 OCR",
       unreadablePages:
         "{total} 頁中有 {count} 頁沒有可讀的文字層，因此 .txt 中對應的部分可能是亂碼。OCR 可以辨識這些頁面。",
@@ -3810,7 +3810,7 @@ export const zhTW: TranslationKeys = {
       submitBatch: "轉換為 Markdown（{count} 個檔案）",
       progressLabel: "正在轉換",
       scannedHint:
-        "此 PDF 是掃描檔，沒有可轉換為 Markdown 的文字。OCR 可以辨識其中的文字，但得到的是純文字，耗時較長，且需要已安裝 OCR AI 功能包。",
+        "此 PDF 沒有可讀的文字可轉換為 Markdown。OCR 可以辨識其中的文字，但得到的是純文字，耗時較長，且需要已安裝 OCR AI 功能包。",
       runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-to-word": {
@@ -3819,7 +3819,7 @@ export const zhTW: TranslationKeys = {
       submitBatch: "轉換為 Word（{count} 個檔案）",
       progressLabel: "正在轉換",
       scannedHint:
-        "此 PDF 是掃描檔，轉換成 Word 檔案也只會包含頁面圖片。OCR 可以辨識其中的文字，但得到的是純文字而不是 Word 檔案，耗時較長，且需要已安裝 OCR AI 功能包。",
+        "此 PDF 沒有可讀的文字可放入 Word 檔案。OCR 可以辨識其中的文字，但得到的是純文字而不是 Word 檔案，耗時較長，且需要已安裝 OCR AI 功能包。",
       runOcr: "對此 PDF 執行 OCR",
     },
     "pdf-metadata": {

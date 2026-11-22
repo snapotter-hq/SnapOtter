@@ -4096,7 +4096,7 @@ export const nl: TranslationKeys = {
       submitBatch: "Tekst extraheren ({count} bestanden)",
       progressLabel: "Extraheren",
       scannedHint:
-        "Deze pdf is gescand, dus er is geen tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+        "Deze pdf bevat geen leesbare tekst om te extraheren. OCR kan hem lezen, maar dat duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
       runOcr: "OCR uitvoeren op deze pdf",
       unreadablePages:
         "{count} van de {total} pagina's hebben geen leesbare tekstlaag, dus hun deel van de .txt kan onleesbaar zijn. OCR kan die pagina's lezen.",
@@ -4106,7 +4106,7 @@ export const nl: TranslationKeys = {
       submitBatch: "Converteren naar Markdown ({count} bestanden)",
       progressLabel: "Converteren",
       scannedHint:
-        "Deze pdf is gescand, dus er is geen tekst om naar Markdown om te zetten. OCR kan de tekst lezen, maar levert platte tekst op, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+        "Deze pdf bevat geen leesbare tekst om naar Markdown om te zetten. OCR kan de tekst lezen, maar levert platte tekst op, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
       runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-to-word": {
@@ -4115,7 +4115,7 @@ export const nl: TranslationKeys = {
       submitBatch: "Converteren naar Word ({count} bestanden)",
       progressLabel: "Converteren",
       scannedHint:
-        "Deze pdf is gescand, dus een Word-bestand zou alleen afbeeldingen van de pagina's bevatten. OCR kan de tekst lezen, maar levert platte tekst op in plaats van een Word-bestand, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
+        "Deze pdf bevat geen leesbare tekst voor een Word-bestand. OCR kan de tekst lezen, maar levert platte tekst op in plaats van een Word-bestand, duurt langer en vereist dat het OCR-AI-pakket is geïnstalleerd.",
       runOcr: "OCR uitvoeren op deze pdf",
     },
     "pdf-metadata": {
