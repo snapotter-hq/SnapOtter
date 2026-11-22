@@ -873,7 +873,8 @@ describe("automate initial saved pipelines load (#1987)", () => {
     storageMap.set("snapotter-locale", "de");
     // A real chunk import can outlast findByText's 1 s default on a slow host
     // (#5146), so the test hands out the German catalog itself and releases it
-    // once the English load error is on screen.
+    // once the English load error is on screen. Under a full unit run on that
+    // host the first render alone took over 1 s, hence the longer wait below.
     let releaseChunk!: () => void;
     const chunk = new Promise<void>((resolve) => {
       releaseChunk = resolve;
@@ -886,7 +887,9 @@ describe("automate initial saved pipelines load (#1987)", () => {
     };
     renderAutomate();
 
-    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(en.automate.loadFailed)).toBeInTheDocument(), {
+      timeout: 5000,
+    });
     await act(async () => {
       releaseChunk();
       await chunk;
