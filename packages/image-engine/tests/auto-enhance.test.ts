@@ -92,6 +92,24 @@ async function texturedColor(w: number, h: number): Promise<Buffer> {
     .toBuffer();
 }
 
+/** Vertical stripes of equal width, one per colour, left to right. */
+async function stripes(colors: [number, number, number][], w = 60, h = 32): Promise<Buffer> {
+  const buf = Buffer.alloc(w * h * 3);
+  const band = w / colors.length;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const [r, g, b] = colors[Math.floor(x / band)];
+      const i = (y * w + x) * 3;
+      buf[i] = r;
+      buf[i + 1] = g;
+      buf[i + 2] = b;
+    }
+  }
+  return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
 /** Full-range deterministic RGB noise; sharp reports entropy 6.989 for this. */
 async function noiseImage(dim = 128): Promise<Buffer> {
   const buf = Buffer.alloc(dim * dim * 3);
@@ -214,13 +232,38 @@ describe("analyzeImage scores", () => {
     expect((await analyzeImage(await solidRgb(40, 60, 200))).scores.whiteBalance).toBe(0);
   });
 
-  it("scores saturation from channel-mean spread (round(spread * 1.2 + 20))", async () => {
-    // spread 0 -> 20.
+  it("scores saturation from mean per-pixel chroma (round(20 + chroma * 0.75))", async () => {
+    // chroma 0 -> 20.
     expect((await analyzeImage(await solidRgb(128, 128, 128))).scores.saturation).toBe(20);
-    // spread 7 -> round(7*1.2 + 20) = 28.
-    expect((await analyzeImage(await solidRgb(100, 100, 107))).scores.saturation).toBe(28);
-    // large spread clamps to 100.
+    // chroma 12 -> round(20 + 12 * 0.75) = 29.
+    expect((await analyzeImage(await solidRgb(100, 100, 112))).scores.saturation).toBe(29);
+    // chroma 160 clamps to 100.
     expect((await analyzeImage(await solidRgb(40, 60, 200))).scores.saturation).toBe(100);
+  });
+
+  it("scores a colourful photo whose channel means balance out as colourful (#4869)", async () => {
+    // Channel means are all 103.3 (spread 0), but every pixel has chroma 40
+    // -> round(20 + 40 * 0.75) = 50. The old spread formula scored 20.
+    const buf = await stripes([
+      [130, 90, 90],
+      [90, 130, 90],
+      [90, 90, 130],
+    ]);
+    expect((await analyzeImage(buf)).scores.saturation).toBe(50);
+  });
+
+  it("measures chroma across the whole frame of an image larger than the thumbnail", async () => {
+    // 600x400 is shrunk to a 256px thumbnail first. Chroma 0 on the left and
+    // 80 on the right average to 40 only if both halves count.
+    const buf = await stripes(
+      [
+        [128, 128, 128],
+        [90, 90, 170],
+      ],
+      600,
+      400,
+    );
+    expect((await analyzeImage(buf)).scores.saturation).toBe(50);
   });
 
   it("scores sharpness from luminance stdev (round(stdev * 0.8 + 10))", async () => {
@@ -377,8 +420,33 @@ describe("analyzeImage corrections", () => {
   });
 
   it("boosts saturation only below 40 (factor 0.6, clamped [0,30])", async () => {
-    // saturation 20 -> round((40 - 20) * 0.6) = 12.
-    expect((await analyzeImage(await solidRgb(128, 128, 128))).corrections.saturation).toBe(12);
+    // saturation 29 (chroma 12) -> round((40 - 29) * 0.6) = 7.
+    expect((await analyzeImage(await solidRgb(100, 100, 112))).corrections.saturation).toBe(7);
+  });
+
+  it("leaves a neutral photo's saturation alone instead of boosting it (#4869)", async () => {
+    // Grey texture (R=G=B), the issue's repro: the old formula boosted it by 12.
+    const { corrections } = await analyzeImage(await texturedGray(400, 300, 60, 200));
+    expect(corrections.saturation).toBe(0);
+    // Mean chroma 5 is still neutral; 6 is the first colour worth correcting.
+    expect((await analyzeImage(await solidRgb(100, 100, 105))).corrections.saturation).toBe(0);
+    // chroma 6 -> score round(24.5) = 25 -> round((40 - 25) * 0.6) = 9.
+    expect((await analyzeImage(await solidRgb(100, 100, 106))).corrections.saturation).toBe(9);
+  });
+
+  it("does not boost a colourful photo whose channel means balance out (#4869)", async () => {
+    const buf = await stripes([
+      [130, 90, 90],
+      [90, 130, 90],
+      [90, 90, 130],
+    ]);
+    expect((await analyzeImage(buf)).corrections.saturation).toBe(0);
+  });
+
+  it("does not desaturate a neutral photo with a warm cast (#4869)", async () => {
+    // Channel spread 44: the old formula scored 73 and cut saturation by 5.
+    // Per-pixel chroma is also 44 -> score 53, inside the dead zone.
+    expect((await analyzeImage(await solidRgb(150, 128, 106))).corrections.saturation).toBe(0);
   });
 
   it("reduces saturation only above 60 (factor 0.4, clamped [-20,0])", async () => {
@@ -387,7 +455,7 @@ describe("analyzeImage corrections", () => {
   });
 
   it("leaves saturation uncorrected inside [40,60]", async () => {
-    // saturation 56 (spread 30) -> 0.
+    // saturation 43 (chroma 30) -> 0.
     expect((await analyzeImage(await solidRgb(100, 110, 130))).corrections.saturation).toBe(0);
   });
 
@@ -439,10 +507,17 @@ describe("analyzeImage issues", () => {
   });
 
   it("flags desaturated strictly below saturation 30", async () => {
-    // saturation 28 (spread 7) -> flagged.
-    expect((await analyzeImage(await solidRgb(100, 100, 107))).issues).toContain("desaturated");
-    // saturation 30 (spread 8) -> not flagged.
-    expect((await analyzeImage(await solidRgb(100, 100, 108))).issues).not.toContain("desaturated");
+    // saturation 29 (chroma 12) -> flagged.
+    expect((await analyzeImage(await solidRgb(100, 100, 112))).issues).toContain("desaturated");
+    // saturation 30 (chroma 13, 29.75 rounds up) -> not flagged.
+    expect((await analyzeImage(await solidRgb(100, 100, 113))).issues).not.toContain("desaturated");
+  });
+
+  it("does not flag a neutral photo as desaturated (#4869)", async () => {
+    expect((await analyzeImage(await texturedGray(400, 300, 60, 200))).issues).not.toContain(
+      "desaturated",
+    );
+    expect((await analyzeImage(await solidRgb(100, 100, 105))).issues).not.toContain("desaturated");
   });
 
   it("flags soft-focus strictly below sharpness 35", async () => {
@@ -453,9 +528,10 @@ describe("analyzeImage issues", () => {
   });
 
   it("does not flag issues whose thresholds are not crossed", async () => {
-    // High-contrast neutral two-tone: only 'desaturated' should appear, proving
-    // the other push() conditions stay false (kills always-push mutants).
-    expect((await analyzeImage(await twoTone(0, 255))).issues).toEqual(["desaturated"]);
+    // High-contrast neutral two-tone: nothing should appear, proving every
+    // push() condition stays false (kills always-push mutants). Being neutral,
+    // it isn't 'desaturated' either.
+    expect((await analyzeImage(await twoTone(0, 255))).issues).toEqual([]);
   });
 });
 
