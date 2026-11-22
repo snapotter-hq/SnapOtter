@@ -97,7 +97,7 @@ import { toStorableJson } from "../lib/storable-json.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
-import { inputHandlerFor } from "../modality/input-handler.js";
+import { inputHandlerForInput } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
@@ -718,14 +718,14 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               } else {
                 // Non-image modalities (audio/video/document/file) keep their buffered contract.
                 try {
-                  const prepared = await inputHandlerFor(modality).prepare(
-                    processBuffer,
-                    processFilename,
-                    {
-                      scratchDir,
-                      lenient: getToolConfig(toolId)?.skipStructuralValidation,
-                    },
-                  );
+                  const toolConfig = getToolConfig(toolId);
+                  const prepared = await inputHandlerForInput(
+                    modality,
+                    toolConfig?.inputKinds,
+                  ).prepare(processBuffer, processFilename, {
+                    scratchDir,
+                    lenient: toolConfig?.skipStructuralValidation,
+                  });
                   processBuffer = prepared.buffer;
                   processFilename = prepared.filename;
                 } catch (err) {

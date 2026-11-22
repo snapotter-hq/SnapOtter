@@ -1,4 +1,5 @@
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -109,3 +110,57 @@ describe.skipIf(!ffmpegAvailable())("convert-subtitles (requires ffmpeg) (#4828)
     expect(res.statusCode).toBe(400);
   }, 60_000);
 });
+
+describe.skipIf(!ffmpegAvailable())(
+  "convert-subtitles batch and pipeline (requires ffmpeg) (#5165)",
+  () => {
+    // Both paths used to validate uploads by the tool's video modality, so the
+    // .srt hit ffprobe and failed with "no video track".
+    async function post(url: string, parts: Parameters<typeof createMultipartPayload>[0]) {
+      const { body, contentType } = createMultipartPayload(parts);
+      return testApp.app.inject({
+        method: "POST",
+        url,
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+    }
+
+    it("converts several subtitle files through /batch", async () => {
+      const res = await post("/api/v1/tools/video/convert-subtitles/batch", [
+        { name: "file", filename: "a.srt", contentType: "application/octet-stream", content: SRT },
+        { name: "file", filename: "b.srt", contentType: "application/octet-stream", content: SRT },
+        { name: "settings", content: JSON.stringify({ format: "vtt" }) },
+      ]);
+
+      expect(res.statusCode).toBe(200);
+      const entries = new AdmZip(res.rawPayload).getEntries();
+      expect(entries).toHaveLength(2);
+      for (const entry of entries) {
+        expect(entry.entryName).toMatch(/\.vtt$/);
+        expect(entry.getData().toString("utf8").startsWith("WEBVTT")).toBe(true);
+      }
+    }, 90_000);
+
+    it("runs as the first step of a pipeline", async () => {
+      const res = await post("/api/v1/pipeline/execute", [
+        {
+          name: "file",
+          filename: "tiny.srt",
+          contentType: "application/octet-stream",
+          content: SRT,
+        },
+        {
+          name: "pipeline",
+          content: JSON.stringify({
+            steps: [{ toolId: "convert-subtitles", settings: { format: "vtt" } }],
+          }),
+        },
+      ]);
+
+      const { text } = await download(res);
+      expect(text.startsWith("WEBVTT")).toBe(true);
+      expect(text).toContain("SnapOtter subtitle one");
+    }, 90_000);
+  },
+);

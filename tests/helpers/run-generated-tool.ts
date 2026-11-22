@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join, sep } from "node:path";
 import { isToolInputError, type Modality } from "@snapotter/shared";
 import { InputValidationError } from "../../apps/api/src/modality/contract.js";
-import { inputHandlerFor } from "../../apps/api/src/modality/input-handler.js";
-import { MediaInputHandler } from "../../apps/api/src/modality/media-input.js";
+import { inputHandlerForInput } from "../../apps/api/src/modality/input-handler.js";
 import type {
   AnyToolRouteConfig,
   ToolProcessInputV2,
@@ -113,12 +112,7 @@ export async function buildGeneratedProcessInputs(
       let buffer: Buffer = await readFile(join(fixture.dir, fixture.filename));
       let filename = fixture.filename;
       if (modality && preparationDir) {
-        const kind = config.inputKinds?.[Math.min(index, config.inputKinds.length - 1)];
-        const handler = kind
-          ? kind === "image"
-            ? inputHandlerFor("image")
-            : new MediaInputHandler(kind)
-          : inputHandlerFor(modality);
+        const handler = inputHandlerForInput(modality, config.inputKinds, index);
         const prepared = await handler.prepare(buffer, filename, { scratchDir: preparationDir });
         buffer = prepared.buffer;
         filename = prepared.filename;
