@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter espone 117 endpoint di preset di conversione dedicati oltre agli strumenti di conversione di base. Ogni preset blocca il formato di output e delega alla propria pipeline di elaborazione di base, quindi il comportamento, la validazione e il contratto di output corrispondono allo strumento di base elencato di seguito.
+SnapOtter espone 121 endpoint di preset di conversione dedicati oltre agli strumenti di conversione di base. Ogni preset blocca il formato di output e delega alla propria pipeline di elaborazione di base, quindi il comportamento, la validazione e il contratto di output corrispondono allo strumento di base elencato di seguito.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Invia `multipart/form-data` con una parte `file` e una stringa JSON `settings` o
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF to TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF to TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 to TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF to WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

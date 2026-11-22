@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { posix, win32 } from "node:path";
+import { CONVERSION_PRESET_BY_ID } from "../../packages/shared/src/conversion-presets.js";
 
 interface PythonResolutionOptions {
   cwd?: string;
@@ -93,8 +94,10 @@ export function findMissingGeneratedPythonPrerequisite(
   settings: unknown,
   capabilities: GeneratedPythonCapabilities = GENERATED_PYTHON_CAPABILITIES,
 ): string | undefined {
-  let modules = GENERATED_TOOL_MODULES[toolId];
-  if (toolId === "epub-convert") {
+  // A conversion preset runs its base tool, so it needs the base's modules.
+  const baseId = CONVERSION_PRESET_BY_ID[toolId]?.base ?? toolId;
+  let modules = GENERATED_TOOL_MODULES[baseId];
+  if (baseId === "epub-convert") {
     const format =
       settings && typeof settings === "object" && "format" in settings
         ? (settings as { format?: unknown }).format

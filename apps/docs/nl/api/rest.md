@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: a742c3dcb372
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 22829087a148
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Conversiepresets {#conversion-presets}
 
-De gedeelde catalogus bevat 117 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
+De gedeelde catalogus bevat 121 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `proportion-calculator` | Verhoudingscalculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
 | `base64` | Base64 coderen / decoderen | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
 | `excel-to-csv` | Excel naar CSV | speciale conversiepreset ondersteund door `convert-spreadsheet` |
+| `otf-to-ttf` | OTF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff-to-ttf` | WOFF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff2-to-ttf` | WOFF2 naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `ttf-to-woff2` | TTF naar WOFF2 | speciale conversiepreset ondersteund door `convert-font` |
 | `create-zip` | ZIP maken | - (meerdere bestanden, 2-50 bestanden) |
 | `extract-zip` | ZIP uitpakken | - (beschermd tegen zip-bommen) |
 

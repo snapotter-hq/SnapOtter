@@ -26843,6 +26843,294 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/tools/files/otf-to-ttf:
+    post:
+      operationId: otfToTtfTool
+      tags:
+        - Files
+      summary: OTF ke TTF
+      description: |
+        Konversi OTF ke TTF
+        Ini adalah endpoint preset konversi khusus yang didukung oleh `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File input OTF ke TTF (.otf)
+                settings:
+                  type: string
+                  description: |
+                    Konverter khusus OTF ke TTF menggunakan pipeline convert-font.
+                    Format keluaran dikunci oleh endpoint.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID pekerjaan yang disediakan klien untuk pelacakan progres SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: File yang telah diproses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Input atau pengaturan tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autentikasi diperlukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Pemrosesan gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/files/woff-to-ttf:
+    post:
+      operationId: woffToTtfTool
+      tags:
+        - Files
+      summary: WOFF ke TTF
+      description: |
+        Konversi WOFF ke TTF
+        Ini adalah endpoint preset konversi khusus yang didukung oleh `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File input WOFF ke TTF (.woff)
+                settings:
+                  type: string
+                  description: |
+                    Konverter khusus WOFF ke TTF menggunakan pipeline convert-font.
+                    Format keluaran dikunci oleh endpoint.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID pekerjaan yang disediakan klien untuk pelacakan progres SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: File yang telah diproses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Input atau pengaturan tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autentikasi diperlukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Pemrosesan gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/files/woff2-to-ttf:
+    post:
+      operationId: woff2ToTtfTool
+      tags:
+        - Files
+      summary: WOFF2 ke TTF
+      description: |
+        Konversi WOFF2 ke TTF
+        Ini adalah endpoint preset konversi khusus yang didukung oleh `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File input WOFF2 ke TTF (.woff2)
+                settings:
+                  type: string
+                  description: |
+                    Konverter khusus WOFF2 ke TTF menggunakan pipeline convert-font.
+                    Format keluaran dikunci oleh endpoint.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID pekerjaan yang disediakan klien untuk pelacakan progres SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: File yang telah diproses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Input atau pengaturan tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autentikasi diperlukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Pemrosesan gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/files/ttf-to-woff2:
+    post:
+      operationId: ttfToWoff2Tool
+      tags:
+        - Files
+      summary: TTF ke WOFF2
+      description: |
+        Konversi TTF ke WOFF2
+        Ini adalah endpoint preset konversi khusus yang didukung oleh `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File input TTF ke WOFF2 (.ttf, .otf)
+                settings:
+                  type: string
+                  description: |
+                    Konverter khusus TTF ke WOFF2 menggunakan pipeline convert-font.
+                    Format keluaran dikunci oleh endpoint.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: ID pekerjaan yang disediakan klien untuk pelacakan progres SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: File yang telah diproses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Input atau pengaturan tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Autentikasi diperlukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Pemrosesan gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/readyz:
     get:
       operationId: readinessCheck
@@ -31258,6 +31546,38 @@ x-i18n:
       sourceHash: c5b6027afaa5
       provenance: machine
       outputHash: 77cb8905adb1
+    paths./api/v1/tools/files/otf-to-ttf.post.summary:
+      sourceHash: fba0b8a6e035
+      provenance: machine
+      outputHash: 11fe15aa00a1
+    paths./api/v1/tools/files/otf-to-ttf.post.description:
+      sourceHash: b742c9393bb4
+      provenance: machine
+      outputHash: e9de5a573fd7
+    paths./api/v1/tools/files/woff-to-ttf.post.summary:
+      sourceHash: 9a45a95e999f
+      provenance: machine
+      outputHash: ec614edc39c5
+    paths./api/v1/tools/files/woff-to-ttf.post.description:
+      sourceHash: 438ad32a4b4b
+      provenance: machine
+      outputHash: d71fbe7bef7e
+    paths./api/v1/tools/files/woff2-to-ttf.post.summary:
+      sourceHash: e94eaac47cf9
+      provenance: machine
+      outputHash: ea30dc8e0414
+    paths./api/v1/tools/files/woff2-to-ttf.post.description:
+      sourceHash: 4c810ef8c002
+      provenance: machine
+      outputHash: 3843ee2c8808
+    paths./api/v1/tools/files/ttf-to-woff2.post.summary:
+      sourceHash: 11d7b371918a
+      provenance: machine
+      outputHash: cbf09f46c9fb
+    paths./api/v1/tools/files/ttf-to-woff2.post.description:
+      sourceHash: 4edc284a778e
+      provenance: machine
+      outputHash: 8c766dd3d20c
     paths./api/v1/readyz.get.summary:
       sourceHash: 2f70aef72373
       provenance: machine
@@ -40959,6 +41279,118 @@ x-i18n:
       provenance: machine
       outputHash: 9570566f65ab
     ptr:/paths/~1api~1v1~1tools~1files~1excel-to-csv/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 1a211f07115d
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 132360f9a828
+      provenance: machine
+      outputHash: 2f3f6e59ab81
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: c0fa280a6f6f
+      provenance: machine
+      outputHash: 6f7bbc4e0232
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 61a5de331c6c
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: 75b60d2a4f0f
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 2274c981e1ad
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 9570566f65ab
+    ptr:/paths/~1api~1v1~1tools~1files~1otf-to-ttf/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 1a211f07115d
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 5d4cdb855a26
+      provenance: machine
+      outputHash: 49c6947bd4aa
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 392d176747cb
+      provenance: machine
+      outputHash: 80f30ae75b77
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 61a5de331c6c
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: 75b60d2a4f0f
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 2274c981e1ad
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 9570566f65ab
+    ptr:/paths/~1api~1v1~1tools~1files~1woff-to-ttf/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 1a211f07115d
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 9af18ae085bb
+      provenance: machine
+      outputHash: 8000445c3e53
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 96a9e4dc0af9
+      provenance: machine
+      outputHash: 237ca2c799c6
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 61a5de331c6c
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: 75b60d2a4f0f
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 2274c981e1ad
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 9570566f65ab
+    ptr:/paths/~1api~1v1~1tools~1files~1woff2-to-ttf/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: 1a211f07115d
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 2b24bf1ee296
+      provenance: machine
+      outputHash: deb23a2174eb
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 9ebe88dc57ef
+      provenance: machine
+      outputHash: 8f3363fac1f7
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: 61a5de331c6c
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: 75b60d2a4f0f
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: 2274c981e1ad
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 9570566f65ab
+    ptr:/paths/~1api~1v1~1tools~1files~1ttf-to-woff2/post/responses/422/description:
       sourceHash: 88ca7e4a48e4
       provenance: machine
       outputHash: 1a211f07115d

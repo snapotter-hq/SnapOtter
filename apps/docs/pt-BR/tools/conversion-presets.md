@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Predefinições de Conversão {#conversion-presets}
 
-O SnapOtter expõe 117 endpoints de predefinições de conversão dedicados, além das ferramentas conversoras base. Cada predefinição fixa o formato de saída e delega ao seu pipeline de processamento base, de modo que o comportamento, a validação e o contrato de saída correspondam à ferramenta base listada abaixo.
+O SnapOtter expõe 121 endpoints de predefinições de conversão dedicados, além das ferramentas conversoras base. Cada predefinição fixa o formato de saída e delega ao seu pipeline de processamento base, de modo que o comportamento, a validação e o contrato de saída correspondam à ferramenta base listada abaixo.
 
 ## Padrão de Endpoint da API {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Envie `multipart/form-data` com uma parte `file` e uma string JSON opcional `set
 | ID da Predefinição | Converte | Rota | Ferramenta base | Entradas aceitas | Configurações opcionais |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel para CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | nenhuma |
+| `otf-to-ttf` | OTF para TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | nenhuma |
+| `woff-to-ttf` | WOFF para TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | nenhuma |
+| `woff2-to-ttf` | WOFF2 para TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | nenhuma |
+| `ttf-to-woff2` | TTF para WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | nenhuma |
 
 ## Notas {#notes}
 

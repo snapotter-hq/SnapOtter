@@ -6,10 +6,10 @@ import {
 } from "../../../packages/shared/src/conversion-presets.js";
 
 describe("conversion presets", () => {
-  it("defines 117 presets with unique ids", () => {
-    expect(CONVERSION_PRESETS.length).toBe(117);
+  it("defines 121 presets with unique ids", () => {
+    expect(CONVERSION_PRESETS.length).toBe(121);
     const ids = CONVERSION_PRESETS.map((p) => p.id);
-    expect(new Set(ids).size).toBe(117);
+    expect(new Set(ids).size).toBe(121);
   });
 
   it("subtitle presets lock convert-subtitles' format and take one extension (#5052)", () => {
@@ -41,6 +41,25 @@ describe("conversion presets", () => {
   it("presets are present in the exported TOOLS catalog", () => {
     const toolIds = new Set(TOOLS.map((t) => t.id));
     for (const p of CONVERSION_PRESETS) expect(toolIds.has(p.id)).toBe(true);
+  });
+
+  it("locks convert-font to the target format for each font preset (#5053)", () => {
+    const fonts = CONVERSION_PRESETS.filter((p) => p.base === "convert-font").map((p) => ({
+      id: p.id,
+      format: p.locked.format,
+      inputs: p.sourceInputs,
+    }));
+    expect(fonts).toEqual([
+      { id: "otf-to-ttf", format: "ttf", inputs: [".otf"] },
+      { id: "woff-to-ttf", format: "ttf", inputs: [".woff"] },
+      { id: "woff2-to-ttf", format: "ttf", inputs: [".woff2"] },
+      { id: "ttf-to-woff2", format: "woff2", inputs: [".ttf", ".otf"] },
+    ]);
+    const tools = expandConversionPresets().filter((t) => fonts.some((f) => f.id === t.id));
+    for (const tool of tools) {
+      expect(tool.modality).toBe("file");
+      expect(tool.category).toBe("data");
+    }
   });
 
   it("preset keywords include the natural phrasing", () => {

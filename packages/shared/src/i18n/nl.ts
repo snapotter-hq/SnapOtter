@@ -696,6 +696,22 @@ export const nl: TranslationKeys = {
       name: "Excel naar CSV",
       description: "Zet Excel online om naar CSV. Snel, gratis en privé.",
     },
+    "otf-to-ttf": {
+      name: "OTF naar TTF",
+      description: "Zet OTF online om naar TTF. Snel, gratis en privé.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF naar TTF",
+      description: "Zet WOFF online om naar TTF. Snel, gratis en privé.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 naar TTF",
+      description: "Zet WOFF2 online om naar TTF. Snel, gratis en privé.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF naar WOFF2",
+      description: "Zet TTF online om naar WOFF2. Snel, gratis en privé.",
+    },
     // END conversion-presets
     resize: {
       name: "Afbeelding herschalen",

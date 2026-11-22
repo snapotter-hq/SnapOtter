@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # 轉換預設 {#conversion-presets}
 
-除了基礎轉換工具之外，SnapOtter 還提供 117 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
+除了基礎轉換工具之外，SnapOtter 還提供 121 個專用的轉換預設端點。每個預設都會鎖定輸出格式並委派給其基礎處理管線，因此行為、驗證與輸出約定都會與下方所列的基礎工具相符。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ i18n_hash_version: 2
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel 轉 CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`、`.xls` | none |
+| `otf-to-ttf` | OTF 轉 TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF 轉 TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 轉 TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF 轉 WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`、`.otf` | none |
 
 ## Notes {#notes}
 

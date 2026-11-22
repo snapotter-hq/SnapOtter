@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 760df254b37b
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 13fc29d5c734
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Préréglages de conversion {#conversion-presets}
 
-Le catalogue partagé inclut 117 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
+Le catalogue partagé inclut 121 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Tous les outils d'IA s'exécutent sur votre matériel : CPU par défaut, ou NVID
 | `proportion-calculator` | Calculateur de proportions | `a`, `b`, `c`, `mode` (direct/inverse). Corps JSON, aucun téléversement de fichier ; renvoie la valeur manquante. |
 | `base64` | Encoder / décoder en Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corps JSON, aucun téléversement de fichier ; renvoie le texte converti. |
 | `excel-to-csv` | Excel vers CSV | préréglage de conversion dédié adossé à `convert-spreadsheet` |
+| `otf-to-ttf` | OTF vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `woff-to-ttf` | WOFF vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `woff2-to-ttf` | WOFF2 vers TTF | préréglage de conversion dédié adossé à `convert-font` |
+| `ttf-to-woff2` | TTF vers WOFF2 | préréglage de conversion dédié adossé à `convert-font` |
 | `create-zip` | Créer un ZIP | - (multi-fichiers, 2-50 fichiers) |
 | `extract-zip` | Extraire un ZIP | - (protégé contre les bombes) |
 

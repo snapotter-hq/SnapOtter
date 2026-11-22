@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 4e6dee430962
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: f164d86ea413
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### إعدادات التحويل الجاهزة {#conversion-presets}
 
-يتضمن الكتالوج المشترك 117 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
+يتضمن الكتالوج المشترك 121 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | حاسبة التناسب | `a`، `b`، `c`، `mode` (direct/inverse). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
 | `base64` | ترميز / فك ترميز Base64 | `text`، `mode` (encode/decode)، `urlSafe` (منطقي). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
 | `excel-to-csv` | Excel إلى CSV | إعداد تحويل جاهز مخصص مدعوم بـ `convert-spreadsheet` |
+| `otf-to-ttf` | OTF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff-to-ttf` | WOFF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff2-to-ttf` | WOFF2 إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `ttf-to-woff2` | TTF إلى WOFF2 | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
 | `create-zip` | إنشاء ZIP | - (متعدد الملفات، 2-50 ملفًا) |
 | `extract-zip` | استخراج ZIP | - (محمي من قنابل الضغط) |
 

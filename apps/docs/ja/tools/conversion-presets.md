@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter は、ベースとなるコンバーターツールに加えて、117 個の専用変換プリセットエンドポイントを公開しています。各プリセットは出力形式を固定し、ベースの処理パイプラインに委譲するため、動作、検証、出力の仕様は下記に挙げるベースツールと一致します。
+SnapOtter は、ベースとなるコンバーターツールに加えて、121 個の専用変換プリセットエンドポイントを公開しています。各プリセットは出力形式を固定し、ベースの処理パイプラインに委譲するため、動作、検証、出力の仕様は下記に挙げるベースツールと一致します。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ SnapOtter は、ベースとなるコンバーターツールに加えて、117 
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel から CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`、`.xls` | none |
+| `otf-to-ttf` | OTF から TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF から TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 から TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF から WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`、`.otf` | none |
 
 ## Notes {#notes}
 

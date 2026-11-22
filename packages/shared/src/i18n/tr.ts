@@ -695,6 +695,22 @@ export const tr: TranslationKeys = {
       name: "Excel - CSV",
       description: "Excel dosyasını çevrimiçi CSV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
     },
+    "otf-to-ttf": {
+      name: "OTF - TTF",
+      description: "OTF dosyasını çevrimiçi TTF biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF - TTF",
+      description: "WOFF dosyasını çevrimiçi TTF biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 - TTF",
+      description: "WOFF2 dosyasını çevrimiçi TTF biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF - WOFF2",
+      description: "TTF dosyasını çevrimiçi WOFF2 biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
     // END conversion-presets
     resize: {
       name: "Görüntü Boyutlandır",

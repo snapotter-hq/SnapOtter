@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 05eecf7d7390
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 77e99b408f4f
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 변환 프리셋 {#conversion-presets}
 
-공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 117개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
+공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 121개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 비례식 계산기 | `a`, `b`, `c`, `mode`(direct/inverse). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
 | `base64` | Base64 인코딩 / 디코딩 | `text`, `mode`(encode/decode), `urlSafe`(bool). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
 | `excel-to-csv` | Excel을 CSV로 | `convert-spreadsheet`로 지원되는 전용 변환 프리셋 |
+| `otf-to-ttf` | OTF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff-to-ttf` | WOFF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff2-to-ttf` | WOFF2을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `ttf-to-woff2` | TTF을 WOFF2로 | `convert-font`로 지원되는 전용 변환 프리셋 |
 | `create-zip` | ZIP 생성 | - (다중 파일, 2-50개 파일) |
 | `extract-zip` | ZIP 추출 | - (봄 보호) |
 

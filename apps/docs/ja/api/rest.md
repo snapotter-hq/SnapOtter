@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 22e34d1ecafe
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 8cfaefef781a
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 変換プリセット {#conversion-presets}
 
-共有カタログには、`jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg`、`excel-to-csv` など、117 個の専用変換プリセットエンドポイントが含まれています。プリセットはファーストクラスのツールルートです:
+共有カタログには、`jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg`、`excel-to-csv` など、121 個の専用変換プリセットエンドポイントが含まれています。プリセットはファーストクラスのツールルートです:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 比例計算機 | `a`, `b`, `c`, `mode`（direct/inverse）。JSON ボディ、ファイルアップロードなし。不明な値を返します。 |
 | `base64` | Base64 エンコード / デコード | `text`, `mode`（encode/decode）, `urlSafe`（bool）。JSON ボディ、ファイルアップロードなし。変換後のテキストを返します。 |
 | `excel-to-csv` | Excel から CSV | `convert-spreadsheet` を基盤とする専用の変換プリセット |
+| `otf-to-ttf` | OTF から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `woff-to-ttf` | WOFF から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `woff2-to-ttf` | WOFF2 から TTF | `convert-font` を基盤とする専用の変換プリセット |
+| `ttf-to-woff2` | TTF から WOFF2 | `convert-font` を基盤とする専用の変換プリセット |
 | `create-zip` | ZIP の作成 | -（複数ファイル、2-50 ファイル） |
 | `extract-zip` | ZIP の展開 | -（ボム対策済み） |
 

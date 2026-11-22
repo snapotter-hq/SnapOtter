@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 3ab07dc04f33
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 055edb2bac9c
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preajustes de conversión {#conversion-presets}
 
-El catálogo compartido incluye 117 endpoints de preajustes de conversión dedicados, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` y `excel-to-csv`. Los preajustes son rutas de herramienta de primera clase:
+El catálogo compartido incluye 121 endpoints de preajustes de conversión dedicados, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` y `excel-to-csv`. Los preajustes son rutas de herramienta de primera clase:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `proportion-calculator` | Calculadora de proporciones | `a`, `b`, `c`, `mode` (direct/inverse). Cuerpo JSON, sin subida de archivo; devuelve el valor que falta. |
 | `base64` | Codificar / decodificar Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Cuerpo JSON, sin subida de archivo; devuelve el texto convertido. |
 | `excel-to-csv` | Excel a CSV | preajuste de conversión dedicado respaldado por `convert-spreadsheet` |
+| `otf-to-ttf` | OTF a TTF | preajuste de conversión dedicado respaldado por `convert-font` |
+| `woff-to-ttf` | WOFF a TTF | preajuste de conversión dedicado respaldado por `convert-font` |
+| `woff2-to-ttf` | WOFF2 a TTF | preajuste de conversión dedicado respaldado por `convert-font` |
+| `ttf-to-woff2` | TTF a WOFF2 | preajuste de conversión dedicado respaldado por `convert-font` |
 | `create-zip` | Crear ZIP | - (multiarchivo, 2-50 archivos) |
 | `extract-zip` | Extraer ZIP | - (protegido contra bombas) |
 

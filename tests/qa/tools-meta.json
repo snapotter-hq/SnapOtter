@@ -6827,6 +6827,42 @@
     "isAI": false
   },
   {
+    "id": "otf-to-ttf",
+    "name": "OTF to TTF",
+    "modality": "file",
+    "route": "/files/otf-to-ttf",
+    "acceptedInputs": [".otf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "woff-to-ttf",
+    "name": "WOFF to TTF",
+    "modality": "file",
+    "route": "/files/woff-to-ttf",
+    "acceptedInputs": [".woff"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "woff2-to-ttf",
+    "name": "WOFF2 to TTF",
+    "modality": "file",
+    "route": "/files/woff2-to-ttf",
+    "acceptedInputs": [".woff2"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "ttf-to-woff2",
+    "name": "TTF to WOFF2",
+    "modality": "file",
+    "route": "/files/ttf-to-woff2",
+    "acceptedInputs": [".ttf", ".otf"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "compress-image-to-20kb",
     "name": "Compress Image to 20 KB",
     "modality": "image",

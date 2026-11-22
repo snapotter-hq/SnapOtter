@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # 변환 프리셋 {#conversion-presets}
 
-SnapOtter는 기본 변환기 도구 외에도 117개의 전용 변환 프리셋 엔드포인트를 제공합니다. 각 프리셋은 출력 형식을 고정하고 기본 처리 파이프라인에 위임하므로, 동작, 검증, 출력 계약이 아래에 나열된 기본 도구와 일치합니다.
+SnapOtter는 기본 변환기 도구 외에도 121개의 전용 변환 프리셋 엔드포인트를 제공합니다. 각 프리셋은 출력 형식을 고정하고 기본 처리 파이프라인에 위임하므로, 동작, 검증, 출력 계약이 아래에 나열된 기본 도구와 일치합니다.
 
 ## API 엔드포인트 패턴 {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ SnapOtter는 기본 변환기 도구 외에도 117개의 전용 변환 프리셋
 | 프리셋 ID | 변환 | 라우트 | 기본 도구 | 허용 입력 | 선택 설정 |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF to TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF to TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 to TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF to WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## 참고 사항 {#notes}
 

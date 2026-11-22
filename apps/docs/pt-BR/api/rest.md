@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: 0ce413dd435d
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: c8d7e73291c7
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Presets de conversão {#conversion-presets}
 
-O catálogo compartilhado inclui 117 endpoints dedicados a presets de conversão, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. Os presets são rotas de ferramentas de primeira classe:
+O catálogo compartilhado inclui 121 endpoints dedicados a presets de conversão, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. Os presets são rotas de ferramentas de primeira classe:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `proportion-calculator` | Calculadora de proporção | `a`, `b`, `c`, `mode` (direct/inverse). Corpo JSON, sem upload de arquivo; retorna o valor que falta. |
 | `base64` | Codificar / decodificar Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corpo JSON, sem upload de arquivo; retorna o texto convertido. |
 | `excel-to-csv` | Excel para CSV | preset de conversão dedicado, baseado em `convert-spreadsheet` |
+| `otf-to-ttf` | OTF para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `woff-to-ttf` | WOFF para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `woff2-to-ttf` | WOFF2 para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `ttf-to-woff2` | TTF para WOFF2 | preset de conversão dedicado, baseado em `convert-font` |
 | `create-zip` | Criar ZIP | - (múltiplos arquivos, 2-50 arquivos) |
 | `extract-zip` | Extrair ZIP | - (protegido contra bomb) |
 

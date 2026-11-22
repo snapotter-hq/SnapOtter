@@ -26,6 +26,17 @@ describe("app fuzzy search finds converters by variation", () => {
   });
 });
 
+describe("font conversions lead with their dedicated preset (#5053)", () => {
+  it.each([
+    ["otf to ttf", "otf-to-ttf"],
+    ["woff to ttf", "woff-to-ttf"],
+    ["woff2 to ttf", "woff2-to-ttf"],
+    ["ttf to woff2", "ttf-to-woff2"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+});
+
 describe("the normalizer keeps the words that name a tool (#1327)", () => {
   // "convert image" used to normalize to "image", which ranked the five
   // compress-image-to-N-kb presets first and Convert Image sixth.
@@ -194,7 +205,7 @@ describe("a query with no real match reaches the empty state (#4818)", () => {
     ["make pdf smaller", "compress-pdf"],
     ["make video smaller", "compress-video"],
     ["jpg naar png", "jpg-to-png"],
-    ["otf to ttf", "convert-font"],
+    ["ttf to otf", "convert-font"],
     ["base64 decode", "base64"],
   ])("a typo or synonym like %s still finds %s", (q, id) => {
     expect(search(q).slice(0, 3)).toContain(id);

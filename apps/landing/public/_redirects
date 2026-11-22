@@ -575,6 +575,14 @@
 /tools/srt-to-ass /tools/video/srt-to-ass/ 301
 /tools/excel-to-csv/ /tools/files/excel-to-csv/ 301
 /tools/excel-to-csv /tools/files/excel-to-csv/ 301
+/tools/otf-to-ttf/ /tools/files/otf-to-ttf/ 301
+/tools/otf-to-ttf /tools/files/otf-to-ttf/ 301
+/tools/woff-to-ttf/ /tools/files/woff-to-ttf/ 301
+/tools/woff-to-ttf /tools/files/woff-to-ttf/ 301
+/tools/woff2-to-ttf/ /tools/files/woff2-to-ttf/ 301
+/tools/woff2-to-ttf /tools/files/woff2-to-ttf/ 301
+/tools/ttf-to-woff2/ /tools/files/ttf-to-woff2/ 301
+/tools/ttf-to-woff2 /tools/files/ttf-to-woff2/ 301
 /tools/compress-image-to-20kb/ /tools/image/compress-image-to-20kb/ 301
 /tools/compress-image-to-20kb /tools/image/compress-image-to-20kb/ 301
 /tools/compress-image-to-50kb/ /tools/image/compress-image-to-50kb/ 301

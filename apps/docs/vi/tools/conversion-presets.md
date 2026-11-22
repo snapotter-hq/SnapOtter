@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 117 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
+Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 121 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Gửi `multipart/form-data` với một phần `file` và một chuỗi JSON `se
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF to TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF to TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 to TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF to WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

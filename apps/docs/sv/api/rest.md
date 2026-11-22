@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 514954c8bc89
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: bd3153d93d59
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konverteringsförinställningar {#conversion-presets}
 
-Den delade katalogen innehåller 117 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
+Den delade katalogen innehåller 121 dedikerade slutpunkter för konverteringsförinställningar såsom `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` och `excel-to-csv`. Förinställningar är förstklassiga verktygsrutter:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Alla AI-verktyg körs på din hårdvara: CPU som standard, eller NVIDIA CUDA nä
 | `proportion-calculator` | Proportionsräknare | `a`, `b`, `c`, `mode` (direct/inverse). JSON-kropp, ingen filuppladdning; ger det saknade värdet. |
 | `base64` | Base64-koda / avkoda | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-kropp, ingen filuppladdning; ger den konverterade texten. |
 | `excel-to-csv` | Excel till CSV | dedikerad konverteringsförinställning som backas upp av `convert-spreadsheet` |
+| `otf-to-ttf` | OTF till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `woff-to-ttf` | WOFF till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `woff2-to-ttf` | WOFF2 till TTF | dedikerad konverteringsförinställning som backas upp av `convert-font` |
+| `ttf-to-woff2` | TTF till WOFF2 | dedikerad konverteringsförinställning som backas upp av `convert-font` |
 | `create-zip` | Skapa ZIP | - (flerfil, 2-50 filer) |
 | `extract-zip` | Extrahera ZIP | - (bombskyddad) |
 

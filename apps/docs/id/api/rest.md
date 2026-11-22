@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: d033b8d59371
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 8945c7c5ea1a
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preset Konversi {#conversion-presets}
 
-Katalog bersama menyertakan 117 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
+Katalog bersama menyertakan 121 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `proportion-calculator` | Kalkulator Perbandingan | `a`, `b`, `c`, `mode` (direct/inverse). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
 | `base64` | Encode / Decode Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
 | `excel-to-csv` | Excel to CSV | preset konversi khusus yang didukung oleh `convert-spreadsheet` |
+| `otf-to-ttf` | OTF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff-to-ttf` | WOFF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff2-to-ttf` | WOFF2 to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `ttf-to-woff2` | TTF to WOFF2 | preset konversi khusus yang didukung oleh `convert-font` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Extract ZIP | - (terlindungi dari bomb) |
 

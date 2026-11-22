@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: a3473ad1107b
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 5af4c4a0679d
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Cấu hình chuyển đổi sẵn {#conversion-presets}
 
-Danh mục dùng chung bao gồm 117 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
+Danh mục dùng chung bao gồm 121 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `proportion-calculator` | Máy tính tỉ lệ | `a`, `b`, `c`, `mode` (direct/inverse). Thân JSON, không tải tệp lên; trả về giá trị còn thiếu. |
 | `base64` | Mã hóa / giải mã Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Thân JSON, không tải tệp lên; trả về văn bản đã chuyển đổi. |
 | `excel-to-csv` | Excel sang CSV | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-spreadsheet` |
+| `otf-to-ttf` | OTF sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `woff-to-ttf` | WOFF sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `woff2-to-ttf` | WOFF2 sang TTF | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
+| `ttf-to-woff2` | TTF sang WOFF2 | cấu hình chuyển đổi chuyên biệt được hỗ trợ bởi `convert-font` |
 | `create-zip` | Tạo ZIP | - (đa tệp, 2-50 tệp) |
 | `extract-zip` | Giải nén ZIP | - (chống bom nén) |
 

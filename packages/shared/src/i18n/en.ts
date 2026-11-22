@@ -695,6 +695,22 @@ export const en = {
       name: "Excel to CSV",
       description: "Convert Excel to CSV online. Fast, free, private, no signup.",
     },
+    "otf-to-ttf": {
+      name: "OTF to TTF",
+      description: "Convert OTF to TTF online. Fast, free, private, no signup.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF to TTF",
+      description: "Convert WOFF to TTF online. Fast, free, private, no signup.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2 to TTF",
+      description: "Convert WOFF2 to TTF online. Fast, free, private, no signup.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF to WOFF2",
+      description: "Convert TTF to WOFF2 online. Fast, free, private, no signup.",
+    },
     // END conversion-presets
     resize: {
       name: "Resize Image",

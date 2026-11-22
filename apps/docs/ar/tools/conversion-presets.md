@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # إعدادات التحويل المسبقة {#conversion-presets}
 
-يوفّر SnapOtter 117 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
+يوفّر SnapOtter 121 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
 
 ## نمط نقطة نهاية API {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ i18n_hash_version: 2
 | معرّف الإعداد | يحوِّل | المسار | الأداة الأساسية | المدخلات المقبولة | إعدادات اختيارية |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel إلى CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`، `.xls` | لا شيء |
+| `otf-to-ttf` | OTF إلى TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | لا شيء |
+| `woff-to-ttf` | WOFF إلى TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | لا شيء |
+| `woff2-to-ttf` | WOFF2 إلى TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | لا شيء |
+| `ttf-to-woff2` | TTF إلى WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`، `.otf` | لا شيء |
 
 ## ملاحظات {#notes}
 

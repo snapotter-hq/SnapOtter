@@ -26392,6 +26392,290 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/v1/tools/files/otf-to-ttf:
+    post:
+      operationId: otfToTtfTool
+      tags: [Files]
+      summary: "OTF to TTF"
+      description: |
+        Convert OTF to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OTF to TTF input file (.otf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OTF to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/woff-to-ttf:
+    post:
+      operationId: woffToTtfTool
+      tags: [Files]
+      summary: "WOFF to TTF"
+      description: |
+        Convert WOFF to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WOFF to TTF input file (.woff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WOFF to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/woff2-to-ttf:
+    post:
+      operationId: woff2ToTtfTool
+      tags: [Files]
+      summary: "WOFF2 to TTF"
+      description: |
+        Convert WOFF2 to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WOFF2 to TTF input file (.woff2)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WOFF2 to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/ttf-to-woff2:
+    post:
+      operationId: ttfToWoff2Tool
+      tags: [Files]
+      summary: "TTF to WOFF2"
+      description: |
+        Convert TTF to WOFF2
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "TTF to WOFF2 input file (.ttf, .otf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TTF to WOFF2 converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/readyz:
     get:
       operationId: readinessCheck

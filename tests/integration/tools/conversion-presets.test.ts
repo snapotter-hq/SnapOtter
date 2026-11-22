@@ -11,6 +11,7 @@ import {
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -109,6 +110,14 @@ function specForExt(ext: string): FixtureSpec | null {
         path: fixtures.document.tiny("xlsx"),
         mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       };
+    case ".ttf":
+      return { path: fixtures.data.ttf, mime: "font/ttf" };
+    case ".otf":
+      return { path: fixtures.data.otf, mime: "font/otf" };
+    case ".woff":
+      return { path: fixtures.data.woff, mime: "font/woff" };
+    case ".woff2":
+      return { path: fixtures.data.woff2, mime: "font/woff2" };
     default:
       return null;
   }
@@ -123,11 +132,13 @@ function needsFfmpeg(tool: Tool): boolean {
 /**
  * True when the preset's conversion can run given the system binaries present.
  * Mirrors the ffmpeg gate: spreadsheet conversions delegate to LibreOffice, so
- * the spreadsheet preset only runs where `soffice` is installed.
+ * the spreadsheet preset only runs where `soffice` is installed, and font
+ * presets need the fontTools the convert-font script imports.
  */
 function dependencyAvailable(preset: ConversionPreset, tool: Tool): boolean {
   if (needsFfmpeg(tool) && !ffmpegAvailable()) return false;
   if (preset.base === "convert-spreadsheet" && !sofficeAvailable()) return false;
+  if (findMissingGeneratedPythonPrerequisite(preset.base, preset.locked)) return false;
   return true;
 }
 

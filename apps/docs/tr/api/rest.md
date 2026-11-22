@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 046a7bca9d39
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 5d99906a61e8
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Dönüştürme Ön Ayarları {#conversion-presets}
 
-Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 117 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
+Paylaşılan katalog, `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` ve `excel-to-csv` gibi 121 özel dönüştürme ön ayarı uç noktası içerir. Ön ayarlar birinci sınıf araç yollarıdır:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 | `proportion-calculator` | Orantı Hesaplayıcı | `a`, `b`, `c`, `mode` (direct/inverse). JSON gövdesi, dosya yükleme yok; eksik değeri döndürür. |
 | `base64` | Base64 Kodla / Çöz | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON gövdesi, dosya yükleme yok; dönüştürülen metni döndürür. |
 | `excel-to-csv` | Excel'den CSV'ye | `convert-spreadsheet` tarafından desteklenen özel dönüştürme ön ayarı |
+| `otf-to-ttf` | OTF'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `woff-to-ttf` | WOFF'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `woff2-to-ttf` | WOFF2'den TTF'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
+| `ttf-to-woff2` | TTF'den WOFF2'ye | `convert-font` tarafından desteklenen özel dönüştürme ön ayarı |
 | `create-zip` | ZIP Oluştur | - (çok dosyalı, 2-50 dosya) |
 | `extract-zip` | ZIP Ayıkla | - (bomba korumalı) |
 

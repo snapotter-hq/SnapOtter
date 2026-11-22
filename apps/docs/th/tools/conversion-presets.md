@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter เปิดเผยเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะทาง 117 รายการ นอกเหนือจากเครื่องมือแปลงพื้นฐาน แต่ละพรีเซ็ตจะล็อกรูปแบบผลลัพธ์และมอบหมายให้กับไปป์ไลน์การประมวลผลพื้นฐาน ดังนั้นพฤติกรรม การตรวจสอบความถูกต้อง และสัญญาผลลัพธ์จึงตรงกับเครื่องมือพื้นฐานที่แสดงไว้ด้านล่าง
+SnapOtter เปิดเผยเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะทาง 121 รายการ นอกเหนือจากเครื่องมือแปลงพื้นฐาน แต่ละพรีเซ็ตจะล็อกรูปแบบผลลัพธ์และมอบหมายให้กับไปป์ไลน์การประมวลผลพื้นฐาน ดังนั้นพฤติกรรม การตรวจสอบความถูกต้อง และสัญญาผลลัพธ์จึงตรงกับเครื่องมือพื้นฐานที่แสดงไว้ด้านล่าง
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ SnapOtter เปิดเผยเอนด์พอยต์พรีเซ็�
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF to TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF to TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 to TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF to WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

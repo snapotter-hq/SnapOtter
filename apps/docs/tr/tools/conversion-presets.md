@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter, temel dönüştürücü araçlarına ek olarak 117 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
+SnapOtter, temel dönüştürücü araçlarına ek olarak 121 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Bir `file` parçası ve isteğe bağlı `settings` JSON dizesi ile `multipart/fo
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel'den CSV'ye | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF'den TTF'ye | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF'den TTF'ye | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2'den TTF'ye | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF'den WOFF2'ye | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Préréglages de conversion {#conversion-presets}
 
-SnapOtter expose 117 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
+SnapOtter expose 121 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
 
 ## Modèle de point de terminaison de l'API {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | ID du préréglage | Convertit | Route | Outil de base | Entrées acceptées | Réglages facultatifs |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel vers CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF vers TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF vers TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 vers TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF vers WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Remarques {#notes}
 

@@ -112,6 +112,15 @@ describe("generated source Python prerequisites", () => {
     );
   });
 
+  it.each(["otf-to-ttf", "woff-to-ttf", "woff2-to-ttf", "ttf-to-woff2"])(
+    "gates the %s preset on its base's fontTools (#5053)",
+    (presetId) => {
+      expect(findMissingGeneratedPythonPrerequisite(presetId, {}, NO_CAPABILITIES)).toContain(
+        "fontTools",
+      );
+    },
+  );
+
   it("allows tools when their Python capability is present", () => {
     const capabilities = {
       fitz: true,

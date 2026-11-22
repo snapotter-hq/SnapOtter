@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter exponerar 117 dedikerade konverteringsförinställningsslutpunkter utöver bas-konverteringsverktygen. Varje förinställning låser utdataformatet och delegerar till sin bas-bearbetningspipeline, så att beteendet, valideringen och utdatakontraktet matchar bas-verktyget som listas nedan.
+SnapOtter exponerar 121 dedikerade konverteringsförinställningsslutpunkter utöver bas-konverteringsverktygen. Varje förinställning låser utdataformatet och delegerar till sin bas-bearbetningspipeline, så att beteendet, valideringen och utdatakontraktet matchar bas-verktyget som listas nedan.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -157,6 +157,10 @@ Skicka `multipart/form-data` med en `file`-del och en valfri JSON-sträng `setti
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel till CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF till TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF till TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 till TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF till WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

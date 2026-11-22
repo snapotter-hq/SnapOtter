@@ -694,6 +694,22 @@ export const ko: TranslationKeys = {
       name: "Excel을(를) CSV(으)로",
       description: "Excel을(를) CSV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
     },
+    "otf-to-ttf": {
+      name: "OTF을(를) TTF(으)로",
+      description: "OTF을(를) TTF(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "woff-to-ttf": {
+      name: "WOFF을(를) TTF(으)로",
+      description: "WOFF을(를) TTF(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "woff2-to-ttf": {
+      name: "WOFF2을(를) TTF(으)로",
+      description: "WOFF2을(를) TTF(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "ttf-to-woff2": {
+      name: "TTF을(를) WOFF2(으)로",
+      description: "TTF을(를) WOFF2(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
     // END conversion-presets
     resize: {
       name: "이미지 크기 조정",

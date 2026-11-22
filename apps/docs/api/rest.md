@@ -146,7 +146,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Conversion Presets {#conversion-presets}
 
-The shared catalog includes 117 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
+The shared catalog includes 121 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -388,6 +388,10 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 | `proportion-calculator` | Proportion Calculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON body, no file upload; returns the missing value. |
 | `base64` | Base64 Encode / Decode | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON body, no file upload; returns the converted text. |
 | `excel-to-csv` | Excel to CSV | dedicated conversion preset backed by `convert-spreadsheet` |
+| `otf-to-ttf` | OTF to TTF | dedicated conversion preset backed by `convert-font` |
+| `woff-to-ttf` | WOFF to TTF | dedicated conversion preset backed by `convert-font` |
+| `woff2-to-ttf` | WOFF2 to TTF | dedicated conversion preset backed by `convert-font` |
+| `ttf-to-woff2` | TTF to WOFF2 | dedicated conversion preset backed by `convert-font` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 files) |
 | `extract-zip` | Extract ZIP | - (bomb-protected) |
 

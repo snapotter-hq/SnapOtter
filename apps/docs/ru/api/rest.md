@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: dd6ea646250d
+i18n_output_hash: e10bba8b6fcb
 i18n_hash_version: 2
-i18n_source_hash: d772f94e7a5d
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Пресеты конвертации {#conversion-presets}
 
-Общий каталог включает 117 специальных эндпоинтов пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
+Общий каталог включает 121 специальный эндпоинт пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -392,6 +392,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | Калькулятор пропорций | `a`, `b`, `c`, `mode` (direct/inverse). Тело JSON, без загрузки файла; возвращает недостающее значение. |
 | `base64` | Кодирование / декодирование Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Тело JSON, без загрузки файла; возвращает преобразованный текст. |
 | `excel-to-csv` | Excel в CSV | специальный пресет конвертации на основе `convert-spreadsheet` |
+| `otf-to-ttf` | OTF в TTF | специальный пресет конвертации на основе `convert-font` |
+| `woff-to-ttf` | WOFF в TTF | специальный пресет конвертации на основе `convert-font` |
+| `woff2-to-ttf` | WOFF2 в TTF | специальный пресет конвертации на основе `convert-font` |
+| `ttf-to-woff2` | TTF в WOFF2 | специальный пресет конвертации на основе `convert-font` |
 | `create-zip` | Создание ZIP | - (несколько файлов, 2-50 файлов) |
 | `extract-zip` | Извлечение ZIP | - (защита от zip-бомб) |
 

@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: da222a2bea50
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 9d996ff7366d
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### कन्वर्ज़न प्रीसेट {#conversion-presets}
 
-साझा कैटलॉग में 117 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
+साझा कैटलॉग में 121 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | अनुपात कैलकुलेटर | `a`, `b`, `c`, `mode` (direct/inverse)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
 | `base64` | Base64 एनकोड / डिकोड | `text`, `mode` (encode/decode), `urlSafe` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
 | `excel-to-csv` | Excel से CSV | `convert-spreadsheet` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `otf-to-ttf` | OTF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff-to-ttf` | WOFF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff2-to-ttf` | WOFF2 से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `ttf-to-woff2` | TTF से WOFF2 | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
 | `create-zip` | ZIP बनाएँ | - (मल्टी-फ़ाइल, 2-50 फ़ाइलें) |
 | `extract-zip` | ZIP निकालें | - (bomb-संरक्षित) |
 

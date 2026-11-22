@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: f32fc4964a86
-i18n_source_hash: d772f94e7a5d
+i18n_output_hash: 4c943f9d8481
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 转换预设 {#conversion-presets}
 
-共享目录包含 117 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
+共享目录包含 121 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
 
 `POST /api/v1/tools/<section>/<presetId>`
 
@@ -391,6 +391,10 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `proportion-calculator` | 比例计算器 | `a`、`b`、`c`、`mode`（direct/inverse）。JSON 请求体，无需上传文件；返回缺失的值。 |
 | `base64` | Base64 编码 / 解码 | `text`、`mode`（encode/decode）、`urlSafe`（bool）。JSON 请求体，无需上传文件；返回转换后的文本。 |
 | `excel-to-csv` | Excel 转 CSV | 由 `convert-spreadsheet` 支撑的专用转换预设 |
+| `otf-to-ttf` | OTF 转 TTF | 由 `convert-font` 支撑的专用转换预设 |
+| `woff-to-ttf` | WOFF 转 TTF | 由 `convert-font` 支撑的专用转换预设 |
+| `woff2-to-ttf` | WOFF2 转 TTF | 由 `convert-font` 支撑的专用转换预设 |
+| `ttf-to-woff2` | TTF 转 WOFF2 | 由 `convert-font` 支撑的专用转换预设 |
 | `create-zip` | 创建 ZIP | -（多文件，2-50 个文件） |
 | `extract-zip` | 解压 ZIP | -（已做 ZIP 炸弹防护） |
 
