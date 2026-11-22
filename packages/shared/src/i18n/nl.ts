@@ -2479,6 +2479,7 @@ export const nl: TranslationKeys = {
       submit: "Transcriberen",
       submitBatch: "Transcriberen ({count} bestanden)",
       progressLabel: "Audio transcriberen",
+      noSpeechDetected: "Geen spraak gedetecteerd in dit bestand.",
     },
     "auto-subtitles": {
       language: "Taal",
@@ -2487,6 +2488,7 @@ export const nl: TranslationKeys = {
       submit: "Ondertiteling genereren",
       submitBatch: "Ondertiteling genereren ({count} bestanden)",
       progressLabel: "Ondertiteling genereren",
+      noSpeechDetected: "Geen spraak gedetecteerd in dit bestand.",
     },
     "transparency-fixer": {
       webp: "WebP",

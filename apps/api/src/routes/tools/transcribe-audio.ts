@@ -15,6 +15,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { NO_SPEECH_DETECTED_WARNING } from "../../lib/empty-result-warnings.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -98,6 +99,7 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
     resultPayload: {
       language: result.language,
       segments: segments.length,
+      ...(result.text.trim() === "" && { warning: NO_SPEECH_DETECTED_WARNING }),
     },
   };
 });
