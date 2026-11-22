@@ -61,6 +61,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   sharpening: IMAGE_FIX,
   "color-blindness": IMAGE_FIX,
   "image-enhancement": IMAGE_FIX,
+  beautify: IMAGE_FIX,
   "strip-metadata": IMAGE_FIX,
   pixelate: IMAGE_FIX,
   "image-pad": IMAGE_FIX,
@@ -362,6 +363,45 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
         },
       },
     },
+    // Without the noise-removal bundle this falls back to the Sharp-only result.
+    { label: "deep enhance", settings: { deepEnhance: true } },
+  ],
+
+  beautify: [
+    { label: "defaults", settings: {} },
+    {
+      label: "background solid",
+      settings: { backgroundType: "solid", backgroundColor: "#ff0000" },
+    },
+    { label: "background radial", settings: { backgroundType: "radial-gradient" } },
+    { label: "background transparent", settings: { backgroundType: "transparent" } },
+    { label: "gradient angle max", settings: { gradientAngle: 360 } },
+    { label: "padding min", settings: { padding: 0 } },
+    { label: "padding max", settings: { padding: 256 } },
+    { label: "radius min", settings: { borderRadius: 0 } },
+    { label: "radius max", settings: { borderRadius: 64 } },
+    { label: "shadow none", settings: { shadowPreset: "none" } },
+    { label: "shadow dramatic", settings: { shadowPreset: "dramatic" } },
+    {
+      label: "shadow custom max",
+      settings: {
+        shadowPreset: "custom",
+        shadowBlur: 100,
+        shadowOffsetX: -50,
+        shadowOffsetY: 50,
+        shadowOpacity: 100,
+      },
+    },
+    { label: "frame macos dark", settings: { frame: "macos-dark", frameTitle: "Title" } },
+    { label: "frame iphone", settings: { frame: "iphone" } },
+    { label: "frame macbook", settings: { frame: "macbook" } },
+    { label: "social instagram story", settings: { socialPreset: "instagram-story" } },
+    {
+      label: "watermark center",
+      settings: { watermarkText: "SnapOtter", watermarkPosition: "center", watermarkOpacity: 100 },
+    },
+    { label: "output jpeg", settings: { outputFormat: "jpeg" } },
+    { label: "output webp", settings: { outputFormat: "webp", shadowPreset: "none" } },
   ],
 
   "strip-metadata": [
@@ -1194,8 +1234,6 @@ const AI_GATED_TOOLS = new Set([
   "remove-background",
   "erase-object",
   "passport-photo",
-  "beautify",
-  "image-enhancement",
   "transparency-fixer",
   "blur-background",
   "background-replace",

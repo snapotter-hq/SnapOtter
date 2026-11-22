@@ -109,12 +109,8 @@ describe("generated QA harness contract", () => {
     expect(set, "AI_GATED_TOOLS literal not found").not.toBeNull();
     const ids = [...(set?.[1] ?? "").matchAll(/"([^"]+)"/g)].map(([, id]) => id);
     expect(ids.length).toBeGreaterThan(0);
-    const knownUnbundled = new Set(["beautify", "image-enhancement"]); // #5181
     const unbundled = ids.filter(
-      (id) =>
-        !knownUnbundled.has(id) &&
-        getRequiredBundlesForTool(id).length === 0 &&
-        !TOOL_OPTIONAL_BUNDLE_MAP[id],
+      (id) => getRequiredBundlesForTool(id).length === 0 && !TOOL_OPTIONAL_BUNDLE_MAP[id],
     );
     expect(unbundled).toEqual([]);
   });
