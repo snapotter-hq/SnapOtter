@@ -85,6 +85,57 @@ describe("resolveRoleSplit", () => {
     expect(split.active).toBe(true);
   });
 
+  // node-postgres takes ?host= and ?port= over the URL authority, so two socket
+  // URLs with the same placeholder host can still reach different clusters.
+  it("rejects socket urls whose ?host= names different socket directories", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/pg-a";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/pg-b";
+    expect(() => resolveRoleSplit(runtime, migration)).toThrow(/same database/i);
+  });
+
+  it("rejects urls whose ?port= differs", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/pg&port=5432";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/pg&port=5433";
+    expect(() => resolveRoleSplit(runtime, migration)).toThrow(/same database/i);
+  });
+
+  it("rejects a ?host= override that moves one url to another server", () => {
+    const migration = "postgres://snapotter:ownerpw@db:5432/snapotter?host=elsewhere";
+    expect(() => resolveRoleSplit(RUNTIME, migration)).toThrow(/same database/i);
+  });
+
+  it("compares the last ?host= when one is repeated, as node-postgres does", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/pg-a&host=/run/pg-b";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/pg-a";
+    expect(() => resolveRoleSplit(runtime, migration)).toThrow(/same database/i);
+  });
+
+  it("accepts the same socket directory written as ?host= and as an encoded host", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/postgresql";
+    const migration = "postgres://owner:q@%2Frun%2Fpostgresql/snapotter";
+    const split = resolveRoleSplit(runtime, migration);
+    expect(split).toMatchObject({ active: true, runtimeRole: "app" });
+  });
+
+  it("ignores a trailing slash on a socket directory", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/postgresql/";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/postgresql";
+    expect(resolveRoleSplit(runtime, migration).active).toBe(true);
+  });
+
+  it("treats an omitted ?port= on a socket url as the postgres default", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/pg&port=5432";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/pg";
+    expect(resolveRoleSplit(runtime, migration).active).toBe(true);
+  });
+
+  // Socket paths live on a case-sensitive filesystem, unlike DNS names.
+  it("compares socket directories case-sensitively", () => {
+    const runtime = "postgres://app:p@localhost/snapotter?host=/run/PG";
+    const migration = "postgres://owner:q@localhost/snapotter?host=/run/pg";
+    expect(() => resolveRoleSplit(runtime, migration)).toThrow(/same database/i);
+  });
+
   it("decodes percent-encoded passwords", () => {
     const encoded = "postgres://snapotter_app:p%40ss%3Aword@db:5432/snapotter";
     const split = resolveRoleSplit(encoded, MIGRATION);
