@@ -3618,7 +3618,7 @@ export const es: TranslationKeys = {
       windowTooShort: "Deja al menos 0,1 segundos entre el inicio y el fin",
       start: "Inicio",
       end: "Fin",
-      precise: "Preciso por fotograma (recodifica)",
+      precise: "Fotograma final exacto (recodifica todo el clip)",
       submit: "Recortar",
       submitBatch: "Recortar ({count} archivos)",
       progressLabel: "Recortando",

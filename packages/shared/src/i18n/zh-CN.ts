@@ -3297,7 +3297,7 @@ export const zhCN: TranslationKeys = {
       windowTooShort: "开始和结束之间至少要留 0.1 秒",
       start: "开始",
       end: "结束",
-      precise: "逐帧精确（重新编码）",
+      precise: "精确结束帧（重新编码整个片段）",
       submit: "裁剪",
       submitBatch: "裁剪（{count} 个文件）",
       progressLabel: "正在裁剪",

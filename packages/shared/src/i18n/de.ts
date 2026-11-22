@@ -3650,7 +3650,7 @@ export const de: TranslationKeys = {
       windowTooShort: "Zwischen Start und Ende müssen mindestens 0,1 Sekunden liegen",
       start: "Start",
       end: "Ende",
-      precise: "Bildgenau (neu kodiert)",
+      precise: "Exaktes Endbild (kodiert den ganzen Clip neu)",
       submit: "Kürzen",
       submitBatch: "Kürzen ({count} Dateien)",
       progressLabel: "Wird gekürzt",

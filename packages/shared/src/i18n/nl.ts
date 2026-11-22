@@ -3641,7 +3641,7 @@ export const nl: TranslationKeys = {
       windowTooShort: "Laat minstens 0,1 seconde tussen start en einde",
       start: "Start",
       end: "Einde",
-      precise: "Framenauwkeurig (herencodeert)",
+      precise: "Exact eindframe (herencodeert de hele clip)",
       submit: "Bijknippen",
       submitBatch: "Bijknippen ({count} bestanden)",
       progressLabel: "Bijknippen",

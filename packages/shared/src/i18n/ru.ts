@@ -3631,7 +3631,7 @@ export const ru: TranslationKeys = {
       windowTooShort: "Между началом и концом должно быть не меньше 0,1 секунды",
       start: "Начало",
       end: "Конец",
-      precise: "Покадровая точность (перекодировка)",
+      precise: "Точный конечный кадр (перекодирует весь клип)",
       submit: "Обрезать",
       submitBatch: "Обрезать ({count} файлов)",
       progressLabel: "Обрезка",

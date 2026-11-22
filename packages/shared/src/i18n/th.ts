@@ -3567,7 +3567,7 @@ export const th: TranslationKeys = {
       windowTooShort: "เว้นระยะระหว่างเวลาเริ่มต้นและสิ้นสุดอย่างน้อย 0.1 วินาที",
       start: "เริ่มต้น",
       end: "สิ้นสุด",
-      precise: "แม่นยำระดับเฟรม (เข้ารหัสใหม่)",
+      precise: "เฟรมสุดท้ายแม่นยำ (เข้ารหัสใหม่ทั้งคลิป)",
       submit: "ตัด",
       submitBatch: "ตัด ({count} ไฟล์)",
       progressLabel: "กำลังตัด",

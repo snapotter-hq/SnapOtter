@@ -3643,7 +3643,7 @@ export const fr: TranslationKeys = {
       windowTooShort: "Laissez au moins 0,1 seconde entre le début et la fin",
       start: "Début",
       end: "Fin",
-      precise: "Coupe précise (réencodage)",
+      precise: "Image de fin exacte (réencode tout le clip)",
       submit: "Découper",
       submitBatch: "Découper ({count} fichiers)",
       progressLabel: "Découpage",

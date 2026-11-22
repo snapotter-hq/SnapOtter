@@ -3618,7 +3618,7 @@ export const vi: TranslationKeys = {
       windowTooShort: "Để khoảng cách ít nhất 0,1 giây giữa thời điểm bắt đầu và kết thúc",
       start: "Bắt đầu",
       end: "Kết thúc",
-      precise: "Chính xác từng khung hình (mã hóa lại)",
+      precise: "Khung hình kết thúc chính xác (mã hóa lại toàn bộ clip)",
       submit: "Cắt",
       submitBatch: "Cắt ({count} tệp)",
       progressLabel: "Đang cắt",

@@ -3628,7 +3628,7 @@ export const ptBR: TranslationKeys = {
       windowTooShort: "Deixe pelo menos 0,1 segundo entre o início e o fim",
       start: "Início",
       end: "Fim",
-      precise: "Preciso por quadro (recodifica)",
+      precise: "Quadro final exato (recodifica o clipe inteiro)",
       submit: "Cortar",
       submitBatch: "Cortar ({count} arquivos)",
       progressLabel: "Cortando",

@@ -3374,7 +3374,7 @@ export const hi: TranslationKeys = {
       windowTooShort: "शुरुआत और अंत के बीच कम से कम 0.1 सेकंड रखें",
       start: "शुरुआत",
       end: "अंत",
-      precise: "फ़्रेम-सटीक (री-एनकोड)",
+      precise: "सटीक अंतिम फ़्रेम (पूरी क्लिप री-एनकोड होती है)",
       submit: "ट्रिम करें",
       submitBatch: "ट्रिम करें ({count} फ़ाइलें)",
       progressLabel: "ट्रिम हो रहा है",

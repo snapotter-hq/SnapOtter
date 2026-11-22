@@ -3629,7 +3629,7 @@ export const tr: TranslationKeys = {
       windowTooShort: "Başlangıç ile bitiş arasında en az 0,1 saniye bırakın",
       start: "Başlangıç",
       end: "Bitiş",
-      precise: "Kare hassasiyetinde (yeniden kodlar)",
+      precise: "Tam bitiş karesi (tüm klibi yeniden kodlar)",
       submit: "Kırp",
       submitBatch: "Kırp ({count} dosya)",
       progressLabel: "Kırpılıyor",

@@ -3595,7 +3595,7 @@ export const ar: TranslationKeys = {
       windowTooShort: "اترك 0.1 ثانية على الأقل بين البداية والنهاية",
       start: "البداية",
       end: "النهاية",
-      precise: "دقة الإطار (إعادة ترميز)",
+      precise: "إطار نهاية دقيق (يعيد ترميز المقطع بالكامل)",
       submit: "قص",
       submitBatch: "قص ({count} ملفات)",
       progressLabel: "جارٍ القص",
