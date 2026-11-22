@@ -16189,6 +16189,68 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/merge-text:
+    post:
+      operationId: mergeText
+      tags:
+        - Files
+      summary: Об'єднання текстових файлів
+      description: Об'єднати кілька текстових або Markdown-файлів в один у порядку завантаження. Кожен файл має бути текстом у UTF-8. Якщо всі вхідні файли мають однакове розширення, результат зберігає його, інакше це звичайний текст. CSV-файли завжди повертаються як .txt, бо кожен файл має власний рядок заголовка.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Два або більше файлів .txt, .md, .markdown, .csv або .log для об'єднання (2-50 файлів)
+                settings:
+                  type: string
+                  description: |
+                    JSON-рядок з параметрами:
+                    - `separator` (blank-line | rule | filename-heading, за замовчуванням blank-line) - Що стоїть між файлами: порожній рядок, лінія `---` або ім'я кожного файлу як заголовок
+            example:
+              file:
+                - notes-1.md
+                - notes-2.md
+              settings: '{"separator":"filename-heading"}'
+      responses:
+        '200':
+          description: Об'єднаний текстовий файл
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/merged.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Некоректні вхідні дані
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Потрібна автентифікація
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
@@ -27565,6 +27627,14 @@ x-i18n:
       sourceHash: 4956c801900a
       provenance: machine
       outputHash: 2586d72e8418
+    paths./api/v1/tools/files/merge-text.post.summary:
+      sourceHash: b9311f92a88b
+      provenance: machine
+      outputHash: 34792b2d7d73
+    paths./api/v1/tools/files/merge-text.post.description:
+      sourceHash: eb21d6096cf1
+      provenance: machine
+      outputHash: 613964390e4b
     paths./api/v1/tools/files/yaml-json.post.summary:
       sourceHash: cd3e06c3d51d
       provenance: machine
@@ -34250,6 +34320,26 @@ x-i18n:
       provenance: machine
       outputHash: db39c4b68487
     ptr:/paths/~1api~1v1~1tools~1files~1merge-csvs/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: ab1752cdfc52
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: edb6ac1bcc24
+      provenance: machine
+      outputHash: 605f7823c88e
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 26b420f88b74
+      provenance: machine
+      outputHash: fdd7abe278da
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/200/description:
+      sourceHash: de8b7de8b472
+      provenance: machine
+      outputHash: f7473d068352
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: db39c4b68487
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: ab1752cdfc52

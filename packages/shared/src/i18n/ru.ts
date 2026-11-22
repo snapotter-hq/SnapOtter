@@ -1250,6 +1250,11 @@ export const ru: TranslationKeys = {
       name: "Объединение CSV",
       description: "Объединение нескольких файлов CSV или TSV с совпадающими столбцами",
     },
+    "merge-text": {
+      name: "Объединение текстовых файлов",
+      description:
+        "Объединение нескольких текстовых или Markdown-файлов в один в выбранном порядке",
+    },
     "yaml-json": {
       name: "Конвертация YAML / JSON",
       description: "Конвертация между YAML и JSON в обе стороны",
@@ -4177,6 +4182,14 @@ export const ru: TranslationKeys = {
     "merge-csvs": {
       submit: "Объединить",
       submitBatch: "Объединить ({count} файлов)",
+      progressLabel: "Объединение",
+    },
+    "merge-text": {
+      separator: "Между файлами",
+      separatorBlankLine: "Пустая строка",
+      separatorRule: "Горизонтальная линия (---)",
+      separatorFilenameHeading: "Имя файла как заголовок",
+      submit: "Объединить",
       progressLabel: "Объединение",
     },
     "yaml-json": {

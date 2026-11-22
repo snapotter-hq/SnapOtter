@@ -72,6 +72,18 @@ export const FILE_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "merge-text",
+    name: "Merge Text Files",
+    description: "Combine multiple text or Markdown files into one, in the order you choose",
+    keywords: ["concatenate", "combine", "markdown", "join"],
+    category: "data",
+    icon: "FileStack",
+    route: "/merge-text",
+    modality: "file",
+    acceptedInputs: [".txt", ".md", ".markdown", ".csv", ".log"],
+    executionHint: "fast",
+  },
+  {
     id: "yaml-json",
     name: "Convert YAML / JSON",
     description: "Convert between YAML and JSON, both directions",

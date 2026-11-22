@@ -16,6 +16,7 @@ describe("REORDERABLE_TOOLS", () => {
       "merge-audio",
       "merge-videos",
       "merge-csvs",
+      "merge-text",
       "images-to-video",
       "sprite-sheet",
       "stitch",

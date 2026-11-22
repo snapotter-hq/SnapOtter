@@ -16131,6 +16131,68 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/files/merge-text:
+    post:
+      operationId: mergeText
+      tags:
+        - Files
+      summary: รวมไฟล์ข้อความ
+      description: รวมไฟล์ข้อความหรือ Markdown หลายไฟล์เป็นไฟล์เดียวตามลำดับที่อัปโหลด แต่ละไฟล์ต้องเป็นข้อความ UTF-8 ผลลัพธ์จะใช้นามสกุลเดียวกันเมื่ออินพุตทุกไฟล์มีนามสกุลเดียวกัน มิฉะนั้นจะเป็นข้อความธรรมดา อินพุต CSV จะได้ผลลัพธ์เป็น .txt เสมอ เพราะแต่ละไฟล์มีแถวหัวตารางของตัวเอง
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: ไฟล์ .txt, .md, .markdown, .csv หรือ .log สองไฟล์ขึ้นไปที่จะรวม (2-50 ไฟล์)
+                settings:
+                  type: string
+                  description: |
+                    สตริง JSON พร้อมตัวเลือก:
+                    - `separator` (blank-line | rule | filename-heading, ค่าเริ่มต้น blank-line) - สิ่งที่คั่นระหว่างไฟล์: บรรทัดว่าง เส้น `---` หรือชื่อแต่ละไฟล์เป็นหัวข้อ
+            example:
+              file:
+                - notes-1.md
+                - notes-2.md
+              settings: '{"separator":"filename-heading"}'
+      responses:
+        '200':
+          description: ไฟล์ข้อความที่รวมแล้ว
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/merged.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: อินพุตไม่ถูกต้อง
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: ต้องยืนยันตัวตน
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
@@ -27492,6 +27554,14 @@ x-i18n:
       sourceHash: 4956c801900a
       provenance: machine
       outputHash: 8c27b1b9e019
+    paths./api/v1/tools/files/merge-text.post.summary:
+      sourceHash: b9311f92a88b
+      provenance: machine
+      outputHash: d1069000bb2a
+    paths./api/v1/tools/files/merge-text.post.description:
+      sourceHash: eb21d6096cf1
+      provenance: machine
+      outputHash: 1649e297023a
     paths./api/v1/tools/files/yaml-json.post.summary:
       sourceHash: cd3e06c3d51d
       provenance: machine
@@ -34177,6 +34247,26 @@ x-i18n:
       provenance: machine
       outputHash: 5b68926d4897
     ptr:/paths/~1api~1v1~1tools~1files~1merge-csvs/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: bcf955e0b1c9
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: edb6ac1bcc24
+      provenance: machine
+      outputHash: 82257acb4c51
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 26b420f88b74
+      provenance: machine
+      outputHash: 7bbe4a808364
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/200/description:
+      sourceHash: de8b7de8b472
+      provenance: machine
+      outputHash: 07335143f56e
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: 5b68926d4897
+    ptr:/paths/~1api~1v1~1tools~1files~1merge-text/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: bcf955e0b1c9

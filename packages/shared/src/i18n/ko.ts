@@ -1197,6 +1197,10 @@ export const ko: TranslationKeys = {
       name: "CSV 병합",
       description: "동일한 열을 가진 여러 CSV 또는 TSV 파일을 하나로 합치기",
     },
+    "merge-text": {
+      name: "텍스트 파일 병합",
+      description: "여러 텍스트 또는 Markdown 파일을 원하는 순서대로 하나로 합치기",
+    },
     "yaml-json": {
       name: "YAML / JSON 변환",
       description: "YAML과 JSON 간 양방향 변환",
@@ -4098,6 +4102,14 @@ export const ko: TranslationKeys = {
     "merge-csvs": {
       submit: "병합",
       submitBatch: "병합 ({count}개 파일)",
+      progressLabel: "병합 중",
+    },
+    "merge-text": {
+      separator: "파일 사이 구분",
+      separatorBlankLine: "빈 줄",
+      separatorRule: "가로줄 (---)",
+      separatorFilenameHeading: "파일 이름을 제목으로",
+      submit: "병합",
       progressLabel: "병합 중",
     },
     "yaml-json": {

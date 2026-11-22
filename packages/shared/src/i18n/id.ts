@@ -1249,6 +1249,11 @@ export const id: TranslationKeys = {
       name: "Gabung CSV",
       description: "Gabungkan beberapa file CSV atau TSV dengan kolom yang cocok menjadi satu",
     },
+    "merge-text": {
+      name: "Gabung File Teks",
+      description:
+        "Gabungkan beberapa file teks atau Markdown menjadi satu, sesuai urutan pilihan Anda",
+    },
     "yaml-json": {
       name: "Konversi YAML / JSON",
       description: "Konversi antara YAML dan JSON, dua arah",
@@ -4171,6 +4176,14 @@ export const id: TranslationKeys = {
     "merge-csvs": {
       submit: "Gabungkan",
       submitBatch: "Gabungkan ({count} file)",
+      progressLabel: "Menggabungkan",
+    },
+    "merge-text": {
+      separator: "Di antara file",
+      separatorBlankLine: "Baris kosong",
+      separatorRule: "Garis horizontal (---)",
+      separatorFilenameHeading: "Nama file sebagai judul",
+      submit: "Gabungkan",
       progressLabel: "Menggabungkan",
     },
     "yaml-json": {

@@ -1249,6 +1249,10 @@ export const sv: TranslationKeys = {
       name: "Sammanfoga CSV",
       description: "Kombinera flera CSV- eller TSV-filer med matchande kolumner till en",
     },
+    "merge-text": {
+      name: "Sammanfoga textfiler",
+      description: "Kombinera flera text- eller Markdown-filer till en, i den ordning du väljer",
+    },
     "yaml-json": {
       name: "Konvertera YAML / JSON",
       description: "Konvertera mellan YAML och JSON, båda riktningar",
@@ -4167,6 +4171,14 @@ export const sv: TranslationKeys = {
     "merge-csvs": {
       submit: "Sammanfoga",
       submitBatch: "Sammanfoga ({count} filer)",
+      progressLabel: "Sammanfogar",
+    },
+    "merge-text": {
+      separator: "Mellan filer",
+      separatorBlankLine: "Tom rad",
+      separatorRule: "Horisontell linje (---)",
+      separatorFilenameHeading: "Filnamn som rubrik",
+      submit: "Sammanfoga",
       progressLabel: "Sammanfogar",
     },
     "yaml-json": {

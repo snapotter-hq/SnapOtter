@@ -12307,6 +12307,35 @@
     "invalidProbes": []
   },
   {
+    "id": "merge-text",
+    "name": "Merge Text Files",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".txt", ".md", ".markdown", ".csv", ".log"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "maxInputs": 50,
+    "axes": [
+      {
+        "key": "separator",
+        "values": ["blank-line", "rule", "filename-heading", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "separator",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "separator",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "yaml-json",
     "name": "Convert YAML / JSON",
     "modality": "file",

@@ -1250,6 +1250,11 @@ export const ptBR: TranslationKeys = {
       name: "Mesclar CSVs",
       description: "Combine vários arquivos CSV ou TSV com colunas correspondentes em um só",
     },
+    "merge-text": {
+      name: "Mesclar arquivos de texto",
+      description:
+        "Combine vários arquivos de texto ou Markdown em um só, na ordem que você escolher",
+    },
     "yaml-json": {
       name: "Converter YAML / JSON",
       description: "Converta entre YAML e JSON, nos dois sentidos",
@@ -4176,6 +4181,14 @@ export const ptBR: TranslationKeys = {
     "merge-csvs": {
       submit: "Mesclar",
       submitBatch: "Mesclar ({count} arquivos)",
+      progressLabel: "Mesclando",
+    },
+    "merge-text": {
+      separator: "Entre arquivos",
+      separatorBlankLine: "Linha em branco",
+      separatorRule: "Linha horizontal (---)",
+      separatorFilenameHeading: "Nome do arquivo como título",
+      submit: "Mesclar",
       progressLabel: "Mesclando",
     },
     "yaml-json": {
