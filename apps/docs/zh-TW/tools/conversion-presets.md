@@ -1,8 +1,8 @@
 ---
 description: "從 SnapOtter 工具目錄產生的專用轉換預設端點。"
-i18n_source_hash: a9dcab4c4e81
+i18n_source_hash: 0dcd6c6c61d5
 i18n_provenance: human
-i18n_output_hash: f8d3660de4ff
+i18n_output_hash: b9edb959db97
 i18n_hash_version: 2
 ---
 
@@ -29,9 +29,9 @@ i18n_hash_version: 2
 | `jpg-to-avif` | JPG 轉 AVIF | `/api/v1/tools/image/jpg-to-avif` | `convert` | `.jpg`、`.jpeg` | quality |
 | `png-to-avif` | PNG 轉 AVIF | `/api/v1/tools/image/png-to-avif` | `convert` | `.png` | quality |
 | `webp-to-avif` | WebP 轉 AVIF | `/api/v1/tools/image/webp-to-avif` | `convert` | `.webp` | quality |
-| `heic-to-jpg` | HEIC 轉 JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`、`.heif` | quality |
-| `heic-to-png` | HEIC 轉 PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`、`.heif` | quality |
-| `heic-to-avif` | HEIC 轉 AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`、`.heif` | quality |
+| `heic-to-jpg` | HEIC 轉 JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`、`.heif`、`.hif` | quality |
+| `heic-to-png` | HEIC 轉 PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`、`.heif`、`.hif` | quality |
+| `heic-to-avif` | HEIC 轉 AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`、`.heif`、`.hif` | quality |
 | `jpg-to-gif` | JPG 轉 GIF | `/api/v1/tools/image/jpg-to-gif` | `convert` | `.jpg`、`.jpeg` | quality |
 | `png-to-gif` | PNG 轉 GIF | `/api/v1/tools/image/png-to-gif` | `convert` | `.png` | quality |
 | `gif-to-jpg` | GIF 轉 JPG | `/api/v1/tools/image/gif-to-jpg` | `convert` | `.gif` | quality |
@@ -56,7 +56,7 @@ i18n_hash_version: 2
 | `svg-to-jpg` | SVG 轉 JPG | `/api/v1/tools/image/svg-to-jpg` | `svg-to-raster` | `.svg`、`.svgz` | quality, width, height, dpi, backgroundColor |
 | `jpg-to-pdf` | JPG 轉 PDF | `/api/v1/tools/image/jpg-to-pdf` | `image-to-pdf` | `.jpg`、`.jpeg` | pageSize, orientation, margin, targetSize, collate |
 | `png-to-pdf` | PNG 轉 PDF | `/api/v1/tools/image/png-to-pdf` | `image-to-pdf` | `.png` | pageSize, orientation, margin, targetSize, collate |
-| `heic-to-pdf` | HEIC 轉 PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`、`.heif` | pageSize, orientation, margin, targetSize, collate |
+| `heic-to-pdf` | HEIC 轉 PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`、`.heif`、`.hif` | pageSize, orientation, margin, targetSize, collate |
 | `tiff-to-pdf` | TIFF 轉 PDF | `/api/v1/tools/image/tiff-to-pdf` | `image-to-pdf` | `.tiff`、`.tif` | pageSize, orientation, margin, targetSize, collate |
 | `webp-to-pdf` | WebP 轉 PDF | `/api/v1/tools/image/webp-to-pdf` | `image-to-pdf` | `.webp` | pageSize, orientation, margin, targetSize, collate |
 | `gif-to-pdf` | GIF 轉 PDF | `/api/v1/tools/image/gif-to-pdf` | `image-to-pdf` | `.gif` | pageSize, orientation, margin, targetSize, collate |

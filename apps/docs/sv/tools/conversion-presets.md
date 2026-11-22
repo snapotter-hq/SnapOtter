@@ -1,8 +1,8 @@
 ---
 description: "Dedikerade konverteringsförinställningsslutpunkter genererade från SnapOtters verktygskatalog."
-i18n_source_hash: a9dcab4c4e81
+i18n_source_hash: 0dcd6c6c61d5
 i18n_provenance: human
-i18n_output_hash: e4a5e128cf11
+i18n_output_hash: 268ef68db481
 i18n_hash_version: 2
 ---
 
@@ -29,9 +29,9 @@ Skicka `multipart/form-data` med en `file`-del och en valfri JSON-sträng `setti
 | `jpg-to-avif` | JPG till AVIF | `/api/v1/tools/image/jpg-to-avif` | `convert` | `.jpg`, `.jpeg` | quality |
 | `png-to-avif` | PNG till AVIF | `/api/v1/tools/image/png-to-avif` | `convert` | `.png` | quality |
 | `webp-to-avif` | WebP till AVIF | `/api/v1/tools/image/webp-to-avif` | `convert` | `.webp` | quality |
-| `heic-to-jpg` | HEIC till JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`, `.heif` | quality |
-| `heic-to-png` | HEIC till PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`, `.heif` | quality |
-| `heic-to-avif` | HEIC till AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`, `.heif` | quality |
+| `heic-to-jpg` | HEIC till JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`, `.heif`, `.hif` | quality |
+| `heic-to-png` | HEIC till PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`, `.heif`, `.hif` | quality |
+| `heic-to-avif` | HEIC till AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`, `.heif`, `.hif` | quality |
 | `jpg-to-gif` | JPG till GIF | `/api/v1/tools/image/jpg-to-gif` | `convert` | `.jpg`, `.jpeg` | quality |
 | `png-to-gif` | PNG till GIF | `/api/v1/tools/image/png-to-gif` | `convert` | `.png` | quality |
 | `gif-to-jpg` | GIF till JPG | `/api/v1/tools/image/gif-to-jpg` | `convert` | `.gif` | quality |
@@ -56,7 +56,7 @@ Skicka `multipart/form-data` med en `file`-del och en valfri JSON-sträng `setti
 | `svg-to-jpg` | SVG till JPG | `/api/v1/tools/image/svg-to-jpg` | `svg-to-raster` | `.svg`, `.svgz` | quality, width, height, dpi, backgroundColor |
 | `jpg-to-pdf` | JPG till PDF | `/api/v1/tools/image/jpg-to-pdf` | `image-to-pdf` | `.jpg`, `.jpeg` | pageSize, orientation, margin, targetSize, collate |
 | `png-to-pdf` | PNG till PDF | `/api/v1/tools/image/png-to-pdf` | `image-to-pdf` | `.png` | pageSize, orientation, margin, targetSize, collate |
-| `heic-to-pdf` | HEIC till PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`, `.heif` | pageSize, orientation, margin, targetSize, collate |
+| `heic-to-pdf` | HEIC till PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`, `.heif`, `.hif` | pageSize, orientation, margin, targetSize, collate |
 | `tiff-to-pdf` | TIFF till PDF | `/api/v1/tools/image/tiff-to-pdf` | `image-to-pdf` | `.tiff`, `.tif` | pageSize, orientation, margin, targetSize, collate |
 | `webp-to-pdf` | WebP till PDF | `/api/v1/tools/image/webp-to-pdf` | `image-to-pdf` | `.webp` | pageSize, orientation, margin, targetSize, collate |
 | `gif-to-pdf` | GIF till PDF | `/api/v1/tools/image/gif-to-pdf` | `image-to-pdf` | `.gif` | pageSize, orientation, margin, targetSize, collate |
