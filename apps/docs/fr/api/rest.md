@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 86dd1ab74fe6
-i18n_source_hash: 641c3969deac
+i18n_output_hash: 760df254b37b
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Préréglages de conversion {#conversion-presets}
 
-Le catalogue partagé inclut 83 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
+Le catalogue partagé inclut 117 points de terminaison de préréglages de conversion dédiés, tels que `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, et `excel-to-csv`. Les préréglages sont des routes d'outils de première classe :
 
 `POST /api/v1/tools/<section>/<presetId>`
 

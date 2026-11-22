@@ -146,7 +146,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Conversion Presets {#conversion-presets}
 
-The shared catalog includes 83 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
+The shared catalog includes 117 dedicated conversion preset endpoints such as `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, and `excel-to-csv`. Presets are first-class tool routes:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

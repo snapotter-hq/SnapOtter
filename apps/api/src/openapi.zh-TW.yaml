@@ -11459,6 +11459,11 @@ paths:
                   type: string
                   format: binary
                   description: 內嵌字幕軌的影片檔案
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -23451,6 +23456,294 @@ paths:
                   type: string
                   description: |
                     專用 MP4 轉 OGG 轉換器，使用 extract-audio 流程。
+                    輸出格式由端點鎖定。
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: 用於 SSE 進度追蹤的用戶端工作 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 已處理檔案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 輸入或設定無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 處理失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags:
+        - Video
+      summary: SRT 轉 VTT
+      description: |
+        將 SRT 轉換為 VTT
+        這是一個由 `convert-subtitles` 支援的專用轉換預設端點。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT 轉 VTT 的輸入檔（.srt）
+                settings:
+                  type: string
+                  description: |
+                    專用 SRT 轉 VTT 轉換器，使用 convert-subtitles 流程。
+                    輸出格式由端點鎖定。
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: 用於 SSE 進度追蹤的用戶端工作 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 已處理檔案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 輸入或設定無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 處理失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags:
+        - Video
+      summary: VTT 轉 SRT
+      description: |
+        將 VTT 轉換為 SRT
+        這是一個由 `convert-subtitles` 支援的專用轉換預設端點。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VTT 轉 SRT 的輸入檔（.vtt）
+                settings:
+                  type: string
+                  description: |
+                    專用 VTT 轉 SRT 轉換器，使用 convert-subtitles 流程。
+                    輸出格式由端點鎖定。
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: 用於 SSE 進度追蹤的用戶端工作 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 已處理檔案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 輸入或設定無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 處理失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags:
+        - Video
+      summary: ASS 轉 SRT
+      description: |
+        將 ASS 轉換為 SRT
+        這是一個由 `convert-subtitles` 支援的專用轉換預設端點。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ASS 轉 SRT 的輸入檔（.ass）
+                settings:
+                  type: string
+                  description: |
+                    專用 ASS 轉 SRT 轉換器，使用 convert-subtitles 流程。
+                    輸出格式由端點鎖定。
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: 用於 SSE 進度追蹤的用戶端工作 ID
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: 已處理檔案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 輸入或設定無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: 處理失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags:
+        - Video
+      summary: SRT 轉 ASS
+      description: |
+        將 SRT 轉換為 ASS
+        這是一個由 `convert-subtitles` 支援的專用轉換預設端點。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT 轉 ASS 的輸入檔（.srt）
+                settings:
+                  type: string
+                  description: |
+                    專用 SRT 轉 ASS 轉換器，使用 convert-subtitles 流程。
                     輸出格式由端點鎖定。
                 clientJobId:
                   type: string

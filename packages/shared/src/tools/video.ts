@@ -292,7 +292,7 @@ export const VIDEO_TOOLS: Tool[] = [
   {
     id: "extract-subtitles",
     name: "Extract Subtitles",
-    description: "Pull the subtitle track out of a video as an SRT file",
+    description: "Pull the subtitle track out of a video as an SRT, WebVTT or ASS file",
     category: "video-subtitles",
     icon: "FileText",
     route: "/extract-subtitles",

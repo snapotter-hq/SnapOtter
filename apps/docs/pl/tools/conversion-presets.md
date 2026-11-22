@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter udostępnia 113 dedykowane endpointy predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
+SnapOtter udostępnia 117 dedykowanych endpointów predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ Wyślij `multipart/form-data` z częścią `file` oraz opcjonalnym ciągiem JSON
 | `mp4-to-wav` | MP4 na WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | brak |
 | `mov-to-wav` | MOV na WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | brak |
 | `mp4-to-ogg` | MP4 na OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | brak |
+| `srt-to-vtt` | SRT na VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | brak |
+| `vtt-to-srt` | VTT na SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | brak |
+| `ass-to-srt` | ASS na SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | brak |
+| `srt-to-ass` | SRT na ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | brak |
 
 ## Audio Presets {#audio-presets}
 

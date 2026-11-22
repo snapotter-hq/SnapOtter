@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter, temel dönüştürücü araçlarına ek olarak 113 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
+SnapOtter, temel dönüştürücü araçlarına ek olarak 117 özel dönüştürme ön ayarı uç noktası sunar. Her ön ayar çıktı formatını sabitler ve temel işleme hattına devreder, böylece davranış, doğrulama ve çıktı sözleşmesi aşağıda listelenen temel araçla eşleşir.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ Bir `file` parçası ve isteğe bağlı `settings` JSON dizesi ile `multipart/fo
 | `mp4-to-wav` | MP4'ten WAV'a | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV'dan WAV'a | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4'ten OGG'ye | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT'ten VTT'ye | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT'ten SRT'ye | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS'ten SRT'ye | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT'ten ASS'e | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 

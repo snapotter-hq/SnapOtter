@@ -97,6 +97,12 @@ function specForExt(ext: string): FixtureSpec | null {
       return { path: fixtures.audio.tiny("wma"), mime: "audio/x-ms-wma" };
     case ".aiff":
       return { path: fixtures.audio.tiny("aiff"), mime: "audio/aiff" };
+    case ".srt":
+      return { path: fixtures.video.subs.srt, mime: "application/x-subrip" };
+    case ".vtt":
+      return { path: fixtures.video.subs.vtt, mime: "text/vtt" };
+    case ".ass":
+      return { path: fixtures.video.subs.ass, mime: "text/x-ssa" };
     case ".xlsx":
     case ".xls":
       return {

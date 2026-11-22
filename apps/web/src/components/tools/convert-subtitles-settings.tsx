@@ -5,7 +5,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
-const FORMAT_OPTIONS = [
+export const SUBTITLE_FORMAT_OPTIONS = [
   { value: "srt", label: "SRT" },
   { value: "vtt", label: "WebVTT" },
   { value: "ass", label: "ASS" },
@@ -59,7 +59,7 @@ export function ConvertSubtitlesSettings() {
           onChange={(e) => setOutputFormat(e.target.value)}
           className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
         >
-          {FORMAT_OPTIONS.map((opt) => (
+          {SUBTITLE_FORMAT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

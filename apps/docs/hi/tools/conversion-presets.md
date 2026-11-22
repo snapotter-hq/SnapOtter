@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter बेस कन्वर्टर टूल के अलावा 113 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट प्रदान करता है। प्रत्येक प्रीसेट आउटपुट फ़ॉर्मेट को लॉक करता है और अपनी बेस प्रोसेसिंग पाइपलाइन को सौंप देता है, इसलिए व्यवहार, सत्यापन, और आउटपुट कॉन्ट्रैक्ट नीचे सूचीबद्ध बेस टूल से मेल खाता है।
+SnapOtter बेस कन्वर्टर टूल के अलावा 117 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट प्रदान करता है। प्रत्येक प्रीसेट आउटपुट फ़ॉर्मेट को लॉक करता है और अपनी बेस प्रोसेसिंग पाइपलाइन को सौंप देता है, इसलिए व्यवहार, सत्यापन, और आउटपुट कॉन्ट्रैक्ट नीचे सूचीबद्ध बेस टूल से मेल खाता है।
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ SnapOtter बेस कन्वर्टर टूल के अलावा 11
 | `mp4-to-wav` | MP4 to WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV to WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 to OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT to VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT to SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS to SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT to ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 

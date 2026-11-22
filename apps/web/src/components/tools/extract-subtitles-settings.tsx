@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
+import { SUBTITLE_FORMAT_OPTIONS } from "./convert-subtitles-settings";
 
 export function ExtractSubtitlesSettings() {
   const { t } = useTranslation();
@@ -11,11 +13,13 @@ export function ExtractSubtitlesSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("extract-subtitles");
 
+  const [outputFormat, setOutputFormat] = useState("srt");
+
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
   const handleProcess = () => {
-    const settings = {};
+    const settings = { format: outputFormat };
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -25,6 +29,24 @@ export function ExtractSubtitlesSettings() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <label htmlFor="es-format" className="mb-1.5 block text-sm font-medium">
+          {s.format}
+        </label>
+        <select
+          id="es-format"
+          value={outputFormat}
+          onChange={(e) => setOutputFormat(e.target.value)}
+          className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
+        >
+          {SUBTITLE_FORMAT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
       {processing ? (

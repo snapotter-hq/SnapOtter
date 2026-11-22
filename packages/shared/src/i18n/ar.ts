@@ -672,6 +672,22 @@ export const ar: TranslationKeys = {
       name: "AIFF إلى M4A",
       description: "حوّل AIFF إلى M4A عبر الإنترنت. سريع ومجاني وخاص.",
     },
+    "srt-to-vtt": {
+      name: "SRT إلى VTT",
+      description: "حوّل SRT إلى VTT عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "vtt-to-srt": {
+      name: "VTT إلى SRT",
+      description: "حوّل VTT إلى SRT عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "ass-to-srt": {
+      name: "ASS إلى SRT",
+      description: "حوّل ASS إلى SRT عبر الإنترنت. سريع ومجاني وخاص.",
+    },
+    "srt-to-ass": {
+      name: "SRT إلى ASS",
+      description: "حوّل SRT إلى ASS عبر الإنترنت. سريع ومجاني وخاص.",
+    },
     "excel-to-csv": {
       name: "Excel إلى CSV",
       description: "حوّل Excel إلى CSV عبر الإنترنت. سريع ومجاني وخاص.",
@@ -1086,7 +1102,7 @@ export const ar: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "استخراج الترجمات",
-      description: "استخراج مسار الترجمة من الفيديو كملف SRT",
+      description: "استخراج مسار الترجمة من الفيديو كملف SRT أو WebVTT أو ASS",
     },
     "convert-subtitles": {
       name: "تحويل الترجمات",
@@ -3736,6 +3752,7 @@ export const ar: TranslationKeys = {
       progressLabel: "جارٍ تضمين الترجمات",
     },
     "extract-subtitles": {
+      format: "صيغة الإخراج",
       submit: "استخراج الترجمات",
       submitBatch: "استخراج الترجمات ({count} ملفات)",
       progressLabel: "جارٍ استخراج الترجمات",

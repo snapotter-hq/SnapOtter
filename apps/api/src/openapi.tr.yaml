@@ -11520,6 +11520,11 @@ paths:
                   type: string
                   format: binary
                   description: Gömülü altyazı izi olan video dosyası
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -23538,6 +23543,294 @@ paths:
                   type: string
                   description: |
                     extract-audio hattını kullanan özel MP4'ten OGG'ye dönüştürücü.
+                    Çıktı biçimi uç nokta tarafından kilitlenir.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE ile ilerleme takibi için istemci tarafından verilen işlem kimliği
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: İşlenmiş dosya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Geçersiz girdi veya ayarlar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: İşlem başarısız oldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags:
+        - Video
+      summary: SRT'ten VTT'ye
+      description: |
+        SRT'ü VTT'ye dönüştür
+        Bu, `convert-subtitles` tarafından desteklenen özel bir dönüştürme ön ayarı uç noktasıdır.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT'ten VTT'ye giriş dosyası (.srt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles hattını kullanan özel SRT'ten VTT'ye dönüştürücü.
+                    Çıktı biçimi uç nokta tarafından kilitlenir.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE ile ilerleme takibi için istemci tarafından verilen işlem kimliği
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: İşlenmiş dosya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Geçersiz girdi veya ayarlar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: İşlem başarısız oldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags:
+        - Video
+      summary: VTT'ten SRT'ye
+      description: |
+        VTT'ü SRT'ye dönüştür
+        Bu, `convert-subtitles` tarafından desteklenen özel bir dönüştürme ön ayarı uç noktasıdır.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VTT'ten SRT'ye giriş dosyası (.vtt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles hattını kullanan özel VTT'ten SRT'ye dönüştürücü.
+                    Çıktı biçimi uç nokta tarafından kilitlenir.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE ile ilerleme takibi için istemci tarafından verilen işlem kimliği
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: İşlenmiş dosya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Geçersiz girdi veya ayarlar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: İşlem başarısız oldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags:
+        - Video
+      summary: ASS'ten SRT'ye
+      description: |
+        ASS'ü SRT'ye dönüştür
+        Bu, `convert-subtitles` tarafından desteklenen özel bir dönüştürme ön ayarı uç noktasıdır.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ASS'ten SRT'ye giriş dosyası (.ass)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles hattını kullanan özel ASS'ten SRT'ye dönüştürücü.
+                    Çıktı biçimi uç nokta tarafından kilitlenir.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: SSE ile ilerleme takibi için istemci tarafından verilen işlem kimliği
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: İşlenmiş dosya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Geçersiz girdi veya ayarlar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Kimlik doğrulama gerekli
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: İşlem başarısız oldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags:
+        - Video
+      summary: SRT'ten ASS'ye
+      description: |
+        SRT'ü ASS'ye dönüştür
+        Bu, `convert-subtitles` tarafından desteklenen özel bir dönüştürme ön ayarı uç noktasıdır.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SRT'ten ASS'ye giriş dosyası (.srt)
+                settings:
+                  type: string
+                  description: |
+                    convert-subtitles hattını kullanan özel SRT'ten ASS'ye dönüştürücü.
                     Çıktı biçimi uç nokta tarafından kilitlenir.
                 clientJobId:
                   type: string

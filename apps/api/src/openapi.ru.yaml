@@ -11522,6 +11522,11 @@ paths:
                   type: string
                   format: binary
                   description: Видеофайл со встроенной дорожкой субтитров
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -23541,6 +23546,294 @@ paths:
                   type: string
                   description: |
                     Выделенный конвертер MP4 в OGG на базе конвейера extract-audio.
+                    Формат вывода задан эндпоинтом.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Необязательный ID задачи, передаваемый клиентом, для отслеживания прогресса через SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: Обработанный файл
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Недопустимые данные или настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags:
+        - Video
+      summary: SRT в VTT
+      description: |
+        Конвертация SRT в VTT
+        Это выделенный эндпоинт-пресет конвертации на базе `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Входной файл SRT для конвертации в VTT (.srt)
+                settings:
+                  type: string
+                  description: |
+                    Выделенный конвертер SRT в VTT на базе конвейера convert-subtitles.
+                    Формат вывода задан эндпоинтом.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Необязательный ID задачи, передаваемый клиентом, для отслеживания прогресса через SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: Обработанный файл
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Недопустимые данные или настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags:
+        - Video
+      summary: VTT в SRT
+      description: |
+        Конвертация VTT в SRT
+        Это выделенный эндпоинт-пресет конвертации на базе `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Входной файл VTT для конвертации в SRT (.vtt)
+                settings:
+                  type: string
+                  description: |
+                    Выделенный конвертер VTT в SRT на базе конвейера convert-subtitles.
+                    Формат вывода задан эндпоинтом.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Необязательный ID задачи, передаваемый клиентом, для отслеживания прогресса через SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: Обработанный файл
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Недопустимые данные или настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags:
+        - Video
+      summary: ASS в SRT
+      description: |
+        Конвертация ASS в SRT
+        Это выделенный эндпоинт-пресет конвертации на базе `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Входной файл ASS для конвертации в SRT (.ass)
+                settings:
+                  type: string
+                  description: |
+                    Выделенный конвертер ASS в SRT на базе конвейера convert-subtitles.
+                    Формат вывода задан эндпоинтом.
+                clientJobId:
+                  type: string
+                  pattern: ^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+                  maxLength: 128
+                  description: Необязательный ID задачи, передаваемый клиентом, для отслеживания прогресса через SSE
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        '200':
+          description: Обработанный файл
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: Недопустимые данные или настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          description: Ошибка обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags:
+        - Video
+      summary: SRT в ASS
+      description: |
+        Конвертация SRT в ASS
+        Это выделенный эндпоинт-пресет конвертации на базе `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Входной файл SRT для конвертации в ASS (.srt)
+                settings:
+                  type: string
+                  description: |
+                    Выделенный конвертер SRT в ASS на базе конвейера convert-subtitles.
                     Формат вывода задан эндпоинтом.
                 clientJobId:
                   type: string

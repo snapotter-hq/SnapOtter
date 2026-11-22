@@ -805,6 +805,70 @@ function spreadsheetEntry(p) {
   };
 }
 
+const SUB = {
+  SRT: {
+    full: "SubRip (SRT)",
+    home: "TVs, media players, and most video editors",
+    styling: "basic tags such as italics and bold",
+    use: "Play the subtitles on a TV or media player, or drop them into a video editor",
+    article: "an",
+  },
+  VTT: {
+    full: "WebVTT",
+    home: "HTML5 video players and streaming sites",
+    styling: "italics, bold and underline",
+    use: "Add the subtitles to an HTML5 video player or a streaming upload",
+    article: "a",
+  },
+  ASS: {
+    full: "Advanced SubStation Alpha (ASS)",
+    home: "Aegisub and styled-subtitle players such as mpv and VLC",
+    styling: "fonts, colours, positioning and karaoke effects",
+    use: "Restyle the subtitles in Aegisub, or play them styled in mpv or VLC",
+    article: "an",
+  },
+};
+
+function subtitleEntry(p) {
+  const { from, to } = p;
+  const a = SUB[from];
+  const b = SUB[to];
+  const loss =
+    from === "ASS"
+      ? `On-screen positioning, fonts and karaoke effects are dropped, since ${to} can't hold them; italics and bold survive.`
+      : to === "ASS"
+        ? `The cues get a default ASS style, ready for you to restyle in Aegisub or another editor.`
+        : `${b.full} keeps ${b.styling}, so anything fancier in the source is dropped.`;
+  return {
+    searchTitle: `${from} to ${to} Subtitle Converter Online Free`,
+    longDescription: `Convert ${a.full} subtitles to ${b.full}, the format ${b.home} expect. Cue timing and dialogue carry over unchanged. ${loss} ${PRIVACY}`,
+    useCases: [
+      b.use,
+      `Hand ${b.article} ${to} file to a video platform or editor that rejects ${from}`,
+      `Fix the encoding of an old ${from} file while converting it`,
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      `Writes UTF-8 ${to}, decoding legacy Windows-1252 ${from} files automatically`,
+      priv(from),
+    ],
+    faqs: [
+      {
+        q: `Does converting ${from} to ${to} change the timing?`,
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: `This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic ${from} files in a legacy encoding, use Convert Subtitles and pick the encoding there.`,
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  };
+}
+
 const BY_BASE = {
   convert: rasterEntry,
   vectorize: vectorizeEntry,
@@ -817,6 +881,7 @@ const BY_BASE = {
   "extract-audio": extractAudioEntry,
   "convert-audio": audioEntry,
   "convert-spreadsheet": spreadsheetEntry,
+  "convert-subtitles": subtitleEntry,
 };
 
 function serialize(id, seo) {

@@ -20,7 +20,7 @@ describe("toolSection", () => {
         .map((t) => t.id)
         .sort();
     expect(TOOLS.filter((t) => toolSection(t) === "image")).toHaveLength(113);
-    expect(TOOLS.filter((t) => toolSection(t) === "video")).toHaveLength(59);
+    expect(TOOLS.filter((t) => toolSection(t) === "video")).toHaveLength(63);
     expect(TOOLS.filter((t) => toolSection(t) === "audio")).toHaveLength(57);
     expect(bySection("pdf")).toHaveLength(37);
     expect(bySection("files")).toHaveLength(28);

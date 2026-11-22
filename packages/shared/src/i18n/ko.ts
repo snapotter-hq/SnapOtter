@@ -674,6 +674,22 @@ export const ko: TranslationKeys = {
       name: "AIFF을(를) M4A(으)로",
       description: "AIFF을(를) M4A(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
     },
+    "srt-to-vtt": {
+      name: "SRT을(를) VTT(으)로",
+      description: "SRT을(를) VTT(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "vtt-to-srt": {
+      name: "VTT을(를) SRT(으)로",
+      description: "VTT을(를) SRT(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "ass-to-srt": {
+      name: "ASS을(를) SRT(으)로",
+      description: "ASS을(를) SRT(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
+    "srt-to-ass": {
+      name: "SRT을(를) ASS(으)로",
+      description: "SRT을(를) ASS(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
+    },
     "excel-to-csv": {
       name: "Excel을(를) CSV(으)로",
       description: "Excel을(를) CSV(으)로 온라인 변환. 빠르고 무료이며 비공개입니다.",
@@ -1043,7 +1059,7 @@ export const ko: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "자막 추출",
-      description: "동영상에서 자막 트랙을 SRT 파일로 추출",
+      description: "동영상에서 자막 트랙을 SRT, WebVTT 또는 ASS 파일로 추출",
     },
     "convert-subtitles": {
       name: "자막 변환",
@@ -3691,6 +3707,7 @@ export const ko: TranslationKeys = {
       progressLabel: "자막 삽입 중",
     },
     "extract-subtitles": {
+      format: "출력 형식",
       submit: "자막 추출",
       submitBatch: "자막 추출 ({count}개 파일)",
       progressLabel: "자막 추출 중",

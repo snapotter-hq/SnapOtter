@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # إعدادات التحويل المسبقة {#conversion-presets}
 
-يوفّر SnapOtter 113 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
+يوفّر SnapOtter 117 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
 
 ## نمط نقطة نهاية API {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ i18n_hash_version: 2
 | `mp4-to-wav` | MP4 إلى WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | لا شيء |
 | `mov-to-wav` | MOV إلى WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | لا شيء |
 | `mp4-to-ogg` | MP4 إلى OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | لا شيء |
+| `srt-to-vtt` | SRT إلى VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | لا شيء |
+| `vtt-to-srt` | VTT إلى SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | لا شيء |
+| `ass-to-srt` | ASS إلى SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | لا شيء |
+| `srt-to-ass` | SRT إلى ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | لا شيء |
 
 ## إعدادات الصوت المسبقة {#audio-presets}
 

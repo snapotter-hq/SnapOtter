@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 427061b4f171
-i18n_source_hash: 641c3969deac
+i18n_output_hash: f32fc4964a86
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 转换预设 {#conversion-presets}
 
-共享目录包含 83 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
+共享目录包含 117 个专用的转换预设端点，例如 `jpg-to-png`、`mov-to-mp4`、`m4a-to-mp3`、`pdf-to-jpg` 和 `excel-to-csv`。预设是一等的工具路由：
 
 `POST /api/v1/tools/<section>/<presetId>`
 

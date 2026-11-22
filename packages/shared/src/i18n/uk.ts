@@ -675,6 +675,22 @@ export const uk: TranslationKeys = {
       name: "AIFF у M4A",
       description: "Конвертуйте AIFF у M4A онлайн. Швидко, безкоштовно та приватно.",
     },
+    "srt-to-vtt": {
+      name: "SRT у VTT",
+      description: "Конвертуйте SRT у VTT онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "vtt-to-srt": {
+      name: "VTT у SRT",
+      description: "Конвертуйте VTT у SRT онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "ass-to-srt": {
+      name: "ASS у SRT",
+      description: "Конвертуйте ASS у SRT онлайн. Швидко, безкоштовно та приватно.",
+    },
+    "srt-to-ass": {
+      name: "SRT у ASS",
+      description: "Конвертуйте SRT у ASS онлайн. Швидко, безкоштовно та приватно.",
+    },
     "excel-to-csv": {
       name: "Excel у CSV",
       description: "Конвертуйте Excel у CSV онлайн. Швидко, безкоштовно та приватно.",
@@ -1093,7 +1109,7 @@ export const uk: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Витягнення субтитрів",
-      description: "Витягти доріжку субтитрів з відео як файл SRT",
+      description: "Витягти доріжку субтитрів з відео як файл SRT, WebVTT або ASS",
     },
     "convert-subtitles": {
       name: "Конвертування субтитрів",
@@ -3770,6 +3786,7 @@ export const uk: TranslationKeys = {
       progressLabel: "Вбудовування субтитрів",
     },
     "extract-subtitles": {
+      format: "Вихідний формат",
       submit: "Видобути субтитри",
       submitBatch: "Видобути субтитри ({count} файлів)",
       progressLabel: "Видобування субтитрів",

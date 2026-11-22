@@ -674,6 +674,22 @@ export const pl: TranslationKeys = {
       name: "AIFF na M4A",
       description: "Konwertuj AIFF na M4A online. Szybko, za darmo i prywatnie.",
     },
+    "srt-to-vtt": {
+      name: "SRT na VTT",
+      description: "Konwertuj SRT na VTT online. Szybko, za darmo i prywatnie.",
+    },
+    "vtt-to-srt": {
+      name: "VTT na SRT",
+      description: "Konwertuj VTT na SRT online. Szybko, za darmo i prywatnie.",
+    },
+    "ass-to-srt": {
+      name: "ASS na SRT",
+      description: "Konwertuj ASS na SRT online. Szybko, za darmo i prywatnie.",
+    },
+    "srt-to-ass": {
+      name: "SRT na ASS",
+      description: "Konwertuj SRT na ASS online. Szybko, za darmo i prywatnie.",
+    },
     "excel-to-csv": {
       name: "Excel na CSV",
       description: "Konwertuj Excel na CSV online. Szybko, za darmo i prywatnie.",
@@ -1091,7 +1107,7 @@ export const pl: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Wyodrębnij napisy",
-      description: "Wyodrębnij ścieżkę napisów z wideo jako plik SRT",
+      description: "Wyodrębnij ścieżkę napisów z wideo jako plik SRT, WebVTT lub ASS",
     },
     "convert-subtitles": {
       name: "Konwertuj napisy",
@@ -3767,6 +3783,7 @@ export const pl: TranslationKeys = {
       progressLabel: "Osadzanie napisów",
     },
     "extract-subtitles": {
+      format: "Format wyjściowy",
       submit: "Wyodrębnij napisy",
       submitBatch: "Wyodrębnij napisy ({count} plików)",
       progressLabel: "Wyodrębnianie napisów",

@@ -676,6 +676,22 @@ export const ptBR: TranslationKeys = {
       name: "AIFF para M4A",
       description: "Converta AIFF para M4A online. Rápido, grátis e privado.",
     },
+    "srt-to-vtt": {
+      name: "SRT para VTT",
+      description: "Converta SRT para VTT online. Rápido, grátis e privado.",
+    },
+    "vtt-to-srt": {
+      name: "VTT para SRT",
+      description: "Converta VTT para SRT online. Rápido, grátis e privado.",
+    },
+    "ass-to-srt": {
+      name: "ASS para SRT",
+      description: "Converta ASS para SRT online. Rápido, grátis e privado.",
+    },
+    "srt-to-ass": {
+      name: "SRT para ASS",
+      description: "Converta SRT para ASS online. Rápido, grátis e privado.",
+    },
     "excel-to-csv": {
       name: "Excel para CSV",
       description: "Converta Excel para CSV online. Rápido, grátis e privado.",
@@ -1092,7 +1108,7 @@ export const ptBR: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Extrair Legendas",
-      description: "Extraia a faixa de legendas de um vídeo como arquivo SRT",
+      description: "Extraia a faixa de legendas de um vídeo como arquivo SRT, WebVTT ou ASS",
     },
     "convert-subtitles": {
       name: "Converter Legendas",
@@ -3768,6 +3784,7 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Embutindo legendas",
     },
     "extract-subtitles": {
+      format: "Formato de saída",
       submit: "Extrair legendas",
       submitBatch: "Extrair legendas ({count} arquivos)",
       progressLabel: "Extraindo legendas",

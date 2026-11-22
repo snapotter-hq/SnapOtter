@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # Conversion Presets {#conversion-presets}
 
-Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 113 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
+Ngoài các công cụ chuyển đổi gốc, SnapOtter cung cấp 117 endpoint cấu hình chuyển đổi chuyên dụng. Mỗi cấu hình khóa định dạng đầu ra và ủy quyền cho pipeline xử lý gốc của nó, nên hành vi, kiểm tra hợp lệ và hợp đồng đầu ra khớp với công cụ gốc được liệt kê bên dưới.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ Gửi `multipart/form-data` với một phần `file` và một chuỗi JSON `se
 | `mp4-to-wav` | MP4 to WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV to WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 to OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT to VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT to SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS to SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT to ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 

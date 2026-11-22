@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: c42e7b3c57de
-i18n_source_hash: 641c3969deac
+i18n_output_hash: a742c3dcb372
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Conversiepresets {#conversion-presets}
 
-De gedeelde catalogus bevat 83 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
+De gedeelde catalogus bevat 117 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

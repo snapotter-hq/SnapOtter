@@ -8,8 +8,11 @@ import { isOperationalErrno } from "../../lib/error-report.js";
 import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
+import { SUBTITLE_CONTENT_TYPES, SUBTITLE_OUTPUT_FORMATS } from "./convert-subtitles.js";
 
-const settingsSchema = z.object({});
+const settingsSchema = z.object({
+  format: z.enum(SUBTITLE_OUTPUT_FORMATS).default("srt"),
+});
 
 const MISSING_SUBTITLE_STREAM_RE =
   /Stream map '(?:0:s:0)?' matches no streams|does not contain any stream/i;
@@ -24,8 +27,9 @@ export function registerExtractSubtitles(app: FastifyInstance) {
       throw new Error("extract-subtitles is v2-only");
     },
     processV2: async (ctx) => {
+      const settings = settingsSchema.parse(ctx.settings);
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
-      const outName = `${base}.srt`;
+      const outName = `${base}.${settings.format}`;
 
       const [inPath] = await stageMediaInputs(ctx);
       const info = await probeMedia(inPath);
@@ -48,7 +52,7 @@ export function registerExtractSubtitles(app: FastifyInstance) {
         const message = err instanceof Error ? err.message : "";
         if (BITMAP_SUBTITLE_STREAM_RE.test(message)) {
           throw new InputValidationError(
-            "Image-based subtitle tracks cannot be converted to SRT without OCR",
+            "Image-based subtitle tracks cannot be converted to text subtitles without OCR",
             422,
           );
         }
@@ -61,7 +65,7 @@ export function registerExtractSubtitles(app: FastifyInstance) {
       return {
         scratchPath: outPath,
         filename: outName,
-        contentType: "application/x-subrip",
+        contentType: SUBTITLE_CONTENT_TYPES[settings.format],
       };
     },
   });

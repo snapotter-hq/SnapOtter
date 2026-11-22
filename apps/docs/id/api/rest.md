@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 9a5408898cc1
-i18n_source_hash: 641c3969deac
+i18n_output_hash: d033b8d59371
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preset Konversi {#conversion-presets}
 
-Katalog bersama menyertakan 83 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
+Katalog bersama menyertakan 117 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

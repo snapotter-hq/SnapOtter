@@ -3659,6 +3659,122 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "srt-to-vtt": {
+    searchTitle: "SRT to VTT Subtitle Converter Online Free",
+    longDescription:
+      "Convert SubRip (SRT) subtitles to WebVTT, the format HTML5 video players and streaming sites expect. Cue timing and dialogue carry over unchanged. WebVTT keeps italics, bold and underline, so anything fancier in the source is dropped. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Add the subtitles to an HTML5 video player or a streaming upload",
+      "Hand a VTT file to a video platform or editor that rejects SRT",
+      "Fix the encoding of an old SRT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 VTT, decoding legacy Windows-1252 SRT files automatically",
+      "Your SRT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting SRT to VTT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic SRT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "vtt-to-srt": {
+    searchTitle: "VTT to SRT Subtitle Converter Online Free",
+    longDescription:
+      "Convert WebVTT subtitles to SubRip (SRT), the format TVs, media players, and most video editors expect. Cue timing and dialogue carry over unchanged. SubRip (SRT) keeps basic tags such as italics and bold, so anything fancier in the source is dropped. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Play the subtitles on a TV or media player, or drop them into a video editor",
+      "Hand an SRT file to a video platform or editor that rejects VTT",
+      "Fix the encoding of an old VTT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 SRT, decoding legacy Windows-1252 VTT files automatically",
+      "Your VTT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting VTT to SRT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic VTT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "ass-to-srt": {
+    searchTitle: "ASS to SRT Subtitle Converter Online Free",
+    longDescription:
+      "Convert Advanced SubStation Alpha (ASS) subtitles to SubRip (SRT), the format TVs, media players, and most video editors expect. Cue timing and dialogue carry over unchanged. On-screen positioning, fonts and karaoke effects are dropped, since SRT can't hold them; italics and bold survive. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Play the subtitles on a TV or media player, or drop them into a video editor",
+      "Hand an SRT file to a video platform or editor that rejects ASS",
+      "Fix the encoding of an old ASS file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 SRT, decoding legacy Windows-1252 ASS files automatically",
+      "Your ASS files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting ASS to SRT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic ASS files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "srt-to-ass": {
+    searchTitle: "SRT to ASS Subtitle Converter Online Free",
+    longDescription:
+      "Convert SubRip (SRT) subtitles to Advanced SubStation Alpha (ASS), the format Aegisub and styled-subtitle players such as mpv and VLC expect. Cue timing and dialogue carry over unchanged. The cues get a default ASS style, ready for you to restyle in Aegisub or another editor. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Restyle the subtitles in Aegisub, or play them styled in mpv or VLC",
+      "Hand an ASS file to a video platform or editor that rejects SRT",
+      "Fix the encoding of an old SRT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 ASS, decoding legacy Windows-1252 SRT files automatically",
+      "Your SRT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting SRT to ASS change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic SRT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
   "excel-to-csv": {
     searchTitle: "Excel to CSV Converter Online Free",
     longDescription:
@@ -6842,7 +6958,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "extract-subtitles": {
     searchTitle: "Extract Subtitles From Video File",
     longDescription:
-      "Pull the embedded subtitle track out of a video container and save it as a standalone SRT file. Useful for repurposing captions, translating them, or archiving text separately from video. SnapOtter extracts the subtitles on your own server.",
+      "Pull the embedded subtitle track out of a video container and save it as a standalone SRT, WebVTT or ASS file. Useful for repurposing captions, translating them, or archiving text separately from video. SnapOtter extracts the subtitles on your own server.",
     useCases: [
       "Extract captions from a training video to create a text transcript",
       "Pull subtitle files from videos for translation into other languages",
@@ -6850,7 +6966,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Extract closed captions from broadcast recordings for compliance documentation",
     ],
     features: [
-      "Extracts embedded subtitle streams as standalone SRT files",
+      "Extracts embedded subtitle streams as standalone SRT, WebVTT or ASS files",
       "Supports extraction from MP4, MKV, MOV, and WebM containers",
       "Detects and lists all available subtitle tracks in a file",
       "Preserves original timing and formatting from the source stream",
@@ -6867,7 +6983,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "What format is the output?",
-        a: "Subtitles are extracted as SRT files, the most widely supported subtitle format. SRT is plain text with timestamps, making it easy to edit or translate. All extraction happens locally on your infrastructure.",
+        a: "SRT by default, the most widely supported subtitle format. You can pick WebVTT for web players or ASS for styled-subtitle editors instead. All extraction happens locally on your infrastructure.",
       },
     ],
   },

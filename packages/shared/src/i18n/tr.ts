@@ -675,6 +675,22 @@ export const tr: TranslationKeys = {
       name: "AIFF - M4A",
       description: "AIFF dosyasını çevrimiçi M4A biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
     },
+    "srt-to-vtt": {
+      name: "SRT - VTT",
+      description: "SRT dosyasını çevrimiçi VTT biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "vtt-to-srt": {
+      name: "VTT - SRT",
+      description: "VTT dosyasını çevrimiçi SRT biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "ass-to-srt": {
+      name: "ASS - SRT",
+      description: "ASS dosyasını çevrimiçi SRT biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
+    "srt-to-ass": {
+      name: "SRT - ASS",
+      description: "SRT dosyasını çevrimiçi ASS biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
+    },
     "excel-to-csv": {
       name: "Excel - CSV",
       description: "Excel dosyasını çevrimiçi CSV biçimine dönüştürün. Hızlı, ücretsiz ve gizli.",
@@ -1095,7 +1111,7 @@ export const tr: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "Altyazı Çıkar",
-      description: "Videodan altyazı parçasını SRT dosyası olarak çıkar",
+      description: "Videodan altyazı parçasını SRT, WebVTT veya ASS dosyası olarak çıkar",
     },
     "convert-subtitles": {
       name: "Altyazı Dönüştür",
@@ -3768,6 +3784,7 @@ export const tr: TranslationKeys = {
       progressLabel: "Altyazı gömülüyor",
     },
     "extract-subtitles": {
+      format: "Çıktı Formatı",
       submit: "Altyazı Çıkar",
       submitBatch: "Altyazı Çıkar ({count} dosya)",
       progressLabel: "Altyazı çıkarılıyor",

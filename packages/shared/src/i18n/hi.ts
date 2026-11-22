@@ -471,6 +471,10 @@ export const hi: TranslationKeys = {
       name: "AIFF से M4A",
       description: "AIFF को M4A में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
     },
+    "srt-to-vtt": { name: "SRT से VTT", description: "SRT को VTT में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "vtt-to-srt": { name: "VTT से SRT", description: "VTT को SRT में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "ass-to-srt": { name: "ASS से SRT", description: "ASS को SRT में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
+    "srt-to-ass": { name: "SRT से ASS", description: "SRT को ASS में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।" },
     "excel-to-csv": {
       name: "Excel से CSV",
       description: "Excel को CSV में ऑनलाइन बदलें। तेज़, मुफ़्त और निजी।",
@@ -882,7 +886,7 @@ export const hi: TranslationKeys = {
     },
     "extract-subtitles": {
       name: "सबटाइटल निकालें",
-      description: "वीडियो से सबटाइटल ट्रैक SRT फ़ाइल के रूप में निकालें",
+      description: "वीडियो से सबटाइटल ट्रैक SRT, WebVTT या ASS फ़ाइल के रूप में निकालें",
     },
     "convert-subtitles": {
       name: "सबटाइटल कन्वर्ट करें",
@@ -3529,6 +3533,7 @@ export const hi: TranslationKeys = {
       progressLabel: "सबटाइटल एम्बेड हो रहे हैं",
     },
     "extract-subtitles": {
+      format: "आउटपुट फ़ॉर्मेट",
       submit: "सबटाइटल एक्सट्रैक्ट करें",
       submitBatch: "सबटाइटल एक्सट्रैक्ट करें ({count} फ़ाइलें)",
       progressLabel: "सबटाइटल एक्सट्रैक्ट हो रहे हैं",

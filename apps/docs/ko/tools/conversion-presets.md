@@ -8,7 +8,7 @@ i18n_hash_version: 2
 
 # 변환 프리셋 {#conversion-presets}
 
-SnapOtter는 기본 변환기 도구 외에도 113개의 전용 변환 프리셋 엔드포인트를 제공합니다. 각 프리셋은 출력 형식을 고정하고 기본 처리 파이프라인에 위임하므로, 동작, 검증, 출력 계약이 아래에 나열된 기본 도구와 일치합니다.
+SnapOtter는 기본 변환기 도구 외에도 117개의 전용 변환 프리셋 엔드포인트를 제공합니다. 각 프리셋은 출력 형식을 고정하고 기본 처리 파이프라인에 위임하므로, 동작, 검증, 출력 계약이 아래에 나열된 기본 도구와 일치합니다.
 
 ## API 엔드포인트 패턴 {#api-endpoint-pattern}
 
@@ -94,6 +94,10 @@ SnapOtter는 기본 변환기 도구 외에도 113개의 전용 변환 프리셋
 | `mp4-to-wav` | MP4 to WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV to WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 to OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT to VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT to SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS to SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT to ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## 오디오 프리셋 {#audio-presets}
 

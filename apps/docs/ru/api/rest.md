@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 55db5e1af8ba
+i18n_output_hash: dd6ea646250d
 i18n_hash_version: 2
-i18n_source_hash: 641c3969deac
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -150,7 +150,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Пресеты конвертации {#conversion-presets}
 
-Общий каталог включает 83 специальных эндпоинта пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
+Общий каталог включает 117 специальных эндпоинтов пресетов конвертации, таких как `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` и `excel-to-csv`. Пресеты - это полноценные маршруты инструментов:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

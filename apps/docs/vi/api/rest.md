@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: cf33b54f84d8
-i18n_source_hash: 641c3969deac
+i18n_output_hash: a3473ad1107b
+i18n_source_hash: d772f94e7a5d
 i18n_provenance: human
 ---
 
@@ -149,7 +149,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Cấu hình chuyển đổi sẵn {#conversion-presets}
 
-Danh mục dùng chung bao gồm 83 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
+Danh mục dùng chung bao gồm 117 endpoint cấu hình chuyển đổi chuyên biệt như `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, và `excel-to-csv`. Cấu hình sẵn là các route công cụ hạng nhất:
 
 `POST /api/v1/tools/<section>/<presetId>`
 

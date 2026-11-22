@@ -223,7 +223,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
 };
 
 // Each conversion preset mirrors the display mode of its base tool (e.g.
-// jpg-to-png follows "convert"). Generated here so the 83 presets never drift
+// jpg-to-png follows "convert"). Generated here so the presets never drift
 // from the static map above. Every displayBase is one of the keys defined
 // statically, so the lookup always resolves.
 for (const preset of CONVERSION_PRESETS) {
