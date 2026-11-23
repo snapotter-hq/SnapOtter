@@ -79,6 +79,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "svg-to-raster": { buffer: SVG, filename: "test.svg" },
   "smart-crop": IMAGE_FIX,
   "content-aware-resize": IMAGE_FIX,
+  vectorize: IMAGE_FIX,
   // Video tools
   "convert-video": VIDEO_FIX,
   "compress-video": VIDEO_FIX,
@@ -617,6 +618,27 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "blur radius min", settings: { width: 100, blurRadius: 0 } },
     { label: "blur radius max", settings: { width: 100, blurRadius: 20 } },
     { label: "square mode", settings: { square: true } },
+  ],
+
+  vectorize: [
+    { label: "bw default", settings: { colorMode: "bw" } },
+    { label: "bw threshold min", settings: { colorMode: "bw", threshold: 0 } },
+    { label: "bw threshold max", settings: { colorMode: "bw", threshold: 255 } },
+    { label: "bw invert", settings: { colorMode: "bw", invert: true } },
+    { label: "bw path polygon", settings: { colorMode: "bw", pathMode: "polygon" } },
+    { label: "color default", settings: { colorMode: "color" } },
+    { label: "color path none", settings: { colorMode: "color", pathMode: "none" } },
+    {
+      label: "color precision min",
+      settings: { colorMode: "color", colorPrecision: 1, layerDifference: 1 },
+    },
+    {
+      label: "color precision max",
+      settings: { colorMode: "color", colorPrecision: 16, layerDifference: 128 },
+    },
+    { label: "color speckle max", settings: { colorMode: "color", filterSpeckle: 256 } },
+    { label: "color corner min", settings: { colorMode: "color", cornerThreshold: 0 } },
+    { label: "color corner max", settings: { colorMode: "color", cornerThreshold: 180 } },
   ],
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1185,8 +1207,6 @@ const AI_GATED_TOOLS = new Set([
   "red-eye-removal",
   "blur-faces",
   "smart-crop",
-  "content-aware-resize",
-  "vectorize",
 ]);
 
 // Accepted status codes: 200 = success, 202 = async, 400 = bad settings,
