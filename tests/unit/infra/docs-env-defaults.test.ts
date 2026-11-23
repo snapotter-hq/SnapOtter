@@ -74,6 +74,9 @@ function dockerfileEnv(): Map<string, string> {
     const line = raw.trim();
     if (line.startsWith("ENV ")) inEnv = true;
     else if (!inEnv) continue;
+    // Docker drops comment lines inside a continued instruction, so the ENV
+    // block carries on past one. Stopping here hid LOGIN_ATTEMPT_LIMIT=30.
+    if (line.startsWith("#")) continue;
     const assign = line.replace(/^ENV\s+/, "").match(/^([A-Z][A-Z0-9_]*)=(.*?)\s*\\?$/);
     if (assign) out.set(assign[1], assign[2].replace(/^["']|["']$/g, ""));
     if (!raw.trimEnd().endsWith("\\")) inEnv = false;
@@ -101,6 +104,14 @@ const APP_SRC = readAll([
   "packages/*/src/**/*.ts",
 ]);
 
+/** The AI sidecar reads its own knobs from os.environ. Its tests only set them. */
+const PYTHON_SRC = globSync("packages/ai/python/**/*.py", {
+  cwd: ROOT,
+  exclude: (f) => /(^|\/)tests(\/|$)/.test(f),
+})
+  .map((f) => readFileSync(path.join(ROOT, f), "utf8"))
+  .join("\n");
+
 /**
  * Declared is not the same as wired. MAX_SPLIT_GRID sat in the schema and in the
  * docs for releases while the split tool used a hardcoded 100, so a reader could
@@ -111,7 +122,11 @@ function isRead(name: string): boolean {
   const inApp = new RegExp(
     `\\b(?:env|config)\\.${name}\\b|process\\.env\\.${name}\\b|resolveBin\\(\\s*"${name}"`,
   );
-  return inApp.test(APP_SRC) || new RegExp(`\\$\\{?${name}\\b`).test(SHELL_SRC);
+  return (
+    inApp.test(APP_SRC) ||
+    new RegExp(`\\$\\{?${name}\\b`).test(SHELL_SRC) ||
+    new RegExp(`(?:environ\\.get|environ\\[|getenv|_env_[a-z_]+)\\(?\\s*"${name}"`).test(PYTHON_SRC)
+  );
 }
 
 interface Row {
@@ -288,5 +303,60 @@ describe("CPU upscale ceiling", () => {
     const multiple = MAX_CPU_UPSCALE_OUTPUT_MP / MAX_CPU_UPSCALE_MP;
     expect(row?.description).toMatch(new RegExp(`\\b${multiple} times\\b`));
     expect(row?.description).toContain(`${MAX_CPU_UPSCALE_OUTPUT_MP} MP by default`);
+  });
+});
+
+/**
+ * low-resource.md told readers to set MAX_VIDEO_DURATION_S while Configuration
+ * never named it, and SNAPOTTER_LICENSE_KEY had no row anywhere (#5188). A
+ * variable in the schema now needs a row on a reference page or a reason here.
+ */
+const OFF_THE_REFERENCE_PAGES = new Map([
+  ["DATA_DIR", "the image sets it to the /data volume; moving it breaks the volume layout"],
+  ["LOG_DIR", "the image sets it under /data; follows DATA_DIR"],
+  ["SCRATCH_PATH", "internal scratch space, defaults to the OS temp dir"],
+  ["DB_STARTUP_TIMEOUT_MS", "boot retry window for a dependency that is not up yet"],
+  [
+    "SQLITE_MIGRATE_PATH",
+    "1.x import; Embedded mode explains the /data/snapotter.db path in prose",
+  ],
+  ["INSTALL_STALL_MS", "AI bundle installer watchdog"],
+  ["INSTALL_MAX_MS", "AI bundle installer watchdog"],
+  ["GDPR_EXPORT_TIMEOUT_MS", "internal deadline for the data export job"],
+  ["SNAPOTTER_INSTANCE_ID", "for provisioning tools, set before first boot"],
+  ["MAX_SPLIT_GRID", "nothing reads it; see the isRead note above"],
+]);
+
+describe("schema coverage", () => {
+  const referenceDocs = ["configuration", "oidc", "saml", "scim"].map((page) =>
+    readFileSync(path.join(ROOT, `apps/docs/guide/${page}.md`), "utf8"),
+  );
+  const rowNames = new Set(
+    referenceDocs.flatMap((doc) =>
+      [...doc.matchAll(/^\|\s*`([A-Z][A-Z0-9_]*)`\s*\|/gm)].map((m) => m[1]),
+    ),
+  );
+  const configNames = new Set(
+    ROWS.filter((r) => r.doc === "apps/docs/guide/configuration.md").map((r) => r.name),
+  );
+
+  it("every schema variable has a reference row or a reason to stay off", () => {
+    const missing = [...SCHEMA.keys()].filter(
+      (name) => !rowNames.has(name) && !OFF_THE_REFERENCE_PAGES.has(name),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("the reasons list names only schema variables that still have no row", () => {
+    const stale = [...OFF_THE_REFERENCE_PAGES.keys()].filter(
+      (name) => !SCHEMA.has(name) || rowNames.has(name),
+    );
+    expect(stale).toEqual([]);
+  });
+
+  it("configuration.md has rows for the AI sidecar's own knobs", () => {
+    // Python-only, so they never show up in the schema check above.
+    const sidecar = ["AI_SESSION_IDLE_TIMEOUT", "AI_SESSION_CACHE_BYTES"];
+    expect(sidecar.filter((name) => !configNames.has(name))).toEqual([]);
   });
 });
