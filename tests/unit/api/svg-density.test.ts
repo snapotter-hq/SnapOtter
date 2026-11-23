@@ -68,6 +68,8 @@ describe("openSvgAtDensity (#4423)", () => {
       'viewBox="0 0 144 144"',
       'width="100%" height="100%" viewBox="0 0 144 144"',
       'width="2in" viewBox="0 0 144 144"',
+      'width="10em" height="10em" viewBox="0 0 144 144"',
+      'width="20ex" height="20ex" viewBox="0 0 144 144"',
     ]) {
       expect(await opaqueRowFraction(svg(root, body), 72)).toBeCloseTo(0.25, 2);
       expect(await opaqueRowFraction(svg(root, body), 300)).toBeCloseTo(0.25, 2);
@@ -86,8 +88,28 @@ describe("openSvgAtDensity (#4423)", () => {
       300,
     ],
     ["a fractional viewBox", 'viewBox="0 0 10.5 7.3"', 44, 30],
+    ["an em width", 'width="12em" viewBox="0 0 144 72"', 600, 300],
   ])("sizes a root with %s from its viewBox (#4940)", async (_label, attrs, ew, eh) => {
     expect(await size(svg(attrs), 300)).toEqual([ew, eh]);
+  });
+
+  it.each([
+    ["em", "12em", "6em", 600, 300],
+    ["ex", "24ex", "12ex", 600, 300],
+    ["mixed em and pt", "12em", "72pt", 600, 300],
+  ])(
+    "sizes a %s root from librsvg's 12px default font size (#5082)",
+    async (_unit, w, h, ew, eh) => {
+      expect(await size(svg(`width="${w}" height="${h}"`), 300)).toEqual([ew, eh]);
+    },
+  );
+
+  it("matches sharp's own output for em and ex roots at density 72 (#5082)", async () => {
+    for (const attrs of ['width="10em" height="10em"', 'width="7.5em" height="3ex"']) {
+      const input = svg(attrs);
+      const direct = await sharp(input, { density: 72 }).metadata();
+      expect(await size(input, 72)).toEqual([direct.width, direct.height]);
+    }
   });
 
   it("tags PNG and TIFF output with the requested DPI, not the 72 it rendered at", async () => {
@@ -139,11 +161,24 @@ describe("bakeSvgDensity", () => {
 
   it.each([
     ["a percentage width", 'width="100%" height="50pt"'],
-    ["an em height", 'width="10pt" height="2em"'],
+    ["an em height and a root font-size", 'width="10pt" height="2em" font-size="20"'],
     ["no height and no viewBox", 'width="10pt"'],
     ["no size and no viewBox", ""],
     ["a zero-width viewBox", 'width="100%" viewBox="0 0 0 10"'],
-    ["an em width beside a viewBox", 'width="10em" viewBox="0 0 10 10"'],
+    [
+      "an em width and a font in its style",
+      'width="10em" viewBox="0 0 10 10" style="font: 20px serif"',
+    ],
+    ["an ex size and a FONT-SIZE style", 'width="10ex" height="10ex" style="FONT-SIZE:20px"'],
+    [
+      "an em size and a CSS-escaped font style",
+      'width="10em" height="10em" style="f\\6fnt-size:20px"',
+    ],
+    [
+      "an em size and an XML-referenced font style",
+      'width="10em" height="10em" style="&#102;ont-size:20px"',
+    ],
+    ["an uppercase em unit", 'width="10EM" height="10em"'],
     ["a malformed viewBox", 'viewBox="0 0 10"'],
     ["a hex viewBox", 'viewBox="0 0 0x10 10"'],
     ["a zero width", 'width="0" height="10pt"'],
@@ -153,6 +188,48 @@ describe("bakeSvgDensity", () => {
     const result = bakeSvgDensity(input, 300);
     expect(result.buffer).toBe(input);
     expect(result.density).toBe(300);
+  });
+
+  it.each([
+    ["a style element", "<style>svg{font-size:20px}</style>"],
+    [
+      "a prefixed style element",
+      '<s:style xmlns:s="http://www.w3.org/2000/svg">svg{font-size:20px}</s:style>',
+    ],
+    ["an uppercase STYLE element", "<STYLE>svg{font-size:20px}</STYLE>"],
+  ])("leaves an em root to sharp when the document has %s (#5082)", (_label, body) => {
+    const input = svg('width="10em" height="10em"', body);
+    const result = bakeSvgDensity(input, 300);
+    expect(result.buffer).toBe(input);
+    expect(result.density).toBe(300);
+  });
+
+  it("leaves an em root to sharp behind an xml-stylesheet instruction (#5082)", () => {
+    const input = Buffer.from(
+      '<?xml-stylesheet type="text/css" href="data:text/css,svg{font-size:20px}"?><svg xmlns="http://www.w3.org/2000/svg" width="10em" height="10em"/>',
+    );
+    const result = bakeSvgDensity(input, 300);
+    expect(result.buffer).toBe(input);
+    expect(result.density).toBe(300);
+  });
+
+  it("leaves an em root to sharp when the document declares an entity (#5082)", () => {
+    const input = Buffer.from(
+      '<!DOCTYPE svg [<!ENTITY s "&#60;style>svg{font-size:20px}&#60;/style>">]><svg xmlns="http://www.w3.org/2000/svg" width="10em" height="10em">&s;</svg>',
+    );
+    const result = bakeSvgDensity(input, 300);
+    expect(result.buffer).toBe(input);
+    expect(result.density).toBe(300);
+  });
+
+  it("bakes an em root whose inner elements set their own font-size (#5082)", () => {
+    const input = svg(
+      'width="10em" height="5ex"',
+      '<text font-size="40" style="font-size:40px">x</text>',
+    );
+    const { buffer, density } = bakeSvgDensity(input, 300);
+    expect(density).toBe(72);
+    expect(buffer.toString("utf-8")).toContain('width="500" height="125"');
   });
 
   it("writes a missing root size from the viewBox and drops to density 72", () => {
