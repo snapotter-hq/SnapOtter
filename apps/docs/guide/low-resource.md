@@ -85,7 +85,7 @@ All caps are environment variables, documented fully in [Configuration](/guide/c
 | `AI_SIDECAR_IDLE_TIMEOUT` | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower `AI_SESSION_IDLE_TIMEOUT` too, since the process exit discards cached models. |
 | `MAX_BATCH_SIZE` | `5` | Batches are where 1-2 GB machines run out of memory first. |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Keeps a single huge file from occupying the whole workspace. |
-| `MAX_MEGAPIXELS` | `50` | Decoding a 100+ MP image costs RAM regardless of file size. |
+| `MAX_MEGAPIXELS` | `50` | Decoding a 100+ MP image costs RAM regardless of file size. Images above about 268 MP are refused even at `0`. |
 | `MAX_VIDEO_DURATION_S` | `300` | Long transcodes monopolize a small CPU for minutes to hours. |
 | `JOB_TIMEOUT_LONG_S` | `3600` | Hard ceiling on AI and media jobs, so a runaway job frees the box eventually. The default is two hours. Image and document jobs already stop at `JOB_TIMEOUT_FAST_S` (120 seconds by default). |
 
