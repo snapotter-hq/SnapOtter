@@ -3,7 +3,7 @@ import sharp, { type Metadata, type Sharp } from "sharp";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload, MAX_GIF_FRAMES } from "./gif-limits.js";
 import { logger } from "./logger.js";
-import type { EncoderOptions, OutputFormat } from "./output-format.js";
+import { type EncoderOptions, type OutputFormat, outputFormatFor } from "./output-format.js";
 
 /**
  * Animation-aware plumbing for the Sharp-backed image tools (issue #1083).
@@ -307,14 +307,20 @@ async function mapFrames(
  * output format that cannot hold an animation. Converting an animated GIF to
  * JPEG really does produce a still, so that case is not a failure.
  *
- * `still` is the tool's own logic, unchanged, receiving one frame at a time.
+ * `still` is the tool's own logic, receiving one frame at a time.
  * `outputFormat` is the whole resolved format rather than its name so the
  * route's encoder options reach the final join (#5103).
+ *
+ * `still` also gets the format to encode its frame with, which is always PNG.
+ * The join is the encode the user downloads, so a frame the tool had already
+ * encoded to its lossy output format paid a second generation that a still
+ * never pays (#5125). Tools share one function between both paths by taking
+ * that format as a parameter that defaults to their own output format.
  */
 export async function runPerFrame(
   inputBuffer: Buffer,
   outputFormat: Pick<OutputFormat, "format" | "encoderOptions">,
-  still: (frame: Buffer) => Promise<Buffer>,
+  still: (frame: Buffer, frameFormat: OutputFormat) => Promise<Buffer>,
 ): Promise<Buffer | undefined> {
   // Container first: reading the animation applies the frame cap, and an input
   // headed for a still format should not be rejected over a frame count that is
@@ -328,7 +334,8 @@ export async function runPerFrame(
       : await readAnimation(inputBuffer);
   if (!info.animated) return undefined;
 
+  const frameFormat = outputFormatFor("png");
   return await mapFrames(inputBuffer, info, container, outputFormat.encoderOptions, (frame) =>
-    still(frame),
+    still(frame, frameFormat),
   );
 }

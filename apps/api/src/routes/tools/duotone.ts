@@ -44,7 +44,7 @@ export function registerDuotone(app: FastifyInstance) {
 
         // The blend path rebuilds from a raw buffer, and Sharp ignores page hints
         // on raw input, so animation is handled a frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const a = parseHex(settings.shadow);
           const b = parseHex(settings.highlight);
           const k = settings.intensity / 100;
@@ -121,9 +121,7 @@ export function registerDuotone(app: FastifyInstance) {
             buf = await sharp(buf).joinChannel(alpha).png().toBuffer();
           }
 
-          return await sharp(buf)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          return await sharp(buf).toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;

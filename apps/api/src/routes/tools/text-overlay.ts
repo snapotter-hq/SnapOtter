@@ -40,7 +40,7 @@ export function registerTextOverlay(app: FastifyInstance) {
         // so animation is handled a frame at a time (#1083).
         // Every frame of an animation is the same size, so lay the text out once.
         let cached: { key: string; overlays: OverlayOptions[] } | undefined;
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const image = sharp(source);
           const metadata = await image.metadata();
           const width = metadata.width ?? 800;
@@ -51,7 +51,7 @@ export function registerTextOverlay(app: FastifyInstance) {
           }
           const overlays = cached.overlays;
           const result = image.composite(overlays);
-          return await result.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+          return await result.toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;

@@ -30,7 +30,7 @@ export function registerVignette(app: FastifyInstance) {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         // The gradient is composited, and a composite lands on the first frame
         // only, so animation is handled a frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const meta = await sharp(source).metadata();
           const w = meta.width ?? 1;
           const h = meta.height ?? 1;
@@ -76,9 +76,7 @@ export function registerVignette(app: FastifyInstance) {
             .png()
             .toBuffer();
 
-          return await sharp(buf)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          return await sharp(buf).toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;
